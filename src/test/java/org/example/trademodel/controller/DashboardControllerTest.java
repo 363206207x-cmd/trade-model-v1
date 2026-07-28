@@ -377,13 +377,18 @@ public class DashboardControllerTest {
     @Test
     void positionMonitorTemplateRendersRealMonitorFields() throws Exception {
         String positionRows = functionBody("renderHomePositionsFromPayload");
-        String advice = functionBody("positionCurrentAdviceHtml");
 
-        assertThat(positionRows).contains("entryLogicStatusLabel", "entryLogicStatus");
-        assertThat(positionRows).contains("directionSupportStatusLabel", "directionSupportStatus");
-        assertThat(positionRows).contains("reversalStatusLabel", "lastMonitorAt", "nextMonitorAt");
-        assertThat(advice).contains("suggestedManualActionText", "suggested_manual_action_text");
-        assertThat(advice).contains("suggestedManualAction", "suggested_manual_action");
+        assertThat(positionRows).contains(
+                "list.slice(0, 3)",
+                "p.symbol",
+                "p.direction",
+                "entryLogicStatusLabel",
+                "directionSupportStatusLabel",
+                "reversalStatusLabel",
+                "riskLevelLabel",
+                "suggestedManualActionText");
+        assertThat(positionRows).doesNotContain(
+                "lastMonitorAt", "nextMonitorAt", "fetch(", "position-action-btn", "bindHomePositionRows");
     }
 
     @Test
@@ -401,8 +406,9 @@ public class DashboardControllerTest {
         String execution = functionBody("renderHomeExecutionFromPayload");
 
         assertThat(monitorTime).contains("if (!lastMonitorAt)", "暂无下次监控排期");
-        assertThat(positions).contains("positionMonitorTimeCellHtml");
-        assertThat(execution).doesNotContain("lastMonitorAt", "nextMonitorAt");
+        assertThat(positions).doesNotContain("positionMonitorTimeCellHtml", "lastMonitorAt", "nextMonitorAt");
+        assertThat(execution).doesNotContain(
+                "positionMonitorTimeCellHtml", "lastMonitorAt", "nextMonitorAt");
     }
 
     @Test
@@ -425,7 +431,8 @@ public class DashboardControllerTest {
 
         assertThat(visibleDom).doesNotContain("pendingCount", "degraded",
                 "latestAnalysisFailureCode", "failureReasonCode");
-        assertThat(visibleDom).contains("待复核机会", "资产方向阻断", "等待首次监控");
+        assertThat(visibleDom).contains(
+                "待复核机会", "资产方向阻断", "持仓摘要", "持仓数据不足时保持空状态");
 
         String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
         assertThat(localRealRenderer).contains("localRealFailureLabel", "latestFailureLabel");
@@ -444,21 +451,23 @@ public class DashboardControllerTest {
 
         assertThat(renderer).contains("assetStateLabel", "marketBiasLabel", "confidenceLabel", "riskLevelLabel");
         assertThat(renderer).contains(
-                "当前价格", "综合评分", "方向", "置信度", "风险等级", "一句话结论");
+                "当前价格", "综合评分", "方向", "置信度", "风险等级",
+                "data-asset-state", "state.label");
         assertThat(renderer).doesNotContain(
-                "是否值得开仓", "数据来源", "数据状态", "四周期新鲜度", "证据数", "分析时间");
+                "一句话结论", "是否值得开仓", "数据来源", "数据状态",
+                "四周期新鲜度", "证据数", "分析时间");
     }
 
     @Test
-    void assetConclusionUsesBoundedTwoLineLayout() throws Exception {
-        String html = Files.readString(DASHBOARD_TEMPLATE);
+    void assetCardsDoNotRenderDetailConclusionOrEvidenceFields() throws Exception {
         String renderer = functionBody("renderHomeAssetsFromPayload");
 
-        assertThat(renderer).contains("tile-compact-row conclusion", "一句话结论");
-        assertThat(html).contains(
-                ".tile-compact-row.conclusion .value",
-                "-webkit-line-clamp: 2",
-                "white-space: normal");
+        assertThat(renderer).doesNotContain(
+                "tile-compact-row conclusion",
+                "一句话结论",
+                "currentConclusion",
+                "evidenceCount",
+                "timeframeFreshness");
     }
 
     @Test
@@ -467,7 +476,10 @@ public class DashboardControllerTest {
 
         assertThat(renderer)
                 .contains("frontendContract.executionPlanAccess(s)")
-                .contains("方向", "入场区间", "止损价", "阶梯止盈", "杠杆", "仓位建议", "失效条件")
+                .contains(
+                        "方向", "是否值得开仓", "入场区间", "止损", "止盈方案",
+                        "杠杆建议", "仓位建议", "有效开始", "有效结束",
+                        "计划失效条件", "冲突阻断")
                 .doesNotContain(
                         "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
                         "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
@@ -479,7 +491,12 @@ public class DashboardControllerTest {
         String contract = Files.readString(FRONTEND_CONTRACT);
 
         assertThat(renderer)
-                .contains("if (!access.visible)", "box.innerHTML")
+                .contains(
+                        "function verified(value)",
+                        "return access.visible ? value : \"--\"",
+                        "verified(s.entryZone)",
+                        "verified(s.stopLoss)",
+                        "verified(s.takeProfitRules)")
                 .doesNotContain("originalRows", "execution-original-plan");
         assertThat(contract)
                 .contains("sourceExecutionPlanId")
@@ -496,8 +513,15 @@ public class DashboardControllerTest {
         assertThat(contract).contains(
                 "String(plan.originalPlanIdentity || \"\").toUpperCase() === \"VERIFIED\"",
                 "String(plan.originalPlanCurrentValidity || \"\").toUpperCase() === \"ACTIVE\"");
-        assertThat(renderer.indexOf("if (!access.visible)"))
-                .isLessThan(renderer.indexOf("var rows ="));
+        assertThat(renderer).contains(
+                "frontendContract.executionPlanAccess(s)",
+                "function verified(value)",
+                "verified(s.direction",
+                "verified(s.entryZone)",
+                "verified(s.stopLoss)",
+                "verified(s.takeProfitRules)",
+                "verified(s.validFrom)",
+                "verified(s.expiresAt)");
     }
 
     @Test
@@ -548,41 +572,43 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void floatingPnlDisplayedAsAmountNotPercent() throws Exception {
+    void homePositionSummaryDoesNotAddUncontractedPnl() throws Exception {
         String homePayloadRows = functionBody("renderHomePositionsFromPayload");
 
-        assertThat(homePayloadRows).contains("formatSignedAmount(p.floatingPnl)");
-        assertThat(homePayloadRows).doesNotContain("formatPct(p.floatingPnl)");
+        assertThat(homePayloadRows).doesNotContain(
+                "p.floatingPnl", "formatSignedAmount", "formatPct", "浮动盈亏");
     }
 
     @Test
-    void sidebarSelectionRefreshesDashboardHome() throws Exception {
+    void assetSelectionRefreshesOnlyAssetContext() throws Exception {
         String sidebar = functionBody("renderSidebarSlots");
         String tiles = functionBody("renderHomeAssetsFromPayload");
         String searchSelection = functionBody("selectDashboardAsset");
         String homeRequest = functionBody("fetchDashboardHome");
+        String contextRefresh = functionBody("refreshAssetContext");
+        String homeRenderer = functionBody("renderDashboardHomePayload");
 
-        assertSelectionRefreshOrder(sidebar, "selectedSymbol = sym", "refreshDashboard()");
-        assertSelectionRefreshOrder(tiles, "selectedSymbol = sym", "refreshDashboard()");
-        assertSelectionRefreshOrder(searchSelection, "selectedSymbol = symbol", "refreshDashboard()");
-        assertThat(directFunctionCalls(sidebar)).contains("refreshDashboard");
-        assertThat(directFunctionCalls(tiles)).contains("refreshDashboard");
-        assertThat(directFunctionCalls(searchSelection)).contains("refreshDashboard");
+        assertSelectionRefreshOrder(sidebar, "selectedSymbol = sym", "refreshAssetContext()");
+        assertSelectionRefreshOrder(tiles, "selectedSymbol = sym", "refreshAssetContext()");
+        assertSelectionRefreshOrder(searchSelection, "selectedSymbol = symbol", "refreshAssetContext()");
+        assertThat(directFunctionCalls(sidebar)).contains("refreshAssetContext");
+        assertThat(directFunctionCalls(tiles)).contains("refreshAssetContext");
+        assertThat(directFunctionCalls(searchSelection)).contains("refreshAssetContext");
+        assertThat(contextRefresh).contains("fetchDashboardHome(true)");
+        assertThat(homeRenderer).contains(
+                "if (!preservePositionSummary) renderHomePositionsFromPayload");
         assertThat(homeRequest).contains("/api/dashboard/home", "selectedSymbol=", "encodeURIComponent(selectedSymbol)");
     }
 
     @Test
-    void positionRowClickPassesPositionIdToHomeRequest() throws Exception {
+    void homePositionSummaryRemainsPassiveAndIndependent() throws Exception {
         String positionRows = functionBody("renderHomePositionsFromPayload");
-        String rowBinding = functionBody("bindHomePositionRows");
-        String homeRequest = functionBody("fetchDashboardHome");
 
         assertThat(positionRows).contains(
-                "home-position-row", "data-position-id=", "data-symbol=", "bindHomePositionRows()");
-        assertThat(rowBinding).contains(
-                "selectedSymbol = symbol", "selectedPositionId = positionId", "refreshDashboard()");
-        assertThat(homeRequest).contains(
-                "&positionId=", "encodeURIComponent(selectedPositionId)");
+                "home-position-summary-card", "data-position-id=", "list.slice(0, 3)");
+        assertThat(positionRows).doesNotContain(
+                "role=\"button\"", "tabindex=", "data-symbol=", "bindHomePositionRows()",
+                "refreshDashboard()", "selectedSymbol =", "selectedPositionId =");
     }
 
     @Test
@@ -591,19 +617,17 @@ public class DashboardControllerTest {
         String tiles = functionBody("renderHomeAssetsFromPayload");
         String searchSelection = functionBody("selectDashboardAsset");
 
-        assertSelectionRefreshOrder(sidebar, "selectedPositionId = null", "refreshDashboard()");
-        assertSelectionRefreshOrder(tiles, "selectedPositionId = null", "refreshDashboard()");
-        assertSelectionRefreshOrder(searchSelection, "selectedPositionId = null", "refreshDashboard()");
+        assertSelectionRefreshOrder(sidebar, "selectedPositionId = null", "refreshAssetContext()");
+        assertSelectionRefreshOrder(tiles, "selectedPositionId = null", "refreshAssetContext()");
+        assertSelectionRefreshOrder(searchSelection, "selectedPositionId = null", "refreshAssetContext()");
     }
 
     @Test
-    void multiPositionFailureClearsPreviousPlan() throws Exception {
+    void unverifiedPlanBoundariesFailClosedPerField() throws Exception {
         String payloadRenderer = functionBody("renderDashboardHomePayload");
         String executionRenderer = functionBody("renderHomeExecutionFromPayload");
         String contract = Files.readString(FRONTEND_CONTRACT);
         String unavailable = functionBody("renderDashboardHomeUnavailable");
-        int hiddenStart = executionRenderer.indexOf("if (!access.visible)");
-        int rowsStart = executionRenderer.indexOf("var rows =", hiddenStart);
 
         assertThat(payloadRenderer).contains(
                 "home.selectedPositionId != null", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
@@ -611,11 +635,13 @@ public class DashboardControllerTest {
         assertThat(contract).contains(
                 "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
                 "请选择具体持仓");
-        assertThat(hiddenStart).isGreaterThanOrEqualTo(0);
-        assertThat(rowsStart).isGreaterThan(hiddenStart);
-        assertThat(executionRenderer.substring(hiddenStart, rowsStart))
-                .contains("box.innerHTML", "return")
-                .doesNotContain("entryZone", "stopLoss", "takeProfitRules", "sourceAnalysisId");
+        assertThat(executionRenderer).contains(
+                "return access.visible ? value : \"--\"",
+                "verified(s.entryZone)",
+                "verified(s.stopLoss)",
+                "verified(s.takeProfitRules)",
+                "verified(s.validFrom)",
+                "verified(s.expiresAt)");
         assertThat(unavailable).contains("selectedPositionId = null", "当前不展示执行计划");
     }
 
@@ -659,11 +685,13 @@ public class DashboardControllerTest {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 
         assertThat(html).contains(
-                "<aside class=\"home-sidebar\" aria-label=\"资产导航\">",
+                "<aside class=\"home-sidebar\" aria-label=\"主要导航\"",
+                "Dashboard", "Position", "AI Analysis", "Message", "Profile",
                 "id=\"sidebarSlotList\"",
+                "id=\"sidebarSlotList\" hidden",
                 "id=\"themeBtn\"",
                 "aria-label=\"切换明暗主题\"");
-        assertThat(html).contains("body { padding-left: 0; }");
+        assertThat(html).contains("body { padding-left: 0; }", "[hidden] { display: none !important; }");
     }
 
     @Test
@@ -1764,10 +1792,13 @@ public class DashboardControllerTest {
 
         assertThat(html).contains(CANDIDATE_REVIEW_START);
         assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
-        assertThat(positionCard).contains("用户真实持仓监控");
-        assertThat(positionCard).contains("仅显示手动录入持仓，系统建议不会自动生成持仓");
-        assertThat(positionCard).contains("暂无手动录入持仓");
-        assertThat(positionCard).contains("manualPositionBtn");
+        assertThat(positionCard).contains(
+                "持仓摘要",
+                "用户真实持仓 Top 3 摘要",
+                "仅显示手动录入持仓",
+                "暂无手动持仓",
+                "持仓数据不足时保持空状态");
+        assertThat(positionCard).doesNotContain("manualPositionBtn");
         assertThat(executionCard).contains("系统执行建议（非交易指令）");
 
         assertThat(realPositionDetector).contains("hasOpenPosition");
@@ -1782,12 +1813,16 @@ public class DashboardControllerTest {
         assertThat(realPositionDetector).doesNotContain("stopLoss");
         assertThat(realPositionDetector).doesNotContain("takeProfit");
 
-        assertThat(renderHomePositions).contains("positions", "positionStatusValue(p)", "p.symbol",
-                "p.direction", "p.entryPrice", "p.positionSize", "p.floatingPnl");
+        assertThat(renderHomePositions).contains(
+                "positions", "list.slice(0, 3)", "p.symbol", "p.direction",
+                "p.entryLogicStatusLabel", "p.directionSupportStatusLabel",
+                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText");
         assertThat(renderHomePositions).doesNotContain("fetch(");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/manual-open");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/");
-        assertThat(renderHomePositions).doesNotContain("tradeType", "recommendedAction", "executionPlanDisplay");
+        assertThat(renderHomePositions).doesNotContain(
+                "tradeType", "recommendedAction", "executionPlanDisplay",
+                "p.entryPrice", "p.positionSize", "p.floatingPnl");
         assertThat(renderHomePositions).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
         assertThat(renderHomePositions).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
     }

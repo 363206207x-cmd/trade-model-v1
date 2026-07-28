@@ -13,27 +13,25 @@
   <main class="mobile-home" id="mobile-home-scroll" data-mobile-home-root>
     <header class="mobile-header">
       <div class="product-lockup">
-        <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页概览</h1>
+        <p class="product-name">TRADE MODEL V1</p>
+        <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页</h1>
       </div>
       <div class="header-actions" aria-label="首页快捷入口">
-        <button class="header-action status-entry" type="button" data-header-status-nav>
-          <span class="status-indicator" aria-hidden="true"></span>
-          <span>状态</span>
-        </button>
         <button class="header-action" type="button" data-header-search>搜索</button>
-        <button class="header-action" type="button" data-header-alerts-nav>通知</button>
+        <button class="header-action" type="button" data-header-alerts-nav>消息</button>
       </div>
     </header>
 
     <section class="status-section" id="mobile-status" aria-labelledby="mobile-status-title">
       <div class="section-heading compact-heading">
         <div>
-          <p class="section-kicker">系统状态</p>
-          <h2 id="mobile-status-title" tabindex="-1">当前概览</h2>
+          <p class="section-kicker">当前资产</p>
+          <h2 id="mobile-status-title" tabindex="-1">决策状态</h2>
         </div>
-        <span class="section-note">7 项状态</span>
+        <span class="section-note" data-selected-asset-token
+              th:text="${home.selectedSymbol != null ? home.selectedSymbol : '--'}">--</span>
       </div>
-      <dl class="status-grid" data-top-status-count="7">
+      <dl class="status-grid status-grid-primary" data-top-status-count="4">
         <div class="status-cell">
           <dt>市场趋势</dt>
           <dd th:text="${home.systemState.marketTrend.valueLabel != null ? home.systemState.marketTrend.valueLabel : '--'}">--</dd>
@@ -43,15 +41,25 @@
           <dd th:text="${home.systemState.riskLevel.valueLabel != null ? home.systemState.riskLevel.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
-          <dt>数据质量分</dt>
+          <dt>数据质量</dt>
           <dd th:text="${home.systemState.dataQuality.valueLabel != null ? home.systemState.dataQuality.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
-          <dt>AI 冲突等级</dt>
+          <dt>AI 冲突</dt>
           <dd th:text="${home.systemState.aiConflict.valueLabel != null ? home.systemState.aiConflict.valueLabel : '--'}">--</dd>
         </div>
+      </dl>
+      <div class="system-summary-heading">
+        <h3>系统摘要</h3>
+        <span>全局状态</span>
+      </div>
+      <dl class="status-grid status-grid-system" data-system-status-count="4">
         <div class="status-cell">
-          <dt>待复核机会</dt>
+          <dt>AI 系统</dt>
+          <dd th:text="${home.header.aiStatusLabel != null ? home.header.aiStatusLabel : '待同步'}">待同步</dd>
+        </div>
+        <div class="status-cell">
+          <dt>待复核</dt>
           <dd th:text="${home.systemState.pendingReview.valueLabel != null ? home.systemState.pendingReview.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell status-warning">
@@ -59,7 +67,7 @@
           <dd th:text="${home.systemState.confused.valueLabel != null ? home.systemState.confused.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
-          <dt>热重置</dt>
+          <dt>Hot Reset</dt>
           <dd th:text="${home.systemState.hotReset.valueLabel != null ? home.systemState.hotReset.valueLabel : '--'}">--</dd>
         </div>
       </dl>
@@ -142,8 +150,7 @@
           <button class="watch-tool-button" type="button" data-asset-add disabled aria-disabled="true"
                   aria-describedby="watch-add-contract-status">添加</button>
           <a class="watch-tool-button watch-detail-link" data-asset-detail-link
-             th:if="${!#lists.isEmpty(mobileAssets)}"
-             th:href="@{/dashboard/asset-detail(selectedSymbol=${home.selectedSymbol},view='mobile')}">详情</a>
+             aria-disabled="true" tabindex="-1">当前不可查看</a>
         </div>
       </div>
       <p class="section-note watch-limit-note"
@@ -168,7 +175,7 @@
                 th:each="asset, stat : ${mobileAssets}"
                 th:with="assetKey=${asset.rawSymbol != null ? asset.rawSymbol : asset.symbol},selected=${home.selectedSymbol == assetKey or (home.selectedSymbol == null and stat.first)},stateKey=${asset.assetState != null ? #strings.toLowerCase(asset.assetState) : 'unknown'}"
                 th:classappend="${selected ? ' is-selected' : ''}"
-                th:attr="data-symbol=${assetKey},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
+                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
           <span class="visually-hidden"
                 th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
@@ -185,12 +192,9 @@
             <span><small>置信度</small><b th:text="${asset.confidenceLabel != null ? asset.confidenceLabel : (asset.confidenceLevel != null ? asset.confidenceLevel : '--')}">--</b></span>
             <span><small>风险等级</small><b th:text="${asset.riskLabel != null ? asset.riskLabel : (asset.riskLevel != null ? asset.riskLevel : '--')}">--</b></span>
           </span>
-          <span class="asset-conclusion">
-            <small>一句话结论</small>
-            <strong th:text="${asset.currentConclusion != null ? asset.currentConclusion : '暂无可验证结论'}">暂无可验证结论</strong>
-          </span>
         </button>
       </div>
+      <p class="asset-interaction-note">点击卡片切换当前资产；分析详情仅在权威分析身份可用时开放。</p>
     </section>
 
     <section class="execution-section" id="execution-advice" aria-labelledby="mobile-execution-title"
@@ -211,43 +215,40 @@
       </div>
       <p class="semantic-explanation" data-execution-field="blockedReason"
          th:text="${planExact ? '系统建议，仅供人工复核' : ((home.executionSuggestion.status == 'POSITION_SELECTION_REQUIRED' or home.executionSuggestion.status == 'POSITION_NOT_FOUND' or home.executionSuggestion.status == 'POSITION_SYMBOL_MISMATCH') ? (home.executionSuggestion.blockedReason != null ? home.executionSuggestion.blockedReason : '请选择具体持仓') : '计划来源不可验证')}">计划来源不可验证</p>
-      <dl class="definition-list execution-compact-grid">
+      <dl class="definition-list execution-grid">
         <div><dt>方向</dt><dd data-execution-field="direction"
                               th:text="${planExact and home.executionSuggestion.direction != null ? home.executionSuggestion.direction : '--'}">--</dd></div>
+        <div><dt>是否值得开仓</dt><dd data-execution-field="worthOpening">待同步</dd></div>
         <div><dt>入场区间</dt><dd data-execution-field="entryZone"
                                 th:text="${planExact and home.executionSuggestion.entryZone != null ? home.executionSuggestion.entryZone : '--'}">--</dd></div>
-      </dl>
-      <details class="long-details module-details" data-execution-detail th:hidden="${!planExact}">
-        <summary>展开完整执行建议</summary>
-        <dl class="definition-list expanded-list">
-          <div><dt>止损价</dt><dd data-execution-field="stopLoss"
-                                  th:text="${planExact and home.executionSuggestion.stopLoss != null ? home.executionSuggestion.stopLoss : '--'}">--</dd></div>
-          <div><dt>杠杆</dt><dd data-execution-field="leverageSuggestion"
-                               th:text="${planExact and home.executionSuggestion.leverageSuggestion != null ? home.executionSuggestion.leverageSuggestion : '--'}">--</dd></div>
-          <div class="full-row"><dt>阶梯止盈</dt><dd data-execution-field="takeProfitRules"
-                                                      th:text="${planExact and home.executionSuggestion.takeProfitRules != null ? home.executionSuggestion.takeProfitRules : '--'}">--</dd></div>
-          <div class="full-row"><dt>仓位建议</dt><dd data-execution-field="positionSuggestion"
-                                                      th:text="${planExact and home.executionSuggestion.positionSuggestion != null ? home.executionSuggestion.positionSuggestion : '--'}">--</dd></div>
-          <div class="full-row"><dt>有效期</dt><dd data-execution-field="validPeriod"
-                                                    th:text="${planExact and home.executionSuggestion.validPeriod != null ? home.executionSuggestion.validPeriod : '--'}">--</dd></div>
-          <div class="full-row"><dt>失效条件</dt><dd data-execution-field="invalidCondition"
+        <div><dt>止损</dt><dd data-execution-field="stopLoss"
+                            th:text="${planExact and home.executionSuggestion.stopLoss != null ? home.executionSuggestion.stopLoss : '--'}">--</dd></div>
+        <div class="full-row"><dt>止盈方案</dt><dd data-execution-field="takeProfitRules"
+                                                  th:text="${planExact and home.executionSuggestion.takeProfitRules != null ? home.executionSuggestion.takeProfitRules : '--'}">--</dd></div>
+        <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion"
+                                 th:text="${planExact and home.executionSuggestion.leverageSuggestion != null ? home.executionSuggestion.leverageSuggestion : '--'}">--</dd></div>
+        <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion"
+                                 th:text="${planExact and home.executionSuggestion.positionSuggestion != null ? home.executionSuggestion.positionSuggestion : '--'}">--</dd></div>
+        <div class="full-row"><dt>计划失效条件</dt><dd data-execution-field="invalidCondition"
                                                       th:text="${planExact and home.executionSuggestion.invalidCondition != null ? home.executionSuggestion.invalidCondition : '--'}">--</dd></div>
-          <div><dt>开始时间</dt><dd data-execution-field="validFrom"
-                                   th:text="${planExact and home.executionSuggestion.validFrom != null ? home.executionSuggestion.validFrom : '--'}">--</dd></div>
-          <div><dt>到期时间</dt><dd data-execution-field="expiresAt"
-                                   th:text="${planExact and home.executionSuggestion.expiresAt != null ? home.executionSuggestion.expiresAt : '--'}">--</dd></div>
-          <div class="full-row"><dt>原执行计划</dt><dd data-execution-field="originalPlanLabel"
-                                                        th:text="${planExact and home.executionSuggestion.originalPlanLabel != null ? home.executionSuggestion.originalPlanLabel : '--'}">--</dd></div>
-        </dl>
-      </details>
+        <div><dt>有效开始</dt><dd data-execution-field="validFrom"
+                                th:text="${planExact and home.executionSuggestion.validFrom != null ? home.executionSuggestion.validFrom : '--'}">--</dd></div>
+        <div><dt>有效结束</dt><dd data-execution-field="expiresAt"
+                                th:text="${planExact and home.executionSuggestion.expiresAt != null ? home.executionSuggestion.expiresAt : '--'}">--</dd></div>
+      </dl>
+      <div class="conflict-block-summary">
+        <span>冲突阻断</span>
+        <strong data-execution-conflict
+                th:text="${planExact and home.executionSuggestion.blockedReason != null ? home.executionSuggestion.blockedReason : '--'}">--</strong>
+      </div>
       <p class="safety-copy">仅供人工复核，不是交易指令，不会自动下单或创建持仓。</p>
     </section>
 
     <section class="position-section" id="position-monitor" aria-labelledby="mobile-position-title" data-position-independent>
       <div class="section-heading">
         <div>
-          <p class="section-kicker">独立于重点资产选择</p>
-          <h2 id="mobile-position-title" tabindex="-1">持仓监控</h2>
+          <p class="section-kicker">Top 3 · 独立于资产选择</p>
+          <h2 id="mobile-position-title" tabindex="-1">持仓摘要</h2>
         </div>
       </div>
       <p class="section-description">只展示用户手动录入的开放持仓及其持续验证结论。</p>
@@ -258,29 +259,16 @@
                  th:classappend="${stat.index == 2 ? ' position-third' : ''}"
                  th:attr="data-position-id=${position.positionId}">
           <div class="position-heading">
-            <h3 th:text="${(position.symbol != null ? position.symbol : '--') + ' / ' + (position.directionLabel != null ? position.directionLabel : '--')}">-- / --</h3>
-            <span th:text="${position.riskLevelLabel != null ? position.riskLevelLabel : '风险未知'}">风险未知</span>
+            <h3 th:text="${position.symbol != null ? position.symbol : '--'}">--</h3>
+            <span th:text="${position.directionLabel != null ? position.directionLabel : '--'}">--</span>
           </div>
           <dl class="position-core position-summary">
-            <div><dt>用户开仓价</dt><dd th:text="${position.entryPrice != null ? position.entryPrice : '--'}">--</dd></div>
-            <div><dt>入场逻辑</dt><dd th:text="${position.entryLogicStatusLabel != null ? position.entryLogicStatusLabel : '未知状态'}">未知状态</dd></div>
-            <div class="full-row"><dt>当前建议</dt><dd th:text="${position.suggestedManualActionText != null ? position.suggestedManualActionText : '暂无人工复核建议'}">暂无人工复核建议</dd></div>
-            <div class="full-row"><dt>下次验证</dt><dd th:text="${position.nextMonitorAt != null ? position.nextMonitorAt : (position.lastMonitorAt != null ? '暂无下次监控排期' : '等待首次监控')}">等待首次监控</dd></div>
+            <div><dt>入场逻辑</dt><dd th:text="${position.entryLogicStatusLabel != null ? position.entryLogicStatusLabel : '待同步'}">待同步</dd></div>
+            <div><dt>方向支持</dt><dd th:text="${position.directionSupportStatusLabel != null ? position.directionSupportStatusLabel : '待同步'}">待同步</dd></div>
+            <div><dt>反转状态</dt><dd th:text="${position.reversalStatusLabel != null ? position.reversalStatusLabel : '待同步'}">待同步</dd></div>
+            <div><dt>风险等级</dt><dd th:text="${position.riskLevelLabel != null ? position.riskLevelLabel : '待同步'}">待同步</dd></div>
+            <div class="full-row"><dt>当前建议</dt><dd th:text="${position.suggestedManualActionText != null ? position.suggestedManualActionText : '当前不可查看'}">当前不可查看</dd></div>
           </dl>
-          <details class="position-details">
-            <summary>展开监控详情</summary>
-            <dl class="definition-list expanded-list">
-              <div><dt>当前价</dt><dd th:text="${position.currentPrice != null ? position.currentPrice : '--'}">--</dd></div>
-              <div><dt>浮动盈亏</dt><dd th:text="${position.pnlPct != null ? position.pnlPct : '--'}">--</dd></div>
-              <div><dt>用户止损</dt><dd th:text="${position.userStopLoss != null ? position.userStopLoss : '--'}">--</dd></div>
-              <div><dt>用户止盈</dt><dd th:text="${position.userTakeProfit != null ? position.userTakeProfit : '--'}">--</dd></div>
-              <div><dt>方向支持</dt><dd th:text="${position.directionSupportStatusLabel != null ? position.directionSupportStatusLabel : '未知状态'}">未知状态</dd></div>
-              <div><dt>反转状态</dt><dd th:text="${position.reversalStatusLabel != null ? position.reversalStatusLabel : '未知状态'}">未知状态</dd></div>
-              <div><dt>最近监控</dt><dd th:text="${position.lastMonitorAt != null ? position.lastMonitorAt : '等待首次监控'}">等待首次监控</dd></div>
-              <div><dt>持仓状态</dt><dd th:text="${position.positionStatusLabel != null ? position.positionStatusLabel : '未知状态'}">未知状态</dd></div>
-              <div class="full-row"><dt>监控结论</dt><dd th:text="${position.monitorConclusion != null ? position.monitorConclusion : '暂无监控结论'}">暂无监控结论</dd></div>
-            </dl>
-          </details>
         </article>
       </div>
     </section>
@@ -318,119 +306,33 @@
         </dl>
       </div>
 
-      <p class="empty-state" th:if="${#lists.isEmpty(home.aiDecision.tabs)}">AI 三角色观点待同步</p>
-      <div data-ai-role-root>
-        <div class="role-tabs" role="tablist" aria-label="AI 角色">
-          <button type="button" role="tab" id="mobile-role-tab-GPT_FINAL"
-                  data-role="GPT_FINAL" aria-selected="true"
-                  aria-controls="mobile-role-panel-GPT_FINAL" tabindex="0">
-            <span class="role-code">GPT_FINAL</span>
-            <span class="role-name">最终裁决官</span>
-          </button>
-          <button type="button" role="tab" id="mobile-role-tab-GEMINI_REVIEW"
-                  data-role="GEMINI_REVIEW" aria-selected="false"
-                  aria-controls="mobile-role-panel-GEMINI_REVIEW" tabindex="-1">
-            <span class="role-code">GEMINI_REVIEW</span>
-            <span class="role-name">冲突复核官</span>
-          </button>
-          <button type="button" role="tab" id="mobile-role-tab-GROK_CHALLENGE"
-                  data-role="GROK_CHALLENGE" aria-selected="false"
-                  aria-controls="mobile-role-panel-GROK_CHALLENGE" tabindex="-1">
-            <span class="role-code">GROK_CHALLENGE</span>
-            <span class="role-name">反方挑战官</span>
-          </button>
-        </div>
-
-        <article class="role-panel" role="tabpanel" th:each="tab : ${home.aiDecision.tabs}"
+      <div class="ai-role-summary-list" data-ai-role-root aria-label="AI 三角色摘要">
+        <article class="ai-role-summary-card" th:each="tab : ${home.aiDecision.tabs}"
                  th:if="${tab.role == 'GPT_FINAL' or tab.role == 'GEMINI_REVIEW' or tab.role == 'GROK_CHALLENGE'}"
-                 th:id="${'mobile-role-panel-' + tab.role}"
-                 th:attr="data-role-panel=${tab.role},aria-labelledby=${'mobile-role-tab-' + tab.role}"
-                 th:hidden="${tab.role != 'GPT_FINAL'}">
+                 th:attr="data-ai-role-summary=${tab.role}">
           <div class="role-heading">
             <div><span th:text="${tab.role}">AI_ROLE</span><h3 th:text="${tab.roleLabel != null ? tab.roleLabel : tab.role}">AI 角色</h3></div>
-            <strong th:text="${tab.runStatusLabel != null ? tab.runStatusLabel : '等待同步'}">等待同步</strong>
+            <strong th:text="${tab.runStatusLabel != null ? tab.runStatusLabel : '待同步'}">待同步</strong>
           </div>
-          <p class="role-status" th:text="${tab.statusMessage != null ? tab.statusMessage : '当前角色观点待同步'}">当前角色观点待同步</p>
-
-          <div th:if="${tab.role == 'GPT_FINAL'}">
-            <dl class="definition-list role-fields role-summary-fields">
-              <div><dt>最终倾向</dt><dd th:text="${tab.finalMarketBias != null ? tab.finalMarketBias : '--'}">--</dd></div>
-              <div><dt>置信度</dt><dd th:text="${tab.finalConfidence != null ? tab.finalConfidence : '--'}">--</dd></div>
-              <div><dt>风险等级</dt><dd th:text="${tab.finalRiskLevel != null ? tab.finalRiskLevel : '--'}">--</dd></div>
-              <div class="full-row"><dt>最终结论</dt><dd th:text="${tab.finalConclusion != null ? tab.finalConclusion : '当前摘要未提供最终结论'}">当前摘要未提供最终结论</dd></div>
-              <div class="full-row"><dt>核心支持证据</dt><dd th:text="${#lists.isEmpty(tab.coreSupportingEvidence) ? '当前摘要未包含支持证据' : #strings.listJoin(tab.coreSupportingEvidence, '；')}">当前摘要未包含支持证据</dd></div>
-            </dl>
-            <details class="long-details">
-              <summary>查看当前角色观点</summary>
-              <p><strong>核心反证：</strong><span th:text="${#lists.isEmpty(tab.coreCounterEvidence) ? '当前摘要未包含反向证据' : #strings.listJoin(tab.coreCounterEvidence, '；')}">当前摘要未包含反向证据</span></p>
-              <p><strong>是否值得开仓：</strong><span th:text="${tab.worthOpening != null ? tab.worthOpening : '--'}">--</span></p>
-              <p><strong>裁决摘要：</strong><span th:text="${tab.decisionSummary != null ? tab.decisionSummary : '当前摘要未提供'}">当前摘要未提供</span></p>
-            </details>
-          </div>
-
-          <div th:if="${tab.role == 'GEMINI_REVIEW'}">
-            <dl class="definition-list role-fields role-summary-fields">
-              <div class="full-row"><dt>复核意见</dt><dd th:text="${tab.reviewVerdict != null ? tab.reviewVerdict : '暂无复核意见'}">暂无复核意见</dd></div>
-              <div><dt>是否建议降级</dt><dd th:text="${tab.downgradeRecommendation != null ? tab.downgradeRecommendation : '--'}">--</dd></div>
-              <div class="full-row"><dt>复核结论</dt><dd th:text="${tab.reviewConclusion != null ? tab.reviewConclusion : '暂无复核结论'}">暂无复核结论</dd></div>
-            </dl>
-            <details class="long-details">
-              <summary>查看当前角色观点</summary>
-              <p><strong>发现的冲突：</strong><span th:text="${#lists.isEmpty(tab.detectedContradictions) ? '当前摘要未提供' : #strings.listJoin(tab.detectedContradictions, '；')}">当前摘要未提供</span></p>
-              <p><strong>证据不足点：</strong><span th:text="${#lists.isEmpty(tab.weakEvidence) ? '当前摘要未提供' : #strings.listJoin(tab.weakEvidence, '；')}">当前摘要未提供</span></p>
-              <p><strong>逻辑漏洞：</strong><span th:text="${#lists.isEmpty(tab.logicGaps) ? '当前摘要未提供' : #strings.listJoin(tab.logicGaps, '；')}">当前摘要未提供</span></p>
-              <p><strong>风险调整建议：</strong><span th:text="${tab.riskAdjustmentSuggestion != null ? tab.riskAdjustmentSuggestion : '当前摘要未提供'}">当前摘要未提供</span></p>
-              <p><strong>需要人工复核：</strong><span th:text="${tab.manualReviewRequired != null ? tab.manualReviewRequired : '--'}">--</span></p>
-            </details>
-          </div>
-
-          <div th:if="${tab.role == 'GROK_CHALLENGE'}">
-            <dl class="definition-list role-fields role-summary-fields">
-              <div class="full-row"><dt>反方论点</dt><dd th:text="${tab.challengeThesis != null ? tab.challengeThesis : '暂无反方论点'}">暂无反方论点</dd></div>
-              <div class="full-row"><dt>突发新闻 / 事件风险</dt><dd th:text="${#lists.isEmpty(tab.eventRisks) ? '暂无' : #strings.listJoin(tab.eventRisks, '；')}">暂无</dd></div>
-              <div class="full-row"><dt>反方挑战结论</dt><dd th:text="${tab.challengeConclusion != null ? tab.challengeConclusion : '暂无挑战结论'}">暂无挑战结论</dd></div>
-            </dl>
-            <details class="long-details">
-              <summary>查看当前角色观点</summary>
-              <p><strong>反向证据：</strong><span th:text="${#lists.isEmpty(tab.counterEvidence) ? '当前摘要未包含反向证据' : #strings.listJoin(tab.counterEvidence, '；')}">当前摘要未包含反向证据</span></p>
-              <p><strong>情绪反转风险：</strong><span th:text="${#lists.isEmpty(tab.sentimentReversalRisks) ? '当前摘要未提供' : #strings.listJoin(tab.sentimentReversalRisks, '；')}">当前摘要未提供</span></p>
-              <p><strong>微观结构陷阱：</strong><span th:text="${#lists.isEmpty(tab.microstructureTraps) ? '当前摘要未提供' : #strings.listJoin(tab.microstructureTraps, '；')}">当前摘要未提供</span></p>
-              <p><strong>流动性风险：</strong><span th:text="${#lists.isEmpty(tab.liquidityRisks) ? '当前摘要未提供' : #strings.listJoin(tab.liquidityRisks, '；')}">当前摘要未提供</span></p>
-            </details>
-          </div>
-          <p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>
-        </article>
-
-        <article class="role-panel" id="mobile-role-panel-GPT_FINAL" role="tabpanel"
-                 data-role-panel="GPT_FINAL" aria-labelledby="mobile-role-tab-GPT_FINAL"
-                 th:if="${!#lists.contains(home.aiDecision.tabs.![role], 'GPT_FINAL')}">
-          <div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong>待同步</strong></div>
-          <p class="role-status">当前角色观点待同步</p>
-          <p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>
-        </article>
-        <article class="role-panel" id="mobile-role-panel-GEMINI_REVIEW" role="tabpanel"
-                 data-role-panel="GEMINI_REVIEW" aria-labelledby="mobile-role-tab-GEMINI_REVIEW"
-                 th:if="${!#lists.contains(home.aiDecision.tabs.![role], 'GEMINI_REVIEW')}" hidden>
-          <div class="role-heading"><div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div><strong>待同步</strong></div>
-          <p class="role-status">当前角色观点待同步</p>
-          <p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>
-        </article>
-        <article class="role-panel" id="mobile-role-panel-GROK_CHALLENGE" role="tabpanel"
-                 data-role-panel="GROK_CHALLENGE" aria-labelledby="mobile-role-tab-GROK_CHALLENGE"
-                 th:if="${!#lists.contains(home.aiDecision.tabs.![role], 'GROK_CHALLENGE')}" hidden>
-          <div class="role-heading"><div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div><strong>待同步</strong></div>
-          <p class="role-status">当前角色观点待同步</p>
-          <p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>
+          <p class="role-status"
+             th:text="${tab.role == 'GPT_FINAL' ? (tab.finalConclusion != null ? tab.finalConclusion : (tab.decisionSummary != null ? tab.decisionSummary : '当前观点待同步')) : (tab.role == 'GEMINI_REVIEW' ? (tab.reviewConclusion != null ? tab.reviewConclusion : (tab.reviewVerdict != null ? tab.reviewVerdict : '当前复核待同步')) : (tab.challengeConclusion != null ? tab.challengeConclusion : (tab.challengeThesis != null ? tab.challengeThesis : '当前挑战待同步')))}">当前角色观点待同步</p>
+          <dl class="role-summary-metrics" th:if="${tab.role == 'GPT_FINAL'}">
+            <div><dt>方向</dt><dd th:text="${tab.finalMarketBias != null ? tab.finalMarketBias : '--'}">--</dd></div>
+            <div><dt>置信度</dt><dd th:text="${tab.finalConfidence != null ? tab.finalConfidence : '--'}">--</dd></div>
+          </dl>
         </article>
       </div>
     </section>
 
   </main>
 
-  <nav class="bottom-nav" aria-label="主要导航">
+  <nav class="bottom-nav" aria-label="主要导航" data-mobile-five-tab-navigation>
     <button type="button" data-home-nav aria-current="page">首页</button>
-    <button type="button" data-position-nav>持仓</button>
-    <a href="/review/dashboard" data-review-nav>复盘</a>
+    <button type="button" data-position-nav data-unavailable-nav aria-disabled="true">持仓</button>
+    <button type="button" data-ai-nav data-unavailable-nav aria-disabled="true">AI分析</button>
+    <button type="button" data-message-nav data-unavailable-nav aria-disabled="true">消息</button>
+    <button type="button" data-profile-nav data-unavailable-nav aria-disabled="true">我的</button>
   </nav>
+  <p class="nav-availability-status visually-hidden" data-nav-availability-status aria-live="polite"></p>
 </body>
 </html>

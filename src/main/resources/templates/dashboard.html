@@ -47,6 +47,7 @@
         }
 
         * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
         body {
             margin: 0;
             padding-left: var(--sidebar-width);
@@ -309,6 +310,46 @@
             padding: 0;
             box-shadow: none;
         }
+        .product-navigation {
+            display: grid;
+            gap: 4px;
+        }
+        .product-nav-item {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 44px;
+            padding: 9px 12px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            font: inherit;
+            font-size: 0.82rem;
+            font-weight: 680;
+            text-align: left;
+            text-decoration: none;
+        }
+        .product-nav-item.active {
+            background: rgba(47, 117, 255, 0.09);
+            color: var(--brand-accent);
+            box-shadow: inset 3px 0 0 var(--brand-accent);
+        }
+        .product-nav-item[aria-disabled="true"] {
+            cursor: default;
+            opacity: 0.68;
+        }
+        .product-nav-item:focus-visible {
+            outline: 3px solid rgba(47, 117, 255, 0.52);
+            outline-offset: 2px;
+        }
+        .sidebar-nav-status {
+            min-height: 20px;
+            margin: 2px 4px 0;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            line-height: 1.4;
+        }
         .sidebar-title {
             margin: 0 0 9px 0;
             font-size: 0.86rem;
@@ -441,6 +482,11 @@
             }
             .sidebar-brand,
             .home-sidebar .sidebar-card:first-child { grid-column: 1 / -1; }
+            .product-navigation {
+                grid-column: 1 / -1;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+            .sidebar-nav-status { grid-column: 1 / -1; }
         }
         @media (max-width: 700px) {
             .home-sidebar { display: flex; }
@@ -451,7 +497,7 @@
         /* Layer 1: compact KPI row */
         .layer1 {
             display: grid;
-            grid-template-columns: repeat(7, minmax(128px, 1fr));
+            grid-template-columns: repeat(8, minmax(128px, 1fr));
             gap: 12px;
             margin-bottom: 14px;
             overflow-x: auto;
@@ -691,18 +737,18 @@
         .status-badge.partial { color: var(--status-warn); border-color: rgba(234, 179, 8, 0.5); }
         .status-badge.pending { color: var(--status-error); border-color: rgba(239, 68, 68, 0.45); }
         @media (max-width: 1320px) {
-            .layer1 { grid-template-columns: repeat(7, minmax(128px, 1fr)); }
+            .layer1 { grid-template-columns: repeat(8, minmax(128px, 1fr)); }
             .kpi-card { min-width: 128px; }
         }
         @media (max-width: 900px) {
-            .layer1 { grid-template-columns: repeat(7, minmax(128px, 1fr)); }
+            .layer1 { grid-template-columns: repeat(8, minmax(128px, 1fr)); }
         }
         @media (max-width: 900px) {
             .status-grid { grid-template-columns: 1fr; }
             .status-cell.head { display: none; }
         }
         @media (max-width: 640px) {
-            .layer1 { grid-template-columns: repeat(7, minmax(128px, 1fr)); }
+            .layer1 { grid-template-columns: repeat(8, minmax(128px, 1fr)); }
         }
         .card {
             background: var(--bg-surface);
@@ -1977,6 +2023,116 @@
             gap: 10px;
             align-items: stretch;
         }
+        .home-position-summary-list {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .home-position-summary-card {
+            min-width: 0;
+            padding: 11px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .home-position-summary-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 9px;
+        }
+        .home-position-summary-head strong {
+            overflow-wrap: anywhere;
+        }
+        .home-position-summary-head span {
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 680;
+            text-align: right;
+        }
+        .home-position-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            background: var(--border-subtle);
+        }
+        .home-position-summary-grid > div {
+            min-width: 0;
+            padding: 7px 8px;
+            background: var(--bg-surface);
+        }
+        .home-position-summary-grid .wide {
+            grid-column: 1 / -1;
+        }
+        .home-position-summary-grid dt {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+        }
+        .home-position-summary-grid dd {
+            margin: 3px 0 0;
+            color: var(--text-primary);
+            font-size: 0.75rem;
+            font-weight: 660;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        .home-ai-summary-cards {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .home-ai-summary-card {
+            min-width: 0;
+            padding: 11px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-elevated);
+        }
+        .home-ai-summary-card strong,
+        .home-ai-summary-card span,
+        .home-ai-summary-card p {
+            display: block;
+            overflow-wrap: anywhere;
+        }
+        .home-ai-summary-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .home-ai-summary-head em {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-style: normal;
+            text-align: right;
+        }
+        .home-ai-summary-card strong {
+            color: var(--brand-accent);
+            font-size: 0.72rem;
+        }
+        .home-ai-summary-card span {
+            margin-top: 3px;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+        }
+        .home-ai-summary-card p {
+            margin: 10px 0 0;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+        #assetDetailLink[aria-disabled="true"] {
+            color: var(--text-secondary);
+            cursor: default;
+            opacity: 0.62;
+        }
+        @media (max-width: 980px) {
+            .home-position-summary-list,
+            .home-ai-summary-cards {
+                grid-template-columns: 1fr;
+            }
+        }
         .ai-provenance-note {
             margin: 8px 0 0;
             color: var(--text-secondary);
@@ -2859,18 +3015,23 @@
 
     <div class="wrap">
         <div class="dashboard-shell">
-            <aside class="home-sidebar" aria-label="资产导航">
+            <aside class="home-sidebar" aria-label="主要导航" data-desktop-five-destination-navigation>
                 <div class="sidebar-brand">
                     <span class="sidebar-logo" aria-hidden="true"></span>
                     <span>
-                        <span class="sidebar-brand-title">TRINE LOGIC</span>
-                        <span class="sidebar-brand-subtitle">离线复核工作台</span>
+                        <span class="sidebar-brand-title">TRADE MODEL V1</span>
+                        <span class="sidebar-brand-subtitle">决策复核工作台</span>
                     </span>
                 </div>
-                <section class="sidebar-card" aria-label="资产监控列表">
-                    <h2 class="sidebar-title">资产监控</h2>
-                    <div class="sidebar-slot-list" id="sidebarSlotList"></div>
-                </section>
+                <nav class="product-navigation" aria-label="产品页面">
+                    <a href="/dashboard" class="product-nav-item active" aria-current="page">Dashboard</a>
+                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">Position</button>
+                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">AI Analysis</button>
+                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">Message</button>
+                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">Profile</button>
+                </nav>
+                <div class="sidebar-slot-list" id="sidebarSlotList" hidden></div>
+                <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">其余页面暂未开放</p>
                 <div class="sidebar-divider" aria-hidden="true"></div>
                 <p class="sidebar-brand-subtitle">状态与方向分开显示，结论仅供人工复核。</p>
             </aside>
@@ -2892,6 +3053,10 @@
             <div class="card kpi-card" id="cardAiConflict">
                 <h3>AI 冲突等级</h3>
                 <div id="kpi-ai-conflict"></div>
+            </div>
+            <div class="card kpi-card" id="cardAiSystem">
+                <h3>AI 系统</h3>
+                <div id="kpi-ai-system"></div>
             </div>
             <div class="card kpi-card" id="cardOpportunity" role="button" tabindex="0" aria-controls="opportunityReviewDrawer" aria-expanded="false">
                 <h3>待复核机会</h3>
@@ -2937,7 +3102,7 @@
                 </div>
                 <button type="button" class="btn" id="btnAdd" disabled aria-disabled="true"
                         title="添加资产暂未开放">添加资产暂未开放</button>
-                <a class="btn" id="assetDetailLink" hidden>资产详情</a>
+                <a class="btn" id="assetDetailLink" aria-disabled="true" tabindex="-1">当前不可查看</a>
                 <button type="button" class="btn custom-only-action" id="btnRemove" disabled hidden>删除</button>
                 <button type="button" class="btn asset-pool-toggle" id="assetPoolToggle"
                         aria-expanded="false" disabled hidden>资产池 ▾</button>
@@ -2990,26 +3155,16 @@
             <section class="card" id="homePositionCard" aria-label="持仓监控">
                 <div class="position-card-head">
                     <div>
-                        <p class="position-card-title">持仓监控<span class="visually-hidden">用户真实持仓监控</span></p>
-                        <p class="position-card-helper">手动录入持仓，只读监控<span class="visually-hidden">仅显示手动录入持仓，系统建议不会自动生成持仓</span></p>
-                    </div>
-                    <div class="position-card-actions">
-                        <button type="button" class="btn manual-position-btn" id="manualPositionBtn">手动录入持仓</button>
-                        <a class="btn review-center-btn" id="reviewCenterLink" href="/review/dashboard">复盘中心</a>
+                        <p class="position-card-title">持仓摘要<span class="visually-hidden">用户真实持仓 Top 3 摘要</span></p>
+                        <p class="position-card-helper">Top 3 · 独立于当前资产上下文</p>
                     </div>
                 </div>
                 <p class="position-source-note">仅显示手动录入持仓</p>
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
-                    <table class="position-table"><thead><tr>
-                        <th>资产 / 方向</th><th>入场逻辑</th><th>方向支持</th><th>反转状态</th><th>风险等级</th><th>当前建议</th><th>监控时间</th><th>人工处理</th>
-                    </tr></thead><tbody>
-                        <tr class="position-empty-row"><td><div class="position-empty">暂无持仓<span class="visually-hidden">暂无手动录入持仓</span></div></td><td></td><td></td><td></td><td></td><td></td><td><span class="position-monitor-waiting">等待首次监控</span></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                        <tr class="position-empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                    </tbody></table>
+                    <div class="overview-empty-state" role="status">
+                        <strong>暂无手动持仓</strong><span>持仓数据不足时保持空状态</span>
+                    </div>
                 </div>
             </section>
             <section class="card" id="homeExecutionCard" aria-label="执行建议">
@@ -3022,49 +3177,33 @@
                 <div id="homeExecutionContent">
                     <div class="execution-card-body"><div class="execution-plan-panel"><table class="execution-plan-table"><tbody>
                         <tr><th>方向</th><td></td></tr>
+                        <tr><th>是否值得开仓</th><td></td></tr>
                         <tr><th>入场区间</th><td></td></tr>
-                        <tr><th>止损价</th><td></td></tr>
-                        <tr><th>阶梯止盈</th><td></td></tr>
-                        <tr><th>杠杆</th><td></td></tr>
+                        <tr><th>止损</th><td></td></tr>
+                        <tr><th>止盈方案</th><td></td></tr>
+                        <tr><th>杠杆建议</th><td></td></tr>
                         <tr><th>仓位建议</th><td></td></tr>
-                        <tr><th>有效期</th><td></td></tr>
-                        <tr><th>失效条件</th><td></td></tr>
+                        <tr><th>有效开始</th><td></td></tr>
+                        <tr><th>有效结束</th><td></td></tr>
+                        <tr><th>计划失效条件</th><td></td></tr>
+                        <tr><th>冲突阻断</th><td></td></tr>
                     </tbody></table></div></div>
                 </div>
             </section>
         </div>
 
         <div class="ai-decision-row">
-            <section class="card" id="homeAiPanel" aria-label="AI 证据复核">
+            <section class="card" id="homeAiPanel" aria-label="AI 三角色摘要">
                 <div class="ai-panel-head">
                     <div>
-                        <p class="ai-card-title">AI 证据复核</p>
+                        <p class="ai-card-title">AI 三角色摘要</p>
                         <p class="ai-boundary-line"></p>
                     </div>
                 </div>
-                <div class="ai-tabs" id="homeAiTabs">
-                    <button type="button" class="ai-tab active" data-ai-tab="GPT_FINAL">最终裁决官</button>
-                    <button type="button" class="ai-tab" data-ai-tab="GEMINI_REVIEW">冲突复核官</button>
-                    <button type="button" class="ai-tab" data-ai-tab="GROK_CHALLENGE">反方挑战官</button>
-                </div>
-                <div class="ai-tab-content" id="homeAiTabContent">
-                    <div class="ai-evidence-grid">
-                        <div class="ai-summary-strip">
-                            <div class="ai-summary-item"><span class="ai-summary-label">最终倾向</span><span class="ai-summary-value">暂无</span></div>
-                            <div class="ai-summary-item"><span class="ai-summary-label">置信度</span><span class="ai-summary-value">暂无</span></div>
-                            <div class="ai-summary-item"><span class="ai-summary-label">最终结论</span><span class="ai-summary-value">等待同步</span></div>
-                        </div>
-                        <div class="ai-evidence-list">
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">风险等级</span><span class="ai-evidence-value">暂无</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">AI 计划模式</span><span class="ai-evidence-value">等待同步</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">是否值得开仓</span><span class="ai-evidence-value">等待同步</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">裁决摘要</span><span class="ai-evidence-value">等待同步</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">最终采纳的核心支持证据</span><span class="ai-evidence-value">当前摘要未包含支持证据</span></div>
-                            <div class="ai-evidence-item"><span class="ai-evidence-label">最终考虑的核心反证</span><span class="ai-evidence-value">当前摘要未包含反向证据</span></div>
-                        </div>
-                        <div class="ai-downgrade-row"><span class="ai-downgrade-label">降级 / 阻断原因</span><span class="ai-downgrade-value">当前摘要未提供</span></div>
-                        <p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>
-                    </div>
+                <div class="home-ai-summary-cards" id="homeAiSummaryCards" aria-label="AI 三角色摘要">
+                    <article class="home-ai-summary-card" data-home-ai-role="GPT_FINAL"><strong>GPT_FINAL</strong><span>最终裁决官</span><p>当前观点待同步</p></article>
+                    <article class="home-ai-summary-card" data-home-ai-role="GEMINI_REVIEW"><strong>GEMINI_REVIEW</strong><span>冲突复核官</span><p>当前复核待同步</p></article>
+                    <article class="home-ai-summary-card" data-home-ai-role="GROK_CHALLENGE"><strong>GROK_CHALLENGE</strong><span>反方挑战官</span><p>当前挑战待同步</p></article>
                 </div>
             </section>
             <section class="card" id="homeConsistencyPanel" aria-label="AI 一致性摘要">
@@ -3803,7 +3942,6 @@
     var dashboardHomeAbortController = null;
     var searchQuery = "";
     var modeValue = "system";
-    var activeAiTab = "GPT_FINAL";
     var lastExternalContextPayload = {};
     var frontendContract = window.TradeModelFrontendContract;
     if (!frontendContract) throw new Error("FRONTEND_CONTRACT_MISSING");
@@ -6300,8 +6438,9 @@
         return 0;
     }
 
-    function renderHomeSystemStateFromPayload(systemState) {
+    function renderHomeSystemStateFromPayload(systemState, header) {
         var s = systemState || {};
+        var h = header || {};
         function put(id, title, card) {
             var el = document.getElementById(id);
             if (!el) return;
@@ -6311,6 +6450,11 @@
         put("kpi-risk", "风险等级", s.riskLevel);
         put("kpi-data-quality", "数据质量分", s.dataQuality);
         put("kpi-ai-conflict", "AI 冲突等级", s.aiConflict);
+        put("kpi-ai-system", "AI 系统", {
+            valueLabel: h.aiStatusLabel,
+            status: h.aiStatus,
+            helper: "系统级 AI 运行状态"
+        });
         put("kpi-opportunity", "待复核机会", s.pendingReview);
         put("kpi-confused", "冲突阻断", s.confused);
         put("kpi-hot-reset", "热重置", s.hotReset);
@@ -6379,17 +6523,23 @@
         }).slice(0, 6);
     }
 
-    function updateAssetDetailLink(symbol) {
+    function updateAssetDetailLink(asset) {
         var link = document.getElementById("assetDetailLink");
         if (!link) return;
-        var normalized = normalizeDisplaySymbol(symbol);
-        if (!normalized) {
+        var analysisId = cleanBlankValue(asset && asset.analysisId);
+        var symbol = normalizeDisplaySymbol(asset && (asset.rawSymbol || asset.symbol));
+        if (!analysisId || !symbol) {
             link.removeAttribute("href");
-            link.hidden = true;
+            link.setAttribute("aria-disabled", "true");
+            link.setAttribute("tabindex", "-1");
+            link.textContent = "当前不可查看";
             return;
         }
-        link.href = "/dashboard/asset-detail?selectedSymbol=" + encodeURIComponent(normalized);
-        link.hidden = false;
+        link.href = "/dashboard/analysis-detail?analysisId=" + encodeURIComponent(analysisId)
+            + "&selectedSymbol=" + encodeURIComponent(symbol);
+        link.removeAttribute("aria-disabled");
+        link.setAttribute("tabindex", "0");
+        link.textContent = "分析详情";
     }
 
     function renderHomeAssetsFromPayload(assets) {
@@ -6405,7 +6555,7 @@
         var linkedAsset = list.find(function (asset) {
             return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === selectedSymbol;
         });
-        updateAssetDetailLink(linkedAsset && (linkedAsset.rawSymbol || linkedAsset.symbol));
+        updateAssetDetailLink(linkedAsset);
         box.innerHTML = list.map(function (asset, idx) {
             var rawSymbol = normalizeDisplaySymbol(asset.rawSymbol || asset.symbol);
             var selected = rawSymbol && rawSymbol === selectedSymbol ? " selected" : "";
@@ -6414,13 +6564,14 @@
             var riskText = cleanBlankValue(asset.riskLabel || riskLevelLabel(asset.riskLevel));
             var confidenceText = cleanBlankValue(asset.confidenceLabel || confidenceLabel(asset.confidenceLevel));
             var state = frontendContract.assetStateView(asset.assetState, asset.assetStateLabel);
-            var conclusionText = cleanBlankValue(asset.currentConclusion) || "暂无可验证结论";
+            var analysisId = cleanBlankValue(asset.analysisId);
             var priceText = asset.latestPrice != null ? formatPrice(asset.latestPrice) : "--";
             if (!priceText || priceText === "—") priceText = "--";
             var scoreText = asset.compositeScore != null ? String(asset.compositeScore) : "--";
             var coinCls = coinAvatarClass(rawSymbol);
             return '<div class="coin-tile bias-' + bcls + selected + '" role="button" tabindex="0"'
                 + ' data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '"'
+                + ' data-analysis-id="' + escapeHtml(analysisId) + '"'
                 + ' data-asset-state="' + escapeHtml(state.code) + '">' +
                 '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
                 + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span></span>'
@@ -6432,7 +6583,6 @@
                 '<div class="tile-compact-row"><span class="label">方向</span><span class="value tile-bias ' + bcls + '">' + escapeHtml(bias || "当前判断不可用") + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText || "--") + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText || "--") + '</span></div>' +
-                '<div class="tile-compact-row conclusion"><span class="label">一句话结论</span><span class="value">' + escapeHtml(conclusionText) + '</span></div>' +
                 '</div></div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
@@ -6441,8 +6591,14 @@
                 if (!sym) return;
                 selectedSymbol = sym;
                 selectedPositionId = null;
+                Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (tile) {
+                    tile.classList.toggle("selected", tile === el);
+                });
+                updateAssetDetailLink(list.find(function (asset) {
+                    return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === sym;
+                }) || null);
                 syncDashboardSelectionUrl();
-                refreshDashboard();
+                refreshAssetContext();
             }
             el.addEventListener("click", selectAsset);
             el.addEventListener("keydown", function (event) {
@@ -6456,48 +6612,39 @@
     function renderHomePositionsFromPayload(positions) {
         var box = document.getElementById("homePositionContent");
         if (!box) return;
-        var tableHead = positionTableHeadHtml();
         var list = (positions || []).filter(function (p) {
             var positionId = p && (p.positionId != null ? p.positionId : p.id);
-            return !isLocallyClosedPosition(positionId) && canManualClosePositionStatus(positionStatusValue(p));
+            return !isLocallyClosedPosition(positionId);
         });
         if (!list.length) {
-            box.innerHTML = tableHead + positionEmptyRows() + '</tbody></table>';
+            box.innerHTML = '<div class="overview-empty-state" role="status">'
+                + '<strong>暂无手动持仓</strong><span>持仓数据不足时保持空状态</span></div>';
             return;
         }
-        var rows = list.slice(0, 5).map(function (p) {
+        function value(raw, fallback) {
+            return cleanBlankValue(raw) || fallback || "--";
+        }
+        var cards = list.slice(0, 3).map(function (p) {
             var positionId = p.positionId != null ? p.positionId : p.id;
-            var positionStatus = positionStatusValue(p);
-            var positionSymbol = normalizeSymbolInput(p.symbol || "");
-            var selectedRow = normalizePositionId(selectedPositionId) === normalizePositionId(positionId);
-            var assetCell = positionAssetCellHtml(p.symbol, p.direction, [
-                { label: "用户开仓价", value: cleanBlankValue(formatPrice(p.entryPrice)) },
-                { label: "杠杆", value: p.leverage != null ? String(p.leverage) : "" },
-                { label: "仓位", value: p.positionSize != null ? String(p.positionSize) : "" },
-                { label: "开仓时间", value: cleanBlankValue(formatDateTime(p.openedAt || p.opened_at || p.openTime || p.open_time || p.entryTime || p.entry_time)) },
-                { label: "当前价", value: cleanBlankValue(formatPrice(p.currentPrice)) },
-                { label: "浮动盈亏", value: cleanBlankValue(formatSignedAmount(p.floatingPnl)) }
-            ]);
-            return '<tr class="home-position-row' + (selectedRow ? ' selected' : '') + '" tabindex="0"'
-                + ' data-position-id="' + escapeHtml(normalizePositionId(positionId)) + '"'
-                + ' data-symbol="' + escapeHtml(positionSymbol) + '"'
-                + ' aria-selected="' + (selectedRow ? 'true' : 'false') + '">'
-                + '<td class="position-asset-cell">' + assetCell + '</td>'
-                + '<td>' + positionMonitorCell(p.entryLogicStatusLabel || positionLogicStatusLabel(p.entryLogicStatus), "等待首次监控") + '</td>'
-                + '<td>' + positionMonitorCell(p.directionSupportStatusLabel || directionSupportStatusLabel(p.directionSupportStatus), "等待首次监控") + '</td>'
-                + '<td>' + positionMonitorCell(p.reversalStatusLabel || reversalStatusLabel(p.reversalStatus), "等待首次监控") + '</td>'
-                + '<td>' + positionRiskHtml(p) + '</td>'
-                + '<td>' + positionCurrentAdviceHtml(p) + '</td>'
-                + '<td>' + positionMonitorTimeCellHtml(p.lastMonitorAt || p.last_monitor_at, p.nextMonitorAt || p.next_monitor_at) + '</td>'
-                + '<td>' + positionCloseActionHtml(positionId, p.symbol, positionStatus) + '</td>'
-                + '</tr>';
+            var direction = value(p.directionLabel || positionSideText(p.direction), "--");
+            return '<article class="home-position-summary-card" data-position-id="'
+                + escapeHtml(normalizePositionId(positionId)) + '">'
+                + '<div class="home-position-summary-head"><strong>'
+                + escapeHtml(value(p.symbol, "--")) + '</strong><span>'
+                + escapeHtml(direction) + '</span></div>'
+                + '<dl class="home-position-summary-grid">'
+                + '<div><dt>入场逻辑</dt><dd>' + escapeHtml(value(p.entryLogicStatusLabel, "待同步")) + '</dd></div>'
+                + '<div><dt>方向支持</dt><dd>' + escapeHtml(value(p.directionSupportStatusLabel, "待同步")) + '</dd></div>'
+                + '<div><dt>反转状态</dt><dd>' + escapeHtml(value(p.reversalStatusLabel, "待同步")) + '</dd></div>'
+                + '<div><dt>风险等级</dt><dd>' + escapeHtml(value(p.riskLevelLabel, "待同步")) + '</dd></div>'
+                + '<div class="wide"><dt>当前建议</dt><dd>' + escapeHtml(value(p.suggestedManualActionText, "当前不可查看")) + '</dd></div>'
+                + '</dl></article>';
         });
-        box.innerHTML = tableHead + rows.join("") + positionFillerRows(Math.max(0, 5 - rows.length)) + '</tbody></table>';
-        bindHomePositionRows();
-        bindManualCloseButtons();
+        box.innerHTML = '<div class="home-position-summary-list" data-home-position-summary>'
+            + cards.join("") + '</div>';
     }
 
-    function renderHomeExecutionFromPayload(suggestion) {
+    function renderHomeExecutionFromPayload(suggestion, selectedAsset) {
         var box = document.getElementById("homeExecutionContent");
         if (!box) return;
         var s = suggestion || {};
@@ -6517,41 +6664,52 @@
             + escapeHtml(access.statusLabel) + '</p><p class="sub">'
             + escapeHtml(access.reason) + '</p></div>';
         box.dataset.exactPlanVisible = String(access.visible);
-        if (!access.visible) {
-            box.innerHTML = '<div class="execution-card-body">' + statusHtml + '</div>';
-            return;
+        var worthOpening = selectedAsset && selectedAsset.worthOpening === true
+            ? "是" : (selectedAsset && selectedAsset.worthOpening === false ? "否" : "待同步");
+        function verified(value) {
+            return access.visible ? value : "--";
         }
         var rows = [
-            ["方向", marketBiasLabel(s.direction)],
-            ["入场区间", s.entryZone],
-            ["止损价", s.stopLoss],
-            ["阶梯止盈", s.takeProfitRules],
-            ["杠杆", s.leverageSuggestion],
-            ["仓位建议", s.positionSuggestion],
-            ["有效期", formatExecutionValidPeriod(
-                s.validPeriod || "", s.entryZone, s.stopLoss, s.takeProfitRules, s.expiresAt)],
-            ["失效条件", s.invalidCondition]
+            ["方向", verified(s.direction ? marketBiasLabel(s.direction) : "--")],
+            ["是否值得开仓", worthOpening],
+            ["入场区间", verified(s.entryZone)],
+            ["止损", verified(s.stopLoss)],
+            ["止盈方案", verified(s.takeProfitRules)],
+            ["杠杆建议", verified(s.leverageSuggestion)],
+            ["仓位建议", verified(s.positionSuggestion)],
+            ["有效开始", verified(s.validFrom)],
+            ["有效结束", verified(s.expiresAt)],
+            ["计划失效条件", verified(s.invalidCondition)],
+            ["冲突阻断", cleanBlankValue(s.blockedReason) || "--"]
         ];
-        box.innerHTML = '<div class="execution-card-body">' + statusHtml + executionRowsHtml(rows) + '</div>';
+        box.innerHTML = '<div class="execution-card-body">' + statusHtml + executionRowsHtml(rows)
+            + '<p class="position-source-note">系统建议，仅供人工复核；不会自动下单或创建持仓。</p></div>';
     }
 
     function renderHomeAiDecisionFromPayload(aiDecision) {
-        var tabs = document.getElementById("homeAiTabs");
-        var content = document.getElementById("homeAiTabContent");
+        var cards = document.getElementById("homeAiSummaryCards");
         var ai = aiDecision || {};
         var tabList = frontendContract.normalizeAiTabs(ai.tabs);
-        if (!activeAiTab || !tabList.some(function (t) { return t.role === activeAiTab; })) {
-            activeAiTab = "GPT_FINAL";
+        function summary(tab) {
+            if (tab.role === "GPT_FINAL") {
+                return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
+                    || "当前观点待同步";
+            }
+            if (tab.role === "GEMINI_REVIEW") {
+                return cleanBlankValue(tab.reviewConclusion || tab.reviewVerdict || tab.statusMessage)
+                    || "当前复核待同步";
+            }
+            return cleanBlankValue(tab.challengeConclusion || tab.challengeThesis || tab.statusMessage)
+                || "当前挑战待同步";
         }
-        var current = tabList.find(function (t) { return t.role === activeAiTab; }) || {};
-        if (tabs && content) {
-            Array.prototype.forEach.call(tabs.querySelectorAll(".ai-tab"), function (btn) {
-                var tab = btn.getAttribute("data-ai-tab");
-                btn.textContent = aiTabLabel(tab);
-                btn.classList.toggle("active", tab === activeAiTab);
-                btn.onclick = function () { activeAiTab = tab; renderHomeAiDecisionFromPayload(aiDecision); };
-            });
-            content.innerHTML = renderHomeAiRoleTab(current, activeAiTab);
+        if (cards) {
+            cards.innerHTML = tabList.map(function (tab) {
+                return '<article class="home-ai-summary-card" data-home-ai-role="' + escapeHtml(tab.role) + '">'
+                    + '<div class="home-ai-summary-head"><strong>' + escapeHtml(tab.role) + '</strong><em>'
+                    + escapeHtml(tab.runStatusLabel || "待同步") + '</em></div>'
+                    + '<span>' + escapeHtml(aiTabLabel(tab.role)) + '</span>'
+                    + '<p>' + escapeHtml(summary(tab)) + '</p></article>';
+            }).join("");
         }
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
@@ -6585,7 +6743,14 @@
         setText("opportunityRiskCountText", String(counts.positionRisk || 0));
     }
 
-    function renderDashboardHomePayload(home) {
+    function selectedHomeAsset(home) {
+        var assets = home && Array.isArray(home.assets) ? home.assets : [];
+        return assets.find(function (asset) {
+            return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === selectedSymbol;
+        }) || null;
+    }
+
+    function renderDashboardHomePayload(home, preservePositionSummary) {
         if (!home) return;
         var header = home.header || {};
         setRuntimeStatus(header.dataStatus || "WAITING_SYNC");
@@ -6608,12 +6773,12 @@
         };
         allDecisions = (home.assets || []).map(homeAssetDecisionLike);
         displayDecisions = allDecisions.slice(0, 6);
-        renderHomeSystemStateFromPayload(home.systemState || {});
+        renderHomeSystemStateFromPayload(home.systemState || {}, header);
         renderHomeAlertEventRowsFromPayload(home);
         renderHomeAssetsFromPayload(home.assets || []);
         renderSidebarSlots();
-        renderHomePositionsFromPayload(home.positions || []);
-        renderHomeExecutionFromPayload(home.executionSuggestion || {});
+        if (!preservePositionSummary) renderHomePositionsFromPayload(home.positions || []);
+        renderHomeExecutionFromPayload(home.executionSuggestion || {}, selectedHomeAsset(home));
         renderHomeAiDecisionFromPayload(home.aiDecision || {});
         renderHomePushInboxFromPayload(home.pushInbox || {});
         updateAssetPoolPanel();
@@ -6630,7 +6795,7 @@
         setRuntimeStatus("WAITING_SYNC");
         setHeaderAiStatus("WAITING_SYNC", "等待同步");
         setText("headerSourceStatusText", "等待重新同步");
-        renderHomeSystemStateFromPayload({});
+        renderHomeSystemStateFromPayload({}, {});
         renderHomeAlertEventRowsFromPayload({});
         renderHomeAssetsFromPayload([]);
         renderSidebarSlots();
@@ -6642,8 +6807,10 @@
         if (execution) {
             execution.innerHTML = '<div class="execution-card-body"><div class="execution-fail-status" role="status"><p class="main">当前不展示执行计划</p><p class="sub">首页数据暂不可用，等待重新同步</p></div></div>';
         }
-        var aiContent = document.getElementById("homeAiTabContent");
-        if (aiContent) aiContent.innerHTML = renderUnavailableAiRole({ runStatusLabel: "等待同步", statusMessage: "首页数据暂不可用，等待重新同步" });
+        renderHomeAiDecisionFromPayload({
+            consistency: { aiApplicable: false },
+            tabs: []
+        });
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
             consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
@@ -6652,7 +6819,7 @@
         document.getElementById("lastUpdatedText").textContent = nowText();
     }
 
-    function fetchDashboardHome() {
+    function fetchDashboardHome(preservePositionSummary) {
         dashboardHomeRequestSequence += 1;
         var sequence = dashboardHomeRequestSequence;
         if (dashboardHomeAbortController) dashboardHomeAbortController.abort();
@@ -6673,7 +6840,7 @@
                 if (sequence !== dashboardHomeRequestSequence) return null;
                 var parsed = frontendContract.parseApiEnvelope(resp);
                 if (!parsed.ok) throw new Error(parsed.message);
-                renderDashboardHomePayload(parsed.data);
+                renderDashboardHomePayload(parsed.data, preservePositionSummary === true);
                 return parsed.data;
             })
             .catch(function (error) {
@@ -6915,7 +7082,7 @@
                 selectedSymbol = sym;
                 selectedPositionId = null;
                 syncDashboardSelectionUrl();
-                refreshDashboard();
+                refreshAssetContext();
             });
         });
     }
@@ -9621,9 +9788,19 @@
     }
 
     function refreshDashboard() {
-        return fetchDashboardHome()
+        return fetchDashboardHome(false)
             .catch(function () {
                 renderDashboardHomeUnavailable();
+                return null;
+            });
+    }
+
+    function refreshAssetContext() {
+        return fetchDashboardHome(true)
+            .catch(function () {
+                updateAssetDetailLink(null);
+                renderHomeExecutionFromPayload({}, null);
+                renderHomeAiDecisionFromPayload({ consistency: {}, tabs: [] });
                 return null;
             });
     }
@@ -9879,7 +10056,7 @@
         if (topSearch) topSearch.value = formatSymbolPair(symbol);
         if (sideSearch) sideSearch.value = formatSymbolPair(symbol);
         hideAssetSearchSuggestions();
-        refreshDashboard();
+        refreshAssetContext();
     }
 
     function renderAssetSearchSuggestions() {
@@ -10389,6 +10566,18 @@
         });
     }
 
+    function bindDesktopProductNavigation() {
+        var status = document.querySelector("[data-desktop-nav-status]");
+        Array.prototype.forEach.call(
+            document.querySelectorAll("[data-desktop-unavailable-nav]"),
+            function (control) {
+                control.addEventListener("click", function () {
+                    if (status) status.textContent = (control.textContent || "该页面") + " 暂未开放";
+                });
+            }
+        );
+    }
+
     function toggleTheme() {
         var root = document.documentElement;
         var btn = document.getElementById("themeBtn");
@@ -10413,6 +10602,7 @@
             if (btn) btn.textContent = "白天主题";
         }
         restoreDashboardSelectionFromUrl();
+        bindDesktopProductNavigation();
         modeValue = "system";
         updateModeHint();
         renderModuleStatusBoard();

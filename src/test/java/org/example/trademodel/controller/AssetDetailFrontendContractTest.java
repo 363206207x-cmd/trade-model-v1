@@ -253,18 +253,23 @@ class AssetDetailFrontendContractTest {
         String mobileScript = Files.readString(MOBILE_SCRIPT);
 
         assertThat(desktop)
-                .contains("id=\"assetDetailLink\" hidden")
-                .contains("function updateAssetDetailLink(symbol)")
-                .contains("/dashboard/asset-detail?selectedSymbol=")
+                .contains("id=\"assetDetailLink\" aria-disabled=\"true\"")
+                .contains("function updateAssetDetailLink(asset)")
+                .contains("/dashboard/analysis-detail?analysisId=")
+                .contains("asset && asset.analysisId")
                 .contains("slotType !== \"DEFAULT_SLOT\"");
         assertThat(mobile)
                 .contains("data-asset-detail-link")
-                .contains("/dashboard/asset-detail")
-                .contains("!#lists.isEmpty(mobileAssets)");
+                .contains("data-analysis-id=${asset.analysisId}")
+                .contains("当前不可查看")
+                .doesNotContain("/dashboard/asset-detail");
         assertThat(mobileScript)
-                .contains("function updateAssetDetailLink(symbol)")
+                .contains("function updateAssetDetailLink(card)")
+                .contains("/dashboard/analysis-detail?analysisId=")
                 .contains("&view=mobile")
-                .contains("updateAssetDetailLink(selectedCard ? symbol : null)");
+                .contains("updateAssetDetailLink(selectedCard)")
+                .contains("delete card.dataset.analysisId")
+                .doesNotContain("/dashboard/asset-detail?selectedSymbol=");
     }
 
     private int count(String source, String target) {
