@@ -6,11 +6,30 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04 Information Architecture Freeze preparation; FE-04 frontend is NOT_STARTED
-Next Business Phase: FE-04 Figma Baseline Freeze
-Next Business Phase Allowed: RUNTIME_GATED; after this governance alignment is effective on clean, synced main, only the separately authorized FE-04 Figma Baseline Freeze is allowed; FE-04 frontend implementation, API expansion, P4, and production deployment remain blocked
+Current Work Package: FE-04A + FE-04B Frontend Implementation preparation; the Figma baseline is registered on main and FE-04 frontend is NOT_STARTED
+Next Business Phase: FE-04A + FE-04B Frontend Implementation
+Next Business Phase Allowed: RUNTIME_GATED; on clean, synced main only FE-04A Shell & Navigation plus FE-04B Home Dashboard Integration may begin; later FE-04 packages, API expansion, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## FE-04 Figma Baseline Registration
+
+The approved FE-04 baseline is frozen in `Trade Model Design System` and is
+registered by `docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`.
+
+Registered mobile frames are Home `296:2`, Position Monitor `296:3`, AI
+Analysis `296:4`, Message Center `296:5`, Push Detail `296:6`, and Profile
+`296:7`. Registered desktop frames are Dashboard `296:8`, Position Monitoring
+`296:9`, AI Analysis `296:10`, Message Center `296:11`, and Profile `296:12`.
+The registered component nodes are Asset Card `28:154`, Execution Plan Card
+`31:23`, AI Role Card `35:97`, Position Monitor Card `32:26`, Message Card
+`299:54`, and Push Detail Card `300:234`.
+
+The design baseline is `FROZEN` and its repository registration is
+`REGISTERED_ON_MAIN`. FE-04 frontend remains `NOT_STARTED`. No runtime page,
+API, schema, Figma node, or trading capability is changed by this record.
 
 ---
 
@@ -28,10 +47,11 @@ merged main:
 4. P3-H3 UserPosition ownership and authorization foundation is effective on
    merged main `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` through PR #1141.
 
-These merged packages satisfy the prerequisites for a separately authorized
-FE-04 Figma Baseline Freeze. They do not implement the FE-04 frontend, make a
-Figma baseline effective, authorize new APIs, or move trading capability.
-FE-04 frontend status remains `NOT_STARTED`.
+These merged packages satisfied the prerequisites for the FE-04 Figma baseline,
+which is now registered on main in
+`docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`. The registration does
+not implement the FE-04 frontend, authorize new APIs, or move trading
+capability. FE-04 frontend status remains `NOT_STARTED`.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -86,8 +106,10 @@ These changes are effective on merged main; real production PostgreSQL V8, real 
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, and P3-H3 are now
-effective on merged main. The next bounded action is FE-04 Figma Baseline
-Freeze; FE-04 frontend implementation and P4 remain blocked.
+effective on merged main. The FE-04 Figma baseline is registered on main. The
+next bounded implementation package is FE-04A Shell & Navigation plus FE-04B
+Home Dashboard Integration. Later FE-04 packages, API expansion, P4, and
+production deployment remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
@@ -1286,6 +1308,6 @@ No production deployment approval or runtime production implementation package m
 
 ## Workflow PR Status
 
-- CURRENT_PACKAGE_PR: NONE; FE-04 Figma Baseline Freeze has no repository PR
-- OPEN_PR_COUNT: 0 verified against GitHub at main `d523dc3e69920d6dd80a0d49f344f86757eb7b9e`
-- UNRELATED_OPEN_PRS: NONE at the recorded mainline; runtime status remains derived by `scripts/v1-state.sh`
+- CURRENT_PACKAGE_PR: NONE; FE-04 Figma baseline registration is a local documentation package pending repository delivery
+- OPEN_PR_COUNT: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`
+- UNRELATED_OPEN_PRS: not re-verified by this local documentation task; runtime status remains derived by `scripts/v1-state.sh`

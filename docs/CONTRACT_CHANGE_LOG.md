@@ -315,3 +315,29 @@ Does this weaken safety boundaries: No.
 Human confirmation required: Yes before Figma modification or any later FE-04
 implementation package. This local documentation alignment becomes effective
 project governance only after it is merged to clean, synced `main`.
+
+---
+
+## v1.0-fe04-figma-baseline-registration
+
+Date: 2026-07-28
+Changed by: Codex
+Reason: Register the already-frozen FE-04 Figma baseline in repository
+governance so the semantic contract, design identity, delivery matrix, current
+state, and next-task mirror agree.
+Before: The approved design contained exact FE-04 frames and components, but
+merged repository governance still stated that no authoritative Figma
+Page/Frame/Frame ID baseline had been frozen.
+After: Merged-main governance records `Trade Model Design System`, mobile
+frames `296:2` through `296:7`, desktop frames `296:8` through `296:12`, the
+six approved component node IDs, and Mobile Navigation V2 in
+`docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`. FE-04 frontend
+remains `NOT_STARTED`; the registration authorizes no runtime, API, Figma, or
+trading change. The next bounded package is FE-04A Shell & Navigation plus
+FE-04B Home Dashboard Integration.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No.
+Human confirmation required: Yes before FE-04A + FE-04B implementation. This
+record describes the registration's merged-main state; it does not mark FE-04
+implemented or complete.
