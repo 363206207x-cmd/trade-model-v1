@@ -3837,7 +3837,7 @@
                                 <em data-desktop-ai-role-status>待同步</em>
                             </div>
                             <p data-desktop-ai-role-summary>当前观点待同步</p>
-                            <dl class="desktop-ai-role-metrics">
+                            <dl class="desktop-ai-role-metrics" data-desktop-ai-role-output hidden>
                                 <div><dt>方向</dt><dd data-desktop-ai-role-direction>--</dd></div>
                                 <div><dt>置信度</dt><dd data-desktop-ai-role-confidence>--</dd></div>
                             </dl>
@@ -6733,6 +6733,9 @@
     function renderAiRoleEvidencePanel(d, payload, tab) {
         var raw = aiRoleTextForTab(payload, tab);
         var roleObj = aiRoleObjectForTab(payload, tab);
+        if (!roleObj || roleObj.resultAvailable !== true) {
+            return renderUnavailableAiRole(roleObj);
+        }
         var c = d ? resolveAiConflict(d) : { label: "—", score: null, source: "fallback" };
         var hasRaw = hasAiRoleRaw(raw);
         var rows = [
@@ -6981,6 +6984,7 @@
             );
             if (!panel) return;
             var resultAvailable = analysisState === "partial" && tab.resultAvailable === true;
+            panel.dataset.resultAvailable = String(resultAvailable);
             var status = panel.querySelector("[data-desktop-ai-role-status]");
             var summary = panel.querySelector("[data-desktop-ai-role-summary]");
             if (status) status.textContent = analysisState === "partial"
@@ -6989,14 +6993,16 @@
             if (summary) summary.textContent = analysisState === "partial"
                 ? desktopAiRoleSummary(tab)
                 : stateView.roleSummary;
+            var roleOutput = panel.querySelector("[data-desktop-ai-role-output]");
+            if (roleOutput) roleOutput.hidden = !resultAvailable;
             var direction = panel.querySelector("[data-desktop-ai-role-direction]");
             var confidence = panel.querySelector("[data-desktop-ai-role-confidence]");
             if (direction) direction.textContent = resultAvailable
                 ? cleanBlankValue(tab.finalMarketBias) || "--"
-                : "--";
+                : "";
             if (confidence) confidence.textContent = resultAvailable
                 ? cleanBlankValue(tab.finalConfidence) || "--"
-                : "--";
+                : "";
         });
     }
 

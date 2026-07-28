@@ -295,24 +295,38 @@ class Fe04ShellHomeDashboardContractTest {
         String contract = Files.readString(FRONTEND_CONTRACT);
 
         assertThat(contract)
-                .contains("normalized.resultAvailable = normalized.resultAvailable === true");
+                .contains(
+                        "if (!supplied || supplied.resultAvailable !== true)",
+                        "roleLabel: definition.label",
+                        "resultAvailable: false",
+                        "runStatusLabel: displayText(supplied && supplied.runStatusLabel, \"待同步\")",
+                        "supplied && supplied.statusMessage",
+                        "normalized.resultAvailable = true");
         assertThat(mobile)
                 .contains(
                         "data-result-available=${tab.resultAvailable == true}",
+                        "data-role-status-message=${tab.statusMessage != null ? tab.statusMessage : ''}",
                         "tab.resultAvailable == true ?",
-                        "tab.role == 'GPT_FINAL' and tab.resultAvailable == true");
+                        "tab.role == 'GPT_FINAL' and tab.resultAvailable == true",
+                        "data-ai-analysis-role-output hidden");
         assertThat(script)
                 .contains(
                         "if (tab.resultAvailable !== true)",
                         "var resultAvailable = canReadRoles && tab.resultAvailable === true",
+                        "roleOutput.hidden = !resultAvailable",
                         "var resultAvailable = card.dataset.resultAvailable === \"true\"",
-                        "if (resultAvailable && role === \"GPT_FINAL\")")
+                        "card.dataset.roleStatusMessage",
+                        "if (!resultAvailable) return tab",
+                        "if (role === \"GPT_FINAL\")")
                 .doesNotContain("Number(tab.resultAvailable)");
         assertThat(desktop)
                 .contains(
                         "function desktopAiRoleSummary(tab)",
                         "if (tab.resultAvailable !== true)",
-                        "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true")
+                        "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true",
+                        "data-desktop-ai-role-output hidden",
+                        "roleOutput.hidden = !resultAvailable",
+                        "if (!roleObj || roleObj.resultAvailable !== true)")
                 .doesNotContain("Boolean(tab.resultAvailable)");
     }
 

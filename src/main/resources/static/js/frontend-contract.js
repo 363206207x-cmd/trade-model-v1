@@ -130,21 +130,25 @@
 
     return AI_ROLES.map(function (definition) {
       var supplied = byRole[definition.role];
-      var normalized = {};
-      if (supplied && typeof supplied === "object") {
-        Object.keys(supplied).forEach(function (key) {
-          normalized[key] = supplied[key];
-        });
+      if (!supplied || supplied.resultAvailable !== true) {
+        return {
+          role: definition.role,
+          roleLabel: definition.label,
+          resultAvailable: false,
+          runStatusLabel: displayText(supplied && supplied.runStatusLabel, "待同步"),
+          statusMessage: displayText(
+            supplied && supplied.statusMessage,
+            supplied ? "当前角色观点不可用" : "当前角色观点待同步"
+          )
+        };
       }
+      var normalized = {};
+      Object.keys(supplied).forEach(function (key) {
+        normalized[key] = supplied[key];
+      });
       normalized.role = definition.role;
       normalized.roleLabel = displayText(normalized.roleLabel, definition.label);
-      normalized.resultAvailable = normalized.resultAvailable === true;
-      if (!supplied) {
-        normalized.runStatus = "NOT_AVAILABLE";
-        normalized.runStatusLabel = "待同步";
-        normalized.resultAvailable = false;
-        normalized.statusMessage = "当前角色观点待同步";
-      }
+      normalized.resultAvailable = true;
       return normalized;
     });
   }

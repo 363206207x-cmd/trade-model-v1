@@ -59,6 +59,116 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
+    func testDesktopAiAnalysisHardGatesUnavailableRoleOutputs() throws {
+        let webView = try loadDesktopTemplate()
+
+        try run(
+            """
+            window.__resolveDesktopHome = function(index, available) {
+              var hasResult = available === true;
+              window.__overviewRequests[index].resolve({
+                ok: true,
+                json: function() {
+                  return Promise.resolve({
+                    code: 200,
+                    data: {
+                      selectedSymbol: 'BTCUSDT',
+                      header: {},
+                      systemState: {},
+                      assets: [{
+                        symbol: 'BTCUSDT',
+                        rawSymbol: 'BTCUSDT',
+                        analysisId: 'ANA_BTCUSDT',
+                        marketBiasLabel: '规则方向'
+                      }],
+                      positions: [],
+                      executionSuggestion: {},
+                      aiDecision: {
+                        runStatusLabel: 'READY',
+                        consistency: {},
+                        tabs: [{
+                          role: 'GPT_FINAL',
+                          resultAvailable: available,
+                          runStatusLabel: hasResult ? '可用' : '未调用',
+                          statusMessage: 'DESKTOP_STATUS_ONLY',
+                          finalConclusion: hasResult
+                            ? 'DESKTOP_AVAILABLE_CONCLUSION'
+                            : 'DESKTOP_LEAKED_CONCLUSION',
+                          finalMarketBias: hasResult
+                            ? 'DESKTOP_AVAILABLE_DIRECTION'
+                            : 'DESKTOP_LEAKED_DIRECTION',
+                          finalConfidence: hasResult
+                            ? 'DESKTOP_AVAILABLE_CONFIDENCE'
+                            : 'DESKTOP_LEAKED_CONFIDENCE',
+                          evidence: ['DESKTOP_LEAKED_EVIDENCE']
+                        }]
+                      },
+                      pushInbox: {},
+                      diagnostics: {},
+                      safety: {}
+                    }
+                  });
+                }
+              });
+            }
+            window.__resolveDesktopHome(0, false)
+            """,
+            in: webView
+        )
+
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-desktop-ai-role-summary]').textContent === 'DESKTOP_STATUS_ONLY'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-desktop-ai-role-output]').hidden",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-desktop-ai-role-direction]').textContent",
+                in: webView
+            ),
+            ""
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-desktop-ai-role-confidence]').textContent",
+                in: webView
+            ),
+            ""
+        )
+
+        try run("void window.refreshDashboard()", in: webView)
+        XCTAssertTrue(waitUntil("window.__overviewRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolveDesktopHome(1, true)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-desktop-ai-role-summary]').textContent === 'DESKTOP_AVAILABLE_CONCLUSION'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-desktop-ai-role-output]').hidden",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-desktop-ai-role-direction]').textContent",
+                in: webView
+            ),
+            "DESKTOP_AVAILABLE_DIRECTION"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-desktop-ai-role-confidence]').textContent",
+                in: webView
+            ),
+            "DESKTOP_AVAILABLE_CONFIDENCE"
+        )
+    }
+
     func testRapidSameAssetRequestsKeepBusyUntilLatestRequestFinishes() throws {
         let webView = try loadFixture()
         let cardSelector = "document.querySelector('[data-symbol=\"BTCUSDT\"]')"
@@ -478,6 +588,21 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             timeout: 2
         ))
 
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-role-summary] .role-status')).map(node => node.textContent).join('|')",
+                in: webView
+            ),
+            "STATUS_GPT_ETHUSDT|STATUS_GEMINI_ETHUSDT|STATUS_GROK_ETHUSDT"
+        )
+        XCTAssertEqual(
+            try numberValue(
+                "document.querySelectorAll('[data-ai-role-summary] .role-summary-metrics').length",
+                in: webView
+            ),
+            0
+        )
+
         try run("document.querySelector('[data-ai-nav]').click()", in: webView)
         XCTAssertEqual(
             try stringValue(
@@ -486,8 +611,8 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             ),
             "STATUS_GPT_ETHUSDT|STATUS_GEMINI_ETHUSDT|STATUS_GROK_ETHUSDT"
         )
-        XCTAssertFalse(try booleanValue(
-            "document.querySelector('[data-mobile-ai-view]').textContent.includes('STALE_')",
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-ai-analysis-role-output]').hidden",
             in: webView
         ))
         XCTAssertEqual(
@@ -495,15 +620,138 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 "document.querySelector('[data-ai-analysis-role-direction]').textContent",
                 in: webView
             ),
-            "--"
+            ""
         )
         XCTAssertEqual(
             try stringValue(
                 "document.querySelector('[data-ai-analysis-role-confidence]').textContent",
                 in: webView
             ),
-            "--"
+            ""
         )
+        XCTAssertTrue(try booleanValue(
+            "Array.from(document.querySelectorAll('[data-ai-analysis-role-summary]')).every(node => !node.textContent.includes('STALE_'))",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "Object.keys(TradeModelFrontendContract.normalizeAiTabs([{role:'GPT_FINAL',resultAvailable:false,finalConclusion:'LEAK',finalMarketBias:'LEAK',finalConfidence:'LEAK',evidence:['LEAK'],legacyField:'LEAK'}])[0]).sort().join('|')",
+                in: webView
+            ),
+            "resultAvailable|role|roleLabel|runStatusLabel|statusMessage"
+        )
+    }
+
+    func testAiAnalysisAvailableRolesRenderReturnedOutputs() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        try run("window.__resolveDashboard(0, 'ETHUSDT', true, true, true)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-role-summary]').textContent", in: webView),
+            "GPT_ETHUSDT"
+        )
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-ai-analysis-role-output]').hidden",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-role-direction]').textContent", in: webView),
+            "DIR_ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-ai-analysis-role-confidence]').textContent", in: webView),
+            "CONF_ETHUSDT"
+        )
+
+        try run("document.querySelector('[data-ai-analysis-tab=\"GEMINI_REVIEW\"]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-panel=\"GEMINI_REVIEW\"] [data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "GEMINI_ETHUSDT"
+        )
+        try run("document.querySelector('[data-ai-analysis-tab=\"GROK_CHALLENGE\"]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-panel=\"GROK_CHALLENGE\"] [data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "GROK_ETHUSDT"
+        )
+    }
+
+    func testAiAnalysisMalformedLegacyAvailabilityFailsClosed() throws {
+        let webView = try loadFixture()
+
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').click()", in: webView)
+        try run("window.__resolveDashboard(0, 'SOLUSDT', true, true, 'true')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-analysis-role-summary]')).map(node => node.textContent).join('|')",
+                in: webView
+            ),
+            "STATUS_GPT_SOLUSDT|STATUS_GEMINI_SOLUSDT|STATUS_GROK_SOLUSDT"
+        )
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-ai-analysis-role-output]').hidden",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "Array.from(document.querySelectorAll('[data-ai-analysis-role-summary]')).every(node => !node.textContent.includes('STALE_'))",
+            in: webView
+        ))
+    }
+
+    func testAiAnalysisInitialBridgeIgnoresUnavailableLegacyConclusionDom() throws {
+        let webView = try loadFixture()
+
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-role-summary] .role-status')).map(node => node.textContent).join('|')",
+                in: webView
+            ),
+            "INITIAL_STATUS_GPT|INITIAL_STATUS_GEMINI|INITIAL_STATUS_GROK"
+        )
+        XCTAssertEqual(
+            try numberValue(
+                "document.querySelectorAll('[data-ai-role-summary] .role-summary-metrics').length",
+                in: webView
+            ),
+            0
+        )
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-mobile-home-view]').textContent.includes('LEAKED_INITIAL_')",
+            in: webView
+        ))
+
+        try run("document.querySelector('[data-ai-nav]').click()", in: webView)
+        XCTAssertEqual(
+            try stringValue(
+                "document.querySelector('[data-ai-analysis-role-summary]').textContent",
+                in: webView
+            ),
+            "INITIAL_STATUS_GPT"
+        )
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-ai-analysis-role-output]').hidden",
+            in: webView
+        ))
     }
 
     func testAiAnalysisFiveFailClosedStatesStayDistinct() throws {
@@ -1811,7 +2059,8 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             };
             window.__resolveDashboard = function(index, symbol, verified, analysisAvailable, roleAvailable) {
               var request = window.__pendingRequests[index];
-              var resultAvailable = roleAvailable !== false;
+              var resultAvailable = roleAvailable === undefined ? true : roleAvailable;
+              var hasResult = resultAvailable === true;
               var data = {
                 selectedSymbol: symbol,
                 assets: [{
@@ -1847,25 +2096,25 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                     {
                       role: 'GPT_FINAL',
                       resultAvailable: resultAvailable,
-                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      runStatusLabel: hasResult ? '可用' : '未调用',
                       statusMessage: 'STATUS_GPT_' + symbol,
-                      finalConclusion: resultAvailable ? 'GPT_' + symbol : 'STALE_GPT_' + symbol,
-                      finalMarketBias: resultAvailable ? 'DIR_' + symbol : 'STALE_DIR_' + symbol,
-                      finalConfidence: resultAvailable ? 'CONF_' + symbol : 'STALE_CONF_' + symbol
+                      finalConclusion: hasResult ? 'GPT_' + symbol : 'STALE_GPT_' + symbol,
+                      finalMarketBias: hasResult ? 'DIR_' + symbol : 'STALE_DIR_' + symbol,
+                      finalConfidence: hasResult ? 'CONF_' + symbol : 'STALE_CONF_' + symbol
                     },
                     {
                       role: 'GEMINI_REVIEW',
                       resultAvailable: resultAvailable,
-                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      runStatusLabel: hasResult ? '可用' : '未调用',
                       statusMessage: 'STATUS_GEMINI_' + symbol,
-                      reviewConclusion: resultAvailable ? 'GEMINI_' + symbol : 'STALE_GEMINI_' + symbol
+                      reviewConclusion: hasResult ? 'GEMINI_' + symbol : 'STALE_GEMINI_' + symbol
                     },
                     {
                       role: 'GROK_CHALLENGE',
                       resultAvailable: resultAvailable,
-                      runStatusLabel: resultAvailable ? '可用' : '未调用',
+                      runStatusLabel: hasResult ? '可用' : '未调用',
                       statusMessage: 'STATUS_GROK_' + symbol,
-                      challengeConclusion: resultAvailable ? 'GROK_' + symbol : 'STALE_GROK_' + symbol
+                      challengeConclusion: hasResult ? 'GROK_' + symbol : 'STALE_GROK_' + symbol
                     }
                   ]
                 }
@@ -1988,9 +2237,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <span data-consistency-field="confused">否</span>
               <span data-consistency-field="consistencySummary">等待同步</span>
               <div class="ai-role-summary-list" data-ai-role-root>
-                <article class="ai-role-summary-card" data-ai-role-summary="GPT_FINAL"><div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong>待同步</strong></div><p class="role-status">当前观点待同步</p></article>
-                <article class="ai-role-summary-card" data-ai-role-summary="GEMINI_REVIEW"><div class="role-heading"><div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div><strong>待同步</strong></div><p class="role-status">当前复核待同步</p></article>
-                <article class="ai-role-summary-card" data-ai-role-summary="GROK_CHALLENGE"><div class="role-heading"><div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div><strong>待同步</strong></div><p class="role-status">当前挑战待同步</p></article>
+                <article class="ai-role-summary-card" data-ai-role-summary="GPT_FINAL" data-result-available="false" data-role-status-message="INITIAL_STATUS_GPT"><div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong>未调用</strong></div><p class="role-status">LEAKED_INITIAL_GPT_CONCLUSION</p><dl class="role-summary-metrics"><div><dt>方向</dt><dd>LEAKED_INITIAL_DIRECTION</dd></div><div><dt>置信度</dt><dd>LEAKED_INITIAL_CONFIDENCE</dd></div></dl></article>
+                <article class="ai-role-summary-card" data-ai-role-summary="GEMINI_REVIEW" data-result-available="false" data-role-status-message="INITIAL_STATUS_GEMINI"><div class="role-heading"><div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div><strong>未调用</strong></div><p class="role-status">LEAKED_INITIAL_GEMINI_CONCLUSION</p></article>
+                <article class="ai-role-summary-card" data-ai-role-summary="GROK_CHALLENGE" data-result-available="false" data-role-status-message="INITIAL_STATUS_GROK"><div class="role-heading"><div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div><strong>未调用</strong></div><p class="role-status">LEAKED_INITIAL_GROK_CONCLUSION</p></article>
               </div>
             </section>
             <div style="height: 1800px"></div>
@@ -2032,7 +2281,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                          data-ai-analysis-role-panel="GPT_FINAL">
                   <div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong data-ai-analysis-role-status>待同步</strong></div>
                   <p data-ai-analysis-role-summary>当前观点待同步</p>
-                  <dl class="role-summary-metrics"><div><dt>方向</dt><dd data-ai-analysis-role-direction>--</dd></div><div><dt>置信度</dt><dd data-ai-analysis-role-confidence>--</dd></div></dl>
+                  <dl class="role-summary-metrics" data-ai-analysis-role-output hidden><div><dt>方向</dt><dd data-ai-analysis-role-direction></dd></div><div><dt>置信度</dt><dd data-ai-analysis-role-confidence></dd></div></dl>
                 </article>
                 <article class="ai-analysis-role-panel" role="tabpanel" hidden
                          data-ai-analysis-role-panel="GEMINI_REVIEW">

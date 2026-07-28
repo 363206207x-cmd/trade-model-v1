@@ -243,6 +243,10 @@
   function createRoleSummaryCard(tab) {
     var panel = element("article", "ai-role-summary-card");
     panel.dataset.aiRoleSummary = tab.role;
+    panel.dataset.resultAvailable = String(tab.resultAvailable === true);
+    if (frontendContract.hasText(tab.statusMessage)) {
+      panel.dataset.roleStatusMessage = String(tab.statusMessage);
+    }
     var heading = element("div", "role-heading");
     var headingText = element("div");
     headingText.appendChild(element("span", "", tab.role));
@@ -311,6 +315,7 @@
       );
       if (!panel) return;
       var resultAvailable = canReadRoles && tab.resultAvailable === true;
+      panel.dataset.resultAvailable = String(resultAvailable);
       var status = panel.querySelector("[data-ai-analysis-role-status]");
       var summary = panel.querySelector("[data-ai-analysis-role-summary]");
       if (status) {
@@ -323,13 +328,17 @@
           ? roleSummary(tab)
           : stateView.roleSummary;
       }
+      var roleOutput = panel.querySelector("[data-ai-analysis-role-output]");
+      if (roleOutput) {
+        roleOutput.hidden = !resultAvailable;
+      }
       var direction = panel.querySelector("[data-ai-analysis-role-direction]");
       var confidence = panel.querySelector("[data-ai-analysis-role-confidence]");
       if (direction) {
-        direction.textContent = resultAvailable ? text(tab.finalMarketBias, "--") : "--";
+        direction.textContent = resultAvailable ? text(tab.finalMarketBias, "--") : "";
       }
       if (confidence) {
-        confidence.textContent = resultAvailable ? text(tab.finalConfidence, "--") : "--";
+        confidence.textContent = resultAvailable ? text(tab.finalConfidence, "--") : "";
       }
     });
   }
@@ -396,24 +405,29 @@
         var role = card.dataset.aiRoleSummary;
         var status = card.querySelector(".role-heading strong");
         var label = card.querySelector(".role-heading h3");
-        var summary = card.querySelector(".role-status");
-        var values = card.querySelectorAll(".role-summary-metrics dd");
         var resultAvailable = card.dataset.resultAvailable === "true";
         var tab = {
           role: role,
           roleLabel: label ? label.textContent : roleLabel(role),
           runStatusLabel: status ? status.textContent : "待同步",
           resultAvailable: resultAvailable,
-          statusMessage: summary ? summary.textContent : null
+          statusMessage: text(
+            card.dataset.roleStatusMessage,
+            resultAvailable ? "当前角色状态待同步" : "当前角色观点不可用"
+          )
         };
-        if (resultAvailable && role === "GPT_FINAL") {
-          tab.finalConclusion = tab.statusMessage;
+        if (!resultAvailable) return tab;
+
+        var summary = card.querySelector(".role-status");
+        var values = card.querySelectorAll(".role-summary-metrics dd");
+        if (role === "GPT_FINAL") {
+          tab.finalConclusion = summary ? summary.textContent : null;
           tab.finalMarketBias = values[0] ? values[0].textContent : null;
           tab.finalConfidence = values[1] ? values[1].textContent : null;
-        } else if (resultAvailable && role === "GEMINI_REVIEW") {
-          tab.reviewConclusion = tab.statusMessage;
-        } else if (resultAvailable && role === "GROK_CHALLENGE") {
-          tab.challengeConclusion = tab.statusMessage;
+        } else if (role === "GEMINI_REVIEW") {
+          tab.reviewConclusion = summary ? summary.textContent : null;
+        } else if (role === "GROK_CHALLENGE") {
+          tab.challengeConclusion = summary ? summary.textContent : null;
         }
         return tab;
       }

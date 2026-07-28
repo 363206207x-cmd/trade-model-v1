@@ -310,7 +310,7 @@
       <div class="ai-role-summary-list" data-ai-role-root aria-label="AI 三角色摘要">
         <article class="ai-role-summary-card" th:each="tab : ${home.aiDecision.tabs}"
                  th:if="${tab.role == 'GPT_FINAL' or tab.role == 'GEMINI_REVIEW' or tab.role == 'GROK_CHALLENGE'}"
-                 th:attr="data-ai-role-summary=${tab.role},data-result-available=${tab.resultAvailable == true}">
+                 th:attr="data-ai-role-summary=${tab.role},data-result-available=${tab.resultAvailable == true},data-role-status-message=${tab.statusMessage != null ? tab.statusMessage : ''}">
           <div class="role-heading">
             <div><span th:text="${tab.role}">AI_ROLE</span><h3 th:text="${tab.roleLabel != null ? tab.roleLabel : tab.role}">AI 角色</h3></div>
             <strong th:text="${tab.runStatusLabel != null ? tab.runStatusLabel : '待同步'}">待同步</strong>
@@ -407,7 +407,7 @@
             <strong data-ai-analysis-role-status>待同步</strong>
           </div>
           <p class="role-status" data-ai-analysis-role-summary>当前观点待同步</p>
-          <dl class="role-summary-metrics">
+          <dl class="role-summary-metrics" data-ai-analysis-role-output hidden>
             <div><dt>方向</dt><dd data-ai-analysis-role-direction>--</dd></div>
             <div><dt>置信度</dt><dd data-ai-analysis-role-confidence>--</dd></div>
           </dl>
