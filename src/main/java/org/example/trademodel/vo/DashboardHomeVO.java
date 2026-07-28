@@ -1,5 +1,8 @@
 package org.example.trademodel.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -82,6 +85,7 @@ public class DashboardHomeVO {
         this.selectedSymbol = selectedSymbol;
     }
 
+    @JsonSerialize(using = ToStringSerializer.class)
     public Long getSelectedPositionId() {
         return selectedPositionId;
     }
@@ -626,6 +630,7 @@ public class DashboardHomeVO {
         private String sourceExecutionPlanId;
         private String sourceTraceId;
 
+        @JsonSerialize(using = ToStringSerializer.class)
         public Long getPositionId() {
             return positionId;
         }

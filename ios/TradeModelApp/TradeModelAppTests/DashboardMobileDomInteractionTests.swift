@@ -798,6 +798,125 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
+    func testPositionMonitoringPreservesLargePositionIdAsString() throws {
+        let positionId = "9007199254740993"
+        let webView = try loadPositionMonitoringFixture(positionId: positionId)
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[0].url", in: webView),
+            "/api/dashboard/home?limit=20&positionId=\(positionId)"
+        )
+        try run(
+            "window.__resolvePositionHome(0, { positionId: '\(positionId)' })",
+            in: webView
+        )
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[1].url", in: webView),
+            "/api/user-positions/\(positionId)"
+        )
+
+        try run("window.__resolvePositionDetail(1, '\(positionId)', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        XCTAssertEqual(
+            try stringValue("window.__positionRequests[2].url", in: webView),
+            "/api/review/positions/\(positionId)/monitor-logs?limit=20"
+        )
+        try run("window.__resolvePositionLogs(2, '\(positionId)')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-log-count]').textContent === '1 条'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-selected-position-id]').textContent", in: webView),
+            "positionId · \(positionId)"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-list] .active').dataset.positionId", in: webView),
+            positionId
+        )
+    }
+
+    func testPositionMonitoringLogFailureDoesNotClaimWaitingMonitor() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0, { waiting: true })", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__rejectPositionRequest(2)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-page-status]').dataset.status === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-monitor-field=\"monitorStatus\"]').textContent", in: webView),
+            "当前不可查看"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-monitor-card]').dataset.monitorStatus", in: webView),
+            "MONITOR_DATA_UNAVAILABLE"
+        )
+        XCTAssertFalse(try booleanValue(
+            "document.querySelector('[data-monitor-field=\"monitorStatus\"]').textContent === 'WAITING_MONITOR'",
+            in: webView
+        ))
+    }
+
+    func testPositionMonitoringEmptyLogReadConfirmsWaitingMonitor() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0, { waiting: true })", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__resolvePositionLogsEmpty(2)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-field=\"monitorStatus\"]').textContent === 'WAITING_MONITOR'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-page-status]').dataset.status", in: webView),
+            "ready"
+        )
+    }
+
+    func testPositionMonitoringExistingLogsDoNotConfirmAWaitingSummary() throws {
+        let webView = try loadPositionMonitoringFixture(positionId: "42")
+
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 1", in: webView, timeout: 2))
+        try run("window.__resolvePositionHome(0, { waiting: true })", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__resolvePositionDetail(1, '42', 'BTCUSDT')", in: webView)
+        XCTAssertTrue(waitUntil("window.__positionRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__resolvePositionLogs(2, '42')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-monitor-log-count]').textContent === '1 条'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-monitor-log-list] strong').textContent", in: webView),
+            "LOGIC_VALID"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-monitor-field=\"monitorStatus\"]').textContent", in: webView),
+            "当前不可查看"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-page-status]').dataset.status", in: webView),
+            "partial"
+        )
+    }
+
     func testPositionMonitoringRejectsCrossPositionLogsWithoutRenderingThem() throws {
         let webView = try loadPositionMonitoringFixture(positionId: "42")
 
@@ -993,7 +1112,10 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               window.__positionRequests.push(request);
             });
           };
-          window.__resolvePositionHome = function(index) {
+          window.__resolvePositionHome = function(index, options) {
+            options = options || {};
+            var primaryPositionId = String(options.positionId || '42');
+            var waiting = options.waiting === true;
             window.__positionRequests[index].resolve({
               ok: true,
               status: 200,
@@ -1003,22 +1125,22 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   data: {
                     positions: [
                       {
-                        positionId: 42,
+                        positionId: primaryPositionId,
                         symbol: 'BTCUSDT',
                         direction: 'LONG',
                         directionLabel: '多',
                         positionStatus: 'OPEN',
-                        entryLogicStatus: 'LOGIC_VALID',
-                        entryLogicStatusLabel: '逻辑仍成立',
-                        directionSupportStatusLabel: '仍支持原方向',
-                        reversalStatusLabel: '未反转',
-                        riskLevelLabel: '中',
-                        monitorConclusion: '当前逻辑仍成立',
-                        suggestedManualActionText: '继续人工监控',
-                        lastMonitorAt: '2026-07-28T10:00:00'
+                        entryLogicStatus: waiting ? 'WAITING_MONITOR' : 'LOGIC_VALID',
+                        entryLogicStatusLabel: waiting ? '等待首次监控' : '逻辑仍成立',
+                        directionSupportStatusLabel: waiting ? '等待首次监控' : '仍支持原方向',
+                        reversalStatusLabel: waiting ? '等待首次监控' : '未反转',
+                        riskLevelLabel: waiting ? '等待首次监控' : '中',
+                        monitorConclusion: waiting ? null : '当前逻辑仍成立',
+                        suggestedManualActionText: waiting ? '等待首次监控' : '继续人工监控',
+                        lastMonitorAt: waiting ? null : '2026-07-28T10:00:00'
                       },
                       {
-                        positionId: 43,
+                        positionId: '43',
                         symbol: 'BTCUSDT',
                         direction: 'SHORT',
                         directionLabel: '空',
@@ -1040,7 +1162,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 return Promise.resolve({
                   code: 200,
                   data: {
-                    id: Number(id),
+                    id: String(id),
                     assetSymbol: symbol,
                     side: 'LONG',
                     status: 'OPEN',
@@ -1063,7 +1185,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 return Promise.resolve({
                   code: 200,
                   data: [{
-                    positionId: Number(id),
+                    positionId: String(id),
                     logicStatus: 'LOGIC_VALID',
                     reason: 'LOG_' + id,
                     riskLevel: 'MEDIUM',
@@ -1071,6 +1193,18 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                     sourceStatusLabel: '来源已验证',
                     createdAt: '2026-07-28T10:00:00'
                   }]
+                });
+              }
+            });
+          };
+          window.__resolvePositionLogsEmpty = function(index) {
+            window.__positionRequests[index].resolve({
+              ok: true,
+              status: 200,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: []
                 });
               }
             });

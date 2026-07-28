@@ -1,5 +1,8 @@
 package org.example.trademodel.positionmonitorlog;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -34,6 +37,7 @@ public class PositionMonitorLogDTO {
 
     public Long getLogId() { return logId; }
     public void setLogId(Long logId) { this.logId = logId; }
+    @JsonSerialize(using = ToStringSerializer.class)
     public Long getPositionId() { return positionId; }
     public void setPositionId(Long positionId) { this.positionId = positionId; }
     public String getAnalysisId() { return analysisId; }

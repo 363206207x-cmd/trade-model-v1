@@ -263,7 +263,7 @@
     setText('[data-position-field="userStopLoss"]', positionDetail.stopLoss, "--");
     setText('[data-position-field="userTakeProfit"]', positionDetail.takeProfit, "--");
     renderLifecycle(safeLifecycle(positionDetail.status));
-    renderMonitor(position);
+    renderMonitor(position, false);
     selected.hidden = false;
   }
 
@@ -281,9 +281,34 @@
     setText('[data-monitor-mirror="' + name + '"]', value, fallback);
   }
 
-  function renderMonitor(position) {
+  function renderMonitorUnavailable() {
+    mirrorMonitorField("monitorStatus", "当前不可查看", "当前不可查看");
+    setText('[data-monitor-field="logic"]', "当前不可查看", "当前不可查看");
+    mirrorMonitorField("directionSupport", "当前不可查看", "当前不可查看");
+    mirrorMonitorField("reversal", "当前不可查看", "当前不可查看");
+    mirrorMonitorField("risk", null, "--");
+    setText('[data-monitor-field="conclusion"]', "当前不可查看", "当前不可查看");
+    mirrorMonitorField("suggestion", "当前不可查看", "当前不可查看");
+    setText('[data-monitor-field="lastMonitorAt"]', null, "--");
+    setText("[data-monitor-source]", "数据不可用", "数据不可用");
+    var card = document.querySelector("[data-position-monitor-card]");
+    if (card) card.dataset.monitorStatus = "MONITOR_DATA_UNAVAILABLE";
+  }
+
+  function monitorSummaryClaimsWaiting(position) {
+    return safeMonitorStatus(
+      position && position.entryLogicStatus,
+      position && position.lastMonitorAt
+    ) === "WAITING_MONITOR";
+  }
+
+  function renderMonitor(position, waitingConfirmed) {
     var status = safeMonitorStatus(position.entryLogicStatus, position.lastMonitorAt);
     var waiting = status === "WAITING_MONITOR";
+    if (waiting && waitingConfirmed !== true) {
+      renderMonitorUnavailable();
+      return;
+    }
     mirrorMonitorField("monitorStatus", status, waiting ? "WAITING_MONITOR" : "--");
     setText(
       '[data-monitor-field="logic"]',
@@ -325,6 +350,16 @@
     );
     var card = document.querySelector("[data-position-monitor-card]");
     if (card) card.dataset.monitorStatus = status || "MISSING";
+  }
+
+  function reconcileMonitorSummary(position, logs) {
+    if (!monitorSummaryClaimsWaiting(position)) return true;
+    if (!logs.length) {
+      renderMonitor(position, true);
+      return true;
+    }
+    renderMonitorUnavailable();
+    return false;
   }
 
   function validMonitorLogs(data, selectedId) {
@@ -399,7 +434,7 @@
     setPageStatus("部分数据可用", "partial");
   }
 
-  function loadMonitorLogs(request, selectedId) {
+  function loadMonitorLogs(request, selectedId, selectedSummary) {
     var url = "/api/review/positions/" + encodeURIComponent(selectedId)
       + "/monitor-logs?limit=20";
     return fetchEnvelope(url, request).then(function (data) {
@@ -407,13 +442,19 @@
       var returned = Array.isArray(data) ? data : [];
       var logs = validMonitorLogs(returned, selectedId);
       if (logs.length !== returned.length) {
+        if (monitorSummaryClaimsWaiting(selectedSummary)) renderMonitorUnavailable();
         showMonitorLogError();
         return;
       }
       renderMonitorLogs(logs);
-      setPageStatus("持仓已同步", "ready");
+      if (reconcileMonitorSummary(selectedSummary, logs)) {
+        setPageStatus("持仓已同步", "ready");
+      } else {
+        setPageStatus("部分数据可用", "partial");
+      }
     }).catch(function (error) {
       if (!isCurrentRequest(request) || isAbortError(error)) return;
+      if (monitorSummaryClaimsWaiting(selectedSummary)) renderMonitorUnavailable();
       showMonitorLogError();
     });
   }
@@ -430,7 +471,7 @@
       renderPosition(selectedSummary, positionDetail, selectedId);
       resetMonitorLogState();
       setPageStatus("持仓已同步", "ready");
-      return loadMonitorLogs(request, selectedId);
+      return loadMonitorLogs(request, selectedId, selectedSummary);
     });
   }
 
@@ -518,10 +559,17 @@
       loadPositionMonitoring();
       return;
     }
+    var selectedSummary = validPositionRows(currentHome).find(function (position) {
+      return samePositionId(position.positionId, selectedId);
+    });
+    if (!selectedSummary) {
+      loadPositionMonitoring();
+      return;
+    }
     var request = beginRequest();
     root.setAttribute("aria-busy", "true");
     setPageStatus("正在同步监控记录", "loading");
-    loadMonitorLogs(request, selectedId).finally(function () {
+    loadMonitorLogs(request, selectedId, selectedSummary).finally(function () {
       if (isCurrentRequest(request)) root.setAttribute("aria-busy", "false");
     });
   }

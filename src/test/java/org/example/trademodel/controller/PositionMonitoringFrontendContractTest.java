@@ -68,6 +68,10 @@ class PositionMonitoringFrontendContractTest {
                         "\"POSITION_IDENTITY_MISMATCH\"",
                         "\"&positionId=\" + encodeURIComponent(request.positionId)")
                 .doesNotContain(
+                        "Number(positionId)",
+                        "Number(selectedId)",
+                        "parseInt(",
+                        "parseFloat(",
                         "latestPosition",
                         "latestBySymbol",
                         "positionBySymbol",
@@ -106,7 +110,11 @@ class PositionMonitoringFrontendContractTest {
                         "\"LOGIC_WEAKENED\"",
                         "\"PLAN_INVALIDATED\"",
                         "\"HIGH_RISK\"",
-                        "return \"WAITING_MONITOR\"")
+                        "return \"WAITING_MONITOR\"",
+                        "renderMonitorUnavailable()",
+                        "\"MONITOR_DATA_UNAVAILABLE\"",
+                        "reconcileMonitorSummary(selectedSummary, logs)",
+                        "renderMonitor(position, true)")
                 .doesNotContain(
                         "\"WAITING_MONITOR\",\n  ];",
                         "monitorStatus = \"WAITING_MONITOR\"",

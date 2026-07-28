@@ -75,7 +75,7 @@ class ReviewControllerPositionMonitorLogTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].positionId").value(7))
+                .andExpect(jsonPath("$.data[0].positionId").value("7"))
                 .andExpect(jsonPath("$.data[0].analysisId").value("ana-p0-4"))
                 .andExpect(jsonPath("$.data[0].sourceVerified").value(false))
                 .andExpect(jsonPath("$.data[0].sourceStatus").value("PENDING_VERIFICATION"))
@@ -102,6 +102,20 @@ class ReviewControllerPositionMonitorLogTest {
 
         verify(positionMonitorLogService).listByPositionIdForUser(17L, 7L, 20);
         verify(reviewService, never()).saveOrUpdate(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void monitorLogApiSerializesLargePositionIdentityAsString() throws Exception {
+        long positionId = 9_007_199_254_740_993L;
+        PositionMonitorLogDTO log = dto(13L);
+        log.setPositionId(positionId);
+        when(positionMonitorLogService.listByPositionIdForUser(17L, positionId, 20))
+                .thenReturn(List.of(log));
+
+        mockMvc.perform(get("/api/review/positions/{id}/monitor-logs", positionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].positionId")
+                        .value("9007199254740993"));
     }
 
     @Test
