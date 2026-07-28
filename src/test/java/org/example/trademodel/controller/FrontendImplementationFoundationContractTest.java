@@ -66,20 +66,27 @@ class FrontendImplementationFoundationContractTest {
         assertThat(mobile)
                 .contains("/js/frontend-contract.js")
                 .contains("data-position-independent")
-                .contains("首页", "持仓", "复盘");
+                .contains("首页", "持仓", "AI分析", "消息", "我的")
+                .doesNotContain("data-review-nav");
         assertThat(mobileScript)
                 .contains("frontendContract.parseApiEnvelope")
                 .contains("frontendContract.executionPlanAccess")
                 .contains("frontendContract.normalizeAiTabs")
                 .doesNotContain("localStorage");
         assertThat(desktopRefresh)
-                .contains("fetchDashboardHome()", "renderDashboardHomeUnavailable()")
+                .contains("fetchDashboardHome(false)", "renderDashboardHomeUnavailable()")
                 .doesNotContain(
                         "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
                         "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics");
         assertThat(mobileScript)
                 .containsOnlyOnce("fetch(")
                 .contains("fetch(\"/api/dashboard/home?\" + query.toString()");
+        assertThat(desktop)
+                .contains("data-desktop-five-destination-navigation")
+                .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
+                .contains("data-desktop-unavailable-nav")
+                .contains("function refreshAssetContext()")
+                .contains("fetchDashboardHome(true)");
     }
 
     @Test

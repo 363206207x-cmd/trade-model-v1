@@ -129,13 +129,15 @@ class StaticNoTradeInstructionGuardTest {
     void dashboardPositionExecutionRowKeepsManualPositionDisplayPassive() throws Exception {
         String row = positionExecutionRow();
 
-        assertThat(row).contains("用户真实持仓监控");
-        assertThat(row).contains("仅显示手动录入持仓，系统建议不会自动生成持仓");
-        assertThat(row).contains("暂无手动录入持仓");
+        assertThat(row).contains("持仓摘要");
+        assertThat(row).contains("用户真实持仓 Top 3 摘要");
+        assertThat(row).contains("仅显示手动录入持仓");
+        assertThat(row).contains("暂无手动持仓");
+        assertThat(row).contains("持仓数据不足时保持空状态");
         assertThat(row).contains("系统执行建议（非交易指令）");
-        assertThat(row).contains("manualPositionBtn");
-        assertThat(row).containsOnlyOnce("<button");
+        assertThat(row).doesNotContain("<button");
         assertThat(row).doesNotContain("<form");
+        assertThat(row).doesNotContain("manualPositionBtn");
         assertThat(row).doesNotContain("openPositionBtn");
         assertThat(row).doesNotContain("closePositionBtn");
         assertThat(row).doesNotContain("orderBtn");

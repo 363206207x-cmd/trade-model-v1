@@ -73,17 +73,21 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         XCTAssertEqual(try booleanValue("\(cardSelector).hasAttribute('aria-busy')", in: webView), false)
     }
 
-    func testUnverifiedExecutionPlanClearsPreviouslyVisibleBoundaries() throws {
+    func testUnverifiedExecutionPlanKeepsBackendStateAndClearsPreviouslyVisibleBoundaries() throws {
         let webView = try loadFixture()
 
         try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
         try run("window.__resolveDashboard(0, 'ETHUSDT', false)", in: webView)
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-execution-field=\"statusLabel\"]').textContent === '当前暂无可验证的执行建议'",
+            "document.querySelector('[data-execution-field=\"statusLabel\"]').textContent === 'READY_ETHUSDT'",
             in: webView
         ))
 
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"statusLabel\"]').textContent", in: webView),
+            "READY_ETHUSDT"
+        )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-execution-field=\"direction\"]').textContent", in: webView),
             "--"
@@ -91,6 +95,22 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-execution-field=\"entryZone\"]').textContent", in: webView),
             "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"stopLoss\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"takeProfitRules\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"blockedReason\"]').textContent", in: webView),
+            "RISK_ETHUSDT"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-conflict]').textContent", in: webView),
+            "RISK_ETHUSDT"
         )
         XCTAssertEqual(
             try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
@@ -166,26 +186,56 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
-    func testAiRoleSwitchKeepsOnePanelVisibleWithoutChangingAsset() throws {
+    func testMobileHomeAnalysisEntryUsesOnlyCurrentAuthoritativeAnalysisId() throws {
+        let webView = try loadFixture()
+        let link = "document.querySelector('[data-asset-detail-link]')"
+
+        XCTAssertTrue(try booleanValue(
+            "new URL(\(link).href).searchParams.get('analysisId') === 'ANA_BTCUSDT'",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "new URL(\(link).href).searchParams.get('selectedSymbol') === 'BTCUSDT'",
+            in: webView
+        ))
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run("window.__resolveDashboard(0, 'ETHUSDT', true, true)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "new URL(\(link).href).searchParams.get('analysisId') === 'ANA_ETHUSDT'",
+            in: webView
+        ))
+
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 2", in: webView))
+        try run("window.__resolveDashboard(1, 'SOLUSDT', true, false)", in: webView)
+        XCTAssertTrue(waitUntil("\(link).getAttribute('aria-disabled') === 'true'", in: webView))
+        XCTAssertEqual(try stringValue("\(link).getAttribute('href') || ''", in: webView), "")
+        XCTAssertEqual(try stringValue("\(link).textContent", in: webView), "当前不可查看")
+    }
+
+    func testAiSummaryKeepsExactlyThreeRolesVisibleWithoutChangingAsset() throws {
         let webView = try loadFixture()
         let selectedAsset = try stringValue(
             "document.querySelector('[data-selected-asset-token]').textContent",
             in: webView
         )
 
-        try run("document.querySelector('[data-role=\"GEMINI_REVIEW\"]').click()", in: webView)
-
         XCTAssertEqual(
-            try numberValue("document.querySelectorAll('[data-role][aria-selected=\"true\"]').length", in: webView),
-            1
+            try numberValue("document.querySelectorAll('[data-ai-role-summary]').length", in: webView),
+            3
         )
         XCTAssertEqual(
-            try numberValue("Array.from(document.querySelectorAll('[data-role-panel]')).filter(p => !p.hidden).length", in: webView),
-            1
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-ai-role-summary]')).map(node => node.dataset.aiRoleSummary).join('|')",
+                in: webView
+            ),
+            "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
         )
         XCTAssertEqual(
-            try stringValue("document.querySelector('[data-role][aria-selected=\"true\"]').dataset.role", in: webView),
-            "GEMINI_REVIEW"
+            try numberValue("document.querySelectorAll('[data-role-panel], [role=\"tablist\"]').length", in: webView),
+            0
         )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
@@ -266,7 +316,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         XCTAssertEqual(try numberValue("document.querySelectorAll('.asset-select').length", in: webView), 3)
     }
 
-    func testApprovedInformationArchitectureHasSevenSectionsAndThreeNavigationItems() throws {
+    func testApprovedInformationArchitectureHasSevenSectionsAndFiveNavigationItems() throws {
         let webView = try loadFixture()
 
         XCTAssertEqual(
@@ -281,20 +331,20 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 "Array.from(document.querySelectorAll('.bottom-nav button, .bottom-nav a')).map(node => node.textContent.trim()).join('|')",
                 in: webView
             ),
-            "首页|持仓|复盘"
+            "首页|持仓|AI分析|消息|我的"
         )
         XCTAssertEqual(
             try numberValue("document.querySelectorAll('.bottom-nav button, .bottom-nav a').length", in: webView),
-            3
+            5
         )
         XCTAssertEqual(
-            try stringValue("document.querySelector('[data-review-nav]').getAttribute('href')", in: webView),
-            "/review/dashboard"
+            try numberValue("document.querySelectorAll('.bottom-nav [data-unavailable-nav][aria-disabled=\"true\"]').length", in: webView),
+            4
         )
-        XCTAssertEqual(try numberValue("document.querySelectorAll('.status-cell').length", in: webView), 7)
-        XCTAssertEqual(try numberValue("document.querySelectorAll('[data-role]').length", in: webView), 3)
+        XCTAssertEqual(try numberValue("document.querySelectorAll('.status-cell').length", in: webView), 8)
+        XCTAssertEqual(try numberValue("document.querySelectorAll('[data-ai-role-summary]').length", in: webView), 3)
         XCTAssertEqual(
-            try stringValue("Array.from(document.querySelectorAll('[data-role] .role-code')).map(node => node.textContent).join('|')", in: webView),
+            try stringValue("Array.from(document.querySelectorAll('[data-ai-role-summary]')).map(node => node.dataset.aiRoleSummary).join('|')", in: webView),
             "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
         )
     }
@@ -305,9 +355,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         XCTAssertEqual(try numberValue("document.querySelectorAll('h1').length", in: webView), 1)
         XCTAssertEqual(
             try stringValue("document.querySelector('h1').textContent", in: webView),
-            "首页概览"
+            "首页"
         )
-        XCTAssertEqual(try booleanValue("document.body.textContent.includes('Trade Model')", in: webView), false)
+        XCTAssertEqual(try booleanValue("document.body.textContent.includes('TRADE MODEL V1')", in: webView), true)
         XCTAssertTrue(try booleanValue(
             "document.getElementById('mobile-page-context').getBoundingClientRect().height > 0",
             in: webView
@@ -329,9 +379,12 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
 
         try run("document.querySelector('[data-position-nav]').click()", in: webView)
-        XCTAssertTrue(waitUntil("document.activeElement.id === 'mobile-position-title'", in: webView, timeout: 2))
         XCTAssertEqual(
-            try stringValue("document.querySelector('[data-position-nav]').getAttribute('aria-current')", in: webView),
+            try stringValue("document.querySelector('[data-nav-availability-status]').textContent", in: webView),
+            "持仓暂未开放"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-home-nav]').getAttribute('aria-current')", in: webView),
             "page"
         )
         XCTAssertEqual(try numberValue("document.querySelectorAll('.bottom-nav [aria-current]').length", in: webView), 1)
@@ -1045,17 +1098,30 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 window.__pendingRequests.push(request);
               });
             };
-            window.__resolveDashboard = function(index, symbol, verified) {
+            window.__resolveDashboard = function(index, symbol, verified, analysisAvailable) {
               var request = window.__pendingRequests[index];
               var data = {
                 selectedSymbol: symbol,
+                assets: [{
+                  symbol: symbol,
+                  rawSymbol: symbol,
+                  analysisId: analysisAvailable === false ? null : 'ANA_' + symbol,
+                  worthOpening: true
+                }],
                 executionSuggestion: {
                   status: 'USABLE_REVIEW_PLAN',
                   statusLabel: 'READY_' + symbol,
                   blockedReason: 'RISK_' + symbol,
                   sourceExecutionPlanId: verified === false ? null : 'PLAN_' + symbol,
                   direction: 'DIR_' + symbol,
-                  entryZone: 'ENTRY_' + symbol
+                  entryZone: 'ENTRY_' + symbol,
+                  stopLoss: 'STOP_' + symbol,
+                  takeProfitRules: 'TP_' + symbol,
+                  leverageSuggestion: 'LEV_' + symbol,
+                  positionSuggestion: 'POS_' + symbol,
+                  invalidCondition: 'INVALID_' + symbol,
+                  validFrom: 'FROM_' + symbol,
+                  expiresAt: 'UNTIL_' + symbol
                 },
                 aiDecision: {
                   runStatusLabel: 'AI_' + symbol,
@@ -1083,24 +1149,28 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
           <main class="mobile-home" data-mobile-home-root>
             <header class="mobile-header">
               <div class="product-lockup">
-                <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页概览</h1>
+                <p class="product-name">TRADE MODEL V1</p>
+                <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页</h1>
               </div>
               <div class="header-actions">
-                <button class="header-action" type="button" data-header-status-nav>状态</button>
                 <button class="header-action" type="button" data-header-search>搜索</button>
-                <button class="header-action" type="button" data-header-alerts-nav>通知</button>
+                <button class="header-action" type="button" data-header-alerts-nav>消息</button>
               </div>
             </header>
             <section class="status-section" id="mobile-status">
-              <h2 id="mobile-status-title" tabindex="-1">当前概览</h2>
-              <dl class="status-grid">
+              <h2 id="mobile-status-title" tabindex="-1">决策状态</h2>
+              <dl class="status-grid status-grid-primary">
                 <div class="status-cell"><dt>市场趋势</dt><dd>震荡</dd></div>
                 <div class="status-cell"><dt>风险等级</dt><dd>中</dd></div>
-                <div class="status-cell"><dt>数据质量分</dt><dd>82</dd></div>
-                <div class="status-cell"><dt>AI 冲突等级</dt><dd>低</dd></div>
+                <div class="status-cell"><dt>数据质量</dt><dd>82</dd></div>
+                <div class="status-cell"><dt>AI 冲突</dt><dd>低</dd></div>
+              </dl>
+              <div class="system-summary-heading"><h3>系统摘要</h3><span>全局状态</span></div>
+              <dl class="status-grid status-grid-system">
+                <div class="status-cell"><dt>AI 系统</dt><dd>正常</dd></div>
                 <div class="status-cell"><dt>待复核机会</dt><dd>2</dd></div>
                 <div class="status-cell"><dt>冲突阻断</dt><dd>否</dd></div>
-                <div class="status-cell"><dt>热重置</dt><dd>未触发</dd></div>
+                <div class="status-cell"><dt>Hot Reset</dt><dd>未触发</dd></div>
               </dl>
             </section>
             <section class="alert-event-section" id="mobile-alerts">
@@ -1117,6 +1187,8 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                           aria-expanded="false" aria-controls="mobile-asset-search">搜索</button>
                   <button class="watch-tool-button" type="button" data-asset-add disabled
                           aria-disabled="true" aria-describedby="watch-add-contract-status">添加</button>
+                  <a class="watch-tool-button watch-detail-link" data-asset-detail-link
+                     aria-disabled="true" tabindex="-1">当前不可查看</a>
                 </div>
               </div>
               <div class="asset-search-panel" id="mobile-asset-search" hidden>
@@ -1128,23 +1200,20 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
               <strong data-selected-asset-token>\(selectedSymbol)</strong>
               <div class="asset-pager" role="radiogroup">
-                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
-                  <span class="asset-conclusion"><small>一句话结论</small><strong>等待触发条件</strong></span>
                 </button>
-                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
-                  <span class="asset-conclusion"><small>一句话结论</small><strong>等待人工复核</strong></span>
                 </button>
-                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
+                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
-                  <span class="asset-conclusion"><small>一句话结论</small><strong>风险升高</strong></span>
                 </button>
               </div>
             </section>
@@ -1152,10 +1221,19 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <h2 id="mobile-execution-title" tabindex="-1">执行建议</h2>
               <strong data-execution-field="statusLabel">等待同步</strong>
               <p data-execution-field="blockedReason">暂无补充说明</p>
-              <dl class="definition-list execution-compact-grid">
+              <dl class="definition-list execution-grid">
                 <div><dt>方向</dt><dd data-execution-field="direction">--</dd></div>
+                <div><dt>是否值得开仓</dt><dd data-execution-field="worthOpening">待同步</dd></div>
                 <div><dt>入场区间</dt><dd data-execution-field="entryZone">--</dd></div>
+                <div><dt>止损</dt><dd data-execution-field="stopLoss">--</dd></div>
+                <div><dt>止盈方案</dt><dd data-execution-field="takeProfitRules">--</dd></div>
+                <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion">--</dd></div>
+                <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion">--</dd></div>
+                <div><dt>计划失效条件</dt><dd data-execution-field="invalidCondition">--</dd></div>
+                <div><dt>有效开始</dt><dd data-execution-field="validFrom">--</dd></div>
+                <div><dt>有效结束</dt><dd data-execution-field="expiresAt">--</dd></div>
               </dl>
+              <div class="conflict-block-summary"><span>冲突阻断</span><strong data-execution-conflict>--</strong></div>
             </section>
             <section class="position-section" id="position-monitor" data-position-independent>
               <h2 id="mobile-position-title" tabindex="-1">持仓监控</h2>
@@ -1168,25 +1246,23 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <span data-consistency-field="level">--</span>
               <span data-consistency-field="confused">否</span>
               <span data-consistency-field="consistencySummary">等待同步</span>
-              <div data-ai-role-root>
-                <div class="role-tabs" role="tablist">
-                  <button id="mobile-role-tab-GPT_FINAL" data-role="GPT_FINAL" aria-selected="true"><span class="role-code">GPT_FINAL</span><span class="role-name">最终裁决官</span></button>
-                  <button id="mobile-role-tab-GEMINI_REVIEW" data-role="GEMINI_REVIEW" aria-selected="false"><span class="role-code">GEMINI_REVIEW</span><span class="role-name">冲突复核官</span></button>
-                  <button id="mobile-role-tab-GROK_CHALLENGE" data-role="GROK_CHALLENGE" aria-selected="false"><span class="role-code">GROK_CHALLENGE</span><span class="role-name">反方挑战官</span></button>
-                </div>
-                <article data-role-panel="GPT_FINAL">最终结论：等待更多证据后人工复核。</article>
-                <article data-role-panel="GEMINI_REVIEW" hidden>复核结论：当前没有发现新增冲突。</article>
-                <article data-role-panel="GROK_CHALLENGE" hidden>挑战结论：继续关注反向风险。</article>
+              <div class="ai-role-summary-list" data-ai-role-root>
+                <article class="ai-role-summary-card" data-ai-role-summary="GPT_FINAL"><div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong>待同步</strong></div><p class="role-status">当前观点待同步</p></article>
+                <article class="ai-role-summary-card" data-ai-role-summary="GEMINI_REVIEW"><div class="role-heading"><div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div><strong>待同步</strong></div><p class="role-status">当前复核待同步</p></article>
+                <article class="ai-role-summary-card" data-ai-role-summary="GROK_CHALLENGE"><div class="role-heading"><div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div><strong>待同步</strong></div><p class="role-status">当前挑战待同步</p></article>
               </div>
             </section>
             <div style="height: 1800px"></div>
             <div id="fixture-end-marker" style="height: 1px"></div>
           </main>
-          <nav class="bottom-nav">
+          <nav class="bottom-nav" data-mobile-five-tab-navigation>
             <button type="button" data-home-nav aria-current="page">首页</button>
-            <button type="button" data-position-nav>持仓</button>
-            <a href="/review/dashboard" data-review-nav>复盘</a>
+            <button type="button" data-position-nav data-unavailable-nav aria-disabled="true">持仓</button>
+            <button type="button" data-ai-nav data-unavailable-nav aria-disabled="true">AI分析</button>
+            <button type="button" data-message-nav data-unavailable-nav aria-disabled="true">消息</button>
+            <button type="button" data-profile-nav data-unavailable-nav aria-disabled="true">我的</button>
           </nav>
+          <p class="nav-availability-status visually-hidden" data-nav-availability-status aria-live="polite"></p>
           <script>\(script)</script>
         </body>
         </html>
