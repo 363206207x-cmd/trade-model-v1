@@ -8,7 +8,7 @@
 | Figma file | `Trade Model Design System` |
 | Figma baseline | `FROZEN` |
 | Semantic contract | `docs/design/FE04_SEMANTIC_CONTRACT_V2.md` |
-| Frontend status | `NOT_STARTED` |
+| Frontend status | `IN_PROGRESS_PARTIAL` |
 | Governance effectivity | `REGISTERED_ON_MAIN` |
 | Code/API/schema/Figma change in this package | `NONE` |
 | Capability movement | `NONE` |
@@ -84,24 +84,43 @@ The following remain mandatory:
   monitoring history, or settings-save result;
 - no auto-open, auto-close, auto-reverse, auto-reduce, order, or trading action.
 
-## 6. Delivery Gate
+## 6. Delivery Gate After FE-04A/B
 
 This registration is effective project governance on clean, synced `main`.
-FE-04 frontend remains `NOT_STARTED`; design registration is not frontend
-implementation evidence.
+FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are effective
+on merged main `aaf905b4f74ecafcf514aa34d7c06361461a0eb4`
+through PR #1146. Overall FE-04 remains `IN_PROGRESS_PARTIAL`; this merged
+slice does not prove FE-04 complete.
 
-The next bounded implementation package is FE-04A + FE-04B:
+The next bounded implementation package is FE-04C Position Monitoring.
+FE-04C remains `NOT_STARTED`. Its first package may implement only:
 
-- FE-04A: `Frontend Shell & Navigation`;
-- FE-04B: `Home Dashboard Integration`.
+- Position List;
+- Position Monitor Card;
+- exact `positionId`;
+- owner-scoped read-only monitoring;
+- monitor-status display;
+- existing monitor logs.
 
-The package must not implement later FE-04 screens, expand APIs, or move
+The package must inherit the P3-H3 ownership foundation, use exact
+`positionId`, and provide no symbol or latest-position fallback. Available
+read capabilities are UserPosition list/detail, owner-scoped summary, and
+monitor logs. A unified read DTO, closed-position history, and human-handling
+history remain `PARTIAL` and must stay fail closed.
+
+The package must not add edit, manual close, partial-close UI, replay, trade
+execution, automatic action, or an automatic call to the write-type monitor-run
+endpoint. It must not implement FE-04D/FE-04E/FE-04F, expand APIs, or move
 trading capability.
 
 ```text
 FE04_FIGMA_BASELINE: FROZEN
 FE04_FIGMA_BASELINE_REGISTRATION: REGISTERED_ON_MAIN
-FE04_FRONTEND_STATUS: NOT_STARTED
-FE04_IMPLEMENTATION_ALLOWED: FE-04A_AND_FE-04B_ONLY
-NEXT_IMPLEMENTATION_PACKAGE: FE-04A_AND_FE-04B_FRONTEND_IMPLEMENTATION
+FE04_FRONTEND_STATUS: IN_PROGRESS_PARTIAL
+FE04A_STATUS: EFFECTIVE_MERGED_MAIN
+FE04B_STATUS: EFFECTIVE_MERGED_MAIN
+FE04_AB_MERGE_COMMIT: aaf905b4f74ecafcf514aa34d7c06361461a0eb4
+FE04C_STATUS: NOT_STARTED
+FE04_IMPLEMENTATION_ALLOWED: FE-04C_FIRST_READONLY_PACKAGE_ONLY
+NEXT_IMPLEMENTATION_PACKAGE: FE-04C_POSITION_MONITORING
 ```

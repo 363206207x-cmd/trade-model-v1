@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04A + FE-04B Frontend Implementation preparation; the Figma baseline is registered on main and FE-04 frontend is NOT_STARTED
-Next Business Phase: FE-04A + FE-04B Frontend Implementation
-Next Business Phase Allowed: RUNTIME_GATED; on clean, synced main only FE-04A Shell & Navigation plus FE-04B Home Dashboard Integration may begin; later FE-04 packages, API expansion, P4, and production deployment remain blocked
+Current Work Package: FE-04C Position Monitoring first-package governance alignment; FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are effective on merged main, while FE-04C remains NOT_STARTED
+Next Business Phase: FE-04C Position Monitoring first implementation package
+Next Business Phase Allowed: RUNTIME_GATED; on clean, synced main only the bounded, read-only FE-04C package may begin; FE-04D/FE-04E/FE-04F, API expansion, write actions, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -28,15 +28,17 @@ The registered component nodes are Asset Card `28:154`, Execution Plan Card
 `299:54`, and Push Detail Card `300:234`.
 
 The design baseline is `FROZEN` and its repository registration is
-`REGISTERED_ON_MAIN`. FE-04 frontend remains `NOT_STARTED`. No runtime page,
-API, schema, Figma node, or trading capability is changed by this record.
+`REGISTERED_ON_MAIN`. FE-04 frontend is `IN_PROGRESS_PARTIAL`: FE-04A and
+FE-04B are effective on merged main, while FE-04C and later packages remain
+unimplemented. No API, schema, Figma node, or trading capability is changed by
+this governance record.
 
 ---
 
-## FE-02 through P3-H3 Merged-Main Progression
+## FE-02 through FE-04A/B Merged-Main Progression
 
-The bounded frontend and prerequisite packages preceding FE-04 are effective on
-merged main:
+The bounded frontend and prerequisite packages leading into FE-04C are
+effective on merged main:
 
 1. FE-02 Asset Detail is effective on merged main
    `654d3821ff7046037f2cd02bf5de645b4550f196` through PR #1137.
@@ -46,12 +48,17 @@ merged main:
    `76383725c19d038e0bf2065ae034b06b7f34b732` through PR #1140.
 4. P3-H3 UserPosition ownership and authorization foundation is effective on
    merged main `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` through PR #1141.
+5. FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are
+   effective on merged main `aaf905b4f74ecafcf514aa34d7c06361461a0eb4`
+   through PR #1146.
 
-These merged packages satisfied the prerequisites for the FE-04 Figma baseline,
-which is now registered on main in
-`docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`. The registration does
-not implement the FE-04 frontend, authorize new APIs, or move trading
-capability. FE-04 frontend status remains `NOT_STARTED`.
+These merged packages satisfy the prerequisites for the bounded FE-04C
+Position Monitoring package. FE-04C remains `NOT_STARTED` and is the
+`NEXT_IMPLEMENTATION_PACKAGE`. Its first package is limited to Position List,
+Position Monitor Card, exact `positionId`, owner-scoped read-only monitoring,
+monitor-status display, and existing monitor logs. It may not add edit, manual
+close, partial-close UI, replay, trade execution, automatic action, API
+expansion, or an automatic call to the write-type monitor-run endpoint.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -105,11 +112,12 @@ local PostgreSQL 16 and passed the local browser-equivalent Session/CSRF smoke.
 These changes are effective on merged main; real production PostgreSQL V8, real mobile
 Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
-Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, and P3-H3 are now
-effective on merged main. The FE-04 Figma baseline is registered on main. The
-next bounded implementation package is FE-04A Shell & Navigation plus FE-04B
-Home Dashboard Integration. Later FE-04 packages, API expansion, P4, and
-production deployment remain blocked.
+Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
+and FE-04B are now effective on merged main. The FE-04 Figma baseline is
+registered on main. The next bounded implementation package is FE-04C Position
+Monitoring, restricted to owner-scoped, exact-`positionId`, read-only
+monitoring through existing APIs. FE-04D/FE-04E/FE-04F, API expansion, write
+actions, P4, and production deployment remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
