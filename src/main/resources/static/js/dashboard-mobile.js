@@ -8,6 +8,7 @@
   var AI_ROLES = frontendContract.AI_ROLES;
   var requestSequence = 0;
   var activeRequest = null;
+  var activeAiRole = "GPT_FINAL";
 
   function bindPreferredColorScheme() {
     if (!window.matchMedia) return;
@@ -77,25 +78,40 @@
   }
 
   function updateAssetDetailLink(card) {
-    var link = document.querySelector("[data-asset-detail-link]");
-    if (!link) return;
+    var links = document.querySelectorAll(
+      "[data-asset-detail-link], [data-ai-analysis-detail-link]"
+    );
     var analysisId = card ? String(card.dataset.analysisId || "").trim() : "";
     var symbol = card ? String(card.dataset.symbol || "").trim() : "";
-    if (!analysisId || !symbol) {
-      link.removeAttribute("href");
-      link.setAttribute("aria-disabled", "true");
-      link.tabIndex = -1;
-      link.textContent = "当前不可查看";
-      return;
+    var identityReady = !!analysisId && !!symbol;
+    setText("[data-ai-analysis-symbol]", symbol, "--");
+    setText("[data-ai-analysis-id]", analysisId, "待同步");
+    setText(
+      "[data-ai-analysis-direction]",
+      card ? card.dataset.directionLabel : null,
+      "--"
+    );
+    var analysisRoot = document.querySelector("[data-ai-analysis-root]");
+    if (analysisRoot) {
+      analysisRoot.dataset.analysisIdentity = identityReady ? "verified" : "missing";
     }
-    link.href = "/dashboard/analysis-detail?analysisId="
-      + encodeURIComponent(analysisId)
-      + "&selectedSymbol="
-      + encodeURIComponent(symbol)
-      + "&view=mobile";
-    link.removeAttribute("aria-disabled");
-    link.tabIndex = 0;
-    link.textContent = "分析详情";
+    links.forEach(function (link) {
+      if (!identityReady) {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+        link.tabIndex = -1;
+        link.textContent = link.dataset.disabledLabel || "当前不可查看";
+        return;
+      }
+      link.href = "/dashboard/analysis-detail?analysisId="
+        + encodeURIComponent(analysisId)
+        + "&selectedSymbol="
+        + encodeURIComponent(symbol)
+        + "&view=mobile";
+      link.removeAttribute("aria-disabled");
+      link.tabIndex = 0;
+      link.textContent = link.dataset.enabledLabel || "分析详情";
+    });
   }
 
   function setSelectedAsset(symbol) {
@@ -203,6 +219,9 @@
   }
 
   function roleSummary(tab) {
+    if (tab.resultAvailable !== true) {
+      return text(tab.statusMessage, "当前角色观点不可用");
+    }
     if (tab.role === "GPT_FINAL") {
       return text(
         tab.finalConclusion,
@@ -224,6 +243,10 @@
   function createRoleSummaryCard(tab) {
     var panel = element("article", "ai-role-summary-card");
     panel.dataset.aiRoleSummary = tab.role;
+    panel.dataset.resultAvailable = String(tab.resultAvailable === true);
+    if (frontendContract.hasText(tab.statusMessage)) {
+      panel.dataset.roleStatusMessage = String(tab.statusMessage);
+    }
     var heading = element("div", "role-heading");
     var headingText = element("div");
     headingText.appendChild(element("span", "", tab.role));
@@ -232,7 +255,7 @@
     heading.appendChild(element("strong", "", text(tab.runStatusLabel, "等待同步")));
     panel.appendChild(heading);
     panel.appendChild(element("p", "role-status", roleSummary(tab)));
-    if (tab.role === "GPT_FINAL") {
+    if (tab.role === "GPT_FINAL" && tab.resultAvailable === true) {
       var metrics = element("dl", "role-summary-metrics");
       appendDefinition(metrics, "方向", tab.finalMarketBias, false);
       appendDefinition(metrics, "置信度", tab.finalConfidence, false);
@@ -251,11 +274,178 @@
     });
   }
 
+  function setActiveAiRole(role, focusTab) {
+    if (!AI_ROLES.some(function (item) { return item.role === role; })) return;
+    activeAiRole = role;
+    document.querySelectorAll("[data-ai-analysis-tab]").forEach(function (tab) {
+      var selected = tab.dataset.aiAnalysisTab === role;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focusTab) tab.focus();
+    });
+    document.querySelectorAll("[data-ai-analysis-role-panel]").forEach(function (panel) {
+      panel.hidden = panel.dataset.aiAnalysisRolePanel !== role;
+    });
+  }
+
+  function bindAiRoleTabs() {
+    var tabs = Array.from(document.querySelectorAll("[data-ai-analysis-tab]"));
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener("click", function () {
+        setActiveAiRole(tab.dataset.aiAnalysisTab, false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        event.preventDefault();
+        var offset = event.key === "ArrowRight" ? 1 : -1;
+        var next = tabs[(index + offset + tabs.length) % tabs.length];
+        setActiveAiRole(next.dataset.aiAnalysisTab, true);
+      });
+    });
+    setActiveAiRole(activeAiRole, false);
+  }
+
+  function renderAiAnalysisRoles(tabs, analysisState) {
+    var stateView = frontendContract.aiAnalysisStateView(analysisState);
+    var canReadRoles = analysisState === "partial";
+    var normalized = frontendContract.normalizeAiTabs(canReadRoles ? tabs : []);
+    normalized.forEach(function (tab) {
+      var panel = document.querySelector(
+        '[data-ai-analysis-role-panel="' + tab.role + '"]'
+      );
+      if (!panel) return;
+      var resultAvailable = canReadRoles && tab.resultAvailable === true;
+      panel.dataset.resultAvailable = String(resultAvailable);
+      var status = panel.querySelector("[data-ai-analysis-role-status]");
+      var summary = panel.querySelector("[data-ai-analysis-role-summary]");
+      if (status) {
+        status.textContent = canReadRoles
+          ? text(tab.runStatusLabel, "待同步")
+          : stateView.roleStatusLabel;
+      }
+      if (summary) {
+        summary.textContent = canReadRoles
+          ? roleSummary(tab)
+          : stateView.roleSummary;
+      }
+      var roleOutput = panel.querySelector("[data-ai-analysis-role-output]");
+      if (roleOutput) {
+        roleOutput.hidden = !resultAvailable;
+      }
+      var direction = panel.querySelector("[data-ai-analysis-role-direction]");
+      var confidence = panel.querySelector("[data-ai-analysis-role-confidence]");
+      if (direction) {
+        direction.textContent = resultAvailable ? text(tab.finalMarketBias, "--") : "";
+      }
+      if (confidence) {
+        confidence.textContent = resultAvailable ? text(tab.finalConfidence, "--") : "";
+      }
+    });
+  }
+
+  function renderAiAnalysis(aiDecision, card) {
+    var root = document.querySelector("[data-ai-analysis-root]");
+    if (!root) return;
+    var safeAi = aiDecision || {};
+    var analysisId = card ? String(card.dataset.analysisId || "").trim() : "";
+    var symbol = card ? String(card.dataset.symbol || "").trim() : "";
+    var identityReady = !!analysisId && !!symbol;
+    var runStatus = String(safeAi.runStatus || "").trim().toUpperCase();
+    var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
+    var loading = runStatus === "LOADING" || runStatus === "PENDING";
+    var empty = !card && !failed && !loading;
+    var analysisState = frontendContract.aiAnalysisState(
+      identityReady,
+      failed,
+      loading,
+      empty
+    );
+    var stateView = frontendContract.aiAnalysisStateView(analysisState);
+    root.dataset.analysisState = analysisState;
+    setText(
+      "[data-ai-analysis-state-status]",
+      analysisState === "partial" ? safeAi.runStatusLabel : stateView.statusLabel,
+      stateView.statusLabel
+    );
+    setText(
+      "[data-ai-analysis-run-status]",
+      analysisState === "partial" ? safeAi.runStatusLabel : stateView.runStatusLabel,
+      stateView.runStatusLabel
+    );
+    var consistency = analysisState === "partial" ? (safeAi.consistency || {}) : {};
+    setText(
+      "[data-ai-analysis-consistency-level]",
+      consistency.consistencyLevel,
+      stateView.consistencyLevel
+    );
+    setText(
+      "[data-ai-analysis-consistency-summary]",
+      consistency.consistencySummary,
+      stateView.consistencySummary
+    );
+    setText(
+      "[data-ai-analysis-detail-status]",
+      stateView.detailStatus
+    );
+    renderAiAnalysisRoles(safeAi.tabs, analysisState);
+  }
+
+  function initialAiDecisionFromHome() {
+    var source = document.getElementById("ai-review");
+    if (!source) return {};
+    var consistency = {};
+    ["consistencyLevel", "level", "consistencySummary"].forEach(function (field) {
+      var node = source.querySelector('[data-consistency-field="' + field + '"]');
+      if (node) consistency[field] = node.textContent;
+    });
+    var confused = source.querySelector('[data-consistency-field="confused"]');
+    if (confused) consistency.confused = confused.textContent.trim() === "是";
+    var tabs = Array.from(source.querySelectorAll("[data-ai-role-summary]")).map(
+      function (card) {
+        var role = card.dataset.aiRoleSummary;
+        var status = card.querySelector(".role-heading strong");
+        var label = card.querySelector(".role-heading h3");
+        var resultAvailable = card.dataset.resultAvailable === "true";
+        var tab = {
+          role: role,
+          roleLabel: label ? label.textContent : roleLabel(role),
+          runStatusLabel: status ? status.textContent : "待同步",
+          resultAvailable: resultAvailable,
+          statusMessage: text(
+            card.dataset.roleStatusMessage,
+            resultAvailable ? "当前角色状态待同步" : "当前角色观点不可用"
+          )
+        };
+        if (!resultAvailable) return tab;
+
+        var summary = card.querySelector(".role-status");
+        var values = card.querySelectorAll(".role-summary-metrics dd");
+        if (role === "GPT_FINAL") {
+          tab.finalConclusion = summary ? summary.textContent : null;
+          tab.finalMarketBias = values[0] ? values[0].textContent : null;
+          tab.finalConfidence = values[1] ? values[1].textContent : null;
+        } else if (role === "GEMINI_REVIEW") {
+          tab.reviewConclusion = summary ? summary.textContent : null;
+        } else if (role === "GROK_CHALLENGE") {
+          tab.challengeConclusion = summary ? summary.textContent : null;
+        }
+        return tab;
+      }
+    );
+    var runStatus = source.querySelector("[data-ai-run-status]");
+    return {
+      runStatusLabel: runStatus ? runStatus.textContent : "等待同步",
+      consistency: consistency,
+      tabs: tabs
+    };
+  }
+
   function updateAi(aiDecision) {
     var safeAi = aiDecision || {};
     setText("[data-ai-run-status]", safeAi.runStatusLabel, "等待同步");
     updateConsistency(safeAi.consistency);
     renderRoles(safeAi.tabs);
+    renderAiAnalysis(safeAi, selectedAssetCard());
   }
 
   function failClosedAfterLoadError() {
@@ -264,6 +454,7 @@
       blockedReason: "无法同步当前资产，请稍后重试。"
     }, null, selectedAssetCard());
     updateAi({
+      runStatus: "LOAD_FAILED",
       runStatusLabel: "同步失败",
       consistency: {},
       tabs: []
@@ -289,6 +480,12 @@
     } else {
       delete card.dataset.worthOpening;
     }
+    var directionLabel = asset && (asset.marketBiasLabel || asset.marketBias);
+    if (frontendContract.hasText(directionLabel)) {
+      card.dataset.directionLabel = String(directionLabel);
+    } else {
+      delete card.dataset.directionLabel;
+    }
   }
 
   async function selectAsset(symbol, sourceCard) {
@@ -305,6 +502,7 @@
       blockedReason: "当前资产上下文同步中"
     }, null, sourceCard);
     updateAi({
+      runStatus: "LOADING",
       runStatusLabel: "正在同步",
       consistency: {},
       tabs: []
@@ -451,6 +649,35 @@
 
   }
 
+  function setMobileProductView(view, focusHeading) {
+    var showAi = view === "ai";
+    var homeView = document.querySelector("[data-mobile-home-view]");
+    var aiView = document.querySelector("[data-mobile-ai-view]");
+    if (!homeView || !aiView) return;
+    homeView.hidden = showAi;
+    aiView.hidden = !showAi;
+    var homeControl = document.querySelector("[data-home-nav]");
+    var aiControl = document.querySelector("[data-ai-nav]");
+    if (homeControl) {
+      if (showAi) homeControl.removeAttribute("aria-current");
+      else homeControl.setAttribute("aria-current", "page");
+    }
+    if (aiControl) {
+      if (showAi) aiControl.setAttribute("aria-current", "page");
+      else aiControl.removeAttribute("aria-current");
+    }
+    frontendContract.replaceUrlParam("view", showAi ? "ai" : null);
+    window.scrollTo({ top: 0, behavior: focusHeading ? "smooth" : "auto" });
+    if (focusHeading) {
+      window.setTimeout(function () {
+        var heading = document.getElementById(
+          showAi ? "mobile-ai-analysis-title" : "mobile-page-context"
+        );
+        if (heading) heading.focus({ preventScroll: true });
+      }, 260);
+    }
+  }
+
   function bindNavigation() {
     function moveTo(targetId, focusId) {
       if (targetId) {
@@ -469,7 +696,14 @@
     var homeControl = document.querySelector("[data-home-nav]");
     if (homeControl) {
       homeControl.addEventListener("click", function () {
-        moveTo(null, "mobile-page-context");
+        setMobileProductView("home", true);
+      });
+    }
+
+    var aiControl = document.querySelector("[data-ai-nav]");
+    if (aiControl) {
+      aiControl.addEventListener("click", function () {
+        setMobileProductView("ai", true);
       });
     }
 
@@ -501,6 +735,11 @@
         }, 280);
       });
     }
+
+    setMobileProductView(
+      frontendContract.readUrlParam("view") === "ai" ? "ai" : "home",
+      false
+    );
   }
 
   function bindRootHorizontalContainment() {
@@ -531,6 +770,8 @@
         "待同步"
       );
     }
+    bindAiRoleTabs();
+    updateAi(initialAiDecisionFromHome());
     bindNavigation();
   }
 

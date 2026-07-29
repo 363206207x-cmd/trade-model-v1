@@ -10,7 +10,7 @@
   <script th:src="@{/js/dashboard-mobile.js}" src="/js/dashboard-mobile.js" defer></script>
 </head>
 <body>
-  <main class="mobile-home" id="mobile-home-scroll" data-mobile-home-root>
+  <main class="mobile-home" id="mobile-home-scroll" data-mobile-home-root data-mobile-home-view>
     <header class="mobile-header">
       <div class="product-lockup">
         <p class="product-name">TRADE MODEL V1</p>
@@ -150,6 +150,7 @@
           <button class="watch-tool-button" type="button" data-asset-add disabled aria-disabled="true"
                   aria-describedby="watch-add-contract-status">添加</button>
           <a class="watch-tool-button watch-detail-link" data-asset-detail-link
+             data-enabled-label="分析详情" data-disabled-label="当前不可查看"
              aria-disabled="true" tabindex="-1">当前不可查看</a>
         </div>
       </div>
@@ -175,7 +176,7 @@
                 th:each="asset, stat : ${mobileAssets}"
                 th:with="assetKey=${asset.rawSymbol != null ? asset.rawSymbol : asset.symbol},selected=${home.selectedSymbol == assetKey or (home.selectedSymbol == null and stat.first)},stateKey=${asset.assetState != null ? #strings.toLowerCase(asset.assetState) : 'unknown'}"
                 th:classappend="${selected ? ' is-selected' : ''}"
-                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
+                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-direction-label=${asset.marketBiasLabel != null ? asset.marketBiasLabel : asset.marketBias},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
           <span class="visually-hidden"
                 th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
@@ -309,14 +310,14 @@
       <div class="ai-role-summary-list" data-ai-role-root aria-label="AI 三角色摘要">
         <article class="ai-role-summary-card" th:each="tab : ${home.aiDecision.tabs}"
                  th:if="${tab.role == 'GPT_FINAL' or tab.role == 'GEMINI_REVIEW' or tab.role == 'GROK_CHALLENGE'}"
-                 th:attr="data-ai-role-summary=${tab.role}">
+                 th:attr="data-ai-role-summary=${tab.role},data-result-available=${tab.resultAvailable == true},data-role-status-message=${tab.statusMessage != null ? tab.statusMessage : ''}">
           <div class="role-heading">
             <div><span th:text="${tab.role}">AI_ROLE</span><h3 th:text="${tab.roleLabel != null ? tab.roleLabel : tab.role}">AI 角色</h3></div>
             <strong th:text="${tab.runStatusLabel != null ? tab.runStatusLabel : '待同步'}">待同步</strong>
           </div>
           <p class="role-status"
-             th:text="${tab.role == 'GPT_FINAL' ? (tab.finalConclusion != null ? tab.finalConclusion : (tab.decisionSummary != null ? tab.decisionSummary : '当前观点待同步')) : (tab.role == 'GEMINI_REVIEW' ? (tab.reviewConclusion != null ? tab.reviewConclusion : (tab.reviewVerdict != null ? tab.reviewVerdict : '当前复核待同步')) : (tab.challengeConclusion != null ? tab.challengeConclusion : (tab.challengeThesis != null ? tab.challengeThesis : '当前挑战待同步')))}">当前角色观点待同步</p>
-          <dl class="role-summary-metrics" th:if="${tab.role == 'GPT_FINAL'}">
+             th:text="${tab.resultAvailable == true ? (tab.role == 'GPT_FINAL' ? (tab.finalConclusion != null ? tab.finalConclusion : (tab.decisionSummary != null ? tab.decisionSummary : (tab.statusMessage != null ? tab.statusMessage : '当前观点待同步'))) : (tab.role == 'GEMINI_REVIEW' ? (tab.reviewConclusion != null ? tab.reviewConclusion : (tab.reviewVerdict != null ? tab.reviewVerdict : (tab.statusMessage != null ? tab.statusMessage : '当前复核待同步'))) : (tab.challengeConclusion != null ? tab.challengeConclusion : (tab.challengeThesis != null ? tab.challengeThesis : (tab.statusMessage != null ? tab.statusMessage : '当前挑战待同步'))))) : (tab.statusMessage != null ? tab.statusMessage : '当前角色观点不可用')}">当前角色观点待同步</p>
+          <dl class="role-summary-metrics" th:if="${tab.role == 'GPT_FINAL' and tab.resultAvailable == true}">
             <div><dt>方向</dt><dd th:text="${tab.finalMarketBias != null ? tab.finalMarketBias : '--'}">--</dd></div>
             <div><dt>置信度</dt><dd th:text="${tab.finalConfidence != null ? tab.finalConfidence : '--'}">--</dd></div>
           </dl>
@@ -326,10 +327,133 @@
 
   </main>
 
+  <main class="mobile-home mobile-ai-analysis" id="mobile-ai-analysis"
+        data-mobile-ai-view data-ai-analysis-root hidden
+        aria-labelledby="mobile-ai-analysis-title">
+    <header class="mobile-header ai-analysis-header">
+      <div class="product-lockup">
+        <p class="product-name">TRADE MODEL V1</p>
+        <h1 class="page-heading" id="mobile-ai-analysis-title" tabindex="-1">AI 分析</h1>
+      </div>
+      <span class="ai-analysis-identity-pill" data-ai-analysis-state-status role="status">正在同步</span>
+    </header>
+
+    <section class="ai-analysis-toolbar" aria-labelledby="mobile-ai-search-title">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="section-kicker">受限第一实现包</p>
+          <h2 id="mobile-ai-search-title">单资产分析</h2>
+        </div>
+      </div>
+      <label class="ai-analysis-search-label" for="mobile-ai-market-search">搜索市场资产</label>
+      <input class="ai-analysis-search" id="mobile-ai-market-search" type="search"
+             placeholder="暂未开放" disabled aria-disabled="true">
+      <p class="section-description">市场资产搜索与观察资产写入暂未开放。</p>
+    </section>
+
+    <section class="ai-analysis-context-section" aria-labelledby="mobile-ai-context-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">权威分析上下文</p>
+          <h2 id="mobile-ai-context-title">当前资产</h2>
+        </div>
+        <span class="context-chip" data-ai-analysis-symbol>--</span>
+      </div>
+      <dl class="ai-analysis-context-grid">
+        <div class="full-row">
+          <dt>analysisId</dt>
+          <dd data-ai-analysis-id>待同步</dd>
+        </div>
+        <div>
+          <dt>规则基础方向</dt>
+          <dd data-ai-analysis-direction>--</dd>
+        </div>
+        <div>
+          <dt>一致性等级</dt>
+          <dd data-ai-analysis-consistency-level>等待同步</dd>
+        </div>
+        <div class="full-row">
+          <dt>一致性摘要</dt>
+          <dd data-ai-analysis-consistency-summary>等待 AI 三角色结果同步后生成一致性结论</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="ai-analysis-role-section" aria-labelledby="mobile-ai-role-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">固定职责，不进行投票</p>
+          <h2 id="mobile-ai-role-title">三 AI 摘要</h2>
+        </div>
+        <strong class="ai-analysis-run-status" data-ai-analysis-run-status>等待同步</strong>
+      </div>
+      <div class="ai-analysis-role-tabs" role="tablist" aria-label="AI 角色">
+        <button type="button" role="tab" id="mobile-ai-tab-gpt"
+                aria-selected="true" aria-controls="mobile-ai-panel-gpt"
+                data-ai-analysis-tab="GPT_FINAL">GPT_FINAL</button>
+        <button type="button" role="tab" id="mobile-ai-tab-gemini"
+                aria-selected="false" aria-controls="mobile-ai-panel-gemini"
+                data-ai-analysis-tab="GEMINI_REVIEW" tabindex="-1">GEMINI_REVIEW</button>
+        <button type="button" role="tab" id="mobile-ai-tab-grok"
+                aria-selected="false" aria-controls="mobile-ai-panel-grok"
+                data-ai-analysis-tab="GROK_CHALLENGE" tabindex="-1">GROK_CHALLENGE</button>
+      </div>
+      <div class="ai-analysis-role-panels" data-ai-analysis-role-root>
+        <article class="ai-analysis-role-panel" id="mobile-ai-panel-gpt"
+                 role="tabpanel" tabindex="0" aria-labelledby="mobile-ai-tab-gpt"
+                 data-ai-analysis-role-panel="GPT_FINAL">
+          <div class="role-heading">
+            <div><span>GPT_FINAL</span><h3>最终裁决官</h3></div>
+            <strong data-ai-analysis-role-status>待同步</strong>
+          </div>
+          <p class="role-status" data-ai-analysis-role-summary>当前观点待同步</p>
+          <dl class="role-summary-metrics" data-ai-analysis-role-output hidden>
+            <div><dt>方向</dt><dd data-ai-analysis-role-direction>--</dd></div>
+            <div><dt>置信度</dt><dd data-ai-analysis-role-confidence>--</dd></div>
+          </dl>
+        </article>
+        <article class="ai-analysis-role-panel" id="mobile-ai-panel-gemini"
+                 role="tabpanel" tabindex="0" aria-labelledby="mobile-ai-tab-gemini"
+                 data-ai-analysis-role-panel="GEMINI_REVIEW" hidden>
+          <div class="role-heading">
+            <div><span>GEMINI_REVIEW</span><h3>冲突复核官</h3></div>
+            <strong data-ai-analysis-role-status>待同步</strong>
+          </div>
+          <p class="role-status" data-ai-analysis-role-summary>当前复核待同步</p>
+        </article>
+        <article class="ai-analysis-role-panel" id="mobile-ai-panel-grok"
+                 role="tabpanel" tabindex="0" aria-labelledby="mobile-ai-tab-grok"
+                 data-ai-analysis-role-panel="GROK_CHALLENGE" hidden>
+          <div class="role-heading">
+            <div><span>GROK_CHALLENGE</span><h3>反方挑战官</h3></div>
+            <strong data-ai-analysis-role-status>待同步</strong>
+          </div>
+          <p class="role-status" data-ai-analysis-role-summary>当前挑战待同步</p>
+        </article>
+      </div>
+      <p class="safety-copy">三角色各自履行固定职责；一致性摘要不是第四个 AI 角色。</p>
+    </section>
+
+    <section class="ai-analysis-deep-section" aria-labelledby="mobile-ai-deep-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">复用 FE-03</p>
+          <h2 id="mobile-ai-deep-title">深层分析</h2>
+        </div>
+      </div>
+      <p class="ai-analysis-detail-status" data-ai-analysis-detail-status>需要权威 analysisId</p>
+      <a class="ai-analysis-detail-link" data-ai-analysis-detail-link
+         data-enabled-label="查看 Analysis Detail"
+         data-disabled-label="当前不可查看"
+         aria-disabled="true" tabindex="-1">当前不可查看</a>
+      <p class="section-description">八大评分、多周期与证据链仅由 FE-03 Analysis Detail 展示；缺失时不补造。</p>
+    </section>
+  </main>
+
   <nav class="bottom-nav" aria-label="主要导航" data-mobile-five-tab-navigation>
     <button type="button" data-home-nav aria-current="page">首页</button>
     <a href="/dashboard/mobile/positions" data-position-nav>持仓</a>
-    <button type="button" data-ai-nav data-unavailable-nav aria-disabled="true">AI分析</button>
+    <button type="button" data-ai-nav>AI分析</button>
     <button type="button" data-message-nav data-unavailable-nav aria-disabled="true">消息</button>
     <button type="button" data-profile-nav data-unavailable-nav aria-disabled="true">我的</button>
   </nav>

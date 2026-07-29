@@ -26,7 +26,7 @@ class Fe04ShellHomeDashboardContractTest {
             Path.of("src/main/resources/templates/dashboard.html");
 
     @Test
-    void mobileShellUsesTheFrozenFiveDestinationOrderAndFailsClosed() throws Exception {
+    void mobileShellUsesTheFrozenFiveDestinationOrderAndActivatesAiAnalysis() throws Exception {
         String html = Files.readString(MOBILE);
         String navigation = slice(html, "<nav class=\"bottom-nav\"", "</nav>");
 
@@ -41,9 +41,10 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(navigation)
                 .contains("data-home-nav aria-current=\"page\"")
                 .contains("href=\"/dashboard/mobile/positions\" data-position-nav")
-                .contains("data-ai-nav data-unavailable-nav aria-disabled=\"true\"")
+                .contains("<button type=\"button\" data-ai-nav>AI分析</button>")
                 .contains("data-message-nav data-unavailable-nav aria-disabled=\"true\"")
-                .contains("data-profile-nav data-unavailable-nav aria-disabled=\"true\"");
+                .contains("data-profile-nav data-unavailable-nav aria-disabled=\"true\"")
+                .doesNotContain("data-ai-nav data-unavailable-nav");
     }
 
     @Test
@@ -97,10 +98,16 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("data-position-independent");
         assertThat(desktopPayload)
                 .contains("if (!preservePositionSummary) renderHomePositionsFromPayload")
-                .contains("renderHomeExecutionFromPayload")
-                .contains("renderHomeAiDecisionFromPayload");
+                .contains("var selectedAsset = selectedHomeAsset(home)")
+                .contains("renderHomeExecutionFromPayload(home.executionSuggestion || {}, selectedAsset)")
+                .contains("renderHomeAiDecisionFromPayload(home.aiDecision || {}, selectedAsset)");
         assertThat(desktopContextRefresh)
                 .contains("fetchDashboardHome(true)")
+                .contains("renderHomeExecutionFromPayload({}, null)")
+                .contains("runStatus: \"LOAD_FAILED\"")
+                .contains("runStatusLabel: \"当前不可查看\"")
+                .contains("consistency: { aiApplicable: false }")
+                .contains("}, null);")
                 .doesNotContain("renderHomePositionsFromPayload")
                 .doesNotContain("renderDashboardHomeUnavailable");
     }
@@ -174,6 +181,165 @@ class Fe04ShellHomeDashboardContractTest {
     }
 
     @Test
+    void restrictedAiAnalysisViewsReuseAuthoritativeIdentityAndFe03WithoutNewCapabilities()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String mobileScript = Files.readString(MOBILE_SCRIPT);
+        String mobileStyles = Files.readString(MOBILE_STYLES);
+        String desktop = Files.readString(DESKTOP);
+        String mobileAi = slice(
+                mobile,
+                "<main class=\"mobile-home mobile-ai-analysis\"",
+                "</main>");
+        String desktopAi = slice(
+                desktop,
+                "<section class=\"desktop-ai-analysis-view\"",
+                "</section>\n            </main>");
+
+        assertThat(mobileAi)
+                .contains(
+                        "data-mobile-ai-view",
+                        "data-ai-analysis-id",
+                        "data-ai-analysis-tab=\"GPT_FINAL\"",
+                        "data-ai-analysis-tab=\"GEMINI_REVIEW\"",
+                        "data-ai-analysis-tab=\"GROK_CHALLENGE\"",
+                        "data-ai-analysis-detail-link",
+                        "市场资产搜索与观察资产写入暂未开放",
+                        "placeholder=\"暂未开放\" disabled",
+                        "八大评分、多周期与证据链仅由 FE-03 Analysis Detail 展示")
+                .doesNotContain("data-ai-analysis-tab=\"AI_CONSISTENCY\"")
+                .doesNotContain("data-watch-write")
+                .doesNotContain("data-market-search-result");
+        assertThat(desktopAi)
+                .contains(
+                        "data-desktop-ai-analysis-root",
+                        "id=\"desktopAiAnalysisId\"",
+                        "data-desktop-ai-tab=\"GPT_FINAL\"",
+                        "data-desktop-ai-tab=\"GEMINI_REVIEW\"",
+                        "data-desktop-ai-tab=\"GROK_CHALLENGE\"",
+                        "id=\"desktopAiDetailLink\"",
+                        "市场资产搜索与观察资产写入暂未开放",
+                        "placeholder=\"暂未开放\"")
+                .doesNotContain("data-desktop-ai-tab=\"AI_CONSISTENCY\"");
+        assertThat(mobileScript)
+                .contains(
+                        "card.dataset.analysisId",
+                        "renderAiAnalysis(safeAi, selectedAssetCard())",
+                        "frontendContract.normalizeAiTabs(canReadRoles ? tabs : [])",
+                        "/dashboard/analysis-detail?analysisId=",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                .doesNotContain("latestAnalysis")
+                .doesNotContain("Number(analysisId)")
+                .doesNotContain("parseInt(analysisId");
+        assertThat(desktop)
+                .contains(
+                        "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
+                        "renderDesktopAiAnalysis(ai, asset || null)",
+                        "analysisState === \"partial\" ? ai.tabs : []",
+                        "/dashboard/analysis-detail?analysisId=",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                .doesNotContain(
+                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))")
+                .doesNotContain("latestAnalysisId");
+        assertThat(mobileStyles)
+                .contains(
+                        ".ai-analysis-role-tabs button",
+                        "min-height: 48px",
+                        ".ai-analysis-detail-link",
+                        "min-height: 44px");
+    }
+
+    @Test
+    void restrictedAiAnalysisFailsClosedForMissingIdentityAndLoadFailure() throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String script = Files.readString(MOBILE_SCRIPT);
+        String desktop = Files.readString(DESKTOP);
+        String contract = Files.readString(FRONTEND_CONTRACT);
+
+        assertThat(mobile + desktop + contract)
+                .contains(
+                        "分析身份待同步",
+                        "当前不可查看",
+                        "等待同步",
+                        "--",
+                        "不补造");
+        assertThat(contract)
+                .contains(
+                        "function aiAnalysisState(identityReady, failed, loading, empty)",
+                        "if (failed) return \"error\"",
+                        "if (loading) return \"loading\"",
+                        "if (empty) return \"empty\"",
+                        "if (!identityReady) return \"missing\"",
+                        "return \"partial\"",
+                        "AI 分析加载失败，当前不可查看",
+                        "暂无可分析资产",
+                        "缺少权威 analysisId，当前不可查看");
+        assertThat(script)
+                .contains(
+                        "var empty = !card && !failed && !loading",
+                        "frontendContract.aiAnalysisState(",
+                        "frontendContract.aiAnalysisStateView(analysisState)",
+                        "root.dataset.analysisState = analysisState",
+                        "runStatus: \"LOADING\"",
+                        "runStatus: \"LOAD_FAILED\"",
+                        "renderAiAnalysisRoles(safeAi.tabs, analysisState)")
+                .doesNotContain("/api/analysis/create")
+                .doesNotContain("/api/watch");
+        assertThat(desktop)
+                .contains(
+                        "var empty = !asset && !failed && !loading",
+                        "frontendContract.aiAnalysisState(",
+                        "frontendContract.aiAnalysisStateView(analysisState)",
+                        "root.dataset.analysisState = analysisState")
+                .doesNotContain("fetch(\"/api/analysis")
+                .doesNotContain("fetch(\"/api/watch");
+    }
+
+    @Test
+    void aiAnalysisRequiresExplicitRoleAvailabilityBeforeRenderingConclusions()
+            throws Exception {
+        String mobile = Files.readString(MOBILE);
+        String script = Files.readString(MOBILE_SCRIPT);
+        String desktop = Files.readString(DESKTOP);
+        String contract = Files.readString(FRONTEND_CONTRACT);
+
+        assertThat(contract)
+                .contains(
+                        "if (!supplied || supplied.resultAvailable !== true)",
+                        "roleLabel: definition.label",
+                        "resultAvailable: false",
+                        "runStatusLabel: displayText(supplied && supplied.runStatusLabel, \"待同步\")",
+                        "supplied && supplied.statusMessage",
+                        "normalized.resultAvailable = true");
+        assertThat(mobile)
+                .contains(
+                        "data-result-available=${tab.resultAvailable == true}",
+                        "data-role-status-message=${tab.statusMessage != null ? tab.statusMessage : ''}",
+                        "tab.resultAvailable == true ?",
+                        "tab.role == 'GPT_FINAL' and tab.resultAvailable == true",
+                        "data-ai-analysis-role-output hidden");
+        assertThat(script)
+                .contains(
+                        "if (tab.resultAvailable !== true)",
+                        "var resultAvailable = canReadRoles && tab.resultAvailable === true",
+                        "roleOutput.hidden = !resultAvailable",
+                        "var resultAvailable = card.dataset.resultAvailable === \"true\"",
+                        "card.dataset.roleStatusMessage",
+                        "if (!resultAvailable) return tab",
+                        "if (role === \"GPT_FINAL\")")
+                .doesNotContain("Number(tab.resultAvailable)");
+        assertThat(desktop)
+                .contains(
+                        "function desktopAiRoleSummary(tab)",
+                        "if (tab.resultAvailable !== true)",
+                        "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true",
+                        "data-desktop-ai-role-output hidden",
+                        "roleOutput.hidden = !resultAvailable",
+                        "if (!roleObj || roleObj.resultAvailable !== true)")
+                .doesNotContain("Boolean(tab.resultAvailable)");
+    }
+
+    @Test
     void desktopAiConsistencyStaysInsideThreeRoleRegionAndUsesConsistencyFieldsOnly()
             throws Exception {
         String desktop = Files.readString(DESKTOP);
@@ -187,7 +353,7 @@ class Fe04ShellHomeDashboardContractTest {
                 "function renderGptFinalHomeRole");
         String payloadRenderer = slice(
                 desktop,
-                "function renderHomeAiDecisionFromPayload(aiDecision)",
+                "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
                 "function renderHomePushInboxFromPayload");
 
         assertThat(aiPanel)
@@ -314,7 +480,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
                 .contains("data-desktop-unavailable-nav")
-                .contains("其余页面暂未开放");
+                .contains("消息与个人页暂未开放");
     }
 
     private String slice(String source, String start, String end) {

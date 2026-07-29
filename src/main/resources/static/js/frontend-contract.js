@@ -18,6 +18,54 @@
     CONFUSED: Object.freeze({ label: "冲突阻断", tone: "danger" })
   });
 
+  var AI_ANALYSIS_STATE_VIEWS = Object.freeze({
+    loading: Object.freeze({
+      statusLabel: "正在同步",
+      runStatusLabel: "正在同步",
+      consistencyLevel: "等待同步",
+      consistencySummary: "AI 角色结果正在同步",
+      roleStatusLabel: "正在同步",
+      roleSummary: "AI 角色结果正在同步",
+      detailStatus: "分析身份同步中"
+    }),
+    empty: Object.freeze({
+      statusLabel: "暂无可分析资产",
+      runStatusLabel: "暂无可分析资产",
+      consistencyLevel: "--",
+      consistencySummary: "暂无可分析资产",
+      roleStatusLabel: "暂无数据",
+      roleSummary: "暂无可分析资产",
+      detailStatus: "暂无可分析资产"
+    }),
+    error: Object.freeze({
+      statusLabel: "当前不可查看",
+      runStatusLabel: "同步失败",
+      consistencyLevel: "--",
+      consistencySummary: "AI 分析加载失败，当前不可查看",
+      roleStatusLabel: "当前不可查看",
+      roleSummary: "AI 角色数据加载失败，当前不可查看",
+      detailStatus: "当前不可查看"
+    }),
+    partial: Object.freeze({
+      statusLabel: "部分数据待同步",
+      runStatusLabel: "等待同步",
+      consistencyLevel: "等待同步",
+      consistencySummary: "等待 AI 三角色结果同步后生成一致性结论",
+      roleStatusLabel: "待同步",
+      roleSummary: "当前角色观点待同步",
+      detailStatus: "权威 analysisId 已就绪"
+    }),
+    missing: Object.freeze({
+      statusLabel: "分析身份待同步",
+      runStatusLabel: "当前不可查看",
+      consistencyLevel: "--",
+      consistencySummary: "缺少权威 analysisId，当前不可查看",
+      roleStatusLabel: "当前不可查看",
+      roleSummary: "缺少权威 analysisId，当前不可查看",
+      detailStatus: "需要权威 analysisId"
+    })
+  });
+
   var POSITION_SELECTION_STATUSES = Object.freeze([
     "POSITION_SELECTION_REQUIRED",
     "POSITION_NOT_FOUND",
@@ -82,22 +130,40 @@
 
     return AI_ROLES.map(function (definition) {
       var supplied = byRole[definition.role];
-      var normalized = {};
-      if (supplied && typeof supplied === "object") {
-        Object.keys(supplied).forEach(function (key) {
-          normalized[key] = supplied[key];
-        });
+      if (!supplied || supplied.resultAvailable !== true) {
+        return {
+          role: definition.role,
+          roleLabel: definition.label,
+          resultAvailable: false,
+          runStatusLabel: displayText(supplied && supplied.runStatusLabel, "待同步"),
+          statusMessage: displayText(
+            supplied && supplied.statusMessage,
+            supplied ? "当前角色观点不可用" : "当前角色观点待同步"
+          )
+        };
       }
+      var normalized = {};
+      Object.keys(supplied).forEach(function (key) {
+        normalized[key] = supplied[key];
+      });
       normalized.role = definition.role;
       normalized.roleLabel = displayText(normalized.roleLabel, definition.label);
-      if (!supplied) {
-        normalized.runStatus = "NOT_AVAILABLE";
-        normalized.runStatusLabel = "待同步";
-        normalized.resultAvailable = false;
-        normalized.statusMessage = "当前角色观点待同步";
-      }
+      normalized.resultAvailable = true;
       return normalized;
     });
+  }
+
+  function aiAnalysisState(identityReady, failed, loading, empty) {
+    if (failed) return "error";
+    if (loading) return "loading";
+    if (empty) return "empty";
+    if (!identityReady) return "missing";
+    return "partial";
+  }
+
+  function aiAnalysisStateView(state) {
+    var normalized = String(state || "").trim().toLowerCase();
+    return AI_ANALYSIS_STATE_VIEWS[normalized] || AI_ANALYSIS_STATE_VIEWS.missing;
   }
 
   function executionPlanAccess(suggestion) {
@@ -213,12 +279,15 @@
   global.TradeModelFrontendContract = Object.freeze({
     AI_ROLES: AI_ROLES,
     ASSET_STATES: ASSET_STATES,
+    AI_ANALYSIS_STATE_VIEWS: AI_ANALYSIS_STATE_VIEWS,
     hasText: hasText,
     displayText: displayText,
     displayNumber: displayNumber,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,
+    aiAnalysisState: aiAnalysisState,
+    aiAnalysisStateView: aiAnalysisStateView,
     executionPlanAccess: executionPlanAccess,
     csrfHeaders: csrfHeaders,
     clearTextFields: clearTextFields,
