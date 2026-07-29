@@ -8,7 +8,7 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: FE-04E Message/Push Contract Foundation is effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8; Message/Push UI remains NOT_STARTED and the bounded first UI implementation is the next authorized package after this governance alignment reaches merged main
 Next Business Phase: FE-04E Message/Push UI First Implementation
-Next Business Phase Allowed: AFTER_GOVERNANCE_MERGE_MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_ONLY; the bounded frontend package may add Message Center and Push Detail UI over the existing exact string identities, source-specific authenticated read-only contracts, OPPORTUNITY/POSITION_RISK sources, and explicit READY/EMPTY/ERROR/MISSING/PARTIAL states, while system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, trading capability, FE-04F, P4, and production deployment remain blocked
+Next Business Phase Allowed: AFTER_GOVERNANCE_MERGE_MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_ONLY; the bounded frontend package may add Message Center and Push Detail UI over the existing exact string identities, a strict public-field projection for authenticated shared read-only OPPORTUNITY data, current-user-scoped POSITION_RISK data, and explicit READY/EMPTY/ERROR/MISSING/PARTIAL states, while system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -104,8 +104,7 @@ The FE-04E Message/Push Contract Foundation is
 
 - exact string `messageId` and `pushId` identities;
 - exact `sourceIdentity` for only `OPPORTUNITY` and `POSITION_RISK`;
-- authenticated shared read-only opportunity reads that expose market-
-  opportunity data without user-private position or risk data;
+- authenticated shared read-only opportunity reads;
 - authenticated owner-scoped position-risk reads that inherit the P3-H3
   authorization boundary;
 - a real UserPosition -> PositionMonitor -> risk-event -> message foundation;
@@ -125,10 +124,22 @@ reaches clean, synced merged main, only the bounded
 - Mobile and Desktop Message Center UI using the registered frames and Message
   Card;
 - Mobile Push Detail UI using the registered frame and Push Detail Card;
-- exact string identity, authenticated shared read-only `OPPORTUNITY` GET
-  reads, and owner-scoped `POSITION_RISK` GET reads;
+- exact string identity and authenticated shared read-only `OPPORTUNITY` GET
+  reads projected to public opportunity data, opportunity identity,
+  `sourceIdentity`, public status, and timestamp before frontend storage or
+  rendering;
+- owner-scoped `POSITION_RISK` GET reads that may expose current-user risk and
+  monitoring fields;
 - only `OPPORTUNITY` and `POSITION_RISK` product sources;
 - explicit loading plus READY/EMPTY/ERROR/MISSING/PARTIAL fail-closed display.
+
+For shared `OPPORTUNITY` Push Detail, UserPosition data, account risk, position
+risk, `failReasonJson`, private risk reasons, and any
+`currentRecheck.riskLevel` or `changeReason` value derived from those private
+sources are outside the UI contract. They must be discarded before entering
+frontend state, cache, DOM, accessibility text, or logs, even when present in
+the existing payload. This governance package does not change the backend/API
+response and does not claim transport-level privacy sanitization.
 
 System notifications, Telegram, external send, automatic notification,
 delivery acknowledgement, fabricated unread/message counts, fabricated
