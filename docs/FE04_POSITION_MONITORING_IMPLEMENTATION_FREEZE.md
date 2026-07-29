@@ -141,8 +141,9 @@ capability. The FE-04E Message/Push Contract Foundation is
 The FE-04E UI readiness re-evaluation passed. After this governance alignment
 reaches clean, synced main, only the bounded Message/Push UI first
 implementation is authorized: Mobile and Desktop Message Center, Mobile Push
-Detail, exact string identity, owner-scoped GET-only reads, only
-`OPPORTUNITY`/`POSITION_RISK` sources, and explicit loading plus
+Detail, exact string identity, authenticated shared read-only `OPPORTUNITY`
+GETs without user-private position or risk data, owner-scoped `POSITION_RISK`
+GETs, only `OPPORTUNITY`/`POSITION_RISK` sources, and explicit loading plus
 READY/EMPTY/ERROR/MISSING/PARTIAL display.
 
 System notifications, Telegram, external send, automatic notification,
@@ -176,6 +177,8 @@ FE04E_UI_STATUS: AUTHORIZED_PENDING_MERGED_MAIN
 FE04E_NEXT_PACKAGE: MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION
 FE04E_AUTHORIZATION: MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_AUTHORIZED_PENDING_GOVERNANCE_MERGE
 FE04E_MESSAGE_SOURCE_STATUS: PASS_OPPORTUNITY_AND_POSITION_RISK_ONLY
+FE04E_OPPORTUNITY_ACCESS: AUTHENTICATED_SHARED_READ_ONLY_NO_USER_PRIVATE_POSITION_OR_RISK_DATA
+FE04E_POSITION_RISK_ACCESS: OWNER_SCOPED_CROSS_USER_BLOCKED
 FE04E_MESSAGE_IDENTITY_STATUS: PASS_STRING_SAFE_AUTHORITATIVE_IDENTITY
 FE04E_PUSH_DETAIL_STATUS: PASS_COMPOSED_READ_ONLY_GET
 FE04E_TELEGRAM_BOUNDARY_STATUS: PASS_EXTENSION_NOT_CONNECTED
