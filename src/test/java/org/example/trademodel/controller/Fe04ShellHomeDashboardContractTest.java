@@ -98,10 +98,16 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("data-position-independent");
         assertThat(desktopPayload)
                 .contains("if (!preservePositionSummary) renderHomePositionsFromPayload")
-                .contains("renderHomeExecutionFromPayload")
-                .contains("renderHomeAiDecisionFromPayload");
+                .contains("var selectedAsset = selectedHomeAsset(home)")
+                .contains("renderHomeExecutionFromPayload(home.executionSuggestion || {}, selectedAsset)")
+                .contains("renderHomeAiDecisionFromPayload(home.aiDecision || {}, selectedAsset)");
         assertThat(desktopContextRefresh)
                 .contains("fetchDashboardHome(true)")
+                .contains("renderHomeExecutionFromPayload({}, null)")
+                .contains("runStatus: \"LOAD_FAILED\"")
+                .contains("runStatusLabel: \"当前不可查看\"")
+                .contains("consistency: { aiApplicable: false }")
+                .contains("}, null);")
                 .doesNotContain("renderHomePositionsFromPayload")
                 .doesNotContain("renderDashboardHomeUnavailable");
     }
@@ -227,10 +233,13 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("parseInt(analysisId");
         assertThat(desktop)
                 .contains(
-                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))",
+                        "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
+                        "renderDesktopAiAnalysis(ai, asset || null)",
                         "analysisState === \"partial\" ? ai.tabs : []",
                         "/dashboard/analysis-detail?analysisId=",
                         "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                .doesNotContain(
+                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))")
                 .doesNotContain("latestAnalysisId");
         assertThat(mobileStyles)
                 .contains(
@@ -344,7 +353,7 @@ class Fe04ShellHomeDashboardContractTest {
                 "function renderGptFinalHomeRole");
         String payloadRenderer = slice(
                 desktop,
-                "function renderHomeAiDecisionFromPayload(aiDecision)",
+                "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
                 "function renderHomePushInboxFromPayload");
 
         assertThat(aiPanel)

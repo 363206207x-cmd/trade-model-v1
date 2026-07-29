@@ -7185,7 +7185,7 @@
             + '<p class="position-source-note">系统建议，仅供人工复核；不会自动下单或创建持仓。</p></div>';
     }
 
-    function renderHomeAiDecisionFromPayload(aiDecision) {
+    function renderHomeAiDecisionFromPayload(aiDecision, asset) {
         var cards = document.getElementById("homeAiSummaryCards");
         var ai = aiDecision || {};
         var tabList = frontendContract.normalizeAiTabs(ai.tabs);
@@ -7225,7 +7225,7 @@
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
         }
-        renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}));
+        renderDesktopAiAnalysis(ai, asset || null);
     }
 
     function renderHomePushInboxFromPayload(pushInbox) {
@@ -7273,8 +7273,9 @@
         renderHomeAssetsFromPayload(home.assets || []);
         renderSidebarSlots();
         if (!preservePositionSummary) renderHomePositionsFromPayload(home.positions || []);
-        renderHomeExecutionFromPayload(home.executionSuggestion || {}, selectedHomeAsset(home));
-        renderHomeAiDecisionFromPayload(home.aiDecision || {});
+        var selectedAsset = selectedHomeAsset(home);
+        renderHomeExecutionFromPayload(home.executionSuggestion || {}, selectedAsset);
+        renderHomeAiDecisionFromPayload(home.aiDecision || {}, selectedAsset);
         renderHomePushInboxFromPayload(home.pushInbox || {});
         updateAssetPoolPanel();
         document.getElementById("lastUpdatedText").textContent = nowText();
@@ -7307,7 +7308,7 @@
             runStatusLabel: "当前不可查看",
             consistency: { aiApplicable: false },
             tabs: []
-        });
+        }, null);
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
             consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
@@ -10297,7 +10298,12 @@
             .catch(function () {
                 updateAssetDetailLink(null);
                 renderHomeExecutionFromPayload({}, null);
-                renderHomeAiDecisionFromPayload({ consistency: {}, tabs: [] });
+                renderHomeAiDecisionFromPayload({
+                    runStatus: "LOAD_FAILED",
+                    runStatusLabel: "当前不可查看",
+                    consistency: { aiApplicable: false },
+                    tabs: []
+                }, null);
                 return null;
             });
     }

@@ -169,6 +169,178 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
+    func testDesktopAssetRefreshFailureCannotReuseStaleHomeAndRetryRestoresSuccess() throws {
+        let webView = try loadDesktopTemplate()
+
+        try run(
+            """
+            window.__resolveDesktopAssetHome = function(index, selectedSymbol, marker) {
+              var assets = ['BTCUSDT', 'ETHUSDT'].map(function(symbol) {
+                return {
+                  symbol: symbol,
+                  rawSymbol: symbol,
+                  analysisId: 'ANA_' + symbol + '_' + marker,
+                  marketBiasLabel: 'BIAS_' + marker,
+                  latestPrice: symbol === 'BTCUSDT' ? '66000' : '3500',
+                  worthOpening: true
+                };
+              });
+              window.__overviewRequests[index].resolve({
+                ok: true,
+                json: function() {
+                  return Promise.resolve({
+                    code: 200,
+                    data: {
+                      selectedSymbol: selectedSymbol,
+                      header: {},
+                      systemState: {},
+                      assets: assets,
+                      positions: [],
+                      executionSuggestion: {
+                        status: 'USABLE_REVIEW_PLAN',
+                        statusLabel: 'EXEC_' + marker,
+                        sourceExecutionPlanId: 'PLAN_' + marker,
+                        direction: 'LONG',
+                        entryZone: 'ENTRY_' + marker,
+                        stopLoss: 'STOP_' + marker,
+                        takeProfitRules: 'TP_' + marker
+                      },
+                      aiDecision: {
+                        runStatus: 'SUCCESS',
+                        runStatusLabel: 'READY_' + marker,
+                        consistency: {},
+                        tabs: [{
+                          role: 'GPT_FINAL',
+                          resultAvailable: true,
+                          runStatusLabel: 'AVAILABLE_' + marker,
+                          statusMessage: 'STATUS_' + marker,
+                          finalConclusion: 'AI_' + marker,
+                          finalMarketBias: 'DIRECTION_' + marker,
+                          finalConfidence: 'CONFIDENCE_' + marker
+                        }]
+                      },
+                      pushInbox: {},
+                      diagnostics: {},
+                      safety: {}
+                    }
+                  });
+                }
+              });
+            };
+            window.__failDesktopAssetHome = function(index) {
+              window.__overviewRequests[index].resolve({
+                ok: false,
+                status: 500,
+                json: function() {
+                  return Promise.resolve({ code: 500, msg: 'LOAD_FAILED' });
+                }
+              });
+            };
+            window.__resolveDesktopAssetHome(0, 'BTCUSDT', 'INITIAL')
+            """,
+            in: webView
+        )
+
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-desktop-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('homeAiSummaryCards').textContent.includes('AI_INITIAL')",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('homeExecutionContent').textContent.includes('EXEC_INITIAL')",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('desktopAiDetailLink').href.includes('analysisId=ANA_BTCUSDT_INITIAL')",
+            in: webView
+        ))
+
+        try run(
+            "document.querySelector('.sidebar-slot[data-symbol=\"ETHUSDT\"]').click()",
+            in: webView
+        )
+        XCTAssertTrue(waitUntil("window.__overviewRequests.length === 2", in: webView, timeout: 2))
+        try run("window.__failDesktopAssetHome(1)", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-desktop-ai-analysis-root]').dataset.analysisState === 'error'",
+            in: webView,
+            timeout: 2
+        ))
+
+        XCTAssertTrue(try booleanValue(
+            "window.__lastDashboardHome.assets.find(asset => asset.symbol === 'ETHUSDT').analysisId === 'ANA_ETHUSDT_INITIAL'",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue("document.getElementById('desktopAiStateStatus').textContent", in: webView),
+            "当前不可查看"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.getElementById('desktopAiDetailLink').getAttribute('aria-disabled')",
+                in: webView
+            ),
+            "true"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.getElementById('desktopAiDetailLink').getAttribute('href') || ''",
+                in: webView
+            ),
+            ""
+        )
+        XCTAssertTrue(try booleanValue(
+            "!document.getElementById('homeAiSummaryCards').textContent.includes('AI_INITIAL')",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "!document.getElementById('homeExecutionContent').textContent.includes('EXEC_INITIAL')",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue(
+                "document.getElementById('homeExecutionContent').dataset.exactPlanVisible",
+                in: webView
+            ),
+            "false"
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "document.getElementById('assetDetailLink').getAttribute('aria-disabled')",
+                in: webView
+            ),
+            "true"
+        )
+
+        try run(
+            "document.querySelector('.sidebar-slot[data-symbol=\"ETHUSDT\"]').click()",
+            in: webView
+        )
+        XCTAssertTrue(waitUntil("window.__overviewRequests.length === 3", in: webView, timeout: 2))
+        try run("window.__resolveDesktopAssetHome(2, 'ETHUSDT', 'RETRY')", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-desktop-ai-analysis-root]').dataset.analysisState === 'partial'",
+            in: webView,
+            timeout: 2
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('homeAiSummaryCards').textContent.includes('AI_RETRY')",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('homeExecutionContent').textContent.includes('EXEC_RETRY')",
+            in: webView
+        ))
+        XCTAssertTrue(try booleanValue(
+            "document.getElementById('desktopAiDetailLink').href.includes('analysisId=ANA_ETHUSDT_RETRY')",
+            in: webView
+        ))
+    }
+
     func testRapidSameAssetRequestsKeepBusyUntilLatestRequestFinishes() throws {
         let webView = try loadFixture()
         let cardSelector = "document.querySelector('[data-symbol=\"BTCUSDT\"]')"
