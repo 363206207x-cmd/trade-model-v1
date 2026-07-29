@@ -19,6 +19,15 @@ public interface PositionMonitorLogMapper {
             + "decision_snapshot AS decisionSnapshot, risk_snapshot AS riskSnapshot, trace_id AS traceId, "
             + "created_at AS createdAt FROM tm_position_monitor_log ";
 
+    String OWNER_SCOPED_SELECT = "SELECT l.log_id AS logId, l.position_id AS positionId, "
+            + "l.analysis_id AS analysisId, l.execution_plan_id AS executionPlanId, "
+            + "l.current_price AS currentPrice, l.logic_status AS logicStatus, l.risk_level AS riskLevel, "
+            + "l.suggested_action AS suggestedAction, l.reason, l.evidence_snapshot AS evidenceSnapshot, "
+            + "l.score_snapshot AS scoreSnapshot, l.decision_snapshot AS decisionSnapshot, "
+            + "l.risk_snapshot AS riskSnapshot, l.trace_id AS traceId, l.created_at AS createdAt "
+            + "FROM tm_position_monitor_log l "
+            + "INNER JOIN tm_user_position p ON p.id = l.position_id AND p.user_id = #{userId} ";
+
     @Insert("INSERT INTO tm_position_monitor_log("
             + "position_id, analysis_id, execution_plan_id, current_price, logic_status, risk_level, suggested_action, "
             + "reason, evidence_snapshot, score_snapshot, decision_snapshot, risk_snapshot, trace_id, created_at"
@@ -40,4 +49,22 @@ public interface PositionMonitorLogMapper {
 
     @Select(BASE_SELECT + "WHERE analysis_id = #{analysisId} ORDER BY created_at DESC, log_id DESC LIMIT #{limit}")
     List<PositionMonitorLogDO> listByAnalysisId(@Param("analysisId") String analysisId, @Param("limit") int limit);
+
+    @Select(OWNER_SCOPED_SELECT
+            + "WHERE l.log_id = #{logId} "
+            + "AND l.logic_status IN ('LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK')")
+    PositionMonitorLogDO selectRiskByIdAndUserId(@Param("logId") Long logId,
+                                                 @Param("userId") Long userId);
+
+    @Select(OWNER_SCOPED_SELECT
+            + "WHERE l.logic_status IN ('LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK') "
+            + "ORDER BY l.created_at DESC, l.log_id DESC LIMIT #{limit}")
+    List<PositionMonitorLogDO> listRiskByUserId(@Param("userId") Long userId,
+                                                @Param("limit") int limit);
+
+    @Select(OWNER_SCOPED_SELECT
+            + "WHERE l.position_id = #{positionId} "
+            + "ORDER BY l.created_at DESC, l.log_id DESC LIMIT 1")
+    PositionMonitorLogDO selectLatestByPositionIdAndUserId(@Param("positionId") Long positionId,
+                                                           @Param("userId") Long userId);
 }

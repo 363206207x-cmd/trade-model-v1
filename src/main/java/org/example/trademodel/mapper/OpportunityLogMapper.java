@@ -62,6 +62,15 @@ public interface OpportunityLogMapper {
     @Select(BASE_SELECT + "WHERE opportunity_id = #{opportunityId}")
     OpportunityLogDO selectByOpportunityId(@Param("opportunityId") String opportunityId);
 
+    @Select(BASE_SELECT + "WHERE opportunity_id = #{opportunityId} AND push_id IS NOT NULL"
+            + SHARED_STATE_PREDICATE)
+    OpportunityLogDO selectPushBackedSharedByOpportunityId(@Param("opportunityId") String opportunityId);
+
+    @Select(BASE_SELECT + "WHERE push_id IS NOT NULL"
+            + SHARED_STATE_PREDICATE
+            + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
+    List<OpportunityLogDO> listPushBackedShared(@Param("limit") int limit);
+
     @Select(BASE_SELECT + "WHERE opportunity_key = #{opportunityKey}")
     OpportunityLogDO selectByOpportunityKey(@Param("opportunityKey") String opportunityKey);
 
