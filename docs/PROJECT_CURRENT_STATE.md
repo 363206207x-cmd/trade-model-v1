@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04E Message/Push Contract Foundation is effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8; Message/Push UI remains NOT_STARTED and the bounded first UI implementation is the next authorized package after this governance alignment reaches merged main
-Next Business Phase: FE-04E Message/Push UI First Implementation
-Next Business Phase Allowed: AFTER_GOVERNANCE_MERGE_MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_ONLY; the bounded frontend package may add Message Center and Push Detail UI over the existing exact string identities, a strict public-field projection for authenticated shared read-only OPPORTUNITY data, current-user-scoped POSITION_RISK data, and explicit READY/EMPTY/ERROR/MISSING/PARTIAL states, while system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
+Current Work Package: FE-04E OPPORTUNITY server-side public projection foundation is implemented on PR #1155 and pending exact-head review; the Message/Push Contract Foundation remains effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8, while Message/Push UI remains NOT_STARTED
+Next Business Phase: FE-04E OPPORTUNITY Public Projection Exact Head Review
+Next Business Phase Allowed: EXACT_HEAD_REVIEW_ONLY; Message Center and Push Detail UI remain blocked until the server-side public projection is reviewed, merged to clean/synced main, and governance is re-evaluated; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -33,11 +33,12 @@ FE-04B, the bounded FE-04C read-only Position Monitoring package, and the
 bounded FE-04D AI Analysis first package are effective on merged main. The
 FE-04E Message/Push Contract Foundation is effective on merged main
 `5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154. FE-04E UI and
-FE-04F remain unimplemented. The FE-04E UI readiness re-evaluation passed its
-technical gates and this governance alignment authorizes only the bounded
-Message/Push UI first implementation after the alignment reaches merged main.
-No code, API, schema, Figma node, notification delivery, AI capability, or
-trading capability is changed by this governance alignment.
+FE-04F remain unimplemented. The FE-04E UI readiness re-evaluation identified
+a server-side privacy prerequisite: shared `OPPORTUNITY` responses must not
+carry UserPosition- or account-risk-derived fields for a frontend to discard.
+PR #1155 now contains that B-risk public-projection candidate and is pending
+exact-head review. No Message/Push UI, schema, Figma node, notification
+delivery, AI capability, or trading capability is authorized by this package.
 
 ---
 
@@ -116,30 +117,28 @@ The FE-04E Message/Push Contract Foundation is
 
 The read-only UI readiness re-evaluation passed the message-list, Push Detail,
 source-specific access, state-model, registered Figma, Telegram-boundary, and
-capability gates. FE-04E Message/Push UI remains `NOT_STARTED`; its governance
-state is `AUTHORIZED_PENDING_MERGED_MAIN`. After this governance alignment
-reaches clean, synced merged main, only the bounded
-`MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION` is authorized:
+capability gates, but subsequent P1 review found that the shared response still
+carried private-risk-derived fields. FE-04E Message/Push UI therefore remains
+`NOT_STARTED` and `BLOCKED_PENDING_PUBLIC_PROJECTION_MERGED_MAIN`.
 
-- Mobile and Desktop Message Center UI using the registered frames and Message
-  Card;
-- Mobile Push Detail UI using the registered frame and Push Detail Card;
-- exact string identity and authenticated shared read-only `OPPORTUNITY` GET
-  reads projected to public opportunity data, opportunity identity,
-  `sourceIdentity`, public status, and timestamp before frontend storage or
-  rendering;
-- owner-scoped `POSITION_RISK` GET reads that may expose current-user risk and
-  monitoring fields;
-- only `OPPORTUNITY` and `POSITION_RISK` product sources;
-- explicit loading plus READY/EMPTY/ERROR/MISSING/PARTIAL fail-closed display.
+PR #1155 introduces source-specific server-side read projections:
 
-For shared `OPPORTUNITY` Push Detail, UserPosition data, account risk, position
-risk, `failReasonJson`, private risk reasons, and any
-`currentRecheck.riskLevel` or `changeReason` value derived from those private
-sources are outside the UI contract. They must be discarded before entering
-frontend state, cache, DOM, accessibility text, or logs, even when present in
-the existing payload. This governance package does not change the backend/API
-response and does not claim transport-level privacy sanitization.
+- `OPPORTUNITY` is
+  `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`. Its response contains only exact
+  message/source/opportunity identity, a safe allowlisted public opportunity
+  status, public timestamp, and public description. Its mapper projection does
+  not select UserPosition, account-risk, position-risk, Recheck risk,
+  `failReasonJson`, or private-risk-reason columns.
+- `POSITION_RISK` is `OWNER_SCOPED_PRIVATE_PROJECTION`. Its risk and monitoring
+  fields remain available only through exact current-user-scoped reads.
+- The shared and private sources no longer use one response record that can
+  carry both public opportunity and private risk fields. Missing or malformed
+  source data remains explicit `PARTIAL`, `MISSING`, or `ERROR`.
+
+This privacy-boundary candidate changes the read API response projection but
+does not add a new endpoint, mutation, schema, Message/Push UI, notification
+send, or trading capability. It is not effective until reviewed and merged to
+main. Only exact-head review is currently authorized.
 
 System notifications, Telegram, external send, automatic notification,
 delivery acknowledgement, fabricated unread/message counts, fabricated

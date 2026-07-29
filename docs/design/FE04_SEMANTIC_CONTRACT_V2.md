@@ -223,9 +223,14 @@ Permitted future Telegram categories are limited to:
 Telegram must not expose trading commands, order actions, open/close actions,
 or authorization.
 
-Push Detail remains review-only and shows the original snapshot, current
-PushRecheck result, and returned change reasons. PushRecheck never authorizes a
-trade.
+Push Detail remains review-only and source-specific. Authenticated shared
+`OPPORTUNITY` detail uses a server-side public projection containing only exact
+public identity, safe allowlisted opportunity status, public timestamp, and
+public description. It must not select or serialize UserPosition,
+account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
+reason fields. Owner-scoped `POSITION_RISK` detail may show its original
+monitoring snapshot, current monitoring result, and private change reason only
+for the current user. PushRecheck never authorizes a trade.
 
 ## 8. Search Asset V2
 

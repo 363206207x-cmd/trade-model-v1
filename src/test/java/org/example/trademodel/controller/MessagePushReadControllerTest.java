@@ -61,13 +61,9 @@ class MessagePushReadControllerTest {
     void missingExactMessageIdentityReturnsNotFound() throws Exception {
         when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
         when(messagePushReadService.findPushDetailForUser(7L, "9007199254740993"))
-                .thenReturn(new PushDetailDTO(
+                .thenReturn(new PushDetailDTO.UnavailableProjection(
                         MessageReadState.MISSING,
                         "9007199254740993",
-                        null,
-                        null,
-                        null,
-                        null,
                         null,
                         List.of(),
                         "MESSAGE_NOT_FOUND",

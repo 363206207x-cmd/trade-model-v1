@@ -107,7 +107,7 @@ Overall frontend contract status:
 | Strategy & Monitoring | Execution suggestion, user position, monitoring result | `ExecutionPlan`, `UserPosition`, `PositionMonitorLog` | Figma frame exists; underlying objects exist but no single composed product page | `PARTIAL` |
 | Position Detail | User facts, current monitor result, history, optional review entry | `UserPosition`, `PositionMonitorLog`, close/review records | Figma frame only; current object reads are usable, complete history is not | `PARTIAL` |
 | Review | Original suggestion, actual user execution, monitoring, outcome, deviation | Review dashboard projections and `ReviewResult`-related records | `/review/dashboard` and `/review/{analysisId}` exist | `PARTIAL` |
-| Mobile Push Detail | Snapshot and current Push Recheck result | Push audit records and `PushRecheckStatusContract` | Figma frame exists; no current mobile product route | `PARTIAL` |
+| Mobile Push Detail | Source-specific public opportunity or private position-risk review | Server-side `OPPORTUNITY` public projection and owner-scoped `POSITION_RISK` private projection | Read-only API projection exists as a PR #1155 candidate; Figma frame exists; no current mobile product route | `PARTIAL` |
 | Message Center | Opportunity and position-risk notifications | Notification eligibility/audit contracts | Figma frame only; external delivery disabled | `FAIL_CLOSED` |
 | Profile & Settings | Current user/system read-only information | Minimal `/api/user-config/ping` only | Figma frame exceeds current settings contract | `FAIL_CLOSED` |
 
@@ -438,7 +438,11 @@ frontend has no complete mobile Push Detail route. The Figma Push frame is a
 valid target only when it:
 
 - uses review-only wording;
-- shows original snapshot separately from current result;
+- consumes the server-side source-specific projection;
+- shows original/current private risk fields only for owner-scoped
+  `POSITION_RISK`;
+- never exposes Recheck/account/position risk or private reason fields through
+  authenticated shared `OPPORTUNITY`;
 - exposes information navigation only;
 - never offers execute, buy, sell, order, close, or position mutation.
 

@@ -28,6 +28,11 @@ public interface PushSnapshotMapper {
     @Select("SELECT * FROM tm_push_snapshot WHERE push_id = #{pushId}")
     TmPushSnapshotDO selectByPushId(Long pushId);
 
+    @Select("SELECT push_id AS pushId, analysis_id AS analysisId, "
+            + "push_create_time AS pushCreateTime, create_time AS createTime "
+            + "FROM tm_push_snapshot WHERE push_id = #{pushId}")
+    TmPushSnapshotDO selectPublicProjectionByPushId(@Param("pushId") Long pushId);
+
     @Select("SELECT * FROM tm_push_snapshot WHERE analysis_id = #{analysisId} ORDER BY push_id DESC")
     List<TmPushSnapshotDO> listByAnalysisId(String analysisId);
 

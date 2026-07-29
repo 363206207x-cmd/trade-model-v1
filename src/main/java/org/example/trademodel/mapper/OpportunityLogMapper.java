@@ -42,6 +42,13 @@ public interface OpportunityLogMapper {
             + "not_external_channel AS notExternalChannel, created_at AS createdAt, updated_at AS updatedAt "
             + "FROM tm_opportunity_log ";
 
+    String PUBLIC_MESSAGE_SELECT = "SELECT opportunity_id AS opportunityId, analysis_id AS analysisId, "
+            + "push_id AS pushId, symbol, timeframe, direction, lifecycle_status AS lifecycleStatus, "
+            + "CASE WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID') "
+            + "THEN opportunity_status ELSE NULL END AS opportunityStatus, "
+            + "anchor_time AS anchorTime, created_at AS createdAt "
+            + "FROM tm_opportunity_log ";
+
     @Insert("INSERT INTO tm_opportunity_log(opportunity_id, opportunity_key, analysis_id, decision_id, execution_plan_id, "
             + "push_id, user_position_id, symbol, timeframe, direction, lifecycle_status, opportunity_status, anchor_time, "
             + "evaluation_as_of, resolved_at, entry_reference, target_price, invalidation_price, target_hit, invalidation_hit, "
@@ -70,6 +77,15 @@ public interface OpportunityLogMapper {
             + SHARED_STATE_PREDICATE
             + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
     List<OpportunityLogDO> listPushBackedShared(@Param("limit") int limit);
+
+    @Select(PUBLIC_MESSAGE_SELECT + "WHERE opportunity_id = #{opportunityId} AND push_id IS NOT NULL"
+            + SHARED_STATE_PREDICATE)
+    OpportunityLogDO selectPushBackedPublicByOpportunityId(@Param("opportunityId") String opportunityId);
+
+    @Select(PUBLIC_MESSAGE_SELECT + "WHERE push_id IS NOT NULL"
+            + SHARED_STATE_PREDICATE
+            + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
+    List<OpportunityLogDO> listPushBackedPublic(@Param("limit") int limit);
 
     @Select(BASE_SELECT + "WHERE opportunity_key = #{opportunityKey}")
     OpportunityLogDO selectByOpportunityKey(@Param("opportunityKey") String opportunityKey);

@@ -341,3 +341,28 @@ Does this weaken safety boundaries: No.
 Human confirmation required: Yes before FE-04A + FE-04B implementation. This
 record describes the registration's merged-main state; it does not mark FE-04
 implemented or complete.
+
+---
+
+## v1.0-fe04e-opportunity-public-projection-candidate
+
+Date: 2026-07-30
+Changed by: Codex
+Reason: Close the FE-04E P1 privacy boundary in which an authenticated shared
+`OPPORTUNITY` response could carry UserPosition- or account-risk-derived
+fields and relied on frontend filtering.
+Before: `OPPORTUNITY` and `POSITION_RISK` Push Detail shared one
+private-field-capable response record. The shared path could serialize Recheck
+account-risk status, risk level, or `failReasonJson`.
+After: PR #1155 defines `OPPORTUNITY` as
+`AUTHENTICATED_SHARED_PUBLIC_PROJECTION` and `POSITION_RISK` as
+`OWNER_SCOPED_PRIVATE_PROJECTION`. The public mapper reads only exact public
+identity, safe allowlisted opportunity status, public timestamp, and public
+description inputs; the public response variant cannot carry UserPosition,
+account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
+reason fields. The private variant remains exact current-user scoped.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No; it strengthens transport-level privacy.
+Human confirmation required: Yes before B-risk PR #1155 merge. The candidate
+is not effective until exact-head review and merged main.

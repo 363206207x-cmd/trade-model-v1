@@ -2,14 +2,13 @@ package org.example.trademodel.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PositionMonitorLogDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.messagepush.MessageListDTO;
@@ -19,10 +18,13 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class MessagePushReadServiceTest {
@@ -30,13 +32,11 @@ class MessagePushReadServiceTest {
     private final OpportunityLogMapper opportunityLogMapper = mock(OpportunityLogMapper.class);
     private final PositionMonitorLogMapper positionMonitorLogMapper = mock(PositionMonitorLogMapper.class);
     private final PushSnapshotMapper pushSnapshotMapper = mock(PushSnapshotMapper.class);
-    private final PushRecheckLogMapper pushRecheckLogMapper = mock(PushRecheckLogMapper.class);
     private final UserPositionMapper userPositionMapper = mock(UserPositionMapper.class);
     private final MessagePushReadService service = new MessagePushReadService(
             opportunityLogMapper,
             positionMonitorLogMapper,
             pushSnapshotMapper,
-            pushRecheckLogMapper,
             userPositionMapper);
 
     @Test
@@ -64,8 +64,36 @@ class MessagePushReadServiceTest {
     }
 
     @Test
+    void publicMapperProjectionsDoNotSelectPrivateRiskColumns() throws Exception {
+        String opportunitySql = OpportunityLogMapper.PUBLIC_MESSAGE_SELECT.toLowerCase(Locale.ROOT);
+        Select pushSelect = PushSnapshotMapper.class
+                .getMethod("selectPublicProjectionByPushId", Long.class)
+                .getAnnotation(Select.class);
+        String pushSql = String.join(" ", pushSelect.value()).toLowerCase(Locale.ROOT);
+
+        assertThat(opportunitySql)
+                .contains("opportunity_id", "analysis_id", "push_id", "symbol")
+                .doesNotContain(
+                        "user_position_id",
+                        "risk_blocked_evidence",
+                        "risk_blocked_at",
+                        "reason_codes",
+                        "entry_reference",
+                        "target_price",
+                        "invalidation_price");
+        assertThat(pushSql)
+                .contains("push_id", "analysis_id", "push_create_time")
+                .doesNotContain(
+                        "push_status",
+                        "account_risk_snapshot_id",
+                        "entry_zone_json",
+                        "stop_zone_json",
+                        "invalidation_condition_json");
+    }
+
+    @Test
     void emptyAndErrorAreDistinctAndErrorNeverCarriesAnEmptySuccessList() {
-        when(opportunityLogMapper.listPushBackedShared(anyInt())).thenReturn(List.of());
+        when(opportunityLogMapper.listPushBackedPublic(anyInt())).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of());
 
@@ -74,7 +102,7 @@ class MessagePushReadServiceTest {
         assertThat(empty.state()).isEqualTo(MessageReadState.EMPTY);
         assertThat(empty.items()).isEmpty();
 
-        when(opportunityLogMapper.listPushBackedShared(anyInt()))
+        when(opportunityLogMapper.listPushBackedPublic(anyInt()))
                 .thenThrow(new IllegalStateException("database unavailable"));
 
         MessageListDTO error = service.listForUser(USER_ID, null);
@@ -86,42 +114,41 @@ class MessagePushReadServiceTest {
 
     @Test
     void orphanPushSnapshotReturnsPartialInsteadOfInventingDetail() {
-        OpportunityLogDO opportunity = new OpportunityLogDO();
-        opportunity.setOpportunityId("opp-orphan-push");
-        opportunity.setAnalysisId("ana-orphan-push");
-        opportunity.setPushId(42L);
-        when(opportunityLogMapper.selectPushBackedSharedByOpportunityId("opp-orphan-push"))
+        OpportunityLogDO opportunity = publicOpportunity("opp-orphan-push", 42L);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-orphan-push"))
                 .thenReturn(opportunity);
-        when(pushSnapshotMapper.selectByPushId(42L)).thenReturn(null);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(42L)).thenReturn(null);
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-orphan-push");
 
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
         assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
         assertThat(detail.messageId()).isEqualTo("opp-orphan-push");
-        assertThat(detail.pushId()).isEqualTo("42");
-        assertThat(detail.originalSnapshot()).isNull();
-        assertThat(detail.currentRecheck()).isNull();
-        assertThat(detail.missingFields()).containsExactly("originalSnapshot", "currentRecheck");
+        assertThat(projection.opportunityIdentity().pushId()).isEqualTo("42");
+        assertThat(projection.publicStatus()).isEqualTo("PENDING_EVALUATION");
+        assertThat(projection.missingFields()).containsExactly("publicPushProjection");
     }
 
     @Test
     void mismatchedPersistedPushIdentityReturnsPartialWithoutComposingDetail() {
-        OpportunityLogDO opportunity = new OpportunityLogDO();
-        opportunity.setOpportunityId("opp-mismatched-push");
+        OpportunityLogDO opportunity = publicOpportunity("opp-mismatched-push", 42L);
         opportunity.setAnalysisId("ana-authoritative");
-        opportunity.setPushId(42L);
         TmPushSnapshotDO mismatched = new TmPushSnapshotDO();
         mismatched.setPushId(43L);
         mismatched.setAnalysisId("ana-other");
-        when(opportunityLogMapper.selectPushBackedSharedByOpportunityId("opp-mismatched-push"))
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-mismatched-push"))
                 .thenReturn(opportunity);
-        when(pushSnapshotMapper.selectByPushId(42L)).thenReturn(mismatched);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(42L)).thenReturn(mismatched);
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-mismatched-push");
 
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
         assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
-        assertThat(detail.originalSnapshot()).isNull();
-        assertThat(detail.currentRecheck()).isNull();
+        assertThat(projection.publicDescription()).isEqualTo("BTCUSDT LONG 1H");
         assertThat(detail.reason()).isEqualTo("PUSH_SNAPSHOT_MISSING");
     }
 
@@ -134,49 +161,143 @@ class MessagePushReadServiceTest {
     }
 
     @Test
-    void completeRecheckReturnsReady() {
-        LocalDateTime recheckTime = LocalDateTime.of(2026, 7, 29, 10, 5);
-        TmPushRecheckLogDO recheck = completeRecheck(101L, "REVIEW_WAITING", recheckTime);
-        stubOpportunityDetail("opp-complete-recheck", 201L, recheck);
+    void completePublicOpportunityReturnsReadyWithoutPrivateRecheckData() {
+        LocalDateTime pushTime = LocalDateTime.of(2026, 7, 29, 10, 5);
+        stubOpportunityDetail("opp-public-ready", 201L, pushTime);
 
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-complete-recheck");
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-ready");
 
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
         assertThat(detail.state()).isEqualTo(MessageReadState.READY);
-        assertThat(detail.originalSnapshot().status()).isEqualTo("CAPTURED");
-        assertThat(detail.currentRecheck()).isNotNull();
-        assertThat(detail.currentRecheck().status()).isEqualTo("REVIEW_WAITING");
-        assertThat(detail.currentRecheck().checkedAt()).isEqualTo(recheckTime);
+        assertThat(projection.publicStatus()).isEqualTo("PENDING_EVALUATION");
+        assertThat(projection.publicTimestamp()).isEqualTo(pushTime);
+        assertThat(projection.publicDescription()).isEqualTo("BTCUSDT LONG 1H");
         assertThat(detail.reason()).isNull();
+        verify(opportunityLogMapper, never())
+                .selectPushBackedSharedByOpportunityId("opp-public-ready");
+        verify(pushSnapshotMapper, never()).selectByPushId(201L);
     }
 
     @Test
-    void nullPushStatusReturnsPartialWithoutComposingSnapshot() {
-        TmPushRecheckLogDO recheck = completeRecheck(
-                108L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 12));
-        stubOpportunityDetail("opp-null-push-status", 208L, recheck, null);
+    void opportunityPublicProjectionNeverSerializesRiskDerivedStatusOrPrivateFields() throws Exception {
+        OpportunityLogDO opportunity = publicOpportunity("opp-public-projection", 210L);
+        opportunity.setOpportunityStatus("BLOCKED_BY_RISK_VALID");
+        TmPushSnapshotDO push = publicPush(
+                210L,
+                opportunity.getAnalysisId(),
+                LocalDateTime.of(2026, 7, 29, 10, 14));
+        push.setPushStatus("RECHECK_RISK_BLOCKED");
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-public-projection"))
+                .thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(210L)).thenReturn(push);
 
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-null-push-status");
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-projection");
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(detail));
 
-        assertInvalidPushStatusPartial(detail);
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        assertThat(json.path("publicStatus").asText()).isEqualTo("PENDING_EVALUATION");
+        assertThat(json.path("sourceIdentity").has("positionId")).isFalse();
+        assertThat(json.has("originalSnapshot")).isFalse();
+        assertThat(json.has("currentRecheck")).isFalse();
+        assertThat(json.has("changeReason")).isFalse();
+        assertThat(json.toString()).doesNotContain(
+                "currentAccountRiskAllowed",
+                "failReasonJson",
+                "PRIVATE_ACCOUNT_RISK_REASON",
+                "riskLevel",
+                "RISK_BLOCKED",
+                "positionId",
+                "currentPrice",
+                "dataQualityScore",
+                "confusedScore");
     }
 
     @Test
-    void unknownPushStatusReturnsPartialWithoutLeakingUnknownState() {
-        TmPushRecheckLogDO recheck = completeRecheck(
-                109L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 13));
-        stubOpportunityDetail("opp-unknown-push-status", 209L, recheck, "UNKNOWN_PUSH_STATE");
+    void missingPublicStatusReturnsPartialWithoutReadingPrivateStatus() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-missing-public-status", 208L);
+        opportunity.setLifecycleStatus(null);
+        opportunity.setOpportunityStatus("BLOCKED_BY_RISK_VALID");
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-missing-public-status"))
+                .thenReturn(opportunity);
 
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-unknown-push-status");
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-missing-public-status");
 
-        assertInvalidPushStatusPartial(detail);
-        assertThat(detail.toString()).doesNotContain("UNKNOWN_PUSH_STATE");
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(projection.publicStatus()).isNull();
+        assertThat(projection.missingFields()).containsExactly("publicStatus");
+        assertThat(detail.reason()).isEqualTo("PUBLIC_OPPORTUNITY_INCOMPLETE");
+        verify(pushSnapshotMapper, never()).selectPublicProjectionByPushId(208L);
+    }
+
+    @Test
+    void missingPublicTimestampReturnsPartialBeforePushRead() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-missing-public-time", 211L);
+        opportunity.setAnchorTime(null);
+        opportunity.setCreatedAt(null);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-missing-public-time"))
+                .thenReturn(opportunity);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-missing-public-time");
+
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(projection.missingFields()).containsExactly("publicTimestamp");
+        assertThat(detail.reason()).isEqualTo("PUBLIC_OPPORTUNITY_INCOMPLETE");
+        verify(pushSnapshotMapper, never()).selectPublicProjectionByPushId(211L);
+    }
+
+    @Test
+    void missingPublicDescriptionReturnsPartialBeforePushRead() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-missing-public-description", 212L);
+        opportunity.setSymbol(null);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                "opp-missing-public-description")).thenReturn(opportunity);
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, "opp-missing-public-description");
+
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(projection.missingFields()).containsExactly("publicDescription");
+        assertThat(detail.reason()).isEqualTo("PUBLIC_OPPORTUNITY_INCOMPLETE");
+        verify(pushSnapshotMapper, never()).selectPublicProjectionByPushId(212L);
+    }
+
+    @Test
+    void safeTerminalOpportunityStatusTakesPrecedenceOverLifecycleStatus() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-public-terminal", 213L);
+        opportunity.setLifecycleStatus("RESOLVED");
+        opportunity.setOpportunityStatus("MISSED_VALID");
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-public-terminal"))
+                .thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(213L)).thenReturn(
+                publicPush(213L, opportunity.getAnalysisId(),
+                        LocalDateTime.of(2026, 7, 29, 10, 20)));
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-terminal");
+
+        assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
+        PushDetailDTO.OpportunityPublicProjection projection =
+                (PushDetailDTO.OpportunityPublicProjection) detail;
+        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(projection.publicStatus()).isEqualTo("MISSED_VALID");
     }
 
     @Test
     void positionRiskListUsesAuthoritativeOwnedPositionSymbol() {
         PositionMonitorLogDO risk = positionRisk(301L, 401L);
         UserPositionDO position = ownedPosition(401L, "BTCUSDT");
-        when(opportunityLogMapper.listPushBackedShared(anyInt())).thenReturn(List.of());
+        when(opportunityLogMapper.listPushBackedPublic(anyInt())).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
         when(userPositionMapper.selectByIdAndUserId(401L, USER_ID)).thenReturn(position);
@@ -193,7 +314,7 @@ class MessagePushReadServiceTest {
     @Test
     void missingOwnedPositionMakesRiskMessageListPartialWithoutInventingSymbol() {
         PositionMonitorLogDO risk = positionRisk(302L, 402L);
-        when(opportunityLogMapper.listPushBackedShared(anyInt())).thenReturn(List.of());
+        when(opportunityLogMapper.listPushBackedPublic(anyInt())).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
         when(userPositionMapper.selectByIdAndUserId(402L, USER_ID)).thenReturn(null);
@@ -205,100 +326,31 @@ class MessagePushReadServiceTest {
         assertThat(result.reason()).isEqualTo("SOURCE_RECORD_INCOMPLETE");
     }
 
-    @Test
-    void missingEachRequiredRecheckFieldReturnsPartial() {
-        TmPushRecheckLogDO missingStatus = completeRecheck(
-                102L, null, LocalDateTime.of(2026, 7, 29, 10, 6));
-        stubOpportunityDetail("opp-recheck-no-status", 202L, missingStatus);
-
-        TmPushRecheckLogDO missingTime = completeRecheck(103L, "REVIEW_WAITING", null);
-        missingTime.setCreateTime(LocalDateTime.of(2026, 7, 29, 10, 7));
-        stubOpportunityDetail("opp-recheck-no-time", 203L, missingTime);
-
-        TmPushRecheckLogDO missingExecution = completeRecheck(
-                104L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 8));
-        missingExecution.setExecutionStatus(null);
-        stubOpportunityDetail("opp-recheck-no-execution", 204L, missingExecution);
-
-        assertIncompleteRecheck(
-                service.findPushDetailForUser(USER_ID, "opp-recheck-no-status"),
-                "currentRecheck.status");
-        assertIncompleteRecheck(
-                service.findPushDetailForUser(USER_ID, "opp-recheck-no-time"),
-                "currentRecheck.checkedAt");
-        assertIncompleteRecheck(
-                service.findPushDetailForUser(USER_ID, "opp-recheck-no-execution"),
-                "currentRecheck.executionStatus");
-    }
-
-    @Test
-    void invalidRecheckStatusReturnsErrorWithoutLeakingUnknownState() {
-        TmPushRecheckLogDO recheck = completeRecheck(
-                105L, "UNKNOWN_RECHECK_STATE", LocalDateTime.of(2026, 7, 29, 10, 9));
-        stubOpportunityDetail("opp-invalid-recheck", 205L, recheck);
-
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-invalid-recheck");
-
-        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
-        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INVALID");
-        assertThat(detail.currentRecheck()).isNull();
-        assertThat(detail.toString()).doesNotContain("UNKNOWN_RECHECK_STATE");
-    }
-
-    @Test
-    void invalidExecutionStatusReturnsError() {
-        TmPushRecheckLogDO recheck = completeRecheck(
-                106L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 10));
-        recheck.setExecutionStatus("FAILED");
-        stubOpportunityDetail("opp-invalid-execution", 206L, recheck);
-
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-invalid-execution");
-
-        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
-        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INVALID");
-        assertThat(detail.currentRecheck()).isNull();
-    }
-
-    @Test
-    void existingLegacyValidRecheckRemainsReadyAndCanonical() {
-        TmPushRecheckLogDO recheck = completeRecheck(
-                107L, "VALID_EXECUTABLE", LocalDateTime.of(2026, 7, 29, 10, 11));
-        recheck.setExecutionStatus(" completed ");
-        stubOpportunityDetail("opp-legacy-recheck", 207L, recheck);
-
-        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-legacy-recheck");
-
-        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
-        assertThat(detail.currentRecheck().status()).isEqualTo("REVIEW_PASSED");
-    }
-
     private void stubOpportunityDetail(String opportunityId,
                                        Long pushId,
-                                       TmPushRecheckLogDO recheck) {
-        stubOpportunityDetail(opportunityId, pushId, recheck, "CAPTURED");
-    }
-
-    private void stubOpportunityDetail(String opportunityId,
-                                       Long pushId,
-                                       TmPushRecheckLogDO recheck,
-                                       String pushStatus) {
+                                       LocalDateTime pushTime) {
         String analysisId = "ana-" + opportunityId;
+        OpportunityLogDO opportunity = publicOpportunity(opportunityId, pushId);
+        opportunity.setAnalysisId(analysisId);
+
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(opportunityId))
+                .thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(pushId))
+                .thenReturn(publicPush(pushId, analysisId, pushTime));
+    }
+
+    private static OpportunityLogDO publicOpportunity(String opportunityId, Long pushId) {
         OpportunityLogDO opportunity = new OpportunityLogDO();
         opportunity.setOpportunityId(opportunityId);
-        opportunity.setAnalysisId(analysisId);
+        opportunity.setAnalysisId("ana-" + opportunityId);
         opportunity.setPushId(pushId);
+        opportunity.setSymbol("BTCUSDT");
         opportunity.setDirection("LONG");
-
-        TmPushSnapshotDO push = new TmPushSnapshotDO();
-        push.setPushId(pushId);
-        push.setAnalysisId(analysisId);
-        push.setSymbol("BTCUSDT");
-        push.setPushStatus(pushStatus);
-
-        when(opportunityLogMapper.selectPushBackedSharedByOpportunityId(opportunityId))
-                .thenReturn(opportunity);
-        when(pushSnapshotMapper.selectByPushId(pushId)).thenReturn(push);
-        when(pushRecheckLogMapper.selectLatestByPushId(pushId)).thenReturn(recheck);
+        opportunity.setTimeframe("1h");
+        opportunity.setLifecycleStatus("PENDING_EVALUATION");
+        opportunity.setAnchorTime(LocalDateTime.of(2026, 7, 29, 10, 0));
+        opportunity.setCreatedAt(opportunity.getAnchorTime());
+        return opportunity;
     }
 
     private static PositionMonitorLogDO positionRisk(Long logId, Long positionId) {
@@ -319,29 +371,14 @@ class MessagePushReadServiceTest {
         return row;
     }
 
-    private static TmPushRecheckLogDO completeRecheck(Long logId,
-                                                       String recheckStatus,
-                                                       LocalDateTime recheckTime) {
-        TmPushRecheckLogDO recheck = new TmPushRecheckLogDO();
-        recheck.setLogId(logId);
-        recheck.setExecutionStatus("COMPLETED");
-        recheck.setRecheckStatus(recheckStatus);
-        recheck.setRecheckTime(recheckTime);
-        return recheck;
-    }
-
-    private static void assertIncompleteRecheck(PushDetailDTO detail, String missingField) {
-        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
-        assertThat(detail.currentRecheck()).isNull();
-        assertThat(detail.missingFields()).containsExactly(missingField);
-        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
-    }
-
-    private static void assertInvalidPushStatusPartial(PushDetailDTO detail) {
-        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
-        assertThat(detail.originalSnapshot()).isNull();
-        assertThat(detail.currentRecheck()).isNull();
-        assertThat(detail.missingFields()).containsExactly("originalSnapshot.status");
-        assertThat(detail.reason()).isEqualTo("PUSH_SNAPSHOT_INCOMPLETE");
+    private static TmPushSnapshotDO publicPush(
+            Long pushId,
+            String analysisId,
+            LocalDateTime pushTime) {
+        TmPushSnapshotDO push = new TmPushSnapshotDO();
+        push.setPushId(pushId);
+        push.setAnalysisId(analysisId);
+        push.setPushCreateTime(pushTime);
+        return push;
     }
 }
