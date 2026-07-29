@@ -3,8 +3,10 @@ package org.example.trademodel.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.OpportunityLogDO;
+import org.example.trademodel.entity.PositionMonitorLogDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
@@ -140,10 +142,67 @@ class MessagePushReadServiceTest {
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-complete-recheck");
 
         assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.originalSnapshot().status()).isEqualTo("CAPTURED");
         assertThat(detail.currentRecheck()).isNotNull();
         assertThat(detail.currentRecheck().status()).isEqualTo("REVIEW_WAITING");
         assertThat(detail.currentRecheck().checkedAt()).isEqualTo(recheckTime);
         assertThat(detail.reason()).isNull();
+    }
+
+    @Test
+    void nullPushStatusReturnsPartialWithoutComposingSnapshot() {
+        TmPushRecheckLogDO recheck = completeRecheck(
+                108L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 12));
+        stubOpportunityDetail("opp-null-push-status", 208L, recheck, null);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-null-push-status");
+
+        assertInvalidPushStatusPartial(detail);
+    }
+
+    @Test
+    void unknownPushStatusReturnsPartialWithoutLeakingUnknownState() {
+        TmPushRecheckLogDO recheck = completeRecheck(
+                109L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 13));
+        stubOpportunityDetail("opp-unknown-push-status", 209L, recheck, "UNKNOWN_PUSH_STATE");
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-unknown-push-status");
+
+        assertInvalidPushStatusPartial(detail);
+        assertThat(detail.toString()).doesNotContain("UNKNOWN_PUSH_STATE");
+    }
+
+    @Test
+    void positionRiskListUsesAuthoritativeOwnedPositionSymbol() {
+        PositionMonitorLogDO risk = positionRisk(301L, 401L);
+        UserPositionDO position = ownedPosition(401L, "BTCUSDT");
+        when(opportunityLogMapper.listPushBackedShared(anyInt())).thenReturn(List.of());
+        when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
+                .thenReturn(List.of(risk));
+        when(userPositionMapper.selectByIdAndUserId(401L, USER_ID)).thenReturn(position);
+
+        MessageListDTO result = service.listForUser(USER_ID, null);
+
+        assertThat(result.state()).isEqualTo(MessageReadState.READY);
+        assertThat(result.items()).singleElement().satisfies(item -> {
+            assertThat(item.symbol()).isEqualTo("BTCUSDT");
+            assertThat(item.sourceIdentity().positionId()).isEqualTo("401");
+        });
+    }
+
+    @Test
+    void missingOwnedPositionMakesRiskMessageListPartialWithoutInventingSymbol() {
+        PositionMonitorLogDO risk = positionRisk(302L, 402L);
+        when(opportunityLogMapper.listPushBackedShared(anyInt())).thenReturn(List.of());
+        when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
+                .thenReturn(List.of(risk));
+        when(userPositionMapper.selectByIdAndUserId(402L, USER_ID)).thenReturn(null);
+
+        MessageListDTO result = service.listForUser(USER_ID, null);
+
+        assertThat(result.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(result.items()).isEmpty();
+        assertThat(result.reason()).isEqualTo("SOURCE_RECORD_INCOMPLETE");
     }
 
     @Test
@@ -216,6 +275,13 @@ class MessagePushReadServiceTest {
     private void stubOpportunityDetail(String opportunityId,
                                        Long pushId,
                                        TmPushRecheckLogDO recheck) {
+        stubOpportunityDetail(opportunityId, pushId, recheck, "CAPTURED");
+    }
+
+    private void stubOpportunityDetail(String opportunityId,
+                                       Long pushId,
+                                       TmPushRecheckLogDO recheck,
+                                       String pushStatus) {
         String analysisId = "ana-" + opportunityId;
         OpportunityLogDO opportunity = new OpportunityLogDO();
         opportunity.setOpportunityId(opportunityId);
@@ -227,12 +293,30 @@ class MessagePushReadServiceTest {
         push.setPushId(pushId);
         push.setAnalysisId(analysisId);
         push.setSymbol("BTCUSDT");
-        push.setPushStatus("CAPTURED");
+        push.setPushStatus(pushStatus);
 
         when(opportunityLogMapper.selectPushBackedSharedByOpportunityId(opportunityId))
                 .thenReturn(opportunity);
         when(pushSnapshotMapper.selectByPushId(pushId)).thenReturn(push);
         when(pushRecheckLogMapper.selectLatestByPushId(pushId)).thenReturn(recheck);
+    }
+
+    private static PositionMonitorLogDO positionRisk(Long logId, Long positionId) {
+        PositionMonitorLogDO row = new PositionMonitorLogDO();
+        row.setLogId(logId);
+        row.setPositionId(positionId);
+        row.setAnalysisId("ana-position-" + positionId);
+        row.setLogicStatus("HIGH_RISK");
+        row.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 0));
+        return row;
+    }
+
+    private static UserPositionDO ownedPosition(Long positionId, String symbol) {
+        UserPositionDO row = new UserPositionDO();
+        row.setId(positionId);
+        row.setUserId(USER_ID);
+        row.setAssetSymbol(symbol);
+        return row;
     }
 
     private static TmPushRecheckLogDO completeRecheck(Long logId,
@@ -251,5 +335,13 @@ class MessagePushReadServiceTest {
         assertThat(detail.currentRecheck()).isNull();
         assertThat(detail.missingFields()).containsExactly(missingField);
         assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
+    }
+
+    private static void assertInvalidPushStatusPartial(PushDetailDTO detail) {
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.originalSnapshot()).isNull();
+        assertThat(detail.currentRecheck()).isNull();
+        assertThat(detail.missingFields()).containsExactly("originalSnapshot.status");
+        assertThat(detail.reason()).isEqualTo("PUSH_SNAPSHOT_INCOMPLETE");
     }
 }

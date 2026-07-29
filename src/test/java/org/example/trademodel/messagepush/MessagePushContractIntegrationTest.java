@@ -92,6 +92,7 @@ class MessagePushContractIntegrationTest {
         JsonNode items = objectMapper.readTree(listBody).path("data").path("items");
         assertThat(items.toString()).contains("\"messageId\":\"" + LARGE_MESSAGE_ID + "\"");
         assertThat(items.toString()).contains("\"sourceType\":\"POSITION_RISK\"");
+        assertThat(items.toString()).contains("\"symbol\":\"BTCUSDT\"");
         assertThat(items.toString()).doesNotContain("\"messageId\":\"" + userBLog.getLogId() + "\"");
         assertThat(items.toString()).doesNotContain("\"messageId\":\"" + nonRisk.getLogId() + "\"");
         assertThat(items.toString()).doesNotContain("userId", "ownerId");
