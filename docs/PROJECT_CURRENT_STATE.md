@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04D AI Analysis first package is effective on merged main; governance alignment records PR #1151 commit 66362746fe3bd932061087bcd3496c5273cc218b
-Next Business Phase: FE-04E Message/Push readiness gate
-Next Business Phase Allowed: READINESS_GATE_ONLY; the next action may audit existing Message/Push contracts, APIs, Figma identities, ownership, navigation, and fail-closed behavior, but FE-04E implementation, API expansion, fabricated data, external send, trading capability, P4, and production deployment remain blocked
+Current Work Package: FE-04E Message/Push readiness gate is complete; implementation remains NOT_STARTED and the bounded Contract Foundation is the next authorized package after this governance alignment reaches merged main
+Next Business Phase: FE-04E Message/Push Contract Foundation
+Next Business Phase Allowed: AFTER_GOVERNANCE_MERGE_CONTRACT_FOUNDATION_ONLY; the bounded backend package may add exact string identities, owner-scoped real message sources, a read-only Push Detail contract, and explicit Empty/Error/Missing/Partial states, while Message/Push UI, Telegram, external send, automatic notification, trading capability, FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -31,8 +31,11 @@ The design baseline is `FROZEN` and its repository registration is
 `REGISTERED_ON_MAIN`. FE-04 frontend remains `IN_PROGRESS_PARTIAL`: FE-04A,
 FE-04B, the bounded FE-04C read-only Position Monitoring package, and the
 bounded FE-04D AI Analysis first package are effective on merged main. FE-04E
-and FE-04F remain unimplemented. No API, schema, Figma node, AI capability, or
-trading capability is changed by this governance alignment.
+and FE-04F remain unimplemented. The FE-04E readiness gate is complete and
+authorizes only the separately reviewed Contract Foundation after this
+governance alignment reaches merged main. No code, API, schema, Figma node,
+notification delivery, AI capability, or trading capability is changed by
+this governance alignment.
 
 ---
 
@@ -91,10 +94,39 @@ provenance, eight-score detail, four-timeframe detail, and complete evidence
 chains are not added or fabricated. PR #1151 introduces no API, schema, Figma,
 AI backend, write, external-send, or trading capability.
 
-The next allowed action is only the FE-04E Message/Push read-only readiness
-gate. FE-04E implementation remains `NOT_STARTED`; no implementation may begin
-until that gate separately verifies existing contracts, APIs, Figma identities,
-ownership, navigation, and fail-closed behavior.
+### FE-04E Message/Push Readiness Gate Result
+
+The FE-04E readiness gate is `READINESS_GATE_COMPLETE`. The audit verified the
+registered Message Center and Push Detail Figma identities and confirmed that
+Telegram remains an unconnected extension with no send or trading capability.
+It also classified the current backend as insufficient for frontend
+implementation:
+
+- the reduced Dashboard inbox exposes opportunity snapshots but does not
+  integrate real owner-scoped UserPosition risk messages;
+- current Push identifiers are not a complete string-safe authoritative
+  message identity contract;
+- no composed read-only Push Detail contract returns the original snapshot,
+  current persisted state, and returned change reason by exact message
+  identity;
+- current reduced reads do not reliably distinguish Empty, Error, Missing, and
+  Partial states.
+
+FE-04E implementation remains `NOT_STARTED`. After this governance alignment
+is merged to clean, synced main, the next authorized package is only the
+bounded `CONTRACT_FOUNDATION`:
+
+- exact string `messageId` and `pushId` identities;
+- exact `sourceIdentity` for opportunity and UserPosition-risk messages;
+- owner-scoped reads that inherit the P3-H3 authorization boundary;
+- a real UserPosition -> PositionMonitor -> risk-event -> message foundation;
+- a read-only Push Detail GET contract that does not trigger Recheck, monitor
+  run, delivery, or any mutation;
+- explicit Empty, Error, Missing, and Partial read states.
+
+The Contract Foundation does not authorize Message Center UI, Push Detail UI,
+Telegram, external send, automatic notification, fabricated messages,
+symbol/latest/time identity fallback, AI expansion, or trading capability.
 
 ## P3-U2 iPhone Private Test App Foundation
 
@@ -150,10 +182,12 @@ Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
 FE-04B, FE-04C, and the bounded FE-04D first package are effective on merged
-main. The FE-04 Figma baseline is registered on main. The next bounded action
-is only the FE-04E Message/Push read-only readiness gate. FE-04E implementation,
-market search, watch-asset writes, unsupported deep analysis, API expansion,
-write actions, external send, P4, and production deployment remain blocked.
+main. The FE-04 Figma baseline is registered on main. The FE-04E readiness gate
+is complete; after this governance alignment reaches merged main, the next
+bounded action is only the Message/Push Contract Foundation described above.
+FE-04E UI, market search, watch-asset writes, unsupported deep analysis,
+unrelated API expansion, delivery/write actions, external send, FE-04F, P4,
+and production deployment remain blocked.
 
 See `docs/P3_U1_PERSONAL_LOGIN_SESSION_AUTH.md`.
 
