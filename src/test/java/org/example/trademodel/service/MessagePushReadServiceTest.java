@@ -3,6 +3,7 @@ package org.example.trademodel.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.OpportunityLogDO;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
@@ -128,5 +129,127 @@ class MessagePushReadServiceTest {
 
         assertThat(detail.state()).isEqualTo(MessageReadState.MISSING);
         assertThat(detail.reason()).isEqualTo("MESSAGE_NOT_FOUND");
+    }
+
+    @Test
+    void completeRecheckReturnsReady() {
+        LocalDateTime recheckTime = LocalDateTime.of(2026, 7, 29, 10, 5);
+        TmPushRecheckLogDO recheck = completeRecheck(101L, "REVIEW_WAITING", recheckTime);
+        stubOpportunityDetail("opp-complete-recheck", 201L, recheck);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-complete-recheck");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.currentRecheck()).isNotNull();
+        assertThat(detail.currentRecheck().status()).isEqualTo("REVIEW_WAITING");
+        assertThat(detail.currentRecheck().checkedAt()).isEqualTo(recheckTime);
+        assertThat(detail.reason()).isNull();
+    }
+
+    @Test
+    void missingEachRequiredRecheckFieldReturnsPartial() {
+        TmPushRecheckLogDO missingStatus = completeRecheck(
+                102L, null, LocalDateTime.of(2026, 7, 29, 10, 6));
+        stubOpportunityDetail("opp-recheck-no-status", 202L, missingStatus);
+
+        TmPushRecheckLogDO missingTime = completeRecheck(103L, "REVIEW_WAITING", null);
+        missingTime.setCreateTime(LocalDateTime.of(2026, 7, 29, 10, 7));
+        stubOpportunityDetail("opp-recheck-no-time", 203L, missingTime);
+
+        TmPushRecheckLogDO missingExecution = completeRecheck(
+                104L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 8));
+        missingExecution.setExecutionStatus(null);
+        stubOpportunityDetail("opp-recheck-no-execution", 204L, missingExecution);
+
+        assertIncompleteRecheck(
+                service.findPushDetailForUser(USER_ID, "opp-recheck-no-status"),
+                "currentRecheck.status");
+        assertIncompleteRecheck(
+                service.findPushDetailForUser(USER_ID, "opp-recheck-no-time"),
+                "currentRecheck.checkedAt");
+        assertIncompleteRecheck(
+                service.findPushDetailForUser(USER_ID, "opp-recheck-no-execution"),
+                "currentRecheck.executionStatus");
+    }
+
+    @Test
+    void invalidRecheckStatusReturnsErrorWithoutLeakingUnknownState() {
+        TmPushRecheckLogDO recheck = completeRecheck(
+                105L, "UNKNOWN_RECHECK_STATE", LocalDateTime.of(2026, 7, 29, 10, 9));
+        stubOpportunityDetail("opp-invalid-recheck", 205L, recheck);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-invalid-recheck");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INVALID");
+        assertThat(detail.currentRecheck()).isNull();
+        assertThat(detail.toString()).doesNotContain("UNKNOWN_RECHECK_STATE");
+    }
+
+    @Test
+    void invalidExecutionStatusReturnsError() {
+        TmPushRecheckLogDO recheck = completeRecheck(
+                106L, "REVIEW_WAITING", LocalDateTime.of(2026, 7, 29, 10, 10));
+        recheck.setExecutionStatus("FAILED");
+        stubOpportunityDetail("opp-invalid-execution", 206L, recheck);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-invalid-execution");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INVALID");
+        assertThat(detail.currentRecheck()).isNull();
+    }
+
+    @Test
+    void existingLegacyValidRecheckRemainsReadyAndCanonical() {
+        TmPushRecheckLogDO recheck = completeRecheck(
+                107L, "VALID_EXECUTABLE", LocalDateTime.of(2026, 7, 29, 10, 11));
+        recheck.setExecutionStatus(" completed ");
+        stubOpportunityDetail("opp-legacy-recheck", 207L, recheck);
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-legacy-recheck");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.currentRecheck().status()).isEqualTo("REVIEW_PASSED");
+    }
+
+    private void stubOpportunityDetail(String opportunityId,
+                                       Long pushId,
+                                       TmPushRecheckLogDO recheck) {
+        String analysisId = "ana-" + opportunityId;
+        OpportunityLogDO opportunity = new OpportunityLogDO();
+        opportunity.setOpportunityId(opportunityId);
+        opportunity.setAnalysisId(analysisId);
+        opportunity.setPushId(pushId);
+        opportunity.setDirection("LONG");
+
+        TmPushSnapshotDO push = new TmPushSnapshotDO();
+        push.setPushId(pushId);
+        push.setAnalysisId(analysisId);
+        push.setSymbol("BTCUSDT");
+        push.setPushStatus("CAPTURED");
+
+        when(opportunityLogMapper.selectPushBackedSharedByOpportunityId(opportunityId))
+                .thenReturn(opportunity);
+        when(pushSnapshotMapper.selectByPushId(pushId)).thenReturn(push);
+        when(pushRecheckLogMapper.selectLatestByPushId(pushId)).thenReturn(recheck);
+    }
+
+    private static TmPushRecheckLogDO completeRecheck(Long logId,
+                                                       String recheckStatus,
+                                                       LocalDateTime recheckTime) {
+        TmPushRecheckLogDO recheck = new TmPushRecheckLogDO();
+        recheck.setLogId(logId);
+        recheck.setExecutionStatus("COMPLETED");
+        recheck.setRecheckStatus(recheckStatus);
+        recheck.setRecheckTime(recheckTime);
+        return recheck;
+    }
+
+    private static void assertIncompleteRecheck(PushDetailDTO detail, String missingField) {
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.currentRecheck()).isNull();
+        assertThat(detail.missingFields()).containsExactly(missingField);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
     }
 }

@@ -29,6 +29,7 @@ public class MessagePushReadService {
     static final int MAX_LIMIT = 100;
     private static final Pattern OPPORTUNITY_ID = Pattern.compile("opp-[A-Za-z0-9_-]{1,60}");
     private static final Pattern NUMERIC_ID = Pattern.compile("[1-9][0-9]{0,18}");
+    private static final String RECHECK_EXECUTION_COMPLETED = "COMPLETED";
 
     private final OpportunityLogMapper opportunityLogMapper;
     private final PositionMonitorLogMapper positionMonitorLogMapper;
@@ -149,16 +150,38 @@ public class MessagePushReadService {
             return partial(messageId, pushId, sourceIdentity, original, null, null,
                     List.of("currentRecheck"), "CURRENT_RECHECK_MISSING");
         }
+        String recheckStatus = normalizeMessageId(latest.getRecheckStatus());
+        String executionStatus = normalize(latest.getExecutionStatus());
+        if ((recheckStatus != null
+                && PushRecheckStatusContract.tryParseRecheckStatus(recheckStatus) == null)
+                || (executionStatus != null
+                && !RECHECK_EXECUTION_COMPLETED.equals(executionStatus))) {
+            return error(messageId, "CURRENT_RECHECK_INVALID");
+        }
+        List<String> missingFields = new ArrayList<>();
+        if (recheckStatus == null) {
+            missingFields.add("currentRecheck.status");
+        }
+        if (latest.getRecheckTime() == null) {
+            missingFields.add("currentRecheck.checkedAt");
+        }
+        if (executionStatus == null) {
+            missingFields.add("currentRecheck.executionStatus");
+        }
+        if (!missingFields.isEmpty()) {
+            return partial(messageId, pushId, sourceIdentity, original, null, null,
+                    missingFields, "CURRENT_RECHECK_INCOMPLETE");
+        }
         PushDetailDTO.CurrentRecheck current = new PushDetailDTO.CurrentRecheck(
                 id(latest.getLogId()),
                 "PUSH_RECHECK",
-                PushRecheckStatusContract.canonicalizeRecheckStatusName(latest.getRecheckStatus()),
+                PushRecheckStatusContract.canonicalizeRecheckStatusName(recheckStatus),
                 latest.getCurrentPrice(),
                 latest.getCurrentDataQualityScore(),
                 latest.getCurrentConfusedScore(),
                 latest.getCurrentAccountRiskAllowed() == null
                         ? null : latest.getCurrentAccountRiskAllowed() ? "ALLOWED" : "BLOCKED",
-                firstNonNull(latest.getRecheckTime(), latest.getCreateTime()));
+                latest.getRecheckTime());
         return ready(messageId, pushId, sourceIdentity, original, current, latest.getFailReasonJson());
     }
 
@@ -292,8 +315,12 @@ public class MessagePushReadService {
     }
 
     private static PushDetailDTO error(String messageId) {
+        return error(messageId, "MESSAGE_READ_FAILED");
+    }
+
+    private static PushDetailDTO error(String messageId, String reason) {
         return detail(MessageReadState.ERROR, messageId, null, null,
-                null, null, null, List.of(), "MESSAGE_READ_FAILED");
+                null, null, null, List.of(), reason);
     }
 
     private static PushDetailDTO detail(MessageReadState state,
