@@ -84,7 +84,7 @@ The following remain mandatory:
   monitoring history, or settings-save result;
 - no auto-open, auto-close, auto-reverse, auto-reduce, order, or trading action.
 
-## 6. Delivery Gate Through FE-04D Readiness
+## 6. Delivery Gate Through FE-04D First Package
 
 This registration is effective project governance on clean, synced `main`.
 FE-04A Shell & Navigation and FE-04B Home Dashboard Integration are effective
@@ -114,12 +114,9 @@ FE-04C does not add edit, manual close, partial-close UI, replay, trade
 execution, automatic action, or an automatic call to the write-type
 monitor-run endpoint. It does not expand APIs or move trading capability.
 
-The FE-04D AI Analysis read-only readiness gate is complete. Implementation
-remains `NOT_STARTED`, and authorization is limited to
-`RESTRICTED_FIRST_PACKAGE` after this governance alignment reaches clean,
-synced `main`.
-
-The restricted first package may implement only:
+The FE-04D AI Analysis first package is effective on merged main
+`66362746fe3bd932061087bcd3496c5273cc218b` through PR #1151. Its implemented
+scope is limited to:
 
 - the AI Analysis tab using the registered Mobile `296:4` and Desktop `296:10`
   frames;
@@ -130,9 +127,15 @@ The restricted first package may implement only:
 - FE-03 Analysis Detail reuse by exact `analysisId`;
 - loading, empty, error, partial, missing, and fail-closed states.
 
-It must not implement market-asset search, watch-asset writes, fake search
+It also isolates unavailable AI roles, preserves loading/empty/error/partial/
+missing fail-closed states, and prevents stale Dashboard cache from restoring
+AI, execution-plan, or FE-03-link state after refresh failure.
+
+It does not implement market-asset search, watch-asset writes, fake search
 results, fabricated scores, evidence, multi-timeframe data, or AI content, AI
-capability expansion, API/schema/Figma changes, or trading capability.
+capability expansion, API/schema/Figma changes, external send, or trading
+capability. FE-04E remains `READINESS_GATE_PENDING` and implementation remains
+`NOT_STARTED`.
 
 ```text
 FE04_FIGMA_BASELINE: FROZEN
@@ -144,12 +147,15 @@ FE04_AB_MERGE_COMMIT: aaf905b4f74ecafcf514aa34d7c06361461a0eb4
 FE04C_STATUS: EFFECTIVE_MERGED_MAIN
 FE04C_MERGE_COMMIT: cc39f0c6315812b1178427c29b8b422da511ba0d
 FE04C_CAPABILITY: READONLY_POSITION_MONITORING_ONLY
-FE04D_STATUS: READINESS_GATE_COMPLETE
-FE04D_IMPLEMENTATION_STATUS: NOT_STARTED
-FE04D_AUTHORIZATION: RESTRICTED_FIRST_PACKAGE
+FE04D_STATUS: EFFECTIVE_MERGED_MAIN
+FE04D_IMPLEMENTATION_STATUS: COMPLETE_FIRST_PACKAGE
+FE04D_MERGE_COMMIT: 66362746fe3bd932061087bcd3496c5273cc218b
+FE04D_AUTHORIZATION: FIRST_PACKAGE_EFFECTIVE_NO_EXPANSION
 FE04D_SEARCH_STATUS: PARTIAL_DISABLED_IN_FIRST_PACKAGE
 FE04D_WATCH_ASSET_STATUS: BLOCKED_NO_AUTHENTICATED_WRITE_CONTRACT
 FE04D_API_READINESS: PARTIAL_FAIL_CLOSED
-FE04_IMPLEMENTATION_ALLOWED: RESTRICTED_FIRST_PACKAGE_AFTER_GOVERNANCE_MERGE
-NEXT_ALLOWED_ACTION: FE-04D_RESTRICTED_FIRST_IMPLEMENTATION_PACKAGE_AFTER_GOVERNANCE_MERGE
+FE04E_STATUS: READINESS_GATE_PENDING
+FE04E_IMPLEMENTATION_STATUS: NOT_STARTED
+FE04_IMPLEMENTATION_ALLOWED: NO_NEW_IMPLEMENTATION_PENDING_FE04E_READINESS_GATE
+NEXT_ALLOWED_ACTION: FE-04E_READINESS_GATE_ONLY
 ```
