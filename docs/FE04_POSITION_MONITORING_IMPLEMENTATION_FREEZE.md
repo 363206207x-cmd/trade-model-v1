@@ -134,16 +134,22 @@ AI, execution-plan, or FE-03-link state after refresh failure.
 It does not implement market-asset search, watch-asset writes, fake search
 results, fabricated scores, evidence, multi-timeframe data, or AI content, AI
 capability expansion, API/schema/Figma changes, external send, or trading
-capability. The FE-04E Message/Push readiness gate is now
-`READINESS_GATE_COMPLETE`; implementation remains `NOT_STARTED`.
+capability. The FE-04E Message/Push Contract Foundation is
+`EFFECTIVE_MERGED_MAIN` on
+`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154.
 
-After the readiness governance alignment reaches clean, synced main, only the
-FE-04E `CONTRACT_FOUNDATION` is authorized: exact string `messageId`/`pushId`,
-exact `sourceIdentity`, owner-scoped real opportunity and UserPosition-risk
-messages, a read-only Push Detail GET contract, and explicit Empty, Error,
-Missing, and Partial states. Message Center UI, Push Detail UI, Telegram,
-external send, automatic notification, fabricated data, and trading capability
-remain blocked.
+The FE-04E UI readiness re-evaluation passed. After this governance alignment
+reaches clean, synced main, only the bounded Message/Push UI first
+implementation is authorized: Mobile and Desktop Message Center, Mobile Push
+Detail, exact string identity, owner-scoped GET-only reads, only
+`OPPORTUNITY`/`POSITION_RISK` sources, and explicit loading plus
+READY/EMPTY/ERROR/MISSING/PARTIAL display.
+
+System notifications, Telegram, external send, automatic notification,
+fabricated unread/message counts or message/Push data, mutation, backend/API/
+schema/Figma change, AI expansion, and trading capability remain blocked.
+Figma example values without a real returned field must be hidden or rendered
+fail closed.
 
 ```text
 FE04_FIGMA_BASELINE: FROZEN
@@ -162,17 +168,21 @@ FE04D_AUTHORIZATION: FIRST_PACKAGE_EFFECTIVE_NO_EXPANSION
 FE04D_SEARCH_STATUS: PARTIAL_DISABLED_IN_FIRST_PACKAGE
 FE04D_WATCH_ASSET_STATUS: BLOCKED_NO_AUTHENTICATED_WRITE_CONTRACT
 FE04D_API_READINESS: PARTIAL_FAIL_CLOSED
-FE04E_STATUS: READINESS_GATE_COMPLETE
-FE04E_IMPLEMENTATION_STATUS: NOT_STARTED
-FE04E_NEXT_PACKAGE: CONTRACT_FOUNDATION_AUTHORIZED
-FE04E_MESSAGE_SOURCE_STATUS: BLOCKED_REQUIRES_REAL_OWNER_SCOPED_FOUNDATION
-FE04E_MESSAGE_IDENTITY_STATUS: BLOCKED_REQUIRES_STRING_SAFE_AUTHORITATIVE_IDENTITY
-FE04E_PUSH_DETAIL_STATUS: BLOCKED_REQUIRES_COMPOSED_READ_ONLY_GET
+FE04E_STATUS: CONTRACT_FOUNDATION_EFFECTIVE_MERGED_MAIN
+FE04E_CONTRACT_MAIN_HEAD: 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8
+FE04E_IMPLEMENTATION_STATUS: UI_NOT_STARTED
+FE04E_UI_READINESS_STATUS: PASS
+FE04E_UI_STATUS: AUTHORIZED_PENDING_MERGED_MAIN
+FE04E_NEXT_PACKAGE: MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION
+FE04E_AUTHORIZATION: MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_AUTHORIZED_PENDING_GOVERNANCE_MERGE
+FE04E_MESSAGE_SOURCE_STATUS: PASS_OPPORTUNITY_AND_POSITION_RISK_ONLY
+FE04E_MESSAGE_IDENTITY_STATUS: PASS_STRING_SAFE_AUTHORITATIVE_IDENTITY
+FE04E_PUSH_DETAIL_STATUS: PASS_COMPOSED_READ_ONLY_GET
 FE04E_TELEGRAM_BOUNDARY_STATUS: PASS_EXTENSION_NOT_CONNECTED
-FE04E_API_READINESS: PARTIAL
+FE04E_API_READINESS: PASS_MESSAGE_PUSH_UI_FIRST_PACKAGE
 FE04E_FIGMA_STATUS: PASS_REGISTERED_BASELINE
-FE04E_FAIL_CLOSED_STATUS: BLOCKED_REQUIRES_EXPLICIT_STATE_MODEL
+FE04E_FAIL_CLOSED_STATUS: PASS_EXPLICIT_READY_EMPTY_ERROR_MISSING_PARTIAL
 FE04E_CAPABILITY_BOUNDARY_STATUS: PASS_NO_SEND_NO_TRADING
-FE04_IMPLEMENTATION_ALLOWED: FE-04E_BACKEND_CONTRACT_FOUNDATION_ONLY_AFTER_GOVERNANCE_MERGE
-NEXT_ALLOWED_ACTION: FE-04E_CONTRACT_FOUNDATION_ONLY
+FE04_IMPLEMENTATION_ALLOWED: FE-04E_MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_ONLY_AFTER_GOVERNANCE_MERGE
+NEXT_ALLOWED_ACTION: FE-04E_MESSAGE_PUSH_UI_FIRST_IMPLEMENTATION_ONLY
 ```
