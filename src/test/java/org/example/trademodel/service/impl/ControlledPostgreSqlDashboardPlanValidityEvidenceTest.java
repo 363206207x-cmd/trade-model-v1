@@ -21,12 +21,11 @@ import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
-import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
@@ -363,8 +362,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
                 new UserPositionServiceImpl(positionMapper),
                 new PositionMonitorLogServiceImpl(monitorLogMapper, positionMapper),
                 positionSyncService,
-                mock(PushSnapshotMapper.class),
-                mock(PushRecheckLogMapper.class),
+                mock(OpportunityLogService.class),
                 mock(ExternalContextEvidenceBuilder.class),
                 readinessService,
                 objectMapper());

@@ -1,12 +1,7 @@
 package org.example.trademodel.controller;
 
-import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
-import org.example.trademodel.service.PushRecheckDispatchConfigService;
-import org.example.trademodel.service.PushRecheckScheduler;
-import org.example.trademodel.service.PushRecheckService;
-import org.example.trademodel.service.RecheckResult;
-import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
+import org.example.trademodel.service.PushRecheckAccessBoundary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,9 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.List;
-
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,12 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PushRecheckControllerTest {
 
     @Mock
-    private PushRecheckService pushRecheckService;
-    @Mock
-    private PushRecheckScheduler pushRecheckScheduler;
-    @Mock
-    private PushRecheckDispatchConfigService dispatchConfigService;
-    @Mock
     private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
@@ -42,79 +28,49 @@ class PushRecheckControllerTest {
     @BeforeEach
     void setUp() {
         PushRecheckController controller = new PushRecheckController(
-                pushRecheckService,
-                pushRecheckScheduler,
-                dispatchConfigService,
-                authenticatedUserIdResolver);
+                authenticatedUserIdResolver,
+                new PushRecheckAccessBoundary());
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
     @Test
-    void opsOverview_shouldUseDefaultsWhenLimitNotProvided() throws Exception {
-        PushRecheckOpsOverviewVO body = new PushRecheckOpsOverviewVO();
-        PushRecheckOpsOverviewVO.ConfigSummary config = new PushRecheckOpsOverviewVO.ConfigSummary();
-        config.setLimit(50);
-        body.setConfig(config);
-        body.setRecentLogs(List.of());
-        when(pushRecheckService.getOpsOverview(null, null, null, null)).thenReturn(body);
+    void opsOverviewFailsClosedWithoutGlobalAuthenticatedAccess() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
 
         mockMvc.perform(get("/api/push/recheck/ops/overview"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.config.limit").value(50));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.msg").value("push recheck private data unavailable"));
 
-        verify(pushRecheckService).getOpsOverview(null, null, null, null);
+        verify(authenticatedUserIdResolver).requireCurrentUserId();
     }
 
     @Test
-    void opsOverview_shouldPassThroughQueryParams() throws Exception {
-        PushRecheckOpsOverviewVO body = new PushRecheckOpsOverviewVO();
-        body.setRecentLogs(List.of());
-        when(pushRecheckService.getOpsOverview("B1", "I1", 6, 12)).thenReturn(body);
+    void opsOverviewQueryParametersCannotRestoreGlobalAccess() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
 
         mockMvc.perform(get("/api/push/recheck/ops/overview")
                         .param("dispatchBatchId", "B1")
                         .param("dispatchInstructionId", "I1")
                         .param("auditLimit", "6")
                         .param("logLimit", "12"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
 
-        verify(pushRecheckService).getOpsOverview("B1", "I1", 6, 12);
+        verify(authenticatedUserIdResolver).requireCurrentUserId();
     }
 
     @Test
-    void triggerRecheck_shouldExposeReviewOnlySafetyFields() throws Exception {
-        RecheckResult result = new RecheckResult();
-        result.setPushId(101L);
-        result.setRecheckStatus(RecheckStatusEnum.REVIEW_PASSED);
-        result.setValid(true);
-        result.setReviewPassed(true);
-        result.setMessage("复查条件通过，仅供人工复核，不是交易指令");
-        when(pushRecheckService.recheck(org.mockito.ArgumentMatchers.eq(101L),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any())).thenReturn(result);
+    void manualTriggerFailsClosedBeforeMutation() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
 
         mockMvc.perform(post("/api/push/recheck/101")
                         .contentType("application/json")
                         .content("{\"currentPrice\":100}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.recheckStatus").value("REVIEW_PASSED"))
-                .andExpect(jsonPath("$.data.valid").value(false))
-                .andExpect(jsonPath("$.data.reviewPassed").value(true))
-                .andExpect(jsonPath("$.data.reviewOnly").value(true))
-                .andExpect(jsonPath("$.data.manualReviewOnly").value(true))
-                .andExpect(jsonPath("$.data.notTradeInstruction").value(true))
-                .andExpect(jsonPath("$.data.notExecutable").value(true))
-                .andExpect(jsonPath("$.data.notAutoTrading").value(true))
-                .andExpect(jsonPath("$.data.notOrderExecution").value(true))
-                .andExpect(jsonPath("$.data.notUserPositionCreation").value(true))
-                .andExpect(jsonPath("$.data.notPositionMutation").value(true))
-                .andExpect(jsonPath("$.data.notTradingAuthorization").value(true))
-                .andExpect(jsonPath("$.data.orderAction").doesNotExist())
-                .andExpect(jsonPath("$.data.executionAction").doesNotExist())
-                .andExpect(jsonPath("$.data.autoTradingAction").doesNotExist())
-                .andExpect(jsonPath("$.data.providerPayload").doesNotExist());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+
+        verify(authenticatedUserIdResolver).requireCurrentUserId();
     }
 
     @Test
@@ -127,7 +83,6 @@ class PushRecheckControllerTest {
                 .andExpect(jsonPath("$.msg").value("push recheck private data unavailable"));
 
         verify(authenticatedUserIdResolver).requireCurrentUserId();
-        verify(pushRecheckService, never()).getLatestLog(101L);
     }
 
     @Test
@@ -140,6 +95,25 @@ class PushRecheckControllerTest {
                 .andExpect(jsonPath("$.msg").value("push recheck private data unavailable"));
 
         verify(authenticatedUserIdResolver).requireCurrentUserId();
-        verify(pushRecheckService, never()).listLogs(101L);
+    }
+
+    @Test
+    void replayAndConfigRoutesRemainUnavailable() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+
+        mockMvc.perform(post("/api/push/recheck/replay")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/push/recheck/replay/summary"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/push/recheck/dispatch/config"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/push/recheck/dispatch/config")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/push/recheck/dispatch/config/audit"))
+                .andExpect(status().isNotFound());
     }
 }

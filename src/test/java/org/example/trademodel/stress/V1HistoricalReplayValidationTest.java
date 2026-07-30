@@ -35,6 +35,7 @@ import org.example.trademodel.service.DecisionEngineService;
 import org.example.trademodel.service.DecisionOhlcvSnapshotSource;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
+import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
@@ -223,7 +224,15 @@ class V1HistoricalReplayValidationTest {
         PushRecheckServiceImpl service = new PushRecheckServiceImpl(snapshotMapper,
                 mock(AccountRiskSnapshotMapper.class), logMapper, mock(PushRecheckDispatchConfigService.class),
                 riskAdapter, org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient), config);
-        RecheckResult result = service.recheck(snapshot.getPushId(), currentPrice);
+        RecheckResult result = service.recheck(
+                snapshot.getPushId(),
+                currentPrice,
+                RecheckExecutionCommand.scheduled(
+                        "historical-validation",
+                        "historical-" + scenario,
+                        1,
+                        1,
+                        0));
         verifyNoInteractions(quoteClient);
         verify(logMapper).insert(any());
         return result;

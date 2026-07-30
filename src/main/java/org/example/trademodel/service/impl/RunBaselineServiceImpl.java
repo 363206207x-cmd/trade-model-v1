@@ -1,6 +1,5 @@
 package org.example.trademodel.service.impl;
 
-import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.MonitorAlertMapper;
@@ -41,7 +40,6 @@ public class RunBaselineServiceImpl implements RunBaselineService {
     private final RuntimeMetricService runtimeMetricService;
     private final MonitorAlertMapper monitorAlertMapper;
     private final AnalysisRunMapper analysisRunMapper;
-    private final PushRecheckLogMapper pushRecheckLogMapper;
     private final HotResetEventMapper hotResetEventMapper;
     private Clock clock = Clock.systemUTC();
 
@@ -59,7 +57,6 @@ public class RunBaselineServiceImpl implements RunBaselineService {
         this.runtimeMetricService = runtimeMetricService;
         this.monitorAlertMapper = monitorAlertMapper;
         this.analysisRunMapper = analysisRunMapper;
-        this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.hotResetEventMapper = hotResetEventMapper;
     }
 
@@ -193,16 +190,11 @@ public class RunBaselineServiceImpl implements RunBaselineService {
             LocalDateTime windowStartUtc,
             LocalDateTime asOfUtc) {
         RunBaselineVO.RecheckSummary summary = new RunBaselineVO.RecheckSummary();
-        LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
-        int total = 0;
-        for (RecheckStatusEnum statusEnum : RecheckStatusEnum.values()) {
-            int count = safeCount(pushRecheckLogMapper.countByStatusInWindow(
-                    statusEnum.name(), windowStartUtc, asOfUtc));
-            counts.put(statusEnum.name(), count);
-            total += count;
-        }
-        summary.setTotalCountWindow(total);
-        summary.setStatusCountsWindow(counts);
+        summary.setAvailabilityStatus("PRIVATE_SOURCE_UNAVAILABLE");
+        summary.setAvailabilityDetail(
+                "raw PushRecheck status counts require an authoritative source-owner relation");
+        summary.setTotalCountWindow(null);
+        summary.setStatusCountsWindow(null);
         return summary;
     }
 

@@ -5,16 +5,12 @@ import org.example.trademodel.dto.req.PushRecheckDispatchConfigRequest;
 import org.example.trademodel.dto.req.PushRecheckReplayRequest;
 import org.example.trademodel.dto.req.PushRecheckTriggerRequest;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
-import org.example.trademodel.service.PushRecheckScheduler;
-import org.example.trademodel.service.PushRecheckDispatchConfigService;
-import org.example.trademodel.service.PushRecheckService;
-import org.example.trademodel.service.RecheckExecutionCommand;
+import org.example.trademodel.service.PushRecheckAccessBoundary;
 import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.vo.PushRecheckDispatchConfigAuditVO;
 import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,120 +21,85 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/push/recheck")
 public class PushRecheckController {
 
-    private final PushRecheckService pushRecheckService;
-    private final PushRecheckScheduler pushRecheckScheduler;
-    private final PushRecheckDispatchConfigService dispatchConfigService;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
+    private final PushRecheckAccessBoundary accessBoundary;
 
-    @Autowired
-    public PushRecheckController(PushRecheckService pushRecheckService,
-                                 PushRecheckScheduler pushRecheckScheduler,
-                                 PushRecheckDispatchConfigService dispatchConfigService,
-                                 AuthenticatedUserIdResolver authenticatedUserIdResolver) {
-        this.pushRecheckService = pushRecheckService;
-        this.pushRecheckScheduler = pushRecheckScheduler;
-        this.dispatchConfigService = dispatchConfigService;
+    public PushRecheckController(AuthenticatedUserIdResolver authenticatedUserIdResolver,
+                                 PushRecheckAccessBoundary accessBoundary) {
         this.authenticatedUserIdResolver = authenticatedUserIdResolver;
+        this.accessBoundary = accessBoundary;
     }
 
-    /**
-     * 按 pushId 执行一次二次校验并落库；当前价由调用方传入（与内部 recheck 逻辑一致）。
-     */
     @PostMapping("/{pushId}")
-    public ApiResponse<RecheckResult> triggerRecheck(
+    public ResponseEntity<ApiResponse<RecheckResult>> triggerRecheck(
             @PathVariable Long pushId,
             @RequestBody(required = false) PushRecheckTriggerRequest body) {
-        BigDecimal price = body != null ? body.getCurrentPrice() : null;
-        RecheckExecutionCommand command = RecheckExecutionCommand.manual();
-        if (body != null) {
-            command.setDispatchBatchId(body.getDispatchBatchId());
-            command.setDispatchInstructionId(body.getDispatchInstructionId());
-        }
-        RecheckResult result = pushRecheckService.recheck(pushId, price, command);
-        return ApiResponse.success(result);
+        return unavailable(PushRecheckAccessBoundary.Operation.MUTATE_TRIGGER);
     }
 
     @GetMapping("/dispatch/config")
-    public ApiResponse<Map<String, Integer>> getDispatchConfig() {
-        return ApiResponse.success(pushRecheckScheduler.getDispatchConfig());
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> getDispatchConfig() {
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_CONFIG);
     }
 
     @PostMapping("/dispatch/config")
-    public ApiResponse<Map<String, Integer>> updateDispatchConfig(
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> updateDispatchConfig(
             @RequestBody PushRecheckDispatchConfigRequest request) {
-        return ApiResponse.success(
-                pushRecheckScheduler.updateDispatchConfig(
-                        request != null ? request.getLimit() : null,
-                        request != null ? request.getMaxAttempts() : null,
-                        request != null ? request.getMinRetryMinutes() : null
-                ));
+        return unavailable(PushRecheckAccessBoundary.Operation.MUTATE_CONFIG);
     }
 
     @GetMapping("/dispatch/config/audit")
-    public ApiResponse<List<PushRecheckDispatchConfigAuditVO>> listDispatchConfigAudit(
+    public ResponseEntity<ApiResponse<List<PushRecheckDispatchConfigAuditVO>>> listDispatchConfigAudit(
             @RequestParam(value = "limit", required = false) Integer limit) {
-        int safeLimit = limit != null ? limit : 50;
-        return ApiResponse.success(dispatchConfigService.listRecentAudit(safeLimit).stream().map(row -> {
-            PushRecheckDispatchConfigAuditVO vo = new PushRecheckDispatchConfigAuditVO();
-            vo.setAuditId(row.getAuditId());
-            vo.setConfigKey(row.getConfigKey());
-            vo.setOldValue(row.getOldValue());
-            vo.setNewValue(row.getNewValue());
-            vo.setChangedBy(row.getChangedBy());
-            vo.setChangeSource(row.getChangeSource());
-            vo.setCreateTime(row.getCreateTime());
-            return vo;
-        }).collect(Collectors.toList()));
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_CONFIG_AUDIT);
     }
 
     @PostMapping("/replay")
-    public ApiResponse<List<RecheckResult>> replay(@RequestBody PushRecheckReplayRequest request) {
-        String batchId = request != null ? request.getDispatchBatchId() : null;
-        String instructionId = request != null ? request.getDispatchInstructionId() : null;
-        return ApiResponse.success(pushRecheckService.replayByDispatch(batchId, instructionId));
+    public ResponseEntity<ApiResponse<List<RecheckResult>>> replay(
+            @RequestBody PushRecheckReplayRequest request) {
+        return unavailable(PushRecheckAccessBoundary.Operation.MUTATE_REPLAY);
     }
 
     @GetMapping("/replay/summary")
-    public ApiResponse<PushRecheckReplaySummaryVO> replaySummary(
+    public ResponseEntity<ApiResponse<PushRecheckReplaySummaryVO>> replaySummary(
             @RequestParam(value = "dispatchBatchId", required = false) String dispatchBatchId,
             @RequestParam(value = "dispatchInstructionId", required = false) String dispatchInstructionId) {
-        return ApiResponse.success(pushRecheckService.summarizeReplayByDispatch(dispatchBatchId, dispatchInstructionId));
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_REPLAY_SUMMARY);
     }
 
     @GetMapping("/ops/overview")
-    public ApiResponse<PushRecheckOpsOverviewVO> opsOverview(
+    public ResponseEntity<ApiResponse<PushRecheckOpsOverviewVO>> opsOverview(
             @RequestParam(value = "dispatchBatchId", required = false) String dispatchBatchId,
             @RequestParam(value = "dispatchInstructionId", required = false) String dispatchInstructionId,
             @RequestParam(value = "auditLimit", required = false) Integer auditLimit,
             @RequestParam(value = "logLimit", required = false) Integer logLimit) {
-        return ApiResponse.success(pushRecheckService.getOpsOverview(
-                dispatchBatchId, dispatchInstructionId, auditLimit, logLimit));
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_OPS);
     }
 
-    /** Raw Recheck rows have no owner identity, so user-facing reads fail closed. */
     @GetMapping("/{pushId}/latest")
     public ResponseEntity<ApiResponse<PushRecheckLogItemVO>> latest(@PathVariable Long pushId) {
-        authenticatedUserIdResolver.requireCurrentUserId();
-        return privateRecheckReadUnavailable();
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_LATEST);
     }
 
-    /** Raw Recheck rows have no owner identity, so user-facing reads fail closed. */
     @GetMapping("/{pushId}/logs")
     public ResponseEntity<ApiResponse<List<PushRecheckLogItemVO>>> logs(@PathVariable Long pushId) {
-        authenticatedUserIdResolver.requireCurrentUserId();
-        return privateRecheckReadUnavailable();
+        return unavailable(PushRecheckAccessBoundary.Operation.READ_LOGS);
     }
 
-    private static <T> ResponseEntity<ApiResponse<T>> privateRecheckReadUnavailable() {
+    private <T> ResponseEntity<ApiResponse<T>> unavailable(PushRecheckAccessBoundary.Operation operation) {
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        PushRecheckAccessBoundary.Decision decision = accessBoundary.evaluateUserRequest(
+                new PushRecheckAccessBoundary.Request(userId, null, operation, null, null, null));
+        if (decision.allowed()) {
+            throw new IllegalStateException("raw PushRecheck route cannot be authorized without exact owner identity");
+        }
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.notFound("push recheck private data unavailable"));
     }

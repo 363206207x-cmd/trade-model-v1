@@ -338,23 +338,40 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     @Test
-    void userPositionDerivedOpportunityLogIsNotVisibleThroughTheSharedProjection() throws Exception {
+    void userPositionDerivedOpportunityLogIsSanitizedIntoTheSameSharedProjectionForEveryUser() throws Exception {
         UserPositionDO linkedB = insertPosition(
                 userBId, "SOLUSDT", "OPEN", 6, "plan-owned-by-b");
         OpportunityLogDO opportunity = resolvedOpportunity(linkedB);
         opportunityLogMapper.insert(opportunity);
 
-        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        String userAResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.pushId").doesNotExist())
+                .andExpect(jsonPath("$.data.riskBlockedEvidence").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
 
-        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        String userBResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.pushId").doesNotExist())
+                .andExpect(jsonPath("$.data.riskBlockedEvidence").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(objectMapper.readTree(userAResponse).path("data"))
+                .isEqualTo(objectMapper.readTree(userBResponse).path("data"));
     }
 
     @Test
-    void privateReviewLifecycleAndTimestampAreNotVisibleThroughTheSharedProjection() throws Exception {
+    void privateReviewLifecycleAndReasonDoNotAlterThePublicMarketProjection() throws Exception {
         OpportunityLogDO opportunity = resolvedOpportunity(openB);
         opportunity.setOpportunityId("opp-owner-review-isolation");
         opportunity.setOpportunityKey("ana-owner-review:dec-owner-review");
@@ -366,13 +383,28 @@ class UserPositionOwnershipSecurityIntegrationTest {
         opportunity.setReasonCodes("MULTIPLE_LINKED_USER_POSITIONS");
         opportunityLogMapper.insert(opportunity);
 
-        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        String userAResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.pushId").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
 
-        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        String userBResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
+                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.pushId").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(objectMapper.readTree(userAResponse).path("data"))
+                .isEqualTo(objectMapper.readTree(userBResponse).path("data"));
     }
 
     @Test

@@ -48,7 +48,6 @@ public class DecisionServiceImpl implements DecisionService {
     private final UserPositionMapper userPositionMapper;
     private final AssetStateService assetStateService;
     private final AssetStateMapper assetStateMapper;
-    private final PushSnapshotMapper pushSnapshotMapper;
     private final MissedOpportunityMapper missedOpportunityMapper;
     private final RuntimeMetricService runtimeMetricService;
     private Clock clock = Clock.systemUTC();
@@ -66,7 +65,6 @@ public class DecisionServiceImpl implements DecisionService {
         this.userPositionMapper = userPositionMapper;
         this.assetStateService = assetStateService;
         this.assetStateMapper = assetStateMapper;
-        this.pushSnapshotMapper = pushSnapshotMapper;
         this.missedOpportunityMapper = missedOpportunityMapper;
         this.runtimeMetricService = runtimeMetricService;
     }
@@ -109,8 +107,6 @@ public class DecisionServiceImpl implements DecisionService {
 
         vo.setConfusedCount(assetStateMapper.countDirectionalPushBlocked(
                 ConfusedStatePolicy.DIRECTIONAL_PUSH_BLOCK_THRESHOLD));
-        vo.setPendingCount(pushSnapshotMapper.countPendingRecheckBacklog(
-                UtcLocalTimePolicy.now(clock)));
         vo.setReverseSignalCount(decisionResultMapper.countOpenSymbolsWithReverseSignal());
 
         // Dashboard 口径：展示 tm_asset_state 全库最近一次 hot_reset_time 对应的“当前行语义”。

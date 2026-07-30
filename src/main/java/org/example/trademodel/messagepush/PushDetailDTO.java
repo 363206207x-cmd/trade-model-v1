@@ -32,6 +32,7 @@ public sealed interface PushDetailDTO permits
             String messageId,
             MessageListDTO.SourceIdentity sourceIdentity,
             OpportunityIdentity opportunityIdentity,
+            String publicLifecycle,
             String publicStatus,
             LocalDateTime publicTimestamp,
             String publicDescription,

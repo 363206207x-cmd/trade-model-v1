@@ -7,16 +7,12 @@ import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
-import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
-import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
@@ -57,8 +53,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     private final DecisionResultMapper decisionResultMapper;
     private final ExecutionPlanMapper executionPlanMapper;
     private final PushSnapshotMapper pushSnapshotMapper;
-    private final PushRecheckLogMapper pushRecheckLogMapper;
-    private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private final PersistedOhlcvBarMapper persistedOhlcvBarMapper;
 
     public OpportunityLogServiceImpl(OpportunityLogMapper opportunityLogMapper,
@@ -66,16 +60,12 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
                                      DecisionResultMapper decisionResultMapper,
                                      ExecutionPlanMapper executionPlanMapper,
                                      PushSnapshotMapper pushSnapshotMapper,
-                                     PushRecheckLogMapper pushRecheckLogMapper,
-                                     AccountRiskSnapshotMapper accountRiskSnapshotMapper,
                                      PersistedOhlcvBarMapper persistedOhlcvBarMapper) {
         this.opportunityLogMapper = opportunityLogMapper;
         this.userPositionMapper = userPositionMapper;
         this.decisionResultMapper = decisionResultMapper;
         this.executionPlanMapper = executionPlanMapper;
         this.pushSnapshotMapper = pushSnapshotMapper;
-        this.pushRecheckLogMapper = pushRecheckLogMapper;
-        this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
     }
 
@@ -144,29 +134,30 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     }
 
     private OpportunityLogDTO evaluateSharedOpportunity(String opportunityId, LocalDateTime asOf) {
-        OpportunityLogDO row = requireOpportunity(opportunityId);
-        normalizeSharedState(row);
+        OpportunityLogDO row = requirePublicOpportunity(opportunityId);
+        normalizePublicEvaluationState(row);
         if (OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus()) || row.getOpportunityStatus() != null) {
             OpportunityLogDTO dto = toSharedDto(row);
             dto.setDeduplicated(true);
             return dto;
         }
         if (!hasCompleteSource(row)) {
-            return updateNonFinal(row, OpportunityLogStatus.SOURCE_INCOMPLETE, appendReason(row, "SOURCE_INCOMPLETE"));
+            return updateNonFinal(
+                    row,
+                    OpportunityLogStatus.SOURCE_INCOMPLETE,
+                    appendReason((String) null, "SOURCE_INCOMPLETE"));
         }
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime evaluationEnd = asOf != null ? asOf : now;
-        row.setUserPositionPresent(false);
-        row.setUserPositionId(null);
         row.setEvaluationAsOf(evaluationEnd);
         if (evaluationEnd.isBefore(row.getAnchorTime())) {
             return updateNonFinal(row, OpportunityLogStatus.SOURCE_INCOMPLETE,
-                    appendReason(row, "EVALUATION_AS_OF_BEFORE_ANCHOR"));
+                    appendReason((String) null, "EVALUATION_AS_OF_BEFORE_ANCHOR"));
         }
 
         InvalidationEvidence persistedInvalidation = persistedInvalidationEvidence(row, evaluationEnd);
-        row.setReasonCodes(appendReason(row, persistedInvalidation.ignoredReasonCode));
+        String publicReasonCodes = appendReason((String) null, persistedInvalidation.ignoredReasonCode);
         MarketPathResult marketPath = scanMarketPath(row, evaluationEnd);
         if (!marketPath.available) {
             if (persistedInvalidation.time != null) {
@@ -176,7 +167,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
                 marketPath.reasonCodes = reason("HOT_RESET_INVALIDATION_FIRST", persistedInvalidation.reasonCode);
             } else {
                 return updateNonFinal(row, OpportunityLogStatus.MARKET_PATH_UNAVAILABLE,
-                        appendReason(row, "MARKET_PATH_UNAVAILABLE"));
+                        appendReason(publicReasonCodes, "MARKET_PATH_UNAVAILABLE"));
             }
         }
         if (persistedInvalidation.time != null
@@ -189,27 +180,25 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         }
 
         applyMarketPath(row, marketPath);
-        RiskEvidence risk = riskEvidence(row);
-        row.setRiskBlockedEvidence(risk.blocked);
-        row.setRiskBlockedAt(risk.blockedAt);
-        row.setReasonCodes(appendReason(appendReason(row, marketPath.reasonCodes), risk.reasonCodes));
+        publicReasonCodes = appendReason(publicReasonCodes, marketPath.reasonCodes);
+        row.setReasonCodes(publicReasonCodes);
 
         if (OpportunityLogStatus.AMBIGUOUS_SAME_BAR.equals(marketPath.hitOrder)) {
             return updateNonFinal(row, OpportunityLogStatus.AMBIGUOUS_MARKET_PATH,
-                    appendReason(row, "AMBIGUOUS_SAME_BAR"));
+                    appendReason(publicReasonCodes, "AMBIGUOUS_SAME_BAR"));
         }
         if (marketPath.hitOrder == null) {
             return updateNonFinal(row, OpportunityLogStatus.PENDING_EVALUATION,
-                    appendReason(row, "NO_TARGET_OR_INVALIDATION_HIT"));
+                    appendReason(publicReasonCodes, "NO_TARGET_OR_INVALIDATION_HIT"));
         }
 
-        String finalStatus = classifyShared(marketPath, risk, row);
+        String finalStatus = classifyPublic(marketPath.hitOrder);
         row.setLifecycleStatus(OpportunityLogStatus.RESOLVED);
         row.setOpportunityStatus(finalStatus);
         row.setResolvedAt(now);
         row.setUpdatedAt(now);
         int updated = opportunityLogMapper.updateEvaluation(row);
-        OpportunityLogDO persisted = opportunityLogMapper.selectByOpportunityId(row.getOpportunityId());
+        OpportunityLogDO persisted = requirePublicOpportunity(row.getOpportunityId());
         OpportunityLogDTO dto = toSharedDto(persisted);
         dto.setDeduplicated(updated == 0);
         return dto;
@@ -231,7 +220,9 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     @Override
     public OpportunityLogPublicDTO evaluatePublicOpportunityForUser(
             String opportunityId, Long userId, LocalDateTime asOf) {
-        return toPublicDto(evaluateOpportunityForUser(opportunityId, userId, asOf));
+        requireUserId(userId);
+        evaluateSharedOpportunity(opportunityId, asOf);
+        return findPublicById(opportunityId);
     }
 
     @Override
@@ -505,7 +496,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             dto.setResolvedAt(null);
         } else if (!isSharedOpportunityStatus(row.getOpportunityStatus())) {
             dto.setOpportunityStatus(OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus())
-                    ? classifyForUser(row, false)
+                    ? classifyPublic(row.getHitOrder())
                     : null);
         }
         if (userDerived) {
@@ -514,69 +505,15 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return dto;
     }
 
-    private static OpportunityLogPublicDTO toPublicDto(OpportunityLogDTO source) {
-        if (source == null) {
-            return null;
-        }
-        String lifecycleStatus = OpportunityLogStatus.REVIEW_REQUIRED.equals(source.getLifecycleStatus())
-                ? OpportunityLogStatus.PENDING_EVALUATION
-                : source.getLifecycleStatus();
-        String opportunityStatus = isSharedOpportunityStatus(source.getOpportunityStatus())
-                ? source.getOpportunityStatus()
-                : null;
-        return new OpportunityLogPublicDTO(
-                source.getOpportunityId(),
-                source.getAnalysisId(),
-                source.getSymbol(),
-                source.getTimeframe(),
-                source.getDirection(),
-                lifecycleStatus,
-                opportunityStatus,
-                source.getAnchorTime(),
-                source.getResolvedAt(),
-                source.getEntryReference(),
-                source.getTargetPrice(),
-                source.getInvalidationPrice(),
-                source.getTargetHit(),
-                source.getInvalidationHit(),
-                source.getTargetHitAt(),
-                source.getInvalidationHitAt(),
-                source.getHitOrder(),
-                source.getMfePrice(),
-                source.getMfeRatio(),
-                source.getMaePrice(),
-                source.getMaeRatio(),
-                source.getMarketDataSource(),
-                source.getCreatedAt(),
-                source.getUpdatedAt(),
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true);
-    }
-
-    private void normalizeSharedState(OpportunityLogDO row) {
-        boolean userDerived = hasPersistedUserDerivedState(row);
-        row.setUserPositionId(null);
-        row.setUserPositionPresent(false);
-        row.setReasonCodes(sharedReasonCodes(row.getReasonCodes()));
+    private void normalizePublicEvaluationState(OpportunityLogDO row) {
         if (!isSharedLifecycleStatus(row.getLifecycleStatus())) {
             row.setLifecycleStatus(OpportunityLogStatus.PENDING_EVALUATION);
             row.setOpportunityStatus(null);
             row.setResolvedAt(null);
         } else if (!isSharedOpportunityStatus(row.getOpportunityStatus())) {
             row.setOpportunityStatus(OpportunityLogStatus.RESOLVED.equals(row.getLifecycleStatus())
-                    ? classifyForUser(row, false)
+                    ? classifyPublic(row.getHitOrder())
                     : null);
-        }
-        if (userDerived) {
-            row.setEvaluationAsOf(null);
         }
     }
 
@@ -688,9 +625,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     private static boolean isSharedOpportunityStatus(String status) {
         return status == null
                 || OpportunityLogStatus.MISSED_VALID.equals(status)
-                || OpportunityLogStatus.MISSED_INVALID.equals(status)
-                || OpportunityLogStatus.PUSHED_NOT_FILLED_VALID.equals(status)
-                || OpportunityLogStatus.BLOCKED_BY_RISK_VALID.equals(status);
+                || OpportunityLogStatus.MISSED_INVALID.equals(status);
     }
 
     private static LocalDateTime firstOutcomeTime(OpportunityLogDO row) {
@@ -701,28 +636,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             return row.getInvalidationHitAt();
         }
         return null;
-    }
-
-    private RiskEvidence riskEvidence(OpportunityLogDO row) {
-        RiskEvidence risk = new RiskEvidence();
-        TmAccountRiskSnapshotDO snapshot = accountRiskSnapshotMapper.selectLatestByAnalysisId(row.getAnalysisId());
-        if (snapshot != null && Boolean.FALSE.equals(snapshot.getRiskAllowed())) {
-            risk.blocked = true;
-            risk.blockedAt = snapshot.getCreateTime();
-            risk.reasonCodes = reason("ACCOUNT_RISK_BLOCKED", snapshot.getRiskReasonCode());
-        }
-        List<TmPushSnapshotDO> pushes = safeList(pushSnapshotMapper.listByAnalysisId(row.getAnalysisId()));
-        for (TmPushSnapshotDO push : pushes) {
-            for (TmPushRecheckLogDO log : safeList(pushRecheckLogMapper.selectByPushId(push.getPushId()))) {
-                if ("RISK_BLOCKED".equalsIgnoreCase(safe(log.getRecheckStatus()))) {
-                    risk.blocked = true;
-                    LocalDateTime t = firstNonNull(log.getRecheckTime(), log.getCreateTime());
-                    risk.blockedAt = earlier(risk.blockedAt, t);
-                    risk.reasonCodes = appendReason(risk.reasonCodes, "PUSH_RECHECK_RISK_BLOCKED");
-                }
-            }
-        }
-        return risk;
     }
 
     private InvalidationEvidence persistedInvalidationEvidence(OpportunityLogDO row, LocalDateTime evaluationEnd) {
@@ -759,20 +672,14 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         evidence.reasonCode = appendReason(evidence.reasonCode, reasonCode);
     }
 
-    private String classifyShared(MarketPathResult marketPath, RiskEvidence risk, OpportunityLogDO row) {
-        if (OpportunityLogStatus.TARGET_FIRST.equals(marketPath.hitOrder)) {
-            if (risk.blocked && risk.blockedAt != null && !risk.blockedAt.isAfter(marketPath.targetHitAt)) {
-                return OpportunityLogStatus.BLOCKED_BY_RISK_VALID;
-            }
-            if (Boolean.TRUE.equals(row.getPushPresent())) {
-                return OpportunityLogStatus.PUSHED_NOT_FILLED_VALID;
-            }
+    private static String classifyPublic(String hitOrder) {
+        if (OpportunityLogStatus.TARGET_FIRST.equals(hitOrder)) {
             return OpportunityLogStatus.MISSED_VALID;
         }
-        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(marketPath.hitOrder)) {
+        if (OpportunityLogStatus.INVALIDATION_FIRST.equals(hitOrder)) {
             return OpportunityLogStatus.MISSED_INVALID;
         }
-        throw new IllegalStateException("opportunity has no final hit order");
+        return null;
     }
 
     private void applyMarketPath(OpportunityLogDO row, MarketPathResult result) {
@@ -795,11 +702,11 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         row.setReasonCodes(reasons);
         row.setUpdatedAt(LocalDateTime.now());
         opportunityLogMapper.updateEvaluation(row);
-        return toSharedDto(opportunityLogMapper.selectByOpportunityId(row.getOpportunityId()));
+        return toSharedDto(requirePublicOpportunity(row.getOpportunityId()));
     }
 
-    private OpportunityLogDO requireOpportunity(String opportunityId) {
-        OpportunityLogDO row = opportunityLogMapper.selectByOpportunityId(opportunityId);
+    private OpportunityLogDO requirePublicOpportunity(String opportunityId) {
+        OpportunityLogDO row = opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId(opportunityId);
         if (row == null) {
             throw new IllegalArgumentException("OPPORTUNITY_NOT_FOUND");
         }
@@ -933,16 +840,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         return a.compareTo(b) <= 0 ? a : b;
     }
 
-    private static LocalDateTime earlier(LocalDateTime a, LocalDateTime b) {
-        if (a == null) {
-            return b;
-        }
-        if (b == null) {
-            return a;
-        }
-        return a.isBefore(b) ? a : b;
-    }
-
     @SafeVarargs
     private static <T> T firstNonNull(T... values) {
         for (T value : values) {
@@ -960,10 +857,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             }
         }
         return null;
-    }
-
-    private static String appendReason(OpportunityLogDO row, String reason) {
-        return appendReason(row.getReasonCodes(), reason);
     }
 
     private static String appendReason(String existing, String reason) {
@@ -1075,12 +968,6 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             this.reviewRequired = reviewRequired;
             this.lookupFailed = lookupFailed;
         }
-    }
-
-    private static final class RiskEvidence {
-        private boolean blocked;
-        private LocalDateTime blockedAt;
-        private String reasonCodes;
     }
 
     private static final class InvalidationEvidence {

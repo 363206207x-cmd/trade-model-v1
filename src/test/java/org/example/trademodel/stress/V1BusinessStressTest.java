@@ -37,6 +37,7 @@ import org.example.trademodel.service.DecisionContext;
 import org.example.trademodel.service.DecisionEngineService;
 import org.example.trademodel.service.DecisionOhlcvSnapshotSource;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
+import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
@@ -274,7 +275,15 @@ class V1BusinessStressTest {
                 org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                 ruleConfigContractService);
 
-        RecheckResult result = service.recheck(701L, new BigDecimal("110"));
+        RecheckResult result = service.recheck(
+                701L,
+                new BigDecimal("110"),
+                RecheckExecutionCommand.scheduled(
+                        "business-stress",
+                        "price-drift-701",
+                        1,
+                        1,
+                        0));
 
         verifyNoInteractions(marketQuoteClient);
         verify(pushSnapshotMapper).updatePushStatus(701L, "RECHECK_DRIFTED_FROM_ENTRY_ZONE");

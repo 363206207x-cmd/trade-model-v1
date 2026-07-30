@@ -20,6 +20,7 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.service.PushRecheckAccessBoundary;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.PushRecheckService;
 import org.example.trademodel.service.PushRecheckStatusContract;
@@ -60,6 +61,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final RuleConfigContractService ruleConfigContractService;
+    private final PushRecheckAccessBoundary accessBoundary;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private Clock clock = Clock.systemUTC();
 
@@ -69,7 +71,19 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                                   PushRecheckDispatchConfigService dispatchConfigService,
                                   UserPositionRiskAdapter userPositionRiskAdapter) {
         this(pushSnapshotMapper, accountRiskSnapshotMapper, pushRecheckLogMapper, dispatchConfigService,
-                userPositionRiskAdapter, null, null);
+                userPositionRiskAdapter, null, null, new PushRecheckAccessBoundary());
+    }
+
+    public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
+                                  AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                                  PushRecheckLogMapper pushRecheckLogMapper,
+                                  PushRecheckDispatchConfigService dispatchConfigService,
+                                  UserPositionRiskAdapter userPositionRiskAdapter,
+                                  MarketPriceSnapshotService marketPriceSnapshotService,
+                                  RuleConfigContractService ruleConfigContractService) {
+        this(pushSnapshotMapper, accountRiskSnapshotMapper, pushRecheckLogMapper, dispatchConfigService,
+                userPositionRiskAdapter, marketPriceSnapshotService, ruleConfigContractService,
+                new PushRecheckAccessBoundary());
     }
 
     @Autowired
@@ -79,7 +93,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                                   PushRecheckDispatchConfigService dispatchConfigService,
                                   UserPositionRiskAdapter userPositionRiskAdapter,
                                   MarketPriceSnapshotService marketPriceSnapshotService,
-                                  RuleConfigContractService ruleConfigContractService) {
+                                  RuleConfigContractService ruleConfigContractService,
+                                  PushRecheckAccessBoundary accessBoundary) {
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
         this.pushRecheckLogMapper = pushRecheckLogMapper;
@@ -87,6 +102,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         this.userPositionRiskAdapter = userPositionRiskAdapter;
         this.marketPriceSnapshotService = marketPriceSnapshotService;
         this.ruleConfigContractService = ruleConfigContractService;
+        this.accessBoundary = accessBoundary;
     }
 
     @Autowired(required = false)
@@ -108,6 +124,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     @Transactional(rollbackFor = Exception.class)
     public RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command) {
         RecheckExecutionCommand executionCommand = command != null ? command : RecheckExecutionCommand.manual();
+        accessBoundary.requireInternalScheduledExecution(executionCommand);
         if (pushId == null) {
             RecheckResult early = new RecheckResult();
             early.setPushId(null);
@@ -243,92 +260,22 @@ public class PushRecheckServiceImpl implements PushRecheckService {
 
     @Override
     public PushRecheckLogItemVO getLatestLog(Long pushId) {
-        return null;
+        throw accessBoundary.disabledGlobalOperation(PushRecheckAccessBoundary.Operation.READ_LATEST);
     }
 
     @Override
     public List<PushRecheckLogItemVO> listLogs(Long pushId) {
-        return Collections.emptyList();
+        throw accessBoundary.disabledGlobalOperation(PushRecheckAccessBoundary.Operation.READ_LOGS);
     }
 
     @Override
     public List<RecheckResult> replayByDispatch(String dispatchBatchId, String dispatchInstructionId) {
-        List<TmPushRecheckLogDO> sourceLogs = selectReplaySource(dispatchBatchId, dispatchInstructionId);
-        if (sourceLogs == null || sourceLogs.isEmpty()) {
-            return Collections.emptyList();
-        }
-        String replayBatchId = "REPLAY-" + System.currentTimeMillis();
-        return sourceLogs.stream()
-                .filter(Objects::nonNull)
-                .filter(row -> row.getPushId() != null)
-                .filter(row -> row.getCurrentPrice() != null && row.getCurrentPrice().compareTo(BigDecimal.ZERO) > 0)
-                .map(row -> recheck(
-                        row.getPushId(),
-                        row.getCurrentPrice(),
-                        RecheckExecutionCommand.replay(
-                                replayBatchId,
-                                replayInstructionId(row, dispatchInstructionId),
-                                row.getLogId())))
-                .collect(Collectors.toList());
+        throw accessBoundary.disabledGlobalOperation(PushRecheckAccessBoundary.Operation.MUTATE_REPLAY);
     }
 
     @Override
     public PushRecheckReplaySummaryVO summarizeReplayByDispatch(String dispatchBatchId, String dispatchInstructionId) {
-        List<TmPushRecheckLogDO> logs = selectReplaySource(dispatchBatchId, dispatchInstructionId);
-        PushRecheckReplaySummaryVO summary = new PushRecheckReplaySummaryVO();
-        summary.setDispatchBatchId(blankToNull(trimToNull(dispatchBatchId)));
-        summary.setDispatchInstructionId(blankToNull(trimToNull(dispatchInstructionId)));
-        if (logs == null || logs.isEmpty()) {
-            summary.setTotalCount(0);
-            summary.setSuccessCount(0);
-            summary.setBlockingCount(0);
-            summary.setWaitingCount(0);
-            summary.setExpiredCount(0);
-            summary.setReplayCount(0);
-            summary.setHasError(false);
-            return summary;
-        }
-        int success = 0;
-        int blocking = 0;
-        int waiting = 0;
-        int expired = 0;
-        int replay = 0;
-        for (TmPushRecheckLogDO row : logs) {
-            if (row == null) {
-                continue;
-            }
-            RecheckStatusEnum canonicalStatus = PushRecheckStatusContract.tryParseRecheckStatus(row.getRecheckStatus());
-            if (PushRecheckStatusContract.isReviewPassed(canonicalStatus)) {
-                success++;
-            } else if (PushRecheckStatusContract.isWaiting(canonicalStatus)) {
-                waiting++;
-            } else if (canonicalStatus == RecheckStatusEnum.EXPIRED) {
-                expired++;
-            } else if (PushRecheckStatusContract.isBlocking(canonicalStatus)) {
-                blocking++;
-            }
-            if ("REPLAY".equalsIgnoreCase(trimToNull(row.getTriggerSource()))) {
-                replay++;
-            }
-        }
-        TmPushRecheckLogDO latest = logs.get(0);
-        summary.setDispatchBatchId(
-                firstNonBlank(summary.getDispatchBatchId(), trimToNull(latest.getDispatchBatchId())));
-        summary.setDispatchInstructionId(
-                firstNonBlank(summary.getDispatchInstructionId(), trimToNull(latest.getDispatchInstructionId())));
-        summary.setTriggerSource(trimToNull(latest.getTriggerSource()));
-        summary.setTotalCount(logs.size());
-        summary.setSuccessCount(success);
-        summary.setBlockingCount(blocking);
-        summary.setWaitingCount(waiting);
-        summary.setExpiredCount(expired);
-        summary.setReplayCount(replay);
-        summary.setLatestExecutionStatus(trimToNull(latest.getExecutionStatus()));
-        summary.setLatestExecutionTime(latest.getRecheckTime() != null ? latest.getRecheckTime() : latest.getCreateTime());
-        summary.setLatestErrorCode(trimToNull(latest.getExecutionErrorCode()));
-        summary.setHasError(summary.getLatestErrorCode() != null
-                || !"COMPLETED".equalsIgnoreCase(trimToNull(latest.getExecutionStatus())));
-        return summary;
+        throw accessBoundary.disabledGlobalOperation(PushRecheckAccessBoundary.Operation.READ_REPLAY_SUMMARY);
     }
 
     @Override
@@ -336,29 +283,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                                                    String dispatchInstructionId,
                                                    Integer auditLimit,
                                                    Integer logLimit) {
-        int safeAuditLimit = safeLimit(auditLimit, 5, 50);
-        int safeLogLimit = safeLimit(logLimit, 10, 50);
-
-        PushRecheckOpsOverviewVO overview = new PushRecheckOpsOverviewVO();
-        overview.setConfig(buildConfigSummary(safeAuditLimit));
-        overview.setAuditSummary(buildAuditSummary(safeAuditLimit));
-        List<TmPushRecheckLogDO> recentRows = Optional.ofNullable(pushRecheckLogMapper.selectRecent(safeLogLimit))
-                .orElse(Collections.emptyList());
-        overview.setRecentLogs(recentRows.stream()
-                .map(this::toRecentLogSummary)
-                .collect(Collectors.toList()));
-
-        String resolvedInstructionId = trimToNull(dispatchInstructionId);
-        String resolvedBatchId = trimToNull(dispatchBatchId);
-        if (resolvedInstructionId == null && resolvedBatchId == null) {
-            TmPushRecheckLogDO latest = recentRows.isEmpty() ? null : recentRows.get(0);
-            if (latest != null) {
-                resolvedInstructionId = trimToNull(latest.getDispatchInstructionId());
-                resolvedBatchId = trimToNull(latest.getDispatchBatchId());
-            }
-        }
-        overview.setLatestReplaySummary(summarizeReplayByDispatch(resolvedBatchId, resolvedInstructionId));
-        return overview;
+        throw accessBoundary.disabledGlobalOperation(PushRecheckAccessBoundary.Operation.READ_OPS);
     }
 
     private PushRecheckLogItemVO toLogVo(TmPushRecheckLogDO row) {

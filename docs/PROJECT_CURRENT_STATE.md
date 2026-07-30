@@ -7,7 +7,7 @@ Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Current Work Package: FE-04E cross-endpoint Opportunity/Recheck privacy and state-contract remediation is implemented on the PR #1155 branch and pending a new exact-head review; the Message/Push Contract Foundation remains effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8, while Message/Push UI remains NOT_STARTED
-Next Business Phase: FE-04E Privacy and State Contract Exact Head Review
+Next Business Phase: FE-04E Full Privacy Boundary and State Machine Exact Head Review
 Next Business Phase Allowed: EXACT_HEAD_REVIEW_ONLY; Message Center and Push Detail UI remain blocked until the server-side public projection is reviewed, merged to clean/synced main, and governance is re-evaluated; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
@@ -129,33 +129,35 @@ PR #1155 introduces source-specific server-side read projections:
   message/source/opportunity identity, a safe allowlisted public opportunity
   status, public timestamp, and public description. Its mapper projection does
   not select UserPosition, account-risk, position-risk, or private-risk-reason
-  columns. A separate internal readiness projection reads only Recheck
-  status/time/execution plus `failReasonJson` for structural validation; the
-  raw JSON and all Recheck/private-risk fields are absent from the public DTO
-  and serialized response.
+  columns. Dashboard Home, Opportunity Log, and Message Detail use the same
+  public opportunity projection policy. Public lifecycle, status, and
+  readiness are calculated only from public opportunity data and remain
+  identical across authenticated users.
 - The serialized public `OPPORTUNITY` projection does not expose internal
-  `pushId`, Recheck identity, or a private-risk reference. Internal `pushId`
-  use remains server-side only for a narrow readiness projection that selects
-  structural status/time/execution fields and never returns raw Recheck,
-  account-risk, position-risk, or private-reason values.
+  `pushId`, Recheck identity, Recheck existence/status, or a private-risk
+  reference. Public opportunity evaluation and projection do not read
+  PushRecheck, UserPosition, account risk, position risk, or private failure
+  data, so private state cannot act as a public response oracle.
 - `POSITION_RISK` is `OWNER_SCOPED_PRIVATE_PROJECTION`. Its risk and monitoring
-  fields remain available only through exact current-user-scoped reads.
-- Raw `GET /api/push/recheck/{pushId}/latest` and `/{pushId}/logs` fail closed
-  with `404` for authenticated user-facing requests because the persisted raw
-  Recheck rows do not carry an owner identity from which exact user access can
-  be proven. Dashboard `recheck-preview-status` also rejects every raw
-  `pushId` before any Recheck or ops read. The legacy raw
-  `PushRecheckService` latest/list methods also fail closed; lower-level mapper
-  reads remain internal operational inputs and are not user authorization
-  paths.
+  fields remain available only through exact current-user-scoped message,
+  position, and monitor reads. A complete legal matching monitor projection is
+  `READY`; an incomplete legal projection is `PARTIAL`; invalid, malformed, or
+  contradictory data is `ERROR`; and a missing or inaccessible exact resource
+  is `MISSING`.
+- All raw user-facing PushRecheck reads, config/audit, summary/ops, trigger,
+  and replay routes fail closed with `404` because persisted Push/Recheck rows
+  do not carry the authoritative source-message-position-owner relationship
+  needed for access. Their public service methods reject before repository
+  reads or mutation. Dashboard `recheck-preview-status` also returns only a
+  fail-closed status and does not read private Recheck or global ops data.
+  Internal scheduled Recheck execution remains isolated behind a strict
+  scheduler command and is not a user-facing read or mutation capability.
 - The shared and private sources no longer use one response record that can
   carry both public opportunity and private risk fields.
-- `READY` requires complete public identity/data, a legal completed
-  `push_status`, a complete legal Recheck readiness row, `execution_status =
-  COMPLETED`, and matching Push/Recheck states. Known incomplete or in-progress
-  data maps to `PARTIAL`; illegal enum/JSON/state combinations map to `ERROR`;
-  missing or inaccessible exact resources map to `MISSING`; a successful empty
-  collection alone maps to `EMPTY`.
+- Across both source-specific projections, complete valid data maps to
+  `READY`, incomplete valid data maps to `PARTIAL`, invalid or contradictory
+  data maps to `ERROR`, missing or inaccessible exact resources map to
+  `MISSING`, and only a successful empty collection maps to `EMPTY`.
 
 This privacy-boundary candidate changes the read API response projection but
 does not add a new endpoint, mutation, schema, Message/Push UI, notification

@@ -1464,20 +1464,28 @@ public class DashboardHomeVO {
     }
 
     public static class PushItemVO {
-        private Long pushId;
+        private String messageId;
+        private String sourceIdentity;
         private String symbol;
-        private String status;
-        private String type;
-        private LocalDateTime expiresAt;
-        private String recheckStatus;
-        private LocalDateTime createdAt;
+        private String publicLifecycle;
+        private String publicStatus;
+        private LocalDateTime publicTimestamp;
+        private String publicDescription;
 
-        public Long getPushId() {
-            return pushId;
+        public String getMessageId() {
+            return messageId;
         }
 
-        public void setPushId(Long pushId) {
-            this.pushId = pushId;
+        public void setMessageId(String messageId) {
+            this.messageId = messageId;
+        }
+
+        public String getSourceIdentity() {
+            return sourceIdentity;
+        }
+
+        public void setSourceIdentity(String sourceIdentity) {
+            this.sourceIdentity = sourceIdentity;
         }
 
         public String getSymbol() {
@@ -1488,44 +1496,36 @@ public class DashboardHomeVO {
             this.symbol = symbol;
         }
 
-        public String getStatus() {
-            return status;
+        public String getPublicLifecycle() {
+            return publicLifecycle;
         }
 
-        public void setStatus(String status) {
-            this.status = status;
+        public void setPublicLifecycle(String publicLifecycle) {
+            this.publicLifecycle = publicLifecycle;
         }
 
-        public String getType() {
-            return type;
+        public String getPublicStatus() {
+            return publicStatus;
         }
 
-        public void setType(String type) {
-            this.type = type;
+        public void setPublicStatus(String publicStatus) {
+            this.publicStatus = publicStatus;
         }
 
-        public LocalDateTime getExpiresAt() {
-            return expiresAt;
+        public LocalDateTime getPublicTimestamp() {
+            return publicTimestamp;
         }
 
-        public void setExpiresAt(LocalDateTime expiresAt) {
-            this.expiresAt = expiresAt;
+        public void setPublicTimestamp(LocalDateTime publicTimestamp) {
+            this.publicTimestamp = publicTimestamp;
         }
 
-        public String getRecheckStatus() {
-            return recheckStatus;
+        public String getPublicDescription() {
+            return publicDescription;
         }
 
-        public void setRecheckStatus(String recheckStatus) {
-            this.recheckStatus = recheckStatus;
-        }
-
-        public LocalDateTime getCreatedAt() {
-            return createdAt;
-        }
-
-        public void setCreatedAt(LocalDateTime createdAt) {
-            this.createdAt = createdAt;
+        public void setPublicDescription(String publicDescription) {
+            this.publicDescription = publicDescription;
         }
     }
 

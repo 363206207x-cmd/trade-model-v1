@@ -20,13 +20,6 @@ public class LightSystemStatusVO {
     private Integer confusedCount;
 
     /**
-     * 当前积压待复核的 push 条数，来源 tm_push_snapshot：
-     * push_status 为 CAPTURED 或 RECHECK_VALID_WAITING，且 expires_at 为空或大于当前时间。
-     * 不是「下一批可被调度器拉取的条数」；不 join tm_push_recheck_log，不读 dispatch 配置。
-     */
-    private Integer pendingCount;
-
-    /**
      * 反转信号数量：当前仍有 OPEN 持仓的 distinct symbol 中，该 symbol 在 tm_decision_result 最新一条决策的
      * {@code market_bias_hierarchy}（规范化后）与持仓 {@code position_side} 方向相反的数量。
      * <p>
@@ -90,14 +83,6 @@ public class LightSystemStatusVO {
 
     public void setConfusedCount(Integer confusedCount) {
         this.confusedCount = confusedCount;
-    }
-
-    public Integer getPendingCount() {
-        return pendingCount;
-    }
-
-    public void setPendingCount(Integer pendingCount) {
-        this.pendingCount = pendingCount;
     }
 
     public Integer getReverseSignalCount() {

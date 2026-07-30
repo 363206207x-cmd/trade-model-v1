@@ -15,16 +15,15 @@ import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.messagepush.MessageReadState;
+import org.example.trademodel.messagepush.PublicOpportunityProjectionPolicy;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
-import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
@@ -38,9 +37,9 @@ import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
-import org.example.trademodel.service.PushRecheckStatusContract;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
@@ -48,7 +47,6 @@ import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
-import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -85,23 +83,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"
     );
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
-    private static final List<String> EXECUTABLE_PUSH_STATUSES = List.of(
-            PushRecheckStatusContract.PUSH_STATUS_REVIEW_PASSED,
-            "RECHECK_VALID_EXECUTABLE"
-    );
-    private static final List<String> INVALIDATED_PUSH_STATUSES = List.of(
-            PushRecheckStatusContract.PUSH_STATUS_DRIFTED_FROM_ENTRY_ZONE,
-            PushRecheckStatusContract.PUSH_STATUS_INVALIDATED,
-            PushRecheckStatusContract.PUSH_STATUS_RISK_BLOCKED,
-            PushRecheckStatusContract.PUSH_STATUS_CONFUSED_BLOCKED,
-            PushRecheckStatusContract.PUSH_STATUS_EXPIRED,
-            "RECHECK_DRIFTED",
-            "DRIFTED",
-            "INVALIDATED",
-            "RISK_BLOCKED",
-            "CONFUSED_BLOCKED",
-            "EXPIRED"
-    );
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
     private static final int MIN_DATA_QUALITY_SCORE_FOR_PLAN = 60;
     private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
@@ -114,8 +95,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private final UserPositionService userPositionService;
     private final PositionMonitorLogService positionMonitorLogService;
     private final PositionSyncService positionSyncService;
-    private final PushSnapshotMapper pushSnapshotMapper;
-    private final PushRecheckLogMapper pushRecheckLogMapper;
+    private final OpportunityLogService opportunityLogService;
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private final ProviderReadinessService providerReadinessService;
     private final ObjectMapper objectMapper;
@@ -136,13 +116,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     UserPositionService userPositionService,
                                     PositionMonitorLogService positionMonitorLogService,
                                     PositionSyncService positionSyncService,
-                                    PushSnapshotMapper pushSnapshotMapper,
-                                    PushRecheckLogMapper pushRecheckLogMapper,
+                                    OpportunityLogService opportunityLogService,
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
                                     ProviderReadinessService providerReadinessService,
                                     ObjectMapper objectMapper) {
         this(decisionService, monitorService, userPositionService, positionMonitorLogService, positionSyncService,
-                pushSnapshotMapper, pushRecheckLogMapper, externalContextEvidenceBuilder, providerReadinessService,
+                opportunityLogService, externalContextEvidenceBuilder, providerReadinessService,
                 objectMapper, null);
     }
 
@@ -152,8 +131,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                     UserPositionService userPositionService,
                                     PositionMonitorLogService positionMonitorLogService,
                                     PositionSyncService positionSyncService,
-                                    PushSnapshotMapper pushSnapshotMapper,
-                                    PushRecheckLogMapper pushRecheckLogMapper,
+                                    OpportunityLogService opportunityLogService,
                                     ExternalContextEvidenceBuilder externalContextEvidenceBuilder,
                                     ProviderReadinessService providerReadinessService,
                                     ObjectMapper objectMapper,
@@ -163,8 +141,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.userPositionService = userPositionService;
         this.positionMonitorLogService = positionMonitorLogService;
         this.positionSyncService = positionSyncService;
-        this.pushSnapshotMapper = pushSnapshotMapper;
-        this.pushRecheckLogMapper = pushRecheckLogMapper;
+        this.opportunityLogService = opportunityLogService;
         this.externalContextEvidenceBuilder = externalContextEvidenceBuilder;
         this.providerReadinessService = providerReadinessService;
         this.objectMapper = objectMapper;
@@ -459,15 +436,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                         : "NOT_APPLICABLE",
                 conflictScore
         ));
-        Integer pendingCount = systemStatus != null ? systemStatus.getPendingCount() : null;
         state.setPendingReview(card(
                 "pendingReview",
                 "待复核机会",
-                pendingCount,
-                pendingCount != null && pendingCount > 0 ? String.valueOf(pendingCount) : "暂无",
-                "待复核数量",
-                pendingCount != null ? "CONNECTED" : "WAITING_SYNC",
-                pendingCount
+                null,
+                "当前不可查看",
+                "私有复核统计不可用于共享首页",
+                "PRIVATE_SOURCE_UNAVAILABLE",
+                null
         ));
         Integer confusedCount = directionalBlockCount(systemStatus, decisions);
         state.setConfused(card(
@@ -1357,16 +1333,26 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int invalidated = 0;
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
         try {
-            LocalDateTime nowUtc = UtcLocalTimePolicy.now(planValidityClock);
-            waiting = Math.max(0, pushSnapshotMapper.countPendingRecheckBacklog(nowUtc));
-            executable = safeCountPushStatuses(EXECUTABLE_PUSH_STATUSES);
-            invalidated = safeCountPushStatuses(INVALIDATED_PUSH_STATUSES);
-            items.addAll(pushItems("CAPTURED", limit, nowUtc));
-            if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_REVIEW_WAITING", limit - items.size(), nowUtc));
-            }
-            if (items.size() < limit) {
-                items.addAll(pushItems("RECHECK_VALID_WAITING", limit - items.size(), nowUtc));
+            List<OpportunityLogPublicDTO> publicRows = opportunityLogService.queryPublic(
+                    null, null, null, null, null, null, null, null, limit);
+            for (OpportunityLogPublicDTO row : publicRows == null
+                    ? List.<OpportunityLogPublicDTO>of()
+                    : publicRows) {
+                PublicOpportunityProjectionPolicy.Evaluation evaluation =
+                        PublicOpportunityProjectionPolicy.evaluate(
+                                row, row == null ? null : row.opportunityId());
+                if (row == null
+                        || evaluation.state() == MessageReadState.ERROR
+                        || evaluation.state() == MessageReadState.MISSING) {
+                    continue;
+                }
+                DashboardHomeVO.PushItemVO item = publicOpportunityItem(row, evaluation);
+                items.add(item);
+                if (evaluation.state() == MessageReadState.PARTIAL) {
+                    waiting++;
+                } else if ("MISSED_INVALID".equals(evaluation.displayStatus())) {
+                    invalidated++;
+                }
             }
             readOk = true;
         } catch (RuntimeException ignored) {
@@ -1393,52 +1379,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return false;
     }
 
-    private int safeCountPushStatuses(List<String> statuses) {
-        if (statuses == null || statuses.isEmpty()) {
-            return 0;
-        }
-        try {
-            return Math.max(0, pushSnapshotMapper.countByPushStatuses(statuses));
-        } catch (RuntimeException ignored) {
-            return 0;
-        }
-    }
-
-    private List<DashboardHomeVO.PushItemVO> pushItems(String status, int limit, LocalDateTime nowUtc) {
-        if (limit <= 0) {
-            return List.of();
-        }
-        List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
-        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listPendingRecheck(status, nowUtc, limit);
-        for (TmPushSnapshotDO row : rows == null ? List.<TmPushSnapshotDO>of() : rows) {
-            if (row == null) {
-                continue;
-            }
-            DashboardHomeVO.PushItemVO item = new DashboardHomeVO.PushItemVO();
-            item.setPushId(row.getPushId());
-            item.setSymbol(toDisplaySymbol(row.getSymbol()));
-            item.setStatus(row.getPushStatus());
-            item.setType(row.getPushType());
-            item.setExpiresAt(row.getExpiresAt());
-            item.setRecheckStatus(latestRecheckStatus(row.getPushId()));
-            item.setCreatedAt(row.getPushCreateTime() != null ? row.getPushCreateTime() : row.getCreateTime());
-            items.add(item);
-        }
-        return items;
-    }
-
-    private String latestRecheckStatus(Long pushId) {
-        if (pushId == null) {
-            return null;
-        }
-        try {
-            TmPushRecheckLogDO latest = pushRecheckLogMapper.selectLatestByPushId(pushId);
-            return latest != null
-                    ? trimToNull(PushRecheckStatusContract.canonicalizeRecheckStatusName(latest.getRecheckStatus()))
-                    : null;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
+    private DashboardHomeVO.PushItemVO publicOpportunityItem(
+            OpportunityLogPublicDTO row,
+            PublicOpportunityProjectionPolicy.Evaluation evaluation) {
+        DashboardHomeVO.PushItemVO item = new DashboardHomeVO.PushItemVO();
+        item.setMessageId(row.opportunityId());
+        item.setSourceIdentity("OPPORTUNITY");
+        item.setSymbol(toDisplaySymbol(row.symbol()));
+        item.setPublicLifecycle(evaluation.publicLifecycle());
+        item.setPublicStatus(evaluation.publicStatus());
+        item.setPublicTimestamp(PublicOpportunityProjectionPolicy.publicTimestamp(row));
+        item.setPublicDescription(PublicOpportunityProjectionPolicy.publicDescription(row));
+        return item;
     }
 
     private DashboardHomeVO.DiagnosticsVO buildDiagnostics(LightSystemStatusVO systemStatus,

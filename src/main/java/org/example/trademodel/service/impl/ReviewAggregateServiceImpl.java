@@ -134,7 +134,7 @@ public class ReviewAggregateServiceImpl implements ReviewAggregateService {
         List<ScoreBriefVO> scoreTopItems = scoreService.listTopScoreBriefByAnalysisId(analysisId);
         vo.setScoreTopItems(scoreTopItems != null ? scoreTopItems : Collections.emptyList());
 
-        List<ReviewAggregateVO.ReviewPushWithRecheck> pushRecheck = buildPushRecheck(analysisId);
+        List<ReviewAggregateVO.ReviewPushWithRecheck> pushRecheck = Collections.emptyList();
         vo.setPushRecheck(pushRecheck);
         org.example.trademodel.entity.ReviewResultDO reviewResult = reviewResultMapper.selectByAnalysisId(analysisId);
         List<ReviewAggregateVO.RuleVersionLogSummary> ruleVersionLogs = ruleVersionLogQueryService.listByAnalysisId(analysisId, 20);
@@ -169,7 +169,6 @@ public class ReviewAggregateServiceImpl implements ReviewAggregateService {
         ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(analysisId);
         vo.setPlan(plan == null ? null : toPlanSummary(plan));
 
-        List<TmPushSnapshotDO> pushRows = pushSnapshotMapper.listByAnalysisId(analysisId);
         List<MissedOpportunityDO> missedRows = missedOpportunityMapper.listByAnalysisId(analysisId);
         List<MonitorAlertDO> alertRows = monitorAlertMapper.listByAnalysisId(analysisId);
         ReviewAggregateVO.ReviewHotResetSummary hotReset = toHotReset(run, dr, missedRows);
@@ -183,7 +182,7 @@ public class ReviewAggregateServiceImpl implements ReviewAggregateService {
                 hotReset,
                 Collections.emptyList(),
                 reviewResultMapper.selectByAnalysisId(analysisId)));
-        vo.setDetailSections(buildDetailSectionsMeta(pushRows.size(), missedRows.size(), alertRows.size()));
+        vo.setDetailSections(buildDetailSectionsMeta(0, missedRows.size(), alertRows.size()));
         return Optional.of(vo);
     }
 
@@ -265,33 +264,9 @@ public class ReviewAggregateServiceImpl implements ReviewAggregateService {
     }
 
     private void fillPushRecheckDetail(ReviewAggregateDetailVO vo, String analysisId, int limit) {
-        List<TmPushSnapshotDO> pushRows = pushSnapshotMapper.listByAnalysisId(analysisId);
-        int total = pushRows == null ? 0 : pushRows.size();
-        vo.setTotal(total);
-        if (total == 0) {
-            vo.setPushRecheck(Collections.emptyList());
-            vo.setTruncated(Boolean.FALSE);
-            return;
-        }
-        int toIndex = Math.min(limit, total);
-        List<ReviewAggregateVO.ReviewPushWithRecheck> out = new ArrayList<>(toIndex);
-        for (TmPushSnapshotDO s : pushRows.subList(0, toIndex)) {
-            ReviewAggregateVO.ReviewPushWithRecheck bundle = new ReviewAggregateVO.ReviewPushWithRecheck();
-            TmAccountRiskSnapshotDO risk = s.getAccountRiskSnapshotId() == null
-                    ? null
-                    : accountRiskSnapshotMapper.selectById(s.getAccountRiskSnapshotId());
-            bundle.setPush(toPushSummary(s, risk));
-            List<TmPushRecheckLogDO> logs = pushRecheckLogMapper.selectByPushId(s.getPushId());
-            if (logs == null || logs.isEmpty()) {
-                bundle.setRechecks(Collections.emptyList());
-            } else {
-                int recheckToIndex = Math.min(DETAIL_RECHECK_PER_PUSH_MAX, logs.size());
-                bundle.setRechecks(toRecheckList(logs.subList(0, recheckToIndex)));
-            }
-            out.add(bundle);
-        }
-        vo.setPushRecheck(out);
-        vo.setTruncated(total > toIndex);
+        vo.setTotal(0);
+        vo.setPushRecheck(Collections.emptyList());
+        vo.setTruncated(Boolean.FALSE);
     }
 
     private void fillMissedDetail(ReviewAggregateDetailVO vo, String analysisId, int limit) {
@@ -748,21 +723,7 @@ public class ReviewAggregateServiceImpl implements ReviewAggregateService {
     }
 
     private List<ReviewAggregateVO.ReviewPushWithRecheck> buildPushRecheck(String analysisId) {
-        List<TmPushSnapshotDO> snaps = pushSnapshotMapper.listByAnalysisId(analysisId);
-        if (snaps == null || snaps.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<ReviewAggregateVO.ReviewPushWithRecheck> out = new ArrayList<>(snaps.size());
-        for (TmPushSnapshotDO s : snaps) {
-            ReviewAggregateVO.ReviewPushWithRecheck bundle = new ReviewAggregateVO.ReviewPushWithRecheck();
-            TmAccountRiskSnapshotDO risk = s.getAccountRiskSnapshotId() == null
-                    ? null
-                    : accountRiskSnapshotMapper.selectById(s.getAccountRiskSnapshotId());
-            bundle.setPush(toPushSummary(s, risk));
-            bundle.setRechecks(toRecheckList(pushRecheckLogMapper.selectByPushId(s.getPushId())));
-            out.add(bundle);
-        }
-        return out;
+        return Collections.emptyList();
     }
 
     private static ReviewAggregateVO.ReviewRunSummary toRunSummary(AnalysisRunDO r) {

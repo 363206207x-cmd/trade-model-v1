@@ -259,7 +259,10 @@ class ControlledPostgreSqlFlywayV7EvidenceTest {
                 assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(4);
                 assertThat(baseline.getDataQualitySummary().getAnalysisRunCountWindow()).isEqualTo(3);
                 assertThat(baseline.getDataQualitySummary().getLowQualityCountWindow()).isEqualTo(3);
-                assertThat(baseline.getRecheckSummary().getStatusCountsWindow().get("REVIEW_WAITING")).isEqualTo(3);
+                assertThat(baseline.getRecheckSummary().getAvailabilityStatus())
+                        .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
+                assertThat(baseline.getRecheckSummary().getTotalCountWindow()).isNull();
+                assertThat(baseline.getRecheckSummary().getStatusCountsWindow()).isNull();
                 assertThat(baseline.getHotResetSummary().getEventCountWindow()).isEqualTo(3);
                 assertThat(baseline.getHotResetSummary().getTriggerTypeCountsWindow().get("CONTROLLED_TIMEZONE"))
                         .isEqualTo(3);

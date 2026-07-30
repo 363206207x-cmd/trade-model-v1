@@ -145,7 +145,6 @@ class ReviewAggregateServiceImplEvidenceTopItemsTest {
         run.setAnalysisTime(LocalDateTime.of(2026, 4, 21, 10, 0));
         when(analysisRunMapper.selectById(analysisId)).thenReturn(run);
 
-        when(pushSnapshotMapper.listByAnalysisId(analysisId)).thenReturn(Collections.emptyList());
         when(missedOpportunityMapper.listByAnalysisId(analysisId)).thenReturn(Collections.emptyList());
         when(monitorAlertMapper.listByAnalysisId(analysisId)).thenReturn(Collections.emptyList());
         when(ruleVersionLogQueryService.listByAnalysisId(analysisId, 20)).thenReturn(Collections.emptyList());

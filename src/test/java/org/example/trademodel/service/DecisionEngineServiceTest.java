@@ -210,11 +210,20 @@ class DecisionEngineServiceTest {
                 ruleConfigContractService);
 
         recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T11:59:59Z"), ZoneOffset.UTC));
-        RecheckResult before = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+        RecheckResult before = recheckService.recheck(
+                501L,
+                new java.math.BigDecimal("100"),
+                RecheckExecutionCommand.scheduled("expiry-boundary", "before-expiry", 1, 1, 0));
         recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
-        RecheckResult equal = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+        RecheckResult equal = recheckService.recheck(
+                501L,
+                new java.math.BigDecimal("100"),
+                RecheckExecutionCommand.scheduled("expiry-boundary", "at-expiry", 1, 1, 0));
         recheckService.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:01Z"), ZoneOffset.UTC));
-        RecheckResult after = recheckService.recheck(501L, new java.math.BigDecimal("100"));
+        RecheckResult after = recheckService.recheck(
+                501L,
+                new java.math.BigDecimal("100"),
+                RecheckExecutionCommand.scheduled("expiry-boundary", "after-expiry", 1, 1, 0));
 
         assertThat(before.getRecheckStatus()).isNotEqualTo(RecheckStatusEnum.EXPIRED);
         assertThat(equal.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);

@@ -23,10 +23,26 @@ public interface OpportunityLogMapper {
             + "AND COALESCE(reason_codes, '') NOT LIKE '%LINKED_USER_POSITION_%' "
             + "AND COALESCE(reason_codes, '') NOT LIKE '%USER_POSITION_PROJECTION_UNAVAILABLE%' ";
 
-    String PUBLIC_PROJECTION_PREDICATE = SHARED_STATE_PREDICATE
-            + "AND COALESCE(opportunity_status, '') != 'BLOCKED_BY_RISK_VALID' "
-            + "AND COALESCE(risk_blocked_evidence, FALSE) = FALSE "
-            + "AND risk_blocked_at IS NULL ";
+    String PUBLIC_PROJECTION_PREDICATE = " AND opportunity_id IS NOT NULL ";
+
+    String PUBLIC_LIFECYCLE_EXPRESSION = "CASE "
+            + "WHEN lifecycle_status IN ('PENDING_EVALUATION', 'RESOLVED', 'SOURCE_INCOMPLETE', "
+            + "'MARKET_PATH_UNAVAILABLE', 'AMBIGUOUS_MARKET_PATH') THEN lifecycle_status "
+            + "WHEN lifecycle_status = 'REVIEW_REQUIRED' AND hit_order IN ('TARGET_FIRST', 'INVALIDATION_FIRST') "
+            + "THEN 'RESOLVED' "
+            + "WHEN lifecycle_status = 'REVIEW_REQUIRED' THEN 'PENDING_EVALUATION' "
+            + "ELSE lifecycle_status END";
+
+    String PUBLIC_STATUS_EXPRESSION = "CASE "
+            + "WHEN hit_order = 'TARGET_FIRST' THEN 'MISSED_VALID' "
+            + "WHEN hit_order = 'INVALIDATION_FIRST' THEN 'MISSED_INVALID' "
+            + "WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID') THEN opportunity_status "
+            + "WHEN opportunity_status IN ('PUSHED_NOT_FILLED_VALID', 'BLOCKED_BY_RISK_VALID', "
+            + "'EXECUTED_VALID', 'EXECUTED_INVALID') THEN NULL "
+            + "ELSE opportunity_status END";
+
+    String PUBLIC_RESOLVED_AT_EXPRESSION = "CASE WHEN (" + PUBLIC_LIFECYCLE_EXPRESSION
+            + ") = 'RESOLVED' THEN resolved_at ELSE NULL END";
 
     String BASE_SELECT = "SELECT opportunity_id AS opportunityId, opportunity_key AS opportunityKey, "
             + "analysis_id AS analysisId, decision_id AS decisionId, execution_plan_id AS executionPlanId, "
@@ -49,17 +65,16 @@ public interface OpportunityLogMapper {
             + "FROM tm_opportunity_log ";
 
     String PUBLIC_MESSAGE_SELECT = "SELECT opportunity_id AS opportunityId, analysis_id AS analysisId, "
-            + "push_id AS pushId, symbol, timeframe, direction, lifecycle_status AS lifecycleStatus, "
-            + "CASE WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID') "
-            + "THEN opportunity_status ELSE NULL END AS opportunityStatus, "
+            + "symbol, timeframe, direction, " + PUBLIC_LIFECYCLE_EXPRESSION + " AS lifecycleStatus, "
+            + PUBLIC_STATUS_EXPRESSION + " AS opportunityStatus, "
             + "anchor_time AS anchorTime, created_at AS createdAt "
             + "FROM tm_opportunity_log ";
 
     String PUBLIC_API_SELECT = "SELECT opportunity_id AS opportunityId, analysis_id AS analysisId, "
-            + "symbol, timeframe, direction, lifecycle_status AS lifecycleStatus, "
-            + "CASE WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID') "
-            + "THEN opportunity_status ELSE NULL END AS opportunityStatus, "
-            + "anchor_time AS anchorTime, resolved_at AS resolvedAt, entry_reference AS entryReference, "
+            + "symbol, timeframe, direction, " + PUBLIC_LIFECYCLE_EXPRESSION + " AS lifecycleStatus, "
+            + PUBLIC_STATUS_EXPRESSION + " AS opportunityStatus, "
+            + "anchor_time AS anchorTime, " + PUBLIC_RESOLVED_AT_EXPRESSION + " AS resolvedAt, "
+            + "entry_reference AS entryReference, "
             + "target_price AS targetPrice, invalidation_price AS invalidationPrice, "
             + "target_hit AS targetHit, invalidation_hit AS invalidationHit, "
             + "target_hit_at AS targetHitAt, invalidation_hit_at AS invalidationHitAt, "
@@ -71,6 +86,33 @@ public interface OpportunityLogMapper {
             + "TRUE AS notUserPositionCreation, TRUE AS notUserPositionMutation, "
             + "TRUE AS notPushSend, TRUE AS notExternalChannel "
             + "FROM tm_opportunity_log ";
+
+    String PUBLIC_EVALUATION_SELECT = "SELECT opportunity_id AS opportunityId, "
+            + "opportunity_key AS opportunityKey, analysis_id AS analysisId, decision_id AS decisionId, "
+            + "execution_plan_id AS executionPlanId, symbol, timeframe, direction, "
+            + PUBLIC_LIFECYCLE_EXPRESSION + " AS lifecycleStatus, "
+            + PUBLIC_STATUS_EXPRESSION + " AS opportunityStatus, anchor_time AS anchorTime, "
+            + PUBLIC_RESOLVED_AT_EXPRESSION + " AS resolvedAt, entry_reference AS entryReference, "
+            + "target_price AS targetPrice, invalidation_price AS invalidationPrice, "
+            + "target_hit AS targetHit, invalidation_hit AS invalidationHit, "
+            + "target_hit_at AS targetHitAt, invalidation_hit_at AS invalidationHitAt, "
+            + "hit_order AS hitOrder, mfe_price AS mfePrice, mfe_ratio AS mfeRatio, "
+            + "mae_price AS maePrice, mae_ratio AS maeRatio, source_type AS sourceType, "
+            + "source_reference AS sourceReference, market_data_source AS marketDataSource, "
+            + "market_data_trace_id AS marketDataTraceId, trace_id AS traceId, "
+            + "created_at AS createdAt, updated_at AS updatedAt "
+            + "FROM tm_opportunity_log ";
+
+    String PUBLIC_EVALUATION_UPDATE = "UPDATE tm_opportunity_log SET "
+            + "lifecycle_status = #{lifecycleStatus}, opportunity_status = #{opportunityStatus}, "
+            + "evaluation_as_of = #{evaluationAsOf}, resolved_at = #{resolvedAt}, "
+            + "target_hit = #{targetHit}, invalidation_hit = #{invalidationHit}, "
+            + "target_hit_at = #{targetHitAt}, invalidation_hit_at = #{invalidationHitAt}, "
+            + "hit_order = #{hitOrder}, mfe_price = #{mfePrice}, mfe_ratio = #{mfeRatio}, "
+            + "mae_price = #{maePrice}, mae_ratio = #{maeRatio}, "
+            + "market_data_source = #{marketDataSource}, market_data_trace_id = #{marketDataTraceId}, "
+            + "reason_codes = #{reasonCodes}, updated_at = #{updatedAt} "
+            + "WHERE opportunity_id = #{opportunityId} AND lifecycle_status <> 'RESOLVED'";
 
     @Insert("INSERT INTO tm_opportunity_log(opportunity_id, opportunity_key, analysis_id, decision_id, execution_plan_id, "
             + "push_id, user_position_id, symbol, timeframe, direction, lifecycle_status, opportunity_status, anchor_time, "
@@ -101,18 +143,23 @@ public interface OpportunityLogMapper {
             + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
     List<OpportunityLogDO> listPushBackedShared(@Param("limit") int limit);
 
-    @Select(PUBLIC_MESSAGE_SELECT + "WHERE opportunity_id = #{opportunityId} AND push_id IS NOT NULL"
+    @Select(PUBLIC_MESSAGE_SELECT + "WHERE opportunity_id = #{opportunityId}"
             + PUBLIC_PROJECTION_PREDICATE)
-    OpportunityLogDO selectPushBackedPublicByOpportunityId(@Param("opportunityId") String opportunityId);
+    OpportunityLogDO selectPublicMessageByOpportunityId(@Param("opportunityId") String opportunityId);
 
-    @Select(PUBLIC_MESSAGE_SELECT + "WHERE push_id IS NOT NULL"
+    @Select(PUBLIC_MESSAGE_SELECT + "WHERE 1 = 1"
             + PUBLIC_PROJECTION_PREDICATE
             + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
-    List<OpportunityLogDO> listPushBackedPublic(@Param("limit") int limit);
+    List<OpportunityLogDO> listPublicMessages(@Param("limit") int limit);
 
     @Select(PUBLIC_API_SELECT + "WHERE opportunity_id = #{opportunityId}"
             + PUBLIC_PROJECTION_PREDICATE)
     OpportunityLogPublicDTO selectPublicApiByOpportunityId(
+            @Param("opportunityId") String opportunityId);
+
+    @Select(PUBLIC_EVALUATION_SELECT + "WHERE opportunity_id = #{opportunityId}"
+            + PUBLIC_PROJECTION_PREDICATE)
+    OpportunityLogDO selectPublicEvaluationSourceByOpportunityId(
             @Param("opportunityId") String opportunityId);
 
     @Select({
@@ -124,8 +171,12 @@ public interface OpportunityLogMapper {
             "<if test='decisionId != null and decisionId != \"\"'> AND decision_id = #{decisionId}</if>",
             "<if test='executionPlanId != null and executionPlanId != \"\"'> AND execution_plan_id = #{executionPlanId}</if>",
             "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
-            "<if test='opportunityStatus != null and opportunityStatus != \"\"'> AND opportunity_status = #{opportunityStatus}</if>",
-            "<if test='lifecycleStatus != null and lifecycleStatus != \"\"'> AND lifecycle_status = #{lifecycleStatus}</if>",
+            "<if test='opportunityStatus != null and opportunityStatus != \"\"'> AND (",
+            PUBLIC_STATUS_EXPRESSION,
+            ") = #{opportunityStatus}</if>",
+            "<if test='lifecycleStatus != null and lifecycleStatus != \"\"'> AND (",
+            PUBLIC_LIFECYCLE_EXPRESSION,
+            ") = #{lifecycleStatus}</if>",
             "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
             "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
             "ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}",
@@ -238,15 +289,6 @@ public interface OpportunityLogMapper {
                                                @Param("from") LocalDateTime from,
                                                @Param("to") LocalDateTime to);
 
-    @Update("UPDATE tm_opportunity_log SET user_position_id = #{userPositionId}, "
-            + "user_position_present = #{userPositionPresent}, lifecycle_status = #{lifecycleStatus}, "
-            + "opportunity_status = #{opportunityStatus}, evaluation_as_of = #{evaluationAsOf}, "
-            + "resolved_at = #{resolvedAt}, target_hit = #{targetHit}, invalidation_hit = #{invalidationHit}, "
-            + "target_hit_at = #{targetHitAt}, invalidation_hit_at = #{invalidationHitAt}, hit_order = #{hitOrder}, "
-            + "mfe_price = #{mfePrice}, mfe_ratio = #{mfeRatio}, mae_price = #{maePrice}, mae_ratio = #{maeRatio}, "
-            + "push_present = #{pushPresent}, risk_blocked_evidence = #{riskBlockedEvidence}, "
-            + "risk_blocked_at = #{riskBlockedAt}, market_data_source = #{marketDataSource}, "
-            + "market_data_trace_id = #{marketDataTraceId}, reason_codes = #{reasonCodes}, updated_at = #{updatedAt} "
-            + "WHERE opportunity_id = #{opportunityId} AND lifecycle_status <> 'RESOLVED'")
+    @Update(PUBLIC_EVALUATION_UPDATE)
     int updateEvaluation(OpportunityLogDO row);
 }
