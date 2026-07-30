@@ -849,13 +849,22 @@ public class DashboardController {
                 normalizedDispatchBatchId,
                 normalizedDispatchInstructionId
         );
+        if (pushId != null) {
+            status.put("pushId", null);
+            applyRecheckPreviewStatus(
+                    status,
+                    RECHECK_STATUS_MISSING_FAIL_CLOSED,
+                    "RAW_PUSH_ID_READ_BLOCKED",
+                    "Raw pushId Recheck preview has no authoritative user ownership relation and remains unavailable.",
+                    true,
+                    "BLOCKED"
+            );
+            return status;
+        }
 
         PushRecheckLogItemVO latestLog = null;
         PushRecheckOpsOverviewVO opsOverview;
         try {
-            if (pushId != null && pushRecheckService != null) {
-                latestLog = pushRecheckService.getLatestLog(pushId);
-            }
             opsOverview = pushRecheckService != null
                     ? pushRecheckService.getOpsOverview(
                     normalizedDispatchBatchId,
@@ -1723,7 +1732,7 @@ public class DashboardController {
         status.put("dispatchConfigAuditStatus", RECHECK_STATUS_MISSING_FAIL_CLOSED);
         status.put("duplicateReviewReplayStatus", DUPLICATE_REVIEW_REPLAY_STATUS_REVIEW_REQUIRED);
         status.put("duplicateInternalPushPreviewStatus", DUPLICATE_INTERNAL_PUSH_PREVIEW_REVIEW_REQUIRED);
-        status.put("ownerPath", "PushRecheckService.getLatestLog/getOpsOverview -> PushRecheckLogMapper persisted-log reads -> PushRecheckStatusContract -> replay-summary counters -> dispatch config/audit read evidence");
+        status.put("ownerPath", "PushRecheckService.getOpsOverview only; raw pushId latest/log/preview reads remain blocked");
         status.put("projectionScope", "persisted Recheck log / status contract / dispatch-read evidence review-only projection");
         status.put("sourceHealth", "MISSING");
         status.put("latestLogAvailable", false);

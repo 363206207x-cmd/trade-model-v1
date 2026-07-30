@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
+import org.example.trademodel.messagepush.PushRecheckReadinessProjection;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +32,11 @@ public interface PushRecheckLogMapper {
 
     @Select("SELECT * FROM tm_push_recheck_log WHERE push_id = #{pushId} ORDER BY log_id DESC LIMIT 1")
     TmPushRecheckLogDO selectLatestByPushId(@Param("pushId") Long pushId);
+
+    @Select("SELECT log_id AS logId, recheck_status AS recheckStatus, recheck_time AS recheckTime, "
+            + "execution_status AS executionStatus, fail_reason_json AS failReasonJson "
+            + "FROM tm_push_recheck_log WHERE push_id = #{pushId} ORDER BY log_id DESC LIMIT 1")
+    PushRecheckReadinessProjection selectReadinessByPushId(@Param("pushId") Long pushId);
 
     @Select("SELECT COUNT(*) FROM tm_push_recheck_log WHERE push_id = #{pushId}")
     Integer countByPushId(@Param("pushId") Long pushId);

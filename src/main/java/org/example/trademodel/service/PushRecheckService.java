@@ -14,10 +14,16 @@ public interface PushRecheckService {
 
     RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command);
 
-    /** 按 log_id 倒序取第一条，无记录时返回 null */
+    /**
+     * Legacy raw read. Persisted rows have no authoritative owner relation, so
+     * this service boundary always fails closed with null.
+     */
     PushRecheckLogItemVO getLatestLog(Long pushId);
 
-    /** 同 pushId 下全部日志，新在前（与 Mapper 排序一致） */
+    /**
+     * Legacy raw read. Persisted rows have no authoritative owner relation, so
+     * this service boundary always fails closed with an empty list.
+     */
     List<PushRecheckLogItemVO> listLogs(Long pushId);
 
     /**

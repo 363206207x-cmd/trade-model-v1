@@ -226,11 +226,31 @@ or authorization.
 Push Detail remains review-only and source-specific. Authenticated shared
 `OPPORTUNITY` detail uses a server-side public projection containing only exact
 public identity, safe allowlisted opportunity status, public timestamp, and
-public description. It must not select or serialize UserPosition,
+public description. Its public DTO must not contain or serialize UserPosition,
 account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
-reason fields. Owner-scoped `POSITION_RISK` detail may show its original
+reason fields. A separate server-side readiness projection may validate
+status/time/execution and private JSON structure without returning the raw
+payload. Owner-scoped `POSITION_RISK` detail may show its original
 monitoring snapshot, current monitoring result, and private change reason only
 for the current user. PushRecheck never authorizes a trade.
+
+Internal `pushId` is not a public opportunity identity. Raw user-facing
+PushRecheck latest/log reads and Dashboard preview-by-`pushId` fail closed when
+an authoritative owner relation cannot be proven, and the legacy raw service
+latest/list methods fail closed as well; no symbol or latest-record fallback is
+permitted. A public opportunity may use a server-side structural readiness
+projection, but that projection cannot serialize raw Recheck, account/position
+risk, `failReasonJson`, or private reasons.
+
+Message/Push read states are source-specific and fail closed:
+
+- `READY`: identity and required public/private fields are complete, statuses
+  are legal and consistent, required Recheck is complete, and execution status
+  is `COMPLETED`;
+- `PARTIAL`: known incomplete or in-progress data;
+- `ERROR`: illegal enum, malformed JSON, parse failure, or contradictory state;
+- `MISSING`: exact resource is absent, inaccessible, or cannot be authorized;
+- `EMPTY`: a valid list query completed with no records.
 
 ## 8. Search Asset V2
 

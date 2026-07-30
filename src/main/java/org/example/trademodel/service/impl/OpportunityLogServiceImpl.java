@@ -21,6 +21,7 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.example.trademodel.service.OpportunityLogService;
@@ -225,6 +226,39 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     public OpportunityLogDTO findByIdForSystem(String opportunityId) {
         OpportunityLogDO row = opportunityLogMapper.selectByOpportunityId(opportunityId);
         return row == null ? null : toSharedDto(row);
+    }
+
+    @Override
+    public OpportunityLogPublicDTO evaluatePublicOpportunityForUser(
+            String opportunityId, Long userId, LocalDateTime asOf) {
+        return toPublicDto(evaluateOpportunityForUser(opportunityId, userId, asOf));
+    }
+
+    @Override
+    public OpportunityLogPublicDTO findPublicById(String opportunityId) {
+        return opportunityLogMapper.selectPublicApiByOpportunityId(opportunityId);
+    }
+
+    @Override
+    public List<OpportunityLogPublicDTO> queryPublic(String analysisId,
+                                                     String decisionId,
+                                                     String executionPlanId,
+                                                     String symbol,
+                                                     String opportunityStatus,
+                                                     String lifecycleStatus,
+                                                     LocalDateTime from,
+                                                     LocalDateTime to,
+                                                     int limit) {
+        return opportunityLogMapper.queryPublicApi(
+                trimToNull(analysisId),
+                trimToNull(decisionId),
+                trimToNull(executionPlanId),
+                trimToNull(symbol),
+                trimToNull(opportunityStatus),
+                trimToNull(lifecycleStatus),
+                from,
+                to,
+                sanitizeLimit(limit));
     }
 
     @Override
@@ -478,6 +512,53 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
             dto.setEvaluationAsOf(null);
         }
         return dto;
+    }
+
+    private static OpportunityLogPublicDTO toPublicDto(OpportunityLogDTO source) {
+        if (source == null) {
+            return null;
+        }
+        String lifecycleStatus = OpportunityLogStatus.REVIEW_REQUIRED.equals(source.getLifecycleStatus())
+                ? OpportunityLogStatus.PENDING_EVALUATION
+                : source.getLifecycleStatus();
+        String opportunityStatus = isSharedOpportunityStatus(source.getOpportunityStatus())
+                ? source.getOpportunityStatus()
+                : null;
+        return new OpportunityLogPublicDTO(
+                source.getOpportunityId(),
+                source.getAnalysisId(),
+                source.getSymbol(),
+                source.getTimeframe(),
+                source.getDirection(),
+                lifecycleStatus,
+                opportunityStatus,
+                source.getAnchorTime(),
+                source.getResolvedAt(),
+                source.getEntryReference(),
+                source.getTargetPrice(),
+                source.getInvalidationPrice(),
+                source.getTargetHit(),
+                source.getInvalidationHit(),
+                source.getTargetHitAt(),
+                source.getInvalidationHitAt(),
+                source.getHitOrder(),
+                source.getMfePrice(),
+                source.getMfeRatio(),
+                source.getMaePrice(),
+                source.getMaeRatio(),
+                source.getMarketDataSource(),
+                source.getCreatedAt(),
+                source.getUpdatedAt(),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
     }
 
     private void normalizeSharedState(OpportunityLogDO row) {

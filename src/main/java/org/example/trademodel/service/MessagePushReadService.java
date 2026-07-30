@@ -1,16 +1,21 @@
 package org.example.trademodel.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PositionMonitorLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.messagepush.MessageListDTO;
 import org.example.trademodel.messagepush.MessageReadState;
+import org.example.trademodel.messagepush.OpportunityPushReadinessProjection;
 import org.example.trademodel.messagepush.PushDetailDTO;
+import org.example.trademodel.messagepush.PushRecheckReadinessProjection;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +34,18 @@ public class MessagePushReadService {
     static final int MAX_LIMIT = 100;
     private static final Pattern OPPORTUNITY_ID = Pattern.compile("opp-[A-Za-z0-9_-]{1,60}");
     private static final Pattern NUMERIC_ID = Pattern.compile("[1-9][0-9]{0,18}");
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String EXECUTION_COMPLETED = "COMPLETED";
+    private static final Set<String> EXECUTION_IN_PROGRESS = Set.of(
+            "PENDING", "QUEUED", "RUNNING", "STARTED", "RETRY_PENDING");
+    private static final Set<String> COMPLETE_PUSH_STATUSES = Set.of(
+            PushRecheckStatusContract.PUSH_STATUS_REVIEW_PASSED,
+            PushRecheckStatusContract.PUSH_STATUS_REVIEW_WAITING,
+            PushRecheckStatusContract.PUSH_STATUS_DRIFTED_FROM_ENTRY_ZONE,
+            PushRecheckStatusContract.PUSH_STATUS_INVALIDATED,
+            PushRecheckStatusContract.PUSH_STATUS_RISK_BLOCKED,
+            PushRecheckStatusContract.PUSH_STATUS_CONFUSED_BLOCKED,
+            PushRecheckStatusContract.PUSH_STATUS_EXPIRED);
     private static final Set<String> PUBLIC_OPPORTUNITY_STATUSES = Set.of(
             OpportunityLogStatus.MISSED_VALID,
             OpportunityLogStatus.MISSED_INVALID,
@@ -43,15 +60,18 @@ public class MessagePushReadService {
     private final OpportunityLogMapper opportunityLogMapper;
     private final PositionMonitorLogMapper positionMonitorLogMapper;
     private final PushSnapshotMapper pushSnapshotMapper;
+    private final PushRecheckLogMapper pushRecheckLogMapper;
     private final UserPositionMapper userPositionMapper;
 
     public MessagePushReadService(OpportunityLogMapper opportunityLogMapper,
                                   PositionMonitorLogMapper positionMonitorLogMapper,
                                   PushSnapshotMapper pushSnapshotMapper,
+                                  PushRecheckLogMapper pushRecheckLogMapper,
                                   UserPositionMapper userPositionMapper) {
         this.opportunityLogMapper = opportunityLogMapper;
         this.positionMonitorLogMapper = positionMonitorLogMapper;
         this.pushSnapshotMapper = pushSnapshotMapper;
+        this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.userPositionMapper = userPositionMapper;
     }
 
@@ -161,13 +181,13 @@ public class MessagePushReadService {
                     missingFields,
                     "PUBLIC_OPPORTUNITY_INCOMPLETE");
         }
-        TmPushSnapshotDO push = pushSnapshotMapper
+        OpportunityPushReadinessProjection push = pushSnapshotMapper
                 .selectPublicProjectionByPushId(opportunity.getPushId());
         if (push == null
                 || !Objects.equals(opportunity.getPushId(), push.getPushId())
                 || !Objects.equals(opportunity.getAnalysisId(), push.getAnalysisId())) {
             return opportunityProjection(
-                    MessageReadState.PARTIAL,
+                    MessageReadState.MISSING,
                     messageId,
                     sourceIdentity,
                     opportunityIdentity,
@@ -177,13 +197,135 @@ public class MessagePushReadService {
                     List.of("publicPushProjection"),
                     "PUSH_SNAPSHOT_MISSING");
         }
+        LocalDateTime publicTimestamp = firstNonNull(push.getPushCreateTime(), opportunityTimestamp);
+        String rawPushStatus = normalize(push.getPushStatus());
+        if (rawPushStatus == null) {
+            return opportunityProjection(
+                    MessageReadState.PARTIAL,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of("pushStatus"),
+                    "PUSH_STATUS_INCOMPLETE");
+        }
+        String pushStatus = PushRecheckStatusContract.canonicalizePushStatus(rawPushStatus);
+        if (!PushRecheckStatusContract.PUSH_STATUS_CAPTURED.equals(pushStatus)
+                && !COMPLETE_PUSH_STATUSES.contains(pushStatus)) {
+            return opportunityProjection(
+                    MessageReadState.ERROR,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of(),
+                    "PUSH_STATUS_INVALID");
+        }
+        PushRecheckReadinessProjection recheck =
+                pushRecheckLogMapper.selectReadinessByPushId(opportunity.getPushId());
+        if (recheck == null) {
+            return opportunityProjection(
+                    MessageReadState.PARTIAL,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of("currentRecheck"),
+                    "CURRENT_RECHECK_MISSING");
+        }
+        String rawRecheckStatus = normalize(recheck.getRecheckStatus());
+        RecheckStatusEnum recheckStatus =
+                PushRecheckStatusContract.tryParseRecheckStatus(rawRecheckStatus);
+        if (rawRecheckStatus != null && recheckStatus == null) {
+            return opportunityProjection(
+                    MessageReadState.ERROR,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of(),
+                    "CURRENT_RECHECK_INVALID");
+        }
+        String executionStatus = normalize(recheck.getExecutionStatus());
+        if (executionStatus != null
+                && !EXECUTION_COMPLETED.equals(executionStatus)
+                && !EXECUTION_IN_PROGRESS.contains(executionStatus)) {
+            return opportunityProjection(
+                    MessageReadState.ERROR,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of(),
+                    "CURRENT_RECHECK_EXECUTION_INVALID");
+        }
+        if (!validOptionalJsonObject(recheck.getFailReasonJson())) {
+            return opportunityProjection(
+                    MessageReadState.ERROR,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of(),
+                    "CURRENT_RECHECK_REASON_INVALID");
+        }
+        List<String> missingFields = new ArrayList<>();
+        if (rawRecheckStatus == null) {
+            missingFields.add("currentRecheck.status");
+        }
+        if (recheck.getRecheckTime() == null) {
+            missingFields.add("currentRecheck.checkedAt");
+        }
+        if (executionStatus == null) {
+            missingFields.add("currentRecheck.executionStatus");
+        } else if (EXECUTION_IN_PROGRESS.contains(executionStatus)) {
+            missingFields.add("currentRecheck.executionStatus.completed");
+        }
+        if (!missingFields.isEmpty()) {
+            return opportunityProjection(
+                    MessageReadState.PARTIAL,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    missingFields,
+                    "CURRENT_RECHECK_INCOMPLETE");
+        }
+        String expectedPushStatus = PushRecheckStatusContract.toPushStatus(recheckStatus);
+        if (!COMPLETE_PUSH_STATUSES.contains(pushStatus)
+                || !Objects.equals(pushStatus, expectedPushStatus)) {
+            return opportunityProjection(
+                    MessageReadState.ERROR,
+                    messageId,
+                    sourceIdentity,
+                    opportunityIdentity,
+                    publicStatus,
+                    publicTimestamp,
+                    publicDescription,
+                    List.of(),
+                    "PUSH_RECHECK_STATE_CONFLICT");
+        }
         return opportunityProjection(
                 MessageReadState.READY,
                 messageId,
                 sourceIdentity,
                 opportunityIdentity,
                 publicStatus,
-                firstNonNull(push.getPushCreateTime(), opportunityTimestamp),
+                publicTimestamp,
                 publicDescription,
                 List.of(),
                 null);
@@ -464,6 +606,19 @@ public class MessagePushReadService {
 
     private static String id(Long value) {
         return positive(value) ? Long.toString(value) : null;
+    }
+
+    private static boolean validOptionalJsonObject(String value) {
+        String normalized = normalizeMessageId(value);
+        if (normalized == null) {
+            return true;
+        }
+        try {
+            JsonNode root = JSON.readTree(normalized);
+            return root != null && root.isObject();
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     private static <T> T firstNonNull(T first, T second) {

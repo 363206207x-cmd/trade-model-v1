@@ -138,9 +138,10 @@ capability. The FE-04E Message/Push Contract Foundation is
 `EFFECTIVE_MERGED_MAIN` on
 `5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154.
 
-The FE-04E UI readiness re-evaluation exposed a server-side P1 privacy
-prerequisite. PR #1155 now contains an
-`OPPORTUNITY_PUBLIC_PROJECTION` candidate and is pending exact-head review.
+The FE-04E UI readiness re-evaluation exposed server-side P1 privacy and P2
+state-contract prerequisites. PR #1155 now contains an
+`OPPORTUNITY_PUBLIC_PROJECTION` plus cross-endpoint Recheck isolation and
+five-state validation candidate, and is pending exact-head review.
 Message/Push UI remains `NOT_STARTED` and is not authorized to begin before
 this candidate is reviewed, merged to clean/synced main, and governance is
 re-evaluated.
@@ -148,19 +149,35 @@ re-evaluated.
 `OPPORTUNITY` is frozen as
 `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`: only exact message/source/opportunity
 identity, safe allowlisted public opportunity status, public timestamp, and
-public description may cross the API boundary. The server projection does not
-select or serialize UserPosition data, account risk, position risk, Recheck
-risk fields, `failReasonJson`, or private risk reasons. Frontend filtering is
-not a privacy boundary.
+public description may cross the API boundary. The public DTO does not select
+or serialize UserPosition data, account risk, position risk, Recheck risk
+fields, `failReasonJson`, or private risk reasons. A separate internal
+readiness projection may validate Recheck status/time/execution and the
+structure of `failReasonJson`, but no raw Recheck/private value may cross the
+API boundary. Frontend filtering is not a privacy boundary.
 
 `POSITION_RISK` is frozen as `OWNER_SCOPED_PRIVATE_PROJECTION`. It may expose
 current-user position risk, monitoring risk, and private risk reason only
 through exact owner-scoped reads. Public and private source records must remain
 different DTO variants.
 
+Raw `pushId` is not a public identity. User-facing PushRecheck latest/log reads
+return `MISSING`/not found, and Dashboard Recheck preview rejects raw `pushId`
+before any Recheck read because the persisted raw rows do not contain an
+authoritative owner relation. The legacy raw PushRecheck service latest/list
+methods also fail closed. No symbol, latest-row, or missing-owner fallback is
+allowed.
+
+Message/Push state is frozen as follows: complete valid matching Push/Recheck
+data with `execution_status = COMPLETED` is `READY`; known incomplete or
+in-progress data is `PARTIAL`; illegal enum, malformed JSON, or contradictory
+state is `ERROR`; an absent/inaccessible exact resource is `MISSING`; and only
+a successful empty collection is `EMPTY`.
+
 System notifications, Telegram, external send, automatic notification,
-fabricated unread/message counts or message/Push data, mutation, backend/API/
-schema/Figma change, AI expansion, and trading capability remain blocked.
+fabricated unread/message counts or message/Push data, mutation, unrelated
+backend/API change, schema/Figma change, AI expansion, and trading capability
+remain blocked.
 Figma example values without a real returned field must be hidden or rendered
 fail closed.
 
@@ -185,8 +202,8 @@ FE04E_STATUS: CONTRACT_FOUNDATION_EFFECTIVE_MERGED_MAIN
 FE04E_CONTRACT_MAIN_HEAD: 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8
 FE04E_IMPLEMENTATION_STATUS: UI_NOT_STARTED
 FE04E_UI_READINESS_STATUS: PASS
-FE04E_UI_STATUS: NOT_STARTED_BLOCKED_PENDING_PUBLIC_PROJECTION_MERGED_MAIN
-FE04E_NEXT_PACKAGE: OPPORTUNITY_PUBLIC_PROJECTION_EXACT_HEAD_REVIEW
+FE04E_UI_STATUS: NOT_STARTED_BLOCKED_PENDING_PRIVACY_STATE_REMEDIATION_MERGED_MAIN
+FE04E_NEXT_PACKAGE: PRIVACY_AND_STATE_CONTRACT_EXACT_HEAD_REVIEW
 FE04E_AUTHORIZATION: EXACT_HEAD_REVIEW_ONLY
 FE04E_MESSAGE_SOURCE_STATUS: PASS_OPPORTUNITY_AND_POSITION_RISK_ONLY
 FE04E_OPPORTUNITY_ACCESS: AUTHENTICATED_SHARED_PUBLIC_PROJECTION
@@ -195,13 +212,13 @@ FE04E_OPPORTUNITY_UI_PROJECTION: SERVER_SIDE_PUBLIC_OPPORTUNITY_ALLOWLIST
 FE04E_OPPORTUNITY_FORBIDDEN_FIELDS: USER_POSITION_ACCOUNT_RISK_POSITION_RISK_FAIL_REASON_JSON_PRIVATE_RISK_REASON
 FE04E_POSITION_RISK_ACCESS: OWNER_SCOPED_PRIVATE_PROJECTION_CROSS_USER_BLOCKED
 FE04E_MESSAGE_IDENTITY_STATUS: PASS_STRING_SAFE_AUTHORITATIVE_IDENTITY
-FE04E_PUSH_DETAIL_STATUS: SOURCE_SPECIFIC_PUBLIC_PRIVATE_PROJECTION_PENDING_EXACT_HEAD_REVIEW
+FE04E_PUSH_DETAIL_STATUS: SOURCE_SPECIFIC_PUBLIC_PRIVATE_PROJECTION_WITH_FAIL_CLOSED_STATE_VALIDATION_PENDING_EXACT_HEAD_REVIEW
 FE04E_TELEGRAM_BOUNDARY_STATUS: PASS_EXTENSION_NOT_CONNECTED
-FE04E_API_READINESS: PUBLIC_PROJECTION_IMPLEMENTED_PENDING_EXACT_HEAD_REVIEW
-FE04E_BACKEND_PRIVACY_SANITIZATION: SERVER_SIDE_PUBLIC_PROJECTION_IMPLEMENTED_PENDING_REVIEW
+FE04E_API_READINESS: PRIVACY_AND_STATE_REMEDIATION_IMPLEMENTED_PENDING_EXACT_HEAD_REVIEW
+FE04E_BACKEND_PRIVACY_SANITIZATION: PUBLIC_PROJECTION_AND_RAW_PUSH_ID_READ_ISOLATION_IMPLEMENTED_PENDING_REVIEW
 FE04E_FIGMA_STATUS: PASS_REGISTERED_BASELINE
 FE04E_FAIL_CLOSED_STATUS: PASS_EXPLICIT_READY_EMPTY_ERROR_MISSING_PARTIAL
 FE04E_CAPABILITY_BOUNDARY_STATUS: PASS_NO_SEND_NO_TRADING
 FE04_IMPLEMENTATION_ALLOWED: false
-NEXT_ALLOWED_ACTION: FE-04E_OPPORTUNITY_PUBLIC_PROJECTION_EXACT_HEAD_REVIEW_ONLY
+NEXT_ALLOWED_ACTION: FE-04E_PRIVACY_AND_STATE_CONTRACT_EXACT_HEAD_REVIEW_ONLY
 ```

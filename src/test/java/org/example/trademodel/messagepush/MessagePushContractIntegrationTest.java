@@ -72,11 +72,11 @@ class MessagePushContractIntegrationTest {
         userAId = insertUser(USER_A);
         userBId = insertUser(USER_B);
         positionA = insertPosition(userAId, "BTCUSDT", 1);
-        positionB = insertPosition(userBId, "ETHUSDT", 2);
+        positionB = insertPosition(userBId, "BTCUSDT", 2);
     }
 
     @Test
-    void positionRiskMessagesUseExactStringIdAndRemainOwnerScoped() throws Exception {
+    void positionRiskMessagesUseExactStringIdAndRemainOwnerScopedForTheSameSymbol() throws Exception {
         insertMonitorLogWithId(Long.valueOf(LARGE_MESSAGE_ID), positionA, "HIGH_RISK",
                 "RISK_CONTEXT_UNAVAILABLE");
         PositionMonitorLogDO userBLog = insertMonitorLog(positionB, "PLAN_INVALIDATED",
@@ -128,6 +128,35 @@ class MessagePushContractIntegrationTest {
         TmPushSnapshotDO push = insertPushSnapshot();
         OpportunityLogDO opportunity = insertOpportunity(push);
         insertPushRecheck(push);
+
+        String opportunityBody = mockMvc.perform(
+                        get("/api/opportunity-log/{opportunityId}", opportunity.getOpportunityId())
+                                .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.opportunityId").value(opportunity.getOpportunityId()))
+                .andExpect(jsonPath("$.data.pushId").doesNotExist())
+                .andExpect(jsonPath("$.data.riskBlockedEvidence").doesNotExist())
+                .andExpect(jsonPath("$.data.riskBlockedAt").doesNotExist())
+                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
+                .andExpect(jsonPath("$.data.userPositionPresent").doesNotExist())
+                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(opportunityBody).doesNotContain(
+                "currentAccountRiskAllowed",
+                "failReasonJson",
+                "PRIVATE_ACCOUNT_RISK_REASON");
+
+        mockMvc.perform(get("/api/opportunity-log/query")
+                        .param("symbol", "SOLUSDT")
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].opportunityId")
+                        .value(opportunity.getOpportunityId()))
+                .andExpect(jsonPath("$.data[0].pushId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].riskBlockedEvidence").doesNotExist())
+                .andExpect(jsonPath("$.data[0].riskBlockedAt").doesNotExist())
+                .andExpect(jsonPath("$.data[0].userPositionId").doesNotExist());
 
         String listBody = mockMvc.perform(get("/api/messages")
                         .with(user(USER_A).roles("OPERATOR")))
@@ -188,6 +217,16 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.data.publicStatus").value("PENDING_EVALUATION"))
                 .andExpect(jsonPath("$.data.sourceIdentity.positionId").doesNotExist());
 
+        String previewBody = mockMvc.perform(
+                        get("/api/dashboard/recheck-preview-status")
+                                .param("pushId", String.valueOf(push.getPushId()))
+                                .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_ID_READ_BLOCKED"))
+                .andExpect(jsonPath("$.pushId").isEmpty())
+                .andExpect(jsonPath("$.latestLogAvailable").value(false))
+                .andReturn().getResponse().getContentAsString();
         String latestBody = mockMvc.perform(
                         get("/api/push/recheck/{pushId}/latest", push.getPushId())
                         .with(user(USER_A).roles("OPERATOR")))
@@ -201,7 +240,7 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.code").value(404))
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(latestBody + logsBody).doesNotContain(
+        assertThat(previewBody + latestBody + logsBody).doesNotContain(
                 "currentAccountRiskAllowed",
                 "failReasonJson",
                 "PRIVATE_ACCOUNT_RISK_REASON",
@@ -320,7 +359,7 @@ class MessagePushContractIntegrationTest {
         row.setSymbol("SOLUSDT");
         row.setTimeframe("1h");
         row.setPushType("ANALYSIS_RUN");
-        row.setPushStatus("CAPTURED");
+        row.setPushStatus("RECHECK_REVIEW_PASSED");
         row.setPushCreateTime(LocalDateTime.of(2026, 7, 29, 10, 0));
         row.setRuleVersion("v1");
         row.setTriggerPrice(new BigDecimal("100"));
@@ -344,13 +383,13 @@ class MessagePushContractIntegrationTest {
         row.setTimeframe(push.getTimeframe());
         row.setDirection("LONG");
         row.setLifecycleStatus(OpportunityLogStatus.PENDING_EVALUATION);
-        row.setOpportunityStatus(OpportunityLogStatus.BLOCKED_BY_RISK_VALID);
+        row.setOpportunityStatus(null);
         row.setAnchorTime(push.getPushCreateTime());
         row.setTargetHit(false);
         row.setInvalidationHit(false);
         row.setPushPresent(true);
-        row.setRiskBlockedEvidence(true);
-        row.setRiskBlockedAt(push.getPushCreateTime().plusMinutes(1));
+        row.setRiskBlockedEvidence(false);
+        row.setRiskBlockedAt(null);
         row.setUserPositionPresent(false);
         row.setSourceType("AUTHORITATIVE_ANALYSIS");
         row.setSourceReference("analysisId=" + push.getAnalysisId());
@@ -367,12 +406,12 @@ class MessagePushContractIntegrationTest {
         row.setPushId(push.getPushId());
         row.setExecutionStatus("COMPLETED");
         row.setRecheckTime(LocalDateTime.of(2026, 7, 29, 10, 5));
-        row.setRecheckStatus("RISK_BLOCKED");
+        row.setRecheckStatus("REVIEW_PASSED");
         row.setCurrentPrice(new BigDecimal("102"));
         row.setCurrentDataQualityScore(88);
         row.setCurrentConfusedScore(12);
-        row.setCurrentAccountRiskAllowed(false);
-        row.setFailReasonJson("PRIVATE_ACCOUNT_RISK_REASON");
+        row.setCurrentAccountRiskAllowed(true);
+        row.setFailReasonJson("{\"code\":\"PRIVATE_ACCOUNT_RISK_REASON\"}");
         row.setTraceId("trace-message-recheck");
         row.setCreateTime(row.getRecheckTime());
         pushRecheckLogMapper.insert(row);

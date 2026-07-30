@@ -243,20 +243,12 @@ public class PushRecheckServiceImpl implements PushRecheckService {
 
     @Override
     public PushRecheckLogItemVO getLatestLog(Long pushId) {
-        List<TmPushRecheckLogDO> list = pushRecheckLogMapper.selectByPushId(pushId);
-        if (list == null || list.isEmpty()) {
-            return null;
-        }
-        return toLogVo(list.get(0));
+        return null;
     }
 
     @Override
     public List<PushRecheckLogItemVO> listLogs(Long pushId) {
-        List<TmPushRecheckLogDO> list = pushRecheckLogMapper.selectByPushId(pushId);
-        if (list == null || list.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return list.stream().map(this::toLogVo).collect(Collectors.toList());
+        return Collections.emptyList();
     }
 
     @Override

@@ -4,6 +4,7 @@ import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,21 @@ public interface OpportunityLogService {
     OpportunityLogDTO evaluateOpportunityForUser(String opportunityId, Long userId, LocalDateTime asOf);
 
     OpportunityLogDTO evaluateOpportunityForSystem(String opportunityId, LocalDateTime asOf);
+
+    OpportunityLogPublicDTO evaluatePublicOpportunityForUser(
+            String opportunityId, Long userId, LocalDateTime asOf);
+
+    OpportunityLogPublicDTO findPublicById(String opportunityId);
+
+    List<OpportunityLogPublicDTO> queryPublic(String analysisId,
+                                               String decisionId,
+                                               String executionPlanId,
+                                               String symbol,
+                                               String opportunityStatus,
+                                               String lifecycleStatus,
+                                               LocalDateTime from,
+                                               LocalDateTime to,
+                                               int limit);
 
     OpportunityLogDTO findByIdForUser(String opportunityId, Long userId);
 

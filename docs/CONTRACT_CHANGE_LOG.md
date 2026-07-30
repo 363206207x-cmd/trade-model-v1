@@ -361,10 +361,21 @@ identity, safe allowlisted opportunity status, public timestamp, and public
 description inputs; the public response variant cannot carry UserPosition,
 account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
 reason fields. It also omits internal `pushId` and other private Recheck
-references. Raw user-facing `/{pushId}/latest` and `/{pushId}/logs` reads fail
-closed because their persisted rows do not provide an owner identity; internal
-service reads remain unchanged. The private variant remains exact current-user
-scoped.
+references. Raw user-facing `/{pushId}/latest`, `/{pushId}/logs`, and Dashboard
+preview-by-`pushId` reads fail closed before raw Recheck data is read because
+their persisted rows do not provide an owner identity. The legacy raw
+`PushRecheckService` latest/list methods also fail closed; lower-level mapper
+reads remain internal operational inputs and are not user authorization paths.
+The private variant remains exact current-user scoped.
+
+The same PR candidate restores the read-state contract. `READY` now requires a
+complete legal Push/Recheck pair, completed execution, and matching statuses.
+Known incomplete/in-progress data maps to `PARTIAL`; illegal enum, malformed
+JSON, and contradictory states map to `ERROR`; absent/inaccessible exact
+resources map to `MISSING`; and only an empty successful collection maps to
+`EMPTY`. The structural readiness mapper does not select account-risk or
+position-risk columns; `failReasonJson` is inspected only inside the service
+for structural validity and is never part of the public DTO or response.
 Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.

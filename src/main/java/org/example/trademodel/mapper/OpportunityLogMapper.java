@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.opportunitylog.OpportunityLogCountRow;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatsDTO;
 
 import java.time.LocalDateTime;
@@ -20,7 +21,12 @@ public interface OpportunityLogMapper {
             + "AND COALESCE(opportunity_status, '') NOT IN ('EXECUTED_VALID', 'EXECUTED_INVALID') "
             + "AND COALESCE(reason_codes, '') NOT LIKE '%MULTIPLE_LINKED_USER_POSITIONS%' "
             + "AND COALESCE(reason_codes, '') NOT LIKE '%LINKED_USER_POSITION_%' "
-            + "AND COALESCE(reason_codes, '') NOT LIKE '%USER_POSITION_PROJECTION_UNAVAILABLE%'";
+            + "AND COALESCE(reason_codes, '') NOT LIKE '%USER_POSITION_PROJECTION_UNAVAILABLE%' ";
+
+    String PUBLIC_PROJECTION_PREDICATE = SHARED_STATE_PREDICATE
+            + "AND COALESCE(opportunity_status, '') != 'BLOCKED_BY_RISK_VALID' "
+            + "AND COALESCE(risk_blocked_evidence, FALSE) = FALSE "
+            + "AND risk_blocked_at IS NULL ";
 
     String BASE_SELECT = "SELECT opportunity_id AS opportunityId, opportunity_key AS opportunityKey, "
             + "analysis_id AS analysisId, decision_id AS decisionId, execution_plan_id AS executionPlanId, "
@@ -47,6 +53,23 @@ public interface OpportunityLogMapper {
             + "CASE WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID') "
             + "THEN opportunity_status ELSE NULL END AS opportunityStatus, "
             + "anchor_time AS anchorTime, created_at AS createdAt "
+            + "FROM tm_opportunity_log ";
+
+    String PUBLIC_API_SELECT = "SELECT opportunity_id AS opportunityId, analysis_id AS analysisId, "
+            + "symbol, timeframe, direction, lifecycle_status AS lifecycleStatus, "
+            + "CASE WHEN opportunity_status IN ('MISSED_VALID', 'MISSED_INVALID', 'PUSHED_NOT_FILLED_VALID') "
+            + "THEN opportunity_status ELSE NULL END AS opportunityStatus, "
+            + "anchor_time AS anchorTime, resolved_at AS resolvedAt, entry_reference AS entryReference, "
+            + "target_price AS targetPrice, invalidation_price AS invalidationPrice, "
+            + "target_hit AS targetHit, invalidation_hit AS invalidationHit, "
+            + "target_hit_at AS targetHitAt, invalidation_hit_at AS invalidationHitAt, "
+            + "hit_order AS hitOrder, mfe_price AS mfePrice, mfe_ratio AS mfeRatio, "
+            + "mae_price AS maePrice, mae_ratio AS maeRatio, market_data_source AS marketDataSource, "
+            + "created_at AS createdAt, updated_at AS updatedAt, "
+            + "TRUE AS reviewOnly, TRUE AS manualReviewOnly, TRUE AS notTradeInstruction, "
+            + "TRUE AS notExecutable, TRUE AS notAutoTrading, TRUE AS notOrderExecution, "
+            + "TRUE AS notUserPositionCreation, TRUE AS notUserPositionMutation, "
+            + "TRUE AS notPushSend, TRUE AS notExternalChannel "
             + "FROM tm_opportunity_log ";
 
     @Insert("INSERT INTO tm_opportunity_log(opportunity_id, opportunity_key, analysis_id, decision_id, execution_plan_id, "
@@ -79,13 +102,45 @@ public interface OpportunityLogMapper {
     List<OpportunityLogDO> listPushBackedShared(@Param("limit") int limit);
 
     @Select(PUBLIC_MESSAGE_SELECT + "WHERE opportunity_id = #{opportunityId} AND push_id IS NOT NULL"
-            + SHARED_STATE_PREDICATE)
+            + PUBLIC_PROJECTION_PREDICATE)
     OpportunityLogDO selectPushBackedPublicByOpportunityId(@Param("opportunityId") String opportunityId);
 
     @Select(PUBLIC_MESSAGE_SELECT + "WHERE push_id IS NOT NULL"
-            + SHARED_STATE_PREDICATE
+            + PUBLIC_PROJECTION_PREDICATE
             + " ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}")
     List<OpportunityLogDO> listPushBackedPublic(@Param("limit") int limit);
+
+    @Select(PUBLIC_API_SELECT + "WHERE opportunity_id = #{opportunityId}"
+            + PUBLIC_PROJECTION_PREDICATE)
+    OpportunityLogPublicDTO selectPublicApiByOpportunityId(
+            @Param("opportunityId") String opportunityId);
+
+    @Select({
+            "<script>",
+            PUBLIC_API_SELECT,
+            "WHERE 1 = 1",
+            PUBLIC_PROJECTION_PREDICATE,
+            "<if test='analysisId != null and analysisId != \"\"'> AND analysis_id = #{analysisId}</if>",
+            "<if test='decisionId != null and decisionId != \"\"'> AND decision_id = #{decisionId}</if>",
+            "<if test='executionPlanId != null and executionPlanId != \"\"'> AND execution_plan_id = #{executionPlanId}</if>",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='opportunityStatus != null and opportunityStatus != \"\"'> AND opportunity_status = #{opportunityStatus}</if>",
+            "<if test='lifecycleStatus != null and lifecycleStatus != \"\"'> AND lifecycle_status = #{lifecycleStatus}</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}",
+            "</script>"
+    })
+    List<OpportunityLogPublicDTO> queryPublicApi(
+            @Param("analysisId") String analysisId,
+            @Param("decisionId") String decisionId,
+            @Param("executionPlanId") String executionPlanId,
+            @Param("symbol") String symbol,
+            @Param("opportunityStatus") String opportunityStatus,
+            @Param("lifecycleStatus") String lifecycleStatus,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("limit") int limit);
 
     @Select(BASE_SELECT + "WHERE opportunity_key = #{opportunityKey}")
     OpportunityLogDO selectByOpportunityKey(@Param("opportunityKey") String opportunityKey);

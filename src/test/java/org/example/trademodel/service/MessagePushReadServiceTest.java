@@ -5,15 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PositionMonitorLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.messagepush.MessageListDTO;
 import org.example.trademodel.messagepush.MessageReadState;
+import org.example.trademodel.messagepush.OpportunityPushReadinessProjection;
 import org.example.trademodel.messagepush.PushDetailDTO;
+import org.example.trademodel.messagepush.PushRecheckReadinessProjection;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -32,11 +34,13 @@ class MessagePushReadServiceTest {
     private final OpportunityLogMapper opportunityLogMapper = mock(OpportunityLogMapper.class);
     private final PositionMonitorLogMapper positionMonitorLogMapper = mock(PositionMonitorLogMapper.class);
     private final PushSnapshotMapper pushSnapshotMapper = mock(PushSnapshotMapper.class);
+    private final PushRecheckLogMapper pushRecheckLogMapper = mock(PushRecheckLogMapper.class);
     private final UserPositionMapper userPositionMapper = mock(UserPositionMapper.class);
     private final MessagePushReadService service = new MessagePushReadService(
             opportunityLogMapper,
             positionMonitorLogMapper,
             pushSnapshotMapper,
+            pushRecheckLogMapper,
             userPositionMapper);
 
     @Test
@@ -64,10 +68,17 @@ class MessagePushReadServiceTest {
     @Test
     void publicMapperProjectionsDoNotSelectPrivateRiskColumns() throws Exception {
         String opportunitySql = OpportunityLogMapper.PUBLIC_MESSAGE_SELECT.toLowerCase(Locale.ROOT);
+        String opportunityApiSql = OpportunityLogMapper.PUBLIC_API_SELECT.toLowerCase(Locale.ROOT);
+        String opportunityPredicate =
+                OpportunityLogMapper.PUBLIC_PROJECTION_PREDICATE.toLowerCase(Locale.ROOT);
         Select pushSelect = PushSnapshotMapper.class
                 .getMethod("selectPublicProjectionByPushId", Long.class)
                 .getAnnotation(Select.class);
         String pushSql = String.join(" ", pushSelect.value()).toLowerCase(Locale.ROOT);
+        Select recheckSelect = PushRecheckLogMapper.class
+                .getMethod("selectReadinessByPushId", Long.class)
+                .getAnnotation(Select.class);
+        String recheckSql = String.join(" ", recheckSelect.value()).toLowerCase(Locale.ROOT);
 
         assertThat(opportunitySql)
                 .contains("opportunity_id", "analysis_id", "push_id", "symbol")
@@ -79,14 +90,39 @@ class MessagePushReadServiceTest {
                         "entry_reference",
                         "target_price",
                         "invalidation_price");
-        assertThat(pushSql)
-                .contains("push_id", "analysis_id", "push_create_time")
+        assertThat(opportunityPredicate)
+                .contains(
+                        "user_position_id is null",
+                        "risk_blocked_evidence",
+                        "risk_blocked_at is null",
+                        "blocked_by_risk_valid");
+        assertThat(opportunityApiSql)
+                .contains("opportunity_id", "analysis_id", "symbol", "opportunity_status")
                 .doesNotContain(
-                        "push_status",
+                        "push_id",
+                        "user_position_id",
+                        "risk_blocked_evidence",
+                        "risk_blocked_at",
+                        "reason_codes",
+                        "source_reference",
+                        "trace_id");
+        assertThat(pushSql)
+                .contains("push_id", "analysis_id", "push_status", "push_create_time")
+                .doesNotContain(
                         "account_risk_snapshot_id",
                         "entry_zone_json",
                         "stop_zone_json",
                         "invalidation_condition_json");
+        assertThat(PushSnapshotMapper.class
+                .getMethod("selectPublicProjectionByPushId", Long.class)
+                .getReturnType()).isEqualTo(OpportunityPushReadinessProjection.class);
+        assertThat(recheckSql)
+                .contains("recheck_status", "recheck_time", "execution_status")
+                .doesNotContain(
+                        "current_account_risk_allowed",
+                        "current_price",
+                        "current_data_quality_score",
+                        "current_confused_score");
     }
 
     @Test
@@ -122,7 +158,7 @@ class MessagePushReadServiceTest {
         assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
         PushDetailDTO.OpportunityPublicProjection projection =
                 (PushDetailDTO.OpportunityPublicProjection) detail;
-        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.state()).isEqualTo(MessageReadState.MISSING);
         assertThat(detail.messageId()).isEqualTo("opp-orphan-push");
         assertThat(projection.opportunityIdentity().opportunityId()).isEqualTo("opp-orphan-push");
         assertThat(projection.opportunityIdentity().analysisId()).isEqualTo("ana-opp-orphan-push");
@@ -131,10 +167,11 @@ class MessagePushReadServiceTest {
     }
 
     @Test
-    void mismatchedPersistedPushIdentityReturnsPartialWithoutComposingDetail() {
+    void mismatchedPersistedPushIdentityReturnsMissingWithoutComposingDetail() {
         OpportunityLogDO opportunity = publicOpportunity("opp-mismatched-push", 42L);
         opportunity.setAnalysisId("ana-authoritative");
-        TmPushSnapshotDO mismatched = new TmPushSnapshotDO();
+        OpportunityPushReadinessProjection mismatched =
+                new OpportunityPushReadinessProjection();
         mismatched.setPushId(43L);
         mismatched.setAnalysisId("ana-other");
         when(opportunityLogMapper.selectPushBackedPublicByOpportunityId("opp-mismatched-push"))
@@ -146,7 +183,7 @@ class MessagePushReadServiceTest {
         assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
         PushDetailDTO.OpportunityPublicProjection projection =
                 (PushDetailDTO.OpportunityPublicProjection) detail;
-        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.state()).isEqualTo(MessageReadState.MISSING);
         assertThat(projection.publicDescription()).isEqualTo("BTCUSDT LONG 1H");
         assertThat(detail.reason()).isEqualTo("PUSH_SNAPSHOT_MISSING");
     }
@@ -160,7 +197,7 @@ class MessagePushReadServiceTest {
     }
 
     @Test
-    void completePublicOpportunityReturnsReadyWithoutPrivateRecheckData() {
+    void completePublicOpportunityReturnsReadyWithoutSerializingPrivateRecheckData() {
         LocalDateTime pushTime = LocalDateTime.of(2026, 7, 29, 10, 5);
         stubOpportunityDetail("opp-public-ready", 201L, pushTime);
 
@@ -180,10 +217,174 @@ class MessagePushReadServiceTest {
     }
 
     @Test
+    void missingPushStatusIsPartialAndCannotBecomeReady() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-push-status-missing", 202L);
+        OpportunityPushReadinessProjection push = publicPush(
+                202L, opportunity.getAnalysisId(), opportunity.getAnchorTime());
+        push.setPushStatus(null);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(202L)).thenReturn(push);
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.reason()).isEqualTo("PUSH_STATUS_INCOMPLETE");
+        verify(pushRecheckLogMapper, never()).selectReadinessByPushId(202L);
+    }
+
+    @Test
+    void unknownPushStatusIsErrorAndCannotPassThrough() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-push-status-invalid", 203L);
+        OpportunityPushReadinessProjection push = publicPush(
+                203L, opportunity.getAnalysisId(), opportunity.getAnchorTime());
+        push.setPushStatus("NOT_A_REAL_PUSH_STATUS");
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(203L)).thenReturn(push);
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("PUSH_STATUS_INVALID");
+    }
+
+    @Test
+    void missingRecheckIsPartialInsteadOfReady() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-recheck-missing", 204L);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(204L)).thenReturn(
+                publicPush(204L, opportunity.getAnalysisId(), opportunity.getAnchorTime()));
+        when(pushRecheckLogMapper.selectReadinessByPushId(204L)).thenReturn(null);
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_MISSING");
+    }
+
+    @Test
+    void incompleteRecheckIsPartialInsteadOfReady() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-recheck-incomplete", 205L);
+        PushRecheckReadinessProjection recheck = readiness("REVIEW_PASSED", "COMPLETED");
+        recheck.setRecheckTime(null);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(205L)).thenReturn(
+                publicPush(205L, opportunity.getAnalysisId(), opportunity.getAnchorTime()));
+        when(pushRecheckLogMapper.selectReadinessByPushId(205L)).thenReturn(recheck);
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
+        assertThat(((PushDetailDTO.OpportunityPublicProjection) detail).missingFields())
+                .containsExactly("currentRecheck.checkedAt");
+    }
+
+    @Test
+    void invalidRecheckStatusIsError() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-recheck-invalid", 206L);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(206L)).thenReturn(
+                publicPush(206L, opportunity.getAnalysisId(), opportunity.getAnchorTime()));
+        when(pushRecheckLogMapper.selectReadinessByPushId(206L)).thenReturn(
+                readiness("NOT_A_REAL_RECHECK_STATUS", "COMPLETED"));
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("CURRENT_RECHECK_INVALID");
+    }
+
+    @Test
+    void inProgressExecutionIsPartialAndMalformedReasonJsonIsError() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-recheck-running", 207L);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(207L)).thenReturn(
+                publicPush(207L, opportunity.getAnalysisId(), opportunity.getAnchorTime()));
+        when(pushRecheckLogMapper.selectReadinessByPushId(207L)).thenReturn(
+                readiness("REVIEW_PASSED", "RUNNING"));
+
+        PushDetailDTO running = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(running.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(running.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
+
+        PushRecheckReadinessProjection malformed = readiness("REVIEW_PASSED", "COMPLETED");
+        malformed.setFailReasonJson("PRIVATE_ACCOUNT_RISK_REASON");
+        when(pushRecheckLogMapper.selectReadinessByPushId(207L)).thenReturn(malformed);
+
+        PushDetailDTO invalid = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(invalid.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(invalid.reason()).isEqualTo("CURRENT_RECHECK_REASON_INVALID");
+    }
+
+    @Test
+    void missingExecutionStatusIsPartialAndUnknownExecutionStatusIsError() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-execution-status", 214L);
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(214L)).thenReturn(
+                publicPush(214L, opportunity.getAnalysisId(), opportunity.getAnchorTime()));
+
+        PushRecheckReadinessProjection missing = readiness("REVIEW_PASSED", null);
+        when(pushRecheckLogMapper.selectReadinessByPushId(214L)).thenReturn(missing);
+
+        PushDetailDTO partial = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(partial.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(partial.reason()).isEqualTo("CURRENT_RECHECK_INCOMPLETE");
+        assertThat(((PushDetailDTO.OpportunityPublicProjection) partial).missingFields())
+                .containsExactly("currentRecheck.executionStatus");
+
+        PushRecheckReadinessProjection invalid =
+                readiness("REVIEW_PASSED", "NOT_A_REAL_EXECUTION_STATUS");
+        when(pushRecheckLogMapper.selectReadinessByPushId(214L)).thenReturn(invalid);
+
+        PushDetailDTO error = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(error.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(error.reason()).isEqualTo("CURRENT_RECHECK_EXECUTION_INVALID");
+    }
+
+    @Test
+    void pushAndRecheckStatusConflictIsError() {
+        OpportunityLogDO opportunity = publicOpportunity("opp-state-conflict", 209L);
+        OpportunityPushReadinessProjection push = publicPush(
+                209L, opportunity.getAnalysisId(), opportunity.getAnchorTime());
+        push.setPushStatus("RECHECK_INVALIDATED");
+        when(opportunityLogMapper.selectPushBackedPublicByOpportunityId(
+                opportunity.getOpportunityId())).thenReturn(opportunity);
+        when(pushSnapshotMapper.selectPublicProjectionByPushId(209L)).thenReturn(push);
+        when(pushRecheckLogMapper.selectReadinessByPushId(209L)).thenReturn(
+                readiness("REVIEW_PASSED", "COMPLETED"));
+
+        PushDetailDTO detail = service.findPushDetailForUser(
+                USER_ID, opportunity.getOpportunityId());
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("PUSH_RECHECK_STATE_CONFLICT");
+    }
+
+    @Test
     void opportunityPublicProjectionNeverSerializesRiskDerivedStatusOrPrivateFields() throws Exception {
         OpportunityLogDO opportunity = publicOpportunity("opp-public-projection", 210L);
         opportunity.setOpportunityStatus("BLOCKED_BY_RISK_VALID");
-        TmPushSnapshotDO push = publicPush(
+        OpportunityPushReadinessProjection push = publicPush(
                 210L,
                 opportunity.getAnalysisId(),
                 LocalDateTime.of(2026, 7, 29, 10, 14));
@@ -283,6 +484,8 @@ class MessagePushReadServiceTest {
         when(pushSnapshotMapper.selectPublicProjectionByPushId(213L)).thenReturn(
                 publicPush(213L, opportunity.getAnalysisId(),
                         LocalDateTime.of(2026, 7, 29, 10, 20)));
+        when(pushRecheckLogMapper.selectReadinessByPushId(213L)).thenReturn(
+                readiness("REVIEW_PASSED", "COMPLETED"));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-terminal");
 
@@ -337,6 +540,8 @@ class MessagePushReadServiceTest {
                 .thenReturn(opportunity);
         when(pushSnapshotMapper.selectPublicProjectionByPushId(pushId))
                 .thenReturn(publicPush(pushId, analysisId, pushTime));
+        when(pushRecheckLogMapper.selectReadinessByPushId(pushId))
+                .thenReturn(readiness("REVIEW_PASSED", "COMPLETED"));
     }
 
     private static OpportunityLogDO publicOpportunity(String opportunityId, Long pushId) {
@@ -371,14 +576,28 @@ class MessagePushReadServiceTest {
         return row;
     }
 
-    private static TmPushSnapshotDO publicPush(
+    private static OpportunityPushReadinessProjection publicPush(
             Long pushId,
             String analysisId,
             LocalDateTime pushTime) {
-        TmPushSnapshotDO push = new TmPushSnapshotDO();
+        OpportunityPushReadinessProjection push =
+                new OpportunityPushReadinessProjection();
         push.setPushId(pushId);
         push.setAnalysisId(analysisId);
+        push.setPushStatus("RECHECK_REVIEW_PASSED");
         push.setPushCreateTime(pushTime);
         return push;
+    }
+
+    private static PushRecheckReadinessProjection readiness(
+            String recheckStatus,
+            String executionStatus) {
+        PushRecheckReadinessProjection projection = new PushRecheckReadinessProjection();
+        projection.setLogId(901L);
+        projection.setRecheckStatus(recheckStatus);
+        projection.setRecheckTime(LocalDateTime.of(2026, 7, 29, 10, 5));
+        projection.setExecutionStatus(executionStatus);
+        projection.setFailReasonJson("{\"code\":\"REVIEW_ONLY\"}");
+        return projection;
     }
 }

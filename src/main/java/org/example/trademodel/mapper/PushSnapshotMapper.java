@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.messagepush.OpportunityPushReadinessProjection;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,10 +29,11 @@ public interface PushSnapshotMapper {
     @Select("SELECT * FROM tm_push_snapshot WHERE push_id = #{pushId}")
     TmPushSnapshotDO selectByPushId(Long pushId);
 
-    @Select("SELECT push_id AS pushId, analysis_id AS analysisId, "
+    @Select("SELECT push_id AS pushId, analysis_id AS analysisId, push_status AS pushStatus, "
             + "push_create_time AS pushCreateTime, create_time AS createTime "
             + "FROM tm_push_snapshot WHERE push_id = #{pushId}")
-    TmPushSnapshotDO selectPublicProjectionByPushId(@Param("pushId") Long pushId);
+    OpportunityPushReadinessProjection selectPublicProjectionByPushId(
+            @Param("pushId") Long pushId);
 
     @Select("SELECT * FROM tm_push_snapshot WHERE analysis_id = #{analysisId} ORDER BY push_id DESC")
     List<TmPushSnapshotDO> listByAnalysisId(String analysisId);

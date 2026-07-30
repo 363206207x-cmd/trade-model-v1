@@ -44,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
@@ -628,15 +629,10 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
-    void getLatestLog_shouldCanonicalizeLegacyStatusForReadApi() {
-        org.example.trademodel.entity.TmPushRecheckLogDO old = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        old.setLogId(4001L);
-        old.setPushId(12L);
-        old.setRecheckStatus("DRIFTED");
-        when(pushRecheckLogMapper.selectByPushId(12L)).thenReturn(List.of(old));
-
-        assertThat(service.getLatestLog(12L).getRecheckStatus())
-                .isEqualTo("DRIFTED_FROM_ENTRY_ZONE");
+    void rawLogServiceReadsFailClosedWithoutAuthoritativeOwnerRelation() {
+        assertThat(service.getLatestLog(12L)).isNull();
+        assertThat(service.listLogs(12L)).isEmpty();
+        verify(pushRecheckLogMapper, never()).selectByPushId(12L);
     }
 
     @Test

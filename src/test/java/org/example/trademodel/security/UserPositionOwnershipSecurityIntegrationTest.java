@@ -338,7 +338,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     @Test
-    void opportunityLogAssociationIsProjectedOnlyForCurrentOwner() throws Exception {
+    void userPositionDerivedOpportunityLogIsNotVisibleThroughTheSharedProjection() throws Exception {
         UserPositionDO linkedB = insertPosition(
                 userBId, "SOLUSDT", "OPEN", 6, "plan-owned-by-b");
         OpportunityLogDO opportunity = resolvedOpportunity(linkedB);
@@ -346,24 +346,15 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
-                .andExpect(jsonPath("$.data.userPositionPresent").value(false))
-                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
-                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
-                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID));
+                .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userPositionId").value(linkedB.getId()))
-                .andExpect(jsonPath("$.data.userPositionPresent").value(true))
-                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
-                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.EXECUTED_VALID));
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void opportunityLogReviewLifecycleAndTimestampDoNotLeakAcrossUsers() throws Exception {
+    void privateReviewLifecycleAndTimestampAreNotVisibleThroughTheSharedProjection() throws Exception {
         OpportunityLogDO opportunity = resolvedOpportunity(openB);
         opportunity.setOpportunityId("opp-owner-review-isolation");
         opportunity.setOpportunityKey("ana-owner-review:dec-owner-review");
@@ -377,12 +368,11 @@ class UserPositionOwnershipSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.PENDING_EVALUATION))
-                .andExpect(jsonPath("$.data.evaluationAsOf").doesNotExist())
-                .andExpect(jsonPath("$.data.reasonCodes").isEmpty())
-                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
-                .andExpect(jsonPath("$.data.userPositionPresent").value(false));
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+                        .with(user(USER_B).roles("OPERATOR")))
+                .andExpect(status().isNotFound());
     }
 
     @Test
