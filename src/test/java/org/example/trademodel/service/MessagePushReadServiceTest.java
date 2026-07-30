@@ -468,6 +468,8 @@ class MessagePushReadServiceTest {
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
         when(userPositionMapper.selectByIdAndUserId(401L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogMapper.selectLatestByPositionIdAndUserId(401L, USER_ID))
+                .thenReturn(risk);
 
         MessageListDTO result = service.listForUser(USER_ID, null);
 
@@ -488,6 +490,8 @@ class MessagePushReadServiceTest {
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
         when(userPositionMapper.selectByIdAndUserId(402L, USER_ID)).thenReturn(position);
+        when(positionMonitorLogMapper.selectLatestByPositionIdAndUserId(402L, USER_ID))
+                .thenReturn(risk);
 
         MessageListDTO result = service.listForUser(USER_ID, null);
 
@@ -507,6 +511,8 @@ class MessagePushReadServiceTest {
                 .thenReturn(List.of(risk));
         when(userPositionMapper.selectByIdAndUserId(403L, USER_ID))
                 .thenReturn(ownedPosition(403L, "BTCUSDT"));
+        when(positionMonitorLogMapper.selectLatestByPositionIdAndUserId(403L, USER_ID))
+                .thenReturn(risk);
 
         MessageListDTO result = service.listForUser(USER_ID, null);
 
@@ -534,6 +540,69 @@ class MessagePushReadServiceTest {
     }
 
     @Test
+    void historicalReadyAndLatestInvalidAreConsistentlyError() {
+        PositionMonitorLogDO original = validMonitor(325L, 425L);
+        PositionMonitorLogDO latest = validMonitor(326L, 425L);
+        latest.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 30));
+        latest.setLogicStatus("UNKNOWN_LOGIC");
+        stubPositionRiskListAndDetail(original, latest, ownedPosition(425L, "BTCUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "325");
+
+        assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(list.reason()).isEqualTo("POSITION_MONITOR_LOGIC_STATUS_INVALID");
+        assertThat(detail.reason()).isEqualTo("POSITION_MONITOR_LOGIC_STATUS_INVALID");
+    }
+
+    @Test
+    void historicalReadyAndLatestIncompleteAreConsistentlyPartial() {
+        PositionMonitorLogDO original = validMonitor(327L, 427L);
+        PositionMonitorLogDO latest = validMonitor(328L, 427L);
+        latest.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 30));
+        latest.setReason(null);
+        stubPositionRiskListAndDetail(original, latest, ownedPosition(427L, "ETHUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "327");
+
+        assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(list.items()).isEmpty();
+        assertThat(detail.missingFields()).contains("currentRecheck.reason");
+    }
+
+    @Test
+    void historicalAndLatestValidAreConsistentlyReady() {
+        PositionMonitorLogDO original = validMonitor(329L, 429L);
+        PositionMonitorLogDO latest = validMonitor(330L, 429L);
+        latest.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 30));
+        stubPositionRiskListAndDetail(original, latest, ownedPosition(429L, "SOLUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "329");
+
+        assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(list.items()).singleElement()
+                .extracting(MessageListDTO.MessageItem::messageId)
+                .isEqualTo("329");
+    }
+
+    @Test
+    void historicalAndLatestIdentityMismatchAreConsistentlyError() {
+        PositionMonitorLogDO original = validMonitor(331L, 431L);
+        PositionMonitorLogDO latest = validMonitor(332L, 999L);
+        latest.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 30));
+        stubPositionRiskListAndDetail(original, latest, ownedPosition(431L, "BTCUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "331");
+
+        assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(list.reason()).isEqualTo("POSITION_RISK_IDENTITY_MISMATCH");
+        assertThat(detail.reason()).isEqualTo("POSITION_RISK_IDENTITY_MISMATCH");
+    }
+
+    @Test
     void completeOwnedPositionRiskReturnsReadyWithStringSafeIdentity() throws Exception {
         long largeLogId = 9_007_199_254_740_993L;
         PositionMonitorLogDO monitor = validMonitor(largeLogId, 401L);
@@ -553,11 +622,13 @@ class MessagePushReadServiceTest {
     @Test
     void missingCurrentMonitorIsMissingRatherThanReady() {
         PositionMonitorLogDO original = validMonitor(310L, 410L);
-        stubPositionRisk(original, null, ownedPosition(410L, "BTCUSDT"));
+        stubPositionRiskListAndDetail(original, null, ownedPosition(410L, "BTCUSDT"));
 
+        MessageListDTO list = service.listForUser(USER_ID, null);
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "310");
 
-        assertThat(detail.state()).isEqualTo(MessageReadState.MISSING);
+        assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.MISSING);
+        assertThat(list.reason()).isEqualTo("CURRENT_MONITOR_STATE_MISSING");
         assertThat(detail.reason()).isEqualTo("CURRENT_MONITOR_STATE_MISSING");
     }
 
@@ -729,6 +800,18 @@ class MessagePushReadServiceTest {
             when(positionMonitorLogMapper.selectLatestByPositionIdAndUserId(position.getId(), USER_ID))
                     .thenReturn(latest);
         }
+    }
+
+    private void stubPositionRiskListAndDetail(
+            PositionMonitorLogDO original,
+            PositionMonitorLogDO latest,
+            UserPositionDO position) {
+        when(opportunityLogMapper.queryPublicApi(
+                null, null, null, null, null, null, null, null,
+                MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
+        when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
+                .thenReturn(List.of(original));
+        stubPositionRisk(original, latest, position);
     }
 
     private static OpportunityLogPublicDTO publicOpportunity(
