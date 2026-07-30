@@ -460,7 +460,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void positionRiskListUsesAuthoritativeOwnedPositionSymbol() {
-        PositionMonitorLogDO risk = positionRisk(301L, 401L);
+        PositionMonitorLogDO risk = validMonitor(301L, 401L);
         UserPositionDO position = ownedPosition(401L, "BTCUSDT");
         when(opportunityLogMapper.queryPublicApi(
                 null, null, null, null, null, null, null, null,
@@ -479,20 +479,58 @@ class MessagePushReadServiceTest {
     }
 
     @Test
-    void missingOwnedPositionMakesRiskMessageListPartialWithoutInventingSymbol() {
+    void incompletePositionRiskListCannotBecomeReady() {
         PositionMonitorLogDO risk = positionRisk(302L, 402L);
+        UserPositionDO position = ownedPosition(402L, "BTCUSDT");
         when(opportunityLogMapper.queryPublicApi(
                 null, null, null, null, null, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
-        when(userPositionMapper.selectByIdAndUserId(402L, USER_ID)).thenReturn(null);
+        when(userPositionMapper.selectByIdAndUserId(402L, USER_ID)).thenReturn(position);
 
         MessageListDTO result = service.listForUser(USER_ID, null);
 
         assertThat(result.state()).isEqualTo(MessageReadState.PARTIAL);
         assertThat(result.items()).isEmpty();
         assertThat(result.reason()).isEqualTo("SOURCE_RECORD_INCOMPLETE");
+    }
+
+    @Test
+    void invalidPositionRiskListReturnsError() {
+        PositionMonitorLogDO risk = validMonitor(303L, 403L);
+        risk.setRiskLevel("CRITICAL");
+        when(opportunityLogMapper.queryPublicApi(
+                null, null, null, null, null, null, null, null,
+                MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
+        when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
+                .thenReturn(List.of(risk));
+        when(userPositionMapper.selectByIdAndUserId(403L, USER_ID))
+                .thenReturn(ownedPosition(403L, "BTCUSDT"));
+
+        MessageListDTO result = service.listForUser(USER_ID, null);
+
+        assertThat(result.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(result.items()).isNull();
+        assertThat(result.reason()).isEqualTo("POSITION_MONITOR_RISK_LEVEL_INVALID");
+    }
+
+    @Test
+    void positionRiskListIdentityMismatchIsError() {
+        PositionMonitorLogDO risk = validMonitor(304L, 404L);
+        when(opportunityLogMapper.queryPublicApi(
+                null, null, null, null, null, null, null, null,
+                MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
+        when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
+                .thenReturn(List.of(risk));
+        when(userPositionMapper.selectByIdAndUserId(404L, USER_ID))
+                .thenReturn(ownedPosition(999L, "BTCUSDT"));
+
+        MessageListDTO result = service.listForUser(USER_ID, null);
+
+        assertThat(result.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(result.items()).isNull();
+        assertThat(result.reason()).isEqualTo("POSITION_RISK_IDENTITY_MISMATCH");
     }
 
     @Test
@@ -582,6 +620,31 @@ class MessagePushReadServiceTest {
 
         assertThat(malformedResult.state()).isEqualTo(MessageReadState.ERROR);
         assertThat(malformedResult.reason()).isEqualTo("POSITION_MONITOR_RISK_DATA_MALFORMED");
+    }
+
+    @Test
+    void accountRiskSnapshotMayDifferFromCompositeMonitorRisk() {
+        PositionMonitorLogDO monitor = validMonitor(323L, 423L);
+        monitor.setRiskLevel("HIGH");
+        monitor.setRiskSnapshot("{\"riskLevel\":\"MEDIUM\",\"riskBlocked\":false}");
+        stubPositionRisk(monitor, monitor, ownedPosition(423L, "BTCUSDT"));
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "323");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.reason()).isNull();
+    }
+
+    @Test
+    void unknownAccountRiskSnapshotLevelIsError() {
+        PositionMonitorLogDO monitor = validMonitor(324L, 424L);
+        monitor.setRiskSnapshot("{\"riskLevel\":\"CRITICAL\",\"riskBlocked\":true}");
+        stubPositionRisk(monitor, monitor, ownedPosition(424L, "BTCUSDT"));
+
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "324");
+
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.reason()).isEqualTo("POSITION_MONITOR_RISK_DATA_INVALID");
     }
 
     @Test
