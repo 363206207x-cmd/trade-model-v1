@@ -84,8 +84,7 @@ public sealed interface PushDetailDTO permits
 
     record OpportunityIdentity(
             String opportunityId,
-            String analysisId,
-            String pushId) {
+            String analysisId) {
     }
 
     record OriginalSnapshot(

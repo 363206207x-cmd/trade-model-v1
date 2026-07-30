@@ -129,6 +129,21 @@ class MessagePushContractIntegrationTest {
         OpportunityLogDO opportunity = insertOpportunity(push);
         insertPushRecheck(push);
 
+        String listBody = mockMvc.perform(get("/api/messages")
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("READY"))
+                .andExpect(jsonPath("$.data.items[0].messageId")
+                        .value(opportunity.getOpportunityId()))
+                .andExpect(jsonPath("$.data.items[0].pushId").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(listBody).doesNotContain(
+                "\"pushId\"",
+                "currentAccountRiskAllowed",
+                "failReasonJson",
+                "PRIVATE_ACCOUNT_RISK_REASON");
+
         String responseBody = mockMvc.perform(
                         get("/api/messages/{messageId}/push-detail", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
@@ -140,9 +155,7 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.data.sourceIdentity.positionId").doesNotExist())
                 .andExpect(jsonPath("$.data.opportunityIdentity.opportunityId")
                         .value(opportunity.getOpportunityId()))
-                .andExpect(jsonPath("$.data.opportunityIdentity.pushId")
-                        .value(String.valueOf(push.getPushId())))
-                .andExpect(jsonPath("$.data.opportunityIdentity.pushId").isString())
+                .andExpect(jsonPath("$.data.opportunityIdentity.pushId").doesNotExist())
                 .andExpect(jsonPath("$.data.publicStatus").value("PENDING_EVALUATION"))
                 .andExpect(jsonPath("$.data.publicTimestamp").value("2026-07-29T10:00:00"))
                 .andExpect(jsonPath("$.data.publicDescription").value("SOLUSDT LONG 1H"))
@@ -154,6 +167,7 @@ class MessagePushContractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(responseBody).doesNotContain(
+                "\"pushId\"",
                 "currentAccountRiskAllowed",
                 "failReasonJson",
                 "PRIVATE_ACCOUNT_RISK_REASON",
@@ -173,6 +187,25 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.data.sourceIdentity.sourceType").value("OPPORTUNITY"))
                 .andExpect(jsonPath("$.data.publicStatus").value("PENDING_EVALUATION"))
                 .andExpect(jsonPath("$.data.sourceIdentity.positionId").doesNotExist());
+
+        String latestBody = mockMvc.perform(
+                        get("/api/push/recheck/{pushId}/latest", push.getPushId())
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andReturn().getResponse().getContentAsString();
+        String logsBody = mockMvc.perform(
+                        get("/api/push/recheck/{pushId}/logs", push.getPushId())
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(latestBody + logsBody).doesNotContain(
+                "currentAccountRiskAllowed",
+                "failReasonJson",
+                "PRIVATE_ACCOUNT_RISK_REASON",
+                "RISK_BLOCKED");
     }
 
     @Test
@@ -191,6 +224,10 @@ class MessagePushContractIntegrationTest {
         mockMvc.perform(get("/api/messages"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/messages/1/push-detail"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/push/recheck/1/latest"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/push/recheck/1/logs"))
                 .andExpect(status().isUnauthorized());
     }
 

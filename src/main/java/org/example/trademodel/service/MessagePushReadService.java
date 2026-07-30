@@ -125,11 +125,10 @@ public class MessagePushReadService {
         if (opportunity == null || !positive(opportunity.getPushId())) {
             return unavailable(MessageReadState.MISSING, messageId, "MESSAGE_NOT_FOUND");
         }
-        String pushId = id(opportunity.getPushId());
         MessageListDTO.SourceIdentity sourceIdentity = new MessageListDTO.SourceIdentity(
                 "OPPORTUNITY", opportunity.getOpportunityId(), opportunity.getAnalysisId(), null);
         PushDetailDTO.OpportunityIdentity opportunityIdentity = new PushDetailDTO.OpportunityIdentity(
-                opportunity.getOpportunityId(), opportunity.getAnalysisId(), pushId);
+                opportunity.getOpportunityId(), opportunity.getAnalysisId());
         String publicStatus = publicOpportunityStatus(opportunity);
         LocalDateTime opportunityTimestamp = firstNonNull(
                 opportunity.getAnchorTime(), opportunity.getCreatedAt());
@@ -279,7 +278,6 @@ public class MessagePushReadService {
         }
         return item(
                 row.getOpportunityId(),
-                id(row.getPushId()),
                 new MessageListDTO.SourceIdentity(
                         "OPPORTUNITY", row.getOpportunityId(), row.getAnalysisId(), null),
                 row.getSymbol(),
@@ -301,7 +299,6 @@ public class MessagePushReadService {
         String positionId = id(position.getId());
         return item(
                 messageId,
-                null,
                 new MessageListDTO.SourceIdentity(
                         "POSITION_RISK", messageId, row.getAnalysisId(), positionId),
                 symbol,
@@ -310,14 +307,12 @@ public class MessagePushReadService {
     }
 
     private static MessageListDTO.MessageItem item(String messageId,
-                                                   String pushId,
                                                    MessageListDTO.SourceIdentity sourceIdentity,
                                                    String symbol,
                                                    String status,
                                                    LocalDateTime timestamp) {
         return new MessageListDTO.MessageItem(
                 messageId,
-                pushId,
                 sourceIdentity,
                 symbol,
                 status,

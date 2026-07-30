@@ -40,10 +40,9 @@ class MessagePushReadServiceTest {
             userPositionMapper);
 
     @Test
-    void messageAndPushIdsRemainJsonStringsBeyondJavascriptSafeInteger() throws Exception {
+    void publicMessageIdsRemainJsonStringsWithoutExposingPrivatePushIdentity() throws Exception {
         String largeId = "9007199254740993";
         MessageListDTO.MessageItem item = new MessageListDTO.MessageItem(
-                largeId,
                 largeId,
                 new MessageListDTO.SourceIdentity("OPPORTUNITY", "opp-precision", "ana-precision", null),
                 "BTCUSDT",
@@ -59,8 +58,7 @@ class MessagePushReadServiceTest {
 
         assertThat(json.path("messageId").isTextual()).isTrue();
         assertThat(json.path("messageId").textValue()).isEqualTo(largeId);
-        assertThat(json.path("pushId").isTextual()).isTrue();
-        assertThat(json.path("pushId").textValue()).isEqualTo(largeId);
+        assertThat(json.has("pushId")).isFalse();
     }
 
     @Test
@@ -126,7 +124,8 @@ class MessagePushReadServiceTest {
                 (PushDetailDTO.OpportunityPublicProjection) detail;
         assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
         assertThat(detail.messageId()).isEqualTo("opp-orphan-push");
-        assertThat(projection.opportunityIdentity().pushId()).isEqualTo("42");
+        assertThat(projection.opportunityIdentity().opportunityId()).isEqualTo("opp-orphan-push");
+        assertThat(projection.opportunityIdentity().analysisId()).isEqualTo("ana-opp-orphan-push");
         assertThat(projection.publicStatus()).isEqualTo("PENDING_EVALUATION");
         assertThat(projection.missingFields()).containsExactly("publicPushProjection");
     }
@@ -200,6 +199,7 @@ class MessagePushReadServiceTest {
         assertThat(detail).isInstanceOf(PushDetailDTO.OpportunityPublicProjection.class);
         assertThat(json.path("publicStatus").asText()).isEqualTo("PENDING_EVALUATION");
         assertThat(json.path("sourceIdentity").has("positionId")).isFalse();
+        assertThat(json.toString()).doesNotContain("pushId");
         assertThat(json.has("originalSnapshot")).isFalse();
         assertThat(json.has("currentRecheck")).isFalse();
         assertThat(json.has("changeReason")).isFalse();

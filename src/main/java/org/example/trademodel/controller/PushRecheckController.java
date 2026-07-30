@@ -4,6 +4,7 @@ import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.PushRecheckDispatchConfigRequest;
 import org.example.trademodel.dto.req.PushRecheckReplayRequest;
 import org.example.trademodel.dto.req.PushRecheckTriggerRequest;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.PushRecheckScheduler;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.PushRecheckService;
@@ -14,6 +15,8 @@ import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,14 +37,17 @@ public class PushRecheckController {
     private final PushRecheckService pushRecheckService;
     private final PushRecheckScheduler pushRecheckScheduler;
     private final PushRecheckDispatchConfigService dispatchConfigService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     @Autowired
     public PushRecheckController(PushRecheckService pushRecheckService,
                                  PushRecheckScheduler pushRecheckScheduler,
-                                 PushRecheckDispatchConfigService dispatchConfigService) {
+                                 PushRecheckDispatchConfigService dispatchConfigService,
+                                 AuthenticatedUserIdResolver authenticatedUserIdResolver) {
         this.pushRecheckService = pushRecheckService;
         this.pushRecheckScheduler = pushRecheckScheduler;
         this.dispatchConfigService = dispatchConfigService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     /**
@@ -118,15 +124,22 @@ public class PushRecheckController {
                 dispatchBatchId, dispatchInstructionId, auditLimit, logLimit));
     }
 
-    /** 该 push 最近一次 Recheck 日志；无记录时 data 为 null */
+    /** Raw Recheck rows have no owner identity, so user-facing reads fail closed. */
     @GetMapping("/{pushId}/latest")
-    public ApiResponse<PushRecheckLogItemVO> latest(@PathVariable Long pushId) {
-        return ApiResponse.success(pushRecheckService.getLatestLog(pushId));
+    public ResponseEntity<ApiResponse<PushRecheckLogItemVO>> latest(@PathVariable Long pushId) {
+        authenticatedUserIdResolver.requireCurrentUserId();
+        return privateRecheckReadUnavailable();
     }
 
-    /** 该 push 下全部 Recheck 日志，新记录在前 */
+    /** Raw Recheck rows have no owner identity, so user-facing reads fail closed. */
     @GetMapping("/{pushId}/logs")
-    public ApiResponse<List<PushRecheckLogItemVO>> logs(@PathVariable Long pushId) {
-        return ApiResponse.success(pushRecheckService.listLogs(pushId));
+    public ResponseEntity<ApiResponse<List<PushRecheckLogItemVO>>> logs(@PathVariable Long pushId) {
+        authenticatedUserIdResolver.requireCurrentUserId();
+        return privateRecheckReadUnavailable();
+    }
+
+    private static <T> ResponseEntity<ApiResponse<T>> privateRecheckReadUnavailable() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.notFound("push recheck private data unavailable"));
     }
 }

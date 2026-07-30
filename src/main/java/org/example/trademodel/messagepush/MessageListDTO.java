@@ -16,7 +16,6 @@ public record MessageListDTO(
 
     public record MessageItem(
             String messageId,
-            String pushId,
             SourceIdentity sourceIdentity,
             String symbol,
             String status,

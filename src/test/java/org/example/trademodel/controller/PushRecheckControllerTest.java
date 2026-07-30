@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.enums.RecheckStatusEnum;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.PushRecheckDispatchConfigService;
 import org.example.trademodel.service.PushRecheckScheduler;
 import org.example.trademodel.service.PushRecheckService;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,6 +34,8 @@ class PushRecheckControllerTest {
     private PushRecheckScheduler pushRecheckScheduler;
     @Mock
     private PushRecheckDispatchConfigService dispatchConfigService;
+    @Mock
+    private AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private MockMvc mockMvc;
 
@@ -40,7 +44,8 @@ class PushRecheckControllerTest {
         PushRecheckController controller = new PushRecheckController(
                 pushRecheckService,
                 pushRecheckScheduler,
-                dispatchConfigService);
+                dispatchConfigService,
+                authenticatedUserIdResolver);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -110,5 +115,31 @@ class PushRecheckControllerTest {
                 .andExpect(jsonPath("$.data.executionAction").doesNotExist())
                 .andExpect(jsonPath("$.data.autoTradingAction").doesNotExist())
                 .andExpect(jsonPath("$.data.providerPayload").doesNotExist());
+    }
+
+    @Test
+    void latestFailsClosedWhenNoOwnerScopedProjectionExists() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+
+        mockMvc.perform(get("/api/push/recheck/101/latest"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.msg").value("push recheck private data unavailable"));
+
+        verify(authenticatedUserIdResolver).requireCurrentUserId();
+        verify(pushRecheckService, never()).getLatestLog(101L);
+    }
+
+    @Test
+    void logsFailClosedWhenNoOwnerScopedProjectionExists() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
+
+        mockMvc.perform(get("/api/push/recheck/101/logs"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.msg").value("push recheck private data unavailable"));
+
+        verify(authenticatedUserIdResolver).requireCurrentUserId();
+        verify(pushRecheckService, never()).listLogs(101L);
     }
 }

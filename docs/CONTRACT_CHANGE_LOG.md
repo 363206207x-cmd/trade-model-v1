@@ -360,7 +360,11 @@ After: PR #1155 defines `OPPORTUNITY` as
 identity, safe allowlisted opportunity status, public timestamp, and public
 description inputs; the public response variant cannot carry UserPosition,
 account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
-reason fields. The private variant remains exact current-user scoped.
+reason fields. It also omits internal `pushId` and other private Recheck
+references. Raw user-facing `/{pushId}/latest` and `/{pushId}/logs` reads fail
+closed because their persisted rows do not provide an owner identity; internal
+service reads remain unchanged. The private variant remains exact current-user
+scoped.
 Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.
