@@ -672,15 +672,24 @@ qualifying_static_assertions="$(semantic_count "FE04E_QUALIFYING_STATIC_ASSERTIO
 raw_semantic_guards="$(semantic_count "FE04E_RAW_SEMANTIC_GUARDS")"
 qualifying_semantic_guards="$(semantic_count "FE04E_QUALIFYING_SEMANTIC_GUARDS")"
 raw_helper_unit_tests="$(semantic_count "FE04E_RAW_HELPER_UNIT_TESTS")"
+metadata_complete_helper_unit_tests="$(semantic_count "FE04E_METADATA_COMPLETE_HELPER_UNIT_TESTS")"
+metadata_missing_helper_unit_tests="$(semantic_count "FE04E_METADATA_MISSING_HELPER_UNIT_TESTS")"
 qualifying_helper_unit_tests="$(semantic_count "FE04E_QUALIFYING_HELPER_UNIT_TESTS")"
 raw_negative_probes="$(semantic_count "FE04E_RAW_NEGATIVE_PROBES")"
 qualifying_negative_probes="$(semantic_count "FE04E_QUALIFYING_NEGATIVE_PROBES")"
 raw_legal_controls="$(semantic_count "FE04E_RAW_LEGAL_CONTROLS")"
 qualifying_legal_controls="$(semantic_count "FE04E_QUALIFYING_LEGAL_CONTROLS")"
 duplicate_execution_count="$(semantic_count "FE04E_DUPLICATE_EXECUTION_COUNT")"
+non_qualifying_metadata_count="$(semantic_count "FE04E_NON_QUALIFYING_METADATA_COUNT")"
+invalid_record_count="$(semantic_count "FE04E_INVALID_RECORD_COUNT")"
+duplicate_coverage_id_count="$(semantic_count "FE04E_DUPLICATE_COVERAGE_ID_COUNT")"
 raw_execution_total="$(semantic_count "FE04E_RAW_EXECUTION_TOTAL")"
 qualifying_unique_total="$(semantic_count "FE04E_QUALIFYING_UNIQUE_TOTAL")"
-qualifying_inventory_sha="$(semantic_count "FE04E_QUALIFYING_INVENTORY_SHA256")"
+semantic_inventory_sha="$(semantic_count "FE04E_SEMANTIC_INVENTORY_SHA256")"
+rename_stability_sha="$(semantic_count "FE04E_RENAME_STABILITY_SHA256")"
+reversed_order_sha="$(semantic_count "FE04E_REVERSED_ORDER_SHA256")"
+alternate_path_sha="$(semantic_count "FE04E_ALTERNATE_PATH_SHA256")"
+inventory_stability_match="$(semantic_count "FE04E_INVENTORY_STABILITY_MATCH")"
 semantic_failures="$(semantic_count "FE04E_SEMANTIC_FAILURES")"
 semantic_errors="$(semantic_count "FE04E_SEMANTIC_ERRORS")"
 
@@ -696,12 +705,17 @@ semantic_counts=(
   "$raw_semantic_guards"
   "$qualifying_semantic_guards"
   "$raw_helper_unit_tests"
+  "$metadata_complete_helper_unit_tests"
+  "$metadata_missing_helper_unit_tests"
   "$qualifying_helper_unit_tests"
   "$raw_negative_probes"
   "$qualifying_negative_probes"
   "$raw_legal_controls"
   "$qualifying_legal_controls"
   "$duplicate_execution_count"
+  "$non_qualifying_metadata_count"
+  "$invalid_record_count"
+  "$duplicate_coverage_id_count"
   "$raw_execution_total"
   "$qualifying_unique_total"
   "$semantic_failures"
@@ -736,14 +750,40 @@ fi
 if [[ "$raw_helper_unit_tests" -ne "$helper_unit_tests" ]]; then
   error "coverage inventory helper count does not match unittest execution count"
 fi
+if [[ "$metadata_complete_helper_unit_tests" -ne "$raw_helper_unit_tests" ]]; then
+  error "qualifying helper metadata is incomplete"
+fi
+if [[ "$metadata_missing_helper_unit_tests" -ne 0 ]]; then
+  error "helper tests without explicit qualifying metadata are not permitted"
+fi
+if [[ "$non_qualifying_metadata_count" -ne 0 ]]; then
+  error "non-qualifying metadata records remain in the governance inventory"
+fi
+if [[ "$invalid_record_count" -ne 0 ]]; then
+  error "invalid semantic inventory records remain"
+fi
+if [[ "$duplicate_coverage_id_count" -ne 0 ]]; then
+  error "duplicate explicit coverage IDs remain"
+fi
 if [[ "$raw_negative_probes" -ne $((shell_negative_probes + semantic_adversarial_probes)) ]]; then
   error "coverage inventory negative-probe count does not match executed probes"
 fi
 if [[ "$raw_legal_controls" -ne "$semantic_legal_controls" ]]; then
   error "coverage inventory legal-control count does not match executed controls"
 fi
-if [[ ! "$qualifying_inventory_sha" =~ ^[0-9a-f]{64}$ ]]; then
-  error "coverage inventory digest is missing or invalid"
+inventory_shas=(
+  "$semantic_inventory_sha"
+  "$rename_stability_sha"
+  "$reversed_order_sha"
+  "$alternate_path_sha"
+)
+for inventory_sha in "${inventory_shas[@]}"; do
+  if [[ ! "$inventory_sha" =~ ^[0-9a-f]{64}$ ]]; then
+    error "semantic coverage inventory digest is missing or invalid"
+  fi
+done
+if [[ "$semantic_inventory_sha" != "$rename_stability_sha" || "$semantic_inventory_sha" != "$reversed_order_sha" || "$semantic_inventory_sha" != "$alternate_path_sha" || "$inventory_stability_match" != "YES" ]]; then
+  error "semantic inventory digest is unstable across rename/order/path probes"
 fi
 
 tests="$raw_execution_total"
@@ -765,16 +805,26 @@ echo "FE04E_HELPER_UNIT_TESTS: $helper_unit_tests"
 echo "FE04E_OLD_RAW_GOVERNANCE_TESTS: 280"
 echo "FE04E_OLD_QUALIFYING_TOTAL: NOT_ESTABLISHED"
 echo "FE04E_RAW_HELPER_UNIT_TESTS: $raw_helper_unit_tests"
+echo "FE04E_METADATA_COMPLETE_HELPER_UNIT_TESTS: $metadata_complete_helper_unit_tests"
+echo "FE04E_METADATA_MISSING_HELPER_UNIT_TESTS: $metadata_missing_helper_unit_tests"
 echo "FE04E_QUALIFYING_HELPER_UNIT_TESTS: $qualifying_helper_unit_tests"
 echo "FE04E_RAW_NEGATIVE_PROBES: $raw_negative_probes"
 echo "FE04E_QUALIFYING_NEGATIVE_PROBES: $qualifying_negative_probes"
 echo "FE04E_RAW_LEGAL_CONTROLS: $raw_legal_controls"
 echo "FE04E_QUALIFYING_LEGAL_CONTROLS: $qualifying_legal_controls"
 echo "FE04E_DUPLICATE_EXECUTION_COUNT: $duplicate_execution_count"
+echo "FE04E_NON_QUALIFYING_METADATA_COUNT: $non_qualifying_metadata_count"
+echo "FE04E_INVALID_RECORD_COUNT: $invalid_record_count"
+echo "FE04E_DUPLICATE_COVERAGE_ID_COUNT: $duplicate_coverage_id_count"
 echo "FE04E_RAW_EXECUTION_TOTAL: $raw_execution_total"
 echo "FE04E_QUALIFYING_GOVERNANCE_TESTS: $qualifying_unique_total"
 echo "FE04E_QUALIFYING_UNIQUE_TOTAL: $qualifying_unique_total"
-echo "FE04E_QUALIFYING_INVENTORY_SHA256: $qualifying_inventory_sha"
+echo "FE04E_SEMANTIC_INVENTORY_SHA256: $semantic_inventory_sha"
+echo "FE04E_RENAME_STABILITY_SHA256: $rename_stability_sha"
+echo "FE04E_REVERSED_ORDER_SHA256: $reversed_order_sha"
+echo "FE04E_ALTERNATE_PATH_SHA256: $alternate_path_sha"
+echo "FE04E_INVENTORY_STABILITY_MATCH: $inventory_stability_match"
+echo "FE04E_QUALIFYING_INVENTORY_SHA256: $semantic_inventory_sha"
 echo "FE04E_GOVERNANCE_TESTS: $tests"
 echo "FE04E_RAW_COUNTING_FORMULA: $raw_static_assertions + $raw_semantic_guards + $raw_helper_unit_tests + $raw_negative_probes + $raw_legal_controls = $raw_execution_total"
 echo "FE04E_QUALIFYING_COUNTING_FORMULA: $qualifying_static_assertions + $qualifying_semantic_guards + $qualifying_helper_unit_tests + $qualifying_negative_probes + $qualifying_legal_controls = $qualifying_unique_total"

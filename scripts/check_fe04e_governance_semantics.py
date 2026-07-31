@@ -11,16 +11,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
-import inspect
 import json
 import os
 import re
 import sys
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 
 SEMANTIC = "docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
@@ -175,16 +174,43 @@ class CoverageRecord:
     source: str
 
     @property
+    def semantic_record(self) -> Mapping[str, str]:
+        return {
+            "layer": self.layer,
+            "entrypoint": self.entrypoint,
+            "guard": self.target_guard,
+            "objective": self.assertion_objective,
+            "fixture_fingerprint": self.fixture_fingerprint,
+            "expected": self.expected_result,
+        }
+
+    @property
     def qualifying_key(self) -> str:
-        return ":".join(
-            (
-                self.layer,
-                self.entrypoint,
-                self.target_guard,
-                self.assertion_objective,
-                self.fixture_fingerprint,
-            )
+        canonical = json.dumps(
+            self.semantic_record,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
         )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+VALID_COVERAGE_LAYERS = frozenset(
+    ("L1_UNIT", "L2_HELPER_INTEGRATION", "L3_CONTRACT_PROBE")
+)
+COVERAGE_METADATA_FIELDS = (
+    "coverage_id",
+    "layer",
+    "entrypoint",
+    "target_guard",
+    "assertion_objective",
+    "fixture_identity",
+    "expected_result",
+)
+
+
+class CoverageMetadataError(ValueError):
+    """Raised when qualifying coverage lacks explicit semantic metadata."""
 
 
 @dataclass(frozen=True)
@@ -195,6 +221,7 @@ class Violation:
     category: str
     excerpt: str
     expected: str
+    error_code: str = ""
 
 
 @dataclass(frozen=True)
@@ -213,12 +240,13 @@ class Probe:
 
 def coverage_case(
     *,
+    coverage_id: str,
     layer: str,
     entrypoint: str,
     target_guard: str,
     expected_result: str,
     assertion_objective: str,
-    fixture: str,
+    fixture_identity: Any,
 ) -> Callable[[Callable[..., object]], Callable[..., object]]:
     """Attach auditable coverage metadata to a unittest method."""
 
@@ -227,12 +255,13 @@ def coverage_case(
             function,
             "__fe04e_coverage__",
             {
+                "coverage_id": coverage_id,
                 "layer": layer,
                 "entrypoint": entrypoint,
                 "target_guard": target_guard,
                 "expected_result": expected_result,
                 "assertion_objective": assertion_objective,
-                "fixture": fixture,
+                "fixture_identity": fixture_identity,
             },
         )
         return function
@@ -588,8 +617,16 @@ def private_semantic_category(base_category: str, unit: str) -> str:
             return "PRIVATE_EXECUTION_PENDING_PARTIAL"
         if re.search(r"\b(?:fail|failed|failure)\b|\berror\b", normalized_unit):
             return "PRIVATE_EXECUTION_FAILURE_ERROR"
-        if re.search(r"\bcompleted?\b|\bcompletion\b|\bready\b", normalized_unit):
+        if re.search(
+            r"\b(?:gates?|controls?|blocks?|unblocks?)\b", normalized_unit
+        ):
             return "PRIVATE_EXECUTION_COMPLETION_GATE"
+        if re.search(
+            r"\b(?:requires?|required\s+for|depends?\s+on|dependent\s+on|"
+            r"relies?\s+on|waits?\s+for)\b",
+            normalized_unit,
+        ):
+            return "PRIVATE_EXECUTION_REQUIREMENT"
         return "PRIVATE_EXECUTION_DEPENDENCY"
     if base_category == "UserPosition/private risk":
         if re.search(r"risk|风险", normalized_unit):
@@ -629,10 +666,11 @@ def contradiction_violations(
                     Violation(
                         guard,
                         scope.document,
-                        scope.name,
+                        "Public OPPORTUNITY",
                         private_semantic_category(category, unit),
                         excerpt(unit),
                         "public OPPORTUNITY must use public inputs only",
+                        "PRIVATE_STATE_INFLUENCES_PUBLIC_READINESS",
                     )
                 )
     return violations
@@ -2643,7 +2681,7 @@ def adversarial_probes() -> List[Probe]:
                 "COMPLETED is required for public READY.",
             ),
             "private execution contradiction guard",
-            "PRIVATE_EXECUTION_COMPLETION_GATE",
+            "PRIVATE_EXECUTION_REQUIREMENT",
         ),
         Probe(
             "FAILED produces public ERROR",
@@ -2665,6 +2703,7 @@ def adversarial_probes() -> List[Probe]:
                 "Execution completion gates public visibility.",
             ),
             "private execution contradiction guard",
+            "PRIVATE_EXECUTION_COMPLETION_GATE",
         ),
         Probe(
             "account risk supplements public status",
@@ -3023,8 +3062,12 @@ def adversarial_probes() -> List[Probe]:
                 "Public READY requires execution completion.",
             ),
             "private execution contradiction guard",
-            "PRIVATE_EXECUTION_COMPLETION_GATE",
-            ("Public READY requires execution completion.",),
+            "PRIVATE_EXECUTION_REQUIREMENT",
+            (
+                "Public READY requires execution completion.",
+                'section="Public OPPORTUNITY"',
+                'error="PRIVATE_STATE_INFLUENCES_PUBLIC_READINESS"',
+            ),
         ),
     ]
 
@@ -3236,46 +3279,234 @@ def coverage_slug(value: str) -> str:
     return slug or "unnamed"
 
 
-def coverage_fingerprint(value: str) -> str:
-    canonical = re.sub(
-        r"[^a-z0-9\u3400-\u4dbf\u4e00-\u9fff]+", " ", normalized(value)
-    ).strip()
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+def canonical_fixture_identity(value: Any) -> str:
+    """Serialize semantic fixture input without source or machine-path metadata."""
+
+    def canonicalize(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            return {
+                str(key): canonicalize(item[key])
+                for key in sorted(item, key=lambda candidate: str(candidate))
+            }
+        if isinstance(item, (list, tuple)):
+            return [canonicalize(child) for child in item]
+        if isinstance(item, (set, frozenset)):
+            return sorted(
+                (canonicalize(child) for child in item),
+                key=lambda child: json.dumps(
+                    child, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+                ),
+            )
+        if isinstance(item, Path):
+            return f"<logical-path>/{item.name}"
+        if item is None or isinstance(item, (bool, int, float)):
+            return item
+        text = unicodedata.normalize("NFKC", str(item))
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
+        text = re.sub(
+            r"(?:(?:/Users/[^/\s]+)|(?:/private)?/tmp)(?:/[^\s,;\"']+)+",
+            "<logical-path>",
+            text,
+        )
+        return re.sub(
+            r"[^a-z0-9\u3400-\u4dbf\u4e00-\u9fff]+",
+            " ",
+            text.lower(),
+        ).strip()
+
+    return json.dumps(
+        canonicalize(value),
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
-def helper_unit_coverage_records(test_path: Path) -> List[CoverageRecord]:
-    """Load unittest IDs and attached metadata without executing the suite."""
+def coverage_fingerprint(value: Any) -> str:
+    canonical = canonical_fixture_identity(value)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+
+def coverage_metadata_diagnostics(
+    display_name: str, metadata: Mapping[str, Any]
+) -> Tuple[List[str], List[str]]:
+    missing = [
+        field
+        for field in COVERAGE_METADATA_FIELDS
+        if field not in metadata
+        or metadata[field] is None
+        or (isinstance(metadata[field], str) and not metadata[field].strip())
+    ]
+    invalid: List[str] = []
+    if "coverage_id" not in missing and not re.fullmatch(
+        r"[a-z0-9][a-z0-9._-]*", str(metadata["coverage_id"])
+    ):
+        invalid.append("coverage_id must be a stable lowercase semantic ID")
+    if "layer" not in missing and metadata["layer"] not in VALID_COVERAGE_LAYERS:
+        invalid.append(
+            f"layer must be one of {','.join(sorted(VALID_COVERAGE_LAYERS))}"
+        )
+    for field in (
+        "entrypoint",
+        "target_guard",
+        "assertion_objective",
+        "expected_result",
+    ):
+        if field not in missing and not isinstance(metadata[field], str):
+            invalid.append(f"{field} must be text")
+    if "fixture_identity" not in missing:
+        try:
+            if canonical_fixture_identity(metadata["fixture_identity"]) in (
+                '""',
+                "null",
+                "[]",
+                "{}",
+            ):
+                invalid.append("fixture_identity must contain semantic input")
+        except (TypeError, ValueError) as error:
+            invalid.append(f"fixture_identity is not canonicalizable: {error}")
+    return missing, invalid
+
+
+def _metadata_failure_message(
+    *,
+    missing: Sequence[Tuple[str, Sequence[str]]],
+    invalid: Sequence[Tuple[str, Sequence[str]]],
+    duplicates: Mapping[str, Sequence[str]],
+) -> str:
+    diagnostics: List[str] = []
+    for display_name, fields in missing:
+        diagnostics.extend(
+            (
+                "ERROR: QUALIFYING_METADATA_MISSING",
+                f"TEST: {display_name}",
+                "MISSING_FIELDS:",
+                *(f"- {field}" for field in fields),
+            )
+        )
+    for display_name, errors in invalid:
+        diagnostics.extend(
+            (
+                "ERROR: INVALID_QUALIFYING_METADATA",
+                f"TEST: {display_name}",
+                "INVALID_FIELDS:",
+                *(f"- {error}" for error in errors),
+            )
+        )
+    for coverage_id, displays in sorted(duplicates.items()):
+        diagnostics.extend(
+            (
+                "ERROR: DUPLICATE_COVERAGE_ID",
+                f"COVERAGE_ID: {coverage_id}",
+                "CONFLICTING_RECORDS:",
+                *(f"- {display}" for display in sorted(displays)),
+            )
+        )
+    return "\n".join(diagnostics)
+
+
+def helper_coverage_audit_from_classes(
+    test_classes: Sequence[type],
+    *,
+    source_label: str = "helper-unit-tests",
+    strict: bool = True,
+) -> Dict[str, Any]:
+    """Build helper coverage only from explicit decorators, never test names."""
+
+    discovered: List[Tuple[type, str, Callable[..., object]]] = []
+    for test_class in test_classes:
+        for name, method in vars(test_class).items():
+            if name.startswith("test_") and callable(method):
+                discovered.append((test_class, name, method))
+    discovered.sort(key=lambda item: (item[0].__name__, item[1]))
+
+    missing_records: List[Tuple[str, Sequence[str]]] = []
+    invalid_records: List[Tuple[str, Sequence[str]]] = []
+    complete: List[Tuple[str, Mapping[str, Any]]] = []
+    ids_to_displays: Dict[str, List[str]] = {}
+    for test_class, name, method in discovered:
+        display = f"{test_class.__name__}.{name}"
+        metadata = dict(getattr(method, "__fe04e_coverage__", {}))
+        missing, invalid = coverage_metadata_diagnostics(display, metadata)
+        if missing:
+            missing_records.append((display, missing))
+            continue
+        if invalid:
+            invalid_records.append((display, invalid))
+            continue
+        coverage_id = str(metadata["coverage_id"])
+        ids_to_displays.setdefault(coverage_id, []).append(display)
+        complete.append((display, metadata))
+
+    duplicate_ids = {
+        coverage_id: displays
+        for coverage_id, displays in ids_to_displays.items()
+        if len(displays) > 1
+    }
+    diagnostics = _metadata_failure_message(
+        missing=missing_records,
+        invalid=invalid_records,
+        duplicates=duplicate_ids,
+    )
+    if strict and diagnostics:
+        raise CoverageMetadataError(diagnostics)
+
+    logical_source = Path(source_label).name or "helper-unit-tests"
+    records = [
+        CoverageRecord(
+            id=f"HELPER:{metadata['coverage_id']}",
+            category="HELPER_UNIT_TEST",
+            layer=str(metadata["layer"]),
+            entrypoint=str(metadata["entrypoint"]),
+            target_guard=str(metadata["target_guard"]),
+            expected_result=str(metadata["expected_result"]),
+            assertion_objective=str(metadata["assertion_objective"]),
+            fixture_fingerprint=coverage_fingerprint(metadata["fixture_identity"]),
+            source=f"{logical_source}:{display}",
+        )
+        for display, metadata in complete
+    ]
+    return {
+        "records": records,
+        "raw": len(discovered),
+        "metadata_complete": len(complete),
+        "metadata_missing": len(missing_records),
+        "duplicate_coverage_ids": sum(
+            len(displays) - 1 for displays in duplicate_ids.values()
+        ),
+        "invalid_records": len(invalid_records),
+        "diagnostics": diagnostics,
+    }
+
+
+def helper_unit_coverage_audit(
+    test_path: Path, *, strict: bool = True
+) -> Dict[str, Any]:
     module_name = "fe04e_governance_helper_inventory"
     spec = importlib.util.spec_from_file_location(module_name, test_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load helper test inventory from {test_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    test_class = getattr(module, "GovernanceSemanticHelperTest")
-    method_names = sorted(
-        name for name in dir(test_class) if name.startswith("test_") and callable(getattr(test_class, name))
-    )
-    records: List[CoverageRecord] = []
-    for name in method_names:
-        method = getattr(test_class, name)
-        metadata = dict(getattr(method, "__fe04e_coverage__", {}))
-        source = inspect.getsource(method)
-        fixture = metadata.get("fixture", source)
-        records.append(
-            CoverageRecord(
-                id=f"HELPER:{name}",
-                category="HELPER_UNIT_TEST",
-                layer=metadata.get("layer", "L1_UNIT"),
-                entrypoint=metadata.get("entrypoint", name),
-                target_guard=metadata.get("target_guard", name),
-                expected_result=metadata.get("expected_result", "PASS"),
-                assertion_objective=metadata.get("assertion_objective", name),
-                fixture_fingerprint=coverage_fingerprint(fixture),
-                source=f"{test_path.name}:{name}",
-            )
+    test_classes = [
+        value
+        for value in vars(module).values()
+        if isinstance(value, type)
+        and any(
+            name.startswith("test_") and callable(method)
+            for name, method in vars(value).items()
         )
-    return records
+    ]
+    return helper_coverage_audit_from_classes(
+        test_classes,
+        source_label=test_path.name,
+        strict=strict,
+    )
+
+
+def helper_unit_coverage_records(test_path: Path) -> List[CoverageRecord]:
+    return list(helper_unit_coverage_audit(test_path)["records"])
 
 
 def probe_coverage_record(probe: Probe, *, legal: bool = False) -> CoverageRecord:
@@ -3302,17 +3533,164 @@ def probe_coverage_record(probe: Probe, *, legal: bool = False) -> CoverageRecor
 def deduplicate_coverage_records(
     records: Sequence[CoverageRecord],
 ) -> Tuple[List[str], Dict[str, str]]:
-    first_by_key: Dict[str, CoverageRecord] = {}
+    grouped: Dict[str, List[CoverageRecord]] = {}
+    for record in records:
+        grouped.setdefault(record.qualifying_key, []).append(record)
+
     duplicate_of: Dict[str, str] = {}
     qualifying_ids: List[str] = []
+    for key in sorted(grouped):
+        group = sorted(
+            grouped[key],
+            key=lambda record: (
+                record.id,
+                record.category,
+                record.source,
+            ),
+        )
+        primary = group[0]
+        qualifying_ids.append(primary.id)
+        for duplicate in group[1:]:
+            duplicate_of[duplicate.id] = primary.id
+    return qualifying_ids, dict(sorted(duplicate_of.items()))
+
+
+def semantic_inventory_sha256(records: Sequence[CoverageRecord]) -> str:
+    grouped: Dict[str, Mapping[str, str]] = {}
     for record in records:
-        primary = first_by_key.get(record.qualifying_key)
-        if primary is None:
-            first_by_key[record.qualifying_key] = record
-            qualifying_ids.append(record.id)
-        else:
-            duplicate_of[record.id] = primary.id
-    return qualifying_ids, duplicate_of
+        grouped.setdefault(record.qualifying_key, record.semantic_record)
+    canonical_records = [
+        grouped[key]
+        for key in sorted(
+            grouped,
+            key=lambda candidate: (
+                tuple(grouped[candidate][field] for field in sorted(grouped[candidate])),
+                candidate,
+            ),
+        )
+    ]
+    digest_source = json.dumps(
+        {"schema": "fe04e-semantic-inventory-v2", "records": canonical_records},
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(digest_source.encode("utf-8")).hexdigest()
+
+
+def summarize_coverage_records(
+    records: Sequence[CoverageRecord],
+    *,
+    helper_audit: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, object]:
+    records = list(records)
+    ids = [record.id for record in records]
+    if len(ids) != len(set(ids)):
+        duplicates = sorted(
+            item for item in set(ids) if ids.count(item) > 1
+        )
+        raise CoverageMetadataError(
+            "ERROR: DUPLICATE_INVENTORY_RECORD_ID\n"
+            + "\n".join(f"- {item}" for item in duplicates)
+        )
+
+    qualifying_ids, duplicate_of = deduplicate_coverage_records(records)
+    qualifying_set = set(qualifying_ids)
+    categories: Dict[str, Dict[str, object]] = {}
+    for category in (
+        "STATIC_ASSERTION",
+        "SEMANTIC_GUARD",
+        "HELPER_UNIT_TEST",
+        "NEGATIVE_PROBE",
+        "LEGAL_CONTROL",
+    ):
+        category_records = sorted(
+            (record for record in records if record.category == category),
+            key=lambda record: record.id,
+        )
+        category_ids = [record.id for record in category_records]
+        category_qualifying = [
+            record.id for record in category_records if record.id in qualifying_set
+        ]
+        category_duplicates = [
+            record.id for record in category_records if record.id in duplicate_of
+        ]
+        metadata_complete = len(category_records)
+        metadata_missing = 0
+        invalid_records = 0
+        duplicate_coverage_ids = 0
+        if category == "HELPER_UNIT_TEST" and helper_audit is not None:
+            metadata_complete = int(helper_audit["metadata_complete"])
+            metadata_missing = int(helper_audit["metadata_missing"])
+            invalid_records = int(helper_audit["invalid_records"])
+            duplicate_coverage_ids = int(helper_audit["duplicate_coverage_ids"])
+        categories[category] = {
+            "raw": (
+                int(helper_audit["raw"])
+                if category == "HELPER_UNIT_TEST" and helper_audit is not None
+                else len(category_ids)
+            ),
+            "metadata_complete": metadata_complete,
+            "metadata_missing": metadata_missing,
+            "invalid": invalid_records,
+            "duplicate_coverage_ids": duplicate_coverage_ids,
+            "qualifying": len(category_qualifying),
+            "ids": category_ids,
+            "qualifying_ids": category_qualifying,
+            "duplicate_ids": category_duplicates,
+        }
+
+    semantic_sha = semantic_inventory_sha256(records)
+    renamed_sha = semantic_inventory_sha256(
+        [
+            replace(
+                record,
+                source=f"renamed-helper-class/renamed-test-{index}",
+            )
+            for index, record in enumerate(records, 1)
+        ]
+    )
+    reversed_sha = semantic_inventory_sha256(list(reversed(records)))
+    alternate_path_sha = semantic_inventory_sha256(
+        [
+            replace(
+                record,
+                source=(
+                    f"/tmp/worktree-{index % 2}/renamed/{record.id}.py"
+                    if index % 2
+                    else f"/Users/example/repository/{record.id}.py"
+                ),
+            )
+            for index, record in enumerate(records, 1)
+        ]
+    )
+    metadata_missing_total = sum(
+        int(details["metadata_missing"]) for details in categories.values()
+    )
+    invalid_total = sum(int(details["invalid"]) for details in categories.values())
+    duplicate_coverage_id_total = sum(
+        int(details["duplicate_coverage_ids"]) for details in categories.values()
+    )
+    return {
+        "records": records,
+        "categories": categories,
+        "duplicate_of": duplicate_of,
+        "raw_total": sum(int(details["raw"]) for details in categories.values()),
+        "duplicate_total": len(duplicate_of),
+        "qualifying_total": len(qualifying_ids),
+        "non_qualifying_metadata_count": metadata_missing_total,
+        "invalid_record_count": invalid_total,
+        "duplicate_coverage_id_count": duplicate_coverage_id_total,
+        "digest": semantic_sha,
+        "semantic_digest": semantic_sha,
+        "rename_stability_digest": renamed_sha,
+        "reversed_order_digest": reversed_sha,
+        "alternate_path_digest": alternate_path_sha,
+        "stability_match": len(
+            {semantic_sha, renamed_sha, reversed_sha, alternate_path_sha}
+        )
+        == 1,
+    }
 
 
 def build_coverage_inventory(
@@ -3352,8 +3730,18 @@ def build_coverage_inventory(
         )
         for name in SEMANTIC_GUARD_NAMES
     )
+    helper_audit: Dict[str, Any] = {
+        "records": [],
+        "raw": 0,
+        "metadata_complete": 0,
+        "metadata_missing": 0,
+        "duplicate_coverage_ids": 0,
+        "invalid_records": 0,
+        "diagnostics": "",
+    }
     if include_helper_unit_tests:
-        records.extend(helper_unit_coverage_records(helper_test_path))
+        helper_audit = helper_unit_coverage_audit(helper_test_path)
+        records.extend(helper_audit["records"])
     records.extend(
         CoverageRecord(
             id=f"NEGATIVE:legacy-shell-{index:03d}",
@@ -3374,53 +3762,7 @@ def build_coverage_inventory(
             probe_coverage_record(probe, legal=True) for probe in legal_control_probes()
         )
 
-    qualifying_ids, duplicate_of = deduplicate_coverage_records(records)
-
-    categories: Dict[str, Dict[str, object]] = {}
-    for category in (
-        "STATIC_ASSERTION",
-        "SEMANTIC_GUARD",
-        "HELPER_UNIT_TEST",
-        "NEGATIVE_PROBE",
-        "LEGAL_CONTROL",
-    ):
-        category_records = [record for record in records if record.category == category]
-        category_ids = [record.id for record in category_records]
-        category_qualifying = [item for item in category_ids if item not in duplicate_of]
-        category_duplicates = [item for item in category_ids if item in duplicate_of]
-        categories[category] = {
-            "raw": len(category_ids),
-            "qualifying": len(category_qualifying),
-            "ids": category_ids,
-            "qualifying_ids": category_qualifying,
-            "duplicate_ids": category_duplicates,
-        }
-
-    digest_source = json.dumps(
-        {
-            "records": [
-                {
-                    "id": record.id,
-                    "key": record.qualifying_key,
-                    "source": record.source,
-                }
-                for record in records
-            ],
-            "duplicates": duplicate_of,
-        },
-        ensure_ascii=True,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return {
-        "records": records,
-        "categories": categories,
-        "duplicate_of": duplicate_of,
-        "raw_total": len(records),
-        "duplicate_total": len(duplicate_of),
-        "qualifying_total": len(qualifying_ids),
-        "digest": hashlib.sha256(digest_source.encode("utf-8")).hexdigest(),
-    }
+    return summarize_coverage_records(records, helper_audit=helper_audit)
 
 
 def print_coverage_inventory(inventory: Mapping[str, object]) -> None:
@@ -3437,6 +3779,11 @@ def print_coverage_inventory(inventory: Mapping[str, object]) -> None:
         details = categories[category]
         assert isinstance(details, dict)
         print(f"FE04E_RAW_{prefix}: {details['raw']}")
+        print(
+            f"FE04E_METADATA_COMPLETE_{prefix}: {details['metadata_complete']}"
+        )
+        print(f"FE04E_METADATA_MISSING_{prefix}: {details['metadata_missing']}")
+        print(f"FE04E_INVALID_{prefix}: {details['invalid']}")
         print(f"FE04E_QUALIFYING_{prefix}: {details['qualifying']}")
         print(f"FE04E_{prefix}_IDS: {','.join(details['ids'])}")
         print(
@@ -3457,9 +3804,33 @@ def print_coverage_inventory(inventory: Mapping[str, object]) -> None:
             "reason=same qualifying key, counted once"
         )
     print(f"FE04E_DUPLICATE_EXECUTION_COUNT: {inventory['duplicate_total']}")
+    print(
+        "FE04E_NON_QUALIFYING_METADATA_COUNT: "
+        f"{inventory['non_qualifying_metadata_count']}"
+    )
+    print(f"FE04E_INVALID_RECORD_COUNT: {inventory['invalid_record_count']}")
+    print(
+        "FE04E_DUPLICATE_COVERAGE_ID_COUNT: "
+        f"{inventory['duplicate_coverage_id_count']}"
+    )
     print(f"FE04E_RAW_EXECUTION_TOTAL: {inventory['raw_total']}")
     print(f"FE04E_QUALIFYING_UNIQUE_TOTAL: {inventory['qualifying_total']}")
-    print(f"FE04E_QUALIFYING_INVENTORY_SHA256: {inventory['digest']}")
+    print(f"FE04E_SEMANTIC_INVENTORY_SHA256: {inventory['semantic_digest']}")
+    print(
+        f"FE04E_RENAME_STABILITY_SHA256: {inventory['rename_stability_digest']}"
+    )
+    print(
+        f"FE04E_REVERSED_ORDER_SHA256: {inventory['reversed_order_digest']}"
+    )
+    print(
+        f"FE04E_ALTERNATE_PATH_SHA256: {inventory['alternate_path_digest']}"
+    )
+    print(
+        "FE04E_INVENTORY_STABILITY_MATCH: "
+        f"{'YES' if inventory['stability_match'] else 'NO'}"
+    )
+    # Compatibility key: governance gates now source it from the semantic digest.
+    print(f"FE04E_QUALIFYING_INVENTORY_SHA256: {inventory['semantic_digest']}")
 
 
 def flatten(results: Mapping[str, Sequence[Violation]]) -> List[Violation]:
@@ -3467,10 +3838,13 @@ def flatten(results: Mapping[str, Sequence[Violation]]) -> List[Violation]:
 
 
 def violation_message(violation: Violation) -> str:
+    error = (
+        f' error="{violation.error_code}"' if violation.error_code else ""
+    )
     return (
         f'FAIL: [{violation.guard}] document={violation.document} '
         f'section="{violation.scope}" category="{violation.category}" '
-        f'matched="{violation.excerpt}" expected="{violation.expected}"'
+        f'matched="{violation.excerpt}"{error} expected="{violation.expected}"'
     )
 
 
@@ -3644,11 +4018,29 @@ def main() -> int:
             include_helper_unit_tests=not args.skip_helper_unit_tests,
             include_semantic_probes=not args.skip_probes,
         )
+    except CoverageMetadataError as exc:
+        print(str(exc))
+        probe_errors += 1
     except (ImportError, OSError, RuntimeError, AttributeError) as exc:
         print(f"ERROR: FE-04E qualifying coverage inventory unavailable: {exc}")
         probe_errors += 1
     else:
         print_coverage_inventory(inventory)
+        if (
+            inventory["non_qualifying_metadata_count"]
+            or inventory["invalid_record_count"]
+            or inventory["duplicate_coverage_id_count"]
+        ):
+            print(
+                "ERROR: FE-04E qualifying coverage metadata audit did not pass"
+            )
+            probe_errors += 1
+        if not inventory["stability_match"]:
+            print(
+                "ERROR: FE-04E semantic inventory SHA changed across "
+                "rename/order/path stability probes"
+            )
+            probe_errors += 1
     print(f"FE04E_SEMANTIC_FAILURES: {len(violations) + probe_failures}")
     print(f"FE04E_SEMANTIC_ERRORS: {probe_errors}")
 
