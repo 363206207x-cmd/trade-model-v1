@@ -119,6 +119,7 @@ canonical_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_root="${FE04E_GOVERNANCE_ROOT:-$canonical_root}"
 script_path="$canonical_root/scripts/check-fe04e-governance-contract.sh"
 semantic_helper_path="$canonical_root/scripts/check_fe04e_governance_semantics.py"
+helper_test_path="$canonical_root/scripts/test_check_fe04e_governance_semantics.py"
 
 semantic_rel="docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
 interaction_rel="docs/INTERACTION_CONTRACT_V3.md"
@@ -221,6 +222,7 @@ run_negative_probe() {
 
   probe_output="$probe_root/probe-output.txt"
   if FE04E_GOVERNANCE_ROOT="$probe_root" FE04E_SKIP_NEGATIVE_PROBES=1 \
+    FE04E_SKIP_HELPER_UNIT_TESTS=1 \
     bash "$script_path" >"$probe_output" 2>&1; then
     fail "[$name] controlled regression was accepted; expected assertion=[$expected_assertion]"
   elif ! grep -Fq -- "FAIL: [$expected_assertion]" "$probe_output"; then
@@ -574,6 +576,57 @@ fi
 
 shell_negative_probes=$((tests - shell_static_assertions))
 
+helper_test_output=""
+helper_test_exit=0
+helper_unit_tests=0
+helper_unit_failures=0
+helper_unit_errors=0
+helper_unit_skipped=0
+if [[ "${FE04E_SKIP_HELPER_UNIT_TESTS:-0}" != "1" ]]; then
+  if helper_test_output="$(python3 "$helper_test_path" 2>&1)"; then
+    helper_test_exit=0
+  else
+    helper_test_exit=$?
+  fi
+  printf '%s\n' "$helper_test_output"
+
+  helper_test_count() {
+    local key="$1"
+    printf '%s\n' "$helper_test_output" | awk -F': ' -v key="$key" '
+      $1 == key {
+        print $2
+        found = 1
+        exit
+      }
+    '
+  }
+
+  helper_unit_tests="$(helper_test_count "FE04E_HELPER_UNIT_TESTS")"
+  helper_unit_failures="$(helper_test_count "FE04E_HELPER_UNIT_TEST_FAILURES")"
+  helper_unit_errors="$(helper_test_count "FE04E_HELPER_UNIT_TEST_ERRORS")"
+  helper_unit_skipped="$(helper_test_count "FE04E_HELPER_UNIT_TEST_SKIPPED")"
+  helper_counts=(
+    "$helper_unit_tests"
+    "$helper_unit_failures"
+    "$helper_unit_errors"
+    "$helper_unit_skipped"
+  )
+  for helper_value in "${helper_counts[@]}"; do
+    if [[ ! "$helper_value" =~ ^[0-9]+$ ]]; then
+      error "helper unit-test runner returned an invalid or missing count"
+      helper_test_exit=2
+      helper_unit_tests=0
+      helper_unit_failures=0
+      helper_unit_errors=0
+      helper_unit_skipped=0
+      break
+    fi
+  done
+  if [[ "$helper_test_exit" -ne 0 && "$helper_unit_failures" -eq 0 && "$helper_unit_errors" -eq 0 ]]; then
+    error "helper unit-test runner exited unexpectedly with status $helper_test_exit"
+  fi
+fi
+
 semantic_args=(--root "$repo_root")
 if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" == "1" ]]; then
   semantic_args+=(--skip-probes)
@@ -600,7 +653,7 @@ semantic_count() {
   '
 }
 
-semantic_static_assertions="$(semantic_count "FE04E_SEMANTIC_STATIC_ASSERTIONS")"
+semantic_guards="$(semantic_count "FE04E_SEMANTIC_GUARDS")"
 semantic_contradiction_guards="$(semantic_count "FE04E_CONTRADICTION_GUARDS")"
 semantic_authorization_guards="$(semantic_count "FE04E_AUTHORIZATION_SEMANTIC_GUARDS")"
 semantic_cross_file_guards="$(semantic_count "FE04E_CROSS_FILE_GUARDS")"
@@ -610,7 +663,7 @@ semantic_failures="$(semantic_count "FE04E_SEMANTIC_FAILURES")"
 semantic_errors="$(semantic_count "FE04E_SEMANTIC_ERRORS")"
 
 semantic_counts=(
-  "$semantic_static_assertions"
+  "$semantic_guards"
   "$semantic_contradiction_guards"
   "$semantic_authorization_guards"
   "$semantic_cross_file_guards"
@@ -623,7 +676,7 @@ for semantic_value in "${semantic_counts[@]}"; do
   if [[ ! "$semantic_value" =~ ^[0-9]+$ ]]; then
     error "semantic helper returned an invalid or missing count"
     semantic_exit=2
-    semantic_static_assertions=0
+    semantic_guards=0
     semantic_contradiction_guards=0
     semantic_authorization_guards=0
     semantic_cross_file_guards=0
@@ -639,13 +692,14 @@ if [[ "$semantic_exit" -ne 0 && "$semantic_failures" -eq 0 && "$semantic_errors"
   error "semantic helper exited unexpectedly with status $semantic_exit"
 fi
 
-tests=$((tests + semantic_static_assertions + semantic_adversarial_probes + semantic_legal_controls))
-failures=$((failures + semantic_failures))
-errors=$((errors + semantic_errors))
+tests=$((tests + semantic_guards + semantic_adversarial_probes + semantic_legal_controls + helper_unit_tests))
+failures=$((failures + semantic_failures + helper_unit_failures))
+errors=$((errors + semantic_errors + helper_unit_errors))
+skipped=$((skipped + helper_unit_skipped))
 
 echo "FE04E_BASE_STATIC_ASSERTIONS: $shell_static_assertions"
-echo "FE04E_SEMANTIC_STATIC_ASSERTIONS: $semantic_static_assertions"
-echo "FE04E_STATIC_ASSERTIONS: $((shell_static_assertions + semantic_static_assertions))"
+echo "FE04E_STATIC_ASSERTIONS: $shell_static_assertions"
+echo "FE04E_SEMANTIC_GUARDS: $semantic_guards"
 echo "FE04E_CONTRADICTION_GUARDS: $semantic_contradiction_guards"
 echo "FE04E_AUTHORIZATION_SEMANTIC_GUARDS: $semantic_authorization_guards"
 echo "FE04E_CROSS_FILE_GUARDS: $semantic_cross_file_guards"
@@ -653,7 +707,10 @@ echo "FE04E_LEGACY_NEGATIVE_PROBES: $shell_negative_probes"
 echo "FE04E_ADVERSARIAL_PROBES: $semantic_adversarial_probes"
 echo "FE04E_NEGATIVE_PROBES: $((shell_negative_probes + semantic_adversarial_probes))"
 echo "FE04E_LEGAL_CONTROL_PROBES: $semantic_legal_controls"
+echo "FE04E_HELPER_UNIT_TESTS: $helper_unit_tests"
+echo "FE04E_OLD_GOVERNANCE_TESTS: 152"
 echo "FE04E_GOVERNANCE_TESTS: $tests"
+echo "FE04E_COUNTING_FORMULA: $shell_static_assertions + $semantic_guards + $((shell_negative_probes + semantic_adversarial_probes)) + $semantic_legal_controls + $helper_unit_tests = $tests"
 echo "FAILURES: $failures"
 echo "ERRORS: $errors"
 echo "SKIPPED: $skipped"

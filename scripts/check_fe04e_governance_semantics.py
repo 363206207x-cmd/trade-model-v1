@@ -14,8 +14,9 @@ import re
 import sys
 import unicodedata
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 
 SEMANTIC = "docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
@@ -65,7 +66,13 @@ CROSS_FILE_GUARDS = (
     "trading cross-file consistency guard",
 )
 
-STATIC_GUARD_NAMES = CONTRADICTION_GUARDS + AUTHORIZATION_GUARDS + CROSS_FILE_GUARDS
+SCOPE_GUARDS = ("required governed scope discovery guard",)
+
+SEMANTIC_GUARD_NAMES = (
+    CONTRADICTION_GUARDS + AUTHORIZATION_GUARDS + CROSS_FILE_GUARDS + SCOPE_GUARDS
+)
+# Backward-compatible name used by the existing runner output loop.
+STATIC_GUARD_NAMES = SEMANTIC_GUARD_NAMES
 
 
 @dataclass(frozen=True)
@@ -73,6 +80,42 @@ class Scope:
     document: str
     name: str
     text: str
+
+
+@dataclass(frozen=True)
+class MarkdownSection:
+    level: int
+    title: str
+    normalized_title: str
+    heading_start: int
+    body_start: int
+    end: int
+    body: str
+
+
+@dataclass(frozen=True)
+class ScopeRequirement:
+    name: str
+    document: str
+    aliases: Tuple[str, ...]
+    body_pattern: Optional[re.Pattern[str]] = None
+
+
+class StatusClass(str, Enum):
+    SAFE = "SAFE"
+    DANGEROUS = "DANGEROUS"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True)
+class StatusDeclaration:
+    capability: str
+    classification: StatusClass
+    value: str
+    document: str
+    scope: str
+    excerpt: str
+    line: int = 0
 
 
 @dataclass(frozen=True)
@@ -101,12 +144,78 @@ def normalized(text: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
 
+HEADING_RE = re.compile(r"(?m)^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$")
+HEADING_NUMBER_PREFIX = re.compile(
+    r"^(?:(?:part|step)[ \t]+[a-z0-9一二三四五六七八九十]+|"
+    r"\d+(?:\.\d+)*)(?:[ \t]*(?:[.、:：)）\-—–]|[ \t]))*[ \t]*",
+    re.I,
+)
+
+
+def normalize_heading(title: str) -> str:
+    """Normalize harmless heading decoration without erasing capability words."""
+
+    value = unicodedata.normalize("NFKC", title).strip().strip("#").strip()
+    previous = None
+    while value != previous:
+        previous = value
+        value = HEADING_NUMBER_PREFIX.sub("", value, count=1).strip()
+    value = re.sub(r"[()\[\]{}<>（）【】《》:：,，;；/\\|+]+", " ", value)
+    value = value.replace("—", " ").replace("–", " ").replace("-", " ")
+    return re.sub(r"\s+", " ", value).strip().lower()
+
+
+def parse_markdown_sections(text: str) -> List[MarkdownSection]:
+    """Parse heading-delimited sections using Markdown hierarchy (levels 1-6)."""
+
+    matches = list(HEADING_RE.finditer(text))
+    sections: List[MarkdownSection] = []
+    for index, match in enumerate(matches):
+        level = len(match.group(1))
+        end = len(text)
+        for candidate in matches[index + 1 :]:
+            if len(candidate.group(1)) <= level:
+                end = candidate.start()
+                break
+        body_start = match.end()
+        sections.append(
+            MarkdownSection(
+                level=level,
+                title=match.group(2).strip(),
+                normalized_title=normalize_heading(match.group(2)),
+                heading_start=match.start(),
+                body_start=body_start,
+                end=end,
+                body=text[body_start:end].strip(),
+            )
+        )
+    return sections
+
+
+def heading_matches_alias(title: str, alias: str) -> bool:
+    title_tokens = set(normalize_heading(title).split())
+    alias_tokens = set(normalize_heading(alias).split())
+    return bool(alias_tokens) and alias_tokens.issubset(title_tokens)
+
+
+def find_markdown_sections(text: str, aliases: Sequence[str]) -> List[MarkdownSection]:
+    """Return every section whose normalized heading matches any accepted alias."""
+
+    return [
+        section
+        for section in parse_markdown_sections(text)
+        if any(heading_matches_alias(section.title, alias) for alias in aliases)
+    ]
+
+
 def excerpt(text: str, limit: int = 220) -> str:
     value = re.sub(r"\s+", " ", text).strip()
     return value if len(value) <= limit else value[: limit - 3] + "..."
 
 
 def extract_between(text: str, start: str, end: str) -> str:
+    """Compatibility helper for marker-delimited, non-heading governance facts."""
+
     start_match = re.search(rf"(?m)^{re.escape(start)}\s*$", text)
     if not start_match:
         return ""
@@ -156,65 +265,82 @@ def logical_units(text: str) -> List[str]:
     return units
 
 
-def markdown_section_scope(
+def statement_units(text: str) -> List[str]:
+    """Split prose declarations without separating Markdown table labels/values."""
+
+    statements: List[str] = []
+    for unit in logical_units(text):
+        if unit.lstrip().startswith("|"):
+            statements.append(unit)
+            continue
+        for part in re.split(r"(?<=[.!?。！？;；])\s+|[;；](?=\s*\w)", unit):
+            value = part.strip()
+            if value:
+                statements.append(value)
+    return statements
+
+
+def markdown_alias_scopes(
     documents: Mapping[str, str],
     document: str,
     name: str,
-    start: str,
-    end: str,
-) -> Scope:
-    return Scope(document, name, extract_between(documents[document], start, end))
+    aliases: Sequence[str],
+) -> List[Scope]:
+    return [
+        Scope(document, f"{name} [{section.title}]", section.body)
+        for section in find_markdown_sections(documents[document], aliases)
+    ]
+
+
+def public_opportunity_segment(text: str) -> str:
+    """Keep only the public OPPORTUNITY domain inside a mixed Message section."""
+
+    start = re.search(
+        r"(?im)^(?:Push Detail remains|Authenticated shared.*OPPORTUNITY|"
+        r"Public [`']?OPPORTUNITY)",
+        text,
+    )
+    if not start:
+        return text
+    end = re.search(
+        r"(?im)^(?:(?:[-*]\s*)?Owner[\s-]*scoped\s+[`']?POSITION_RISK[`']?|"
+        r"(?:[-*]\s*)?[`']?POSITION_RISK[`']?\s+is\s+[`']?OWNER_SCOPED)",
+        text[start.start() :],
+    )
+    end_index = len(text) if not end else start.start() + end.start()
+    return text[start.start() : end_index].strip()
 
 
 def opportunity_scopes(documents: Mapping[str, str]) -> List[Scope]:
-    semantic_window = extract_marker_window(
-        documents[SEMANTIC],
-        "Push Detail remains review-only and source-specific.",
-        "Owner-scoped `POSITION_RISK` detail remains a separate",
+    scopes: List[Scope] = []
+    for scope in markdown_alias_scopes(
+        documents,
+        SEMANTIC,
+        "Message/Telegram public OPPORTUNITY",
+        ("message telegram", "telegram authorization", "telegram status", "通知 telegram"),
+    ):
+        scopes.append(Scope(scope.document, scope.name, public_opportunity_segment(scope.text)))
+    scopes.extend(
+        markdown_alias_scopes(documents, INTERACTION, "Overview Dashboard public OPPORTUNITY", ("overview dashboard",))
     )
-    return [
-        Scope(SEMANTIC, "Message And Telegram V2 / public OPPORTUNITY", semantic_window),
-        markdown_section_scope(
+    scopes.extend(
+        markdown_alias_scopes(documents, INTERACTION, "Mobile Push Detail public OPPORTUNITY", ("mobile push detail", "push detail"))
+    )
+    scopes.extend(
+        markdown_alias_scopes(documents, INTERACTION, "Mobile Message Center public OPPORTUNITY", ("mobile message center", "message center"))
+    )
+    scopes.extend(
+        markdown_alias_scopes(documents, STATE, "FE-04E public OPPORTUNITY boundary", ("fe 04e privacy state", "fe 04e privacy"))
+    )
+    scopes.extend(
+        markdown_alias_scopes(
             documents,
-            INTERACTION,
-            "Overview Dashboard",
-            "### 3.1 Overview Dashboard",
-            "### 3.2 Evidence & Scoring",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Mobile Push Detail",
-            "### 3.10 Mobile Push Detail",
-            "### 3.11 Mobile Profile & Settings",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Mobile Message Center",
-            "### 3.12 Mobile Message Center",
-            "### 3.13 AI Analysis And Asset Search",
-        ),
-        markdown_section_scope(
-            documents,
-            STATE,
-            "FE-04E Privacy/State Foundation And UI Readiness Boundary",
-            "### FE-04E Privacy/State Foundation And UI Readiness Boundary",
-            "## P3-U2 iPhone Private Test App Foundation",
-        ),
-        Scope(
             CHANGE_LOG,
-            "v1.0-fe04e-privacy-state-foundation-effective-merged-main",
-            extract_between(
-                documents[CHANGE_LOG],
-                "## v1.0-fe04e-privacy-state-foundation-effective-merged-main",
-                "__END_OF_FILE__",
-            )
-            or documents[CHANGE_LOG].split(
-                "## v1.0-fe04e-privacy-state-foundation-effective-merged-main", 1
-            )[-1],
-        ),
-    ]
+            "FE-04E merged-main public OPPORTUNITY record",
+            ("fe04e privacy state foundation effective merged main",),
+        )
+    )
+    return scopes
 
 
 PRIVATE_ENTITY_PATTERNS = {
@@ -226,13 +352,19 @@ PRIVATE_ENTITY_PATTERNS = {
     ),
     "private execution": re.compile(
         r"\bexecution[\s_-]+status\b|\bprivate[\s_-]+execution\b|"
-        r"\bexecution[\s_-]+(?:completed|failed)\b",
+        r"\bexecution[\s_-]+(?:result|completion|completed|failed|pending)\b|"
+        r"\b(?:completed|failed|pending)\b|\bexecuted\b|"
+        r"\bcompletion[\s_-]+state\b",
         re.I,
     ),
     "UserPosition/private risk": re.compile(
         r"\buserposition\b|\bcurrent\s+user(?:'s)?\s+position\b|"
         r"\buser\s+scoped\s+context\b|\baccount\s+risk\b|"
-        r"\bposition\s+risk\b|\bprivate\s+risk\b",
+        r"\bposition\s+risk\b|\bprivate\s+risk\b|"
+        r"\b(?:long|short|flat|no[\s-]*position)\b|"
+        r"\bposition\s+direction\b|\bholding\s+state\b|"
+        r"\bcaller\s+position\b|\buser\s+exposure\b|"
+        r"多仓|空仓|无仓",
         re.I,
     ),
 }
@@ -242,9 +374,11 @@ UNSAFE_RELATION = re.compile(
     r"\bcan\s+(?:be\s+)?(?:use|consult|supplement|influence|refine|participate)|"
     r"\b(?:used|consulted|consumed)\s+as\b|\bauxiliary\b|\boptional\b|"
     r"\bfallback\b|\bwhen\s+available\b|\bmay\s+determine\b|"
-    r"\b(?:influences?|determines?|refines?|supplements?|participates?|alters?|changes?)\b|"
+    r"\b(?:influences?|determines?|refines?|supplements?|participates?|alters?|changes?|"
+    r"affects?|gates?|produces?)\b|"
+    r"\bmaps?\b.{0,60}\bto\b|\bwaits?\s+for\b|"
     r"\brequired\s+for\b|\binput\s+(?:to|for)\b|\bfor\s+accuracy\b|"
-    r"\bbest\s+effort\b",
+    r"\bused\s+(?:internally|in|to)\b|\bbest\s+effort\b",
     re.I,
 )
 
@@ -267,7 +401,8 @@ SAFE_PROHIBITION = re.compile(
 
 PUBLIC_STATE_CONTEXT = re.compile(
     r"\bpublic\b|\bopportunity\b|\breadiness\b|\blifecycle\b|"
-    r"\bevaluation\b|\bstate\b|\bstatus\b|\bready\b|\berror\b",
+    r"\bevaluation\b|\bresult\b|\bvisibility\b|\bstate\b|\bstatus\b|"
+    r"\bready\b|\bpartial\b|\berror\b",
     re.I,
 )
 
@@ -276,12 +411,7 @@ def contradiction_units(scopes: Iterable[Scope]) -> Iterable[Tuple[Scope, str]]:
     for scope in scopes:
         if not scope.text:
             continue
-        for unit in logical_units(scope.text):
-            unit_normal = normalized(unit)
-            if scope.document != SEMANTIC and not (
-                "public" in unit_normal or "opportunity" in unit_normal
-            ):
-                continue
+        for unit in statement_units(scope.text):
             yield scope, unit
 
 
@@ -368,7 +498,8 @@ CAPABILITY_PATTERNS = {
     ),
     "automatic notification": re.compile(
         r"\bautomatic[\s_-]*notifications?\b|"
-        r"\bauto[\s_-]*(?:notify|notification|send)\b",
+        r"\bautomatic[\s_-]*delivery\b|"
+        r"\bauto[\s_-]*(?:notify|notification|send|delivery)\b",
         re.I,
     ),
     "trading": re.compile(
@@ -390,9 +521,10 @@ SAFE_STATUS = re.compile(
     r"\bno\b.{0,220}\b(?:authorized|enabled|implemented|active|allowed|available|supported)\b|"
     r"\b(?:disabled|blocked|prohibited|forbidden)\b|"
     r"\brequires?\s+separate\s+(?:future\s+)?authorization\b|"
-    r"\bfuture\s+extension\s+only\b|\bpending\s+implementation\b|"
+    r"\bfuture\s+(?:delivery\s+outlet|extension)\s+only\b|\bpending\s+implementation\b|"
     r"\bpermitted\s+future\b.{0,80}\bcategories?\b|"
-    r"\bnot\s+connected\b|\bno\s+delivery\b|\breadiness\s+gate\s+required\b|"
+    r"\bnot\s+connected\b|\bwaiting\s+sync\b|\bno\s+(?:delivery|send|trading)\b|"
+    r"\bnot\s+started\b|\breadiness\s+gate\s+required\b|"
     r"\bmovement\s*(?::|=|\||-)\s*none\b|\bread[\s_-]*only\b|"
     r"\bmust\s+not\b|\bnever\b",
     re.I,
@@ -419,59 +551,25 @@ def selected_markdown_scopes(documents: Mapping[str, str]) -> List[Scope]:
             re.I,
         )
     )
-    return [
-        markdown_section_scope(
-            documents,
-            SEMANTIC,
-            "Message And Telegram V2",
-            "## 7. Message And Telegram V2",
-            "## 8. Search Asset V2",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Product Identity and Safety Contract",
-            "## 1. Product Identity and Safety Contract",
-            "## 2. Page Navigation Structure",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Mobile Push Detail",
-            "### 3.10 Mobile Push Detail",
-            "### 3.11 Mobile Profile & Settings",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Mobile Message Center",
-            "### 3.12 Mobile Message Center",
-            "### 3.13 AI Analysis And Asset Search",
-        ),
-        markdown_section_scope(
-            documents,
-            INTERACTION,
-            "Prohibited prototype behavior",
-            "### 8.2 Prohibited prototype behavior",
-            "## 9. Implementation Readiness",
-        ),
-        markdown_section_scope(
-            documents,
-            STATE,
-            "FE-04E Privacy/State Foundation And UI Readiness Boundary",
-            "### FE-04E Privacy/State Foundation And UI Readiness Boundary",
-            "## P3-U2 iPhone Private Test App Foundation",
-        ),
-        Scope(MATRIX, "FE-04 delivery matrix row", matrix_row),
-        Scope(CAPABILITY, "capability matrix frozen rows", capability_rows),
-        markdown_section_scope(
-            documents,
-            DELIVERY,
-            "Permanent Safety Rules",
-            "## 4. Permanent Safety Rules / 永久安全规则",
-            "## 5. Development Order Gate / 开发顺序总门禁",
-        ),
-    ]
+    scopes: List[Scope] = []
+    specs = (
+        (SEMANTIC, "Message And Telegram V2", ("message telegram", "telegram authorization", "telegram status", "通知 telegram")),
+        (INTERACTION, "Product Identity and Safety Contract", ("product identity safety contract", "safety contract")),
+        (INTERACTION, "Mobile Push Detail", ("mobile push detail", "push detail")),
+        (INTERACTION, "Mobile Message Center", ("mobile message center", "message center")),
+        (INTERACTION, "Prohibited prototype behavior", ("prohibited prototype behavior",)),
+        (STATE, "FE-04E Privacy/State Foundation", ("fe 04e privacy state", "fe 04e privacy")),
+        (DELIVERY, "Permanent Safety Rules", ("permanent safety rules", "永久安全规则")),
+    )
+    for document, name, aliases in specs:
+        scopes.extend(markdown_alias_scopes(documents, document, name, aliases))
+    scopes.extend(
+        (
+            Scope(MATRIX, "FE-04 delivery matrix row", matrix_row),
+            Scope(CAPABILITY, "capability matrix frozen rows", capability_rows),
+        )
+    )
+    return scopes
 
 
 def yaml_entries(text: str) -> List[Tuple[str, str, str]]:
@@ -502,37 +600,236 @@ def yaml_entries(text: str) -> List[Tuple[str, str, str]]:
     return entries
 
 
+REQUIRED_SCOPE_REQUIREMENTS = (
+    ScopeRequirement(
+        "Telegram",
+        SEMANTIC,
+        ("message telegram", "telegram authorization", "telegram status", "通知 telegram"),
+        re.compile(r"\btelegram\b", re.I),
+    ),
+    ScopeRequirement(
+        "system notification",
+        SEMANTIC,
+        ("old new contract difference", "contract difference"),
+        re.compile(r"\bsystem[\s-]*notifications?\b", re.I),
+    ),
+    ScopeRequirement(
+        "external notification",
+        STATE,
+        ("fe 04e privacy state", "fe 04e privacy"),
+        re.compile(r"\bexternal[\s-]*(?:notification|send|delivery)", re.I),
+    ),
+    ScopeRequirement(
+        "automatic notification",
+        STATE,
+        ("fe 04e privacy state", "fe 04e privacy"),
+        re.compile(r"\bautomatic[\s-]*notification", re.I),
+    ),
+    ScopeRequirement(
+        "trading capability",
+        STATE,
+        ("fe 04e privacy state", "fe 04e privacy"),
+        re.compile(r"\btrading\s+capability\b", re.I),
+    ),
+    ScopeRequirement(
+        "Public OPPORTUNITY contract",
+        SEMANTIC,
+        ("message telegram", "telegram authorization", "telegram status", "通知 telegram"),
+        re.compile(r"\bOPPORTUNITY\b", re.I),
+    ),
+    ScopeRequirement(
+        "POSITION_RISK contract",
+        SEMANTIC,
+        ("message telegram", "telegram authorization", "telegram status", "通知 telegram"),
+        re.compile(r"\bPOSITION_RISK\b", re.I),
+    ),
+)
+
+
+def required_scope_violations(documents: Mapping[str, str]) -> List[Violation]:
+    guard = "required governed scope discovery guard"
+    violations: List[Violation] = []
+    for requirement in REQUIRED_SCOPE_REQUIREMENTS:
+        sections = find_markdown_sections(
+            documents[requirement.document], requirement.aliases
+        )
+        aliases = ", ".join(requirement.aliases)
+        if not sections:
+            violations.append(
+                Violation(
+                    guard,
+                    requirement.document,
+                    requirement.name,
+                    "FAIL_CLOSED_MISSING_SCOPE",
+                    f"parser result=0 sections; searched aliases=[{aliases}]",
+                    "restore a non-empty governed capability section and rerun the semantic gate",
+                )
+            )
+            continue
+        for section in sections:
+            if not section.body.strip():
+                violations.append(
+                    Violation(
+                        guard,
+                        requirement.document,
+                        f"{requirement.name} [{section.title}]",
+                        "FAIL_CLOSED_EMPTY_SCOPE",
+                        f"parser result=empty section; searched aliases=[{aliases}]",
+                        "add explicit governed status text; an empty capability scope cannot pass",
+                    )
+                )
+        if requirement.body_pattern and not any(
+            requirement.body_pattern.search(section.body) for section in sections
+        ):
+            violations.append(
+                Violation(
+                    guard,
+                    requirement.document,
+                    requirement.name,
+                    "FAIL_CLOSED_SCOPE_CONTENT_MISSING",
+                    f"parser result={len(sections)} section(s) but required capability text missing; aliases=[{aliases}]",
+                    "restore the explicit capability contract inside the discovered scope",
+                )
+            )
+
+    yaml_requirements = (
+        (NEXT_TASK, "module"),
+        (NEXT_TASK, "next_allowed_action"),
+        (ACTIVE, "next_required_action"),
+    )
+    for document, required_leaf in yaml_requirements:
+        matches = [
+            (path, value)
+            for path, value, _ in yaml_entries(documents[document])
+            if path.split(".")[-1] == required_leaf
+        ]
+        if not matches or any(not value.strip() for _, value in matches):
+            violations.append(
+                Violation(
+                    guard,
+                    document,
+                    "next task",
+                    "FAIL_CLOSED_MISSING_OR_EMPTY_NEXT_TASK_SCOPE",
+                    f"expected non-empty YAML key={required_leaf}; parser result={matches or 'missing'}",
+                    "restore an explicit read-only readiness/governance next-task declaration",
+                )
+            )
+    return violations
+
+
 def capability_in_text(capability: str, text: str) -> bool:
     return bool(CAPABILITY_PATTERNS[capability].search(normalized(text)))
 
 
-def positive_assignment(capability: str, text: str) -> bool:
+def is_negated(text: str, start: int) -> bool:
+    prefix = text[max(0, start - 280) : start]
+    if re.match(r"^\s*no\b", text[:start], re.I):
+        return True
+    return bool(
+        re.search(
+            r"(?:\bnot\b|\bno\b|\bnever\b|\bwithout\b|\bmust\s+not\b|"
+            r"\b(?:blocked|disabled|prohibited|forbidden)\b).{0,250}$",
+            prefix,
+            re.I,
+        )
+    )
+
+
+def dangerous_assignment(capability: str, text: str) -> bool:
+    """Detect positive capability authorization without allowing safe masking."""
+
     capability_pattern = CAPABILITY_PATTERNS[capability]
     search_text = normalized(text)
     for match in capability_pattern.finditer(search_text):
-        window_start = max(0, match.start() - 45)
-        window_end = min(len(search_text), match.end() + 120)
-        window = search_text[window_start:window_end]
-        positive = POSITIVE_STATUS.search(search_text, match.end(), window_end)
-        if not positive:
-            continue
-        relationship = search_text[match.end() : positive.end()]
-        if not (
-            ASSIGNMENT_CONNECTOR.search(relationship)
-            or re.search(
-                r"\b(?:authori[sz]e|enable|implement|activate|allow|support|permit)\w*\b",
-                relationship,
-                re.I,
-            )
-        ):
-            continue
-        polarity_window = window
-        if SAFE_STATUS.search(polarity_window) and not re.search(
-            r"\b(?:but|however|except|unless)\b", polarity_window, re.I
-        ):
-            continue
-        return True
+        window_end = min(len(search_text), match.end() + 160)
+        for positive in POSITIVE_STATUS.finditer(search_text, match.end(), window_end):
+            if is_negated(search_text, positive.start()):
+                continue
+            relationship = search_text[match.end() : positive.start()]
+            if (
+                ASSIGNMENT_CONNECTOR.search(relationship)
+                or len(relationship.split()) <= 4
+                or re.search(
+                    r"\b(?:authori[sz]e|enable|implement|activate|allow|support|permit)\w*\b",
+                    relationship,
+                    re.I,
+                )
+            ):
+                return True
+        prefix = search_text[max(0, match.start() - 90) : match.start()]
+        command = re.search(
+            r"\b(?:authori[sz]e|enable|implement|activate|allow|support)\w*\b"
+            r"\s+(?:the\s+)?$",
+            prefix,
+            re.I,
+        )
+        if command and not is_negated(prefix, command.start()):
+            return True
     return False
+
+
+def status_declarations_for_text(
+    capability: str,
+    text: str,
+    document: str = "<memory>",
+    scope: str = "<statement>",
+    line: int = 0,
+) -> List[StatusDeclaration]:
+    """Classify every explicit capability status in one prose/table statement."""
+
+    if not capability_in_text(capability, text):
+        return []
+    declarations: List[StatusDeclaration] = []
+    if SAFE_STATUS.search(normalized(text)):
+        declarations.append(
+            StatusDeclaration(
+                capability,
+                StatusClass.SAFE,
+                "SAFE",
+                document,
+                scope,
+                excerpt(text),
+                line,
+            )
+        )
+    if dangerous_assignment(capability, text):
+        declarations.append(
+            StatusDeclaration(
+                capability,
+                StatusClass.DANGEROUS,
+                "DANGEROUS",
+                document,
+                scope,
+                excerpt(text),
+                line,
+            )
+        )
+    explicit_status = re.search(
+        r"\b(?:status|authori[sz]ation|capability|movement|implementation|"
+        r"enabled|active|auto[\s_-]*send)\b\s*(?::|=|\||\bis\b|\bare\b)",
+        normalized(text),
+        re.I,
+    )
+    if explicit_status and not declarations:
+        declarations.append(
+            StatusDeclaration(
+                capability,
+                StatusClass.UNKNOWN,
+                "UNKNOWN",
+                document,
+                scope,
+                excerpt(text),
+                line,
+            )
+        )
+    return declarations
+
+
+def positive_assignment(capability: str, text: str) -> bool:
+    return any(
+        item.classification == StatusClass.DANGEROUS
+        for item in status_declarations_for_text(capability, text)
+    )
 
 
 def relevant_yaml_path(capability: str, path: str, value: str) -> bool:
@@ -543,14 +840,15 @@ def relevant_yaml_path(capability: str, path: str, value: str) -> bool:
     )
 
 
-def yaml_authorized(capability: str, path: str, value: str) -> bool:
-    if not relevant_yaml_path(capability, path, value):
-        return False
-    combined = f"{path}: {value}"
+def classify_yaml_value(path: str, value: str) -> Optional[StatusClass]:
     value_normal = normalized(value)
     path_normal = normalized(path)
-    if SAFE_STATUS.search(combined):
-        return False
+    if not value_normal:
+        return None
+    if value_normal in {"0", "false", "no", "off", "none"}:
+        return StatusClass.SAFE
+    if SAFE_STATUS.search(normalized(f"{path}: {value}")):
+        return StatusClass.SAFE
     if value_normal in {
         "authorized",
         "enabled",
@@ -565,134 +863,176 @@ def yaml_authorized(capability: str, path: str, value: str) -> bool:
         "on",
         "granted",
         "permitted",
+        "limited",
+        "expanded",
+        "partial",
+        "read only plus",
     }:
-        return True
-    if POSITIVE_STATUS.search(value) and positive_assignment(capability, combined):
-        return True
+        return StatusClass.DANGEROUS
     if value_normal in {"true", "yes", "on"} and re.search(
         r"\b(?:authorized|enabled|active|allowed|implemented|send|delivery)\b",
         path_normal,
     ):
+        return StatusClass.DANGEROUS
+    if re.search(
+        r"\b(?:status|authori[sz]ation|enabled|active|implemented|send|delivery|movement)\b",
+        path_normal,
+    ):
+        return StatusClass.UNKNOWN
+    return None
+
+
+def yaml_status_declarations(
+    capability: str, document: str, text: str
+) -> List[StatusDeclaration]:
+    declarations: List[StatusDeclaration] = []
+    for path, value, raw in yaml_entries(text):
+        if not relevant_yaml_path(capability, path, value):
+            continue
+        path_has_capability = capability_in_text(capability, path)
+        pieces = [part.strip() for part in re.split(r"[;；]", value) if part.strip()]
+        if not pieces and value:
+            pieces = [value]
+        for piece in pieces:
+            classification = classify_yaml_value(path, piece) if path_has_capability else None
+            if classification is not None:
+                declarations.append(
+                    StatusDeclaration(
+                        capability,
+                        classification,
+                        normalized(piece) or "<empty>",
+                        document,
+                        path or "<list item>",
+                        excerpt(raw),
+                    )
+                )
+                continue
+            prose_units = statement_units(piece) or [piece]
+            for prose_unit in prose_units:
+                statement = (
+                    f"{capability} {prose_unit}" if path_has_capability else prose_unit
+                )
+                declarations.extend(
+                    status_declarations_for_text(
+                        capability,
+                        statement,
+                        document,
+                        path or "<list item>",
+                    )
+                )
+    return declarations
+
+
+def yaml_authorized(capability: str, path: str, value: str) -> bool:
+    if not relevant_yaml_path(capability, path, value):
+        return False
+    classification = classify_yaml_value(path, value)
+    if classification == StatusClass.DANGEROUS:
         return True
-    return False
+    return dangerous_assignment(capability, f"{path}: {value}")
+
+
+def aggregate_authorization_violation(
+    capability: str,
+    guard: str,
+    declarations: Sequence[StatusDeclaration],
+) -> List[Violation]:
+    unique: List[StatusDeclaration] = []
+    seen = set()
+    for declaration in declarations:
+        key = (
+            declaration.classification,
+            declaration.value,
+            declaration.document,
+            declaration.scope,
+            declaration.excerpt,
+        )
+        if key not in seen:
+            seen.add(key)
+            unique.append(declaration)
+    dangerous = [item for item in unique if item.classification == StatusClass.DANGEROUS]
+    unknown = [item for item in unique if item.classification == StatusClass.UNKNOWN]
+    safe = [item for item in unique if item.classification == StatusClass.SAFE]
+    if not dangerous and not unknown:
+        return []
+    if dangerous and safe:
+        category = "CONTRADICTORY_AUTHORIZATION"
+    elif unknown:
+        category = "UNKNOWN_OR_AMBIGUOUS_AUTHORIZATION"
+    else:
+        category = f"{capability} authorization"
+    values = "; ".join(
+        f"{item.classification.value}:{item.value}@{item.document}:{item.scope}"
+        for item in unique
+    )
+    first = (dangerous or unknown)[0]
+    return [
+        Violation(
+            guard,
+            first.document,
+            first.scope,
+            category,
+            excerpt(f"capability={capability}; all detected values=[{values}]", 700),
+            f"{capability} expects only explicit compatible SAFE values; any DANGEROUS or UNKNOWN value blocks",
+        )
+    ]
 
 
 def authorization_violations(
     documents: Mapping[str, str], capability: str, guard: str
 ) -> List[Violation]:
-    violations: List[Violation] = []
+    declarations: List[StatusDeclaration] = []
     for document in (ACTIVE, NEXT_TASK):
-        for path, value, raw in yaml_entries(documents[document]):
-            if (
-                capability != "trading"
-                and capability_in_text(capability, path)
-                and "capability movement" in normalized(path)
-                and normalized(value) != "none"
-            ):
-                violations.append(
-                    Violation(
-                        guard,
-                        document,
-                        path,
-                        f"{capability} capability movement",
-                        excerpt(raw),
-                        f"{capability} capability movement must remain NONE",
-                    )
-                )
-                continue
-            if yaml_authorized(capability, path, value):
-                violations.append(
-                    Violation(
-                        guard,
-                        document,
-                        path or "<list item>",
-                        f"{capability} authorization",
-                        excerpt(raw),
-                        f"{capability} must remain not implemented and not authorized",
-                    )
-                )
+        declarations.extend(yaml_status_declarations(capability, document, documents[document]))
     for scope in selected_markdown_scopes(documents):
-        if not scope.text:
-            continue
-        for unit in logical_units(scope.text):
-            movement = re.search(
-                r"capability[\s_-]+movement"
-                r"\s*(?::|=|\||—|-|\bis\b)\s*([A-Za-z0-9_-]+)",
-                unit,
-                re.I,
+        for unit in statement_units(scope.text):
+            declarations.extend(
+                status_declarations_for_text(
+                    capability,
+                    unit,
+                    scope.document,
+                    scope.name,
+                )
             )
-            if (
-                capability != "trading"
-                and capability_in_text(capability, unit)
-                and movement
-                and normalized(movement.group(1)) != "none"
-            ):
-                violations.append(
-                    Violation(
-                        guard,
-                        scope.document,
-                        scope.name,
-                        f"{capability} capability movement",
-                        excerpt(unit),
-                        f"{capability} capability movement must remain NONE",
-                    )
-                )
-                continue
-            if positive_assignment(capability, unit):
-                violations.append(
-                    Violation(
-                        guard,
-                        scope.document,
-                        scope.name,
-                        f"{capability} authorization",
-                        excerpt(unit),
-                        f"{capability} must remain not implemented and not authorized",
-                    )
-                )
-    return violations
+    return aggregate_authorization_violation(capability, guard, declarations)
+
+
+TRADING_MOVEMENT_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:trading[\s_-]*)?capability[\s_-]*movement\b"
+    r"\s*(?::|=|\||—|-|\bis\b)\s*([A-Za-z0-9_-]+)",
+    re.I,
+)
+
+
+def trading_movement_values(
+    text: str, document: str = "<memory>", scope: str = "trading movement"
+) -> List[StatusDeclaration]:
+    declarations: List[StatusDeclaration] = []
+    for match in TRADING_MOVEMENT_PATTERN.finditer(text):
+        value = normalized(match.group(1))
+        line = text.count("\n", 0, match.start()) + 1
+        declarations.append(
+            StatusDeclaration(
+                "trading capability movement",
+                StatusClass.SAFE if value == "none" else StatusClass.DANGEROUS,
+                value,
+                document,
+                scope,
+                excerpt(match.group(0)),
+                line,
+            )
+        )
+    return declarations
 
 
 def trading_movement_violations(documents: Mapping[str, str]) -> List[Violation]:
     guard = "trading capability movement guard"
-    violations: List[Violation] = []
-    movement_key = re.compile(r"\btrading[\s_-]*capability[\s_-]*movement\b", re.I)
-    for document in (ACTIVE, NEXT_TASK):
-        for path, value, raw in yaml_entries(documents[document]):
-            if not movement_key.search(path):
-                continue
-            if normalized(value) != "none":
-                violations.append(
-                    Violation(
-                        guard,
-                        document,
-                        path,
-                        "trading capability movement",
-                        excerpt(raw),
-                        "TRADING_CAPABILITY_MOVEMENT must remain NONE",
-                    )
-                )
-    for scope in selected_markdown_scopes(documents):
-        for unit in logical_units(scope.text):
-            if not movement_key.search(unit):
-                continue
-            match = re.search(
-                r"trading[\s_-]*capability[\s_-]*movement"
-                r"\s*(?::|=|\||—|-|\bis\b)\s*([A-Za-z0-9_-]+)",
-                unit,
-                re.I,
-            )
-            if match and normalized(match.group(1)) != "none":
-                violations.append(
-                    Violation(
-                        guard,
-                        scope.document,
-                        scope.name,
-                        "trading capability movement",
-                        excerpt(unit),
-                        "TRADING_CAPABILITY_MOVEMENT must remain NONE",
-                    )
-                )
-    return violations
+    declarations: List[StatusDeclaration] = []
+    for document, text in documents.items():
+        declarations.extend(trading_movement_values(text, document))
+    return aggregate_authorization_violation(
+        "trading capability movement", guard, declarations
+    )
 
 
 def pushrecheck_trade_violations(documents: Mapping[str, str]) -> List[Violation]:
@@ -743,9 +1083,50 @@ def pushrecheck_trade_violations(documents: Mapping[str, str]) -> List[Violation
     return violations
 
 
+NEXT_TASK_ALLOWED_ACTION = re.compile(
+    r"\b(?:review|re[\s-]*evaluat\w*|audit|verify|inspect|confirm|compare|"
+    r"assess\w*|validate\w*|read[\s-]*only\s+gate|output)\b|"
+    r"\b(?:readiness|governance)\s+(?:assessment|validation|review|gate)\b",
+    re.I,
+)
+NEXT_TASK_FORBIDDEN_TARGET = re.compile(
+    r"\b(?:message\s*(?:center|push)?\s*ui|push\s*detail\s*ui|telegram|"
+    r"system\s*notifications?|external\s*notifications?|automatic\s*notifications?|"
+    r"automatic\s+delivery|auto\s+delivery|push\s+notifications?|mutation|"
+    r"write\s+action|unread\s+count|fake\s+count|order|trade|trading|"
+    r"close|reverse|execution|delivery|notification)\b",
+    re.I,
+)
+NEXT_TASK_FORBIDDEN_ACTION = re.compile(
+    r"\b(?:implement(?:ation)?|build|add|create|modify|mutate|mutation|write|"
+    r"send|deliver|delivery|enable|activate|trigger|execute|dispatch)\w*\b",
+    re.I,
+)
+
+
+def classify_next_task_statement(text: str) -> StatusClass:
+    value = normalized(text)
+    dangerous_actions = [
+        match
+        for match in NEXT_TASK_FORBIDDEN_ACTION.finditer(value)
+        if not is_negated(value, match.start())
+        and not re.search(
+            r"\b(?:review|verify|audit)\b.{0,45}\b(?:prohibition|boundary|absence)\b",
+            value[max(0, match.start() - 55) : match.end() + 55],
+            re.I,
+        )
+    ]
+    if dangerous_actions and NEXT_TASK_FORBIDDEN_TARGET.search(value):
+        return StatusClass.DANGEROUS
+    if NEXT_TASK_ALLOWED_ACTION.search(value):
+        return StatusClass.SAFE
+    if NEXT_TASK_FORBIDDEN_TARGET.search(value) and SAFE_STATUS.search(value):
+        return StatusClass.SAFE
+    return StatusClass.UNKNOWN
+
+
 def next_task_violations(documents: Mapping[str, str]) -> List[Violation]:
     guard = "next-task capability authorization guard"
-    violations: List[Violation] = []
     target_paths = {
         "module",
         "next_business_phase",
@@ -753,35 +1134,23 @@ def next_task_violations(documents: Mapping[str, str]) -> List[Violation]:
         "next_required_action",
         "allowed_scope",
     }
-    forbidden_target = re.compile(
-        r"\b(?:message\s*(?:center|push)\s*ui|push\s*detail\s*ui|telegram|"
-        r"system\s*notification|external\s*notification|automatic\s*notification|"
-        r"trading|order\s*execution)\b",
-        re.I,
-    )
-    delivery_action = re.compile(
-        r"\b(?:implementation|implement|delivery|send|enable|activate|execute)\b", re.I
-    )
-    for path, value, raw in yaml_entries(documents[NEXT_TASK]):
-        leaf = path.split(".")[-1]
-        if leaf not in target_paths:
-            continue
-        if forbidden_target.search(value) and delivery_action.search(value):
-            if re.search(r"\b(?:readiness|governance|inspect|re-evaluat)\b", value, re.I):
+    declarations: List[StatusDeclaration] = []
+    for document in (NEXT_TASK, ACTIVE):
+        for path, value, raw in yaml_entries(documents[document]):
+            leaf = path.split(".")[-1]
+            if leaf not in target_paths or not value.strip():
                 continue
-            if SAFE_STATUS.search(value):
-                continue
-            violations.append(
-                Violation(
-                    guard,
-                    NEXT_TASK,
+            declarations.append(
+                StatusDeclaration(
+                    "next task",
+                    classify_next_task_statement(value),
+                    normalized(value),
+                    document,
                     path,
-                    "next-task capability authorization",
                     excerpt(raw),
-                    "next task must remain read-only readiness/governance re-evaluation",
                 )
             )
-    return violations
+    return aggregate_authorization_violation("next task", guard, declarations)
 
 
 def required_markers_missing(
@@ -808,6 +1177,10 @@ def required_markers_missing(
 
 def evaluate(documents: Mapping[str, str]) -> Dict[str, List[Violation]]:
     results: Dict[str, List[Violation]] = {name: [] for name in STATIC_GUARD_NAMES}
+
+    results["required governed scope discovery guard"].extend(
+        required_scope_violations(documents)
+    )
 
     for guard, category in zip(CONTRADICTION_GUARDS[:4], PRIVATE_ENTITY_PATTERNS):
         results[guard].extend(
@@ -986,12 +1359,29 @@ def append_text(documents: MutableMapping[str, str], document: str, text: str) -
     documents[document] = documents[document].rstrip() + "\n" + text.rstrip() + "\n"
 
 
+def replace_once(
+    documents: MutableMapping[str, str], document: str, old: str, new: str
+) -> None:
+    source = documents[document]
+    if source.count(old) != 1:
+        raise ValueError(
+            f"probe replacement expected exactly one match in {document}: {old}"
+        )
+    documents[document] = source.replace(old, new, 1)
+
+
 def mutation_before(document: str, marker: str, text: str) -> Callable[[MutableMapping[str, str]], None]:
     return lambda documents: insert_before(documents, document, marker, text)
 
 
 def mutation_append(document: str, text: str) -> Callable[[MutableMapping[str, str]], None]:
     return lambda documents: append_text(documents, document, text)
+
+
+def mutation_replace(
+    document: str, old: str, new: str
+) -> Callable[[MutableMapping[str, str]], None]:
+    return lambda documents: replace_once(documents, document, old, new)
 
 
 def adversarial_probes() -> List[Probe]:
@@ -1165,6 +1555,224 @@ def adversarial_probes() -> List[Probe]:
             ),
             "trading semantic authorization guard",
         ),
+        # Conflict aggregation: every declaration is retained; safe never masks danger.
+        Probe(
+            "Telegram prohibited then enabled conflict",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram remains prohibited. Telegram is enabled.",
+            ),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "Telegram NOT_AUTHORIZED plus AUTHORIZED",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: NOT_AUTHORIZED\ntelegram: AUTHORIZED"),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "Telegram DISABLED plus ACTIVE",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: DISABLED\ntelegram: ACTIVE"),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "system notification safe plus enabled",
+            ACTIVE,
+            mutation_append(
+                ACTIVE,
+                "system_notification: NOT_AUTHORIZED\nsystem_notification: ENABLED",
+            ),
+            "system notification semantic authorization guard",
+        ),
+        Probe(
+            "external notification safe plus implemented",
+            ACTIVE,
+            mutation_append(
+                ACTIVE,
+                "external_notification: DISABLED\nexternal_notification: IMPLEMENTED",
+            ),
+            "external notification semantic authorization guard",
+        ),
+        Probe(
+            "automatic notification safe plus auto send",
+            NEXT_TASK,
+            mutation_append(
+                NEXT_TASK,
+                "automatic_notification: DISABLED\nautomatic_notification_auto_send: true",
+            ),
+            "automatic notification semantic authorization guard",
+        ),
+        Probe(
+            "trading movement NONE plus LIMITED",
+            NEXT_TASK,
+            mutation_append(
+                NEXT_TASK,
+                "TRADING_CAPABILITY_MOVEMENT: NONE; TRADING_CAPABILITY_MOVEMENT: LIMITED",
+            ),
+            "trading capability movement guard",
+        ),
+        # All-match validation, including order independence and cross-file conflicts.
+        Probe(
+            "first safe second dangerous",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram is disabled. Telegram is authorized.",
+            ),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "first dangerous second safe",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram is authorized. Telegram is disabled.",
+            ),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "multiple dangerous Telegram values",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: ENABLED\ntelegram: ACTIVE"),
+            "Telegram semantic authorization guard",
+        ),
+        Probe(
+            "cross-file Telegram status conflict",
+            STATE,
+            mutation_before(
+                STATE,
+                "## P3-U2 iPhone Private Test App Foundation",
+                "Telegram is implemented.",
+            ),
+            "Telegram semantic authorization guard",
+        ),
+        # Heading discovery must inspect every alias-matched section and fail closed.
+        Probe(
+            "empty Telegram capability section",
+            SEMANTIC,
+            mutation_before(SEMANTIC, "## 8. Search Asset V2", "### Telegram Status"),
+            "required governed scope discovery guard",
+        ),
+        Probe(
+            "dangerous Telegram status in second section",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "## 8. Search Asset V2",
+                "### Telegram Status\n\nTelegram is enabled.",
+            ),
+            "Telegram semantic authorization guard",
+        ),
+        # Equivalent private-state language remains forbidden in public OPPORTUNITY.
+        Probe(
+            "long short no position changes public lifecycle",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Long, short, or no position changes public lifecycle.",
+            ),
+            "UserPosition/private risk contradiction guard",
+        ),
+        Probe(
+            "position direction influences public readiness",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Current position direction influences public readiness.",
+            ),
+            "UserPosition/private risk contradiction guard",
+        ),
+        Probe(
+            "COMPLETED required for public READY",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "COMPLETED is required for public READY.",
+            ),
+            "private execution contradiction guard",
+        ),
+        Probe(
+            "FAILED produces public ERROR",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "FAILED produces public ERROR.",
+            ),
+            "private execution contradiction guard",
+        ),
+        Probe(
+            "execution completion gates public visibility",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Execution completion gates public visibility.",
+            ),
+            "private execution contradiction guard",
+        ),
+        Probe(
+            "account risk supplements public status",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Account risk supplements public status.",
+            ),
+            "UserPosition/private risk contradiction guard",
+        ),
+        Probe(
+            "position risk refines public evaluation",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Position risk refines public evaluation.",
+            ),
+            "UserPosition/private risk contradiction guard",
+        ),
+        # Next task is an audit/readiness gate, never an implementation action.
+        Probe(
+            "next task adds mutation and automatic delivery",
+            NEXT_TASK,
+            mutation_append(
+                NEXT_TASK,
+                'module: "Message/Push UI add mutation and automatic delivery"',
+            ),
+            "next-task capability authorization guard",
+        ),
+        Probe(
+            "next task implements Message UI",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, 'module: "Implement Message UI"'),
+            "next-task capability authorization guard",
+        ),
+        Probe(
+            "next task adds Telegram integration",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, 'module: "Add Telegram integration"'),
+            "next-task capability authorization guard",
+        ),
+        Probe(
+            "next task enables external notification",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, 'module: "Enable external notification"'),
+            "next-task capability authorization guard",
+        ),
+        Probe(
+            "next task adds trading action",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, 'module: "Add trading action"'),
+            "next-task capability authorization guard",
+        ),
     ]
 
 
@@ -1218,6 +1826,82 @@ def legal_control_probes() -> List[Probe]:
             "unrelated ready true control",
             NEXT_TASK,
             mutation_append(NEXT_TASK, "unrelated_feature:\n  ready: true"),
+            "",
+        ),
+        Probe(
+            "duplicate safe Telegram values control",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: DISABLED\ntelegram: NOT_AUTHORIZED"),
+            "",
+        ),
+        Probe(
+            "Telegram heading level change control",
+            SEMANTIC,
+            mutation_replace(
+                SEMANTIC,
+                "## 7. Message And Telegram V2",
+                "### 7. Message And Telegram V2",
+            ),
+            "",
+        ),
+        Probe(
+            "Telegram numbered heading alias control",
+            SEMANTIC,
+            mutation_replace(
+                SEMANTIC,
+                "## 7. Message And Telegram V2",
+                "#### Part A - Telegram Authorization",
+            ),
+            "",
+        ),
+        Probe(
+            "Telegram bilingual heading alias control",
+            SEMANTIC,
+            mutation_replace(
+                SEMANTIC,
+                "## 7. Message And Telegram V2",
+                "### 通知 / Telegram（未来扩展）",
+            ),
+            "",
+        ),
+        Probe(
+            "multiple safe Telegram sections control",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "## 8. Search Asset V2",
+                "### Telegram Status\n\nTelegram remains prohibited.",
+            ),
+            "",
+        ),
+        Probe(
+            "review mutation prohibition control",
+            NEXT_TASK,
+            mutation_replace(
+                NEXT_TASK,
+                'module: "FE-04E Message/Push UI Readiness and Governance Re-evaluation"',
+                'module: "Review mutation prohibition for Message/Push readiness"',
+            ),
+            "",
+        ),
+        Probe(
+            "verify no automatic delivery control",
+            NEXT_TASK,
+            mutation_replace(
+                NEXT_TASK,
+                'module: "FE-04E Message/Push UI Readiness and Governance Re-evaluation"',
+                'module: "Verify no automatic delivery in the read-only gate"',
+            ),
+            "",
+        ),
+        Probe(
+            "owner-scoped POSITION_RISK private Recheck control",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "## 8. Search Asset V2",
+                "Private Recheck is permitted only inside owner-scoped POSITION_RISK state resolution.",
+            ),
             "",
         ),
     ]
@@ -1370,7 +2054,9 @@ def main() -> int:
         for message in probe_messages:
             print(message)
 
-    print(f"FE04E_SEMANTIC_STATIC_ASSERTIONS: {len(STATIC_GUARD_NAMES)}")
+    print(f"FE04E_SEMANTIC_GUARDS: {len(SEMANTIC_GUARD_NAMES)}")
+    # Compatibility key for callers pinned to the previous helper protocol.
+    print(f"FE04E_SEMANTIC_STATIC_ASSERTIONS: {len(SEMANTIC_GUARD_NAMES)}")
     print(f"FE04E_CONTRADICTION_GUARDS: {len(CONTRADICTION_GUARDS)}")
     print(f"FE04E_AUTHORIZATION_SEMANTIC_GUARDS: {len(AUTHORIZATION_GUARDS)}")
     print(f"FE04E_CROSS_FILE_GUARDS: {len(CROSS_FILE_GUARDS)}")
