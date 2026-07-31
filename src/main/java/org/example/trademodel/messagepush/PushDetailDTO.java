@@ -4,26 +4,91 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record PushDetailDTO(
-        MessageReadState state,
-        String messageId,
-        String pushId,
-        MessageListDTO.SourceIdentity sourceIdentity,
-        OriginalSnapshot originalSnapshot,
-        CurrentRecheck currentRecheck,
-        String changeReason,
-        List<String> missingFields,
-        String reason,
-        boolean reviewOnly,
-        boolean notTradeInstruction,
-        boolean notExecutable,
-        boolean notPushSend) {
+public sealed interface PushDetailDTO permits
+        PushDetailDTO.OpportunityPublicProjection,
+        PushDetailDTO.PositionRiskPrivateProjection,
+        PushDetailDTO.UnavailableProjection {
 
-    public PushDetailDTO {
-        missingFields = missingFields == null ? List.of() : List.copyOf(missingFields);
+    MessageReadState state();
+
+    String messageId();
+
+    MessageListDTO.SourceIdentity sourceIdentity();
+
+    List<String> missingFields();
+
+    String reason();
+
+    boolean reviewOnly();
+
+    boolean notTradeInstruction();
+
+    boolean notExecutable();
+
+    boolean notPushSend();
+
+    record OpportunityPublicProjection(
+            MessageReadState state,
+            String messageId,
+            MessageListDTO.SourceIdentity sourceIdentity,
+            OpportunityIdentity opportunityIdentity,
+            String publicLifecycle,
+            String publicStatus,
+            LocalDateTime publicTimestamp,
+            String publicDescription,
+            List<String> missingFields,
+            String reason,
+            boolean reviewOnly,
+            boolean notTradeInstruction,
+            boolean notExecutable,
+            boolean notPushSend) implements PushDetailDTO {
+
+        public OpportunityPublicProjection {
+            missingFields = immutable(missingFields);
+        }
     }
 
-    public record OriginalSnapshot(
+    record PositionRiskPrivateProjection(
+            MessageReadState state,
+            String messageId,
+            MessageListDTO.SourceIdentity sourceIdentity,
+            OriginalSnapshot originalSnapshot,
+            CurrentRecheck currentRecheck,
+            String changeReason,
+            List<String> missingFields,
+            String reason,
+            boolean reviewOnly,
+            boolean notTradeInstruction,
+            boolean notExecutable,
+            boolean notPushSend) implements PushDetailDTO {
+
+        public PositionRiskPrivateProjection {
+            missingFields = immutable(missingFields);
+        }
+    }
+
+    record UnavailableProjection(
+            MessageReadState state,
+            String messageId,
+            MessageListDTO.SourceIdentity sourceIdentity,
+            List<String> missingFields,
+            String reason,
+            boolean reviewOnly,
+            boolean notTradeInstruction,
+            boolean notExecutable,
+            boolean notPushSend) implements PushDetailDTO {
+
+        public UnavailableProjection {
+            missingFields = immutable(missingFields);
+        }
+    }
+
+    record OpportunityIdentity(
+            String opportunityId,
+            String analysisId) {
+    }
+
+    record OriginalSnapshot(
             String snapshotId,
             String sourceType,
             String analysisId,
@@ -39,7 +104,7 @@ public record PushDetailDTO(
             LocalDateTime capturedAt) {
     }
 
-    public record CurrentRecheck(
+    record CurrentRecheck(
             String recheckId,
             String sourceType,
             String status,
@@ -48,5 +113,9 @@ public record PushDetailDTO(
             Integer confusedScore,
             String riskLevel,
             LocalDateTime checkedAt) {
+    }
+
+    private static List<String> immutable(List<String> values) {
+        return values == null ? List.of() : List.copyOf(values);
     }
 }

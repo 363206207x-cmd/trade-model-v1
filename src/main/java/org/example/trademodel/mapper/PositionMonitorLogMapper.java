@@ -51,8 +51,7 @@ public interface PositionMonitorLogMapper {
     List<PositionMonitorLogDO> listByAnalysisId(@Param("analysisId") String analysisId, @Param("limit") int limit);
 
     @Select(OWNER_SCOPED_SELECT
-            + "WHERE l.log_id = #{logId} "
-            + "AND l.logic_status IN ('LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK')")
+            + "WHERE l.log_id = #{logId}")
     PositionMonitorLogDO selectRiskByIdAndUserId(@Param("logId") Long logId,
                                                  @Param("userId") Long userId);
 

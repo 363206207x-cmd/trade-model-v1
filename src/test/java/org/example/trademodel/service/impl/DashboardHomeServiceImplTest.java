@@ -18,13 +18,9 @@ import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserConfigDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.EvidenceItemMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
-import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
@@ -44,10 +40,13 @@ import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
+import org.example.trademodel.opportunitylog.OpportunityLogStatus;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
@@ -125,9 +124,7 @@ class DashboardHomeServiceImplTest {
     @Mock
     private PositionSyncService positionSyncService;
     @Mock
-    private PushSnapshotMapper pushSnapshotMapper;
-    @Mock
-    private PushRecheckLogMapper pushRecheckLogMapper;
+    private OpportunityLogService opportunityLogService;
     @Mock
     private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     @Mock
@@ -156,8 +153,7 @@ class DashboardHomeServiceImplTest {
                 userPositionService,
                 positionMonitorLogService,
                 positionSyncService,
-                pushSnapshotMapper,
-                pushRecheckLogMapper,
+                opportunityLogService,
                 externalContextEvidenceBuilder,
                 providerReadinessService,
                 new ObjectMapper()
@@ -174,7 +170,6 @@ class DashboardHomeServiceImplTest {
     void homeAggregatesStableReadOnlySemanticsWithoutCrossFallbacks() {
         LightSystemStatusVO system = new LightSystemStatusVO();
         system.setStatus("OK");
-        system.setPendingCount(4);
         system.setMissedValidOpportunityCount(99);
         system.setConfusedCount(2);
         system.setHotResetFired(false);
@@ -238,14 +233,13 @@ class DashboardHomeServiceImplTest {
         when(monitorService.getRecentAlerts(2)).thenReturn(List.of(alert));
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position, nonManualPosition));
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
-        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(7);
-        when(pushSnapshotMapper.listPendingRecheck(anyString(), any(LocalDateTime.class), anyInt()))
-                .thenReturn(List.of());
-
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
-        assertThat(home.getSystemState().getPendingReview().getValue()).isEqualTo(4);
-        assertThat(home.getSystemState().getPendingReview().getValue()).isNotEqualTo(99);
+        assertThat(home.getSystemState().getPendingReview().getValue()).isNull();
+        assertThat(home.getSystemState().getPendingReview().getValueLabel())
+                .isEqualTo("当前不可查看");
+        assertThat(home.getSystemState().getPendingReview().getStatus())
+                .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
         assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(88);
         assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("选中资产分析快照");
         assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("HIGH");
@@ -305,7 +299,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v1");
         assertThat(home.getAiDecision().getTabs().get(0).getSupportEvidence())
                 .containsExactly("规则方向与 AI 复核一致");
-        assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(7);
+        assertThat(home.getPushInbox().getCounts().getWaiting()).isZero();
         assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
         assertThat(home.getPushInbox().getHasOpenPosition()).isTrue();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_AND_POSITION_RISK");
@@ -335,7 +329,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void pushInboxCountsUseReadonlyPushBacklogAndNotMissedOpportunityOrPositions() {
+    void pushInboxCountsUseOnlyPublicOpportunityProjection() {
         LightSystemStatusVO system = new LightSystemStatusVO();
         system.setMissedValidOpportunityCount(99);
 
@@ -347,17 +341,14 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(nonManualPosition));
-        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(3);
-        when(pushSnapshotMapper.countByPushStatuses(anyList())).thenAnswer(invocation -> {
-            List<String> statuses = invocation.getArgument(0);
-            if (statuses.contains("RECHECK_REVIEW_PASSED")) {
-                return 2;
-            }
-            if (statuses.contains("RECHECK_INVALIDATED")) {
-                return 5;
-            }
-            return 0;
-        });
+        when(opportunityLogService.queryPublic(
+                any(), any(), any(), any(), any(), any(), any(), any(), eq(6)))
+                .thenReturn(List.of(
+                        publicOpportunity("opp-pending", OpportunityLogStatus.PENDING_EVALUATION, null),
+                        publicOpportunity("opp-valid", OpportunityLogStatus.RESOLVED,
+                                OpportunityLogStatus.MISSED_VALID),
+                        publicOpportunity("opp-invalid", OpportunityLogStatus.RESOLVED,
+                                OpportunityLogStatus.MISSED_INVALID)));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
@@ -366,10 +357,10 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPushInbox().getTelegramStatus()).isEqualTo(home.getDiagnostics().getTelegram());
         assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
-        assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(3);
+        assertThat(home.getPushInbox().getCounts().getWaiting()).isEqualTo(1);
         assertThat(home.getPushInbox().getCounts().getWaiting()).isNotEqualTo(99);
-        assertThat(home.getPushInbox().getCounts().getExecutable()).isEqualTo(2);
-        assertThat(home.getPushInbox().getCounts().getInvalidated()).isEqualTo(5);
+        assertThat(home.getPushInbox().getCounts().getExecutable()).isZero();
+        assertThat(home.getPushInbox().getCounts().getInvalidated()).isEqualTo(1);
         assertThat(home.getPushInbox().getCounts().getPositionRisk()).isZero();
     }
 
@@ -454,43 +445,44 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void pushInboxItemsMapOnlyRealSnapshotFieldsAndLatestRecheckStatus() {
-        LocalDateTime createTime = LocalDateTime.of(2026, 6, 27, 9, 30);
-        LocalDateTime expiresAt = LocalDateTime.of(2026, 6, 27, 11, 30);
-        TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
-        snapshot.setPushId(101L);
-        snapshot.setSymbol("BTCUSDT");
-        snapshot.setPushType("OPPORTUNITY_RECHECK");
-        snapshot.setPushStatus("CAPTURED");
-        snapshot.setCreateTime(createTime);
-        snapshot.setExpiresAt(expiresAt);
-
-        TmPushRecheckLogDO latestLog = new TmPushRecheckLogDO();
-        latestLog.setPushId(101L);
-        latestLog.setRecheckStatus("DRIFTED");
-
-        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(1);
-        when(pushSnapshotMapper.listPendingRecheck(eq("CAPTURED"), any(LocalDateTime.class), eq(6)))
-                .thenReturn(List.of(snapshot));
-        when(pushSnapshotMapper.listPendingRecheck(eq("RECHECK_REVIEW_WAITING"), any(LocalDateTime.class), eq(5)))
-                .thenReturn(List.of());
-        when(pushSnapshotMapper.listPendingRecheck(eq("RECHECK_VALID_WAITING"), any(LocalDateTime.class), eq(5)))
-                .thenReturn(List.of());
-        when(pushRecheckLogMapper.selectLatestByPushId(101L)).thenReturn(latestLog);
+    void pushInboxItemsUsePublicSchemaWithoutPrivatePushOrRecheckFields() throws Exception {
+        LocalDateTime publicTime = LocalDateTime.of(2026, 6, 27, 9, 30);
+        OpportunityLogPublicDTO opportunity = publicOpportunity(
+                "opp-dashboard",
+                "resolved",
+                "missed_valid",
+                publicTime);
+        when(opportunityLogService.queryPublic(
+                any(), any(), any(), any(), any(), any(), any(), any(), eq(6)))
+                .thenReturn(List.of(opportunity));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPushInbox().getItems()).hasSize(1);
         DashboardHomeVO.PushItemVO item = home.getPushInbox().getItems().get(0);
-        assertThat(item.getPushId()).isEqualTo(101L);
+        assertThat(item.getMessageId()).isEqualTo("opp-dashboard");
+        assertThat(item.getSourceIdentity()).isEqualTo("OPPORTUNITY");
         assertThat(item.getSymbol()).isEqualTo("BTC/USDT");
-        assertThat(item.getStatus()).isEqualTo("CAPTURED");
-        assertThat(item.getType()).isEqualTo("OPPORTUNITY_RECHECK");
-        assertThat(item.getCreatedAt()).isEqualTo(createTime);
-        assertThat(item.getExpiresAt()).isEqualTo(expiresAt);
-        assertThat(item.getRecheckStatus()).isEqualTo("DRIFTED_FROM_ENTRY_ZONE");
+        assertThat(item.getPublicLifecycle()).isEqualTo(OpportunityLogStatus.RESOLVED);
+        assertThat(item.getPublicStatus()).isEqualTo(OpportunityLogStatus.MISSED_VALID);
+        assertThat(item.getPublicTimestamp()).isEqualTo(publicTime);
+        assertThat(item.getPublicDescription()).isEqualTo("BTCUSDT LONG 1H");
         assertThat(Arrays.stream(DashboardHomeVO.PushItemVO.class.getDeclaredFields()).map(Field::getName))
-                .doesNotContain("title", "summary");
+                .doesNotContain(
+                        "pushId",
+                        "recheckStatus",
+                        "failReasonJson",
+                        "currentAccountRiskAllowed",
+                        "title",
+                        "summary");
+        String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(item);
+        assertThat(json)
+                .contains("\"messageId\":\"opp-dashboard\"")
+                .doesNotContain(
+                        "\"pushId\"",
+                        "\"recheckStatus\"",
+                        "\"failReasonJson\"",
+                        "\"currentAccountRiskAllowed\"");
     }
 
     @Test
@@ -2927,6 +2919,63 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_2_LIGHT_DIVERGENCE", 25,
                 confidence, "SLIGHTLY_RAISED", planMode, false,
                 downgradeReason);
+    }
+
+    private static OpportunityLogPublicDTO publicOpportunity(
+            String opportunityId,
+            String lifecycle,
+            String status) {
+        return publicOpportunity(
+                opportunityId,
+                lifecycle,
+                status,
+                LocalDateTime.of(2026, 6, 27, 9, 30));
+    }
+
+    private static OpportunityLogPublicDTO publicOpportunity(
+            String opportunityId,
+            String lifecycle,
+            String status,
+            LocalDateTime timestamp) {
+        return new OpportunityLogPublicDTO(
+                opportunityId,
+                "analysis-" + opportunityId,
+                "BTCUSDT",
+                "1h",
+                "LONG",
+                lifecycle,
+                status,
+                timestamp,
+                OpportunityLogStatus.RESOLVED.equalsIgnoreCase(lifecycle) ? timestamp : null,
+                new BigDecimal("100"),
+                new BigDecimal("110"),
+                new BigDecimal("95"),
+                OpportunityLogStatus.MISSED_VALID.equalsIgnoreCase(status),
+                OpportunityLogStatus.MISSED_INVALID.equalsIgnoreCase(status),
+                OpportunityLogStatus.MISSED_VALID.equalsIgnoreCase(status) ? timestamp : null,
+                OpportunityLogStatus.MISSED_INVALID.equalsIgnoreCase(status) ? timestamp : null,
+                OpportunityLogStatus.MISSED_VALID.equalsIgnoreCase(status)
+                        ? OpportunityLogStatus.TARGET_FIRST
+                        : OpportunityLogStatus.MISSED_INVALID.equalsIgnoreCase(status)
+                        ? OpportunityLogStatus.INVALIDATION_FIRST
+                        : null,
+                null,
+                null,
+                null,
+                null,
+                "MARKET_DATA",
+                timestamp,
+                timestamp,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
     }
 
     private DecisionResultVO decision(String symbol,

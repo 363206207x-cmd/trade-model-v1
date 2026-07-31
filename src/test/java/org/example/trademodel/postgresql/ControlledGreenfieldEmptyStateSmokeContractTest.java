@@ -818,8 +818,9 @@ class ControlledGreenfieldEmptyStateSmokeContractTest {
                         "analysisRunCountWindow", 0,
                         "lowQualityCountWindow", 0),
                 "recheckSummary", Map.of(
-                        "totalCountWindow", 0,
-                        "statusCountsWindow", Map.of()),
+                        "availabilityStatus", "PRIVATE_SOURCE_UNAVAILABLE",
+                        "availabilityDetail",
+                        "raw PushRecheck status counts require an authoritative source-owner relation"),
                 "hotResetSummary", Map.of(
                         "eventCountWindow", 0,
                         "triggerTypeCountsWindow", Map.of()));

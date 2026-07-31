@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -321,13 +322,12 @@ class DecisionServiceImplTest {
     }
 
     @Test
-    void getLightSystemStatus_mapsMissedCountAndHotResetDefaults() {
+    void getLightSystemStatusMapsPublicCountsWithoutGlobalPrivatePushBacklog() {
         when(analysisRunMapper.countDistinctSymbols()).thenReturn(7);
         when(decisionResultMapper.selectLastDecisionTime()).thenReturn(null);
         when(decisionResultMapper.countDecisionsInRange(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(0);
         when(missedOpportunityMapper.countByBizDate(any(LocalDate.class))).thenReturn(5);
         when(assetStateMapper.countDirectionalPushBlocked(85)).thenReturn(3);
-        when(pushSnapshotMapper.countPendingRecheckBacklog(any(LocalDateTime.class))).thenReturn(11);
         when(decisionResultMapper.countOpenSymbolsWithReverseSignal()).thenReturn(2);
         when(assetStateService.findLatestHotResetSnapshot()).thenReturn(null);
 
@@ -335,9 +335,9 @@ class DecisionServiceImplTest {
 
         assertThat(vo.getMissedValidOpportunityCount()).isEqualTo(5);
         assertThat(vo.getConfusedCount()).isEqualTo(3);
-        assertThat(vo.getPendingCount()).isEqualTo(11);
         assertThat(vo.getReverseSignalCount()).isEqualTo(2);
         assertThat(vo.getHotResetFired()).isFalse();
+        verifyNoInteractions(pushSnapshotMapper);
     }
 
     @Test

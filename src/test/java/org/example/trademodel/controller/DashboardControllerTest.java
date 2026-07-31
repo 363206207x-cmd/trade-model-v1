@@ -72,6 +72,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -451,7 +452,8 @@ public class DashboardControllerTest {
                 .contains("DEGRADED", "数据部分可用", "未知状态");
         String serviceSource = Files.readString(Path.of(
                 "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"));
-        assertThat(serviceSource).contains("\"待复核数量\"");
+        assertThat(serviceSource).contains("\"PRIVATE_SOURCE_UNAVAILABLE\"");
+        assertThat(serviceSource).doesNotContain("\"待复核数量\"");
         assertThat(serviceSource).doesNotContain("\" · degraded \"");
     }
 
@@ -1674,15 +1676,13 @@ public class DashboardControllerTest {
                 riskActionGuardDisplayAdapter,
                 paperObservationDisplayAdapter,
                 hotResetEventMapper,
-                sourceTraceEventSourceOwnershipService,
-                pushRecheckService
+                sourceTraceEventSourceOwnershipService
         );
     }
 
     @Test
-    void summary_json_exposesPendingCountOnSystemStatus() throws Exception {
+    void summary_json_doesNotExposeGlobalPrivatePushCount() throws Exception {
         LightSystemStatusVO system = new LightSystemStatusVO();
-        system.setPendingCount(7);
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(decisionService.countOpenPositions()).thenReturn(0);
         when(systemHealthService.getSystemHealth()).thenReturn(Collections.emptyMap());
@@ -1691,7 +1691,7 @@ public class DashboardControllerTest {
 
         mockMvc.perform(get("/api/dashboard/summary"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.systemStatus.pendingCount").value(7));
+                .andExpect(jsonPath("$.systemStatus.pendingCount").doesNotExist());
     }
 
     @Test
@@ -2833,31 +2833,21 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void recheckPreviewStatusEndpointReturnsReviewOnlyReadyProjectionFromPersistedLogAndOpsOverview() throws Exception {
-        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "REVIEW_WAITING"));
-        when(pushRecheckService.getOpsOverview("batch-1", "inst-1", 5, 10)).thenReturn(recheckOpsOverview(true, true));
-
+    void recheckPreviewStatusEndpointRejectsRawPushIdWithoutReadingRecheckData() throws Exception {
         mockMvc.perform(get("/api/dashboard/recheck-preview-status")
                         .param("pushId", "101")
                         .param("dispatchBatchId", "batch-1")
-                        .param("dispatchInstructionId", "inst-1"))
+                .param("dispatchInstructionId", "inst-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.pushId").value(101))
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.pushId").doesNotExist())
                 .andExpect(jsonPath("$.dispatchBatchId").value("batch-1"))
                 .andExpect(jsonPath("$.dispatchInstructionId").value("inst-1"))
-                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.recheckStatusReadModelStatus").value("RECHECK_STATUS_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.recheckLogReadModelStatus").value("RECHECK_LOG_READ_MODEL_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.replaySummaryCounterStatus").value("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.dispatchConfigAuditStatus").value("DISPATCH_CONFIG_AUDIT_REVIEW_ONLY_READY"))
-                .andExpect(jsonPath("$.latestLogAvailable").value(true))
-                .andExpect(jsonPath("$.latestRecheckStatus").value("REVIEW_WAITING"))
-                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_REVIEW_WAITING"))
-                .andExpect(jsonPath("$.latestRecheckReviewTag").value("WAITING"))
-                .andExpect(jsonPath("$.statusContractMeaning").value("persisted status label only; not executable readiness or trading authorization"))
-                .andExpect(jsonPath("$.replaySummaryTotalCount").value(3))
-                .andExpect(jsonPath("$.dispatchAuditAvailable").value(true))
+                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.latestLogAvailable").doesNotExist())
+                .andExpect(jsonPath("$.opsOverviewAvailable").value(false))
+                .andExpect(jsonPath("$.latestRecheckStatus").doesNotExist())
+                .andExpect(jsonPath("$.latestPushStatusEvidence").doesNotExist())
                 .andExpect(jsonPath("$.reviewOnly").value(true))
                 .andExpect(jsonPath("$.manualReviewOnly").value(true))
                 .andExpect(jsonPath("$.notRecheckExecution").value(true))
@@ -2878,33 +2868,32 @@ public class DashboardControllerTest {
                 .andExpect(jsonPath("$.notTradingSignal").value(true))
                 .andExpect(jsonPath("$.notExecutable").value(true))
                 .andExpect(jsonPath("$.displaySlotsAreCandidatePool").value(false))
-                .andExpect(jsonPath("$.failClosed").value(false))
-                .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_PREVIEW_REVIEW_ONLY_READY')]").exists())
+                .andExpect(jsonPath("$.failClosed").value(true))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"))
                 .andExpect(jsonPath("$.statusMapping[?(@ == 'RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
                 .andExpect(jsonPath("$.statusMapping[?(@ == 'API_CLIENT_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
                 .andExpect(jsonPath("$.statusMapping[?(@ == 'MARKET_QUOTE_REFRESH_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
                 .andExpect(jsonPath("$.statusMapping[?(@ == 'PUSH_SNAPSHOT_WRITE_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists())
                 .andExpect(jsonPath("$.statusMapping[?(@ == 'TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED')]").exists());
 
-        verify(pushRecheckService).getLatestLog(101L);
-        verify(pushRecheckService).getOpsOverview("batch-1", "inst-1", 5, 10);
+        verify(pushRecheckService, never()).getLatestLog(anyLong());
+        verify(pushRecheckService, never()).getOpsOverview(any(), any(), anyInt(), anyInt());
         verify(pushRecheckService, never()).recheck(anyLong(), any(), any());
         verify(pushRecheckService, never()).replayByDispatch(any(), any());
     }
 
     @Test
-    void recheckPreviewStatusEndpointFailsClosedWhenOwnerEvidenceMissing() throws Exception {
-        when(pushRecheckService.getOpsOverview(null, null, 5, 10)).thenReturn(null);
-
+    void recheckPreviewStatusEndpointFailsClosedWithoutReadingOwnerEvidence() throws Exception {
         mockMvc.perform(get("/api/dashboard/recheck-preview-status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
-                .andExpect(jsonPath("$.latestLogAvailable").value(false))
+                .andExpect(jsonPath("$.latestLogAvailable").doesNotExist())
                 .andExpect(jsonPath("$.opsOverviewAvailable").value(false))
-                .andExpect(jsonPath("$.sourceHealth").value("MISSING"))
+                .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
                 .andExpect(jsonPath("$.failClosed").value(true))
-                .andExpect(jsonPath("$.reason").value("RECHECK_PREVIEW_OWNER_EVIDENCE_MISSING"))
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"))
                 .andExpect(jsonPath("$.recheckExecutionBoundaryStatus").value("RECHECK_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.replayExecutionBoundaryStatus").value("REPLAY_EXECUTION_BOUNDARY_BLOCKED_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.schedulerDispatchBoundaryStatus").value("SCHEDULER_DISPATCH_BOUNDARY_BLOCKED_FAIL_CLOSED"))
@@ -2919,14 +2908,12 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void recheckPreviewStatusEndpointFailsClosedWhenReadPathThrows() throws Exception {
-        when(pushRecheckService.getLatestLog(101L)).thenThrow(new IllegalStateException("read unavailable"));
-
-        mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("pushId", "101"))
+    void recheckPreviewStatusEndpointKeepsPrivateReadPathDisabled() throws Exception {
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.sourceHealth").value("BLOCKED"))
-                .andExpect(jsonPath("$.reason").value("RECHECK_READ_PATH_UNAVAILABLE"))
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"))
                 .andExpect(jsonPath("$.failClosed").value(true))
                 .andExpect(jsonPath("$.notRecheckExecution").value(true))
                 .andExpect(jsonPath("$.notReplayExecution").value(true))
@@ -2938,29 +2925,26 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void recheckPreviewStatusEndpointMarksPartialWhenOnlyOpsEvidenceExists() throws Exception {
-        when(pushRecheckService.getOpsOverview("batch-1", null, 5, 10)).thenReturn(recheckOpsOverview(true, false));
-
+    void recheckPreviewStatusEndpointIgnoresLegacyOpsEvidence() throws Exception {
         mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("dispatchBatchId", "batch-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY"))
-                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_PARTIAL_REVIEW_ONLY"))
-                .andExpect(jsonPath("$.latestLogAvailable").value(false))
-                .andExpect(jsonPath("$.opsOverviewAvailable").value(true))
-                .andExpect(jsonPath("$.replaySummaryCounterStatus").value("REPLAY_SUMMARY_COUNTER_REVIEW_ONLY_READY"))
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.recheckPreviewStatus").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.latestLogAvailable").doesNotExist())
+                .andExpect(jsonPath("$.opsOverviewAvailable").value(false))
+                .andExpect(jsonPath("$.replaySummaryCounterStatus").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.dispatchConfigAuditStatus").value("RECHECK_STATUS_MISSING_FAIL_CLOSED"))
                 .andExpect(jsonPath("$.failClosed").value(true))
-                .andExpect(jsonPath("$.reason").value("RECHECK_PREVIEW_PARTIAL_OWNER_EVIDENCE"));
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"));
     }
 
     @Test
     void recheckPreviewStatusEndpointDoesNotExposeExecutableActionFields() throws Exception {
-        when(pushRecheckService.getLatestLog(101L)).thenReturn(recheckLog(101L, "REVIEW_PASSED"));
-        when(pushRecheckService.getOpsOverview(null, null, 5, 10)).thenReturn(recheckOpsOverview(true, true));
-
         mockMvc.perform(get("/api/dashboard/recheck-preview-status").param("pushId", "101"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.latestPushStatusEvidence").value("RECHECK_REVIEW_PASSED"))
+                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
+                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"))
+                .andExpect(jsonPath("$.latestPushStatusEvidence").doesNotExist())
                 .andExpect(jsonPath("$.recheckExecutionAction").doesNotExist())
                 .andExpect(jsonPath("$.replayExecutionAction").doesNotExist())
                 .andExpect(jsonPath("$.schedulerAction").doesNotExist())
@@ -2986,6 +2970,9 @@ public class DashboardControllerTest {
                 .andExpect(jsonPath("$.positionMonitorExecutionAction").doesNotExist())
                 .andExpect(jsonPath("$.executablePayload").doesNotExist())
                 .andExpect(jsonPath("$.providerPayload").doesNotExist());
+
+        verify(pushRecheckService, never()).getLatestLog(anyLong());
+        verify(pushRecheckService, never()).getOpsOverview(any(), any(), anyInt(), anyInt());
     }
 
     @Test

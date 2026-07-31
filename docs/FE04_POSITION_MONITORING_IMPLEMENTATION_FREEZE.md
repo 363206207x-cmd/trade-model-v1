@@ -134,16 +134,58 @@ AI, execution-plan, or FE-03-link state after refresh failure.
 It does not implement market-asset search, watch-asset writes, fake search
 results, fabricated scores, evidence, multi-timeframe data, or AI content, AI
 capability expansion, API/schema/Figma changes, external send, or trading
-capability. The FE-04E Message/Push readiness gate is now
-`READINESS_GATE_COMPLETE`; implementation remains `NOT_STARTED`.
+capability. The FE-04E Message/Push Contract Foundation is
+`EFFECTIVE_MERGED_MAIN` on
+`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154.
 
-After the readiness governance alignment reaches clean, synced main, only the
-FE-04E `CONTRACT_FOUNDATION` is authorized: exact string `messageId`/`pushId`,
-exact `sourceIdentity`, owner-scoped real opportunity and UserPosition-risk
-messages, a read-only Push Detail GET contract, and explicit Empty, Error,
-Missing, and Partial states. Message Center UI, Push Detail UI, Telegram,
-external send, automatic notification, fabricated data, and trading capability
+The FE-04E UI readiness re-evaluation exposed server-side P1 privacy and P2
+state-contract prerequisites. PR #1155 now contains a full
+`OPPORTUNITY_PUBLIC_PROJECTION`, cross-endpoint PushRecheck isolation, and
+source-specific five-state validation candidate, and is pending exact-head
+review.
+Message/Push UI remains `NOT_STARTED` and is not authorized to begin before
+this candidate is reviewed, merged to clean/synced main, and governance is
+re-evaluated.
+
+`OPPORTUNITY` is frozen as
+`AUTHENTICATED_SHARED_PUBLIC_PROJECTION`: only exact message/source/opportunity
+identity, safe allowlisted public opportunity lifecycle/status, public
+timestamp, and public description may cross the API boundary. Dashboard Home,
+Opportunity Log, and Message Detail use the same public policy. The public DTO
+does not select or serialize UserPosition data, account risk, position risk,
+Recheck identity/existence/state, `failReasonJson`, or private risk reasons,
+and public readiness never reads those sources. Frontend filtering is not a
+privacy boundary.
+
+`POSITION_RISK` is frozen as `OWNER_SCOPED_PRIVATE_PROJECTION`. It may expose
+current-user position risk, monitoring risk, and private risk reason only
+through exact owner-scoped reads. Public and private source records must remain
+different DTO variants.
+
+Raw `pushId` is not a public identity. User-facing PushRecheck latest/log,
+config/audit, summary/ops, trigger, and replay routes return not found, and
+Dashboard Recheck preview rejects raw PushRecheck access before any private
+read because the persisted raw rows do not contain an authoritative
+source-message-position-owner relation. The corresponding service methods
+also fail closed before repository reads or mutation. Only strict internal
+scheduled execution remains; it is not a user-facing capability. No symbol,
+latest-row, global-recent-row, or missing-owner fallback is allowed.
+
+Message/Push state is frozen as follows: complete valid source-specific data is
+`READY`; known incomplete valid data is `PARTIAL`; illegal enum, malformed
+JSON, or contradictory state is `ERROR`; an absent/inaccessible exact resource
+is `MISSING`; and only a successful empty collection is `EMPTY`. Public
+OPPORTUNITY state uses public opportunity data only. Private POSITION_RISK
+state validates the exact owned position and matching monitor identity,
+lifecycle, timestamp, logic status, risk level/data, conclusion, and legal
+state combination.
+
+System notifications, Telegram, external send, automatic notification,
+fabricated unread/message counts or message/Push data, mutation, unrelated
+backend/API change, schema/Figma change, AI expansion, and trading capability
 remain blocked.
+Figma example values without a real returned field must be hidden or rendered
+fail closed.
 
 ```text
 FE04_FIGMA_BASELINE: FROZEN
@@ -162,17 +204,27 @@ FE04D_AUTHORIZATION: FIRST_PACKAGE_EFFECTIVE_NO_EXPANSION
 FE04D_SEARCH_STATUS: PARTIAL_DISABLED_IN_FIRST_PACKAGE
 FE04D_WATCH_ASSET_STATUS: BLOCKED_NO_AUTHENTICATED_WRITE_CONTRACT
 FE04D_API_READINESS: PARTIAL_FAIL_CLOSED
-FE04E_STATUS: READINESS_GATE_COMPLETE
-FE04E_IMPLEMENTATION_STATUS: NOT_STARTED
-FE04E_NEXT_PACKAGE: CONTRACT_FOUNDATION_AUTHORIZED
-FE04E_MESSAGE_SOURCE_STATUS: BLOCKED_REQUIRES_REAL_OWNER_SCOPED_FOUNDATION
-FE04E_MESSAGE_IDENTITY_STATUS: BLOCKED_REQUIRES_STRING_SAFE_AUTHORITATIVE_IDENTITY
-FE04E_PUSH_DETAIL_STATUS: BLOCKED_REQUIRES_COMPOSED_READ_ONLY_GET
+FE04E_STATUS: CONTRACT_FOUNDATION_EFFECTIVE_MERGED_MAIN
+FE04E_CONTRACT_MAIN_HEAD: 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8
+FE04E_IMPLEMENTATION_STATUS: UI_NOT_STARTED
+FE04E_UI_READINESS_STATUS: PASS
+FE04E_UI_STATUS: NOT_STARTED_BLOCKED_PENDING_PRIVACY_STATE_REMEDIATION_MERGED_MAIN
+FE04E_NEXT_PACKAGE: FULL_PRIVACY_BOUNDARY_AND_STATE_MACHINE_EXACT_HEAD_REVIEW
+FE04E_AUTHORIZATION: EXACT_HEAD_REVIEW_ONLY
+FE04E_MESSAGE_SOURCE_STATUS: PASS_OPPORTUNITY_AND_POSITION_RISK_ONLY
+FE04E_OPPORTUNITY_ACCESS: AUTHENTICATED_SHARED_PUBLIC_PROJECTION
+FE04E_OPPORTUNITY_CONTRACT: AUTHENTICATED_SHARED_PUBLIC_PROJECTION
+FE04E_OPPORTUNITY_UI_PROJECTION: SERVER_SIDE_PUBLIC_OPPORTUNITY_ALLOWLIST
+FE04E_OPPORTUNITY_FORBIDDEN_FIELDS: USER_POSITION_ACCOUNT_RISK_POSITION_RISK_FAIL_REASON_JSON_PRIVATE_RISK_REASON
+FE04E_POSITION_RISK_ACCESS: OWNER_SCOPED_PRIVATE_PROJECTION_CROSS_USER_BLOCKED
+FE04E_MESSAGE_IDENTITY_STATUS: PASS_STRING_SAFE_AUTHORITATIVE_IDENTITY
+FE04E_PUSH_DETAIL_STATUS: SOURCE_SPECIFIC_PUBLIC_PRIVATE_PROJECTION_WITH_FAIL_CLOSED_STATE_VALIDATION_PENDING_EXACT_HEAD_REVIEW
 FE04E_TELEGRAM_BOUNDARY_STATUS: PASS_EXTENSION_NOT_CONNECTED
-FE04E_API_READINESS: PARTIAL
+FE04E_API_READINESS: PRIVACY_AND_STATE_REMEDIATION_IMPLEMENTED_PENDING_EXACT_HEAD_REVIEW
+FE04E_BACKEND_PRIVACY_SANITIZATION: UNIFIED_PUBLIC_PROJECTION_PRIVATE_ORACLE_REMOVAL_AND_ALL_RAW_USER_PUSHRECHECK_ROUTES_DISABLED_PENDING_REVIEW
 FE04E_FIGMA_STATUS: PASS_REGISTERED_BASELINE
-FE04E_FAIL_CLOSED_STATUS: BLOCKED_REQUIRES_EXPLICIT_STATE_MODEL
+FE04E_FAIL_CLOSED_STATUS: PASS_EXPLICIT_READY_EMPTY_ERROR_MISSING_PARTIAL
 FE04E_CAPABILITY_BOUNDARY_STATUS: PASS_NO_SEND_NO_TRADING
-FE04_IMPLEMENTATION_ALLOWED: FE-04E_BACKEND_CONTRACT_FOUNDATION_ONLY_AFTER_GOVERNANCE_MERGE
-NEXT_ALLOWED_ACTION: FE-04E_CONTRACT_FOUNDATION_ONLY
+FE04_IMPLEMENTATION_ALLOWED: false
+NEXT_ALLOWED_ACTION: FE-04E_FULL_PRIVACY_BOUNDARY_AND_STATE_MACHINE_EXACT_HEAD_REVIEW_ONLY
 ```

@@ -107,7 +107,7 @@ Overall frontend contract status:
 | Strategy & Monitoring | Execution suggestion, user position, monitoring result | `ExecutionPlan`, `UserPosition`, `PositionMonitorLog` | Figma frame exists; underlying objects exist but no single composed product page | `PARTIAL` |
 | Position Detail | User facts, current monitor result, history, optional review entry | `UserPosition`, `PositionMonitorLog`, close/review records | Figma frame only; current object reads are usable, complete history is not | `PARTIAL` |
 | Review | Original suggestion, actual user execution, monitoring, outcome, deviation | Review dashboard projections and `ReviewResult`-related records | `/review/dashboard` and `/review/{analysisId}` exist | `PARTIAL` |
-| Mobile Push Detail | Snapshot and current Push Recheck result | Push audit records and `PushRecheckStatusContract` | Figma frame exists; no current mobile product route | `PARTIAL` |
+| Mobile Push Detail | Source-specific public opportunity or private position-risk review | Server-side `OPPORTUNITY` public projection and owner-scoped `POSITION_RISK` private projection | PR #1155 contains a pending privacy/state remediation candidate: raw `pushId` latest/log/preview pivots fail closed and READY requires complete legal matching Push/Recheck data with completed execution; Figma frame exists; no current mobile product route | `PARTIAL` |
 | Message Center | Opportunity and position-risk notifications | Notification eligibility/audit contracts | Figma frame only; external delivery disabled | `FAIL_CLOSED` |
 | Profile & Settings | Current user/system read-only information | Minimal `/api/user-config/ping` only | Figma frame exceeds current settings contract | `FAIL_CLOSED` |
 
@@ -433,14 +433,26 @@ trading authorization.
 | `CONFUSED_BLOCKED` | `RECHECK_CONFUSED_BLOCKED` | 冲突阻断 |
 | `EXPIRED` | `RECHECK_EXPIRED` | 已过期 |
 
-The backend exposes review trigger/latest/log behavior, but the current product
-frontend has no complete mobile Push Detail route. The Figma Push frame is a
-valid target only when it:
+The backend retains internal review trigger/latest/log behavior, while raw
+user-facing latest/log reads fail closed and the current product frontend has
+no complete mobile Push Detail route. The Figma Push frame is a valid target
+only when it:
 
 - uses review-only wording;
-- shows original snapshot separately from current result;
+- consumes the server-side source-specific projection;
+- shows original/current private risk fields only for owner-scoped
+  `POSITION_RISK`;
+- never exposes Recheck/account/position risk or private reason fields through
+  authenticated shared `OPPORTUNITY`;
 - exposes information navigation only;
 - never offers execute, buy, sell, order, close, or position mutation.
+
+Raw user-facing latest/log/preview access by `pushId` is not a frontend data
+source unless an authoritative source-domain and owner relation is available.
+The current raw rows do not provide that relation, so those paths and the
+legacy raw service latest/list methods fail closed. UI state must preserve
+`READY`, `PARTIAL`, `ERROR`, `MISSING`, and `EMPTY` without turning
+missing/invalid Recheck data into READY.
 
 Status: `PARTIAL`.
 

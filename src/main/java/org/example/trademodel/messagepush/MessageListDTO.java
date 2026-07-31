@@ -1,5 +1,7 @@
 package org.example.trademodel.messagepush;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,7 +16,6 @@ public record MessageListDTO(
 
     public record MessageItem(
             String messageId,
-            String pushId,
             SourceIdentity sourceIdentity,
             String symbol,
             String status,
@@ -25,6 +26,7 @@ public record MessageListDTO(
             boolean notPushSend) {
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record SourceIdentity(
             String sourceType,
             String sourceId,

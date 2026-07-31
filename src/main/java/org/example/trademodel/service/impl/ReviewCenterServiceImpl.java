@@ -2,12 +2,8 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.ReviewResultDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
-import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
@@ -16,25 +12,20 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.ReviewCenterService;
-import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewSummaryDTO;
 import org.example.trademodel.vo.ReviewAggregateVO;
 import org.example.trademodel.vo.ReviewCenterDashboardVO;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 @Service
 public class ReviewCenterServiceImpl implements ReviewCenterService {
     static final int DEFAULT_LIMIT = 50;
-    static final String TELEGRAM_WAITING_SYNC = "WAITING_SYNC";
     private static final String REVIEW_TYPE_RULE_FEEDBACK = "RULE_FEEDBACK";
     private static final Set<String> REVIEWABLE_OPPORTUNITY_STATUSES = Set.of(
             OpportunityLogStatus.EXECUTED_VALID,
@@ -48,31 +39,19 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
     private final UserPositionMapper userPositionMapper;
     private final UserPositionReviewAdapter userPositionReviewAdapter;
     private final OpportunityLogService opportunityLogService;
-    private final PushSnapshotMapper pushSnapshotMapper;
-    private final PushRecheckLogMapper pushRecheckLogMapper;
     private final ReviewResultMapper reviewResultMapper;
     private final AnalysisRunMapper analysisRunMapper;
-    private Clock clock = Clock.systemUTC();
 
     public ReviewCenterServiceImpl(UserPositionMapper userPositionMapper,
                                    UserPositionReviewAdapter userPositionReviewAdapter,
                                    OpportunityLogService opportunityLogService,
-                                   PushSnapshotMapper pushSnapshotMapper,
-                                   PushRecheckLogMapper pushRecheckLogMapper,
                                    ReviewResultMapper reviewResultMapper,
                                    AnalysisRunMapper analysisRunMapper) {
         this.userPositionMapper = userPositionMapper;
         this.userPositionReviewAdapter = userPositionReviewAdapter;
         this.opportunityLogService = opportunityLogService;
-        this.pushSnapshotMapper = pushSnapshotMapper;
-        this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.reviewResultMapper = reviewResultMapper;
         this.analysisRunMapper = analysisRunMapper;
-    }
-
-    @Autowired(required = false)
-    public void setClock(Clock clock) {
-        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
@@ -100,7 +79,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         ReviewCenterDashboardVO.Diagnostics diagnostics = new ReviewCenterDashboardVO.Diagnostics();
         diagnostics.setPositionReviewStatus(sourceStatus(vo.getPositionReviews().size()));
         diagnostics.setOpportunityLogStatus(sourceStatus(vo.getOpportunityReviews().size()));
-        diagnostics.setPushRecheckStatus(sourceStatus(vo.getPushReviews().size()));
+        diagnostics.setPushRecheckStatus("BLOCKED_PRIVATE_SOURCE_UNAVAILABLE");
         diagnostics.setRuleFeedbackStatus(sourceStatus(vo.getRuleFeedback().size()));
         diagnostics.setReviewCenterStatus("READY_READONLY");
         return diagnostics;
@@ -179,27 +158,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
     }
 
     private List<ReviewCenterDashboardVO.PushReviewItem> pushReviews() {
-        List<TmPushSnapshotDO> rows = pushSnapshotMapper.listRecent(DEFAULT_LIMIT);
-        if (rows == null || rows.isEmpty()) {
-            return List.of();
-        }
-        List<ReviewCenterDashboardVO.PushReviewItem> out = new ArrayList<>(rows.size());
-        for (TmPushSnapshotDO row : rows) {
-            TmPushRecheckLogDO latest = row.getPushId() == null ? null : pushRecheckLogMapper.selectLatestByPushId(row.getPushId());
-            ReviewCenterDashboardVO.PushReviewItem item = new ReviewCenterDashboardVO.PushReviewItem();
-            item.setPushTime(firstNonNull(row.getPushCreateTime(), row.getCreateTime()));
-            item.setSymbol(row.getSymbol());
-            item.setPushType(row.getPushType());
-            item.setTelegramStatus(TELEGRAM_WAITING_SYNC);
-            item.setClicked(null);
-            item.setRecheckStatus(latest == null ? null : latest.getRecheckStatus());
-            item.setExpired(isExpired(row));
-            item.setFailReason(latest == null ? null : firstNonBlank(
-                    latest.getFailReasonJson(), latest.getExecutionErrorMessage(), latest.getExecutionErrorCode()));
-            item.setOutcome(latest == null ? row.getPushStatus() : firstNonBlank(latest.getExecutionStatus(), row.getPushStatus()));
-            out.add(item);
-        }
-        return out;
+        return List.of();
     }
 
     private List<ReviewCenterDashboardVO.RuleFeedbackItem> ruleFeedback(Long userId) {
@@ -251,17 +210,6 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
         String side = trimToNull(row.getSide());
         String quantity = row.getQuantity() == null ? null : row.getQuantity().stripTrailingZeros().toPlainString();
         return firstNonBlank(joinNonBlank(side, quantity), side, quantity);
-    }
-
-    private Boolean isExpired(TmPushSnapshotDO row) {
-        String status = trimToNull(row.getPushStatus());
-        if (status != null && status.toUpperCase(Locale.ROOT).contains("EXPIRED")) {
-            return true;
-        }
-        if (row.getExpiresAt() == null) {
-            return null;
-        }
-        return !UtcLocalTimePolicy.now(clock).isBefore(row.getExpiresAt());
     }
 
     private static Boolean ruleIssue(String errorType) {

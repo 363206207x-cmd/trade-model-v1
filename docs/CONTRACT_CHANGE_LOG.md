@@ -341,3 +341,43 @@ Does this weaken safety boundaries: No.
 Human confirmation required: Yes before FE-04A + FE-04B implementation. This
 record describes the registration's merged-main state; it does not mark FE-04
 implemented or complete.
+
+---
+
+## v1.0-fe04e-opportunity-public-projection-candidate
+
+Date: 2026-07-30
+Changed by: Codex
+Reason: Close the FE-04E P1 privacy boundary in which an authenticated shared
+`OPPORTUNITY` response could carry UserPosition- or account-risk-derived
+fields and relied on frontend filtering.
+Before: `OPPORTUNITY` and `POSITION_RISK` Push Detail shared one
+private-field-capable response record. The shared path could serialize Recheck
+account-risk status, risk level, or `failReasonJson`.
+After: PR #1155 defines `OPPORTUNITY` as
+`AUTHENTICATED_SHARED_PUBLIC_PROJECTION` and `POSITION_RISK` as
+`OWNER_SCOPED_PRIVATE_PROJECTION`. The public mapper reads only exact public
+identity, safe allowlisted opportunity status, public timestamp, and public
+description inputs; the public response variant cannot carry UserPosition,
+account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
+reason fields. It also omits internal `pushId` and other private Recheck
+references. Raw user-facing `/{pushId}/latest`, `/{pushId}/logs`, and Dashboard
+preview-by-`pushId` reads fail closed before raw Recheck data is read because
+their persisted rows do not provide an owner identity. The legacy raw
+`PushRecheckService` latest/list methods also fail closed; lower-level mapper
+reads remain internal operational inputs and are not user authorization paths.
+The private variant remains exact current-user scoped.
+
+The same PR candidate restores the read-state contract. `READY` now requires a
+complete legal Push/Recheck pair, completed execution, and matching statuses.
+Known incomplete/in-progress data maps to `PARTIAL`; illegal enum, malformed
+JSON, and contradictory states map to `ERROR`; absent/inaccessible exact
+resources map to `MISSING`; and only an empty successful collection maps to
+`EMPTY`. The structural readiness mapper does not select account-risk or
+position-risk columns; `failReasonJson` is inspected only inside the service
+for structural validity and is never part of the public DTO or response.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No; it strengthens transport-level privacy.
+Human confirmation required: Yes before B-risk PR #1155 merge. The candidate
+is not effective until exact-head review and merged main.

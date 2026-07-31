@@ -1,8 +1,8 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
-import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogEvaluateReq;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.OpportunityLogService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,9 +32,9 @@ public class OpportunityLogController {
     }
 
     @GetMapping("/{opportunityId}")
-    public ResponseEntity<ApiResponse<OpportunityLogDTO>> findById(@PathVariable String opportunityId) {
-        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
-        OpportunityLogDTO dto = opportunityLogService.findByIdForUser(opportunityId, userId);
+    public ResponseEntity<ApiResponse<OpportunityLogPublicDTO>> findById(@PathVariable String opportunityId) {
+        authenticatedUserIdResolver.requireCurrentUserId();
+        OpportunityLogPublicDTO dto = opportunityLogService.findPublicById(opportunityId);
         if (dto == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.notFound("opportunity not found: " + opportunityId));
@@ -43,7 +43,7 @@ public class OpportunityLogController {
     }
 
     @GetMapping("/query")
-    public ResponseEntity<ApiResponse<List<OpportunityLogDTO>>> query(
+    public ResponseEntity<ApiResponse<List<OpportunityLogPublicDTO>>> query(
             @RequestParam(required = false) String analysisId,
             @RequestParam(required = false) String decisionId,
             @RequestParam(required = false) String executionPlanId,
@@ -53,21 +53,22 @@ public class OpportunityLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(required = false, defaultValue = "50") int limit) {
-        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.success(opportunityLogService.queryForUser(
-                userId, analysisId, decisionId, executionPlanId, symbol, opportunityStatus, lifecycleStatus,
-                from, to, limit)));
+        authenticatedUserIdResolver.requireCurrentUserId();
+        List<OpportunityLogPublicDTO> rows = opportunityLogService.queryPublic(
+                analysisId, decisionId, executionPlanId, symbol, opportunityStatus, lifecycleStatus,
+                from, to, limit);
+        return ResponseEntity.ok(ApiResponse.success(rows));
     }
 
     @PostMapping("/{opportunityId}/evaluate")
-    public ResponseEntity<ApiResponse<OpportunityLogDTO>> evaluate(@PathVariable String opportunityId,
-                                                                   @RequestBody(required = false)
-                                                                   OpportunityLogEvaluateReq request) {
+    public ResponseEntity<ApiResponse<OpportunityLogPublicDTO>> evaluate(
+            @PathVariable String opportunityId,
+            @RequestBody(required = false) OpportunityLogEvaluateReq request) {
         try {
             Long userId = authenticatedUserIdResolver.requireCurrentUserId();
             LocalDateTime asOf = request != null ? request.getAsOf() : null;
             return ResponseEntity.ok(ApiResponse.success(
-                    opportunityLogService.evaluateOpportunityForUser(opportunityId, userId, asOf)));
+                    opportunityLogService.evaluatePublicOpportunityForUser(opportunityId, userId, asOf)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.notFound(e.getMessage()));

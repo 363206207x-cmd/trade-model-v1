@@ -1,23 +1,30 @@
 package org.example.trademodel.service;
 
-import org.example.trademodel.entity.OpportunityLogDO;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.PositionMonitorLogDO;
-import org.example.trademodel.entity.TmPushRecheckLogDO;
-import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.enums.UserPositionStatusEnum;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
-import org.example.trademodel.mapper.PushRecheckLogMapper;
-import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.messagepush.MessageListDTO;
 import org.example.trademodel.messagepush.MessageReadState;
+import org.example.trademodel.messagepush.PublicOpportunityProjectionPolicy;
 import org.example.trademodel.messagepush.PushDetailDTO;
+import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -30,46 +37,44 @@ public class MessagePushReadService {
     static final int MAX_LIMIT = 100;
     private static final Pattern OPPORTUNITY_ID = Pattern.compile("opp-[A-Za-z0-9_-]{1,60}");
     private static final Pattern NUMERIC_ID = Pattern.compile("[1-9][0-9]{0,18}");
-    private static final String RECHECK_EXECUTION_COMPLETED = "COMPLETED";
-    private static final Set<String> VALID_PUSH_STATUSES = Set.of(
-            PushRecheckStatusContract.PUSH_STATUS_CAPTURED,
-            PushRecheckStatusContract.PUSH_STATUS_REVIEW_PASSED,
-            PushRecheckStatusContract.PUSH_STATUS_REVIEW_WAITING,
-            PushRecheckStatusContract.PUSH_STATUS_DRIFTED_FROM_ENTRY_ZONE,
-            PushRecheckStatusContract.PUSH_STATUS_INVALIDATED,
-            PushRecheckStatusContract.PUSH_STATUS_RISK_BLOCKED,
-            PushRecheckStatusContract.PUSH_STATUS_CONFUSED_BLOCKED,
-            PushRecheckStatusContract.PUSH_STATUS_EXPIRED);
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> RISK_LOGIC_STATUSES = Set.of(
+            PositionMonitorLogicStatusEnum.LOGIC_WEAKENED.name(),
+            PositionMonitorLogicStatusEnum.PLAN_INVALIDATED.name(),
+            PositionMonitorLogicStatusEnum.HIGH_RISK.name());
+    private static final Set<String> RISK_LEVELS = Set.of("LOW", "MEDIUM", "HIGH");
 
     private final OpportunityLogMapper opportunityLogMapper;
     private final PositionMonitorLogMapper positionMonitorLogMapper;
-    private final PushSnapshotMapper pushSnapshotMapper;
-    private final PushRecheckLogMapper pushRecheckLogMapper;
     private final UserPositionMapper userPositionMapper;
+    private Clock clock = Clock.systemUTC();
 
     public MessagePushReadService(OpportunityLogMapper opportunityLogMapper,
                                   PositionMonitorLogMapper positionMonitorLogMapper,
-                                  PushSnapshotMapper pushSnapshotMapper,
-                                  PushRecheckLogMapper pushRecheckLogMapper,
                                   UserPositionMapper userPositionMapper) {
         this.opportunityLogMapper = opportunityLogMapper;
         this.positionMonitorLogMapper = positionMonitorLogMapper;
-        this.pushSnapshotMapper = pushSnapshotMapper;
-        this.pushRecheckLogMapper = pushRecheckLogMapper;
         this.userPositionMapper = userPositionMapper;
+    }
+
+    @Autowired(required = false)
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     public MessageListDTO listForUser(Long userId, Integer limit) {
         requireUserId(userId);
         int safeLimit = sanitizeLimit(limit);
         try {
-            List<OpportunityLogDO> opportunities = safeList(
-                    opportunityLogMapper.listPushBackedShared(safeLimit));
+            List<OpportunityLogPublicDTO> opportunities = safeList(
+                    opportunityLogMapper.queryPublicApi(
+                            null, null, null, null, null, null, null, null, safeLimit));
             List<PositionMonitorLogDO> positionRisks = safeList(
                     positionMonitorLogMapper.listRiskByUserId(userId, safeLimit));
             List<MessageListDTO.MessageItem> items = new ArrayList<>();
             int incompleteSources = 0;
-            for (OpportunityLogDO row : opportunities) {
+            LocalDateTime now = UtcLocalTimePolicy.now(clock);
+            for (OpportunityLogPublicDTO row : opportunities) {
                 MessageListDTO.MessageItem item = opportunityItem(row);
                 if (item == null) {
                     incompleteSources++;
@@ -78,11 +83,20 @@ public class MessagePushReadService {
                 }
             }
             for (PositionMonitorLogDO row : positionRisks) {
-                MessageListDTO.MessageItem item = positionRiskItem(row, userId);
-                if (item == null) {
-                    incompleteSources++;
-                } else {
-                    items.add(item);
+                PositionRiskListItem result = positionRiskItem(row, userId, now);
+                switch (result.state()) {
+                    case READY -> items.add(result.item());
+                    case PARTIAL -> incompleteSources++;
+                    case MISSING -> {
+                        return new MessageListDTO(MessageReadState.MISSING, null, result.reason());
+                    }
+                    case ERROR -> {
+                        return new MessageListDTO(MessageReadState.ERROR, null, result.reason());
+                    }
+                    default -> {
+                        return new MessageListDTO(
+                                MessageReadState.ERROR, null, "POSITION_RISK_STATE_INVALID");
+                    }
                 }
             }
             items.sort(Comparator.comparing(
@@ -108,7 +122,7 @@ public class MessagePushReadService {
         requireUserId(userId);
         String messageId = normalizeMessageId(rawMessageId);
         if (messageId == null) {
-            return missing(rawMessageId);
+            return unavailable(MessageReadState.MISSING, rawMessageId, "MESSAGE_NOT_FOUND");
         }
         try {
             if (OPPORTUNITY_ID.matcher(messageId).matches()) {
@@ -117,87 +131,36 @@ public class MessagePushReadService {
             if (NUMERIC_ID.matcher(messageId).matches()) {
                 return positionRiskDetail(userId, messageId);
             }
-            return missing(messageId);
+            return unavailable(MessageReadState.MISSING, messageId, "MESSAGE_NOT_FOUND");
         } catch (RuntimeException ex) {
-            return error(messageId);
+            return unavailable(MessageReadState.ERROR, messageId, "MESSAGE_READ_FAILED");
         }
     }
 
     private PushDetailDTO opportunityDetail(String messageId) {
-        OpportunityLogDO opportunity = opportunityLogMapper
-                .selectPushBackedSharedByOpportunityId(messageId);
-        if (opportunity == null || !positive(opportunity.getPushId())) {
-            return missing(messageId);
+        OpportunityLogPublicDTO opportunity = opportunityLogMapper
+                .selectPublicApiByOpportunityId(messageId);
+        PublicOpportunityProjectionPolicy.Evaluation evaluation =
+                PublicOpportunityProjectionPolicy.evaluate(opportunity, messageId);
+        if (evaluation.state() == MessageReadState.MISSING) {
+            return unavailable(MessageReadState.MISSING, messageId, "MESSAGE_NOT_FOUND");
         }
-        String pushId = id(opportunity.getPushId());
         MessageListDTO.SourceIdentity sourceIdentity = new MessageListDTO.SourceIdentity(
-                "OPPORTUNITY", opportunity.getOpportunityId(), opportunity.getAnalysisId(), null);
-        TmPushSnapshotDO push = pushSnapshotMapper.selectByPushId(opportunity.getPushId());
-        if (push == null
-                || normalizeMessageId(opportunity.getAnalysisId()) == null
-                || !Objects.equals(opportunity.getPushId(), push.getPushId())
-                || !Objects.equals(opportunity.getAnalysisId(), push.getAnalysisId())) {
-            return partial(messageId, pushId, sourceIdentity, null, null, null,
-                    List.of("originalSnapshot", "currentRecheck"), "PUSH_SNAPSHOT_MISSING");
-        }
-        String pushStatus = validPushStatus(push.getPushStatus());
-        if (pushStatus == null) {
-            return partial(messageId, pushId, sourceIdentity, null, null, null,
-                    List.of("originalSnapshot.status"), "PUSH_SNAPSHOT_INCOMPLETE");
-        }
-
-        PushDetailDTO.OriginalSnapshot original = new PushDetailDTO.OriginalSnapshot(
-                pushId,
-                "OPPORTUNITY",
-                push.getAnalysisId(),
-                null,
-                push.getSymbol(),
-                opportunity.getDirection(),
-                pushStatus,
-                push.getTriggerPrice(),
-                push.getEntryZoneJson(),
-                push.getInvalidationConditionJson(),
-                null,
-                opportunity.getReasonCodes(),
-                firstNonNull(push.getPushCreateTime(), push.getCreateTime()));
-        TmPushRecheckLogDO latest = pushRecheckLogMapper.selectLatestByPushId(opportunity.getPushId());
-        if (latest == null) {
-            return partial(messageId, pushId, sourceIdentity, original, null, null,
-                    List.of("currentRecheck"), "CURRENT_RECHECK_MISSING");
-        }
-        String recheckStatus = normalizeMessageId(latest.getRecheckStatus());
-        String executionStatus = normalize(latest.getExecutionStatus());
-        if ((recheckStatus != null
-                && PushRecheckStatusContract.tryParseRecheckStatus(recheckStatus) == null)
-                || (executionStatus != null
-                && !RECHECK_EXECUTION_COMPLETED.equals(executionStatus))) {
-            return error(messageId, "CURRENT_RECHECK_INVALID");
-        }
-        List<String> missingFields = new ArrayList<>();
-        if (recheckStatus == null) {
-            missingFields.add("currentRecheck.status");
-        }
-        if (latest.getRecheckTime() == null) {
-            missingFields.add("currentRecheck.checkedAt");
-        }
-        if (executionStatus == null) {
-            missingFields.add("currentRecheck.executionStatus");
-        }
-        if (!missingFields.isEmpty()) {
-            return partial(messageId, pushId, sourceIdentity, original, null, null,
-                    missingFields, "CURRENT_RECHECK_INCOMPLETE");
-        }
-        PushDetailDTO.CurrentRecheck current = new PushDetailDTO.CurrentRecheck(
-                id(latest.getLogId()),
-                "PUSH_RECHECK",
-                PushRecheckStatusContract.canonicalizeRecheckStatusName(recheckStatus),
-                latest.getCurrentPrice(),
-                latest.getCurrentDataQualityScore(),
-                latest.getCurrentConfusedScore(),
-                latest.getCurrentAccountRiskAllowed() == null
-                        ? null : latest.getCurrentAccountRiskAllowed() ? "ALLOWED" : "BLOCKED",
-                latest.getRecheckTime());
-        return ready(messageId, pushId, sourceIdentity, original, current, latest.getFailReasonJson());
+                "OPPORTUNITY", opportunity.opportunityId(), opportunity.analysisId(), null);
+        PushDetailDTO.OpportunityIdentity opportunityIdentity = new PushDetailDTO.OpportunityIdentity(
+                opportunity.opportunityId(),
+                opportunity.analysisId());
+        return opportunityProjection(
+                evaluation.state(),
+                messageId,
+                sourceIdentity,
+                opportunityIdentity,
+                evaluation.publicLifecycle(),
+                evaluation.publicStatus(),
+                PublicOpportunityProjectionPolicy.publicTimestamp(opportunity),
+                PublicOpportunityProjectionPolicy.publicDescription(opportunity),
+                evaluation.missingFields(),
+                evaluation.reason());
     }
 
     private PushDetailDTO positionRiskDetail(Long userId, String messageId) {
@@ -205,26 +168,20 @@ public class MessagePushReadService {
         try {
             logId = Long.valueOf(messageId);
         } catch (NumberFormatException ex) {
-            return missing(messageId);
+            return unavailable(MessageReadState.MISSING, messageId, "MESSAGE_NOT_FOUND");
         }
         PositionMonitorLogDO originalLog = positionMonitorLogMapper
                 .selectRiskByIdAndUserId(logId, userId);
-        if (originalLog == null || !positive(originalLog.getPositionId())) {
-            return missing(messageId);
-        }
-        UserPositionDO position = userPositionMapper.selectByIdAndUserId(
-                originalLog.getPositionId(), userId);
+        PositionRiskStateResolution resolution = resolvePositionRiskState(
+                userId, logId, originalLog, UtcLocalTimePolicy.now(clock));
+        UserPositionDO position = resolution.position();
         if (position == null) {
-            return missing(messageId);
+            return unavailable(resolution.state(), messageId, resolution.reason());
         }
         String positionId = id(position.getId());
         MessageListDTO.SourceIdentity sourceIdentity = new MessageListDTO.SourceIdentity(
                 "POSITION_RISK", messageId, originalLog.getAnalysisId(), positionId);
         String positionSymbol = normalizeMessageId(position.getAssetSymbol());
-        if (positionSymbol == null) {
-            return partial(messageId, null, sourceIdentity, null, null, null,
-                    List.of("originalSnapshot.symbol"), "POSITION_SYMBOL_MISSING");
-        }
         PushDetailDTO.OriginalSnapshot original = new PushDetailDTO.OriginalSnapshot(
                 messageId,
                 "POSITION_RISK",
@@ -239,11 +196,17 @@ public class MessagePushReadService {
                 normalize(originalLog.getRiskLevel()),
                 originalLog.getReason(),
                 originalLog.getCreatedAt());
-        PositionMonitorLogDO latest = positionMonitorLogMapper
-                .selectLatestByPositionIdAndUserId(position.getId(), userId);
+        PositionMonitorLogDO latest = resolution.latest();
         if (latest == null) {
-            return partial(messageId, null, sourceIdentity, original, null, null,
-                    List.of("currentRecheck"), "CURRENT_MONITOR_STATE_MISSING");
+            return positionRiskProjection(
+                    resolution.state(),
+                    messageId,
+                    sourceIdentity,
+                    original,
+                    null,
+                    null,
+                    resolution.missingFields(),
+                    resolution.reason());
         }
         PushDetailDTO.CurrentRecheck current = new PushDetailDTO.CurrentRecheck(
                 id(latest.getLogId()),
@@ -254,54 +217,133 @@ public class MessagePushReadService {
                 null,
                 normalize(latest.getRiskLevel()),
                 latest.getCreatedAt());
-        return ready(messageId, null, sourceIdentity, original, current, latest.getReason());
+        return positionRiskProjection(
+                resolution.state(),
+                messageId,
+                sourceIdentity,
+                original,
+                current,
+                latest.getReason(),
+                resolution.missingFields(),
+                resolution.reason());
     }
 
-    private static MessageListDTO.MessageItem opportunityItem(OpportunityLogDO row) {
-        if (row == null || !validOpportunityId(row.getOpportunityId()) || !positive(row.getPushId())) {
+    private static MessageListDTO.MessageItem opportunityItem(OpportunityLogPublicDTO row) {
+        PublicOpportunityProjectionPolicy.Evaluation evaluation =
+                PublicOpportunityProjectionPolicy.evaluate(row, row == null ? null : row.opportunityId());
+        if (row == null
+                || evaluation.state() == MessageReadState.ERROR
+                || evaluation.state() == MessageReadState.MISSING
+                || normalizeMessageId(row.analysisId()) == null
+                || normalizeMessageId(row.symbol()) == null
+                || evaluation.displayStatus() == null
+                || PublicOpportunityProjectionPolicy.publicTimestamp(row) == null) {
             return null;
         }
         return item(
-                row.getOpportunityId(),
-                id(row.getPushId()),
+                row.opportunityId(),
                 new MessageListDTO.SourceIdentity(
-                        "OPPORTUNITY", row.getOpportunityId(), row.getAnalysisId(), null),
-                row.getSymbol(),
-                firstText(row.getOpportunityStatus(), row.getLifecycleStatus()),
-                firstNonNull(row.getAnchorTime(), row.getCreatedAt()));
+                        "OPPORTUNITY", row.opportunityId(), row.analysisId(), null),
+                row.symbol(),
+                evaluation.displayStatus(),
+                PublicOpportunityProjectionPolicy.publicTimestamp(row));
     }
 
-    private MessageListDTO.MessageItem positionRiskItem(PositionMonitorLogDO row, Long userId) {
-        if (row == null || !positive(row.getLogId()) || !positive(row.getPositionId())
-                || !isRiskState(row.getLogicStatus())) {
-            return null;
+    private PositionRiskListItem positionRiskItem(
+            PositionMonitorLogDO row,
+            Long userId,
+            LocalDateTime now) {
+        PositionRiskStateResolution resolution = resolvePositionRiskState(
+                userId, row == null ? null : row.getLogId(), row, now);
+        if (resolution.state() != MessageReadState.READY) {
+            return new PositionRiskListItem(
+                    resolution.state(), null, resolution.reason());
         }
-        UserPositionDO position = userPositionMapper.selectByIdAndUserId(row.getPositionId(), userId);
-        String symbol = position == null ? null : normalizeMessageId(position.getAssetSymbol());
-        if (position == null || !Objects.equals(position.getId(), row.getPositionId()) || symbol == null) {
-            return null;
-        }
+        UserPositionDO position = resolution.position();
         String messageId = id(row.getLogId());
         String positionId = id(position.getId());
-        return item(
-                messageId,
-                null,
-                new MessageListDTO.SourceIdentity(
-                        "POSITION_RISK", messageId, row.getAnalysisId(), positionId),
-                symbol,
-                normalize(row.getLogicStatus()),
-                row.getCreatedAt());
+        return new PositionRiskListItem(
+                MessageReadState.READY,
+                item(
+                        messageId,
+                        new MessageListDTO.SourceIdentity(
+                                "POSITION_RISK", messageId, row.getAnalysisId(), positionId),
+                        normalizeMessageId(position.getAssetSymbol()),
+                        normalize(row.getLogicStatus()),
+                        row.getCreatedAt()),
+                null);
+    }
+
+    private PositionRiskStateResolution resolvePositionRiskState(
+            Long userId,
+            Long expectedLogId,
+            PositionMonitorLogDO original,
+            LocalDateTime now) {
+        if (original == null) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.MISSING, null, null, List.of(), "MESSAGE_NOT_FOUND");
+        }
+        if (!positive(expectedLogId) || !positive(original.getLogId())) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.ERROR, null, null, List.of(),
+                    "POSITION_MONITOR_IDENTITY_INVALID");
+        }
+        if (!Objects.equals(expectedLogId, original.getLogId())) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.ERROR, null, null, List.of(),
+                    "POSITION_RISK_MESSAGE_IDENTITY_MISMATCH");
+        }
+        if (!positive(original.getPositionId())) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.ERROR, null, null, List.of(),
+                    "POSITION_RISK_POSITION_IDENTITY_INVALID");
+        }
+
+        UserPositionDO position = userPositionMapper.selectByIdAndUserId(
+                original.getPositionId(), userId);
+        if (position == null) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.MISSING, null, null, List.of(), "MESSAGE_NOT_FOUND");
+        }
+        if (!Objects.equals(position.getId(), original.getPositionId())) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.ERROR, null, null, List.of(),
+                    "POSITION_RISK_IDENTITY_MISMATCH");
+        }
+        if (!Objects.equals(userId, position.getUserId())) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.ERROR, null, null, List.of(),
+                    "POSITION_RISK_OWNER_MISMATCH");
+        }
+
+        PositionMonitorLogDO latest = positionMonitorLogMapper
+                .selectLatestByPositionIdAndUserId(position.getId(), userId);
+        if (latest == null) {
+            return new PositionRiskStateResolution(
+                    MessageReadState.MISSING,
+                    position,
+                    null,
+                    List.of("currentRecheck"),
+                    "CURRENT_MONITOR_STATE_MISSING");
+        }
+
+        MonitorValidation validation = validatePositionRisk(
+                userId, position, original, latest, now);
+        return new PositionRiskStateResolution(
+                validation.state(),
+                position,
+                latest,
+                validation.missingFields(),
+                validation.reason());
     }
 
     private static MessageListDTO.MessageItem item(String messageId,
-                                                   String pushId,
                                                    MessageListDTO.SourceIdentity sourceIdentity,
                                                    String symbol,
                                                    String status,
                                                    LocalDateTime timestamp) {
         return new MessageListDTO.MessageItem(
                 messageId,
-                pushId,
                 sourceIdentity,
                 symbol,
                 status,
@@ -312,60 +354,67 @@ public class MessagePushReadService {
                 true);
     }
 
-    private static PushDetailDTO ready(String messageId,
-                                       String pushId,
-                                       MessageListDTO.SourceIdentity sourceIdentity,
-                                       PushDetailDTO.OriginalSnapshot original,
-                                       PushDetailDTO.CurrentRecheck current,
-                                       String changeReason) {
-        return detail(MessageReadState.READY, messageId, pushId, sourceIdentity,
-                original, current, changeReason, List.of(), null);
-    }
-
-    private static PushDetailDTO partial(String messageId,
-                                         String pushId,
-                                         MessageListDTO.SourceIdentity sourceIdentity,
-                                         PushDetailDTO.OriginalSnapshot original,
-                                         PushDetailDTO.CurrentRecheck current,
-                                         String changeReason,
-                                         List<String> missingFields,
-                                         String reason) {
-        return detail(MessageReadState.PARTIAL, messageId, pushId, sourceIdentity,
-                original, current, changeReason, missingFields, reason);
-    }
-
-    private static PushDetailDTO missing(String messageId) {
-        return detail(MessageReadState.MISSING, normalizeMessageId(messageId), null, null,
-                null, null, null, List.of(), "MESSAGE_NOT_FOUND");
-    }
-
-    private static PushDetailDTO error(String messageId) {
-        return error(messageId, "MESSAGE_READ_FAILED");
-    }
-
-    private static PushDetailDTO error(String messageId, String reason) {
-        return detail(MessageReadState.ERROR, messageId, null, null,
-                null, null, null, List.of(), reason);
-    }
-
-    private static PushDetailDTO detail(MessageReadState state,
-                                        String messageId,
-                                        String pushId,
-                                        MessageListDTO.SourceIdentity sourceIdentity,
-                                        PushDetailDTO.OriginalSnapshot original,
-                                        PushDetailDTO.CurrentRecheck current,
-                                        String changeReason,
-                                        List<String> missingFields,
-                                        String reason) {
-        return new PushDetailDTO(
+    private static PushDetailDTO opportunityProjection(
+            MessageReadState state,
+            String messageId,
+            MessageListDTO.SourceIdentity sourceIdentity,
+            PushDetailDTO.OpportunityIdentity opportunityIdentity,
+            String publicLifecycle,
+            String publicStatus,
+            LocalDateTime publicTimestamp,
+            String publicDescription,
+            List<String> missingFields,
+            String reason) {
+        return new PushDetailDTO.OpportunityPublicProjection(
                 state,
                 messageId,
-                pushId,
+                sourceIdentity,
+                opportunityIdentity,
+                publicLifecycle,
+                publicStatus,
+                publicTimestamp,
+                publicDescription,
+                missingFields,
+                reason,
+                true,
+                true,
+                true,
+                true);
+    }
+
+    private static PushDetailDTO positionRiskProjection(
+            MessageReadState state,
+            String messageId,
+            MessageListDTO.SourceIdentity sourceIdentity,
+            PushDetailDTO.OriginalSnapshot original,
+            PushDetailDTO.CurrentRecheck current,
+            String changeReason,
+            List<String> missingFields,
+            String reason) {
+        return new PushDetailDTO.PositionRiskPrivateProjection(
+                state,
+                messageId,
                 sourceIdentity,
                 original,
                 current,
                 changeReason,
                 missingFields,
+                reason,
+                true,
+                true,
+                true,
+                true);
+    }
+
+    private static PushDetailDTO unavailable(
+            MessageReadState state,
+            String messageId,
+            String reason) {
+        return new PushDetailDTO.UnavailableProjection(
+                state,
+                normalizeMessageId(messageId),
+                null,
+                List.of(),
                 reason,
                 true,
                 true,
@@ -402,44 +451,264 @@ public class MessagePushReadService {
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
-    private static boolean validOpportunityId(String value) {
-        return value != null && OPPORTUNITY_ID.matcher(value).matches();
-    }
-
     private static boolean positive(Long value) {
         return value != null && value > 0;
     }
 
-    private static boolean isRiskState(String value) {
-        String normalized = normalize(value);
-        return "LOGIC_WEAKENED".equals(normalized)
-                || "PLAN_INVALIDATED".equals(normalized)
-                || "HIGH_RISK".equals(normalized);
-    }
-
-    private static String validPushStatus(String value) {
-        String normalized = normalizeMessageId(value);
-        if (normalized == null) {
-            return null;
-        }
-        String canonical = PushRecheckStatusContract.canonicalizePushStatus(normalized);
-        return VALID_PUSH_STATUSES.contains(canonical) ? canonical : null;
+    private static boolean positive(BigDecimal value) {
+        return value != null && value.compareTo(BigDecimal.ZERO) > 0;
     }
 
     private static String id(Long value) {
         return positive(value) ? Long.toString(value) : null;
     }
 
-    private static String firstText(String first, String second) {
-        String value = normalizeMessageId(first);
-        return value != null ? value : normalizeMessageId(second);
-    }
-
-    private static <T> T firstNonNull(T first, T second) {
-        return first != null ? first : second;
-    }
-
     private static <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
+    }
+
+    private static MonitorValidation validatePositionRisk(
+            Long userId,
+            UserPositionDO position,
+            PositionMonitorLogDO original,
+            PositionMonitorLogDO latest,
+            LocalDateTime now) {
+        LinkedHashSet<String> missing = new LinkedHashSet<>();
+        String error = validatePositionIdentity(userId, position, original, latest, missing);
+        if (error == null) {
+            error = validatePositionLifecycle(position, latest, missing);
+        }
+        if (error == null) {
+            error = validateMonitor("originalSnapshot", original, now, missing);
+        }
+        if (error == null && !Objects.equals(original.getLogId(), latest.getLogId())) {
+            error = validateMonitor("currentRecheck", latest, now, missing);
+        }
+        if (error == null) {
+            error = validateMonitorRelationship(original, latest, missing);
+        }
+        if (error != null) {
+            return new MonitorValidation(MessageReadState.ERROR, List.copyOf(missing), error);
+        }
+        if (!missing.isEmpty()) {
+            return new MonitorValidation(
+                    MessageReadState.PARTIAL,
+                    List.copyOf(missing),
+                    "POSITION_RISK_DATA_INCOMPLETE");
+        }
+        return new MonitorValidation(MessageReadState.READY, List.of(), null);
+    }
+
+    private static String validatePositionIdentity(
+            Long userId,
+            UserPositionDO position,
+            PositionMonitorLogDO original,
+            PositionMonitorLogDO latest,
+            Set<String> missing) {
+        if (!positive(userId) || !Objects.equals(userId, position.getUserId())) {
+            return "POSITION_RISK_OWNER_MISMATCH";
+        }
+        if (!positive(position.getId())
+                || !Objects.equals(position.getId(), original.getPositionId())
+                || !Objects.equals(position.getId(), latest.getPositionId())) {
+            return "POSITION_RISK_IDENTITY_MISMATCH";
+        }
+        if (normalizeMessageId(position.getAssetSymbol()) == null) {
+            missing.add("position.symbol");
+        }
+        String originalLogic = normalize(original.getLogicStatus());
+        if (originalLogic == null) {
+            missing.add("originalSnapshot.status");
+        } else if (!RISK_LOGIC_STATUSES.contains(originalLogic)) {
+            return "POSITION_RISK_SOURCE_MISMATCH";
+        }
+        return null;
+    }
+
+    private static String validatePositionLifecycle(
+            UserPositionDO position,
+            PositionMonitorLogDO latest,
+            Set<String> missing) {
+        String status = normalize(position.getStatus());
+        if (status == null) {
+            missing.add("position.status");
+            return null;
+        }
+        UserPositionStatusEnum lifecycle;
+        try {
+            lifecycle = UserPositionStatusEnum.valueOf(status);
+        } catch (IllegalArgumentException ex) {
+            return "POSITION_LIFECYCLE_INVALID";
+        }
+        if (lifecycle.visibleInOpenPositions() && position.getClosedAt() != null) {
+            return "POSITION_LIFECYCLE_CONFLICT";
+        }
+        if (lifecycle == UserPositionStatusEnum.CLOSED) {
+            if (position.getClosedAt() == null) {
+                missing.add("position.closedAt");
+            } else if (latest.getCreatedAt() != null
+                    && latest.getCreatedAt().isAfter(position.getClosedAt())) {
+                return "POSITION_MONITOR_AFTER_CLOSE";
+            }
+        }
+        return null;
+    }
+
+    private static String validateMonitor(
+            String fieldPrefix,
+            PositionMonitorLogDO row,
+            LocalDateTime now,
+            Set<String> missing) {
+        if (!positive(row.getLogId()) || !positive(row.getPositionId())) {
+            return "POSITION_MONITOR_IDENTITY_INVALID";
+        }
+        if (normalizeMessageId(row.getAnalysisId()) == null) {
+            missing.add(fieldPrefix + ".analysisId");
+        }
+        if (normalizeMessageId(row.getExecutionPlanId()) == null) {
+            missing.add(fieldPrefix + ".executionPlanId");
+        }
+        if (row.getCurrentPrice() == null) {
+            missing.add(fieldPrefix + ".currentPrice");
+        } else if (!positive(row.getCurrentPrice())) {
+            return "POSITION_MONITOR_PRICE_INVALID";
+        }
+
+        String logicStatus = normalize(row.getLogicStatus());
+        if (logicStatus == null) {
+            missing.add(fieldPrefix + ".status");
+        } else {
+            try {
+                PositionMonitorLogicStatusEnum.valueOf(logicStatus);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_MONITOR_LOGIC_STATUS_INVALID";
+            }
+        }
+
+        String riskLevel = normalize(row.getRiskLevel());
+        if (riskLevel == null) {
+            missing.add(fieldPrefix + ".riskLevel");
+        } else if (!RISK_LEVELS.contains(riskLevel)) {
+            return "POSITION_MONITOR_RISK_LEVEL_INVALID";
+        }
+
+        String action = normalize(row.getSuggestedAction());
+        if (action == null) {
+            missing.add(fieldPrefix + ".suggestedAction");
+        } else {
+            try {
+                PositionMonitorSuggestedActionEnum.valueOf(action);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_MONITOR_ACTION_INVALID";
+            }
+            if (logicStatus != null && !legalAction(logicStatus, action)) {
+                return "POSITION_MONITOR_STATE_CONFLICT";
+            }
+        }
+        if (normalizeMessageId(row.getReason()) == null) {
+            missing.add(fieldPrefix + ".reason");
+        }
+        if (row.getCreatedAt() == null) {
+            missing.add(fieldPrefix + ".checkedAt");
+        } else if (now != null && row.getCreatedAt().isAfter(now)) {
+            return "POSITION_MONITOR_TIMESTAMP_INVALID";
+        }
+        return validateRiskSnapshot(fieldPrefix, row, missing);
+    }
+
+    private static String validateRiskSnapshot(
+            String fieldPrefix,
+            PositionMonitorLogDO row,
+            Set<String> missing) {
+        String raw = normalizeMessageId(row.getRiskSnapshot());
+        if (raw == null) {
+            missing.add(fieldPrefix + ".riskSnapshot");
+            return null;
+        }
+        JsonNode root;
+        try {
+            root = JSON.readTree(raw);
+        } catch (Exception ex) {
+            return "POSITION_MONITOR_RISK_DATA_MALFORMED";
+        }
+        if (root == null || !root.isObject()) {
+            return "POSITION_MONITOR_RISK_DATA_MALFORMED";
+        }
+        JsonNode snapshotRiskLevel = root.get("riskLevel");
+        if (snapshotRiskLevel == null || snapshotRiskLevel.isNull()) {
+            missing.add(fieldPrefix + ".riskSnapshot.riskLevel");
+        } else if (!snapshotRiskLevel.isTextual()) {
+            return "POSITION_MONITOR_RISK_DATA_MALFORMED";
+        } else {
+            // Account-level snapshot risk and composite monitor risk are independently valid dimensions.
+            String normalizedRisk = normalize(snapshotRiskLevel.asText());
+            if (!RISK_LEVELS.contains(normalizedRisk)) {
+                return "POSITION_MONITOR_RISK_DATA_INVALID";
+            }
+        }
+        JsonNode riskBlocked = root.get("riskBlocked");
+        if (riskBlocked == null || riskBlocked.isNull()) {
+            missing.add(fieldPrefix + ".riskSnapshot.riskBlocked");
+        } else if (!riskBlocked.isBoolean()) {
+            return "POSITION_MONITOR_RISK_DATA_MALFORMED";
+        }
+        return null;
+    }
+
+    private static String validateMonitorRelationship(
+            PositionMonitorLogDO original,
+            PositionMonitorLogDO latest,
+            Set<String> missing) {
+        String originalAnalysisId = normalizeMessageId(original.getAnalysisId());
+        String latestAnalysisId = normalizeMessageId(latest.getAnalysisId());
+        if (originalAnalysisId != null
+                && latestAnalysisId != null
+                && !originalAnalysisId.equals(latestAnalysisId)) {
+            return "POSITION_MONITOR_ANALYSIS_IDENTITY_MISMATCH";
+        }
+        String originalPlanId = normalizeMessageId(original.getExecutionPlanId());
+        String latestPlanId = normalizeMessageId(latest.getExecutionPlanId());
+        if (originalPlanId != null && latestPlanId != null && !originalPlanId.equals(latestPlanId)) {
+            return "POSITION_MONITOR_PLAN_IDENTITY_MISMATCH";
+        }
+        if (latest.getCreatedAt() != null
+                && original.getCreatedAt() != null
+                && latest.getCreatedAt().isBefore(original.getCreatedAt())) {
+            return "POSITION_MONITOR_SEQUENCE_INVALID";
+        }
+        if (originalAnalysisId == null || latestAnalysisId == null) {
+            missing.add("sourceIdentity.analysisId");
+        }
+        return null;
+    }
+
+    private static boolean legalAction(String logicStatus, String action) {
+        return switch (logicStatus) {
+            case "LOGIC_VALID" -> "HOLD".equals(action) || "MANUAL_REVIEW".equals(action);
+            case "LOGIC_WEAKENED" -> "MANUAL_REVIEW".equals(action) || "RECHECK_PLAN".equals(action);
+            case "PLAN_INVALIDATED" -> "RECHECK_PLAN".equals(action);
+            case "HIGH_RISK" -> "RISK_REVIEW".equals(action);
+            default -> false;
+        };
+    }
+
+    private record MonitorValidation(
+            MessageReadState state,
+            List<String> missingFields,
+            String reason) {
+    }
+
+    private record PositionRiskListItem(
+            MessageReadState state,
+            MessageListDTO.MessageItem item,
+            String reason) {
+    }
+
+    private record PositionRiskStateResolution(
+            MessageReadState state,
+            UserPositionDO position,
+            PositionMonitorLogDO latest,
+            List<String> missingFields,
+            String reason) {
     }
 }

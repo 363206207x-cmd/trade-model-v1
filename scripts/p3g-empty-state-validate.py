@@ -359,9 +359,12 @@ for field in ("analysisRunCountWindow", "lowQualityCountWindow"):
     require(data_quality.get(field) == 0, f"run baseline {field} is not zero")
 
 recheck = baseline.get("recheckSummary") or {}
-require(recheck.get("totalCountWindow") == 0, "run baseline recheck total is not zero")
-require(all(value == 0 for value in (recheck.get("statusCountsWindow") or {}).values()),
-        "run baseline recheck status count is not zero")
+require(recheck.get("availabilityStatus") == "PRIVATE_SOURCE_UNAVAILABLE",
+        "run baseline recheck private source is not fail-closed")
+require(recheck.get("totalCountWindow") is None,
+        "run baseline exposed a global private recheck total")
+require(recheck.get("statusCountsWindow") is None,
+        "run baseline exposed global private recheck status counts")
 
 hot_reset = baseline.get("hotResetSummary") or {}
 require(hot_reset.get("eventCountWindow") == 0,

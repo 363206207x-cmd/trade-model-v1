@@ -342,8 +342,26 @@ public class RunBaselineVO {
     }
 
     public static class RecheckSummary {
+        private String availabilityStatus;
+        private String availabilityDetail;
         private Integer totalCountWindow;
-        private Map<String, Integer> statusCountsWindow = new LinkedHashMap<>();
+        private Map<String, Integer> statusCountsWindow;
+
+        public String getAvailabilityStatus() {
+            return availabilityStatus;
+        }
+
+        public void setAvailabilityStatus(String availabilityStatus) {
+            this.availabilityStatus = availabilityStatus;
+        }
+
+        public String getAvailabilityDetail() {
+            return availabilityDetail;
+        }
+
+        public void setAvailabilityDetail(String availabilityDetail) {
+            this.availabilityDetail = availabilityDetail;
+        }
 
         public Integer getTotalCountWindow() {
             return totalCountWindow;

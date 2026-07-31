@@ -41,9 +41,11 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
@@ -90,9 +92,18 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
+    void manualTriggerFailsClosedBeforeRepositoryMutation() {
+        assertThatThrownBy(() -> service.recheck(1L, new BigDecimal("100")))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("USER_TRIGGER_AND_REPLAY_DISABLED");
+
+        verifyNoInteractions(pushSnapshotMapper, pushRecheckLogMapper);
+    }
+
+    @Test
     void snapshotMissing_invalidated() {
         when(pushSnapshotMapper.selectByPushId(1L)).thenReturn(null);
-        RecheckResult r = service.recheck(1L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(1L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isValid()).isFalse();
         assertThat(r.isReviewPassed()).isFalse();
@@ -107,7 +118,7 @@ class PushRecheckServiceImplTest {
         TmPushSnapshotDO s = baseSnap();
         s.setExpiresAt(LocalDateTime.parse("2026-07-14T11:59:00"));
         when(pushSnapshotMapper.selectByPushId(2L)).thenReturn(s);
-        RecheckResult r = service.recheck(2L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(2L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
         assertThat(r.isReviewPassed()).isFalse();
         assertSafeReviewOnlyResult(r);
@@ -125,11 +136,11 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(203L)).thenReturn(snapshot);
 
         service.setClock(Clock.fixed(Instant.parse("2026-07-14T11:59:59Z"), ZoneOffset.UTC));
-        RecheckResult before = service.recheck(201L, new BigDecimal("100"));
+        RecheckResult before = scheduledRecheck(201L, new BigDecimal("100"));
         service.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:00Z"), ZoneOffset.UTC));
-        RecheckResult equal = service.recheck(202L, new BigDecimal("100"));
+        RecheckResult equal = scheduledRecheck(202L, new BigDecimal("100"));
         service.setClock(Clock.fixed(Instant.parse("2026-07-14T12:00:01Z"), ZoneOffset.UTC));
-        RecheckResult after = service.recheck(203L, new BigDecimal("100"));
+        RecheckResult after = scheduledRecheck(203L, new BigDecimal("100"));
 
         assertThat(before.getRecheckStatus()).isNotEqualTo(RecheckStatusEnum.EXPIRED);
         assertThat(equal.getRecheckStatus()).isEqualTo(RecheckStatusEnum.EXPIRED);
@@ -154,7 +165,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(22);
         s.setDataQualityScoreSnapshot(72);
         when(pushSnapshotMapper.selectByPushId(3L)).thenReturn(s);
-        RecheckResult r = service.recheck(3L, new BigDecimal("110"));
+        RecheckResult r = scheduledRecheck(3L, new BigDecimal("110"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.DRIFTED_FROM_ENTRY_ZONE);
         assertThat(r.isReviewPassed()).isFalse();
         assertSafeReviewOnlyResult(r);
@@ -172,7 +183,7 @@ class PushRecheckServiceImplTest {
         TmPushSnapshotDO s = baseSnap();
         s.setInvalidationConditionJson("{\"invalidPriceBelow\":105,\"text\":\"x\"}");
         when(pushSnapshotMapper.selectByPushId(4L)).thenReturn(s);
-        RecheckResult r = service.recheck(4L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(4L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertSafeReviewOnlyResult(r);
         verify(pushSnapshotMapper).updatePushStatus(4L, "RECHECK_INVALIDATED");
@@ -183,7 +194,7 @@ class PushRecheckServiceImplTest {
         TmPushSnapshotDO s = baseSnap();
         when(pushSnapshotMapper.selectByPushId(41L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(41L, BigDecimal.ZERO);
+        RecheckResult r = scheduledRecheck(41L, BigDecimal.ZERO);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isReviewPassed()).isFalse();
@@ -202,7 +213,7 @@ class PushRecheckServiceImplTest {
         quote.setLastPrice(new BigDecimal("101"));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote));
 
-        RecheckResult r = service.recheck(42L, null);
+        RecheckResult r = scheduledRecheck(42L, null);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         assertThat(r.getCurrentPrice()).isEqualByComparingTo("101");
@@ -220,7 +231,7 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(43L)).thenReturn(s);
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 
-        RecheckResult r = service.recheck(43L, null);
+        RecheckResult r = scheduledRecheck(43L, null);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isReviewPassed()).isFalse();
@@ -243,7 +254,7 @@ class PushRecheckServiceImplTest {
         quote.setLastPrice(null);
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote));
 
-        RecheckResult r = service.recheck(44L, null);
+        RecheckResult r = scheduledRecheck(44L, null);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isReviewPassed()).isFalse();
@@ -265,7 +276,7 @@ class PushRecheckServiceImplTest {
         when(marketQuoteClient.fetch24hTicker("BTCUSDT"))
                 .thenThrow(new RuntimeException("provider unavailable"));
 
-        RecheckResult r = service.recheck(45L, null);
+        RecheckResult r = scheduledRecheck(45L, null);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isReviewPassed()).isFalse();
@@ -285,7 +296,7 @@ class PushRecheckServiceImplTest {
         s.setSymbol(null);
         when(pushSnapshotMapper.selectByPushId(46L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(46L, null);
+        RecheckResult r = scheduledRecheck(46L, null);
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(r.isReviewPassed()).isFalse();
@@ -308,7 +319,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(10);
         when(pushSnapshotMapper.selectByPushId(47L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(47L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(47L, new BigDecimal("100"));
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         assertThat(r.isValid()).isFalse();
@@ -329,7 +340,7 @@ class PushRecheckServiceImplTest {
                 .thenReturn(new ProviderCallResult<>(derivatives(UnifiedSourceStatus.READY,
                         SnapshotFreshnessStatus.FRESH, "COMPLETE"), null, null));
 
-        RecheckResult result = service.recheck(470L, new BigDecimal("100"));
+        RecheckResult result = scheduledRecheck(470L, new BigDecimal("100"));
 
         assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         verify(derivativesSnapshotReadPort).readCached(any(), any(), any(), any());
@@ -345,7 +356,7 @@ class PushRecheckServiceImplTest {
                 .thenReturn(new ProviderCallResult<>(derivatives(UnifiedSourceStatus.STALE,
                         SnapshotFreshnessStatus.STALE_READABLE, "COMPLETE"), null, null));
 
-        RecheckResult result = service.recheck(471L, new BigDecimal("100"));
+        RecheckResult result = scheduledRecheck(471L, new BigDecimal("100"));
 
         assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
         assertThat(result.isReviewPassed()).isFalse();
@@ -380,7 +391,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(75);
         s.setDataQualityScoreSnapshot(65);
         when(pushSnapshotMapper.selectByPushId(5L)).thenReturn(s);
-        RecheckResult r = service.recheck(5L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(5L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_WAITING);
         assertThat(r.isValid()).isFalse();
         assertThat(r.isReviewPassed()).isFalse();
@@ -400,7 +411,7 @@ class PushRecheckServiceImplTest {
         s.setExecutionFeasibilitySnapshot(55);
         when(pushSnapshotMapper.selectByPushId(52L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(52L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(52L, new BigDecimal("100"));
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_WAITING);
         assertThat(r.isReviewPassed()).isFalse();
@@ -414,7 +425,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(90);
         when(pushSnapshotMapper.selectByPushId(51L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(51L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(51L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.CONFUSED_BLOCKED);
         assertThat(r.isValid()).isFalse();
         assertSafeReviewOnlyResult(r);
@@ -427,7 +438,7 @@ class PushRecheckServiceImplTest {
         s.setConfusedScoreSnapshot(10);
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(6L)).thenReturn(s);
-        RecheckResult r = service.recheck(6L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(6L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         assertThat(r.isValid()).isFalse();
         assertThat(r.isReviewPassed()).isTrue();
@@ -448,7 +459,7 @@ class PushRecheckServiceImplTest {
         s.setDataQualityScoreSnapshot(88);
         when(pushSnapshotMapper.selectByPushId(6L)).thenReturn(s);
 
-        RecheckResult r = service.recheck(6L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(6L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
 
         verify(pushSnapshotMapper).updatePushStatus(6L, "RECHECK_REVIEW_PASSED");
@@ -464,7 +475,7 @@ class PushRecheckServiceImplTest {
         risk.setRiskAllowed(Boolean.FALSE);
         when(accountRiskSnapshotMapper.selectById(99L)).thenReturn(risk);
 
-        RecheckResult r = service.recheck(7L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(7L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
         assertThat(r.isValid()).isFalse();
         assertSafeReviewOnlyResult(r);
@@ -484,7 +495,7 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(8L)).thenReturn(s);
         when(accountRiskSnapshotMapper.selectById(100L)).thenReturn(null);
 
-        RecheckResult r = service.recheck(8L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(8L, new BigDecimal("100"));
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         assertSafeReviewOnlyResult(r);
     }
@@ -497,7 +508,7 @@ class PushRecheckServiceImplTest {
         when(pushSnapshotMapper.selectByPushId(81L)).thenReturn(s);
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
 
-        RecheckResult r = service.recheck(81L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(81L, new BigDecimal("100"));
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_PASSED);
         assertThat(r.isValid()).isFalse();
@@ -520,7 +531,7 @@ class PushRecheckServiceImplTest {
         UserPositionRiskResult blocked = UserPositionRiskResult.failClosed("HIGH_LEVERAGE_RISK");
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(blocked);
 
-        RecheckResult r = service.recheck(82L, new BigDecimal("100"));
+        RecheckResult r = scheduledRecheck(82L, new BigDecimal("100"));
 
         assertThat(r.getRecheckStatus()).isEqualTo(RecheckStatusEnum.RISK_BLOCKED);
         assertThat(r.isValid()).isFalse();
@@ -560,83 +571,32 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
-    void replayByInstruction_shouldRecheckUsingHistoricalPrice() {
-        TmPushSnapshotDO s = baseSnap();
-        s.setConfusedScoreSnapshot(10);
-        when(pushSnapshotMapper.selectByPushId(10L)).thenReturn(s);
+    void replayByInstructionFailsClosedBeforeHistoricalOrMutationAccess() {
+        assertThatThrownBy(() -> service.replayByDispatch(null, "SCH-B2-PUSH-10"))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("MUTATE_REPLAY_DISABLED");
 
-        org.example.trademodel.entity.TmPushRecheckLogDO old = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        old.setLogId(1001L);
-        old.setPushId(10L);
-        old.setCurrentPrice(new BigDecimal("101"));
-        old.setDispatchInstructionId("SCH-B2-PUSH-10");
-        when(pushRecheckLogMapper.selectByInstructionId("SCH-B2-PUSH-10"))
-                .thenReturn(java.util.List.of(old));
-
-        List<RecheckResult> results = service.replayByDispatch(null, "SCH-B2-PUSH-10");
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getPushId()).isEqualTo(10L);
-
-        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
-                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
-        verify(pushRecheckLogMapper).insert(cap.capture());
-        assertThat(cap.getValue().getTriggerSource()).isEqualTo("REPLAY");
-        assertThat(cap.getValue().getReplayFromLogId()).isEqualTo(1001L);
+        verifyNoInteractions(pushSnapshotMapper, pushRecheckLogMapper);
     }
 
     @Test
-    void summarizeReplayByInstruction_shouldAggregateMinimalMetrics() {
-        org.example.trademodel.entity.TmPushRecheckLogDO latest = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        latest.setLogId(2003L);
-        latest.setDispatchBatchId("SCH-B3");
-        latest.setDispatchInstructionId("SCH-B3-PUSH-11");
-        latest.setTriggerSource("REPLAY");
-        latest.setRecheckStatus("VALID_WAITING");
-        latest.setExecutionStatus("COMPLETED");
-        latest.setExecutionErrorCode("RISK_UNKNOWN_WAIT");
-        latest.setRecheckTime(LocalDateTime.now());
+    void summarizeReplayByInstructionFailsClosedBeforeGlobalRead() {
+        assertThatThrownBy(() -> service.summarizeReplayByDispatch(null, "SCH-B3-PUSH-11"))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_REPLAY_SUMMARY_DISABLED");
 
-        org.example.trademodel.entity.TmPushRecheckLogDO old1 = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        old1.setLogId(2002L);
-        old1.setTriggerSource("SCHEDULED");
-        old1.setRecheckStatus("VALID_EXECUTABLE");
-        old1.setExecutionStatus("COMPLETED");
-
-        org.example.trademodel.entity.TmPushRecheckLogDO old2 = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        old2.setLogId(2001L);
-        old2.setTriggerSource("REPLAY");
-        old2.setRecheckStatus("RISK_BLOCKED");
-        old2.setExecutionStatus("FAILED");
-
-        when(pushRecheckLogMapper.selectByInstructionId("SCH-B3-PUSH-11"))
-                .thenReturn(List.of(latest, old1, old2));
-
-        PushRecheckReplaySummaryVO summary = service.summarizeReplayByDispatch(null, "SCH-B3-PUSH-11");
-
-        assertThat(summary.getDispatchBatchId()).isEqualTo("SCH-B3");
-        assertThat(summary.getDispatchInstructionId()).isEqualTo("SCH-B3-PUSH-11");
-        assertThat(summary.getTriggerSource()).isEqualTo("REPLAY");
-        assertThat(summary.getTotalCount()).isEqualTo(3);
-        assertThat(summary.getSuccessCount()).isEqualTo(1);
-        assertThat(summary.getBlockingCount()).isEqualTo(1);
-        assertThat(summary.getWaitingCount()).isEqualTo(1);
-        assertThat(summary.getExpiredCount()).isEqualTo(0);
-        assertThat(summary.getReplayCount()).isEqualTo(2);
-        assertThat(summary.getLatestExecutionStatus()).isEqualTo("COMPLETED");
-        assertThat(summary.getLatestErrorCode()).isEqualTo("RISK_UNKNOWN_WAIT");
-        assertThat(summary.getHasError()).isTrue();
+        verifyNoInteractions(pushRecheckLogMapper);
     }
 
     @Test
-    void getLatestLog_shouldCanonicalizeLegacyStatusForReadApi() {
-        org.example.trademodel.entity.TmPushRecheckLogDO old = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        old.setLogId(4001L);
-        old.setPushId(12L);
-        old.setRecheckStatus("DRIFTED");
-        when(pushRecheckLogMapper.selectByPushId(12L)).thenReturn(List.of(old));
-
-        assertThat(service.getLatestLog(12L).getRecheckStatus())
-                .isEqualTo("DRIFTED_FROM_ENTRY_ZONE");
+    void rawLogServiceReadsFailClosedWithoutAuthoritativeOwnerRelation() {
+        assertThatThrownBy(() -> service.getLatestLog(12L))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_LATEST_DISABLED");
+        assertThatThrownBy(() -> service.listLogs(12L))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_LOGS_DISABLED");
+        verifyNoInteractions(pushRecheckLogMapper);
     }
 
     @Test
@@ -660,80 +620,51 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
-    void summarizeReplayByDispatch_shouldReturnZeroSummaryWhenNoLogs() {
-        when(pushRecheckLogMapper.selectByBatchId("SCH-EMPTY")).thenReturn(List.of());
+    void summarizeReplayByDispatchDoesNotExposeEmptyGlobalShell() {
+        assertThatThrownBy(() -> service.summarizeReplayByDispatch("SCH-EMPTY", null))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_REPLAY_SUMMARY_DISABLED");
 
-        PushRecheckReplaySummaryVO summary = service.summarizeReplayByDispatch("SCH-EMPTY", null);
-
-        assertThat(summary.getDispatchBatchId()).isEqualTo("SCH-EMPTY");
-        assertThat(summary.getDispatchInstructionId()).isNull();
-        assertThat(summary.getTotalCount()).isEqualTo(0);
-        assertThat(summary.getSuccessCount()).isEqualTo(0);
-        assertThat(summary.getBlockingCount()).isEqualTo(0);
-        assertThat(summary.getWaitingCount()).isEqualTo(0);
-        assertThat(summary.getExpiredCount()).isEqualTo(0);
-        assertThat(summary.getReplayCount()).isEqualTo(0);
-        assertThat(summary.getHasError()).isFalse();
+        verifyNoInteractions(pushRecheckLogMapper);
     }
 
     @Test
-    void getOpsOverview_shouldAggregateFourReadOnlyBlocks() {
-        when(dispatchConfigService.getCurrentConfig()).thenReturn(java.util.Map.of(
-                "limit", 50,
-                "maxAttempts", 3,
-                "minRetryMinutes", 5));
-        org.example.trademodel.entity.PushRecheckDispatchConfigAuditDO latestAudit =
-                new org.example.trademodel.entity.PushRecheckDispatchConfigAuditDO();
-        latestAudit.setChangedBy("ops");
-        latestAudit.setConfigKey("maxAttempts");
-        latestAudit.setOldValue(2);
-        latestAudit.setNewValue(3);
-        latestAudit.setCreateTime(LocalDateTime.now());
-        when(dispatchConfigService.listRecentAudit(5)).thenReturn(List.of(latestAudit));
+    void getOpsOverviewDoesNotExposeGlobalAuthenticatedData() {
+        assertThatThrownBy(() -> service.getOpsOverview(null, null, null, null))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_OPS_DISABLED");
 
-        org.example.trademodel.entity.TmPushRecheckLogDO latestLog = new org.example.trademodel.entity.TmPushRecheckLogDO();
-        latestLog.setLogId(3001L);
-        latestLog.setDispatchBatchId("SCH-B9");
-        latestLog.setDispatchInstructionId("SCH-B9-PUSH-1");
-        latestLog.setTriggerSource("SCHEDULED");
-        latestLog.setExecutionStatus("COMPLETED");
-        latestLog.setCreateTime(LocalDateTime.now());
-        when(pushRecheckLogMapper.selectRecent(10)).thenReturn(List.of(latestLog));
-        when(pushRecheckLogMapper.selectByInstructionId("SCH-B9-PUSH-1")).thenReturn(List.of(latestLog));
-
-        PushRecheckOpsOverviewVO overview = service.getOpsOverview(null, null, null, null);
-
-        assertThat(overview.getConfig().getLimit()).isEqualTo(50);
-        assertThat(overview.getAuditSummary().getAuditCount()).isEqualTo(1);
-        assertThat(overview.getLatestReplaySummary().getDispatchInstructionId()).isEqualTo("SCH-B9-PUSH-1");
-        assertThat(overview.getRecentLogs()).hasSize(1);
-        assertThat(overview.getRecentLogs().get(0).getLogId()).isEqualTo(3001L);
+        verifyNoInteractions(dispatchConfigService, pushRecheckLogMapper);
     }
 
     @Test
-    void getOpsOverview_shouldRespectExplicitDispatchParams() {
-        when(dispatchConfigService.getCurrentConfig()).thenReturn(java.util.Map.of());
-        when(dispatchConfigService.listRecentAudit(8)).thenReturn(List.of());
-        when(pushRecheckLogMapper.selectRecent(7)).thenReturn(List.of());
-        when(pushRecheckLogMapper.selectByBatchId("SCH-B10")).thenReturn(List.of());
+    void getOpsOverviewExplicitDispatchParametersCannotBypassBoundary() {
+        assertThatThrownBy(() -> service.getOpsOverview("SCH-B10", null, 8, 7))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_OPS_DISABLED");
 
-        service.getOpsOverview("SCH-B10", null, 8, 7);
-
-        verify(pushRecheckLogMapper).selectByBatchId("SCH-B10");
+        verifyNoInteractions(dispatchConfigService, pushRecheckLogMapper);
     }
 
     @Test
-    void getOpsOverview_emptyAuditAndReplay_stillReturnsNestedShells() {
-        when(dispatchConfigService.getCurrentConfig()).thenReturn(java.util.Map.of());
-        when(dispatchConfigService.listRecentAudit(anyInt())).thenReturn(List.of());
-        when(pushRecheckLogMapper.selectRecent(anyInt())).thenReturn(List.of());
+    void getOpsOverviewDoesNotReturnMisleadingEmptyShells() {
+        assertThatThrownBy(() -> service.getOpsOverview(null, null, 5, 10))
+                .isInstanceOf(SecurityException.class)
+                .hasMessage("READ_OPS_DISABLED");
 
-        PushRecheckOpsOverviewVO overview = service.getOpsOverview(null, null, null, null);
+        verifyNoInteractions(dispatchConfigService, pushRecheckLogMapper);
+    }
 
-        assertThat(overview.getAuditSummary()).isNotNull();
-        assertThat(overview.getAuditSummary().getAuditCount()).isEqualTo(0);
-        assertThat(overview.getLatestReplaySummary()).isNotNull();
-        assertThat(overview.getLatestReplaySummary().getTotalCount()).isEqualTo(0);
+    private RecheckResult scheduledRecheck(Long pushId, BigDecimal currentPrice) {
+        return service.recheck(
+                pushId,
+                currentPrice,
+                RecheckExecutionCommand.scheduled(
+                        "TEST-BATCH-" + pushId,
+                        "TEST-INSTRUCTION-" + pushId,
+                        1,
+                        3,
+                        0));
     }
 
     private static TmPushSnapshotDO baseSnap() {

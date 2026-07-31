@@ -601,17 +601,18 @@ recheck rules.
 
 **Data sources**
 
-- persisted push snapshot;
-- current PushRecheck result;
-- returned risk, drift, data-quality, conflict, and evidence-change reasons;
-- exact asset/position context when supplied.
+- authenticated shared server-side `OPPORTUNITY` public projection;
+- exact current-user-scoped `POSITION_RISK` private projection;
+- no frontend-composed or frontend-filtered privacy projection.
 
 **Displayable fields**
 
-- asset, push type, creation time;
-- original direction, entry zone, and invalidation condition;
-- current canonical review status and reason summary;
-- returned changes only.
+- for `OPPORTUNITY`: exact public identity, safe allowlisted public opportunity
+  status, public timestamp, and public description only;
+- for `POSITION_RISK`: exact position identity plus returned owner-scoped
+  monitoring risk, status, and reason;
+- UserPosition, account risk, position risk, Recheck risk, `failReasonJson`,
+  and private risk reasons are forbidden in the shared `OPPORTUNITY` payload.
 
 **Click entries and targets**
 
@@ -622,6 +623,14 @@ recheck rules.
 **Fail-closed behavior**
 
 - raw executable-sounding codes are mapped to review-only wording;
+- public and private source DTOs remain separate;
+- raw `pushId` latest/log/preview paths remain unavailable unless an
+  authoritative source and owner relation can be proven; no symbol/latest
+  fallback is allowed;
+- complete legal matching Push/Recheck data with completed execution is
+  `READY`; known incomplete/in-progress data is `PARTIAL`; illegal,
+  contradictory, or malformed data is `ERROR`; absent/inaccessible exact data
+  is `MISSING`; only a successful empty list is `EMPTY`;
 - no position context means no monitor link;
 - no execute, buy, sell, order, or create-position action.
 

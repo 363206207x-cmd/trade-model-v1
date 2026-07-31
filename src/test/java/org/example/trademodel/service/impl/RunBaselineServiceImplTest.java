@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,7 +73,7 @@ class RunBaselineServiceImplTest {
     }
 
     @Test
-    void recheckWindowUsesExplicitUtcBoundsAcrossJvmTimezones() {
+    void recheckSummaryRemainsUnavailableAcrossJvmTimezones() {
         TimeZone original = TimeZone.getDefault();
 
         try {
@@ -80,23 +81,20 @@ class RunBaselineServiceImplTest {
                 TimeZone.setDefault(TimeZone.getTimeZone(zone));
                 RunBaselineVO result = service.getRunBaseline(30);
                 assertThat(result.getGeneratedAt()).isEqualTo(LocalDateTime.parse("2026-07-14T12:00:00"));
+                assertThat(result.getRecheckSummary().getAvailabilityStatus())
+                        .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
+                assertThat(result.getRecheckSummary().getTotalCountWindow()).isNull();
+                assertThat(result.getRecheckSummary().getStatusCountsWindow()).isNull();
             }
         } finally {
             TimeZone.setDefault(original);
         }
 
-        for (RecheckStatusEnum status : RecheckStatusEnum.values()) {
-            verify(pushRecheckLogMapper, times(3)).countByStatusInWindow(
-                    status.name(),
-                    LocalDateTime.parse("2026-07-14T11:30:00"),
-                    LocalDateTime.parse("2026-07-14T12:00:00"));
-        }
+        verifyNoInteractions(pushRecheckLogMapper);
     }
 
     @Test
-    void runBaselineRecheckCountIsTimezoneIndependent() {
-        when(pushRecheckLogMapper.countByStatusInWindow(anyString(), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenAnswer(invocation -> RecheckStatusEnum.REVIEW_WAITING.name().equals(invocation.getArgument(0)) ? 2 : 0);
+    void runBaselineDoesNotExposeGlobalRecheckCounts() {
         TimeZone original = TimeZone.getDefault();
 
         try {
@@ -104,21 +102,21 @@ class RunBaselineServiceImplTest {
             for (String zone : List.of("UTC", "Asia/Shanghai", "America/New_York")) {
                 TimeZone.setDefault(TimeZone.getTimeZone(zone));
                 RunBaselineVO.RecheckSummary actual = service.getRunBaseline(30).getRecheckSummary();
-                assertThat(actual.getTotalCountWindow()).isEqualTo(2);
-                assertThat(actual.getStatusCountsWindow()).containsEntry(RecheckStatusEnum.REVIEW_WAITING.name(), 2);
+                assertThat(actual.getAvailabilityStatus()).isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
+                assertThat(actual.getAvailabilityDetail()).contains("authoritative source-owner relation");
+                assertThat(actual.getTotalCountWindow()).isNull();
+                assertThat(actual.getStatusCountsWindow()).isNull();
                 if (expected == null) {
                     expected = actual;
                 } else {
-                    assertThat(actual.getStatusCountsWindow()).isEqualTo(expected.getStatusCountsWindow());
+                    assertThat(actual.getAvailabilityStatus()).isEqualTo(expected.getAvailabilityStatus());
                 }
             }
         } finally {
             TimeZone.setDefault(original);
         }
 
-        verify(pushRecheckLogMapper, times(RecheckStatusEnum.values().length * 3))
-                .countByStatusInWindow(anyString(), eq(LocalDateTime.parse("2026-07-14T11:30:00")),
-                        eq(LocalDateTime.parse("2026-07-14T12:00:00")));
+        verifyNoInteractions(pushRecheckLogMapper);
     }
 
     @Test
@@ -138,9 +136,7 @@ class RunBaselineServiceImplTest {
                 windowStartUtc, asOfUtc);
         verify(analysisRunMapper).countInWindow(windowStartUtc, asOfUtc);
         verify(analysisRunMapper).countLowQualityInWindow(windowStartUtc, asOfUtc, 60);
-        for (RecheckStatusEnum status : RecheckStatusEnum.values()) {
-            verify(pushRecheckLogMapper).countByStatusInWindow(status.name(), windowStartUtc, asOfUtc);
-        }
+        verifyNoInteractions(pushRecheckLogMapper);
         verify(hotResetEventMapper).countInWindow(windowStartUtc, asOfUtc);
         verify(hotResetEventMapper).selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc);
     }
