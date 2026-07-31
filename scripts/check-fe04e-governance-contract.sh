@@ -12,6 +12,11 @@ fail() {
   failures=$((failures + 1))
 }
 
+error() {
+  echo "ERROR: $*"
+  errors=$((errors + 1))
+}
+
 assert_contains() {
   local file="$1"
   local text="$2"
@@ -34,15 +39,197 @@ assert_not_contains() {
   fi
 }
 
-semantic="docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
-interaction="docs/INTERACTION_CONTRACT_V3.md"
-freeze="docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md"
-state="docs/PROJECT_CURRENT_STATE.md"
-matrix="docs/DELIVERY_PROGRESS_MATRIX.md"
-active="docs/ACTIVE_MAINLINE_STATUS.yml"
-next_task="docs/CODEX_NEXT_TASK.yml"
-change_log="docs/CONTRACT_CHANGE_LOG.md"
-frontend_audit="docs/FRONTEND_IMPLEMENTATION_CONTRACT_AUDIT_V2.md"
+assert_contains_named() {
+  local name="$1"
+  local file="$2"
+  local text="$3"
+  tests=$((tests + 1))
+  if [[ ! -f "$file" ]]; then
+    fail "[$name] document=$file expected contract unavailable because the file is missing"
+  elif ! grep -Fq -- "$text" "$file"; then
+    fail "[$name] document=$file expected contract missing: $text"
+  fi
+}
+
+assert_line_named() {
+  local name="$1"
+  local file="$2"
+  local line="$3"
+  tests=$((tests + 1))
+  if [[ ! -f "$file" ]]; then
+    fail "[$name] document=$file expected exact contract line unavailable because the file is missing"
+  elif ! grep -Fxq -- "$line" "$file"; then
+    fail "[$name] document=$file expected exact contract line missing: $line"
+  fi
+}
+
+assert_section_contains_named() {
+  local name="$1"
+  local file="$2"
+  local start_heading="$3"
+  local end_heading="$4"
+  local text="$5"
+  local section
+  tests=$((tests + 1))
+
+  if [[ ! -f "$file" ]]; then
+    fail "[$name] document=$file expected section contract unavailable because the file is missing"
+    return
+  fi
+  if ! grep -Fxq -- "$start_heading" "$file"; then
+    fail "[$name] document=$file section start missing: $start_heading"
+    return
+  fi
+  if ! grep -Fxq -- "$end_heading" "$file"; then
+    fail "[$name] document=$file section end missing: $end_heading"
+    return
+  fi
+
+  section="$(
+    awk -v start="$start_heading" -v end="$end_heading" '
+      $0 == start { in_section = 1 }
+      in_section && $0 == end && $0 != start { exit }
+      in_section { print }
+    ' "$file"
+  )"
+  if [[ "$section" != *"$text"* ]]; then
+    fail "[$name] document=$file section=$start_heading expected contract missing: $text"
+  fi
+}
+
+assert_files_not_contain_named() {
+  local name="$1"
+  local text="$2"
+  shift 2
+  local file
+  tests=$((tests + 1))
+  for file in "$@"; do
+    if [[ ! -f "$file" ]]; then
+      fail "[$name] document=$file conflict check unavailable because the file is missing"
+      return
+    fi
+    if grep -Fq -- "$text" "$file"; then
+      fail "[$name] document=$file conflicting authorization found: $text"
+      return
+    fi
+  done
+}
+
+canonical_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="${FE04E_GOVERNANCE_ROOT:-$canonical_root}"
+script_path="$canonical_root/scripts/check-fe04e-governance-contract.sh"
+
+semantic_rel="docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
+interaction_rel="docs/INTERACTION_CONTRACT_V3.md"
+freeze_rel="docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md"
+state_rel="docs/PROJECT_CURRENT_STATE.md"
+matrix_rel="docs/DELIVERY_PROGRESS_MATRIX.md"
+active_rel="docs/ACTIVE_MAINLINE_STATUS.yml"
+next_task_rel="docs/CODEX_NEXT_TASK.yml"
+change_log_rel="docs/CONTRACT_CHANGE_LOG.md"
+frontend_audit_rel="docs/FRONTEND_IMPLEMENTATION_CONTRACT_AUDIT_V2.md"
+delivery_contract_rel="docs/PROJECT_DELIVERY_CONTRACT.md"
+capability_matrix_rel="docs/V1_CAPABILITY_MATRIX.md"
+
+semantic="$repo_root/$semantic_rel"
+interaction="$repo_root/$interaction_rel"
+freeze="$repo_root/$freeze_rel"
+state="$repo_root/$state_rel"
+matrix="$repo_root/$matrix_rel"
+active="$repo_root/$active_rel"
+next_task="$repo_root/$next_task_rel"
+change_log="$repo_root/$change_log_rel"
+frontend_audit="$repo_root/$frontend_audit_rel"
+delivery_contract="$repo_root/$delivery_contract_rel"
+capability_matrix="$repo_root/$capability_matrix_rel"
+
+probe_contract_files=(
+  "$semantic_rel"
+  "$interaction_rel"
+  "$freeze_rel"
+  "$state_rel"
+  "$matrix_rel"
+  "$active_rel"
+  "$next_task_rel"
+  "$change_log_rel"
+  "$frontend_audit_rel"
+  "$delivery_contract_rel"
+  "$capability_matrix_rel"
+)
+
+replace_exact_line() {
+  local file="$1"
+  local from="$2"
+  local to="$3"
+  local output="$file.tmp"
+  if ! awk -v from="$from" -v to="$to" '
+    $0 == from {
+      print to
+      replaced = 1
+      next
+    }
+    { print }
+    END {
+      if (!replaced) {
+        exit 3
+      }
+    }
+  ' "$file" >"$output"; then
+    rm -f "$output"
+    return 1
+  fi
+  mv "$output" "$file"
+}
+
+run_negative_probe() {
+  local name="$1"
+  local file_rel="$2"
+  local from="$3"
+  local to="$4"
+  local expected_assertion="$5"
+  local probe_root
+  local probe_file
+  local probe_output
+  local rel
+
+  tests=$((tests + 1))
+  probe_root="$(mktemp -d "${TMPDIR:-/tmp}/fe04e-governance-probe.XXXXXX")" || {
+    error "[$name] could not create a temporary probe root"
+    return
+  }
+
+  for rel in "${probe_contract_files[@]}"; do
+    if ! mkdir -p "$(dirname "$probe_root/$rel")"; then
+      error "[$name] could not create temporary path for $rel"
+      rm -rf "$probe_root"
+      return
+    fi
+    if ! cp "$repo_root/$rel" "$probe_root/$rel"; then
+      error "[$name] could not copy governance source $rel"
+      rm -rf "$probe_root"
+      return
+    fi
+  done
+
+  probe_file="$probe_root/$file_rel"
+  if ! replace_exact_line "$probe_file" "$from" "$to"; then
+    error "[$name] could not install the controlled regression in $file_rel"
+    rm -rf "$probe_root"
+    return
+  fi
+
+  probe_output="$probe_root/probe-output.txt"
+  if FE04E_GOVERNANCE_ROOT="$probe_root" FE04E_SKIP_NEGATIVE_PROBES=1 \
+    bash "$script_path" >"$probe_output" 2>&1; then
+    fail "[$name] controlled regression was accepted; expected assertion=[$expected_assertion]"
+  elif ! grep -Fq -- "FAIL: [$expected_assertion]" "$probe_output"; then
+    fail "[$name] controlled regression failed for an unexpected reason; expected assertion=[$expected_assertion]"
+  else
+    echo "PASS: negative probe [$name] rejected by [$expected_assertion]"
+  fi
+
+  rm -rf "$probe_root"
+}
 
 # Public OPPORTUNITY contract: public inputs only and no private state oracle.
 assert_contains "$semantic" 'AUTHENTICATED_SHARED_PUBLIC_PROJECTION'
@@ -59,6 +246,63 @@ assert_contains "$interaction" 'private pivot or state oracle.'
 assert_contains "$interaction" 'No system-notification, AI-generated-message, delivery, or third message source'
 assert_not_contains "$interaction" 'complete legal matching Push/Recheck data with completed execution'
 assert_not_contains "$interaction" 'System notices may be shown as a separate informational category'
+
+# Cross-surface OPPORTUNITY contract: each surface is pinned to the same
+# public-only source and the shared no-private-state-oracle policy.
+assert_section_contains_named \
+  "Dashboard OPPORTUNITY shared public projection" \
+  "$interaction" \
+  "### 3.1 Overview Dashboard" \
+  "### 3.2 Evidence & Scoring" \
+  $'- any `OPPORTUNITY` preview uses the shared public projection and public state\n  only; it never pivots through PushRecheck or UserPosition risk;'
+assert_section_contains_named \
+  "Opportunity Log OPPORTUNITY shared public projection" \
+  "$interaction" \
+  "### 3.10 Mobile Push Detail" \
+  "### 3.11 Mobile Profile & Settings" \
+  $'This public/private split is shared by Dashboard opportunity previews,\nOpportunity Log, Message Center contracts, and Message Detail contracts. No'
+assert_section_contains_named \
+  "Message Center OPPORTUNITY shared public projection" \
+  "$interaction" \
+  "### 3.12 Mobile Message Center" \
+  "### 3.13 AI Analysis And Asset Search" \
+  '1. authenticated shared public `OPPORTUNITY`;'
+assert_section_contains_named \
+  "Message Center OPPORTUNITY has no private state pivot" \
+  "$interaction" \
+  "### 3.12 Mobile Message Center" \
+  "### 3.13 AI Analysis And Asset Search" \
+  $'Public `OPPORTUNITY` cards may use only public lifecycle and\npublic evaluation state; they never use private `pushId`, PushRecheck,\nUserPosition, or monitor risk.'
+assert_section_contains_named \
+  "Message Detail OPPORTUNITY public projection" \
+  "$interaction" \
+  "### 3.10 Mobile Push Detail" \
+  "### 3.11 Mobile Profile & Settings" \
+  '- authenticated shared server-side `OPPORTUNITY` public projection;'
+assert_section_contains_named \
+  "all OPPORTUNITY surfaces share one contract" \
+  "$interaction" \
+  "### 3.10 Mobile Push Detail" \
+  "### 3.11 Mobile Profile & Settings" \
+  $'This public/private split is shared by Dashboard opportunity previews,\nOpportunity Log, Message Center contracts, and Message Detail contracts. No\nsurface may recreate a private pivot or state oracle.'
+assert_section_contains_named \
+  "shared OPPORTUNITY no-private-state-oracle" \
+  "$semantic" \
+  "## 7. Message And Telegram V2" \
+  "## 8. Search Asset V2" \
+  'This is a strict no-private-state-oracle rule.'
+assert_section_contains_named \
+  "shared OPPORTUNITY uses public inputs only" \
+  "$semantic" \
+  "## 7. Message And Telegram V2" \
+  "## 8. Search Asset V2" \
+  $'Its public state inputs are limited to public `messageId`,\n`sourceIdentity=OPPORTUNITY`, public opportunity identity, public lifecycle,\npublic status, public market evidence, public evaluation completeness, public\ntimestamps, public expiry/staleness, and public source validity.'
+assert_section_contains_named \
+  "shared OPPORTUNITY excludes private inputs" \
+  "$semantic" \
+  "## 7. Message And Telegram V2" \
+  "## 8. Search Asset V2" \
+  $'state MUST NOT read or depend on private/internal `pushId`, a Push\nentity, a PushRecheck row, Recheck existence/completeness/validity, private\n`execution_status`, `failReasonJson`, account risk, position risk,\nUserPosition, current-user position direction, or private monitor state.'
 
 # Private POSITION_RISK contract: one resolver and the authoritative latest monitor.
 assert_contains "$freeze" 'list and detail use one shared resolver'
@@ -91,7 +335,10 @@ assert_contains "$active" 'fe_04e_governance_alignment_status: "PENDING_MERGED_M
 assert_contains "$active" 'fe_04e_position_risk_state_resolver: "LIST_DETAIL_SHARED_AUTHORITATIVE_LATEST_MONITOR"'
 assert_contains "$active" 'fe_04e_risk_level_dimensions: "ACCOUNT_AND_MONITOR_COMPOSITE_INDEPENDENT_MISMATCH_NOT_ERROR"'
 
-assert_contains "$next_task" 'module: "FE-04E Message/Push UI Readiness and Governance Re-evaluation"'
+assert_line_named \
+  "next task remains read-only readiness re-evaluation" \
+  "$next_task" \
+  'module: "FE-04E Message/Push UI Readiness and Governance Re-evaluation"'
 assert_contains "$next_task" 'fe_04e_ui_status: "NOT_STARTED_PENDING_READINESS_AND_GOVERNANCE_REEVALUATION"'
 assert_contains "$next_task" 'fe_04e_source_authorized_head: "269ec97c11efa30fe58d99a4d78d09387e6fd277"'
 assert_contains "$next_task" 'fe_04e_source_merged_at: "2026-07-31T03:55:03Z"'
@@ -106,6 +353,221 @@ assert_contains "$change_log" '`NOT_IMPLEMENTED`'
 
 assert_contains "$frontend_audit" 'public `OPPORTUNITY` readiness uses public opportunity inputs only'
 assert_contains "$frontend_audit" 'Private `POSITION_RISK` states use the same authoritative'
+
+# Notification and trading prohibitions are checked as semantic combinations,
+# not as bare keyword absence, so legitimate "blocked" wording is accepted.
+assert_contains_named \
+  "Telegram semantic status remains pending implementation" \
+  "$semantic" \
+  'Telegram is an `EXTENSION / PENDING_IMPLEMENTATION` notification outlet.'
+assert_section_contains_named \
+  "Telegram Message Center status remains unavailable" \
+  "$interaction" \
+  "### 3.12 Mobile Message Center" \
+  "### 3.13 AI Analysis And Asset Search" \
+  $'Telegram is `EXTENSION / PENDING_IMPLEMENTATION`. It is a future delivery\noutlet only and must not be presented as connected, delivered, or actionable.'
+assert_line_named \
+  "Telegram active status remains not connected" \
+  "$active" \
+  'fe_04e_telegram_boundary_status: "PASS_EXTENSION_NOT_CONNECTED"'
+assert_contains_named \
+  "Telegram remains blocked in next task" \
+  "$next_task" \
+  'system notifications, Telegram, external send, automatic notification'
+
+assert_section_contains_named \
+  "system notification is not a Message Center source" \
+  "$interaction" \
+  "### 3.12 Mobile Message Center" \
+  "### 3.13 AI Analysis And Asset Search" \
+  $'No system-notification, AI-generated-message, delivery, or third message source\nis authorized.'
+assert_contains_named \
+  "system notification remains unauthorized in semantic contract" \
+  "$semantic" \
+  'system notifications are not authorized'
+assert_contains_named \
+  "system notification remains blocked in active state" \
+  "$active" \
+  'Message/Push UI implementation, system notifications, Telegram'
+assert_contains_named \
+  "system notification remains blocked in next task" \
+  "$next_task" \
+  'Message/Push UI implementation, system notifications, Telegram'
+
+assert_contains_named \
+  "external notification remains blocked in current state" \
+  "$state" \
+  'System notifications, Telegram, external send, automatic notification,'
+assert_contains_named \
+  "external notification remains blocked in active state" \
+  "$active" \
+  'Telegram, external send, automatic notification'
+assert_contains_named \
+  "external notification remains blocked in next task" \
+  "$next_task" \
+  'Telegram, external send, automatic notification'
+
+assert_contains_named \
+  "automatic notification remains blocked in current state" \
+  "$state" \
+  'System notifications, Telegram, external send, automatic notification,'
+assert_contains_named \
+  "automatic notification remains blocked in active state" \
+  "$active" \
+  'external send, automatic notification, fabricated unread/message counts'
+assert_contains_named \
+  "automatic notification remains blocked in next task" \
+  "$next_task" \
+  'external send, automatic notification, fabricated counts or data'
+assert_section_contains_named \
+  "Message Push UI has no delivery control" \
+  "$interaction" \
+  "### 3.12 Mobile Message Center" \
+  "### 3.13 AI Analysis And Asset Search" \
+  $'Provide one read-only entry for high-value product events without becoming a\ntrading or delivery-control surface.'
+
+assert_section_contains_named \
+  "PushRecheck is never trading authorization in delivery contract" \
+  "$delivery_contract" \
+  "## 4. Permanent Safety Rules / 永久安全规则" \
+  "## 5. Development Order Gate / 开发顺序总门禁" \
+  '8. Treat PushRecheck as trading authorization.'
+assert_contains_named \
+  "PushRecheck never authorizes a trade in FE04 semantics" \
+  "$semantic" \
+  'PushRecheck never authorizes a trade.'
+assert_contains_named \
+  "PushRecheck is not trading authorization in interaction contract" \
+  "$interaction" \
+  'Push recheck is not trading authorization.'
+assert_line_named \
+  "FE04E active capability remains no-send no-trading" \
+  "$active" \
+  'fe_04e_capability_boundary_status: "PASS_NO_SEND_NO_TRADING"'
+assert_line_named \
+  "trading capability movement remains none" \
+  "$next_task" \
+  '  - "No schema, Figma, Telegram, external-send, automatic-notification, AI, or trading capability movement occurs"'
+assert_section_contains_named \
+  "current state records no notification or trading capability" \
+  "$state" \
+  "### FE-04E Privacy/State Foundation And UI Readiness Boundary" \
+  "## P3-U2 iPhone Private Test App Foundation" \
+  $'This merged privacy-boundary package changes the read API response projection\nbut does not add a new endpoint, mutation, schema, Message/Push UI,\nnotification send, or trading capability.'
+assert_contains_named \
+  "delivery matrix keeps FE04E trading blocked" \
+  "$matrix" \
+  'external/automatic notification, fabricated data, mutation, AI expansion, and trading remain blocked.'
+assert_contains_named \
+  "capability matrix keeps external channels not started" \
+  "$capability_matrix" \
+  '| External Channel | 0 NOT_STARTED | Not started and requires separate C-level authorization. | No Telegram/email/webhook/app/local notification send is authorized.'
+assert_contains_named \
+  "capability matrix keeps order execution auto-trading not started" \
+  "$capability_matrix" \
+  '| order / execution / auto-trading | 0 NOT_STARTED | Explicitly out of V1 runtime scope and blocked. | No order API, execution API, or auto-trading should be built.'
+assert_section_contains_named \
+  "governance PR remains metadata-only" \
+  "$state" \
+  "### FE-04E Privacy/State Foundation And UI Readiness Boundary" \
+  "## P3-U2 iPhone Private Test App Foundation" \
+  $'server-side read projections effective. PR #1156 aligns governance metadata\nonly and remains `PENDING_MERGED_MAIN` until separately reviewed and merged:'
+
+governance_boundary_files=(
+  "$semantic"
+  "$interaction"
+  "$state"
+  "$matrix"
+  "$active"
+  "$next_task"
+  "$capability_matrix"
+)
+assert_files_not_contain_named "Telegram enabled flag is forbidden" "TELEGRAM_ENABLED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "Telegram authorization flag is forbidden" "TELEGRAM_AUTHORIZED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "system notification enabled flag is forbidden" "SYSTEM_NOTIFICATION_ENABLED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "system notification authorization flag is forbidden" "SYSTEM_NOTIFICATION_AUTHORIZED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "external notification enabled flag is forbidden" "EXTERNAL_NOTIFICATION_ENABLED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "external notification authorization flag is forbidden" "EXTERNAL_NOTIFICATION_AUTHORIZED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "automatic notification enabled flag is forbidden" "AUTOMATIC_NOTIFICATION_ENABLED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "automatic notification authorization flag is forbidden" "AUTOMATIC_NOTIFICATION_AUTHORIZED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "trading capability enabled flag is forbidden" "TRADING_CAPABILITY_MOVEMENT: ENABLED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "auto trade authorization flag is forbidden" "AUTO_TRADE_AUTHORIZED" "${governance_boundary_files[@]}"
+assert_files_not_contain_named "PushRecheck trade authorization flag is forbidden" "PUSH_RECHECK_IS_TRADE_AUTHORIZATION" "${governance_boundary_files[@]}"
+
+if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" != "1" ]]; then
+  run_negative_probe \
+    "Message Detail private Recheck regression" \
+    "$interaction_rel" \
+    '- authenticated shared server-side `OPPORTUNITY` public projection;' \
+    '- authenticated private PushRecheck projection;' \
+    "Message Detail OPPORTUNITY public projection"
+  run_negative_probe \
+    "shared surface contract deletion regression" \
+    "$interaction_rel" \
+    'This public/private split is shared by Dashboard opportunity previews,' \
+    'This public/private split is no longer shared across surfaces.' \
+    "Opportunity Log OPPORTUNITY shared public projection"
+  run_negative_probe \
+    "Dashboard private Recheck regression" \
+    "$interaction_rel" \
+    '- any `OPPORTUNITY` preview uses the shared public projection and public state' \
+    '- any `OPPORTUNITY` preview uses private PushRecheck state' \
+    "Dashboard OPPORTUNITY shared public projection"
+  run_negative_probe \
+    "Opportunity Log user-scoped projection regression" \
+    "$interaction_rel" \
+    'Opportunity Log, Message Center contracts, and Message Detail contracts. No' \
+    'Opportunity Log uses a user-scoped projection instead of the shared contract.' \
+    "Opportunity Log OPPORTUNITY shared public projection"
+  run_negative_probe \
+    "Message Center divergent source regression" \
+    "$interaction_rel" \
+    '1. authenticated shared public `OPPORTUNITY`;' \
+    '1. owner-scoped private `OPPORTUNITY` with a separate state source;' \
+    "Message Center OPPORTUNITY shared public projection"
+  run_negative_probe \
+    "Telegram authorization regression" \
+    "$active_rel" \
+    'fe_04e_telegram_boundary_status: "PASS_EXTENSION_NOT_CONNECTED"' \
+    'fe_04e_telegram_boundary_status: "TELEGRAM_AUTHORIZED"' \
+    "Telegram active status remains not connected"
+  run_negative_probe \
+    "system notification authorization regression" \
+    "$interaction_rel" \
+    'No system-notification, AI-generated-message, delivery, or third message source' \
+    'SYSTEM_NOTIFICATION_AUTHORIZED: system notification is a Message Center source' \
+    "system notification is not a Message Center source"
+  run_negative_probe \
+    "external notification enablement regression" \
+    "$active_rel" \
+    'compatibility_next_business_phase_allowed_note: "This derived file authorizes only the read-only readiness/governance gate. Message/Push UI implementation, system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or data, FE-04F, P4, trading, and production deployment remain blocked."' \
+    'compatibility_next_business_phase_allowed_note: "EXTERNAL_NOTIFICATION_ENABLED"' \
+    "external notification enabled flag is forbidden"
+  run_negative_probe \
+    "automatic notification authorization regression" \
+    "$next_task_rel" \
+    'compatibility_next_business_phase_allowed_note: "Only the read-only FE-04E Message/Push UI readiness and governance re-evaluation is authorized. Message/Push UI implementation, system notifications, Telegram, external send, automatic notification, fabricated counts or data, FE-04F, P4, trading, and production deployment remain blocked."' \
+    'compatibility_next_business_phase_allowed_note: "AUTOMATIC_NOTIFICATION_AUTHORIZED"' \
+    "automatic notification remains blocked in next task"
+  run_negative_probe \
+    "trading capability movement regression" \
+    "$next_task_rel" \
+    '  - "No schema, Figma, Telegram, external-send, automatic-notification, AI, or trading capability movement occurs"' \
+    '  - "TRADING_CAPABILITY_MOVEMENT: ENABLED"' \
+    "trading capability movement remains none"
+  run_negative_probe \
+    "next task Telegram implementation regression" \
+    "$next_task_rel" \
+    'module: "FE-04E Message/Push UI Readiness and Governance Re-evaluation"' \
+    'module: "FE-04E Telegram Implementation"' \
+    "next task remains read-only readiness re-evaluation"
+  run_negative_probe \
+    "PushRecheck trade authorization regression" \
+    "$semantic_rel" \
+    'fallback is permitted. PushRecheck never authorizes a trade.' \
+    'fallback is permitted. PUSH_RECHECK_IS_TRADE_AUTHORIZATION' \
+    "PushRecheck never authorizes a trade in FE04 semantics"
+fi
 
 echo "FE04E_GOVERNANCE_TESTS: $tests"
 echo "FAILURES: $failures"
