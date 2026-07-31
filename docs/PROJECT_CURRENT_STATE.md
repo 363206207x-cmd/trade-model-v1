@@ -6,9 +6,9 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04E cross-endpoint Opportunity/Recheck privacy and state-contract remediation is implemented on the PR #1155 branch and pending a new exact-head review; the Message/Push Contract Foundation remains effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8, while Message/Push UI remains NOT_STARTED
-Next Business Phase: FE-04E Full Privacy Boundary and State Machine Exact Head Review
-Next Business Phase Allowed: EXACT_HEAD_REVIEW_ONLY; Message Center and Push Detail UI remain blocked until the server-side public projection is reviewed, merged to clean/synced main, and governance is re-evaluated; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
+Current Work Package: FE-04E privacy boundary and state machine are effective on merged main 2552dd24b1b756d5eb517e640baa772e1c5bcab6 through PR #1155; Message/Push UI remains NOT_STARTED pending a separate readiness and governance re-evaluation
+Next Business Phase: FE-04E Message/Push UI Readiness and Governance Re-evaluation
+Next Business Phase Allowed: READ_ONLY_READINESS_REEVALUATION_ONLY; Message Center and Push Detail UI implementation remains blocked until that gate passes and its authorization is merged to main; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, trading capability, FE-04F, P4, and production deployment remain blocked
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -32,14 +32,14 @@ The design baseline is `FROZEN` and its repository registration is
 FE-04B, the bounded FE-04C read-only Position Monitoring package, and the
 bounded FE-04D AI Analysis first package are effective on merged main. The
 FE-04E Message/Push Contract Foundation is effective on merged main
-`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154. FE-04E UI and
-FE-04F remain unimplemented. The FE-04E UI readiness re-evaluation identified
-a server-side privacy prerequisite: shared `OPPORTUNITY` responses must not
-carry UserPosition- or account-risk-derived fields for a frontend to discard.
-PR #1155 now contains that B-risk public-projection candidate plus
-cross-endpoint PushRecheck isolation and explicit Message/Push state validation,
-and is pending a new exact-head review. No Message/Push UI, schema, Figma node, notification
-delivery, AI capability, or trading capability is authorized by this package.
+`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154. Its privacy
+boundary and state-machine hardening are effective on merged main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6` through PR #1155. FE-04E UI and
+FE-04F remain unimplemented. The merged package provides the server-side
+public/private projection split, cross-endpoint PushRecheck isolation, and
+source-specific Message/Push state validation. No Message/Push UI, schema,
+Figma node, notification delivery, AI capability, or trading capability is
+authorized by this package.
 
 ---
 
@@ -119,10 +119,13 @@ The FE-04E Message/Push Contract Foundation is
 The read-only UI readiness re-evaluation passed the message-list, Push Detail,
 source-specific access, state-model, registered Figma, Telegram-boundary, and
 capability gates, but subsequent P1 review found that the shared response still
-carried private-risk-derived fields. FE-04E Message/Push UI therefore remains
-`NOT_STARTED` and `BLOCKED_PENDING_PRIVACY_BOUNDARY_REVIEW_AND_MERGED_MAIN`.
+carried private-risk-derived fields. At that gate, FE-04E Message/Push UI
+remained `NOT_STARTED` and blocked pending privacy remediation and merged-main
+validation.
 
-PR #1155 introduces source-specific server-side read projections:
+PR #1155, merged as
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6`, makes the source-specific
+server-side read projections effective:
 
 - `OPPORTUNITY` is
   `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`. Its response contains only exact
@@ -159,10 +162,10 @@ PR #1155 introduces source-specific server-side read projections:
   data maps to `ERROR`, missing or inaccessible exact resources map to
   `MISSING`, and only a successful empty collection maps to `EMPTY`.
 
-This privacy-boundary candidate changes the read API response projection but
-does not add a new endpoint, mutation, schema, Message/Push UI, notification
-send, or trading capability. It is not effective until reviewed and merged to
-main. Only exact-head review is currently authorized.
+This merged privacy-boundary package changes the read API response projection
+but does not add a new endpoint, mutation, schema, Message/Push UI,
+notification send, or trading capability. The only allowed next step is a
+separate read-only Message/Push UI readiness and governance re-evaluation.
 
 System notifications, Telegram, external send, automatic notification,
 delivery acknowledgement, fabricated unread/message counts, fabricated
@@ -225,10 +228,11 @@ Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
 FE-04B, FE-04C, the bounded FE-04D first package, and the FE-04E Contract
-Foundation are effective on merged main. The FE-04 Figma baseline is
-registered on main. PR #1155 remains pending a new exact-head privacy review
-and merged-main validation; Message/Push UI is not authorized while that
-boundary is pending. System notifications, Telegram, external/automatic
+Foundation and the PR #1155 privacy/state hardening are effective on merged
+main. The FE-04 Figma baseline is registered on main. Message/Push UI remains
+NOT_STARTED and is not authorized before a separate readiness and governance
+re-evaluation passes and its authorization is merged. System notifications,
+Telegram, external/automatic
 notification, fabricated UI data, market search, watch-asset writes,
 unsupported deep analysis, unrelated API expansion, delivery/write actions,
 FE-04F, P4, and production deployment remain blocked.

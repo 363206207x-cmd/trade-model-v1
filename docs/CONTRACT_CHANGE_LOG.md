@@ -379,5 +379,8 @@ for structural validity and is never part of the public DTO or response.
 Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.
-Human confirmation required: Yes before B-risk PR #1155 merge. The candidate
-is not effective until exact-head review and merged main.
+Human confirmation required: Yes before B-risk PR #1155 merge. Confirmation
+was obtained, and PR #1155 became effective on merged main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6` on 2026-07-31. This effectivity
+covers the privacy/state foundation only; Message/Push UI remains unimplemented
+and requires a separate readiness/governance authorization.
