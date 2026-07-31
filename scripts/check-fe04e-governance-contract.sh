@@ -118,6 +118,7 @@ assert_files_not_contain_named() {
 canonical_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_root="${FE04E_GOVERNANCE_ROOT:-$canonical_root}"
 script_path="$canonical_root/scripts/check-fe04e-governance-contract.sh"
+semantic_helper_path="$canonical_root/scripts/check_fe04e_governance_semantics.py"
 
 semantic_rel="docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
 interaction_rel="docs/INTERACTION_CONTRACT_V3.md"
@@ -494,6 +495,8 @@ assert_files_not_contain_named "trading capability enabled flag is forbidden" "T
 assert_files_not_contain_named "auto trade authorization flag is forbidden" "AUTO_TRADE_AUTHORIZED" "${governance_boundary_files[@]}"
 assert_files_not_contain_named "PushRecheck trade authorization flag is forbidden" "PUSH_RECHECK_IS_TRADE_AUTHORIZATION" "${governance_boundary_files[@]}"
 
+shell_static_assertions="$tests"
+
 if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" != "1" ]]; then
   run_negative_probe \
     "Message Detail private Recheck regression" \
@@ -569,6 +572,87 @@ if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" != "1" ]]; then
     "PushRecheck never authorizes a trade in FE04 semantics"
 fi
 
+shell_negative_probes=$((tests - shell_static_assertions))
+
+semantic_args=(--root "$repo_root")
+if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" == "1" ]]; then
+  semantic_args+=(--skip-probes)
+fi
+
+semantic_output=""
+if semantic_output="$(
+  python3 "$semantic_helper_path" "${semantic_args[@]}" 2>&1
+)"; then
+  semantic_exit=0
+else
+  semantic_exit=$?
+fi
+printf '%s\n' "$semantic_output"
+
+semantic_count() {
+  local key="$1"
+  printf '%s\n' "$semantic_output" | awk -F': ' -v key="$key" '
+    $1 == key {
+      print $2
+      found = 1
+      exit
+    }
+  '
+}
+
+semantic_static_assertions="$(semantic_count "FE04E_SEMANTIC_STATIC_ASSERTIONS")"
+semantic_contradiction_guards="$(semantic_count "FE04E_CONTRADICTION_GUARDS")"
+semantic_authorization_guards="$(semantic_count "FE04E_AUTHORIZATION_SEMANTIC_GUARDS")"
+semantic_cross_file_guards="$(semantic_count "FE04E_CROSS_FILE_GUARDS")"
+semantic_adversarial_probes="$(semantic_count "FE04E_ADVERSARIAL_PROBES")"
+semantic_legal_controls="$(semantic_count "FE04E_LEGAL_CONTROL_PROBES")"
+semantic_failures="$(semantic_count "FE04E_SEMANTIC_FAILURES")"
+semantic_errors="$(semantic_count "FE04E_SEMANTIC_ERRORS")"
+
+semantic_counts=(
+  "$semantic_static_assertions"
+  "$semantic_contradiction_guards"
+  "$semantic_authorization_guards"
+  "$semantic_cross_file_guards"
+  "$semantic_adversarial_probes"
+  "$semantic_legal_controls"
+  "$semantic_failures"
+  "$semantic_errors"
+)
+for semantic_value in "${semantic_counts[@]}"; do
+  if [[ ! "$semantic_value" =~ ^[0-9]+$ ]]; then
+    error "semantic helper returned an invalid or missing count"
+    semantic_exit=2
+    semantic_static_assertions=0
+    semantic_contradiction_guards=0
+    semantic_authorization_guards=0
+    semantic_cross_file_guards=0
+    semantic_adversarial_probes=0
+    semantic_legal_controls=0
+    semantic_failures=0
+    semantic_errors=0
+    break
+  fi
+done
+
+if [[ "$semantic_exit" -ne 0 && "$semantic_failures" -eq 0 && "$semantic_errors" -eq 0 ]]; then
+  error "semantic helper exited unexpectedly with status $semantic_exit"
+fi
+
+tests=$((tests + semantic_static_assertions + semantic_adversarial_probes + semantic_legal_controls))
+failures=$((failures + semantic_failures))
+errors=$((errors + semantic_errors))
+
+echo "FE04E_BASE_STATIC_ASSERTIONS: $shell_static_assertions"
+echo "FE04E_SEMANTIC_STATIC_ASSERTIONS: $semantic_static_assertions"
+echo "FE04E_STATIC_ASSERTIONS: $((shell_static_assertions + semantic_static_assertions))"
+echo "FE04E_CONTRADICTION_GUARDS: $semantic_contradiction_guards"
+echo "FE04E_AUTHORIZATION_SEMANTIC_GUARDS: $semantic_authorization_guards"
+echo "FE04E_CROSS_FILE_GUARDS: $semantic_cross_file_guards"
+echo "FE04E_LEGACY_NEGATIVE_PROBES: $shell_negative_probes"
+echo "FE04E_ADVERSARIAL_PROBES: $semantic_adversarial_probes"
+echo "FE04E_NEGATIVE_PROBES: $((shell_negative_probes + semantic_adversarial_probes))"
+echo "FE04E_LEGAL_CONTROL_PROBES: $semantic_legal_controls"
 echo "FE04E_GOVERNANCE_TESTS: $tests"
 echo "FAILURES: $failures"
 echo "ERRORS: $errors"
