@@ -627,9 +627,17 @@ if [[ "${FE04E_SKIP_HELPER_UNIT_TESTS:-0}" != "1" ]]; then
   fi
 fi
 
-semantic_args=(--root "$repo_root")
+semantic_args=(
+  --root "$repo_root"
+  --static-assertions "$shell_static_assertions"
+  --legacy-negative-probes "$shell_negative_probes"
+  --helper-test-path "$helper_test_path"
+)
 if [[ "${FE04E_SKIP_NEGATIVE_PROBES:-0}" == "1" ]]; then
   semantic_args+=(--skip-probes)
+fi
+if [[ "${FE04E_SKIP_HELPER_UNIT_TESTS:-0}" == "1" ]]; then
+  semantic_args+=(--skip-helper-unit-tests)
 fi
 
 semantic_output=""
@@ -659,6 +667,20 @@ semantic_authorization_guards="$(semantic_count "FE04E_AUTHORIZATION_SEMANTIC_GU
 semantic_cross_file_guards="$(semantic_count "FE04E_CROSS_FILE_GUARDS")"
 semantic_adversarial_probes="$(semantic_count "FE04E_ADVERSARIAL_PROBES")"
 semantic_legal_controls="$(semantic_count "FE04E_LEGAL_CONTROL_PROBES")"
+raw_static_assertions="$(semantic_count "FE04E_RAW_STATIC_ASSERTIONS")"
+qualifying_static_assertions="$(semantic_count "FE04E_QUALIFYING_STATIC_ASSERTIONS")"
+raw_semantic_guards="$(semantic_count "FE04E_RAW_SEMANTIC_GUARDS")"
+qualifying_semantic_guards="$(semantic_count "FE04E_QUALIFYING_SEMANTIC_GUARDS")"
+raw_helper_unit_tests="$(semantic_count "FE04E_RAW_HELPER_UNIT_TESTS")"
+qualifying_helper_unit_tests="$(semantic_count "FE04E_QUALIFYING_HELPER_UNIT_TESTS")"
+raw_negative_probes="$(semantic_count "FE04E_RAW_NEGATIVE_PROBES")"
+qualifying_negative_probes="$(semantic_count "FE04E_QUALIFYING_NEGATIVE_PROBES")"
+raw_legal_controls="$(semantic_count "FE04E_RAW_LEGAL_CONTROLS")"
+qualifying_legal_controls="$(semantic_count "FE04E_QUALIFYING_LEGAL_CONTROLS")"
+duplicate_execution_count="$(semantic_count "FE04E_DUPLICATE_EXECUTION_COUNT")"
+raw_execution_total="$(semantic_count "FE04E_RAW_EXECUTION_TOTAL")"
+qualifying_unique_total="$(semantic_count "FE04E_QUALIFYING_UNIQUE_TOTAL")"
+qualifying_inventory_sha="$(semantic_count "FE04E_QUALIFYING_INVENTORY_SHA256")"
 semantic_failures="$(semantic_count "FE04E_SEMANTIC_FAILURES")"
 semantic_errors="$(semantic_count "FE04E_SEMANTIC_ERRORS")"
 
@@ -669,6 +691,19 @@ semantic_counts=(
   "$semantic_cross_file_guards"
   "$semantic_adversarial_probes"
   "$semantic_legal_controls"
+  "$raw_static_assertions"
+  "$qualifying_static_assertions"
+  "$raw_semantic_guards"
+  "$qualifying_semantic_guards"
+  "$raw_helper_unit_tests"
+  "$qualifying_helper_unit_tests"
+  "$raw_negative_probes"
+  "$qualifying_negative_probes"
+  "$raw_legal_controls"
+  "$qualifying_legal_controls"
+  "$duplicate_execution_count"
+  "$raw_execution_total"
+  "$qualifying_unique_total"
   "$semantic_failures"
   "$semantic_errors"
 )
@@ -692,7 +727,26 @@ if [[ "$semantic_exit" -ne 0 && "$semantic_failures" -eq 0 && "$semantic_errors"
   error "semantic helper exited unexpectedly with status $semantic_exit"
 fi
 
-tests=$((tests + semantic_guards + semantic_adversarial_probes + semantic_legal_controls + helper_unit_tests))
+if [[ "$raw_static_assertions" -ne "$shell_static_assertions" ]]; then
+  error "coverage inventory static count does not match runner execution count"
+fi
+if [[ "$raw_semantic_guards" -ne "$semantic_guards" ]]; then
+  error "coverage inventory semantic count does not match helper execution count"
+fi
+if [[ "$raw_helper_unit_tests" -ne "$helper_unit_tests" ]]; then
+  error "coverage inventory helper count does not match unittest execution count"
+fi
+if [[ "$raw_negative_probes" -ne $((shell_negative_probes + semantic_adversarial_probes)) ]]; then
+  error "coverage inventory negative-probe count does not match executed probes"
+fi
+if [[ "$raw_legal_controls" -ne "$semantic_legal_controls" ]]; then
+  error "coverage inventory legal-control count does not match executed controls"
+fi
+if [[ ! "$qualifying_inventory_sha" =~ ^[0-9a-f]{64}$ ]]; then
+  error "coverage inventory digest is missing or invalid"
+fi
+
+tests="$raw_execution_total"
 failures=$((failures + semantic_failures + helper_unit_failures))
 errors=$((errors + semantic_errors + helper_unit_errors))
 skipped=$((skipped + helper_unit_skipped))
@@ -708,11 +762,22 @@ echo "FE04E_ADVERSARIAL_PROBES: $semantic_adversarial_probes"
 echo "FE04E_NEGATIVE_PROBES: $((shell_negative_probes + semantic_adversarial_probes))"
 echo "FE04E_LEGAL_CONTROL_PROBES: $semantic_legal_controls"
 echo "FE04E_HELPER_UNIT_TESTS: $helper_unit_tests"
-echo "FE04E_OLD_RAW_GOVERNANCE_TESTS: 208"
+echo "FE04E_OLD_RAW_GOVERNANCE_TESTS: 280"
 echo "FE04E_OLD_QUALIFYING_TOTAL: NOT_ESTABLISHED"
-echo "FE04E_QUALIFYING_GOVERNANCE_TESTS: $tests"
+echo "FE04E_RAW_HELPER_UNIT_TESTS: $raw_helper_unit_tests"
+echo "FE04E_QUALIFYING_HELPER_UNIT_TESTS: $qualifying_helper_unit_tests"
+echo "FE04E_RAW_NEGATIVE_PROBES: $raw_negative_probes"
+echo "FE04E_QUALIFYING_NEGATIVE_PROBES: $qualifying_negative_probes"
+echo "FE04E_RAW_LEGAL_CONTROLS: $raw_legal_controls"
+echo "FE04E_QUALIFYING_LEGAL_CONTROLS: $qualifying_legal_controls"
+echo "FE04E_DUPLICATE_EXECUTION_COUNT: $duplicate_execution_count"
+echo "FE04E_RAW_EXECUTION_TOTAL: $raw_execution_total"
+echo "FE04E_QUALIFYING_GOVERNANCE_TESTS: $qualifying_unique_total"
+echo "FE04E_QUALIFYING_UNIQUE_TOTAL: $qualifying_unique_total"
+echo "FE04E_QUALIFYING_INVENTORY_SHA256: $qualifying_inventory_sha"
 echo "FE04E_GOVERNANCE_TESTS: $tests"
-echo "FE04E_COUNTING_FORMULA: $shell_static_assertions + $semantic_guards + $((shell_negative_probes + semantic_adversarial_probes)) + $semantic_legal_controls + $helper_unit_tests = $tests"
+echo "FE04E_RAW_COUNTING_FORMULA: $raw_static_assertions + $raw_semantic_guards + $raw_helper_unit_tests + $raw_negative_probes + $raw_legal_controls = $raw_execution_total"
+echo "FE04E_QUALIFYING_COUNTING_FORMULA: $qualifying_static_assertions + $qualifying_semantic_guards + $qualifying_helper_unit_tests + $qualifying_negative_probes + $qualifying_legal_controls = $qualifying_unique_total"
 echo "FAILURES: $failures"
 echo "ERRORS: $errors"
 echo "SKIPPED: $skipped"

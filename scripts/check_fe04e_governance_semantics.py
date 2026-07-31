@@ -9,6 +9,10 @@ case-insensitive authorization-state checks for Markdown and YAML-shaped text.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.util
+import inspect
+import json
 import os
 import re
 import sys
@@ -131,6 +135,10 @@ class StatusDeclaration:
     key_path: str = ""
     source_kind: str = "PROSE"
     token_order: int = 0
+    clause: str = ""
+    clause_start: int = 0
+    clause_end: int = 0
+    clause_order: int = 0
 
 
 @dataclass(frozen=True)
@@ -140,6 +148,43 @@ class MatchedStatusToken:
     normalized: str
     start: int
     end: int
+    clause: str = ""
+    clause_start: int = 0
+    clause_end: int = 0
+    clause_order: int = 0
+
+
+@dataclass(frozen=True)
+class LogicalClause:
+    text: str
+    start: int
+    end: int
+    order: int
+
+
+@dataclass(frozen=True)
+class CoverageRecord:
+    id: str
+    category: str
+    layer: str
+    entrypoint: str
+    target_guard: str
+    expected_result: str
+    assertion_objective: str
+    fixture_fingerprint: str
+    source: str
+
+    @property
+    def qualifying_key(self) -> str:
+        return ":".join(
+            (
+                self.layer,
+                self.entrypoint,
+                self.target_guard,
+                self.assertion_objective,
+                self.fixture_fingerprint,
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -161,6 +206,38 @@ class Probe:
     expected_category: str = ""
     expected_tokens: Tuple[str, ...] = ()
     validator: Optional[Callable[[Mapping[str, str]], Optional[str]]] = None
+    coverage_layer: str = "L2_HELPER_INTEGRATION"
+    coverage_entrypoint: str = "semantic_evaluate"
+    coverage_objective: str = ""
+
+
+def coverage_case(
+    *,
+    layer: str,
+    entrypoint: str,
+    target_guard: str,
+    expected_result: str,
+    assertion_objective: str,
+    fixture: str,
+) -> Callable[[Callable[..., object]], Callable[..., object]]:
+    """Attach auditable coverage metadata to a unittest method."""
+
+    def decorate(function: Callable[..., object]) -> Callable[..., object]:
+        setattr(
+            function,
+            "__fe04e_coverage__",
+            {
+                "layer": layer,
+                "entrypoint": entrypoint,
+                "target_guard": target_guard,
+                "expected_result": expected_result,
+                "assertion_objective": assertion_objective,
+                "fixture": fixture,
+            },
+        )
+        return function
+
+    return decorate
 
 
 def normalized(text: str) -> str:
@@ -444,9 +521,12 @@ UNSAFE_RELATION = re.compile(
     r"\b(?:used|consulted|consumed)\s+as\b|\bauxiliary\b|\boptional\b|"
     r"\bfallback\b|\bwhen\s+available\b|\bmay\s+determine\b|"
     r"\b(?:influences?|determines?|refines?|supplements?|participates?|alters?|changes?|"
-    r"affects?|gates?|produces?|makes?|controls?)\b|"
-    r"\bmaps?\b.{0,60}\bto\b|\bwaits?\s+for\b|"
-    r"\brequired\s+for\b|\binput\s+(?:to|for)\b|\bfor\s+accuracy\b|"
+    r"affects?|gates?|produces?|makes?|keeps?|controls?)\b|"
+    r"\bmaps?\b.{0,60}\bto\b|\bwaits?\s+for\b|\brel(?:y|ies)\s+on\b|"
+    r"\bdepends?\s+on\b|\b(?:is|are)\s+dependent\s+on\b|"
+    r"\brequir(?:e|es|ing)\b|\brequired\s+(?:for|before)\b|"
+    r"\b(?:is|are)\s+required\s+(?:for|before)\b|"
+    r"\binput\s+(?:to|for)\b|\bfor\s+accuracy\b|"
     r"\bused\s+(?:internally|in|to|as\s+fallback)\b|\bhidden\s+but\s+used\b|"
     r"\bbest\s+effort\b|改变|影响|决定|控制|参与|修正|用于|参与计算",
     re.I,
@@ -627,7 +707,7 @@ SAFE_STATUS = re.compile(
 
 SAFE_STATUS_TOKEN = re.compile(
     r"(?<![A-Za-z0-9])(?:"
-    r"no\b[^.\n]{0,320}\bis\s+allowed\b|"
+    r"no\b.{0,320}?\bis\s+allowed\b|"
     r"not[\s_-]+(?:authorized|enabled|implemented|active|allowed|available|supported|ready)|"
     r"(?:no|must[\s_-]+not|never)\b.{0,120}?\b"
     r"(?:authorized|enabled|implemented|active|allowed|available|supported|ready)|"
@@ -643,14 +723,98 @@ SAFE_STATUS_TOKEN = re.compile(
 
 DANGEROUS_STATUS_TOKEN = re.compile(
     r"(?<![A-Za-z0-9])(?:authorized|enabled|implemented|active|allowed|available|supported|"
-    r"ready|true|yes|granted|permitted|limited|expanded|partial|"
+    r"ready|connected|true|yes|granted|permitted|limited|expanded|partial|"
     r"已授权|已启用|已实现|启用|授权|激活|允许|可用|支持|就绪)(?![A-Za-z0-9])",
     re.I,
 )
 
 COMPOUND_STATUS_SEPARATOR = re.compile(
-    r"\s*(?:[;,+/|\n、，；]|\b(?:and|but|then)\b|并且|但|同时)\s*",
+    r"\s*(?:[;,+/|\n、，；]|\b(?:and|but|however|yet|although|then|while|whereas)\b|"
+    r"并且|但是|然而|不过|同时|随后|但)\s*",
     re.I,
+)
+
+LOGICAL_CLAUSE_BOUNDARY = re.compile(
+    r"(?:[.;:\n。；]+|"
+    r"\s*(?:,\s*)?\b(?:but|however|yet|although|then|while|whereas)\b\s*|"
+    r"\s*(?:，\s*)?(?:但是|然而|不过|同时|随后|但)\s*)",
+    re.I,
+)
+
+RESIDUE_WORD = re.compile(r"[A-Za-z0-9_]+|[\u3400-\u4dbf\u4e00-\u9fff]+")
+
+ALLOWED_RESIDUE_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "be",
+        "remains",
+        "remain",
+        "currently",
+        "explicitly",
+        "still",
+        "status",
+        "state",
+        "capability",
+        "authorization",
+        "implementation",
+        "integration",
+        "delivery",
+        "send",
+        "movement",
+        "notification",
+        "notifications",
+        "system",
+        "external",
+        "automatic",
+        "auto",
+        "telegram",
+        "trading",
+        "trade",
+        "order",
+        "placement",
+        "public",
+        "private",
+        "future",
+        "extension",
+        "only",
+        "outlet",
+        "pass",
+        "boundary",
+        "and",
+        "or",
+        "plus",
+        "to",
+        "of",
+        "for",
+        "this",
+        "that",
+        "it",
+        "until",
+        "verified",
+        "source",
+        "exists",
+        "0",
+        "no",
+        "not",
+        "must",
+        "never",
+        "状态",
+        "能力",
+        "授权",
+        "实现",
+        "集成",
+        "通知",
+        "推送",
+        "发送",
+        "交易",
+        "未来",
+        "扩展",
+        "仅",
+    }
 )
 
 ASSIGNMENT_CONNECTOR = re.compile(
@@ -661,49 +825,182 @@ ASSIGNMENT_CONNECTOR = re.compile(
 )
 
 
-def status_tokens(value: str) -> List[MatchedStatusToken]:
-    """Collect every atomic SAFE/DANGEROUS status while preserving source spans."""
+def logical_clauses(value: str) -> List[LogicalClause]:
+    """Split authorization prose before classification while retaining offsets."""
 
     source = unicodedata.normalize("NFKC", value)
-    safe_matches = list(SAFE_STATUS_TOKEN.finditer(source))
-    tokens = [
-        MatchedStatusToken(
-            StatusClass.SAFE,
-            match.group(0),
-            normalized(match.group(0)),
-            match.start(),
-            match.end(),
-        )
-        for match in safe_matches
-    ]
-    safe_spans = [(match.start(), match.end()) for match in safe_matches]
-    for match in DANGEROUS_STATUS_TOKEN.finditer(source):
-        if any(match.start() < end and match.end() > start for start, end in safe_spans):
-            continue
+    clauses: List[LogicalClause] = []
+    cursor = 0
+    for boundary in LOGICAL_CLAUSE_BOUNDARY.finditer(source):
+        raw = source[cursor : boundary.start()]
+        leading = len(raw) - len(raw.lstrip())
+        trailing = len(raw.rstrip())
+        start = cursor + leading
+        end = cursor + trailing
+        if start < end:
+            clauses.append(LogicalClause(source[start:end], start, end, len(clauses) + 1))
+        cursor = boundary.end()
+    raw = source[cursor:]
+    leading = len(raw) - len(raw.lstrip())
+    trailing = len(raw.rstrip())
+    start = cursor + leading
+    end = cursor + trailing
+    if start < end:
+        clauses.append(LogicalClause(source[start:end], start, end, len(clauses) + 1))
+    if not clauses and source.strip():
+        start = len(source) - len(source.lstrip())
+        end = len(source.rstrip())
+        clauses.append(LogicalClause(source[start:end], start, end, 1))
+    return clauses
+
+
+def status_fragments(value: str) -> List[Tuple[int, int, LogicalClause]]:
+    source = unicodedata.normalize("NFKC", value)
+    fragments: List[Tuple[int, int, LogicalClause]] = []
+    for clause in logical_clauses(source):
+        cursor = 0
+        for separator in COMPOUND_STATUS_SEPARATOR.finditer(clause.text):
+            raw = clause.text[cursor : separator.start()]
+            leading = len(raw) - len(raw.lstrip())
+            trailing = len(raw.rstrip())
+            start = clause.start + cursor + leading
+            end = clause.start + cursor + trailing
+            if start < end:
+                fragments.append((start, end, clause))
+            cursor = separator.end()
+        raw = clause.text[cursor:]
+        leading = len(raw) - len(raw.lstrip())
+        trailing = len(raw.rstrip())
+        start = clause.start + cursor + leading
+        end = clause.start + cursor + trailing
+        if start < end:
+            fragments.append((start, end, clause))
+    return fragments
+
+
+def status_tokens(value: str) -> List[MatchedStatusToken]:
+    """Collect clause-bounded SAFE/DANGEROUS tokens with original offsets."""
+
+    source = unicodedata.normalize("NFKC", value)
+    tokens: List[MatchedStatusToken] = []
+    for clause in logical_clauses(source):
+        safe_matches = list(SAFE_STATUS_TOKEN.finditer(clause.text))
+        safe_spans = [(match.start(), match.end()) for match in safe_matches]
+        for match in safe_matches:
+            tokens.append(
+                MatchedStatusToken(
+                    StatusClass.SAFE,
+                    match.group(0),
+                    normalized(match.group(0)),
+                    clause.start + match.start(),
+                    clause.start + match.end(),
+                    clause.text,
+                    clause.start,
+                    clause.end,
+                    clause.order,
+                )
+            )
+        for match in DANGEROUS_STATUS_TOKEN.finditer(clause.text):
+            if any(match.start() < end and match.end() > start for start, end in safe_spans):
+                continue
+            tokens.append(
+                MatchedStatusToken(
+                    StatusClass.DANGEROUS,
+                    match.group(0),
+                    normalized(match.group(0)),
+                    clause.start + match.start(),
+                    clause.start + match.end(),
+                    clause.text,
+                    clause.start,
+                    clause.end,
+                    clause.order,
+                )
+            )
+    if not tokens and normalized(source) in {"0", "no"}:
+        clause = logical_clauses(source)[0]
         tokens.append(
             MatchedStatusToken(
-                StatusClass.DANGEROUS,
-                match.group(0),
-                normalized(match.group(0)),
-                match.start(),
-                match.end(),
+                StatusClass.SAFE,
+                clause.text,
+                normalized(clause.text),
+                clause.start,
+                clause.end,
+                clause.text,
+                clause.start,
+                clause.end,
+                clause.order,
             )
-        )
-    if not tokens and normalized(source) in {"0", "no"}:
-        tokens.append(
-            MatchedStatusToken(StatusClass.SAFE, source.strip(), normalized(source), 0, len(source))
         )
     elif not tokens and normalized(source) == "on":
+        clause = logical_clauses(source)[0]
         tokens.append(
             MatchedStatusToken(
                 StatusClass.DANGEROUS,
-                source.strip(),
-                normalized(source),
-                0,
-                len(source),
+                clause.text,
+                normalized(clause.text),
+                clause.start,
+                clause.end,
+                clause.text,
+                clause.start,
+                clause.end,
+                clause.order,
             )
         )
-    return sorted(tokens, key=lambda item: (item.start, item.end))
+    return sorted(tokens, key=lambda item: (item.start, item.end, item.classification.value))
+
+
+def residue_tokens(
+    source: str,
+    known_tokens: Sequence[MatchedStatusToken],
+) -> List[MatchedStatusToken]:
+    """Return every non-structural word not consumed by a known status span."""
+
+    unknown: List[MatchedStatusToken] = []
+    for fragment_start, fragment_end, clause in status_fragments(source):
+        covered = sorted(
+            (
+                max(fragment_start, token.start),
+                min(fragment_end, token.end),
+            )
+            for token in known_tokens
+            if token.start < fragment_end and token.end > fragment_start
+        )
+        merged: List[Tuple[int, int]] = []
+        for start, end in covered:
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+        gaps: List[Tuple[int, int]] = []
+        cursor = fragment_start
+        for start, end in merged:
+            if cursor < start:
+                gaps.append((cursor, start))
+            cursor = max(cursor, end)
+        if cursor < fragment_end:
+            gaps.append((cursor, fragment_end))
+        for gap_start, gap_end in gaps:
+            for match in RESIDUE_WORD.finditer(source[gap_start:gap_end]):
+                raw = match.group(0)
+                components = normalized(raw).split()
+                if not components or all(word in ALLOWED_RESIDUE_WORDS for word in components):
+                    continue
+                start = gap_start + match.start()
+                end = gap_start + match.end()
+                unknown.append(
+                    MatchedStatusToken(
+                        StatusClass.UNKNOWN,
+                        raw,
+                        normalized(raw) or "<unknown>",
+                        start,
+                        end,
+                        clause.text,
+                        clause.start,
+                        clause.end,
+                        clause.order,
+                    )
+                )
+    return unknown
 
 
 def status_value_tokens(
@@ -716,32 +1013,7 @@ def status_value_tokens(
     if not include_unknown:
         return tokens
 
-    separators = list(COMPOUND_STATUS_SEPARATOR.finditer(source))
-    starts = [0, *(match.end() for match in separators)]
-    ends = [*(match.start() for match in separators), len(source)]
-    for start, end in zip(starts, ends):
-        raw_fragment = source[start:end]
-        leading = len(raw_fragment) - len(raw_fragment.lstrip())
-        trailing = len(raw_fragment.rstrip())
-        fragment_start = start + leading
-        fragment_end = start + trailing
-        if fragment_start >= fragment_end:
-            continue
-        if any(
-            token.start < fragment_end and token.end > fragment_start
-            for token in tokens
-        ):
-            continue
-        fragment = source[fragment_start:fragment_end]
-        tokens.append(
-            MatchedStatusToken(
-                StatusClass.UNKNOWN,
-                fragment,
-                normalized(fragment) or "<unknown>",
-                fragment_start,
-                fragment_end,
-            )
-        )
+    tokens.extend(residue_tokens(source, tokens))
     return sorted(tokens, key=lambda item: (item.start, item.end))
 
 
@@ -769,6 +1041,10 @@ def declaration_from_token(
         key_path=scope,
         source_kind=source_kind,
         token_order=token_order,
+        clause=token.clause,
+        clause_start=token.clause_start,
+        clause_end=token.clause_end,
+        clause_order=token.clause_order,
     )
 
 
@@ -853,6 +1129,10 @@ def table_status_tokens(capability: str, text: str) -> List[MatchedStatusToken]:
                     token.normalized,
                     value_start + token.start,
                     value_start + token.end,
+                    token.clause,
+                    value_start + token.clause_start,
+                    value_start + token.clause_end,
+                    token.clause_order,
                 )
             )
     return sorted(tokens, key=lambda item: (item.start, item.end))
@@ -1251,6 +1531,9 @@ def aggregate_authorization_violation(
             declaration.document,
             declaration.scope,
             declaration.excerpt,
+            declaration.clause,
+            declaration.clause_start,
+            declaration.clause_end,
         )
         if key not in seen:
             seen.add(key)
@@ -1263,20 +1546,69 @@ def aggregate_authorization_violation(
     if dangerous and safe:
         category = "CONTRADICTORY_AUTHORIZATION"
     elif unknown:
-        category = "UNKNOWN_OR_AMBIGUOUS_AUTHORIZATION"
+        category = "UNKNOWN_AUTHORIZATION_STATE"
     else:
         category = f"{capability} authorization"
+    blocking = dangerous + unknown
+    blocking_originals = {
+        item.original_value or item.excerpt for item in blocking
+    }
+    first = (dangerous or unknown)[0]
+    same_statement = [
+        item
+        for item in unique
+        if (item.original_value or item.excerpt) in blocking_originals
+    ]
+    if dangerous and safe and not any(
+        item.classification == StatusClass.SAFE for item in same_statement
+    ):
+        first_index = unique.index(first)
+
+        def contextual_distance(item: StatusDeclaration) -> Tuple[int, int, int, int]:
+            same_document = item.document == first.document
+            same_scope = same_document and item.scope == first.scope
+            item_root = item.scope.split(".", 1)[0]
+            first_root = first.scope.split(".", 1)[0]
+            same_scope_root = same_document and item_root == first_root
+            return (
+                0 if same_scope else 1,
+                0 if same_scope_root else 1,
+                0 if same_document else 1,
+                abs(unique.index(item) - first_index),
+            )
+
+        diagnostic_items = [min(safe, key=contextual_distance), *same_statement]
+    else:
+        diagnostic_items = same_statement
     original_values = list(
-        dict.fromkeys(item.original_value or item.excerpt for item in unique)
+        dict.fromkeys(item.original_value or item.excerpt for item in diagnostic_items)
     )
     values = "; ".join(
         f"{item.matched_token or item.value} [{item.classification.value}] "
         f"normalized={item.normalized_value or item.value} "
         f"source={item.document}/{item.key_path or item.scope} "
         f"line={item.line} kind={item.source_kind}"
-        for item in unique
+        for item in diagnostic_items
     )
-    first = (dangerous or unknown)[0]
+    clause_values = []
+    clause_seen = set()
+    for item in sorted(
+        diagnostic_items, key=lambda value: (value.clause_order, value.token_order)
+    ):
+        clause_key = (item.clause_order, item.clause_start, item.clause_end, item.clause)
+        if not item.clause or clause_key in clause_seen:
+            continue
+        clause_seen.add(clause_key)
+        clause_values.append(
+            f"{item.clause_order}. {item.clause} "
+            f"CLASSIFICATION={item.classification.value} "
+            f"OFFSET={item.clause_start}:{item.clause_end}"
+        )
+    unconsumed = [
+        item.matched_token or item.value
+        for item in diagnostic_items
+        if item.classification == StatusClass.UNKNOWN
+    ]
     return [
         Violation(
             guard,
@@ -1285,7 +1617,8 @@ def aggregate_authorization_violation(
             category,
             excerpt(
                 f"CAPABILITY={capability}; ORIGINAL_VALUE={original_values}; "
-                f"DETECTED=[{values}]",
+                f"CLAUSES=[{'; '.join(clause_values)}]; DETECTED=[{values}]; "
+                f"UNCONSUMED={unconsumed}",
                 1200,
             ),
             f"{capability} expects only explicit compatible SAFE values; any DANGEROUS or UNKNOWN value blocks",
@@ -1731,22 +2064,38 @@ def replace_once(
     documents[document] = source.replace(old, new, 1)
 
 
+def tagged_mutation(
+    mutation: Callable[[MutableMapping[str, str]], None],
+    fixtures: Sequence[str],
+) -> Callable[[MutableMapping[str, str]], None]:
+    setattr(mutation, "__fe04e_fixtures__", tuple(fixtures))
+    return mutation
+
+
 def mutation_before(document: str, marker: str, text: str) -> Callable[[MutableMapping[str, str]], None]:
-    return lambda documents: insert_before(documents, document, marker, text)
+    return tagged_mutation(
+        lambda documents: insert_before(documents, document, marker, text), (text,)
+    )
 
 
 def mutation_after(document: str, marker: str, text: str) -> Callable[[MutableMapping[str, str]], None]:
-    return lambda documents: insert_after(documents, document, marker, text)
+    return tagged_mutation(
+        lambda documents: insert_after(documents, document, marker, text), (text,)
+    )
 
 
 def mutation_append(document: str, text: str) -> Callable[[MutableMapping[str, str]], None]:
-    return lambda documents: append_text(documents, document, text)
+    return tagged_mutation(
+        lambda documents: append_text(documents, document, text), (text,)
+    )
 
 
 def mutation_replace(
     document: str, old: str, new: str
 ) -> Callable[[MutableMapping[str, str]], None]:
-    return lambda documents: replace_once(documents, document, old, new)
+    return tagged_mutation(
+        lambda documents: replace_once(documents, document, old, new), (new,)
+    )
 
 
 def mutation_sequence(
@@ -1756,7 +2105,12 @@ def mutation_sequence(
         for mutation in mutations:
             mutation(documents)
 
-    return apply
+    fixtures = tuple(
+        fixture
+        for mutation in mutations
+        for fixture in getattr(mutation, "__fe04e_fixtures__", ())
+    )
+    return tagged_mutation(apply, fixtures)
 
 
 POSITION_RISK_PRIVATE_RECHECK_CONTROL = (
@@ -2478,6 +2832,200 @@ def adversarial_probes() -> List[Probe]:
             mutation_append(NEXT_TASK, 'module: "Add trading action"'),
             "next-task capability authorization guard",
         ),
+        # Clause isolation: later authorization must survive an earlier SAFE clause.
+        Probe(
+            "Telegram safe clause then allowed delivery",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "No Telegram capability is authorized, but Telegram delivery is allowed.",
+            ),
+            "Telegram semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("No Telegram capability is authorized", "allowed"),
+        ),
+        Probe(
+            "Telegram not enabled then active delivery",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram is not enabled; Telegram delivery is active.",
+            ),
+            "Telegram semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("not enabled", "active"),
+        ),
+        Probe(
+            "Telegram prohibited then supported integration",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram remains prohibited. Telegram integration is supported.",
+            ),
+            "Telegram semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("prohibited", "supported"),
+        ),
+        Probe(
+            "system notification disabled however automatic delivery enabled",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "System notification is disabled, however automatic delivery is enabled.",
+            ),
+            "system notification semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("disabled", "enabled"),
+        ),
+        Probe(
+            "trading unauthorized yet order placement allowed",
+            STATE,
+            mutation_before(
+                STATE,
+                "## P3-U2 iPhone Private Test App Foundation",
+                "Trading is not authorized, yet order placement is allowed.",
+            ),
+            "trading semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("not authorized", "allowed"),
+        ),
+        Probe(
+            "Chinese Telegram unauthorized then enabled",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "未授权 Telegram，但 Telegram 推送已启用。",
+            ),
+            "Telegram semantic authorization guard",
+            "CONTRADICTORY_AUTHORIZATION",
+            ("未授权", "已启用"),
+        ),
+        # Unknown residue must be preserved after every recognized SAFE span.
+        Probe(
+            "Telegram NOT_AUTHORIZED MAYBE residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: NOT_AUTHORIZED MAYBE"),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("MAYBE",),
+        ),
+        Probe(
+            "Telegram NOT_AUTHORIZED AND_MAYBE residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: NOT_AUTHORIZED AND_MAYBE"),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("AND_MAYBE",),
+        ),
+        Probe(
+            "Telegram NOT_AUTHORIZED CONDITIONAL residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: NOT_AUTHORIZED CONDITIONAL"),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("CONDITIONAL",),
+        ),
+        Probe(
+            "Telegram DISABLED OPTIONAL residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "telegram: DISABLED OPTIONAL"),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("OPTIONAL",),
+        ),
+        Probe(
+            "system notification NOT_IMPLEMENTED TBD residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "system_notification: NOT_IMPLEMENTED TBD"),
+            "system notification semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("TBD",),
+        ),
+        Probe(
+            "external notification BLOCKED EXPERIMENTAL residue",
+            ACTIVE,
+            mutation_append(ACTIVE, "external_notification: BLOCKED EXPERIMENTAL"),
+            "external notification semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("EXPERIMENTAL",),
+        ),
+        Probe(
+            "automatic notification DISABLED BETA residue",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, "automatic_notification: DISABLED BETA"),
+            "automatic notification semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("BETA",),
+        ),
+        Probe(
+            "trading NOT_AUTHORIZED PREVIEW residue",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, "trading: NOT_AUTHORIZED PREVIEW"),
+            "trading semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("PREVIEW",),
+        ),
+        Probe(
+            "trading movement NONE MAYBE residue",
+            NEXT_TASK,
+            mutation_append(NEXT_TASK, "TRADING_CAPABILITY_MOVEMENT: NONE MAYBE"),
+            "trading semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("MAYBE",),
+        ),
+        Probe(
+            "Telegram prohibited possibly residue prose",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram remains prohibited, possibly.",
+            ),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("possibly",),
+        ),
+        Probe(
+            "Telegram NOT_AUTHORIZED MAYBE residue table",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "| Telegram | NOT_AUTHORIZED MAYBE |",
+            ),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("MAYBE",),
+            coverage_objective="table_contract_rejection",
+        ),
+        Probe(
+            "Telegram nested qualifier MAYBE residue",
+            ACTIVE,
+            mutation_append(
+                ACTIVE,
+                "telegram:\n  status: NOT_AUTHORIZED\n  qualifier: MAYBE",
+            ),
+            "Telegram semantic authorization guard",
+            "UNKNOWN_AUTHORIZATION_STATE",
+            ("MAYBE",),
+        ),
+        Probe(
+            "Public READY requires execution completion",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                semantic_end,
+                "Public READY requires execution completion.",
+            ),
+            "private execution contradiction guard",
+            "PRIVATE_EXECUTION_COMPLETION_GATE",
+            ("Public READY requires execution completion.",),
+        ),
     ]
 
 
@@ -2635,6 +3183,7 @@ def legal_control_probes() -> List[Probe]:
                 mutation_append(NEXT_TASK, "telegram: NOT_AUTHORIZED"),
             ),
             "",
+            coverage_objective="cross_file_contract_acceptance",
         ),
         Probe(
             "owner-scoped POSITION_RISK private Recheck control",
@@ -2648,7 +3197,269 @@ def legal_control_probes() -> List[Probe]:
             "",
             validator=validate_position_risk_private_recheck_control,
         ),
+        Probe(
+            "Telegram explicit NOT_AUTHORIZED grammar control",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram is explicitly NOT_AUTHORIZED.",
+            ),
+            "",
+        ),
+        Probe(
+            "Telegram capability remains NOT_AUTHORIZED grammar control",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Push Detail remains review-only and source-specific.",
+                "Telegram capability remains NOT_AUTHORIZED.",
+            ),
+            "",
+        ),
+        Probe(
+            "Public READY explicit execution non-use control",
+            SEMANTIC,
+            mutation_before(
+                SEMANTIC,
+                "Owner-scoped `POSITION_RISK` detail remains a separate",
+                "Public READY is determined only by the shared public OPPORTUNITY "
+                "projection; execution completion is not used.",
+            ),
+            "",
+        ),
     ]
+
+
+def coverage_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized(value)).strip("-")
+    return slug or "unnamed"
+
+
+def coverage_fingerprint(value: str) -> str:
+    canonical = re.sub(
+        r"[^a-z0-9\u3400-\u4dbf\u4e00-\u9fff]+", " ", normalized(value)
+    ).strip()
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def helper_unit_coverage_records(test_path: Path) -> List[CoverageRecord]:
+    """Load unittest IDs and attached metadata without executing the suite."""
+
+    module_name = "fe04e_governance_helper_inventory"
+    spec = importlib.util.spec_from_file_location(module_name, test_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load helper test inventory from {test_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    test_class = getattr(module, "GovernanceSemanticHelperTest")
+    method_names = sorted(
+        name for name in dir(test_class) if name.startswith("test_") and callable(getattr(test_class, name))
+    )
+    records: List[CoverageRecord] = []
+    for name in method_names:
+        method = getattr(test_class, name)
+        metadata = dict(getattr(method, "__fe04e_coverage__", {}))
+        source = inspect.getsource(method)
+        fixture = metadata.get("fixture", source)
+        records.append(
+            CoverageRecord(
+                id=f"HELPER:{name}",
+                category="HELPER_UNIT_TEST",
+                layer=metadata.get("layer", "L1_UNIT"),
+                entrypoint=metadata.get("entrypoint", name),
+                target_guard=metadata.get("target_guard", name),
+                expected_result=metadata.get("expected_result", "PASS"),
+                assertion_objective=metadata.get("assertion_objective", name),
+                fixture_fingerprint=coverage_fingerprint(fixture),
+                source=f"{test_path.name}:{name}",
+            )
+        )
+    return records
+
+
+def probe_coverage_record(probe: Probe, *, legal: bool = False) -> CoverageRecord:
+    fixtures = getattr(probe.mutation, "__fe04e_fixtures__", ()) or (probe.name,)
+    expected = "ACCEPT" if legal else "REJECT"
+    target_guard = "LEGAL_CONTROL" if legal else probe.expected_guard
+    objective = probe.coverage_objective or (
+        "contract_acceptance" if legal else "contract_rejection"
+    )
+    prefix = "LEGAL" if legal else "NEGATIVE"
+    return CoverageRecord(
+        id=f"{prefix}:{coverage_slug(probe.name)}",
+        category="LEGAL_CONTROL" if legal else "NEGATIVE_PROBE",
+        layer=probe.coverage_layer,
+        entrypoint=probe.coverage_entrypoint,
+        target_guard=target_guard,
+        expected_result=expected,
+        assertion_objective=objective,
+        fixture_fingerprint=coverage_fingerprint("\n".join(fixtures)),
+        source=probe.name,
+    )
+
+
+def deduplicate_coverage_records(
+    records: Sequence[CoverageRecord],
+) -> Tuple[List[str], Dict[str, str]]:
+    first_by_key: Dict[str, CoverageRecord] = {}
+    duplicate_of: Dict[str, str] = {}
+    qualifying_ids: List[str] = []
+    for record in records:
+        primary = first_by_key.get(record.qualifying_key)
+        if primary is None:
+            first_by_key[record.qualifying_key] = record
+            qualifying_ids.append(record.id)
+        else:
+            duplicate_of[record.id] = primary.id
+    return qualifying_ids, duplicate_of
+
+
+def build_coverage_inventory(
+    *,
+    static_assertions: int,
+    legacy_negative_probes: int,
+    helper_test_path: Path,
+    include_helper_unit_tests: bool = True,
+    include_semantic_probes: bool = True,
+) -> Dict[str, object]:
+    records: List[CoverageRecord] = []
+    records.extend(
+        CoverageRecord(
+            id=f"STATIC:{index:03d}",
+            category="STATIC_ASSERTION",
+            layer="L3_CONTRACT_RUNNER",
+            entrypoint="check-fe04e-governance-contract.sh",
+            target_guard=f"static-assertion-{index:03d}",
+            expected_result="PASS",
+            assertion_objective=f"static-contract-{index:03d}",
+            fixture_fingerprint=coverage_fingerprint(f"static-{index:03d}"),
+            source="scripts/check-fe04e-governance-contract.sh",
+        )
+        for index in range(1, static_assertions + 1)
+    )
+    records.extend(
+        CoverageRecord(
+            id=f"SEMANTIC:{coverage_slug(name)}",
+            category="SEMANTIC_GUARD",
+            layer="L2_HELPER_INTEGRATION",
+            entrypoint="semantic_evaluate",
+            target_guard=name,
+            expected_result="PASS",
+            assertion_objective="baseline_guard_acceptance",
+            fixture_fingerprint=coverage_fingerprint(name),
+            source="SEMANTIC_GUARD_NAMES",
+        )
+        for name in SEMANTIC_GUARD_NAMES
+    )
+    if include_helper_unit_tests:
+        records.extend(helper_unit_coverage_records(helper_test_path))
+    records.extend(
+        CoverageRecord(
+            id=f"NEGATIVE:legacy-shell-{index:03d}",
+            category="NEGATIVE_PROBE",
+            layer="L3_CONTRACT_PROBE",
+            entrypoint="check-fe04e-governance-contract.sh",
+            target_guard=f"legacy-shell-probe-{index:03d}",
+            expected_result="REJECT",
+            assertion_objective="runner_rejection_and_restore",
+            fixture_fingerprint=coverage_fingerprint(f"legacy-shell-{index:03d}"),
+            source="run_negative_probe",
+        )
+        for index in range(1, legacy_negative_probes + 1)
+    )
+    if include_semantic_probes:
+        records.extend(probe_coverage_record(probe) for probe in adversarial_probes())
+        records.extend(
+            probe_coverage_record(probe, legal=True) for probe in legal_control_probes()
+        )
+
+    qualifying_ids, duplicate_of = deduplicate_coverage_records(records)
+
+    categories: Dict[str, Dict[str, object]] = {}
+    for category in (
+        "STATIC_ASSERTION",
+        "SEMANTIC_GUARD",
+        "HELPER_UNIT_TEST",
+        "NEGATIVE_PROBE",
+        "LEGAL_CONTROL",
+    ):
+        category_records = [record for record in records if record.category == category]
+        category_ids = [record.id for record in category_records]
+        category_qualifying = [item for item in category_ids if item not in duplicate_of]
+        category_duplicates = [item for item in category_ids if item in duplicate_of]
+        categories[category] = {
+            "raw": len(category_ids),
+            "qualifying": len(category_qualifying),
+            "ids": category_ids,
+            "qualifying_ids": category_qualifying,
+            "duplicate_ids": category_duplicates,
+        }
+
+    digest_source = json.dumps(
+        {
+            "records": [
+                {
+                    "id": record.id,
+                    "key": record.qualifying_key,
+                    "source": record.source,
+                }
+                for record in records
+            ],
+            "duplicates": duplicate_of,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return {
+        "records": records,
+        "categories": categories,
+        "duplicate_of": duplicate_of,
+        "raw_total": len(records),
+        "duplicate_total": len(duplicate_of),
+        "qualifying_total": len(qualifying_ids),
+        "digest": hashlib.sha256(digest_source.encode("utf-8")).hexdigest(),
+    }
+
+
+def print_coverage_inventory(inventory: Mapping[str, object]) -> None:
+    categories = inventory["categories"]
+    assert isinstance(categories, dict)
+    key_prefixes = {
+        "STATIC_ASSERTION": "STATIC_ASSERTIONS",
+        "SEMANTIC_GUARD": "SEMANTIC_GUARDS",
+        "HELPER_UNIT_TEST": "HELPER_UNIT_TESTS",
+        "NEGATIVE_PROBE": "NEGATIVE_PROBES",
+        "LEGAL_CONTROL": "LEGAL_CONTROLS",
+    }
+    for category, prefix in key_prefixes.items():
+        details = categories[category]
+        assert isinstance(details, dict)
+        print(f"FE04E_RAW_{prefix}: {details['raw']}")
+        print(f"FE04E_QUALIFYING_{prefix}: {details['qualifying']}")
+        print(f"FE04E_{prefix}_IDS: {','.join(details['ids'])}")
+        print(
+            f"FE04E_{prefix}_DUPLICATE_IDS: "
+            f"{','.join(details['duplicate_ids']) or 'NONE'}"
+        )
+    duplicate_of = inventory["duplicate_of"]
+    assert isinstance(duplicate_of, dict)
+    records = inventory["records"]
+    assert isinstance(records, list)
+    records_by_id = {record.id: record for record in records}
+    for duplicate_id, primary_id in sorted(duplicate_of.items()):
+        duplicate = records_by_id[duplicate_id]
+        print(
+            f"FE04E_DUPLICATE_EXECUTION: {duplicate_id} -> {primary_id}; "
+            f"layer={duplicate.layer}; entrypoint={duplicate.entrypoint}; "
+            f"guard={duplicate.target_guard}; fixture={duplicate.fixture_fingerprint}; "
+            "reason=same qualifying key, counted once"
+        )
+    print(f"FE04E_DUPLICATE_EXECUTION_COUNT: {inventory['duplicate_total']}")
+    print(f"FE04E_RAW_EXECUTION_TOTAL: {inventory['raw_total']}")
+    print(f"FE04E_QUALIFYING_UNIQUE_TOTAL: {inventory['qualifying_total']}")
+    print(f"FE04E_QUALIFYING_INVENTORY_SHA256: {inventory['digest']}")
 
 
 def flatten(results: Mapping[str, Sequence[Violation]]) -> List[Violation]:
@@ -2773,6 +3584,13 @@ def main() -> int:
         action="store_true",
         help="run scoped semantic guards without adversarial/control probes",
     )
+    parser.add_argument("--static-assertions", type=int, default=0)
+    parser.add_argument("--legacy-negative-probes", type=int, default=0)
+    parser.add_argument("--skip-helper-unit-tests", action="store_true")
+    parser.add_argument(
+        "--helper-test-path",
+        default=str(Path(__file__).with_name("test_check_fe04e_governance_semantics.py")),
+    )
     args = parser.parse_args()
 
     try:
@@ -2818,6 +3636,19 @@ def main() -> int:
     print(f"FE04E_ADVERSARIAL_PROBES_PASSED: {negative_passed}")
     print(f"FE04E_LEGAL_CONTROL_PROBES: {control_total}")
     print(f"FE04E_LEGAL_CONTROL_PROBES_PASSED: {control_passed}")
+    try:
+        inventory = build_coverage_inventory(
+            static_assertions=args.static_assertions,
+            legacy_negative_probes=args.legacy_negative_probes,
+            helper_test_path=Path(args.helper_test_path).resolve(),
+            include_helper_unit_tests=not args.skip_helper_unit_tests,
+            include_semantic_probes=not args.skip_probes,
+        )
+    except (ImportError, OSError, RuntimeError, AttributeError) as exc:
+        print(f"ERROR: FE-04E qualifying coverage inventory unavailable: {exc}")
+        probe_errors += 1
+    else:
+        print_coverage_inventory(inventory)
     print(f"FE04E_SEMANTIC_FAILURES: {len(violations) + probe_failures}")
     print(f"FE04E_SEMANTIC_ERRORS: {probe_errors}")
 

@@ -16,6 +16,28 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import check_fe04e_governance_semantics as semantics  # noqa: E402
 
 
+def l2_rejection(fixture: str, guard: str):
+    return semantics.coverage_case(
+        layer="L2_HELPER_INTEGRATION",
+        entrypoint="semantic_evaluate",
+        target_guard=guard,
+        expected_result="REJECT",
+        assertion_objective="contract_rejection",
+        fixture=fixture,
+    )
+
+
+def l2_acceptance(fixture: str):
+    return semantics.coverage_case(
+        layer="L2_HELPER_INTEGRATION",
+        entrypoint="semantic_evaluate",
+        target_guard="LEGAL_CONTROL",
+        expected_result="ACCEPT",
+        assertion_objective="contract_acceptance",
+        fixture=fixture,
+    )
+
+
 class GovernanceSemanticHelperTest(unittest.TestCase):
     def _telegram_declarations(
         self, heading: str, body: str
@@ -358,7 +380,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             "telegram", "guard", declarations
         )
         self.assertEqual(
-            violations[0].category, "UNKNOWN_OR_AMBIGUOUS_AUTHORIZATION"
+            violations[0].category, "UNKNOWN_AUTHORIZATION_STATE"
         )
 
     def test_original_compound_value_and_token_order_are_retained(self) -> None:
@@ -407,6 +429,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             {semantics.StatusClass.SAFE},
         )
 
+    @l2_rejection("Execution is used as fallback.", "private execution contradiction guard")
     def test_execution_fallback_equivalent_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Execution is used as fallback.",
@@ -414,6 +437,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_EXECUTION_FALLBACK")
 
+    @l2_rejection("Pending execution makes public PARTIAL.", "private execution contradiction guard")
     def test_pending_execution_equivalent_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Pending execution makes public PARTIAL.",
@@ -421,6 +445,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_EXECUTION_PENDING_PARTIAL")
 
+    @l2_rejection("COMPLETED is required for public READY.", "private execution contradiction guard")
     def test_completed_execution_gate_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "COMPLETED is required for public READY.",
@@ -428,6 +453,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_EXECUTION_COMPLETION_GATE")
 
+    @l2_rejection("FAILED produces public ERROR.", "private execution contradiction guard")
     def test_failed_execution_mapping_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "FAILED produces public ERROR.",
@@ -435,6 +461,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_EXECUTION_FAILURE_ERROR")
 
+    @l2_rejection("Risk context determines public readiness.", "UserPosition/private risk contradiction guard")
     def test_risk_context_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Risk context determines public readiness.",
@@ -442,6 +469,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_RISK_PUBLIC_STATE_DEPENDENCY")
 
+    @l2_rejection("Account risk supplements public status.", "UserPosition/private risk contradiction guard")
     def test_account_risk_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Account risk supplements public status.",
@@ -449,6 +477,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_RISK_PUBLIC_STATE_DEPENDENCY")
 
+    @l2_rejection("Position risk refines public evaluation.", "UserPosition/private risk contradiction guard")
     def test_position_risk_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Position risk refines public evaluation.",
@@ -456,6 +485,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
         )
         self.assertEqual(violation.category, "PRIVATE_RISK_PUBLIC_STATE_DEPENDENCY")
 
+    @l2_rejection("Long, short, or no position changes public lifecycle.", "UserPosition/private risk contradiction guard")
     def test_english_position_direction_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "Long, short, or no position changes public lifecycle.",
@@ -474,6 +504,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             violation.category, "POSITION_DIRECTION_PUBLIC_STATE_DEPENDENCY"
         )
 
+    @l2_rejection("多仓改变公共状态。", "UserPosition/private risk contradiction guard")
     def test_chinese_long_position_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "多仓改变公共状态。", "UserPosition/private risk contradiction guard"
@@ -482,6 +513,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             violation.category, "POSITION_DIRECTION_PUBLIC_STATE_DEPENDENCY"
         )
 
+    @l2_rejection("空仓影响公开生命周期。", "UserPosition/private risk contradiction guard")
     def test_chinese_short_position_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "空仓影响公开生命周期。", "UserPosition/private risk contradiction guard"
@@ -490,6 +522,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             violation.category, "POSITION_DIRECTION_PUBLIC_STATE_DEPENDENCY"
         )
 
+    @l2_rejection("无仓决定公开就绪状态。", "UserPosition/private risk contradiction guard")
     def test_chinese_no_position_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "无仓决定公开就绪状态。", "UserPosition/private risk contradiction guard"
@@ -498,6 +531,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             violation.category, "POSITION_DIRECTION_PUBLIC_STATE_DEPENDENCY"
         )
 
+    @l2_rejection("持仓方向参与公开评估。", "UserPosition/private risk contradiction guard")
     def test_chinese_position_direction_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "持仓方向参与公开评估。", "UserPosition/private risk contradiction guard"
@@ -506,6 +540,7 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             violation.category, "POSITION_DIRECTION_PUBLIC_STATE_DEPENDENCY"
         )
 
+    @l2_rejection("私有风险虽不展示但参与计算。", "UserPosition/private risk contradiction guard")
     def test_chinese_private_risk_is_rejected_in_public_scope(self) -> None:
         violation = self._public_violation(
             "私有风险虽不展示但参与计算。",
@@ -542,6 +577,10 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             semantics.evaluate(documents)["private Recheck contradiction guard"]
         )
 
+    @l2_rejection(
+        semantics.POSITION_RISK_PRIVATE_RECHECK_CONTROL,
+        "private Recheck contradiction guard",
+    )
     def test_same_private_recheck_control_fails_in_public_scope(self) -> None:
         violation = self._public_violation(
             semantics.POSITION_RISK_PRIVATE_RECHECK_CONTROL,
@@ -587,6 +626,294 @@ class GovernanceSemanticHelperTest(unittest.TestCase):
             "CAPABILITY_MOVEMENT: NONE; CAPABILITY_MOVEMENT: EXPANDED"
         )
         self.assertEqual([item.value for item in declarations], ["none", "expanded"])
+
+    def test_clause_safe_then_dangerous_isolated(self) -> None:
+        text = "No Telegram capability is authorized, but Telegram delivery is allowed."
+        declarations = semantics.status_declarations_for_text("telegram", text)
+        self.assertEqual(
+            [item.classification for item in declarations],
+            [semantics.StatusClass.SAFE, semantics.StatusClass.DANGEROUS],
+        )
+        self.assertEqual([item.clause_order for item in declarations], [1, 2])
+        violation = semantics.aggregate_authorization_violation(
+            "telegram", "guard", declarations
+        )[0]
+        self.assertIn("CLAUSES=[1. No Telegram capability is authorized", violation.excerpt)
+        self.assertIn("2. Telegram delivery is allowed CLASSIFICATION=DANGEROUS", violation.excerpt)
+
+    def test_clause_dangerous_then_safe_isolated(self) -> None:
+        declarations = semantics.status_declarations_for_text(
+            "telegram", "Telegram is enabled, but Telegram remains prohibited."
+        )
+        self.assertEqual(
+            [item.classification for item in declarations],
+            [semantics.StatusClass.DANGEROUS, semantics.StatusClass.SAFE],
+        )
+
+    def test_clause_english_but_boundary_retains_offsets(self) -> None:
+        text = "Telegram is disabled, but Telegram is active."
+        clauses = semantics.logical_clauses(text)
+        self.assertEqual([item.text for item in clauses], ["Telegram is disabled", "Telegram is active"])
+        self.assertEqual(text[clauses[1].start : clauses[1].end], clauses[1].text)
+
+    def test_clause_english_however_boundary(self) -> None:
+        clauses = semantics.logical_clauses(
+            "System notification is disabled, however automatic delivery is enabled."
+        )
+        self.assertEqual(len(clauses), 2)
+        self.assertEqual(clauses[1].text, "automatic delivery is enabled")
+
+    def test_clause_english_yet_boundary(self) -> None:
+        clauses = semantics.logical_clauses(
+            "Trading is not authorized, yet order placement is allowed."
+        )
+        self.assertEqual(len(clauses), 2)
+
+    def test_clause_semicolon_boundary(self) -> None:
+        declarations = semantics.status_declarations_for_text(
+            "telegram", "Telegram is not enabled; Telegram delivery is active."
+        )
+        self.assertEqual([item.clause_order for item in declarations], [1, 2])
+
+    def test_clause_period_boundary(self) -> None:
+        clauses = semantics.logical_clauses(
+            "Telegram remains prohibited. Telegram integration is supported."
+        )
+        self.assertEqual(len(clauses), 2)
+
+    def test_clause_chinese_but_boundary(self) -> None:
+        declarations = semantics.status_declarations_for_text(
+            "telegram", "未授权 Telegram，但 Telegram 推送已启用。"
+        )
+        self.assertEqual(
+            [item.classification for item in declarations],
+            [semantics.StatusClass.SAFE, semantics.StatusClass.DANGEROUS],
+        )
+
+    def test_clause_chinese_however_boundary(self) -> None:
+        clauses = semantics.logical_clauses("Telegram 已禁用，然而 Telegram 推送已启用。")
+        self.assertEqual(len(clauses), 2)
+
+    def test_clause_chinese_sentence_boundary(self) -> None:
+        clauses = semantics.logical_clauses("Telegram 已禁用。Telegram 推送已启用。")
+        self.assertEqual(len(clauses), 2)
+
+    def test_safe_span_ends_before_later_dangerous_clause(self) -> None:
+        text = "No Telegram capability is authorized, but Telegram delivery is allowed."
+        tokens = semantics.status_tokens(text)
+        self.assertLess(tokens[0].end, tokens[1].start)
+        self.assertEqual(tokens[0].clause_end, text.index(","))
+
+    def test_clause_overlap_preserves_safe_and_dangerous(self) -> None:
+        declarations = semantics.status_declarations_for_text(
+            "telegram", "Telegram is not authorized but Telegram is authorized."
+        )
+        self.assertEqual(
+            {item.classification for item in declarations},
+            {semantics.StatusClass.SAFE, semantics.StatusClass.DANGEROUS},
+        )
+
+    def test_unknown_residue_not_authorized_maybe(self) -> None:
+        tokens = semantics.status_value_tokens("NOT_AUTHORIZED MAYBE", include_unknown=True)
+        self.assertEqual(
+            [item.classification for item in tokens],
+            [semantics.StatusClass.SAFE, semantics.StatusClass.UNKNOWN],
+        )
+        self.assertEqual(tokens[1].original, "MAYBE")
+        declarations = self._yaml_declarations("telegram", "NOT_AUTHORIZED MAYBE")
+        violation = semantics.aggregate_authorization_violation(
+            "telegram", "guard", declarations
+        )[0]
+        self.assertIn("UNCONSUMED=['MAYBE']", violation.excerpt)
+
+    def test_unknown_residue_not_authorized_and_maybe(self) -> None:
+        tokens = semantics.status_value_tokens(
+            "NOT_AUTHORIZED AND_MAYBE", include_unknown=True
+        )
+        self.assertEqual(tokens[1].original, "AND_MAYBE")
+
+    def test_unknown_residue_disabled_optional(self) -> None:
+        tokens = semantics.status_value_tokens("DISABLED OPTIONAL", include_unknown=True)
+        self.assertEqual(tokens[1].classification, semantics.StatusClass.UNKNOWN)
+
+    def test_unknown_residue_none_maybe(self) -> None:
+        tokens = semantics.status_value_tokens("NONE MAYBE", include_unknown=True)
+        self.assertEqual(tokens[1].original, "MAYBE")
+
+    def test_unknown_residue_offsets_are_original_offsets(self) -> None:
+        source = "NOT_AUTHORIZED MAYBE"
+        unknown = semantics.status_value_tokens(source, include_unknown=True)[1]
+        self.assertEqual(source[unknown.start : unknown.end], "MAYBE")
+
+    def test_punctuation_only_residue_is_allowed(self) -> None:
+        tokens = semantics.status_value_tokens("NOT_AUTHORIZED --", include_unknown=True)
+        self.assertEqual({item.classification for item in tokens}, {semantics.StatusClass.SAFE})
+
+    def test_grammar_only_residue_is_allowed(self) -> None:
+        declarations = semantics.status_declarations_for_text(
+            "telegram", "Telegram is explicitly NOT_AUTHORIZED."
+        )
+        self.assertEqual(
+            {item.classification for item in declarations}, {semantics.StatusClass.SAFE}
+        )
+
+    def test_dangerous_residue_is_dangerous_not_unknown(self) -> None:
+        tokens = semantics.status_value_tokens(
+            "NOT_AUTHORIZED ALLOWED", include_unknown=True
+        )
+        self.assertEqual(
+            [item.classification for item in tokens],
+            [semantics.StatusClass.SAFE, semantics.StatusClass.DANGEROUS],
+        )
+
+    @l2_rejection(
+        "Public READY requires execution completion.",
+        "private execution contradiction guard",
+    )
+    def test_public_ready_requires_execution_completion(self) -> None:
+        violation = self._public_violation(
+            "Public READY requires execution completion.",
+            "private execution contradiction guard",
+        )
+        self.assertEqual(violation.category, "PRIVATE_EXECUTION_COMPLETION_GATE")
+
+    def test_public_readiness_depends_on_execution_completion(self) -> None:
+        self.assertTrue(
+            semantics.is_unsafe_private_statement(
+                "Public readiness depends on execution completion.",
+                semantics.PRIVATE_ENTITY_PATTERNS["private execution"],
+            )
+        )
+
+    def test_execution_completion_is_required_for_ready(self) -> None:
+        self.assertTrue(
+            semantics.is_unsafe_private_statement(
+                "Execution completion is required for Public READY.",
+                semantics.PRIVATE_ENTITY_PATTERNS["private execution"],
+            )
+        )
+
+    def test_public_visibility_waits_for_execution_completion(self) -> None:
+        self.assertTrue(
+            semantics.is_unsafe_private_statement(
+                "Public visibility waits for execution completion.",
+                semantics.PRIVATE_ENTITY_PATTERNS["private execution"],
+            )
+        )
+
+    def test_pending_execution_keeps_state_partial(self) -> None:
+        self.assertTrue(
+            semantics.is_unsafe_private_statement(
+                "Pending execution keeps public state PARTIAL.",
+                semantics.PRIVATE_ENTITY_PATTERNS["private execution"],
+            )
+        )
+
+    @l2_acceptance(
+        "Public READY is determined only by the shared public OPPORTUNITY projection; "
+        "execution completion is not used."
+    )
+    def test_legal_explicit_execution_non_use_control(self) -> None:
+        statement = (
+            "Public READY is determined only by the shared public OPPORTUNITY projection; "
+            "execution completion is not used."
+        )
+        documents = semantics.load_documents(ROOT)
+        semantics.insert_before(
+            documents,
+            semantics.SEMANTIC,
+            "Owner-scoped `POSITION_RISK` detail remains a separate",
+            statement,
+        )
+        self.assertFalse(
+            semantics.evaluate(documents)["private execution contradiction guard"]
+        )
+
+    def test_identical_l2_records_deduplicate(self) -> None:
+        fingerprint = semantics.coverage_fingerprint("same fixture")
+        records = [
+            semantics.CoverageRecord(
+                item,
+                "HELPER_UNIT_TEST" if item == "a" else "NEGATIVE_PROBE",
+                "L2_HELPER_INTEGRATION",
+                "semantic_evaluate",
+                "guard",
+                "REJECT",
+                "contract_rejection",
+                fingerprint,
+                item,
+            )
+            for item in ("a", "b")
+        ]
+        qualifying, duplicates = semantics.deduplicate_coverage_records(records)
+        self.assertEqual(qualifying, ["a"])
+        self.assertEqual(duplicates, {"b": "a"})
+
+    def test_l1_and_l2_same_text_count_separately(self) -> None:
+        fingerprint = semantics.coverage_fingerprint("same fixture")
+        base = dict(
+            category="HELPER_UNIT_TEST",
+            entrypoint="semantic_evaluate",
+            target_guard="guard",
+            expected_result="REJECT",
+            assertion_objective="contract_rejection",
+            fixture_fingerprint=fingerprint,
+            source="test",
+        )
+        records = [
+            semantics.CoverageRecord(id="l1", layer="L1_UNIT", **base),
+            semantics.CoverageRecord(id="l2", layer="L2_HELPER_INTEGRATION", **base),
+        ]
+        qualifying, duplicates = semantics.deduplicate_coverage_records(records)
+        self.assertEqual(qualifying, ["l1", "l2"])
+        self.assertFalse(duplicates)
+
+    def test_duplicate_fixture_fingerprint_is_reported(self) -> None:
+        first = semantics.coverage_fingerprint("Public READY requires execution completion.")
+        second = semantics.coverage_fingerprint("public ready requires execution completion")
+        self.assertEqual(first, second)
+
+    def test_inventory_raw_total_differs_from_qualifying_total(self) -> None:
+        inventory = semantics.build_coverage_inventory(
+            static_assertions=1,
+            legacy_negative_probes=0,
+            helper_test_path=Path(__file__),
+        )
+        self.assertGreater(inventory["raw_total"], inventory["qualifying_total"])
+        skipped = semantics.build_coverage_inventory(
+            static_assertions=1,
+            legacy_negative_probes=0,
+            helper_test_path=Path(__file__),
+            include_helper_unit_tests=False,
+            include_semantic_probes=False,
+        )
+        self.assertEqual(skipped["categories"]["HELPER_UNIT_TEST"]["raw"], 0)
+        self.assertEqual(skipped["categories"]["NEGATIVE_PROBE"]["raw"], 0)
+        self.assertEqual(skipped["categories"]["LEGAL_CONTROL"]["raw"], 0)
+
+    def test_inventory_is_stable_across_two_runs(self) -> None:
+        first = semantics.build_coverage_inventory(
+            static_assertions=1,
+            legacy_negative_probes=0,
+            helper_test_path=Path(__file__),
+        )
+        second = semantics.build_coverage_inventory(
+            static_assertions=1,
+            legacy_negative_probes=0,
+            helper_test_path=Path(__file__),
+        )
+        self.assertEqual(first["digest"], second["digest"])
+        self.assertEqual(first["duplicate_of"], second["duplicate_of"])
+
+    def test_inventory_ids_are_deterministic_and_unique(self) -> None:
+        inventory = semantics.build_coverage_inventory(
+            static_assertions=1,
+            legacy_negative_probes=0,
+            helper_test_path=Path(__file__),
+        )
+        records = inventory["records"]
+        ids = [item.id for item in records]
+        self.assertEqual(len(ids), len(set(ids)))
 
     def test_each_required_markdown_scope_fails_when_heading_is_removed(self) -> None:
         base = semantics.load_documents(ROOT)
