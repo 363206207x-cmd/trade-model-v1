@@ -4,10 +4,14 @@
 
 | Item | Value |
 | --- | --- |
-| Contract version | V3.1 / FE-04 semantic correction |
-| Freeze date | 2026-07-28 |
-| Audited repository HEAD | `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` |
-| Current work package | `FE-04 Information Architecture Freeze` |
+| Contract version | V3.2 / FE-04E privacy-state alignment |
+| Freeze date | 2026-07-31 |
+| Audited repository HEAD | `2552dd24b1b756d5eb517e640baa772e1c5bcab6` |
+| Source implementation PR | `#1155 / MERGED` |
+| Source authorized Head | `269ec97c11efa30fe58d99a4d78d09387e6fd277` |
+| Source merge commit | `2552dd24b1b756d5eb517e640baa772e1c5bcab6` |
+| Source merged at | `2026-07-31T03:55:03Z / SQUASH` |
+| Current work package | `FE-04E Post-Merge Governance Alignment / PR #1156 PENDING_MERGED_MAIN` |
 | Contract result | `FROZEN_WITH_EXPLICIT_FAIL_CLOSED_GAPS` |
 | Backend completeness | `PARTIAL` |
 | Figma change in this task | None |
@@ -162,7 +166,7 @@ Target presence and runtime availability are separate:
 | 首页 | `READY`: existing authenticated mobile Dashboard |
 | 持仓 | `PARTIAL`: owner-scoped position reads exist; FE-04 product route is pending |
 | AI分析 | `PARTIAL`: analysis create/detail exists; market-search landing is pending |
-| 消息 | `PARTIAL`: reduced read/recheck records exist; complete inbox route is pending |
+| 消息 | `PARTIAL`: source-specific public/private read projections exist; Message/Push UI requires a separate readiness/governance gate |
 | 我的 | `PARTIAL`: minimal session/logout shell; settings and watch persistence are unavailable |
 
 Contextual navigation:
@@ -208,6 +212,8 @@ reviewable decisions, real user positions, and monitoring.
 
 - `GET /api/dashboard/home` and `DashboardHomeVO`;
 - Dashboard status, alert, event, decision, and asset projections;
+- any `OPPORTUNITY` preview uses the shared public projection and public state
+  only; it never pivots through PushRecheck or UserPosition risk;
 - exact `UserPosition` and monitor projections;
 - stored three-role AI summaries.
 
@@ -592,12 +598,13 @@ are no close, sell, order, or automatic controls.
 
 ### 3.10 Mobile Push Detail
 
-**Status:** `CURRENT_REVIEW_ONLY`.
+**Status:** `CONTRACT_ONLY / UI_NOT_IMPLEMENTED_PENDING_SEPARATE_GATE`.
 
 **Purpose**
 
-Explain whether the original notification context still passes current
-recheck rules.
+Present either a public opportunity evaluation or an owner-scoped position-risk
+evaluation without crossing the public/private source boundary. This contract
+does not authorize a current product route or UI implementation.
 
 **Data sources**
 
@@ -613,8 +620,17 @@ recheck rules.
   monitoring risk, status, and reason;
 - UserPosition, account risk, position risk, Recheck risk, `failReasonJson`,
   and private risk reasons are forbidden in the shared `OPPORTUNITY` payload.
+- public opportunity lifecycle/status/readiness comes only from public
+  opportunity identity, lifecycle, market evidence, evaluation completeness,
+  timestamps, expiry/staleness, and public source validity.
+
+This public/private split is shared by Dashboard opportunity previews,
+Opportunity Log, Message Center contracts, and Message Detail contracts. No
+surface may recreate a private pivot or state oracle.
 
 **Click entries and targets**
+
+Future bounded entries, only after a separate UI readiness gate:
 
 - `查看现有证据` -> Evidence & Scoring or Mobile Asset Detail;
 - `查看资产详情` -> Asset Detail;
@@ -624,13 +640,25 @@ recheck rules.
 
 - raw executable-sounding codes are mapped to review-only wording;
 - public and private source DTOs remain separate;
+- public `OPPORTUNITY` never exposes or pivots through private/internal
+  `pushId`, Push, PushRecheck, private `execution_status`, UserPosition,
+  account/position risk, or monitor data;
+- private Push/Recheck existence, status, validity, or execution outcome and
+  the current user's long/short/no-position state never change public
+  lifecycle, status, or readiness; the same public opportunity result is
+  consistent across authenticated users;
+- complete valid public opportunity data is `READY`, valid but incomplete
+  public data is `PARTIAL`, invalid/malformed/contradictory public data is
+  `ERROR`, a missing public record is `MISSING`, and only a successful empty
+  public list is `EMPTY`;
+- private `POSITION_RISK` list/detail use one resolver over the same
+  authoritative latest monitor and exact owner/message/position relation;
+  complete legal data is `READY`, valid incomplete/intermediate data is
+  `PARTIAL`, illegal or contradictory data is `ERROR`, absent/inaccessible
+  exact data is `MISSING`, and only a successful empty private list is `EMPTY`;
 - raw `pushId` latest/log/preview paths remain unavailable unless an
   authoritative source and owner relation can be proven; no symbol/latest
   fallback is allowed;
-- complete legal matching Push/Recheck data with completed execution is
-  `READY`; known incomplete/in-progress data is `PARTIAL`; illegal,
-  contradictory, or malformed data is `ERROR`; absent/inaccessible exact data
-  is `MISSING`; only a successful empty list is `EMPTY`;
 - no position context means no monitor link;
 - no execute, buy, sell, order, or create-position action.
 
@@ -674,7 +702,7 @@ pretending unsupported settings persistence exists.
 
 ### 3.12 Mobile Message Center
 
-**Status:** `PARTIAL`.
+**Status:** `CONTRACT_ONLY / UI_NOT_IMPLEMENTED_PENDING_SEPARATE_GATE`.
 
 **Purpose**
 
@@ -683,18 +711,24 @@ trading or delivery-control surface.
 
 **Business sources**
 
-1. asset-pool opportunity;
-2. exact UserPosition monitoring risk.
+1. authenticated shared public `OPPORTUNITY`;
+2. exact owner-scoped private `POSITION_RISK`.
 
-System notices may be shown as a separate informational category only when a
-real record exists. They are not a third opportunity/risk Push source.
+No system-notification, AI-generated-message, delivery, or third message source
+is authorized. Public `OPPORTUNITY` cards may use only public lifecycle and
+public evaluation state; they never use private `pushId`, PushRecheck,
+UserPosition, or monitor risk. Private `POSITION_RISK` cards use the exact
+owner/message/position relationship and the authoritative latest monitor
+through the shared private state resolver.
 
 Telegram is `EXTENSION / PENDING_IMPLEMENTATION`. It is a future delivery
 outlet only and must not be presented as connected, delivered, or actionable.
 
 **Fail-closed behavior**
 
-- no complete inbox route: target tab shows `当前不可查看`;
+- no implemented inbox route: target tab shows `当前不可查看`;
+- no separate readiness/governance authorization: no Message Center or Push
+  Detail UI is implemented;
 - delivery disabled: `通知送达能力未启用`;
 - missing exact asset/position identity: no detail navigation;
 - no buy, sell, close, order, execute, or authorization control.

@@ -344,9 +344,9 @@ implemented or complete.
 
 ---
 
-## v1.0-fe04e-opportunity-public-projection-candidate
+## v1.0-fe04e-privacy-state-foundation-effective-merged-main
 
-Date: 2026-07-30
+Date: 2026-07-31
 Changed by: Codex
 Reason: Close the FE-04E P1 privacy boundary in which an authenticated shared
 `OPPORTUNITY` response could carry UserPosition- or account-risk-derived
@@ -354,33 +354,45 @@ fields and relied on frontend filtering.
 Before: `OPPORTUNITY` and `POSITION_RISK` Push Detail shared one
 private-field-capable response record. The shared path could serialize Recheck
 account-risk status, risk level, or `failReasonJson`.
-After: PR #1155 defines `OPPORTUNITY` as
+After: PR #1155 authorized Head
+`269ec97c11efa30fe58d99a4d78d09387e6fd277` was squash-merged at
+`2026-07-31T03:55:03Z` as current main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6`. It defines `OPPORTUNITY` as
 `AUTHENTICATED_SHARED_PUBLIC_PROJECTION` and `POSITION_RISK` as
-`OWNER_SCOPED_PRIVATE_PROJECTION`. The public mapper reads only exact public
-identity, safe allowlisted opportunity status, public timestamp, and public
-description inputs; the public response variant cannot carry UserPosition,
-account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
-reason fields. It also omits internal `pushId` and other private Recheck
-references. Raw user-facing `/{pushId}/latest`, `/{pushId}/logs`, and Dashboard
+`OWNER_SCOPED_PRIVATE_PROJECTION`.
+
+The public mapper/state policy reads only public `messageId`,
+`sourceIdentity=OPPORTUNITY`, public opportunity identity/lifecycle/status,
+market evidence, evaluation completeness, timestamps, expiry/staleness,
+source validity, and public description. It neither reads nor serializes
+internal `pushId`, Push, PushRecheck, private `execution_status`, UserPosition,
+account/position risk, monitor state, `failReasonJson`, or private risk reason.
+Private Push/Recheck existence, status, validity, execution outcome, and the
+current user's position direction cannot change public lifecycle, status, or
+readiness; the same public opportunity result is consistent across
+authenticated users.
+
+Raw user-facing `/{pushId}/latest`, `/{pushId}/logs`, and Dashboard
 preview-by-`pushId` reads fail closed before raw Recheck data is read because
 their persisted rows do not provide an owner identity. The legacy raw
 `PushRecheckService` latest/list methods also fail closed; lower-level mapper
 reads remain internal operational inputs and are not user authorization paths.
-The private variant remains exact current-user scoped.
 
-The same PR candidate restores the read-state contract. `READY` now requires a
-complete legal Push/Recheck pair, completed execution, and matching statuses.
-Known incomplete/in-progress data maps to `PARTIAL`; illegal enum, malformed
-JSON, and contradictory states map to `ERROR`; absent/inaccessible exact
-resources map to `MISSING`; and only an empty successful collection maps to
-`EMPTY`. The structural readiness mapper does not select account-risk or
-position-risk columns; `failReasonJson` is inspected only inside the service
-for structural validity and is never part of the public DTO or response.
+The private `POSITION_RISK` variant remains exact current-user scoped. Its list
+and detail use one resolver over the same authoritative latest monitor.
+Historical or selected rows cannot replace the latest monitor, and row
+existence alone never implies `READY`. Complete legal latest-monitor state is
+`READY`; legal incomplete/intermediate state is `PARTIAL`; unknown, malformed,
+mismatched, actually contradictory, or illegal state is `ERROR`; absent or
+inaccessible exact state is `MISSING`; and only a successful empty private
+collection is `EMPTY`. Account-risk and composite monitor-risk levels are
+independent dimensions; their inequality alone is not `ERROR`.
 Does this change phase order: No.
 Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.
-Human confirmation required: Yes before B-risk PR #1155 merge. Confirmation
-was obtained, and PR #1155 became effective on merged main
-`2552dd24b1b756d5eb517e640baa772e1c5bcab6` on 2026-07-31. This effectivity
-covers the privacy/state foundation only; Message/Push UI remains unimplemented
-and requires a separate readiness/governance authorization.
+Human confirmation required: Yes before B-risk PR #1155 merge; confirmation
+was obtained. Runtime privacy/state behavior is `EFFECTIVE_MERGED_MAIN`.
+Governance alignment PR #1156 is metadata-only and remains
+`PENDING_MERGED_MAIN` until separately reviewed and merged. This effectivity
+covers the privacy/state foundation only; Message/Push UI remains
+`NOT_IMPLEMENTED` and requires a separate readiness/governance re-evaluation.

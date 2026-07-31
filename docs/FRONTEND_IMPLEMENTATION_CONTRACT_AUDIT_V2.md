@@ -107,7 +107,7 @@ Overall frontend contract status:
 | Strategy & Monitoring | Execution suggestion, user position, monitoring result | `ExecutionPlan`, `UserPosition`, `PositionMonitorLog` | Figma frame exists; underlying objects exist but no single composed product page | `PARTIAL` |
 | Position Detail | User facts, current monitor result, history, optional review entry | `UserPosition`, `PositionMonitorLog`, close/review records | Figma frame only; current object reads are usable, complete history is not | `PARTIAL` |
 | Review | Original suggestion, actual user execution, monitoring, outcome, deviation | Review dashboard projections and `ReviewResult`-related records | `/review/dashboard` and `/review/{analysisId}` exist | `PARTIAL` |
-| Mobile Push Detail | Source-specific public opportunity or private position-risk review | Server-side `OPPORTUNITY` public projection and owner-scoped `POSITION_RISK` private projection | PR #1155 is effective on merged main `2552dd24b1b756d5eb517e640baa772e1c5bcab6`: raw `pushId` latest/log/preview pivots fail closed and READY requires complete legal matching Push/Recheck data with completed execution; Figma frame exists, but no current mobile product route is authorized before a separate readiness/governance gate | `PARTIAL` |
+| Mobile Push Detail | Source-specific public opportunity or private position-risk review | Server-side `OPPORTUNITY` public projection and owner-scoped `POSITION_RISK` private projection | PR #1155 is effective on merged main `2552dd24b1b756d5eb517e640baa772e1c5bcab6`: public `OPPORTUNITY` readiness uses public opportunity inputs only and never private Push/Recheck or execution state; private `POSITION_RISK` uses the exact owner relationship and authoritative latest-monitor resolver; Figma exists, but no mobile product route is authorized before a separate readiness/governance gate | `PARTIAL` |
 | Message Center | Opportunity and position-risk notifications | Notification eligibility/audit contracts | Figma frame only; external delivery disabled | `FAIL_CLOSED` |
 | Profile & Settings | Current user/system read-only information | Minimal `/api/user-config/ping` only | Figma frame exceeds current settings contract | `FAIL_CLOSED` |
 
@@ -451,8 +451,11 @@ Raw user-facing latest/log/preview access by `pushId` is not a frontend data
 source unless an authoritative source-domain and owner relation is available.
 The current raw rows do not provide that relation, so those paths and the
 legacy raw service latest/list methods fail closed. UI state must preserve
-`READY`, `PARTIAL`, `ERROR`, `MISSING`, and `EMPTY` without turning
-missing/invalid Recheck data into READY.
+`READY`, `PARTIAL`, `ERROR`, `MISSING`, and `EMPTY`. Public `OPPORTUNITY`
+states use public inputs only and remain unchanged by missing/invalid/private
+Recheck state. Private `POSITION_RISK` states use the same authoritative
+latest-monitor resolver for list and detail and never treat row existence as
+`READY`.
 
 Status: `PARTIAL`.
 

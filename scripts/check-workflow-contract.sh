@@ -96,9 +96,11 @@ require_file "scripts/v1-merge-sync.sh"
 require_file "scripts/v1-safe-check.sh"
 require_file "scripts/v1-session-bootstrap.sh"
 require_file "scripts/v1-next-pack-context.sh"
+require_file "scripts/check-fe04e-governance-contract.sh"
 require_executable "scripts/v1-auto.sh"
 require_executable "scripts/v1-merge-current.sh"
 require_executable "scripts/v1.sh"
+require_executable "scripts/check-fe04e-governance-contract.sh"
 
 # New delivery-contract source of truth.
 require_file "docs/PROJECT_DELIVERY_CONTRACT.md"
@@ -193,6 +195,10 @@ fi
 
 if grep -Eiq 'review-only slice count.*(complete|progress|next)|completed review-only.*next business' scripts/v1-auto.sh scripts/v1-state.sh scripts/codex-next-task.sh docs/CODEX_NEXT_TASK.yml docs/ACTIVE_MAINLINE_STATUS.yml 2>/dev/null; then
   fail "workflow must not use completed review-only slice count as next-task or delivery-completion basis"
+fi
+
+if ! bash scripts/check-fe04e-governance-contract.sh; then
+  fail "FE-04E governance contract checks failed"
 fi
 
 changed_files="$({ git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git diff --name-only origin/main...HEAD 2>/dev/null || true; git diff --name-only HEAD~1..HEAD 2>/dev/null || true; } | sort -u)"

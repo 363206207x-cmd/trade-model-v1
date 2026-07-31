@@ -143,6 +143,10 @@ state-contract prerequisites. PR #1155 made the full
 `OPPORTUNITY_PUBLIC_PROJECTION`, cross-endpoint PushRecheck isolation, and
 source-specific five-state validation effective on merged main
 `2552dd24b1b756d5eb517e640baa772e1c5bcab6`.
+The authorized source Head was
+`269ec97c11efa30fe58d99a4d78d09387e6fd277`; GitHub records the squash merge
+at `2026-07-31T03:55:03Z`. PR #1156 is governance metadata alignment only and
+remains `PENDING_MERGED_MAIN` until separately reviewed and merged.
 Message/Push UI remains `NOT_STARTED` and is not authorized to begin before a
 separate readiness/governance re-evaluation passes and its authorization is
 merged to clean/synced main.
@@ -171,14 +175,35 @@ also fail closed before repository reads or mutation. Only strict internal
 scheduled execution remains; it is not a user-facing capability. No symbol,
 latest-row, global-recent-row, or missing-owner fallback is allowed.
 
-Message/Push state is frozen as follows: complete valid source-specific data is
-`READY`; known incomplete valid data is `PARTIAL`; illegal enum, malformed
-JSON, or contradictory state is `ERROR`; an absent/inaccessible exact resource
-is `MISSING`; and only a successful empty collection is `EMPTY`. Public
-OPPORTUNITY state uses public opportunity data only. Private POSITION_RISK
-state validates the exact owned position and matching monitor identity,
-lifecycle, timestamp, logic status, risk level/data, conclusion, and legal
-state combination.
+Public `OPPORTUNITY` state uses public opportunity data only. Private
+`POSITION_RISK` list and detail use one shared resolver and load the same
+authoritative latest monitor through the exact owner/message/position
+relationship. A selected historical monitor cannot substitute for the latest
+monitor; symbol, latest-position, time, or global-record fallback cannot
+replace exact identity. Monitor-row existence alone must never imply `READY`.
+A complete historical monitor followed by a sparse or invalid latest monitor
+must not remain list `READY`, and list/detail must resolve to the same state.
+
+The private `POSITION_RISK` state machine is frozen as follows:
+
+- `READY`: exact owner and identities pass; the authoritative latest monitor
+  exists; required risk fields and conclusion are complete; timestamp,
+  `logicStatus`, and risk values are legal; and the state combination is legal
+  and neither malformed nor contradictory;
+- `PARTIAL`: the authoritative latest monitor is legal but incomplete, is in a
+  known legal intermediate state, or lacks a nonfatal required field;
+- `ERROR`: an enum/value is unknown, data or timestamp is malformed, identity
+  or source mismatches, or fields form an actual contradiction or illegal
+  state combination;
+- `MISSING`: the exact resource, authoritative monitor, ownership relation, or
+  exact message-position relation is absent or inaccessible;
+- `EMPTY`: a valid private collection query completed with zero results.
+
+Account-risk level and monitor composite-risk level are distinct dimensions.
+Derivatives, leverage, or external context may elevate composite monitor risk;
+inequality between the two levels is valid and is not itself `ERROR`. Only an
+invalid value, malformed data, actual contradiction, or illegal combination
+maps that comparison to `ERROR`.
 
 System notifications, Telegram, external send, automatic notification,
 fabricated unread/message counts or message/Push data, mutation, unrelated
@@ -207,6 +232,12 @@ FE04D_API_READINESS: PARTIAL_FAIL_CLOSED
 FE04E_STATUS: PRIVACY_AND_STATE_FOUNDATION_EFFECTIVE_MERGED_MAIN
 FE04E_CONTRACT_MAIN_HEAD: 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8
 FE04E_PRIVACY_STATE_MAIN_HEAD: 2552dd24b1b756d5eb517e640baa772e1c5bcab6
+FE04E_SOURCE_IMPLEMENTATION_PR: 1155_MERGED
+FE04E_SOURCE_AUTHORIZED_HEAD: 269ec97c11efa30fe58d99a4d78d09387e6fd277
+FE04E_SOURCE_MERGE_COMMIT: 2552dd24b1b756d5eb517e640baa772e1c5bcab6
+FE04E_SOURCE_MERGED_AT: 2026-07-31T03:55:03Z
+FE04E_SOURCE_MERGE_METHOD: SQUASH
+FE04E_GOVERNANCE_ALIGNMENT: PR_1156_PENDING_MERGED_MAIN
 FE04E_IMPLEMENTATION_STATUS: UI_NOT_STARTED
 FE04E_UI_READINESS_STATUS: REEVALUATION_REQUIRED_AFTER_PRIVACY_STATE_MERGE
 FE04E_UI_STATUS: NOT_STARTED_PENDING_READINESS_AND_GOVERNANCE_REEVALUATION
@@ -218,6 +249,9 @@ FE04E_OPPORTUNITY_CONTRACT: AUTHENTICATED_SHARED_PUBLIC_PROJECTION
 FE04E_OPPORTUNITY_UI_PROJECTION: SERVER_SIDE_PUBLIC_OPPORTUNITY_ALLOWLIST
 FE04E_OPPORTUNITY_FORBIDDEN_FIELDS: USER_POSITION_ACCOUNT_RISK_POSITION_RISK_FAIL_REASON_JSON_PRIVATE_RISK_REASON
 FE04E_POSITION_RISK_ACCESS: OWNER_SCOPED_PRIVATE_PROJECTION_CROSS_USER_BLOCKED
+FE04E_POSITION_RISK_STATE_RESOLVER: LIST_DETAIL_SHARED_AUTHORITATIVE_LATEST_MONITOR
+FE04E_POSITION_RISK_ROW_EXISTENCE_RULE: ROW_EXISTENCE_NEVER_IMPLIES_READY
+FE04E_RISK_LEVEL_DIMENSIONS: ACCOUNT_AND_MONITOR_COMPOSITE_INDEPENDENT_MISMATCH_NOT_ERROR
 FE04E_MESSAGE_IDENTITY_STATUS: PASS_STRING_SAFE_AUTHORITATIVE_IDENTITY
 FE04E_PUSH_DETAIL_STATUS: SOURCE_SPECIFIC_PUBLIC_PRIVATE_PROJECTION_EFFECTIVE_MERGED_MAIN_UI_NOT_STARTED
 FE04E_TELEGRAM_BOUNDARY_STATUS: PASS_EXTENSION_NOT_CONNECTED

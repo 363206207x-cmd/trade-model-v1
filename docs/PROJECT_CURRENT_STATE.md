@@ -9,6 +9,13 @@ Existing Module Maturity: PARTIAL
 Current Work Package: FE-04E privacy boundary and state machine are effective on merged main 2552dd24b1b756d5eb517e640baa772e1c5bcab6 through PR #1155; Message/Push UI remains NOT_STARTED pending a separate readiness and governance re-evaluation
 Next Business Phase: FE-04E Message/Push UI Readiness and Governance Re-evaluation
 Next Business Phase Allowed: READ_ONLY_READINESS_REEVALUATION_ONLY; Message Center and Push Detail UI implementation remains blocked until that gate passes and its authorization is merged to main; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, trading capability, FE-04F, P4, and production deployment remain blocked
+FE-04E Source Implementation PR: #1155 / MERGED
+FE-04E Source Authorized Head: 269ec97c11efa30fe58d99a4d78d09387e6fd277
+FE-04E Source Merge Commit: 2552dd24b1b756d5eb517e640baa772e1c5bcab6
+FE-04E Source Merged At: 2026-07-31T03:55:03Z
+FE-04E Source Merge Method: SQUASH
+FE-04E Runtime Status: EFFECTIVE_MERGED_MAIN
+FE-04E Governance Alignment: PR #1156 / PENDING_MERGED_MAIN
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
@@ -98,7 +105,7 @@ provenance, eight-score detail, four-timeframe detail, and complete evidence
 chains are not added or fabricated. PR #1151 introduces no API, schema, Figma,
 AI backend, write, external-send, or trading capability.
 
-### FE-04E Contract Foundation And UI Authorization
+### FE-04E Privacy/State Foundation And UI Readiness Boundary
 
 The FE-04E Message/Push Contract Foundation is
 `CONTRACT_FOUNDATION_EFFECTIVE_MERGED_MAIN` on
@@ -123,9 +130,12 @@ carried private-risk-derived fields. At that gate, FE-04E Message/Push UI
 remained `NOT_STARTED` and blocked pending privacy remediation and merged-main
 validation.
 
-PR #1155, merged as
-`2552dd24b1b756d5eb517e640baa772e1c5bcab6`, makes the source-specific
-server-side read projections effective:
+PR #1155 authorized Head
+`269ec97c11efa30fe58d99a4d78d09387e6fd277` was squash-merged at
+`2026-07-31T03:55:03Z` as
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6`, making the source-specific
+server-side read projections effective. PR #1156 aligns governance metadata
+only and remains `PENDING_MERGED_MAIN` until separately reviewed and merged:
 
 - `OPPORTUNITY` is
   `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`. Its response contains only exact
@@ -143,10 +153,19 @@ server-side read projections effective:
   data, so private state cannot act as a public response oracle.
 - `POSITION_RISK` is `OWNER_SCOPED_PRIVATE_PROJECTION`. Its risk and monitoring
   fields remain available only through exact current-user-scoped message,
-  position, and monitor reads. A complete legal matching monitor projection is
-  `READY`; an incomplete legal projection is `PARTIAL`; invalid, malformed, or
-  contradictory data is `ERROR`; and a missing or inaccessible exact resource
-  is `MISSING`.
+  position, and monitor reads. List and detail use one shared resolver over the
+  same authoritative latest monitor. A selected historical row cannot replace
+  that latest monitor, and monitor-row existence alone never implies `READY`.
+  A complete legal latest-monitor projection is `READY`; a legal but
+  incomplete/intermediate latest monitor is `PARTIAL`; an unknown enum,
+  malformed value/timestamp, identity/source mismatch, actual contradiction,
+  or illegal combination is `ERROR`; a missing/inaccessible exact resource,
+  owner relation, or authoritative monitor is `MISSING`; and only a successful
+  empty private collection is `EMPTY`.
+- Account-risk level and monitor composite-risk level are independent
+  dimensions. Their inequality is valid and is not itself `ERROR`; only an
+  invalid value, malformed data, actual contradiction, or illegal combination
+  maps to `ERROR`.
 - All raw user-facing PushRecheck reads, config/audit, summary/ops, trigger,
   and replay routes fail closed with `404` because persisted Push/Recheck rows
   do not carry the authoritative source-message-position-owner relationship
@@ -157,10 +176,11 @@ server-side read projections effective:
   scheduler command and is not a user-facing read or mutation capability.
 - The shared and private sources no longer use one response record that can
   carry both public opportunity and private risk fields.
-- Across both source-specific projections, complete valid data maps to
-  `READY`, incomplete valid data maps to `PARTIAL`, invalid or contradictory
-  data maps to `ERROR`, missing or inaccessible exact resources map to
-  `MISSING`, and only a successful empty collection maps to `EMPTY`.
+- Public `OPPORTUNITY` applies the five states only to public opportunity
+  inputs. Private Push/Recheck existence, completeness, validity, execution
+  outcome, and current-user position direction cannot alter its result. The
+  same public opportunity therefore has the same lifecycle, status, and
+  readiness for every authenticated user.
 
 This merged privacy-boundary package changes the read API response projection
 but does not add a new endpoint, mutation, schema, Message/Push UI,

@@ -5,8 +5,15 @@
 | Item | Value |
 |---|---|
 | Contract | `FE-04-SEMANTIC-V2` |
-| Correction date | `2026-07-28` |
-| Audited main | `d523dc3e69920d6dd80a0d49f344f86757eb7b9e` |
+| Correction date | `2026-07-31` |
+| Audited main | `2552dd24b1b756d5eb517e640baa772e1c5bcab6` |
+| Source implementation PR | `#1155 / MERGED` |
+| Source authorized Head | `269ec97c11efa30fe58d99a4d78d09387e6fd277` |
+| Source merge commit | `2552dd24b1b756d5eb517e640baa772e1c5bcab6` |
+| Source merged at | `2026-07-31T03:55:03Z` |
+| Source merge method | `SQUASH` |
+| Runtime status | `PRIVACY_AND_STATE_FOUNDATION_EFFECTIVE_MERGED_MAIN` |
+| Governance alignment | `PR #1156 / PENDING_MERGED_MAIN` |
 | Scope | Product semantics, navigation, field ownership, and fail-closed behavior |
 | Code/API/schema/Figma change | None |
 | Capability effect | None until separately implemented and merged |
@@ -224,33 +231,54 @@ Telegram must not expose trading commands, order actions, open/close actions,
 or authorization.
 
 Push Detail remains review-only and source-specific. Authenticated shared
-`OPPORTUNITY` detail uses a server-side public projection containing only exact
-public identity, safe allowlisted opportunity status, public timestamp, and
-public description. Its public DTO must not contain or serialize UserPosition,
-account-risk, position-risk, Recheck risk, `failReasonJson`, or private risk
-reason fields. A separate server-side readiness projection may validate
-status/time/execution and private JSON structure without returning the raw
-payload. Owner-scoped `POSITION_RISK` detail may show its original
-monitoring snapshot, current monitoring result, and private change reason only
-for the current user. PushRecheck never authorizes a trade.
+`OPPORTUNITY` detail is an `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`; shared does
+not mean anonymous. Its public state inputs are limited to public `messageId`,
+`sourceIdentity=OPPORTUNITY`, public opportunity identity, public lifecycle,
+public status, public market evidence, public evaluation completeness, public
+timestamps, public expiry/staleness, and public source validity.
+
+The public projection and its `READY`, `PARTIAL`, `ERROR`, `MISSING`, or
+`EMPTY` state MUST NOT read or depend on private/internal `pushId`, a Push
+entity, a PushRecheck row, Recheck existence/completeness/validity, private
+`execution_status`, `failReasonJson`, account risk, position risk,
+UserPosition, current-user position direction, or private monitor state. A
+complete valid public record is `READY`; a valid but incomplete public record
+is `PARTIAL`; an invalid, malformed, or contradictory public record is
+`ERROR`; a missing public record is `MISSING`; and only a successful public
+collection query with zero records is `EMPTY`.
+
+This is a strict no-private-state-oracle rule. Whether a private Push/Recheck
+exists, whether a private Recheck is ready or failed, whether private execution
+completed or failed, and whether the current user has a long, short, or no
+position MUST NOT change the public result. The same public opportunity
+produces the same lifecycle, status, and readiness for all authenticated users.
+Any source-authorized per-user listing filter may control whether an item is
+listed, but it must not alter those public values.
+
+Owner-scoped `POSITION_RISK` detail remains a separate
+`OWNER_SCOPED_PRIVATE_PROJECTION`. It may show its original monitoring snapshot,
+authoritative latest monitoring result, and private change reason only for the
+current user through an exact message-position-owner relationship. Its list and
+detail states use the same resolver over the same authoritative latest monitor.
+No symbol, selected historical row, latest-position, time, or global-record
+fallback is permitted. PushRecheck never authorizes a trade.
 
 Internal `pushId` is not a public opportunity identity. Raw user-facing
 PushRecheck latest/log reads and Dashboard preview-by-`pushId` fail closed when
 an authoritative owner relation cannot be proven, and the legacy raw service
-latest/list methods fail closed as well; no symbol or latest-record fallback is
-permitted. A public opportunity may use a server-side structural readiness
-projection, but that projection cannot serialize raw Recheck, account/position
-risk, `failReasonJson`, or private reasons.
+latest/list methods fail closed as well.
 
-Message/Push read states are source-specific and fail closed:
+Private `POSITION_RISK` read states are fail closed:
 
-- `READY`: identity and required public/private fields are complete, statuses
-  are legal and consistent, required Recheck is complete, and execution status
-  is `COMPLETED`;
-- `PARTIAL`: known incomplete or in-progress data;
-- `ERROR`: illegal enum, malformed JSON, parse failure, or contradictory state;
-- `MISSING`: exact resource is absent, inaccessible, or cannot be authorized;
-- `EMPTY`: a valid list query completed with no records.
+- `READY`: exact identity/ownership and the authoritative latest monitor are
+  valid, complete, and legally consistent;
+- `PARTIAL`: the latest private state is legal but incomplete or in a known
+  legal intermediate state;
+- `ERROR`: an enum/value is unknown, data is malformed, identity/source is
+  mismatched, or fields form an actual contradiction or illegal combination;
+- `MISSING`: the exact resource, ownership relation, or authoritative monitor
+  is absent or inaccessible;
+- `EMPTY`: a valid private list query completed with no records.
 
 ## 8. Search Asset V2
 
@@ -282,7 +310,7 @@ Until market search and authenticated watch-asset persistence contracts exist:
 | Asset card | Whole card could double as detail navigation | Body switches context; separate authoritative detail affordance |
 | Execution Advice | Source inputs and plan validity could be conflated | Rule-led, source-verified plan; `validFrom/expiresAt` are validity timestamps |
 | AI entry | AI only as an embedded section | Asset Detail/FE-03 is the analysis entry; search/watch flow remains partial |
-| Messages | System notices could look like a third business Push source | Two business event sources; system notices are informational only |
+| Messages | System notices could look like a third business Push source | Exactly two business event sources: `OPPORTUNITY` and `POSITION_RISK`; system notifications are not authorized |
 | Telegram | Could appear as a current channel | Explicit extension/pending implementation |
 | Search | Search/add behavior was not fully bounded | Market search target, explicit add only, current capability `PARTIAL` |
 
