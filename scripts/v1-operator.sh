@@ -125,7 +125,7 @@ confirm_reviewed() {
   risk="$(state_value "$state_text" RESOLVED_RISK)"
   task_branch="$(state_value "$state_text" RESOLVED_BRANCH)"
   active_block="$(state_value "$state_text" RESOLVED_ACTIVE_BLOCK)"
-  [[ "$resolved_from" == "YES" && "$resolution_status" == "PASS" ]] || stop "无法从 v1-state 解析可执行任务。"
+  [[ "$resolved_from" == "YES" && "$resolution_status" == "ALLOWED" ]] || stop "无法从 v1-state 解析可执行任务。"
   [[ "$resolved_mode" != "READ_ONLY_PRODUCT_AUDIT" ]] || stop "只读审计禁止 PR merge 操作。"
   subject="$(subject_from_task "${risk:-B}" "$task_branch" "$active_block")" || stop "无法安全生成合并 subject。"
   [[ "$risk" == "B" ]] || stop "--confirm-reviewed 仅用于 B-risk；当前 risk: ${risk:-UNKNOWN}"
@@ -224,7 +224,7 @@ main() {
     || stop "BLOCKED_UNKNOWN_RESOLVED_STATE: resolved permissions are inconsistent."
 
   [[ "$resolved_from" == "YES" ]] || stop "状态输出缺少 RESOLVED_FROM_STATE=YES。"
-  [[ "$resolution_status" == "PASS" ]] || stop "状态解析已阻断: ${resolution_block_reason:-UNKNOWN}."
+  [[ "$resolution_status" == "ALLOWED" ]] || stop "状态解析已阻断: ${resolution_block_reason:-UNKNOWN}."
 
   echo "Resolved Package（解析包）: ${resolved_package:-UNKNOWN}"
   echo "Resolved Mode（解析模式）: ${resolved_mode:-UNKNOWN}"
@@ -265,7 +265,10 @@ main() {
     exit 0
   fi
 
+  [[ "$resolved_mode" == "IMPLEMENTATION" ]] || stop "未知 successor mode: ${resolved_mode:-UNKNOWN}."
   [[ "$resolved_edit_permission" == "true" ]] || stop "当前 resolved task 不允许仓库编辑。"
+  [[ "$resolved_implementation_permission" == "true" ]] || stop "当前 resolved task 不允许实现。"
+  [[ "$resolved_pr_creation_permission" == "true" ]] || stop "当前 resolved task 不允许创建实现 PR。"
   [[ "$worktree" == "Yes" ]] || stop "工作区不是 clean，resolved task 不允许自动打包或回退。"
   if [[ "$branch" != "main" ]]; then
     stop "当前不是 main 且工作区干净。请切回 main 或在当前分支产生/打包任务改动。当前分支: ${branch:-UNKNOWN}"
@@ -285,6 +288,16 @@ main() {
 
   [[ -n "$resolved_branch" && "$resolved_branch" != "NONE" && "$resolved_branch" != "NONE_READ_ONLY_AUDIT" ]] || stop "resolved task 缺少可写分支。"
 
+  echo "OPERATOR_MODE: IMPLEMENTATION"
+  echo "REPOSITORY_MUTATION: ENABLED"
+  echo "PR_CREATION: ENABLED"
+  echo "IMPLEMENTATION: ENABLED"
+  echo "OPERATOR_RESULT_STATUS: PASS"
+  if [[ "${V1_WORKFLOW_SELF_TEST:-0}" == "1" ]]; then
+    print_task_text
+    exit 0
+  fi
+
   local subject
   subject="$(subject_from_task "${resolved_risk:-A}" "$resolved_branch" "$resolved_active_block")" || stop "无法从 resolved task 生成 subject。"
   echo "Subject（提交/PR 标题）: $subject"
@@ -300,7 +313,6 @@ main() {
   echo
   echo "已由终端脚本创建/切换任务分支；Codex 不需要再创建 branch。"
   echo "尝试启动 Codex；失败时会直接打印完整任务文本。"
-  echo "OPERATOR_RESULT_STATUS: PASS"
   run_codex_or_print_task
 }
 

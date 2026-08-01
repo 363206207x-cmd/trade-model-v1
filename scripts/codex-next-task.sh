@@ -108,8 +108,9 @@ validate_contract_task() {
 
   local matrix_phase="P0-0"
   local matrix_status task_phase task_allowed current_phase current_status effective compat state_text
-  local current_package_phase current_package_mode authorized_next_phase authorized_next_mode
+  local current_package_phase current_package_mode current_package_status authorized_next_phase authorized_next_mode
   local authorized_next_edits authorized_next_implementation authorized_next_pr blocked_package blocked_status
+  local p1b_authorization_status p1b_scope
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
@@ -120,6 +121,7 @@ validate_contract_task() {
   compat="$(yaml_value "$TASK_FILE" compatibility_status)"
   current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
   current_package_mode="$(yaml_value "$TASK_FILE" current_package_mode)"
+  current_package_status="$(yaml_value "$TASK_FILE" current_package_status)"
   authorized_next_phase="$(yaml_value "$TASK_FILE" authorized_next_package_phase)"
   authorized_next_mode="$(yaml_value "$TASK_FILE" authorized_next_package_mode)"
   authorized_next_edits="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
@@ -127,17 +129,23 @@ validate_contract_task() {
   authorized_next_pr="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
   blocked_package="$(yaml_value "$TASK_FILE" blocked_package_phase)"
   blocked_status="$(yaml_value "$TASK_FILE" blocked_package_status)"
+  p1b_authorization_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
+  p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
   [[ "$task_phase" == "$matrix_phase" ]] || { echo "TASK_VALIDATION_FAILED task current_phase mismatch: $task_phase" >&2; failed=1; }
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
+  [[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED P1A completion declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_mode" == "AUTHORIZATION_FLOW_REMEDIATION_ONLY" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_mode" == "READ_ONLY_PRODUCT_AUDIT" ]] || { echo "TASK_VALIDATION_FAILED authorized next mode mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized P1B package mismatch" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "false" && "$authorized_next_implementation" == "false" && "$authorized_next_pr" == "false" ]] || { echo "TASK_VALIDATION_FAILED P1A must remain non-mutating" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" ]] || { echo "TASK_VALIDATION_FAILED bounded P1B permissions are incomplete" >&2; failed=1; }
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
+  [[ "$p1b_authorization_status" == "EFFECTIVE_PENDING_MERGED_MAIN" && "$p1b_scope" == "HOME_READ_PROJECTION_ONLY" ]] || { echo "TASK_VALIDATION_FAILED P1B authorization boundary mismatch" >&2; failed=1; }
+  [[ -f docs/P1A_HOME_ALIGNMENT_AUDIT.md && -f docs/P1B_AUTHORIZATION_SCOPE.md ]] || { echo "TASK_VALIDATION_FAILED P1A/P1B authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -206,6 +214,11 @@ open_pr_evidence_source="$(state_value "$state_text" OPEN_PR_EVIDENCE_SOURCE)"
 open_pr_none_confirmed="$(state_value "$state_text" OPEN_PR_NONE_CONFIRMED)"
 active_conflicting_prs="$(state_value "$state_text" ACTIVE_CONFLICTING_PRS)"
 request_class="$(state_value "$state_text" REQUEST_CLASS)"
+current_package="$(state_value "$state_text" CURRENT_PACKAGE)"
+requested_package_output="$(state_value "$state_text" REQUESTED_PACKAGE)"
+authorization_status="$(state_value "$state_text" AUTHORIZATION_STATUS)"
+p1a_completion_status="$(state_value "$state_text" P1A_COMPLETION_STATUS)"
+p1b_authorization_runtime_status="$(state_value "$state_text" P1B_AUTHORIZATION_RUNTIME_STATUS)"
 resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
 resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
 resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
@@ -221,7 +234,7 @@ resolved_implementation_permission="$(state_value "$state_text" RESOLVED_IMPLEME
 resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
 resolved_next_action="$(state_value "$state_text" RESOLVED_NEXT_ACTION)"
 
-if [[ "$resolved_from_state" != "YES" || "$resolution_status" != "PASS" ]]; then
+if [[ "$resolved_from_state" != "YES" || "$resolution_status" != "ALLOWED" ]]; then
   cat <<EOF
 RESOLVED_FROM_STATE: ${resolved_from_state:-NO}
 RESOLUTION_STATUS: ${resolution_status:-BLOCKED}
@@ -248,9 +261,22 @@ case "$resolved_scope_profile" in
       || { echo "STOP: successor package was not authorized by the authoritative resolver." >&2; exit 1; }
     generated_allowed_scope="$(yaml_list "$TASK_FILE" authorized_next_allowed_scope)"
     generated_blocked_scope="$(yaml_list "$TASK_FILE" authorized_next_blocked_scope)"
-    [[ "$resolved_edit_permission" == "false" ]] || { echo "STOP: read-only audit resolved with repository edits enabled." >&2; exit 1; }
-    [[ "$resolved_implementation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with implementation enabled." >&2; exit 1; }
-    [[ "$resolved_pr_creation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with PR creation enabled." >&2; exit 1; }
+    case "$resolved_mode" in
+      READ_ONLY_PRODUCT_AUDIT)
+        [[ "$resolved_edit_permission" == "false" ]] || { echo "STOP: read-only audit resolved with repository edits enabled." >&2; exit 1; }
+        [[ "$resolved_implementation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with implementation enabled." >&2; exit 1; }
+        [[ "$resolved_pr_creation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with PR creation enabled." >&2; exit 1; }
+        ;;
+      IMPLEMENTATION)
+        [[ "$resolved_edit_permission" == "true" ]] || { echo "STOP: implementation resolved without repository edit permission." >&2; exit 1; }
+        [[ "$resolved_implementation_permission" == "true" ]] || { echo "STOP: implementation resolved without implementation permission." >&2; exit 1; }
+        [[ "$resolved_pr_creation_permission" == "true" ]] || { echo "STOP: implementation resolved without PR creation permission." >&2; exit 1; }
+        ;;
+      *)
+        echo "STOP: unsupported authorized successor mode (${resolved_mode:-UNKNOWN})." >&2
+        exit 1
+        ;;
+    esac
     ;;
   *)
     echo "STOP: unknown resolved scope profile (${resolved_scope_profile:-UNKNOWN})." >&2
@@ -266,7 +292,12 @@ cat <<EOF
 # Authoritative Resolved Task Handoff
 
 RESOLVED_FROM_STATE: YES
-RESOLUTION_STATUS: PASS
+RESOLUTION_STATUS: ALLOWED
+CURRENT_PACKAGE: $current_package
+REQUESTED_PACKAGE: $requested_package_output
+P1A_COMPLETION_STATUS: $p1a_completion_status
+AUTHORIZATION_STATUS: $authorization_status
+P1B_AUTHORIZATION_RUNTIME_STATUS: $p1b_authorization_runtime_status
 RESOLVED_PACKAGE: $resolved_package
 RESOLVED_MODE: $resolved_mode
 RESOLVED_EDIT_PERMISSION: $resolved_edit_permission

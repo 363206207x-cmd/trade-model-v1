@@ -104,6 +104,11 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 **Task mode:** `READINESS_AND_GAP_AUDIT` / `READ_ONLY_PRODUCT_AUDIT`.
 
+**Status:** `COMPLETED`. This is an audit-completion claim only; Home remains
+`PARTIAL` and no implementation capability moved.
+
+**Durable evidence:** `docs/P1A_HOME_ALIGNMENT_AUDIT.md`.
+
 **Input:** P0 baseline effective on clean/synced merged main, Home interaction source bundle, Figma Home nodes, current `GET /api/dashboard/home`, current UI/runtime, and exact field-source evidence.
 
 **Deliverables:** read-only comparison of final module order, field provenance, real/derived/fallback status, context-only asset click, plan/three-AI/Top3 linkage, all five states, desktop/mobile screenshots, and a prioritized bounded gap list.
@@ -120,7 +125,7 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 #### P1B-1 Authorization
 
-**Status:** `AUTHORIZED_PENDING_IMPLEMENTATION_AFTER_MERGED_MAIN`.
+**Status:** `EFFECTIVE_PENDING_MERGED_MAIN`.
 
 **Authorization record:** `docs/P1B_AUTHORIZATION_SCOPE.md`.
 
@@ -134,7 +139,11 @@ machine change is authorized.
 **Effectivity:** this candidate status is not implementation authorization on
 its branch. P1B-1 may start only after the authorization package is
 independently reviewed, merged to clean/synced `main`, and recognized by the
-runtime task gate. It does not mark P1B-1 implemented.
+runtime task gate. At that point a request for
+`P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION` resolves to `IMPLEMENTATION` with
+repository-edit, implementation, and implementation-PR permissions enabled.
+Before merged-main effectivity, the same request remains blocked. This does not
+mark P1B-1 implemented.
 
 **Input:** accepted P1A artifacts and explicit bounded P1B authorization effective on merged main.
 
