@@ -413,3 +413,31 @@ are retained or strengthened.
 Human confirmation required: Already explicitly authorized for this Draft P0
 candidate; independent review and merged main are still required before it is
 effective or P1 may begin.
+
+---
+
+## v2.0-product-foundation-close-paused-debt-candidate
+
+Date: 2026-08-01
+Changed by: Codex
+Reason: Explicit human decision to remove overlapping unfinished governance
+work from the active open-PR set without merging, deleting, or representing it
+as complete.
+Before: PR #1156 remained open as `PAUSED_TECHNICAL_DEBT`; the P1A read-only
+audit gate needed a changed-file/module/source-domain exception to decide
+whether that open PR could coexist.
+After: PR #1156 is closed without merge and recorded as
+`CLOSED_PAUSED_TECHNICAL_DEBT`. Its exact Head, remote branch, eight unresolved
+review threads, named stash object, external patch/hash, and GitHub history are
+preserved. Closed unmerged debt is not an active open-PR blocker and is not
+effective/current content. Every active non-current open PR is conflicting;
+P1A remains blocked until P0 is reviewed, merged, synced, and validated, while
+P1B remains unauthorized.
+Does this change phase order: No.
+Does this change done criteria: No. Closure is explicitly `NOT_COMPLETED` and
+does not resolve review findings.
+Does this weaken safety boundaries: No. It adds no Java, API, schema, UI,
+Figma, notification, or trading capability.
+Human confirmation required: The close-without-merge decision was explicitly
+provided. PR #1157 still requires a new exact-Head review before any Ready or
+merge action.

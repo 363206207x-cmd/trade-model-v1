@@ -10,7 +10,7 @@ Direction: `PRODUCT_FIRST`
 
 Trade Model V1 now has one product authority index: `docs/PRODUCT_SOURCE_OF_TRUTH.md`. Formal product plans precede current code, current UI, phase records, Workflow, Governance, and tests. Current implementation differences are product gaps; the plans are not weakened to match code.
 
-Governance First is paused. PR #1156 and its unfinished semantic-parser/inventory/digest/metadata work are retained as `PAUSED_TECHNICAL_DEBT`, not deleted. After P0 is effective on clean/synced merged main, this exact paused and unrelated Draft PR does not block a declared read-only product audit; it does not grant or relax implementation, Ready, merge, or deployment permission.
+Governance First is paused. PR #1156 and its unfinished semantic-parser/inventory/digest/metadata work are retained as `CLOSED_PAUSED_TECHNICAL_DEBT`, not deleted and not merged. The closed PR no longer participates in the active open-PR gate, while its unmerged content remains non-effective and cannot be used as current product/runtime evidence. This does not grant or relax implementation, Ready, merge, or deployment permission.
 
 ## 2. Registered Formal Sources
 
@@ -49,7 +49,7 @@ What is genuinely complete within this P0 package after review/merge:
 - product module, relation, state, interaction, field, completion, gap, roadmap, and acceptance baselines;
 - minimal deterministic Product Source Gate and representative mapping simulations;
 - permanent task/bootstrap/output requirements;
-- preservation and pause record for PR #1156.
+- preservation and closed-debt record for PR #1156.
 
 These are P0 product-foundation deliverables. They do not make Home, Positions, AI, Messages, or any other business module complete.
 
@@ -110,12 +110,15 @@ Message/Push UI is incomplete, but it remains secondary to Home, Position, AI, a
 
 ```text
 PR: #1156
-STATUS: PAUSED_TECHNICAL_DEBT
-PAUSE_REASON: Product direction reset; governance parser work no longer blocks a specifically declared, non-overlapping read-only product audit after P0 is effective on merged main.
+STATUS: CLOSED_PAUSED_TECHNICAL_DEBT
+CLOSURE_REASON: The unfinished governance parser overlaps shared FE-04 contracts and workflow dependencies; it was removed from the active open-PR set without merge.
+COMPLETION_STATUS: NOT_COMPLETED
+REVIEW_FINDINGS_STATUS: 8_UNRESOLVED_PRESERVED
+MERGED_STATUS: NOT_MERGED
 RESUME_CONDITION: Only resume when a real product regression demonstrates that the missing governance capability is necessary.
 ```
 
-The PR remains open, Draft, and unmerged. This P0 package does not edit its branch, metadata, review threads, or content. The three paused local script modifications are separately preserved by a named stash and an external patch outside the P0 worktree. Its paused unrelated state does not block a specifically declared `READ_ONLY_PRODUCT_AUDIT` after P0 is effective on clean/synced merged main; it continues to block implementation/merge/deployment according to the strict phase gate.
+The PR was closed without merge. Its remote branch and exact Head are preserved; all eight review threads remain unresolved. The three paused local script modifications remain separately preserved by a named stash and an external patch outside the P0 worktree. The full snapshot is recorded in `docs/PAUSED_TECHNICAL_DEBT_REGISTER.md`. Closed unmerged debt does not block a specifically declared `READ_ONLY_PRODUCT_AUDIT`, but it is never effective content and cannot be used as the current implementation. Active conflicting open PRs still block, and implementation/merge/deployment remain governed by the strict phase gate.
 
 ## 10. Product Source Gate Boundary
 

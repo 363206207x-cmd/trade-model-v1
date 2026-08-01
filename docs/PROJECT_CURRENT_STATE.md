@@ -32,14 +32,17 @@ gate only. It does not change Java, business APIs, schema, business UI, Figma,
 business tests, notification delivery, or trading capability. No business
 module becomes complete because of P0.
 
-PR #1156 is `PAUSED_TECHNICAL_DEBT`.
+PR #1156 is `CLOSED_PAUSED_TECHNICAL_DEBT` and was closed without merge.
 
-- Pause reason: Product direction reset; governance parser work no longer
-  blocks product-first read-only and non-trading development.
+- Closure reason: the unfinished governance parser work overlaps shared FE-04
+  contracts and workflow dependencies, so Product First removes it from the
+  active open-PR set without adopting its content.
 - Resume condition: only when a real product regression demonstrates that the
   missing governance capability is necessary.
-- Boundary: keep PR #1156 open, Draft, unmerged, and unchanged; do not resolve
-  its review threads or make it the default P1 blocker.
+- Boundary: the PR remains unmerged, its exact Head and remote branch are
+  preserved, and all eight findings remain unresolved. Its branch, stash,
+  patch, and GitHub history are recovery evidence only, not current product or
+  runtime truth. Resume requires a fresh comparison with the latest `main`.
 
 The only action after this candidate is a Draft PR and independent review. P1
 Home implementation, PR #1156 remediation, Telegram, external notification,

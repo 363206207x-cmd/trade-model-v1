@@ -23,7 +23,7 @@ BLOCKED_BY_PRODUCT_SOURCE_GATE
 
 and must not enter editing.
 
-The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit remains fail closed for a missing/failed source gate, dirty worktree, unsynced main, active/conflicting PR, editable scope, or overlap with paused work. A paused technical-debt PR is unrelated only when actual changed-file, module, and source-domain evidence proves it; `UNKNOWN` never means unrelated.
+The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit remains fail closed for a missing/failed source gate, dirty worktree, unsynced main, any active non-current open PR, or editable scope. Closed unmerged technical debt is not an active blocker and is never effective/current content.
 
 ---
 
@@ -70,15 +70,10 @@ The script prints:
 - `HEAD:`
 - `RECENT_COMMITS:`
 - `OPEN_PRS:`
-- `PAUSED_PR_CHANGED_FILES_SOURCE:`
-- `PAUSED_PR_CHANGED_PATHS:`
-- `PAUSED_PR_CHANGED_MODULES:`
-- `PAUSED_PR_CHANGED_SOURCE_DOMAINS:`
-- `PAUSED_PR_SCOPE_RELATION:`
-- `PAUSED_UNRELATED_OPEN_PRS:`
-- `PAUSED_OVERLAPPING_OPEN_PRS:`
-- `PAUSED_UNKNOWN_SCOPE_OPEN_PRS:`
 - `ACTIVE_CONFLICTING_OPEN_PRS:`
+- `CLOSED_TECHNICAL_DEBT_STATUS:`
+- `CLOSED_TECHNICAL_DEBT_EFFECTIVE:`
+- `CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT:`
 - `MAIN_SYNC:`
 - `CURRENT_TASK_MODE:`
 - `AUTHORIZED_NEXT_TASK_MODE:`
@@ -95,9 +90,9 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 
 如果 `gh` 不可用，脚本在 open PR 字段输出 `GH_NOT_AVAILABLE`，不得输出不可读错误。
 
-When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If open-PR state or changed-file evidence is unavailable, audit and implementation gates remain fail closed. Open PR handling is task-mode specific: implementation/merge/deployment keep the strict phase gate; an effective `READ_ONLY_PRODUCT_AUDIT` may ignore only a task-configured Draft `PAUSED_TECHNICAL_DEBT` PR whose actual changed files classify as `UNRELATED`.
+When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If open-PR state is unavailable, audit and implementation gates remain fail closed. Every active non-current open PR is conflicting. Closed unmerged technical debt is not in the active open-PR set, does not block a read-only audit, and is never effective/current content.
 
-当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。若 open PR 状态或 changed-file 证据不可用，审计与实现都失败关闭。若存在 open PR，实现/合并/部署仍走严格门禁；只有有效任务模式为 `READ_ONLY_PRODUCT_AUDIT`，且配置中的 Draft `PAUSED_TECHNICAL_DEBT` PR 经真实文件、模块和来源域证据判定为 `UNRELATED` 时，才不阻塞只读审计。
+当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。若 open PR 状态不可用，审计与实现都失败关闭。任何非当前活动 open PR 都按冲突处理；已关闭且未合并的技术债不阻塞只读审计，也绝不作为已生效或当前内容。
 
 ### Read-Only Product Audit Boundary / 只读产品审计边界
 
@@ -107,24 +102,21 @@ The persisted task contract separates `current_task_mode=PRODUCT_FOUNDATION_REME
 
 - effective `TASK_MODE: READ_ONLY_PRODUCT_AUDIT` after the explicit P0-to-P1A transition;
 - Product Source Gate `PASS`;
-- the exact `read_only_product_audit_scope_contract` forbidding code/test changes, business PR creation, and paused-PR changes;
+- the exact `read_only_product_audit_scope_contract` forbidding code/test changes, business PR creation, and closed-debt recovery-content changes;
 - `p1a_repository_edits_allowed=false`, `p1a_implementation_allowed=false`, and `p1a_implementation_pr_allowed=false`;
 - clean worktree and clean/synced `main`;
 - no current business-package PR;
-- no `ACTIVE_CONFLICTING_PR`;
-- every tolerated open PR matches the configured number, branch, Head, Draft state, and `PAUSED_TECHNICAL_DEBT` status, and its actual changed-file/module/source-domain classification is `UNRELATED`.
+- no `ACTIVE_CONFLICTING_PR`.
 
-Changed files come from GitHub PR changed files when available, otherwise from an exact configured base/Head local diff. Classification is limited to `UNRELATED`, `OVERLAPPING`, or `UNKNOWN`. Exact paths, directory prefixes, shared contract files, mapped product modules, and mapped source domains are checked deterministically. `OVERLAPPING` blocks; unavailable changed files, missing audit scope, invalid paths, or unmapped modules/domains produce `UNKNOWN` and require human decision. Metadata alone is never sufficient.
+The state output reports `CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT=NO` and `CLOSED_TECHNICAL_DEBT_EFFECTIVE=NO`. Those fields record non-effectivity only; audit permission never authorizes implementation, Ready transition, merge, deployment, code/test changes, reopening debt, or applying its stash/patch.
 
-The state output reports `PAUSED_OPEN_PR_BLOCKS_AUDIT=NO` only for a proven unrelated paused PR under read-only mode. `PAUSED_OPEN_PR_BLOCKS_IMPLEMENTATION=YES` remains the strict phase behavior; audit permission never authorizes implementation, Ready transition, merge, deployment, code/test changes, or edits to the paused PR.
-
-Run the deterministic transition and overlap boundary cases with:
+Run the deterministic transition and active-open/closed-debt boundary cases with:
 
 ```bash
 bash scripts/v1-state.sh --self-test-product-audit-policy
 ```
 
-The self-test covers P0 open, Ready/unmerged, merged/unsynced, merged/validated, P1B blocking, unrelated/overlapping/unknown paused scope, exact and directory overlap, shared contracts, missing evidence/scope, active conflict, dirty worktree, failed Product Source Gate, implementation attempts, and attempted editable scope. It is a small fixed path/module policy test, not a natural-language parser, inventory, digest, or governance engine.
+The self-test covers P0 open, Ready/unmerged, merged/unsynced, merged/validated, P1B blocking, closed-unmerged technical debt, current and active-conflicting PRs, dirty worktree, failed Product Source Gate, implementation attempts, and attempted editable scope. It is a small state-policy test, not a natural-language parser, inventory, digest, or governance engine.
 
 ## V1 Auto Operator / V1 自动操作台
 

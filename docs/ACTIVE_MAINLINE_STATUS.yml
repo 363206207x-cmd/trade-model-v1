@@ -31,14 +31,16 @@ production_deployment_readiness: "BLOCKED"
 current_pr: "P0 DRAFT PR; derive exact number and state from GitHub"
 current_branch: "codex/product-foundation-freeze-p0"
 current_package_pr: "P0 Product Foundation Freeze Draft PR; derive exact number and state from GitHub"
-unrelated_open_prs: "#1156 OPEN / DRAFT / UNMERGED / PAUSED_TECHNICAL_DEBT"
+unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
 pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, reopen, or include its code"
 
 paused_governance_pr: "#1156"
-paused_governance_status: "PAUSED_TECHNICAL_DEBT"
-paused_governance_reason: "Product direction reset; governance parser work no longer blocks product-first read-only and non-trading development"
+paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"
+paused_governance_merged_status: "NOT_MERGED"
+paused_governance_effective: false
+paused_governance_reason: "Closed without merge because the unfinished governance parser overlaps shared FE-04 contracts and workflow dependencies; preserved recovery assets are not current product or runtime truth"
 paused_governance_resume_condition: "Only resume when a real product regression demonstrates that the missing governance capability is necessary"
 
 p1_4_status: "DONE on merged main by PR #1017"

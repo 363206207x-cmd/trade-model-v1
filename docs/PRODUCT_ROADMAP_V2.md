@@ -44,7 +44,7 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 **Deliverables:** Product Source of Truth; registered source snapshots and hashes; Product Source Gate; permanent bootstrap/task/output rules; module tree; relation graph; state machines; interaction baseline; field sources; completion matrix; gaps; Roadmap V2; acceptance standard; freeze report.
 
-**Dependencies:** exact source paths and readable content; clean independent branch; paused PR #1156 preserved unchanged.
+**Dependencies:** exact source paths and readable content; clean independent branch; PR #1156 recovery assets and unresolved review history preserved after close without merge.
 
 **Allowed scope:** product documentation, permanent agent/workflow instructions, minimal deterministic source gate, workflow invocation.
 
@@ -66,9 +66,9 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 **Deliverables:** read-only comparison of final module order, field provenance, real/derived/fallback status, context-only asset click, plan/three-AI/Top3 linkage, all five states, desktop/mobile screenshots, and a prioritized bounded gap list.
 
-**Allowed scope:** source/code/API/test/Figma inspection, runtime/network inspection, screenshots, evidence capture, and audit output. A paused `PAUSED_TECHNICAL_DEBT` PR may coexist only when its actual changed-file, module, and source-domain evidence classifies it `UNRELATED` and `PRODUCT_AUDIT_ALLOWED=YES`. `OVERLAPPING` blocks or requires a human scope decision; unavailable evidence or incomplete mapping is `UNKNOWN` and fails closed. A PR number, branch, Head, Draft state, or governance label alone cannot establish unrelated scope.
+**Allowed scope:** source/merged-code/API/test/Figma inspection, runtime/network inspection, screenshots, evidence capture, and audit output. Every active non-current open PR is a conflict blocker. Closed unmerged technical debt does not block the audit, but its branch/patch/stash content is recovery evidence only and cannot be treated as current implementation.
 
-**Blocked scope:** code or test modification, business PR creation, PR #1156 changes, UI/API/schema/Figma changes, implementation, Ready transition, merge, deployment, Telegram/notification/trading, and presenting fallback scores as real confidence.
+**Blocked scope:** code or test modification, business PR creation, PR #1156 reopen/recovery-content use, UI/API/schema/Figma changes, implementation, Ready transition, merge, deployment, Telegram/notification/trading, and presenting fallback scores as real confidence.
 
 **Audit exit:** findings receive independent review and a separate merged-main authorization record. Audit completion alone does not authorize implementation.
 
@@ -256,4 +256,4 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 ## Roadmap Boundary
 
-P0 creates truth and measurement only. It does not make P1 implementation automatic. The persisted workflow separates the current P0 remediation mode from the authorized next P1A mode. P1A becomes an effective `READ_ONLY_PRODUCT_AUDIT` only after P0 is reviewed, merged, validated, and effective on clean/synced main with Product Source Gate `PASS`; P0 open or Ready/unmerged remains blocked. A paused Draft PR may coexist only after actual scope evidence classifies it `UNRELATED`. `OVERLAPPING` and `UNKNOWN` do not pass. Active/conflicting PRs, dirty worktrees, failed Product Source Gate, repository edits, business PR creation, implementation, merge, and deployment remain blocked. P1B starts only after P1A is independently reviewed and its bounded authorization is effective on merged main. PR #1156 remains `PAUSED_TECHNICAL_DEBT` and is resumed only if a real product regression proves that its missing governance capability is necessary.
+P0 creates truth and measurement only. It does not make P1 implementation automatic. The persisted workflow separates the current P0 remediation mode from the authorized next P1A mode. P1A becomes an effective `READ_ONLY_PRODUCT_AUDIT` only after P0 is reviewed, merged, validated, and effective on clean/synced main with Product Source Gate `PASS`; P0 open or Ready/unmerged remains blocked. Every active non-current open PR blocks. Closed unmerged technical debt does not block and is not effective/current content. Dirty worktrees, failed Product Source Gate, repository edits, business PR creation, implementation, merge, and deployment remain blocked. P1B starts only after P1A is independently reviewed and its bounded authorization is effective on merged main. PR #1156 remains `CLOSED_PAUSED_TECHNICAL_DEBT` and may be reconsidered only if a real product regression proves need, followed by a fresh comparison against latest `main` and new authorization.

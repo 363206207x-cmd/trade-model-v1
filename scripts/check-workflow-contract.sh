@@ -30,6 +30,14 @@ require_contains() {
   fi
 }
 
+require_not_contains() {
+  local file="$1"
+  local text="$2"
+  if [[ -f "$file" ]] && grep -Fq -- "$text" "$file"; then
+    fail "forbidden stale text in $file: $text"
+  fi
+}
+
 require_executable() {
   local file="$1"
   if [[ ! -x "$file" ]]; then
@@ -136,6 +144,7 @@ require_file "docs/CODEX_TASK_TEMPLATE.md"
 require_file "docs/CONTRACT_CHANGE_LOG.md"
 require_file "docs/DEAD_CODE_CANDIDATES.md"
 require_file "docs/PROJECT_GLOBAL_AUDIT.md"
+require_file "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md"
 
 require_contains "AGENTS.md" "docs/PROJECT_DELIVERY_CONTRACT.md"
 require_contains "AGENTS.md" "docs/PROJECT_CURRENT_STATE.md"
@@ -193,19 +202,13 @@ require_contains "scripts/v1-state.sh" "AUTHORIZED_NEXT_TASK_MODE"
 require_contains "scripts/v1-state.sh" "NEXT_TASK_AUTHORIZATION_STATUS"
 require_contains "scripts/v1-state.sh" "P1A_TRANSITION_ALLOWED"
 require_contains "scripts/v1-state.sh" "P1B_AUTHORIZATION_RUNTIME_STATUS"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_FILES_SOURCE"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_PATHS"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_MODULES"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_SOURCE_DOMAINS"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
-require_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_REASON"
-require_contains "scripts/v1-state.sh" "LOCAL_EXACT_BASE_HEAD"
-require_contains "scripts/v1-state.sh" "MODULE_OR_SOURCE_DOMAIN_MAPPING_UNKNOWN"
-require_contains "scripts/v1-state.sh" "REQUIRE_HUMAN_DECISION_PAUSED_PR_SCOPE_UNKNOWN"
-require_contains "scripts/v1-state.sh" "PAUSED_UNRELATED_OPEN_PRS"
-require_contains "scripts/v1-state.sh" "PAUSED_OVERLAPPING_OPEN_PRS"
-require_contains "scripts/v1-state.sh" "PAUSED_UNKNOWN_SCOPE_OPEN_PRS"
 require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_OPEN_PRS"
+require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_STATUS"
+require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_EFFECTIVE"
+require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT"
+require_not_contains "scripts/v1-state.sh" "classify_paused_pr_scope"
+require_not_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
+require_not_contains "scripts/v1-state.sh" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
 require_contains "scripts/v1-state.sh" "--self-test-product-audit-policy"
 require_contains "docs/CODEX_NEXT_TASK.yml" "current_task_mode:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_task_mode:"
@@ -219,11 +222,19 @@ require_contains "docs/CODEX_NEXT_TASK.yml" "p1b_authorization_status: \"BLOCKED
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_modules:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_paths:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_source_domains:"
-require_contains "docs/CODEX_NEXT_TASK.yml" "read_only_product_audit_scope_contract: \"NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_PAUSED_PR_CHANGES\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "read_only_product_audit_scope_contract: \"NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES\""
 require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_base: \"2552dd24b1b756d5eb517e640baa772e1c5bcab6\""
 require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_head: \"75d04e95bc7aa5eb761299b0192dfbc2caec3792\""
-require_contains "docs/SESSION_BOOTSTRAP.md" "PAUSED_PR_SCOPE_RELATION"
-require_contains "docs/WORKFLOW_COMMAND_AUTOMATION.md" "UNKNOWN"
+require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_status: \"CLOSED_PAUSED_TECHNICAL_DEBT\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_merged_status: \"NOT_MERGED\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_effective: false"
+require_contains "docs/SESSION_BOOTSTRAP.md" "Closed unmerged technical debt does not block"
+require_contains "docs/WORKFLOW_COMMAND_AUTOMATION.md" "Closed unmerged technical debt is not an active blocker"
+require_contains "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md" "FE04E-GOVERNANCE-PARSER-PR1156"
+require_contains "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md" "CLOSED_PAUSED_TECHNICAL_DEBT"
+require_contains "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md" "8_UNRESOLVED_PRESERVED"
+require_contains "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md" "b168819d38e46f4fb90131ca92294cb45b5abbf6"
+require_contains "docs/PAUSED_TECHNICAL_DEBT_REGISTER.md" "440a2a7f038bb4d2086bb7b0fabba1ca02cc81632a58c99b39283de38550bc0a"
 require_contains "docs/PRODUCT_FIELD_SOURCE.md" "REAL_DATA_STATUS=PARTIAL/FALLBACK_PRESENT"
 require_contains "docs/PRODUCT_FIELD_SOURCE.md" "fixed base/default values and light-rule adjustments"
 require_contains "docs/PRODUCT_COMPLETION_MATRIX.md" "| Eight Scores | PARTIAL"
@@ -286,16 +297,9 @@ for expected_case in \
   TRANSITION_TEST_P0_MERGED_UNSYNCED \
   TRANSITION_TEST_P0_MERGED_VALIDATED \
   TRANSITION_TEST_P1B_REMAINS_BLOCKED \
-  SCOPE_TEST_UNRELATED_GOVERNANCE_PARSER \
-  SCOPE_TEST_EXACT_OVERLAP \
-  SCOPE_TEST_DIRECTORY_PREFIX_OVERLAP \
-  SCOPE_TEST_SHARED_CONTRACT_OVERLAP \
-  SCOPE_TEST_LOOKUP_UNAVAILABLE \
-  SCOPE_TEST_MISSING_AUDIT_SCOPE \
-  AUDIT_POLICY_TEST_PAUSED_UNRELATED_AFTER_P0_MERGED \
-  AUDIT_POLICY_TEST_PAUSED_OVERLAP \
-  AUDIT_POLICY_TEST_PAUSED_SCOPE_UNKNOWN \
+  AUDIT_POLICY_TEST_CLOSED_UNMERGED_TECHNICAL_DEBT \
   AUDIT_POLICY_TEST_P0_NOT_MERGED \
+  AUDIT_POLICY_TEST_CURRENT_PACKAGE_PR \
   AUDIT_POLICY_TEST_ACTIVE_CONFLICTING_PR \
   AUDIT_POLICY_TEST_DIRTY_WORKTREE \
   AUDIT_POLICY_TEST_PRODUCT_SOURCE_GATE_FAILED \

@@ -21,7 +21,7 @@ Permanent authority rules:
 4. When a required source or mapping is missing, or formal sources have a real unresolved conflict, stop instead of guessing.
 5. Governance, Workflow, and tests remain delivery controls; none can override `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
 6. The Product Source Gate must remain deterministic and minimal. Do not extend it into a natural-language parser, synonym inventory, digest system, or independent governance roadmap.
-7. A read-only product-gap audit may proceed only when `task_mode=READ_ONLY_PRODUCT_AUDIT`, Product Source Gate passes, P0 is effective on clean/synced merged main, the worktree is clean, editable scope is locked out, no current/active conflicting PR exists, and any tolerated PR matches the exact configured Draft `PAUSED_TECHNICAL_DEBT` number/branch/Head. This exception never authorizes implementation, Ready, merge, deployment, or edits to the paused PR.
+7. A read-only product-gap audit may proceed only when `task_mode=READ_ONLY_PRODUCT_AUDIT`, Product Source Gate passes, P0 is effective on clean/synced merged main, the worktree is clean, editable scope is locked out, and no current or active conflicting open PR exists. Closed unmerged technical debt is not a blocker and is not effective/current content. This never authorizes implementation, Ready, merge, deployment, reopening debt, or using recovery content as current implementation.
 
 The permanent hard boundaries remain: no automatic open/close/add/reduce/reverse/order/trade; no Push Recheck trading authorization; no fake data as real; no owner-scope bypass; no public/private leakage; no ExecutionPlan-as-UserPosition; no `triggered`-as-opened.
 
@@ -158,6 +158,7 @@ direction or override the Product First roadmap.
 - If chat memory, branch names, PR state, and docs conflict, the registered product sources decide product meaning; merged `main`, the delivery matrix/current state, and `bash scripts/v1-state.sh` decide implementation effectivity.
 - If Codex shell reports `GH_NOT_AVAILABLE`, treat Codex GitHub status as unknown, not as project state failure. GPT connector evidence or the user's local terminal `gh` output may be used as handoff evidence for open PR / main sync / clean worktree status.
 - Do not open the next package until the current package is merged on `main`, local `main` is synced, and the worktree is clean.
+- Every active non-current open PR is conflicting for the next product package. Closed unmerged technical debt is not an active blocker, is not effective/current content, and must not be used as implementation evidence.
 - Prefer fixed workflow commands over handwritten long `gh pr create` / `gh pr merge` commands.
 
 ## Duplicate Skeleton Freeze
