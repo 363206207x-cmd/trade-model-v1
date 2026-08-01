@@ -49,9 +49,11 @@ emit_resolved_task_state() {
   printf 'OPEN_PR_NONE_CONFIRMED: %s\n' "${open_pr_none_confirmed:-NO}"
   printf 'ACTIVE_CONFLICTING_PRS: %s\n' "${active_conflicting_pr_count:-UNKNOWN}"
   printf 'REQUEST_CLASS: %s\n' "${request_class:-UNKNOWN}"
-  printf 'REPOSITORY_EDITS_ALLOWED: %s\n' "${authorized_next_repository_edits_allowed:-false}"
-  printf 'IMPLEMENTATION_ALLOWED: %s\n' "${authorized_next_implementation_allowed:-false}"
-  printf 'IMPLEMENTATION_PR_ALLOWED: %s\n' "${authorized_next_implementation_pr_allowed:-false}"
+  printf 'REPOSITORY_EDITS_ALLOWED: %s\n' "${resolved_edit_permission:-false}"
+  printf 'IMPLEMENTATION_ALLOWED: %s\n' "${resolved_implementation_permission:-false}"
+  printf 'PR_CREATION_ALLOWED: %s\n' "${resolved_pr_creation_permission:-false}"
+  # Compatibility alias for older consumers. New launchers consume PR_CREATION_ALLOWED.
+  printf 'IMPLEMENTATION_PR_ALLOWED: %s\n' "${resolved_pr_creation_permission:-false}"
   printf 'P1B_AUTHORIZATION_STATUS: %s\n' "${p1b_authorization_declared_status:-UNDECLARED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
   printf 'RESOLUTION_STATUS: %s\n' "${resolution_status:-BLOCKED}"
@@ -93,7 +95,7 @@ classify_package_request() {
 
 resolve_task_handoff() {
   resolution_status="BLOCKED"
-  resolution_block_reason="BLOCKED_UNKNOWN_STATE"
+  resolution_block_reason="BLOCKED_UNKNOWN_RESOLVED_STATE"
   current_package_action_allowed="NO"
   current_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_STATE"
   next_package_allowed="NO"
@@ -180,7 +182,7 @@ resolve_task_handoff() {
   fi
 
   if [[ "$request_class" != "SUCCESSOR_PACKAGE" ]]; then
-    resolution_block_reason="BLOCKED_UNKNOWN_REQUEST_CLASS"
+    resolution_block_reason="BLOCKED_UNKNOWN_RESOLVED_STATE"
     return 0
   fi
 

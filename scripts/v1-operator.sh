@@ -40,6 +40,19 @@ stop() {
   exit 1
 }
 
+require_resolved_field() {
+  local state_text="$1"
+  local key="$2"
+  local value
+  value="$(state_value "$state_text" "$key")"
+  case "$value" in
+    ""|UNKNOWN|UNDECLARED|UNAVAILABLE)
+      stop "BLOCKED_UNKNOWN_RESOLVED_STATE: missing or unresolved $key."
+      ;;
+  esac
+  printf '%s\n' "$value"
+}
+
 subject_from_task() {
   local risk="$1"
   local branch="$2"
@@ -165,7 +178,9 @@ main() {
   local resolved_from resolution_status resolved_package resolved_mode resolved_branch
   local resolved_active_block resolved_risk resolved_stage resolved_edit_permission
   local resolved_implementation_permission resolved_pr_creation_permission block_reason resolution_block_reason
-  local request_class current_package_action_allowed current_package_block_reason next_package_allowed
+  local current_package authorized_next_package request_class
+  local current_package_action_allowed current_package_block_reason next_package_allowed
+  local repository_edits_allowed implementation_allowed pr_creation_allowed open_pr_evidence_source
   state_text="$(bash scripts/v1-state.sh ${STATE_ARGS[@]+"${STATE_ARGS[@]}"} 2>&1)" || stop "权威状态解析失败。"
   echo "$state_text"
   echo
@@ -189,10 +204,24 @@ main() {
   resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
   block_reason="$(state_value "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
   resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
-  request_class="$(state_value "$state_text" REQUEST_CLASS)"
-  current_package_action_allowed="$(state_value "$state_text" CURRENT_PACKAGE_ACTION_ALLOWED)"
-  current_package_block_reason="$(state_value "$state_text" CURRENT_PACKAGE_BLOCK_REASON)"
-  next_package_allowed="$(state_value "$state_text" NEXT_PACKAGE_ALLOWED)"
+  current_package="$(require_resolved_field "$state_text" CURRENT_PACKAGE)"
+  current_package_action_allowed="$(require_resolved_field "$state_text" CURRENT_PACKAGE_ACTION_ALLOWED)"
+  current_package_block_reason="$(require_resolved_field "$state_text" CURRENT_PACKAGE_BLOCK_REASON)"
+  authorized_next_package="$(require_resolved_field "$state_text" AUTHORIZED_NEXT_PACKAGE)"
+  next_package_allowed="$(require_resolved_field "$state_text" NEXT_PACKAGE_ALLOWED)"
+  block_reason="$(require_resolved_field "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+  request_class="$(require_resolved_field "$state_text" REQUEST_CLASS)"
+  resolved_mode="$(require_resolved_field "$state_text" RESOLVED_MODE)"
+  repository_edits_allowed="$(require_resolved_field "$state_text" REPOSITORY_EDITS_ALLOWED)"
+  implementation_allowed="$(require_resolved_field "$state_text" IMPLEMENTATION_ALLOWED)"
+  pr_creation_allowed="$(require_resolved_field "$state_text" PR_CREATION_ALLOWED)"
+  open_pr_evidence_source="$(require_resolved_field "$state_text" OPEN_PR_EVIDENCE_SOURCE)"
+  require_resolved_field "$state_text" PRODUCT_SOURCE_GATE_STATUS >/dev/null
+
+  [[ "$repository_edits_allowed" == "$resolved_edit_permission" \
+    && "$implementation_allowed" == "$resolved_implementation_permission" \
+    && "$pr_creation_allowed" == "$resolved_pr_creation_permission" ]] \
+    || stop "BLOCKED_UNKNOWN_RESOLVED_STATE: resolved permissions are inconsistent."
 
   [[ "$resolved_from" == "YES" ]] || stop "状态输出缺少 RESOLVED_FROM_STATE=YES。"
   [[ "$resolution_status" == "PASS" ]] || stop "状态解析已阻断: ${resolution_block_reason:-UNKNOWN}."
@@ -210,6 +239,7 @@ main() {
     echo "OPERATOR_MODE: CURRENT_PACKAGE_CONTINUATION"
     echo "CURRENT_PACKAGE_ACTION: ALLOWED"
     echo "CURRENT_PACKAGE_BRANCH: ACCEPTED"
+    echo "OPERATOR_RESULT_STATUS: PASS"
     if [[ "${V1_WORKFLOW_SELF_TEST:-0}" == "1" ]]; then
       print_task_text
     else
@@ -230,6 +260,7 @@ main() {
     echo "REPOSITORY_MUTATION: DISABLED"
     echo "PR_CREATION: DISABLED"
     echo "IMPLEMENTATION: DISABLED"
+    echo "OPERATOR_RESULT_STATUS: PASS"
     print_task_text
     exit 0
   fi
@@ -269,6 +300,7 @@ main() {
   echo
   echo "已由终端脚本创建/切换任务分支；Codex 不需要再创建 branch。"
   echo "尝试启动 Codex；失败时会直接打印完整任务文本。"
+  echo "OPERATOR_RESULT_STATUS: PASS"
   run_codex_or_print_task
 }
 

@@ -25,6 +25,48 @@ Permanent authority rules:
 
 The permanent hard boundaries remain: no automatic open/close/add/reduce/reverse/order/trade; no Push Recheck trading authorization; no fake data as real; no owner-scope bypass; no public/private leakage; no ExecutionPlan-as-UserPosition; no `triggered`-as-opened.
 
+## PRODUCT_FIRST_STOP_RULE
+
+This permanent rule is a simple human review rule. It must not become a new governance product or automated semantic engine.
+
+A review finding may block the current product stage only when it is classified as exactly one of:
+
+- `PRODUCT_SEMANTIC_BLOCKER`: a reproducible conflict with formal product semantics or interaction, including AI authority, ExecutionPlan/UserPosition separation, state separation, Home interaction, or Position Monitoring.
+- `SECURITY_OR_PRIVACY_BLOCKER`: privacy leakage, owner-scope bypass, unauthorized mutation, automatic open/close/reverse/trade, or Push Recheck used as trading authorization.
+- `REAL_DATA_INTEGRITY_BLOCKER`: mock/default/fallback data presented as real, failure presented as success, or fabricated product/AI fields.
+- `NEXT_PRODUCT_STAGE_BLOCKER`: reproducible evidence that the current stage cannot merge or the next formal Product Roadmap stage cannot start after merge, creating a real delivery deadlock.
+- `BUILD_OR_RUNTIME_BLOCKER`: compile failure, required-test failure, application startup failure, or failure of a core runtime chain.
+
+Every other finding is `NON_BLOCKING_TECHNICAL_DEBT` and must set `BLOCKS_CURRENT_STAGE: NO`. Examples include non-critical wording or metadata, formatting/naming preference, theoretical future cases, non-critical Workflow improvement, parser/inventory/digest/helper refinement, non-security test idealization, maintainability advice, or refactoring outside the current product package.
+
+Every review finding must report:
+
+```text
+FINDING_ID:
+BLOCKER_CLASS:
+DIRECT_PRODUCT_IMPACT:
+REPRODUCTION_EVIDENCE:
+BLOCKS_CURRENT_STAGE: YES / NO
+```
+
+A finding with `BLOCKS_CURRENT_STAGE: YES` must also identify the affected formal product source and explain why it cannot be deferred. Without concrete product impact, a reproducible path, the affected formal product source, and a non-deferrable reason, it must set `BLOCKS_CURRENT_STAGE: NO`. P1/P2/P3 priority and blocking status are independent.
+
+Workflow, Governance, Metadata, and Review tooling together may consume at most an estimated 10% of a product stage. At 10%, stop expanding them, register remaining items as `NON_BLOCKING_TECHNICAL_DEBT`, and resume product work. Exceptions require a demonstrated product-semantic, security/privacy, build/runtime, or actual next-stage blocker. Use a reasonable human estimate; do not build a statistics system. Task reports include:
+
+```text
+PRODUCT_WORK_RATIO:
+NON_PRODUCT_WORK_RATIO:
+STOP_RULE_TRIGGERED: YES / NO
+```
+
+Implementation is limited to plain documentation, fixed review fields, minimal shell assertions, and explicit human classification. Do not build a natural-language classifier, synonym list, semantic parser, inventory, digest, whole-review analyzer, independent Stop Rule phase, or large meta-test suite.
+
+Fixed examples:
+
+- naming preference -> `NON_BLOCKING_TECHNICAL_DEBT` -> `BLOCKS_CURRENT_STAGE: NO`
+- reproducible cross-user data leak -> `SECURITY_OR_PRIVACY_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+- reproducible post-merge P1A deadlock -> `NEXT_PRODUCT_STAGE_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+
 ---
 
 # Trade Model V1 Contract-First Delivery Rules

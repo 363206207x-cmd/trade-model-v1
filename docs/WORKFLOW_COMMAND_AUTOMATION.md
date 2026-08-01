@@ -199,9 +199,9 @@ One-command runner entry:
 bash scripts/v1-codex-run-next.sh
 ```
 
-This generates the next task through `v1-auto.sh next` and starts Codex CLI when available. It never stages, commits, pushes, creates PRs, or merges.
+This thin launcher delegates only through `v1-operator.sh -> codex-next-task.sh -> v1-state.sh` and starts Codex CLI when the operator authorizes the resolved task. It does not call `v1-auto.sh next` as an authoritative task selector and does not independently decide current/successor package, branch legality, Open PR conflicts, read-only mode, or Product Source status. It never stages, commits, pushes, creates PRs, or merges.
 
-一键执行入口通过 `v1-auto.sh next` 生成下一任务，并在 Codex CLI 可用时启动 Codex。它不会 stage、commit、push、创建 PR 或合并。
+一键执行入口只通过 `v1-operator.sh -> codex-next-task.sh -> v1-state.sh` 权威链解析并启动任务；它不再通过 `v1-auto.sh next` 选择任务，也不会 stage、commit、push、创建 PR 或合并。
 
 If Codex shell cannot confirm Open PR（未合并 PR）status because local `gh` is unavailable, but GPT connector or the user's terminal has confirmed Open PR none, use:
 
@@ -209,7 +209,7 @@ If Codex shell cannot confirm Open PR（未合并 PR）status because local `gh`
 bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
 ```
 
-This flag only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync（主分支同步）, `CAN_CONTINUE_NEXT_PACKAGE: NO` from other blockers, or merge approval rules.
+This flag is forwarded unchanged to the authoritative resolver. It does not bypass dirty worktree, an explicit conflicting PR, failed Product Source Gate, failed successor Main Sync（主分支同步）, another resolver blocker, or merge approval rules. A legal current-package branch is not rejected merely because it is not `main`; successor-package branch requirements remain resolver-controlled.
 
 如果 Codex shell 因本地 `gh` 不可用无法确认 Open PR 状态，但 GPT connector 或用户本机 terminal 已确认 Open PR none，可使用 `--open-pr-none-confirmed`。该参数只处理 Codex GitHub 状态未知，不绕过其他安全条件。
 

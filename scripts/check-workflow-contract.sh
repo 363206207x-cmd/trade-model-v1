@@ -216,6 +216,12 @@ require_contains "scripts/v1-state.sh" "OPEN_PR_EVIDENCE_SOURCE"
 require_contains "scripts/v1-state.sh" "OPEN_PR_NONE_CONFIRMED"
 require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_PRS"
 require_contains "scripts/v1-state.sh" "REQUEST_CLASS"
+require_contains "scripts/v1-state.sh" "CURRENT_PACKAGE:"
+require_contains "scripts/v1-state.sh" "AUTHORIZED_NEXT_PACKAGE:"
+require_contains "scripts/v1-state.sh" "REPOSITORY_EDITS_ALLOWED:"
+require_contains "scripts/v1-state.sh" "IMPLEMENTATION_ALLOWED:"
+require_contains "scripts/v1-state.sh" "PR_CREATION_ALLOWED:"
+require_contains "scripts/v1-state.sh" "BLOCKED_UNKNOWN_RESOLVED_STATE"
 require_not_contains "scripts/v1-state.sh" "classify_paused_pr_scope"
 require_not_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
 require_not_contains "scripts/v1-state.sh" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
@@ -242,7 +248,14 @@ require_contains "scripts/v1-operator.sh" "OPERATOR_MODE: READ_ONLY_AUDIT"
 require_contains "scripts/v1-operator.sh" "OPERATOR_MODE: CURRENT_PACKAGE_CONTINUATION"
 require_contains "scripts/v1-operator.sh" "REPOSITORY_MUTATION: DISABLED"
 require_contains "scripts/v1-operator.sh" "PR_CREATION: DISABLED"
-require_contains "scripts/v1-codex-run-next.sh" "export V1_OPEN_PR_NONE_CONFIRMED"
+require_contains "scripts/v1-operator.sh" "OPERATOR_RESULT_STATUS: PASS"
+require_contains "scripts/v1-operator.sh" "BLOCKED_UNKNOWN_RESOLVED_STATE"
+require_contains "scripts/v1-codex-run-next.sh" "scripts/v1-operator.sh"
+require_contains "scripts/v1-codex-run-next.sh" "OUTER_LAUNCHER_STATUS: PASS"
+require_contains "scripts/v1-codex-run-next.sh" "--request-package"
+require_contains "scripts/v1-codex-run-next.sh" "PRODUCT_SOURCE_GATE_STATUS"
+require_not_contains "scripts/v1-codex-run-next.sh" "scripts/v1-auto.sh next"
+require_not_contains "scripts/v1-codex-run-next.sh" "当前分支不是 main"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_modules:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_paths:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_source_domains:"
@@ -271,6 +284,34 @@ require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
 require_contains "scripts/v1-merge-sync.sh" "PR_1004_PROTECTED"
+
+product_first_stop_rule_files=(
+  AGENTS.md
+  docs/PRODUCT_SOURCE_OF_TRUTH.md
+  docs/PRODUCT_ROADMAP_V2.md
+  docs/PRODUCT_ACCEPTANCE_STANDARD.md
+  docs/ANSWER_FORMAT_CONTRACT.md
+  docs/SESSION_BOOTSTRAP.md
+)
+for stop_rule_file in "${product_first_stop_rule_files[@]}"; do
+  require_contains "$stop_rule_file" "PRODUCT_FIRST_STOP_RULE"
+  require_contains "$stop_rule_file" "BLOCKER_CLASS:"
+  require_contains "$stop_rule_file" "PRODUCT_SEMANTIC_BLOCKER"
+  require_contains "$stop_rule_file" "SECURITY_OR_PRIVACY_BLOCKER"
+  require_contains "$stop_rule_file" "REAL_DATA_INTEGRITY_BLOCKER"
+  require_contains "$stop_rule_file" "NEXT_PRODUCT_STAGE_BLOCKER"
+  require_contains "$stop_rule_file" "BUILD_OR_RUNTIME_BLOCKER"
+  require_contains "$stop_rule_file" "NON_BLOCKING_TECHNICAL_DEBT"
+  require_contains "$stop_rule_file" "BLOCKS_CURRENT_STAGE: NO"
+  require_contains "$stop_rule_file" "PRODUCT_WORK_RATIO:"
+  require_contains "$stop_rule_file" "NON_PRODUCT_WORK_RATIO:"
+  require_contains "$stop_rule_file" "STOP_RULE_TRIGGERED: YES / NO"
+done
+require_contains "docs/PRODUCT_ROADMAP_V2.md" "at most an estimated 10% of a product stage"
+require_contains "docs/PRODUCT_ACCEPTANCE_STANDARD.md" "at most an estimated 10% of a product stage"
+require_contains "docs/PRODUCT_SOURCE_OF_TRUTH.md" "naming preference -> \`NON_BLOCKING_TECHNICAL_DEBT\` -> \`BLOCKS_CURRENT_STAGE: NO\`"
+require_contains "docs/PRODUCT_SOURCE_OF_TRUTH.md" "reproducible cross-user data leak -> \`SECURITY_OR_PRIVACY_BLOCKER\` -> \`BLOCKS_CURRENT_STAGE: YES\`"
+require_contains "docs/PRODUCT_SOURCE_OF_TRUTH.md" "reproducible post-merge P1A deadlock -> \`NEXT_PRODUCT_STAGE_BLOCKER\` -> \`BLOCKS_CURRENT_STAGE: YES\`"
 
 matrix_phase="P0-0"
 matrix_status="$(matrix_field P0-0 4)"
@@ -347,6 +388,12 @@ run_operator_scenario() {
   V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/v1-operator.sh "$@"
 }
 
+run_outer_scenario() {
+  local scenario="$1"
+  shift
+  V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/v1-codex-run-next.sh "$@"
+}
+
 assert_handoff_blocked() {
   local scenario="$1"
   local expected_reason="$2"
@@ -403,7 +450,7 @@ assert_handoff_blocked p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
 assert_handoff_blocked conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR
 assert_handoff_blocked dirty_worktree BLOCKED_WORKTREE_DIRTY
 assert_handoff_blocked product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
-assert_handoff_blocked unknown_state BLOCKED_UNKNOWN_REQUEST_CLASS
+assert_handoff_blocked unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 
 closed_debt_handoff="$(run_handoff_scenario closed_pr_1156)" || fail "closed debt handoff failed"
 printf '%s\n' "$closed_debt_handoff" | grep -Fq "RESOLVED_PACKAGE: $authorized_next_package_phase" \
@@ -496,7 +543,46 @@ assert_chain_blocked P1A_MUTATION p1a_mutation BLOCKED_P1A_NOT_READ_ONLY
 assert_chain_blocked P1B_BEFORE_AUTHORIZATION p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY
 assert_chain_blocked PRODUCT_SOURCE_FAILURE product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
-assert_chain_blocked UNKNOWN_RESOLVER unknown_state BLOCKED_UNKNOWN_REQUEST_CLASS
+assert_chain_blocked UNKNOWN_RESOLVER unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
+
+assert_outer_allowed() {
+  local name="$1" scenario="$2" expected_mode="$3"
+  local output
+  shift 3
+  output="$(run_outer_scenario "$scenario" "$@")" || { fail "$name outer launcher was blocked"; return; }
+  printf '%s\n' "$output" | grep -Fq "OPERATOR_MODE: $expected_mode" \
+    || fail "$name outer launcher mode mismatch"
+  printf '%s\n' "$output" | grep -Fq "OPERATOR_RESULT_STATUS: PASS" \
+    || fail "$name outer launcher omitted operator PASS"
+  printf '%s\n' "$output" | grep -Fq "OUTER_LAUNCHER_STATUS: PASS" \
+    || fail "$name outer launcher omitted launcher PASS"
+  echo "OUTER_LAUNCHER_$name: PASS"
+}
+
+assert_outer_blocked() {
+  local name="$1" scenario="$2" expected_reason="$3"
+  local output status
+  shift 3
+  set +e
+  output="$(run_outer_scenario "$scenario" "$@" 2>&1)"
+  status=$?
+  set -e
+  [[ "$status" -ne 0 ]] || fail "$name outer launcher unexpectedly passed"
+  printf '%s\n' "$output" | grep -Fq "$expected_reason" \
+    || fail "$name outer launcher reason mismatch"
+  echo "OUTER_LAUNCHER_$name: PASS"
+}
+
+assert_outer_allowed CURRENT_P0_LAUNCH current_p0_remediation CURRENT_PACKAGE_CONTINUATION
+assert_outer_allowed CURRENT_P0_FINAL_GATE current_p0_final_gate CURRENT_PACKAGE_CONTINUATION
+assert_outer_blocked P0_OPEN_TO_P1A p0_open BLOCKED_PENDING_P0_MERGED_MAIN \
+  --request-package "$authorized_next_package_phase"
+assert_outer_allowed P0_MERGED_VALIDATED_TO_P1A p0_merged_validated READ_ONLY_AUDIT
+assert_outer_blocked P1A_MUTATION p1a_mutation BLOCKED_P1A_NOT_READ_ONLY
+assert_outer_blocked P1B p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
+assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
+assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR
+assert_outer_blocked PRODUCT_SOURCE_FAILURE product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
 
 set +e
 invalid_evidence_output="$(V1_OPEN_PR_NONE_CONFIRMED=INVALID V1_WORKFLOW_SELF_TEST=1 \
@@ -507,7 +593,7 @@ set -e
 printf '%s\n' "$invalid_evidence_output" | grep -Fq "RESOLUTION_BLOCK_REASON: BLOCKED_INVALID_OPEN_PR_EVIDENCE" \
   || fail "invalid Open PR evidence did not fail closed"
 
-run_next_output="$(CODEX_RUNNER_COMMAND=true V1_WORKFLOW_SELF_TEST=1 \
+run_next_output="$(V1_WORKFLOW_SELF_TEST=1 \
   V1_HANDOFF_SELF_TEST_SCENARIO=merged_gh_unavailable bash scripts/v1-codex-run-next.sh \
   --open-pr-none-confirmed)" || fail "v1-codex-run-next did not propagate explicit Open PR evidence"
 printf '%s\n' "$run_next_output" | grep -Fq "OPEN_PR_EVIDENCE_SOURCE: EXPLICIT_CONFIRMED" \
