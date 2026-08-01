@@ -37,6 +37,34 @@ yaml_value() {
   ' "$file"
 }
 
+yaml_list() {
+  local file="$1"
+  local key="$2"
+  [[ -f "$file" ]] || return 0
+  awk -v key="$key" '
+    $0 ~ "^" key ":[[:space:]]*$" {
+      capture=1
+      next
+    }
+    capture && $0 ~ "^[^[:space:]]" {
+      exit
+    }
+    capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
+      value=$0
+      sub("^[[:space:]]+-[[:space:]]+", "", value)
+      gsub(/^\"/, "", value)
+      gsub(/\"$/, "", value)
+      print value
+    }
+  ' "$file"
+}
+
+state_value() {
+  local state_text="$1"
+  local key="$2"
+  printf '%s\n' "$state_text" | awk -F': ' -v key="$key" '$1 == key {print substr($0, length(key) + 3); exit}'
+}
+
 matrix_field() {
   local phase="$1"
   local field_index="$2"
@@ -79,6 +107,8 @@ validate_contract_task() {
 
   local matrix_phase="P0-0"
   local matrix_status task_phase task_allowed current_phase current_status effective compat state_text
+  local current_package_phase current_package_mode authorized_next_phase authorized_next_mode
+  local authorized_next_edits authorized_next_implementation authorized_next_pr blocked_package blocked_status
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
@@ -87,11 +117,26 @@ validate_contract_task() {
   state_text="$(bash scripts/v1-state.sh)"
   effective="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "COMPLETION_EFFECTIVE_STATE" {print $2; exit}')"
   compat="$(yaml_value "$TASK_FILE" compatibility_status)"
+  current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
+  current_package_mode="$(yaml_value "$TASK_FILE" current_package_mode)"
+  authorized_next_phase="$(yaml_value "$TASK_FILE" authorized_next_package_phase)"
+  authorized_next_mode="$(yaml_value "$TASK_FILE" authorized_next_package_mode)"
+  authorized_next_edits="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
+  authorized_next_implementation="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_allowed)"
+  authorized_next_pr="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
+  blocked_package="$(yaml_value "$TASK_FILE" blocked_package_phase)"
+  blocked_status="$(yaml_value "$TASK_FILE" blocked_package_status)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
   [[ "$task_phase" == "$matrix_phase" ]] || { echo "TASK_VALIDATION_FAILED task current_phase mismatch: $task_phase" >&2; failed=1; }
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
+  [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
+  [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
+  [[ "$authorized_next_mode" == "READ_ONLY_PRODUCT_AUDIT" ]] || { echo "TASK_VALIDATION_FAILED authorized next mode mismatch" >&2; failed=1; }
+  [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "false" && "$authorized_next_implementation" == "false" && "$authorized_next_pr" == "false" ]] || { echo "TASK_VALIDATION_FAILED P1A must remain non-mutating" >&2; failed=1; }
+  [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -119,79 +164,112 @@ fi
 
 validate_contract_task >/dev/null
 
-state_text="$(bash scripts/v1-state.sh 2>&1 || true)"
-branch="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "BRANCH" {print $2; exit}')"
-worktree="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "WORKTREE_CLEAN" {print $2; exit}')"
-main_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "MAIN_SYNC" {print $2; exit}')"
-open_prs="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PRS" {print substr($0, length("OPEN_PRS") + 3); exit}')"
-open_pr_source="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_CHECK_SOURCE" {print substr($0, length("OPEN_PR_CHECK_SOURCE") + 3); exit}')"
-open_pr_count="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_COUNT" {print substr($0, length("OPEN_PR_COUNT") + 3); exit}')"
-open_pr_status="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "OPEN_PR_STATUS" {print substr($0, length("OPEN_PR_STATUS") + 3); exit}')"
-contract_sync="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CONTRACT_MATRIX_SYNC" {print $2; exit}')"
-next_allowed="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE_ALLOWED" {print $2; exit}')"
-next_phase="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "NEXT_BUSINESS_PHASE" {print $2; exit}')"
-current_package="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CURRENT_WORK_PACKAGE" {print $2; exit}')"
-blockers="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "BLOCKERS" {print $2; exit}')"
-current_phase_status="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "CURRENT_PHASE_STATUS" {print $2; exit}')"
-completion_effective_state="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "COMPLETION_EFFECTIVE_STATE" {print $2; exit}')"
-
-# Normal mode fail-closed for next-business generation. Current P0-0 handoff text is allowed;
-# P0-1 is not generated unless the contract gate opens.
-if [[ "$contract_sync" != "OK" ]]; then
-  echo "STOP: contract sync is not OK ($contract_sync)." >&2
+if ! state_text="$(bash scripts/v1-state.sh 2>&1)"; then
+  echo "STOP: authoritative state resolver failed." >&2
+  printf '%s\n' "$state_text" >&2
   exit 1
 fi
-if [[ "$current_phase_status" != "DONE" ]]; then
-  if [[ "$(yaml_value "$TASK_FILE" current_phase)" != "P0-0" ]]; then
-    echo "STOP: current phase is not DONE and task is outside P0-0." >&2
-    exit 1
-  fi
+
+branch="$(state_value "$state_text" BRANCH)"
+worktree="$(state_value "$state_text" WORKTREE_CLEAN)"
+main_sync="$(state_value "$state_text" MAIN_SYNC)"
+open_prs="$(state_value "$state_text" OPEN_PRS)"
+completion_effective_state="$(state_value "$state_text" COMPLETION_EFFECTIVE_STATE)"
+next_package_allowed="$(state_value "$state_text" NEXT_PACKAGE_ALLOWED)"
+next_package_block_reason="$(state_value "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
+resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
+resolved_package="$(state_value "$state_text" RESOLVED_PACKAGE)"
+resolved_mode="$(state_value "$state_text" RESOLVED_MODE)"
+resolved_branch="$(state_value "$state_text" RESOLVED_BRANCH)"
+resolved_active_block="$(state_value "$state_text" RESOLVED_ACTIVE_BLOCK)"
+resolved_risk="$(state_value "$state_text" RESOLVED_RISK)"
+resolved_scope_profile="$(state_value "$state_text" RESOLVED_SCOPE_PROFILE)"
+resolved_handoff_stage="$(state_value "$state_text" RESOLVED_HANDOFF_STAGE)"
+resolved_edit_permission="$(state_value "$state_text" RESOLVED_EDIT_PERMISSION)"
+resolved_implementation_permission="$(state_value "$state_text" RESOLVED_IMPLEMENTATION_PERMISSION)"
+resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
+resolved_next_action="$(state_value "$state_text" RESOLVED_NEXT_ACTION)"
+
+if [[ "$resolved_from_state" != "YES" || "$resolution_status" != "PASS" ]]; then
+  cat <<EOF
+RESOLVED_FROM_STATE: ${resolved_from_state:-NO}
+RESOLUTION_STATUS: ${resolution_status:-BLOCKED}
+RESOLVED_PACKAGE: ${resolved_package:-BLOCKED}
+RESOLVED_MODE: ${resolved_mode:-BLOCKED}
+RESOLVED_EDIT_PERMISSION: ${resolved_edit_permission:-false}
+NEXT_PACKAGE_ALLOWED: ${next_package_allowed:-NO}
+NEXT_PACKAGE_BLOCK_REASON: ${next_package_block_reason:-BLOCKED_UNKNOWN_STATE}
+GENERATED_TASK: BLOCKED
+EOF
+  exit 1
 fi
-if [[ "$(yaml_value "$TASK_FILE" current_phase)" != "P0-0" ]]; then
-  if [[ "$branch" != "main" || "$worktree" != "Yes" || "$main_sync" != "OK" || "$open_prs" != "none" || "$next_allowed" != "YES" ]]; then
-    echo "STOP: next business phase generation is blocked by branch/worktree/open PR/main sync/contract gate." >&2
+
+case "$resolved_scope_profile" in
+  CURRENT_PACKAGE)
+    generated_allowed_scope="$(yaml_list "$TASK_FILE" current_package_allowed_scope)"
+    generated_blocked_scope="$(yaml_list "$TASK_FILE" current_package_blocked_scope)"
+    ;;
+  AUTHORIZED_NEXT_PACKAGE)
+    generated_allowed_scope="$(yaml_list "$TASK_FILE" authorized_next_allowed_scope)"
+    generated_blocked_scope="$(yaml_list "$TASK_FILE" authorized_next_blocked_scope)"
+    [[ "$resolved_edit_permission" == "false" ]] || { echo "STOP: read-only audit resolved with repository edits enabled." >&2; exit 1; }
+    [[ "$resolved_implementation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with implementation enabled." >&2; exit 1; }
+    [[ "$resolved_pr_creation_permission" == "false" ]] || { echo "STOP: read-only audit resolved with PR creation enabled." >&2; exit 1; }
+    ;;
+  *)
+    echo "STOP: unknown resolved scope profile (${resolved_scope_profile:-UNKNOWN})." >&2
     exit 1
-  fi
-fi
+    ;;
+esac
 
 cat "$TEMPLATE_FILE"
 cat <<EOF
 
 ---
 
-# Fixed Codex Output Contract Hints / Codex 固定输出契约提示
+# Authoritative Resolved Task Handoff
 
-WHAT_THIS_STEP_DOES（这一步在做什么）: Generate a user-readable task handoff without modifying files, staging, committing, pushing, creating PRs, merging, or starting a blocked package.
-CURRENT_PROGRESS（当前进度）: Branch=${branch:-UNKNOWN}; worktree（工作区） clean=${worktree:-UNKNOWN}; main sync=${main_sync:-UNKNOWN}; open PR（未合并 PR）=${open_prs:-UNKNOWN}; open PR source（未合并 PR 来源）=${open_pr_source:-UNKNOWN}; open PR count（未合并 PR 数量）=${open_pr_count:-UNKNOWN}; open PR status（未合并 PR 状态）=${open_pr_status:-UNKNOWN}; current package=${current_package:-UNKNOWN}; completion=${completion_effective_state:-UNKNOWN}; next phase=${next_phase:-UNKNOWN}; next allowed（允许）=${next_allowed:-UNKNOWN}; blockers=${blockers:-UNKNOWN}.
-NEXT_ALLOWED_ACTION（下一允许动作）: ${next_phase:-UNKNOWN} only when the runtime gate（门禁） reports allowed（允许） and the worktree（工作区） is clean/synced main（干净且已同步主线）.
-NEXT_BLOCKED_ACTION（下一禁止动作）: Do not start blocked（阻塞） packages, do not treat open PR（未合并 PR） as done, do not bypass PENDING_MERGED_MAIN（等待合并主线）, and do not auto-trade.
+RESOLVED_FROM_STATE: YES
+RESOLUTION_STATUS: PASS
+RESOLVED_PACKAGE: $resolved_package
+RESOLVED_MODE: $resolved_mode
+RESOLVED_EDIT_PERMISSION: $resolved_edit_permission
+RESOLVED_IMPLEMENTATION_PERMISSION: $resolved_implementation_permission
+RESOLVED_PR_CREATION_PERMISSION: $resolved_pr_creation_permission
+RESOLVED_BRANCH: $resolved_branch
+RESOLVED_HANDOFF_STAGE: $resolved_handoff_stage
+NEXT_PACKAGE_ALLOWED: $next_package_allowed
+NEXT_PACKAGE_BLOCK_REASON: $next_package_block_reason
 
----
+GENERATED_TASK: $resolved_active_block
+GENERATED_PACKAGE: $resolved_package
+GENERATED_TASK_MODE: $resolved_mode
+GENERATED_BRANCH: $resolved_branch
+GENERATED_RISK: $resolved_risk
+GENERATED_EDIT_PERMISSION: $resolved_edit_permission
+GENERATED_IMPLEMENTATION_PERMISSION: $resolved_implementation_permission
+GENERATED_PR_CREATION_PERMISSION: $resolved_pr_creation_permission
+GENERATED_NEXT_ALLOWED_ACTION: $resolved_next_action
 
-# Machine-Readable P0-0 Task Handoff
+CURRENT_RUNTIME_BRANCH: ${branch:-UNKNOWN}
+CURRENT_RUNTIME_WORKTREE_CLEAN: ${worktree:-UNKNOWN}
+CURRENT_RUNTIME_MAIN_SYNC: ${main_sync:-UNKNOWN}
+CURRENT_RUNTIME_OPEN_PRS: ${open_prs:-UNKNOWN}
+CURRENT_EFFECTIVE_STATUS: ${completion_effective_state:-UNKNOWN}
 
-Current Phase: $(yaml_value "$TASK_FILE" current_phase)
-Current Phase Status: $(yaml_value "$TASK_FILE" current_phase_status)
-Completion Effective State: ${completion_effective_state:-UNKNOWN}
-Existing Module Maturity: $(yaml_value "$TASK_FILE" existing_module_maturity)
-Active Block: $(yaml_value "$TASK_FILE" active_block)
-Module: $(yaml_value "$TASK_FILE" module)
-Branch: $(yaml_value "$TASK_FILE" branch)
-Risk: $(yaml_value "$TASK_FILE" risk)
-Compatibility Status: $(yaml_value "$TASK_FILE" compatibility_status)
-Next Business Phase: $(yaml_value "$TASK_FILE" next_business_phase)
-Next Business Phase Allowed: $(yaml_value "$TASK_FILE" next_business_phase_allowed)
-Next Allowed Action: $(yaml_value "$TASK_FILE" next_allowed_action)
+GENERATED_ALLOWED_SCOPE:
+EOF
+while IFS= read -r scope_item; do
+  [[ -n "$scope_item" ]] && printf -- '- %s\n' "$scope_item"
+done <<<"$generated_allowed_scope"
 
-Allowed Scope:
-$(awk '/^allowed_scope:/{flag=1; next} /^forbidden_scope:/{flag=0} flag {print}' "$TASK_FILE")
+echo "GENERATED_BLOCKED_SCOPE:"
+while IFS= read -r scope_item; do
+  [[ -n "$scope_item" ]] && printf -- '- %s\n' "$scope_item"
+done <<<"$generated_blocked_scope"
 
-Forbidden Scope:
-$(awk '/^forbidden_scope:/{flag=1; next} /^checks:/{flag=0} flag {print}' "$TASK_FILE")
+cat <<'EOF'
 
-Checks:
-$(awk '/^checks:/{flag=1; next} /^stop_conditions:/{flag=0} flag {print}' "$TASK_FILE")
-
-Stop Conditions:
-$(awk '/^stop_conditions:/{flag=1; next} flag {print}' "$TASK_FILE")
+NEXT_BLOCKED_ACTION（下一禁止动作）: Do not start an unresolved or blocked package, do not infer authorization from static compatibility fields, and do not bypass the resolved permissions above.
 EOF

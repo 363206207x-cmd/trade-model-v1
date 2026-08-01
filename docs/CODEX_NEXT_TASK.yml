@@ -1,22 +1,62 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "P0 closed technical-debt registration and post-merge P1A transition validation on PR #1157; product implementation remains stopped"
+active_block: "P0 final handoff transition and PR metadata remediation on PR #1157; product implementation remains stopped"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "P0 Closed Technical Debt Registration and P1A Transition Validation"
+module: "P0 Final Handoff Transition and PR Metadata Remediation"
 branch: "codex/product-foundation-freeze-p0"
 task_mode: "PRODUCT_FOUNDATION_REMEDIATION"
 current_task_mode: "PRODUCT_FOUNDATION_REMEDIATION"
 authorized_next_task_mode: "READ_ONLY_PRODUCT_AUDIT"
 current_effective_status: "PENDING_MERGED_MAIN"
 authorized_next_product_phase: "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT"
+
+# Runtime selection is owned by scripts/v1-state.sh. These declarations define
+# the current package, the only authorized successor, and the still-blocked
+# implementation package without making any of them effective by themselves.
+current_package_phase: "P0_PRODUCT_FOUNDATION"
+current_package_name: "P0 Product Foundation Freeze"
+current_package_active_block: "P0 Product Foundation final remediation and merge preparation"
+current_package_mode: "PRODUCT_FOUNDATION_REMEDIATION"
+current_package_status: "PENDING_MERGED_MAIN"
+current_package_branch: "codex/product-foundation-freeze-p0"
+current_package_risk: "A"
+current_package_repository_edits_allowed: true
+current_package_implementation_allowed: false
+current_package_implementation_pr_allowed: false
+current_package_next_action: "Complete the current P0 review and merge path; do not start P1A before merged-main validation"
+current_package_allowed_scope:
+  - "Update the final resolved-state handoff and operator routing"
+  - "Add deterministic current, post-merge, blocked, and read-only operator transition tests"
+  - "Update PR #1157 description metadata after a normal commit and push"
+current_package_blocked_scope:
+  - "Product plans, Product Sources, product baseline facts, Java, API, schema, UI, Figma, or business tests"
+  - "P0 Ready transition, merge, P1A execution, or P1B implementation"
+  - "PR #1156, stash, patch, or closed technical-debt mutation"
+  - "Telegram, notification, order, execution, or trading capability"
+
+authorized_next_package_phase: "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT"
+authorized_next_package_name: "P1A Home Alignment Readiness and Gap Audit"
+authorized_next_package_active_block: "P1A Home Alignment Readiness and Gap Audit"
+authorized_next_package_mode: "READ_ONLY_PRODUCT_AUDIT"
+authorized_next_package_branch: "NONE_READ_ONLY_AUDIT"
+authorized_next_package_risk: "A"
+authorized_next_package_repository_edits_allowed: false
+authorized_next_package_implementation_allowed: false
+authorized_next_package_implementation_pr_allowed: false
+authorized_next_package_next_action: "Perform the read-only Home alignment and gap audit and report findings without repository mutation"
+
+blocked_package_phase: "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
+blocked_package_status: "BLOCKED_PENDING_P1A_REVIEW_AND_MERGED_MAIN_AUTHORIZATION"
 next_task_authorization_status: "BLOCKED_PENDING_P0_MERGED_MAIN"
 next_task_authorization_conditions:
   - "P0_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "P0_MERGED_MAIN_VALIDATION_PASS"
   - "PRODUCT_SOURCE_GATE_PASS"
+  - "CLEAN_WORKTREE"
+  - "NO_ACTIVE_CONFLICTING_PR"
 p1a_repository_edits_allowed: false
 p1a_implementation_allowed: false
 p1a_implementation_pr_allowed: false
@@ -35,7 +75,7 @@ production_deployment_readiness: "BLOCKED"
 next_business_phase: "P1 Home Alignment Readiness and Gap Audit"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Validate the explicit post-merge P1A read-only transition and simple active-open-PR policy, commit/push normally, update PR #1157 metadata, keep it Draft, and stop for a new exact-Head review"
+next_allowed_action: "Fix the final resolved-state handoff and operator routing, validate the full chain, update PR #1157 metadata, keep it Draft, and stop for a new exact-Head review"
 
 product_phase: "P0 Product Foundation Freeze"
 product_direction: "PRODUCT_FIRST"
@@ -126,6 +166,21 @@ allowed_scope:
   - "Add deterministic transition, active-conflict, closed-debt, dirty/source-failure, and mutation-blocking self-tests"
   - "Update PR #1157 description metadata after a normal commit and push"
   - "Commit and push normally, update the existing Draft PR #1157 description, and stop for exact-Head review"
+
+authorized_next_allowed_scope:
+  - "Read the registered Product Sources and Home interaction contracts"
+  - "Read the frozen Figma and design evidence"
+  - "Inspect the current Home implementation without modifying it"
+  - "Inspect field provenance and real, mock, fallback, cache, and fail-closed behavior"
+  - "Capture screenshots when read-only tooling permits"
+  - "Produce a Home alignment readiness and gap report"
+
+authorized_next_blocked_scope:
+  - "Repository edits, staging, commit, push, branch creation, or PR creation"
+  - "Java, API, schema, HTML, CSS, JavaScript, UI, or Figma changes"
+  - "P1B implementation or any business implementation"
+  - "Telegram, external notification, automatic notification, order, execution, or trading capability"
+  - "PR #1156, stash, patch, or closed technical-debt mutation"
 
 blocked_scope:
   - "Java business code, scoring implementation, business API, database schema, HTML, CSS, JavaScript, business tests, or Figma"

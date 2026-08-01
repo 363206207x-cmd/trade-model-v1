@@ -206,6 +206,10 @@ require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_OPEN_PRS"
 require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_STATUS"
 require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_EFFECTIVE"
 require_contains "scripts/v1-state.sh" "CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT"
+require_contains "scripts/v1-state.sh" "RESOLVED_FROM_STATE"
+require_contains "scripts/v1-state.sh" "RESOLVED_PACKAGE"
+require_contains "scripts/v1-state.sh" "RESOLVED_MODE"
+require_contains "scripts/v1-state.sh" "RESOLVED_EDIT_PERMISSION"
 require_not_contains "scripts/v1-state.sh" "classify_paused_pr_scope"
 require_not_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
 require_not_contains "scripts/v1-state.sh" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
@@ -219,6 +223,16 @@ require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_repository_edits_allowed: false
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_allowed: false"
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_pr_allowed: false"
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1b_authorization_status: \"BLOCKED_"
+require_contains "docs/CODEX_NEXT_TASK.yml" "current_package_phase:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "current_package_mode:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_package_phase:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_package_mode:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "blocked_package_phase:"
+require_contains "scripts/codex-next-task.sh" "RESOLVED_FROM_STATE"
+require_contains "scripts/codex-next-task.sh" "RESOLVED_SCOPE_PROFILE"
+require_contains "scripts/v1-operator.sh" "OPERATOR_MODE: READ_ONLY_AUDIT"
+require_contains "scripts/v1-operator.sh" "REPOSITORY_MUTATION: DISABLED"
+require_contains "scripts/v1-operator.sh" "PR_CREATION: DISABLED"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_modules:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_paths:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_source_domains:"
@@ -263,6 +277,18 @@ p1a_repository_edits_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_reposito
 p1a_implementation_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_allowed)"
 p1a_implementation_pr_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_pr_allowed)"
 p1b_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_authorization_status)"
+current_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_phase)"
+current_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_mode)"
+current_package_branch="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_branch)"
+authorized_next_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_phase)"
+authorized_next_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_mode)"
+authorized_next_package_edits="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_repository_edits_allowed)"
+authorized_next_package_implementation="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_allowed)"
+authorized_next_package_pr="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_pr_allowed)"
+blocked_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml blocked_package_phase)"
+blocked_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml blocked_package_status)"
+current_package_allowed_scope="$(yaml_list docs/CODEX_NEXT_TASK.yml current_package_allowed_scope)"
+current_package_blocked_scope="$(yaml_list docs/CODEX_NEXT_TASK.yml current_package_blocked_scope)"
 transition_conditions="$(yaml_list docs/CODEX_NEXT_TASK.yml next_task_authorization_conditions)"
 audit_scope_modules="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_modules)"
 audit_scope_paths="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_paths)"
@@ -277,16 +303,117 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$p1a_implementation_allowed" == "false" ]] || fail "P1A implementation must remain false"
 [[ "$p1a_implementation_pr_allowed" == "false" ]] || fail "P1A implementation PR creation must remain false"
 [[ "$p1b_authorization_status" == BLOCKED_* ]] || fail "P1B must remain blocked"
+[[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
+[[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
+[[ "$authorized_next_package_mode" == "READ_ONLY_PRODUCT_AUDIT" ]] || fail "authorized next package mode mismatch"
+[[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
+[[ "$authorized_next_package_edits" == "false" ]] || fail "authorized P1A repository edits must remain false"
+[[ "$authorized_next_package_implementation" == "false" ]] || fail "authorized P1A implementation must remain false"
+[[ "$authorized_next_package_pr" == "false" ]] || fail "authorized P1A PR creation must remain false"
+[[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
+[[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
   P0_EFFECTIVE_MERGED_MAIN \
   LOCAL_ORIGIN_MAIN_MATCH \
   P0_MERGED_MAIN_VALIDATION_PASS \
-  PRODUCT_SOURCE_GATE_PASS; do
+  PRODUCT_SOURCE_GATE_PASS \
+  CLEAN_WORKTREE \
+  NO_ACTIVE_CONFLICTING_PR; do
   printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
     || fail "missing P0 to P1A transition condition: $transition_condition"
 done
+
+run_handoff_scenario() {
+  local scenario="$1"
+  V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/codex-next-task.sh
+}
+
+assert_handoff_blocked() {
+  local scenario="$1"
+  local expected_reason="$2"
+  local output status
+  set +e
+  output="$(run_handoff_scenario "$scenario" 2>&1)"
+  status=$?
+  set -e
+  [[ "$status" -ne 0 ]] || fail "handoff scenario must be blocked: $scenario"
+  printf '%s\n' "$output" | grep -Fq "RESOLUTION_STATUS: BLOCKED" \
+    || fail "blocked handoff scenario omitted blocked status: $scenario"
+  printf '%s\n' "$output" | grep -Fq "NEXT_PACKAGE_BLOCK_REASON: $expected_reason" \
+    || fail "blocked handoff scenario reason mismatch: $scenario"
+  printf '%s\n' "$output" | grep -Fq "GENERATED_TASK: BLOCKED" \
+    || fail "blocked handoff scenario generated a task: $scenario"
+}
+
+p0_open_handoff="$(run_handoff_scenario p0_open)" || fail "P0 open handoff failed"
+printf '%s\n' "$p0_open_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
+  || fail "P0 open handoff did not resolve current P0 package"
+printf '%s\n' "$p0_open_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P0_REMEDIATION_REVIEW" \
+  || fail "P0 open handoff stage mismatch"
+printf '%s\n' "$p0_open_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
+  || fail "P0 open handoff must keep P1A blocked"
+
+p0_ready_handoff="$(run_handoff_scenario p0_ready_unmerged)" || fail "P0 ready handoff failed"
+printf '%s\n' "$p0_ready_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
+  || fail "P0 ready handoff did not resolve current P0 package"
+printf '%s\n' "$p0_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P0_FINAL_MERGE_PATH" \
+  || fail "P0 ready handoff did not resolve final merge path"
+printf '%s\n' "$p0_ready_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
+  || fail "P0 ready handoff must keep P1A blocked"
+
+assert_handoff_blocked p0_merged_unsynced BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH
+
+p1a_handoff="$(run_handoff_scenario p0_merged_validated)" || fail "P0 merged validated handoff failed"
+for p1a_expected in \
+  "RESOLVED_PACKAGE: $authorized_next_package_phase" \
+  "RESOLVED_MODE: READ_ONLY_PRODUCT_AUDIT" \
+  "RESOLVED_EDIT_PERMISSION: false" \
+  "RESOLVED_IMPLEMENTATION_PERMISSION: false" \
+  "RESOLVED_PR_CREATION_PERMISSION: false" \
+  "GENERATED_PACKAGE: $authorized_next_package_phase" \
+  "GENERATED_BRANCH: NONE_READ_ONLY_AUDIT"; do
+  printf '%s\n' "$p1a_handoff" | grep -Fq "$p1a_expected" \
+    || fail "P1A handoff omitted: $p1a_expected"
+done
+if printf '%s\n' "$p1a_handoff" | grep -Fq "GENERATED_PACKAGE: $current_package_phase" \
+  || printf '%s\n' "$p1a_handoff" | grep -Fq "GENERATED_BRANCH: $current_package_branch"; then
+  fail "post-merge handoff fell back to editable P0"
+fi
+
+assert_handoff_blocked p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
+assert_handoff_blocked conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR
+assert_handoff_blocked dirty_worktree BLOCKED_WORKTREE_DIRTY
+assert_handoff_blocked product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
+assert_handoff_blocked unknown_state BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE
+
+closed_debt_handoff="$(run_handoff_scenario closed_pr_1156)" || fail "closed debt handoff failed"
+printf '%s\n' "$closed_debt_handoff" | grep -Fq "RESOLVED_PACKAGE: $authorized_next_package_phase" \
+  || fail "closed PR #1156 incorrectly blocked P1A"
+if printf '%s\n' "$closed_debt_handoff" | grep -Eq '^GENERATED_(TASK|PACKAGE|BRANCH): .*1156'; then
+  fail "closed PR #1156 became generated task context"
+fi
+
+operator_branch_before="$(git branch --show-current)"
+operator_head_before="$(git rev-parse HEAD)"
+operator_status_before="$(git status --porcelain=v1)"
+operator_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=p1a_operator bash scripts/v1-operator.sh)" \
+  || fail "P1A operator invocation failed"
+operator_branch_after="$(git branch --show-current)"
+operator_head_after="$(git rev-parse HEAD)"
+operator_status_after="$(git status --porcelain=v1)"
+for operator_expected in \
+  "OPERATOR_MODE: READ_ONLY_AUDIT" \
+  "REPOSITORY_MUTATION: DISABLED" \
+  "PR_CREATION: DISABLED" \
+  "IMPLEMENTATION: DISABLED"; do
+  printf '%s\n' "$operator_output" | grep -Fq "$operator_expected" \
+    || fail "P1A operator omitted: $operator_expected"
+done
+[[ "$operator_branch_before" == "$operator_branch_after" ]] || fail "P1A operator changed branch"
+[[ "$operator_head_before" == "$operator_head_after" ]] || fail "P1A operator changed HEAD"
+[[ "$operator_status_before" == "$operator_status_after" ]] || fail "P1A operator changed worktree or index"
 
 audit_policy_text="$(bash scripts/v1-state.sh --self-test-product-audit-policy)" || fail "product audit policy self-test failed"
 printf '%s\n' "$audit_policy_text" | grep -Fq "PRODUCT_AUDIT_POLICY_TESTS: PASS" \
