@@ -1,8 +1,8 @@
 # Trade Model V1 Product Completion Matrix
 
-Status: `P0_PRODUCT_BASELINE_FREEZE_CANDIDATE`
+Status: `P1A_AUDIT_COMPLETE_P1B_AUTHORIZATION_PENDING_MERGED_MAIN`
 
-This matrix recalculates maturity from product evidence, not code volume, test count, PR count, or Governance status. It is a baseline assessment at main `2552dd24b1b756d5eb517e640baa772e1c5bcab6`. Authority: `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
+This matrix recalculates maturity from product evidence, not code volume, test count, PR count, or Governance status. Its Product Foundation baseline is effective at main `0828a9dc034174093f06815e2f79a221ddaa1ef4`. The completed P1A audit and pending P1B authorization do not advance Home maturity. Authority: `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
 
 ## 1. Allowed Product States
 
@@ -39,7 +39,7 @@ Dimension cells use `PASS`, `PARTIAL`, `MISSING`, or `NOT_RUN`. A module's overa
 | Module | Overall state | Product contract | Design | Semantics | Real data wiring | Real interaction | Five-state handling | Real scenario | iPhone | Deployment | Evidence | Principal gap |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Login | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PASS | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | Spring Security/Login page and tests | no real iPhone/session-expiry/deployment scenario |
-| Home | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | `GET /api/dashboard/home`, desktop/mobile shell, contract tests | final interaction/field provenance/screenshot/real-data acceptance absent |
+| Home | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | `GET /api/dashboard/home`, desktop/mobile shell, contract tests, completed `P1A_HOME_ALIGNMENT_AUDIT.md` | bounded P1B implementation plus final interaction/field provenance/screenshot/real-data acceptance absent |
 | Focus Assets | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | Home asset projection and selected-symbol flow | full bias/confidence/state/MTF/evidence trace not accepted together |
 | Execution Plan | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | plan service/VO/Home projection and safety contracts | complete exact-plan read trace and real-market validation absent |
 | Eight Scores | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL / FALLBACK_PRESENT | PARTIAL | PARTIAL | NOT_RUN | PARTIAL | MISSING | `GET /api/score/list`, `ScoreController`, and `ScoreServiceImpl` light-rule/base-score path | complete normalized-evidence inputs, calibration, exact analysis snapshot, and formal Home-confidence use are unvalidated |
@@ -86,7 +86,7 @@ Authentication structure is functional in a web test environment. It remains unv
 
 ### Home and Focus Assets
 
-The Home read model and responsive shell are meaningful. However, product acceptance requires the final module order, asset-card context-only click, exact plan/AI linkage, complete source mapping, real screenshots, and real data in all five states. Those are not one proven flow today.
+The Home read model and responsive shell are meaningful. P1A has completed the read-only gap decision and identified the ExecutionPlan/UserPosition projection coupling, but no Home implementation or acceptance capability moved. Product acceptance still requires the final module order, asset-card context-only click, exact plan/AI linkage, complete source mapping, real screenshots, and real data in all five states. Those are not one proven flow today.
 
 ### Execution Plan
 

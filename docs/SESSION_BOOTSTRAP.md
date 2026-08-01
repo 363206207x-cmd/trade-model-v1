@@ -18,14 +18,16 @@ Product sources are the highest business authority. Delivery contracts, current-
 
 ## Task-Mode Gate
 
-`bash scripts/v1-state.sh` has a persisted P0-to-P1A transition and two deliberately separate continuation decisions. `current_task_mode` remains `PRODUCT_FOUNDATION_REMEDIATION` while the P0 package is unmerged; `authorized_next_task_mode` is `READ_ONLY_PRODUCT_AUDIT`. Only P0 effective merged main, local/origin main match, merged-main validation, and Product Source Gate `PASS` derive the effective task mode as P1A. No YAML rewrite is required after those runtime facts become true.
+`bash scripts/v1-state.sh` preserves the completed P0-to-P1A read-only transition and now resolves the reviewed P1A-to-P1B authorization as a separate step. The current package is the completed P1A Home audit plus its authorization handoff; the only bounded successor is `P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION` in `IMPLEMENTATION` mode.
 
 - `PRODUCT_AUDIT_ALLOWED` applies only after the effective task mode becomes `READ_ONLY_PRODUCT_AUDIT` and the fixed `read_only_product_audit_scope_contract` remains locked. It requires Product Source Gate `PASS`, a clean worktree, clean/synced `main`, no current business-package PR, no active/conflicting open PR, and a complete machine-readable audit scope.
 - `NEXT_BUSINESS_PHASE_ALLOWED` and `CAN_START_NEXT_BUSINESS_PHASE` remain the strict implementation/merge/deployment gates. Every active non-current open PR is conflicting. A closed unmerged technical-debt PR is not an active blocker and is never effective/current content.
 
 A read-only product audit may inspect product sources, merged code, APIs, tests, runtime, network payloads, screenshots, and Figma. It may not change code or tests, create a business implementation PR, reopen or use closed technical-debt content as current implementation, transition Ready, merge, deploy, or begin implementation. An active/conflicting open PR, dirty worktree, failed Product Source Gate, missing clean/synced main, or attempted editable scope makes `PRODUCT_AUDIT_ALLOWED=NO`.
 
-P1A may start only after the P0 baseline is effective and validated on clean/synced merged main. P1A has `repository_edits_allowed=false`, `implementation_allowed=false`, and `implementation_pr_allowed=false`. P1B remains blocked until the P1A decision and bounded implementation authorization are independently reviewed and effective on merged main; completing P1A does not mark Home implementation complete.
+P1A may start only after the P0 baseline is effective and validated on clean/synced merged main. P1A has `repository_edits_allowed=false`, `implementation_allowed=false`, and `implementation_pr_allowed=false`. Its durable audit decision is `docs/P1A_HOME_ALIGNMENT_AUDIT.md`; completing that audit does not mark Home implementation complete.
+
+P1B remains blocked while the authorization package is unmerged, P1A is incomplete, Product Source Gate is not `PASS`, the worktree/main is not clean and synced, or an active conflicting PR exists. After the reviewed authorization is effective on merged main, `bash scripts/v1-state.sh --request-package P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION` may return `AUTHORIZATION_STATUS: APPROVED`, `RESOLUTION_STATUS: ALLOWED`, and all three implementation permissions as `true`. That permission is limited to `HOME_READ_PROJECTION_ONLY` in `docs/P1B_AUTHORIZATION_SCOPE.md`.
 
 ## PRODUCT_FIRST_STOP_RULE
 
