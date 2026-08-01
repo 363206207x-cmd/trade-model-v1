@@ -118,6 +118,24 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 **Task mode:** `IMPLEMENTATION`, followed separately by `VALIDATION` and `MERGE`.
 
+#### P1B-1 Authorization
+
+**Status:** `AUTHORIZED_PENDING_IMPLEMENTATION_AFTER_MERGED_MAIN`.
+
+**Authorization record:** `docs/P1B_AUTHORIZATION_SCOPE.md`.
+
+**Bounded scope:** existing Home read-projection assembly and frontend binding
+only. `executionSuggestion` remains the selected asset's verified plan;
+`positions` remains the independent owner-scoped UserPosition projection. The
+endpoint and JSON shape remain unchanged. No trading, position mutation, AI,
+score, notification, Telegram, schema, or ExecutionPlan/PositionMonitor state
+machine change is authorized.
+
+**Effectivity:** this candidate status is not implementation authorization on
+its branch. P1B-1 may start only after the authorization package is
+independently reviewed, merged to clean/synced `main`, and recognized by the
+runtime task gate. It does not mark P1B-1 implemented.
+
 **Input:** accepted P1A artifacts and explicit bounded P1B authorization effective on merged main.
 
 **Deliverables:** only the authorized subset of final Home module order, focus-asset cards, context-only selection, verified ExecutionPlan summary, three-AI summary, Top3 positions, alerts/events, five-state handling, and responsive desktop/mobile views.

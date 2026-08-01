@@ -62,7 +62,10 @@ p1a_implementation_allowed: false
 p1a_implementation_pr_allowed: false
 p1a_allowed_changes:
   - "NONE"
-p1b_authorization_status: "BLOCKED_PENDING_P1A_REVIEW_AND_MERGED_MAIN_AUTHORIZATION"
+p1b_authorization_status: "BLOCKED_PENDING_P1B_AUTHORIZATION_MERGED_MAIN"
+authorized_next_package: "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
+scope: "HOME_READ_PROJECTION_ONLY"
+implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
 risk: "A-risk product facts and minimal workflow policy correction; no Java business code, business API, schema, UI, Figma, business test, notification, or trading change"
 current_pr: "#1157 OPEN / DRAFT / UNMERGED"
