@@ -1,29 +1,91 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "P0 Product Facts and Bootstrap Deadlock Remediation on PR #1157; product implementation remains stopped"
+active_block: "P0 post-merge P1A transition and paused-PR scope isolation remediation on PR #1157; product implementation remains stopped"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "P0 Product Foundation Facts and Bootstrap Deadlock Remediation"
+module: "P0 Post-Merge P1A Transition and Paused-PR Scope Isolation Remediation"
 branch: "codex/product-foundation-freeze-p0"
-task_mode: "PRODUCT_FOUNDATION_FACT_CORRECTION_ONLY"
+task_mode: "PRODUCT_FOUNDATION_REMEDIATION"
+current_task_mode: "PRODUCT_FOUNDATION_REMEDIATION"
+authorized_next_task_mode: "READ_ONLY_PRODUCT_AUDIT"
+current_effective_status: "PENDING_MERGED_MAIN"
+authorized_next_product_phase: "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT"
+next_task_authorization_status: "BLOCKED_PENDING_P0_MERGED_MAIN"
+next_task_authorization_conditions:
+  - "P0_EFFECTIVE_MERGED_MAIN"
+  - "LOCAL_ORIGIN_MAIN_MATCH"
+  - "P0_MERGED_MAIN_VALIDATION_PASS"
+  - "PRODUCT_SOURCE_GATE_PASS"
+p1a_repository_edits_allowed: false
+p1a_implementation_allowed: false
+p1a_implementation_pr_allowed: false
+p1a_allowed_changes:
+  - "NONE"
+p1b_authorization_status: "BLOCKED_PENDING_P1A_REVIEW_AND_MERGED_MAIN_AUTHORIZATION"
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_PAUSED_PR_CHANGES"
 risk: "A-risk product facts and minimal workflow policy correction; no Java business code, business API, schema, UI, Figma, business test, notification, or trading change"
 current_pr: "#1157 OPEN / DRAFT / UNMERGED"
 current_package_pr: "#1157 Product Foundation Freeze Draft PR"
-unrelated_open_prs: "#1156 OPEN / DRAFT / UNMERGED / PAUSED_TECHNICAL_DEBT"
+unrelated_open_prs: "DERIVED_BY_V1_STATE_SCOPE_CLASSIFIER"
+paused_open_prs: "#1156 OPEN / DRAFT / UNMERGED / PAUSED_TECHNICAL_DEBT"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "not applicable in this task; the P0 PR must remain Draft and requires independent human review before any Ready or merge action"
 production_deployment_readiness: "BLOCKED"
 next_business_phase: "P1 Home Alignment Readiness and Gap Audit"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Correct the four reviewed P0 facts, run the minimal audit-policy regression and required validation, commit/push normally, update PR #1157 metadata, keep it Draft, and stop for a new exact-Head review"
+next_allowed_action: "Validate the explicit post-merge P1A read-only transition and actual paused-PR scope classifier, commit/push normally, update PR #1157 metadata, keep it Draft, and stop for a new exact-Head review"
 
 product_phase: "P0 Product Foundation Freeze"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
 product_module: "Trade Model V1 Product Foundation and Product Source Gate"
+
+audit_scope_modules:
+  - "HOME"
+  - "SHARED_FE04_CONTRACT"
+  - "SHARED_PRODUCT_CONTRACT"
+  - "AUDIT_WORKFLOW_DEPENDENCY"
+
+audit_scope_paths:
+  - "src/main/resources/templates/dashboard.html"
+  - "src/main/resources/templates/dashboard-mobile.html"
+  - "src/main/resources/static/js/dashboard-mobile.js"
+  - "src/main/resources/static/css/dashboard-mobile.css"
+  - "src/main/java/org/example/trademodel/controller/DashboardHomeController.java"
+  - "src/main/java/org/example/trademodel/controller/DashboardController.java"
+  - "src/main/java/org/example/trademodel/controller/MobileDashboardController.java"
+  - "src/main/java/org/example/trademodel/controller/DashboardOverviewController.java"
+  - "src/main/java/org/example/trademodel/service/DashboardHomeService.java"
+  - "src/main/java/org/example/trademodel/service/DashboardAggregationFacade.java"
+  - "src/main/java/org/example/trademodel/service/DashboardReadService.java"
+  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/dashboard"
+  - "src/main/java/org/example/trademodel/vo/DashboardHomeVO.java"
+  - "src/main/java/org/example/trademodel/vo/DashboardDetailResponseVO.java"
+  - "src/main/java/org/example/trademodel/vo/DashboardSummaryResponseVO.java"
+  - "docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md"
+  - "docs/design/P3_U2_IPHONE_HOME_IA_V2.md"
+  - "docs/design/P3_U2_IPHONE_HOME_FIELD_MAPPING.md"
+  - "docs/design/FE04_SEMANTIC_CONTRACT_V2.md"
+  - "docs/INTERACTION_CONTRACT_V3.md"
+  - "docs/FRONTEND_IMPLEMENTATION_CONTRACT_AUDIT_V2.md"
+  - "docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md"
+  - "docs/PRODUCT_SOURCE_OF_TRUTH.md"
+  - "docs/PRODUCT_FIELD_SOURCE.md"
+  - "docs/PRODUCT_COMPLETION_MATRIX.md"
+  - "docs/PRODUCT_GAP_ANALYSIS.md"
+
+audit_scope_source_domains:
+  - "HOME_INTERACTION"
+  - "ASSET_CARD"
+  - "EXECUTION_PLAN"
+  - "THREE_AI_SUMMARY"
+  - "TOP3_POSITION"
+  - "HOME_STATE_MODEL"
+  - "PRODUCT_SOURCE"
+  - "PRODUCT_WORKFLOW"
 
 product_source_gate:
   required: true
@@ -47,7 +109,7 @@ data_source_mapping: |
   Map product fields to source domain, current/designated Service and API, provider/database, cadence, snapshot/cache behavior, null/error behavior, exact identity, owner scope, and public/private classification. Unknown or unproven fields remain product gaps and cannot be marked complete.
 
 current_implementation_gap: |
-  The P0 baseline exists but four reviewed facts require correction: the eight-score endpoint uses derived base/default/light-rule behavior without a proven complete real-evidence chain; the startup gate must distinguish a paused unrelated technical-debt PR from an active/conflicting PR for read-only product audit only; the merged Xcode SwiftUI/WKWebView simulator foundation was undercounted; and PR #1157 metadata must match the corrected exact Head and evidence. Home, live position monitoring, real three-AI evidence, Message UI, real-device iPhone, server, and production scenarios remain incomplete.
+  The P0 baseline and corrected product facts exist, but the persisted task mode has no post-merge transition to P1A and paused-PR tolerance still relies on metadata rather than actual changed-file/module/source-domain evidence. This package adds only that explicit read-only transition and fail-closed scope classifier. Home, live position monitoring, real three-AI evidence, Message UI, real-device iPhone, server, and production scenarios remain incomplete.
 
 allowed_scope:
   - "Register and snapshot the located formal product sources with hashes"
@@ -57,7 +119,10 @@ allowed_scope:
   - "Invoke the product gate at the start of the existing workflow-contract check"
   - "Run three read-only gate simulations and required validation"
   - "Correct eight-score and iPhone facts in the P0 field, completion, gap, roadmap, and freeze documents"
-  - "Add a minimal deterministic read-only product-audit policy and six fixed boundary self-tests to v1-state/workflow contract"
+  - "Separate the current P0 remediation mode from the authorized next P1A read-only mode"
+  - "Derive P1A reachability only after P0 effective merged-main validation and Product Source Gate PASS"
+  - "Classify paused PR scope from actual changed files plus fixed path/module/source-domain mappings"
+  - "Add deterministic transition, overlap, UNKNOWN fail-closed, and implementation-blocking self-tests"
   - "Update PR #1157 description metadata after a normal commit and push"
   - "Commit and push normally, update the existing Draft PR #1157 description, and stop for exact-Head review"
 
@@ -89,7 +154,7 @@ hard_boundaries:
 checks:
   - "Product source paths exist, are non-empty, and match registered SHA-256 hashes"
   - "Product Source Gate and all three simulations pass"
-  - "Six fixed product-audit policy cases pass without a natural-language parser or inventory"
+  - "Fixed P0-to-P1A transition and paused-PR scope cases pass without a natural-language parser or inventory"
   - "Eight-score sources remain partial/fallback-present and iPhone simulator foundation plus real-device gaps are explicit"
   - "Workflow contract, Markdown/YAML, links/paths, diff checks, and Maven pass"
   - "Changed scope contains no Java, business API, schema, UI, Figma, business test, notification, or trading files"
@@ -108,6 +173,7 @@ stop_conditions:
 paused_governance_pr: "#1156"
 paused_governance_status: "PAUSED_TECHNICAL_DEBT"
 paused_governance_branch: "codex/fe04e-privacy-state-merged-main-governance"
+paused_governance_base: "2552dd24b1b756d5eb517e640baa772e1c5bcab6"
 paused_governance_head: "75d04e95bc7aa5eb761299b0192dfbc2caec3792"
-paused_governance_reason: "Product direction reset; after P0 is effective on clean/synced merged main, this exact paused unrelated Draft PR does not block a declared non-overlapping read-only product audit; implementation/merge/deployment gates remain strict"
+paused_governance_reason: "Product direction reset; after P0 is effective on clean/synced merged main, a declared read-only product audit may tolerate this exact paused Draft PR only when actual changed-file, module, and source-domain evidence classifies it UNRELATED; OVERLAPPING or UNKNOWN remains blocked or requires human decision"
 paused_governance_resume_condition: "Only resume when a real product regression demonstrates that the missing governance capability is necessary"

@@ -18,14 +18,14 @@ Product sources are the highest business authority. Delivery contracts, current-
 
 ## Task-Mode Gate
 
-`bash scripts/v1-state.sh` has two deliberately separate continuation decisions:
+`bash scripts/v1-state.sh` has a persisted P0-to-P1A transition and two deliberately separate continuation decisions. `current_task_mode` remains `PRODUCT_FOUNDATION_REMEDIATION` while the P0 package is unmerged; `authorized_next_task_mode` is `READ_ONLY_PRODUCT_AUDIT`. Only P0 effective merged main, local/origin main match, merged-main validation, and Product Source Gate `PASS` derive the effective task mode as P1A. No YAML rewrite is required after those runtime facts become true.
 
-- `PRODUCT_AUDIT_ALLOWED` applies only when the task declares `task_mode: READ_ONLY_PRODUCT_AUDIT` and the fixed `read_only_product_audit_scope_contract`. It requires Product Source Gate `PASS`, a clean worktree, clean/synced `main`, no current business-package PR, and no active/conflicting PR. An explicitly listed Draft PR with exact number, branch, Head, and status `PAUSED_TECHNICAL_DEBT`, such as #1156, is reported separately and does not block that read-only audit; the expected status is `ALLOWED_WITH_PAUSED_UNRELATED_PR`.
+- `PRODUCT_AUDIT_ALLOWED` applies only after the effective task mode becomes `READ_ONLY_PRODUCT_AUDIT` and the fixed `read_only_product_audit_scope_contract` remains locked. It requires Product Source Gate `PASS`, a clean worktree, clean/synced `main`, no current business-package PR, no active/conflicting PR, and a complete machine-readable audit scope. A configured Draft `PAUSED_TECHNICAL_DEBT` PR is tolerated only when its actual changed files are available and `PAUSED_PR_SCOPE_RELATION=UNRELATED` after exact-path, directory-prefix, module, and source-domain checks. `OVERLAPPING` blocks; `UNKNOWN` fails closed and requires human decision. Number, branch, Head, title, Draft state, or a documentation label alone never proves unrelated scope.
 - `NEXT_BUSINESS_PHASE_ALLOWED` and `CAN_START_NEXT_BUSINESS_PHASE` remain the strict implementation/merge/deployment gates. Paused or active open PRs continue to block them according to the current phase rules.
 
 A read-only product audit may inspect product sources, code, APIs, tests, runtime, network payloads, screenshots, and Figma. It may not change code or tests, create a business implementation PR, touch the paused PR, transition Ready, merge, deploy, or begin implementation. An active/conflicting PR, dirty worktree, failed Product Source Gate, missing clean/synced main, or attempted editable scope makes `PRODUCT_AUDIT_ALLOWED=NO`.
 
-P1A may start only after the P0 baseline is effective on merged main. P1B remains blocked until the P1A decision and bounded implementation authorization are independently reviewed and effective on merged main.
+P1A may start only after the P0 baseline is effective and validated on clean/synced merged main. P1A has `repository_edits_allowed=false`, `implementation_allowed=false`, and `implementation_pr_allowed=false`. P1B remains blocked until the P1A decision and bounded implementation authorization are independently reviewed and effective on merged main; completing P1A does not mark Home implementation complete.
 
 ---
 
@@ -187,7 +187,7 @@ Use it only when Codex wrote files but did not successfully create the task bran
 11. Open PR / branch / Issue does not count as done.
 12. Do not continue P359 or start P360 by default.
 13. Do not default back to a historical track. The current active block comes from `docs/ACTIVE_MAINLINE_STATUS.yml`.
-14. For editable implementation, merge, or deployment, continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms the strict phase gate. For a declared `READ_ONLY_PRODUCT_AUDIT`, use `PRODUCT_AUDIT_ALLOWED`; only an explicitly classified paused/unrelated technical-debt PR may coexist, while all other audit conditions remain fail closed.
+14. For editable implementation, merge, or deployment, continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms the strict phase gate. For an effective `READ_ONLY_PRODUCT_AUDIT`, use `PRODUCT_AUDIT_ALLOWED`; only a paused technical-debt PR classified `UNRELATED` from actual changed-file/module/source-domain evidence may coexist. `OVERLAPPING` and `UNKNOWN` remain blocked or require human decision, and all other audit conditions remain fail closed.
 
 If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub status unknown. It is not, by itself, proof that the project has an open PR or an unsynced main. GPT connector evidence or the user's local terminal `gh` output may be accepted as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 

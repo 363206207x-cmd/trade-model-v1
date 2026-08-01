@@ -53,6 +53,28 @@ yaml_value() {
   ' "$file"
 }
 
+yaml_list() {
+  local file="$1"
+  local key="$2"
+  [[ -f "$file" ]] || return 0
+  awk -v key="$key" '
+    $0 ~ "^" key ":[[:space:]]*$" {
+      capture=1
+      next
+    }
+    capture && $0 ~ "^[^[:space:]]" {
+      exit
+    }
+    capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
+      value=$0
+      sub("^[[:space:]]+-[[:space:]]+", "", value)
+      gsub(/^\"/, "", value)
+      gsub(/\"$/, "", value)
+      print value
+    }
+  ' "$file"
+}
+
 matrix_field() {
   local phase="$1"
   local field_index="$2"
@@ -166,14 +188,42 @@ require_contains "scripts/v1-state.sh" "OPEN_PR_STATUS"
 require_contains "scripts/v1-state.sh" "CLEAN_SYNCED_MAIN"
 require_contains "scripts/v1-state.sh" "PRODUCT_AUDIT_ALLOWED"
 require_contains "scripts/v1-state.sh" "READ_ONLY_PRODUCT_AUDIT_STATUS"
+require_contains "scripts/v1-state.sh" "CURRENT_TASK_MODE"
+require_contains "scripts/v1-state.sh" "AUTHORIZED_NEXT_TASK_MODE"
+require_contains "scripts/v1-state.sh" "NEXT_TASK_AUTHORIZATION_STATUS"
+require_contains "scripts/v1-state.sh" "P1A_TRANSITION_ALLOWED"
+require_contains "scripts/v1-state.sh" "P1B_AUTHORIZATION_RUNTIME_STATUS"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_FILES_SOURCE"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_PATHS"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_MODULES"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_CHANGED_SOURCE_DOMAINS"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
+require_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_REASON"
+require_contains "scripts/v1-state.sh" "LOCAL_EXACT_BASE_HEAD"
+require_contains "scripts/v1-state.sh" "MODULE_OR_SOURCE_DOMAIN_MAPPING_UNKNOWN"
+require_contains "scripts/v1-state.sh" "REQUIRE_HUMAN_DECISION_PAUSED_PR_SCOPE_UNKNOWN"
 require_contains "scripts/v1-state.sh" "PAUSED_UNRELATED_OPEN_PRS"
+require_contains "scripts/v1-state.sh" "PAUSED_OVERLAPPING_OPEN_PRS"
+require_contains "scripts/v1-state.sh" "PAUSED_UNKNOWN_SCOPE_OPEN_PRS"
 require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_OPEN_PRS"
 require_contains "scripts/v1-state.sh" "--self-test-product-audit-policy"
-require_contains "docs/CODEX_NEXT_TASK.yml" "task_mode: \"PRODUCT_FOUNDATION_FACT_CORRECTION_ONLY\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "current_task_mode:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_task_mode:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "current_effective_status:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_product_phase:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "next_task_authorization_conditions:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_repository_edits_allowed: false"
+require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_allowed: false"
+require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_pr_allowed: false"
+require_contains "docs/CODEX_NEXT_TASK.yml" "p1b_authorization_status: \"BLOCKED_"
+require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_modules:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_paths:"
+require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_source_domains:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "read_only_product_audit_scope_contract: \"NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_PAUSED_PR_CHANGES\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_base: \"2552dd24b1b756d5eb517e640baa772e1c5bcab6\""
 require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_head: \"75d04e95bc7aa5eb761299b0192dfbc2caec3792\""
-require_contains "docs/SESSION_BOOTSTRAP.md" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
-require_contains "docs/WORKFLOW_COMMAND_AUTOMATION.md" "PAUSED_OPEN_PR_BLOCKS_AUDIT=NO"
+require_contains "docs/SESSION_BOOTSTRAP.md" "PAUSED_PR_SCOPE_RELATION"
+require_contains "docs/WORKFLOW_COMMAND_AUTOMATION.md" "UNKNOWN"
 require_contains "docs/PRODUCT_FIELD_SOURCE.md" "REAL_DATA_STATUS=PARTIAL/FALLBACK_PRESENT"
 require_contains "docs/PRODUCT_FIELD_SOURCE.md" "fixed base/default values and light-rule adjustments"
 require_contains "docs/PRODUCT_COMPLETION_MATRIX.md" "| Eight Scores | PARTIAL"
@@ -196,16 +246,61 @@ active_status="$(yaml_value docs/ACTIVE_MAINLINE_STATUS.yml current_phase_status
 task_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_phase)"
 task_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml next_business_phase_allowed)"
 active_allowed="$(yaml_value docs/ACTIVE_MAINLINE_STATUS.yml next_business_phase_allowed)"
+current_task_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_task_mode)"
+authorized_next_task_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_task_mode)"
+p1a_repository_edits_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_repository_edits_allowed)"
+p1a_implementation_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_allowed)"
+p1a_implementation_pr_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_pr_allowed)"
+p1b_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_authorization_status)"
+transition_conditions="$(yaml_list docs/CODEX_NEXT_TASK.yml next_task_authorization_conditions)"
+audit_scope_modules="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_modules)"
+audit_scope_paths="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_paths)"
+audit_scope_domains="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_source_domains)"
+p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
+
+[[ -n "$current_task_mode" ]] || fail "current_task_mode must be declared"
+[[ -n "$authorized_next_task_mode" ]] || fail "authorized_next_task_mode must be declared"
+[[ "$current_task_mode" != "$authorized_next_task_mode" ]] || fail "current and authorized next task modes must remain distinct"
+[[ "$authorized_next_task_mode" == "READ_ONLY_PRODUCT_AUDIT" ]] || fail "authorized next task mode must be READ_ONLY_PRODUCT_AUDIT"
+[[ "$p1a_repository_edits_allowed" == "false" ]] || fail "P1A repository edits must remain false"
+[[ "$p1a_implementation_allowed" == "false" ]] || fail "P1A implementation must remain false"
+[[ "$p1a_implementation_pr_allowed" == "false" ]] || fail "P1A implementation PR creation must remain false"
+[[ "$p1b_authorization_status" == BLOCKED_* ]] || fail "P1B must remain blocked"
+[[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
+[[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
+for transition_condition in \
+  P0_EFFECTIVE_MERGED_MAIN \
+  LOCAL_ORIGIN_MAIN_MATCH \
+  P0_MERGED_MAIN_VALIDATION_PASS \
+  PRODUCT_SOURCE_GATE_PASS; do
+  printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
+    || fail "missing P0 to P1A transition condition: $transition_condition"
+done
+
 audit_policy_text="$(bash scripts/v1-state.sh --self-test-product-audit-policy)" || fail "product audit policy self-test failed"
 printf '%s\n' "$audit_policy_text" | grep -Fq "PRODUCT_AUDIT_POLICY_TESTS: PASS" \
   || fail "product audit policy self-test did not report PASS"
 for expected_case in \
-  AUDIT_POLICY_TEST_PAUSED_UNRELATED_READ_ONLY \
-  AUDIT_POLICY_TEST_PAUSED_IMPLEMENTATION_BLOCKED_PENDING_P0_MERGED_MAIN \
+  TRANSITION_TEST_P0_OPEN \
+  TRANSITION_TEST_P0_READY_UNMERGED \
+  TRANSITION_TEST_P0_MERGED_UNSYNCED \
+  TRANSITION_TEST_P0_MERGED_VALIDATED \
+  TRANSITION_TEST_P1B_REMAINS_BLOCKED \
+  SCOPE_TEST_UNRELATED_GOVERNANCE_PARSER \
+  SCOPE_TEST_EXACT_OVERLAP \
+  SCOPE_TEST_DIRECTORY_PREFIX_OVERLAP \
+  SCOPE_TEST_SHARED_CONTRACT_OVERLAP \
+  SCOPE_TEST_LOOKUP_UNAVAILABLE \
+  SCOPE_TEST_MISSING_AUDIT_SCOPE \
+  AUDIT_POLICY_TEST_PAUSED_UNRELATED_AFTER_P0_MERGED \
+  AUDIT_POLICY_TEST_PAUSED_OVERLAP \
+  AUDIT_POLICY_TEST_PAUSED_SCOPE_UNKNOWN \
+  AUDIT_POLICY_TEST_P0_NOT_MERGED \
   AUDIT_POLICY_TEST_ACTIVE_CONFLICTING_PR \
   AUDIT_POLICY_TEST_DIRTY_WORKTREE \
   AUDIT_POLICY_TEST_PRODUCT_SOURCE_GATE_FAILED \
-  AUDIT_POLICY_TEST_ATTEMPTED_CODE_CHANGE; do
+  AUDIT_POLICY_TEST_IMPLEMENTATION_ATTEMPT \
+  AUDIT_POLICY_TEST_ATTEMPTED_REPOSITORY_EDIT; do
   printf '%s\n' "$audit_policy_text" | grep -Fq "$expected_case: PASS" \
     || fail "missing product audit policy case: $expected_case"
 done
