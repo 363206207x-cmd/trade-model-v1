@@ -16,6 +16,17 @@ Every new task starts in this exact order:
 
 Product sources are the highest business authority. Delivery contracts, current-state files, Workflow, Governance, and tests are read after the product gate as delivery controls and implementation evidence. They cannot redefine the product.
 
+## Task-Mode Gate
+
+`bash scripts/v1-state.sh` has two deliberately separate continuation decisions:
+
+- `PRODUCT_AUDIT_ALLOWED` applies only when the task declares `task_mode: READ_ONLY_PRODUCT_AUDIT` and the fixed `read_only_product_audit_scope_contract`. It requires Product Source Gate `PASS`, a clean worktree, clean/synced `main`, no current business-package PR, and no active/conflicting PR. An explicitly listed Draft PR with exact number, branch, Head, and status `PAUSED_TECHNICAL_DEBT`, such as #1156, is reported separately and does not block that read-only audit; the expected status is `ALLOWED_WITH_PAUSED_UNRELATED_PR`.
+- `NEXT_BUSINESS_PHASE_ALLOWED` and `CAN_START_NEXT_BUSINESS_PHASE` remain the strict implementation/merge/deployment gates. Paused or active open PRs continue to block them according to the current phase rules.
+
+A read-only product audit may inspect product sources, code, APIs, tests, runtime, network payloads, screenshots, and Figma. It may not change code or tests, create a business implementation PR, touch the paused PR, transition Ready, merge, deploy, or begin implementation. An active/conflicting PR, dirty worktree, failed Product Source Gate, missing clean/synced main, or attempted editable scope makes `PRODUCT_AUDIT_ALLOWED=NO`.
+
+P1A may start only after the P0 baseline is effective on merged main. P1B remains blocked until the P1A decision and bounded implementation authorization are independently reviewed and effective on merged main.
+
 ---
 
 # Contract-First Delivery Compatibility
@@ -176,7 +187,7 @@ Use it only when Codex wrote files but did not successfully create the task bran
 11. Open PR / branch / Issue does not count as done.
 12. Do not continue P359 or start P360 by default.
 13. Do not default back to a historical track. The current active block comes from `docs/ACTIVE_MAINLINE_STATUS.yml`.
-14. Continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms clean/synced `main`, no open PR, and no blockers.
+14. For editable implementation, merge, or deployment, continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms the strict phase gate. For a declared `READ_ONLY_PRODUCT_AUDIT`, use `PRODUCT_AUDIT_ALLOWED`; only an explicitly classified paused/unrelated technical-debt PR may coexist, while all other audit conditions remain fail closed.
 
 If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub status unknown. It is not, by itself, proof that the project has an open PR or an unsynced main. GPT connector evidence or the user's local terminal `gh` output may be accepted as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 

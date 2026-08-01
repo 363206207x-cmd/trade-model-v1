@@ -42,6 +42,7 @@ Dimension cells use `PASS`, `PARTIAL`, `MISSING`, or `NOT_RUN`. A module's overa
 | Home | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | `GET /api/dashboard/home`, desktop/mobile shell, contract tests | final interaction/field provenance/screenshot/real-data acceptance absent |
 | Focus Assets | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | Home asset projection and selected-symbol flow | full bias/confidence/state/MTF/evidence trace not accepted together |
 | Execution Plan | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | plan service/VO/Home projection and safety contracts | complete exact-plan read trace and real-market validation absent |
+| Eight Scores | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL / FALLBACK_PRESENT | PARTIAL | PARTIAL | NOT_RUN | PARTIAL | MISSING | `GET /api/score/list`, `ScoreController`, and `ScoreServiceImpl` light-rule/base-score path | complete normalized-evidence inputs, calibration, exact analysis snapshot, and formal Home-confidence use are unvalidated |
 | Three AI | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PASS | NOT_RUN | MISSING | MISSING | three fixed roles, hard availability gate, FE-03 detail link | unified real evidence package, model run, four-level conflict/fallback not proven end to end |
 | Positions | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PASS | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | manual-open/manual-close/open/exact owner-scoped APIs and pages | real user workflow, remaining quantity, target-device evidence absent |
 | Position Monitoring | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PARTIAL | PARTIAL | PASS | NOT_RUN | MISSING | MISSING | exact owner read, latest resolver/logs, fail-closed contracts | live cadence, reversal/wick/liquidity/risk scenarios not validated |
@@ -49,7 +50,7 @@ Dimension cells use `PASS`, `PARTIAL`, `MISSING`, or `NOT_RUN`. A module's overa
 | Detail Pages | PARTIAL | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | Analysis Detail, Asset Detail, position/read routes | exact-plan/position/push/replay details not one accepted coherent set |
 | Review | FUNCTIONAL_UNVALIDATED | PASS | MISSING | PASS | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | review aggregate/summary/detail/log endpoints and tests | real closed-position and missed-opportunity outcomes absent |
 | My | STRUCTURE_ONLY | PARTIAL | PARTIAL | PARTIAL | MISSING | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | shell/profile node and logout foundation | formal field contract and real account/settings data absent |
-| iPhone | STRUCTURE_ONLY | PASS | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | MISSING | MISSING | responsive/WKWebView contract tests | no complete Xcode route, installation, real-device session/navigation evidence |
+| iPhone | FUNCTIONAL_UNVALIDATED | PASS | PARTIAL | PASS | PARTIAL | PARTIAL | PASS | NOT_RUN | PARTIAL | MISSING | merged Xcode SwiftUI/WKWebView app; Debug/Release simulator builds; 47 unit/security/project tests; 1 UI test; simulator install/launch | real-device install/login/Session lifecycle, real network/server, background recovery, final device layout, and distribution are unvalidated |
 | Server | FUNCTIONAL_UNVALIDATED | PASS | N/A | PASS | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | N/A | MISSING | Spring Boot service, migrations/config/status contracts | production deployment/HTTPS/secrets/rollback/long-run evidence absent |
 | Production Data | PARTIAL | PASS | N/A | PARTIAL | PARTIAL | N/A | PARTIAL | NOT_RUN | N/A | MISSING | market/provider/source-health foundations | sustained real multi-source coverage/freshness/data-quality evidence absent |
 | Observability | PARTIAL | PARTIAL | N/A | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_RUN | N/A | MISSING | health/status/trace/log surfaces | production alerts, SLOs, retention, incident and recovery proof absent |
@@ -59,10 +60,12 @@ Dimension cells use `PASS`, `PARTIAL`, `MISSING`, or `NOT_RUN`. A module's overa
 ### What is genuinely present
 
 - A substantial rule/evidence/score/plan/AI/position/review backend foundation.
+- An eight-score endpoint and derived light-rule implementation, with fixed base/default values still present; this is engineering foundation, not proof of the formal real-evidence score chain or calibrated confidence.
 - Authenticated manual UserPosition APIs with owner-scoped exact reads.
 - Position monitoring read projection and state-contract hardening.
 - Public OPPORTUNITY versus private POSITION_RISK message projection and read-state model.
 - Desktop/mobile web shells, Analysis Detail reuse, and frontend contract tests.
+- A merged iPhone Xcode SwiftUI/WKWebView foundation with simulator build/test/install/launch evidence.
 - Extensive automated tests and workflow checks as engineering evidence.
 
 ### What those facts do not prove
@@ -93,6 +96,10 @@ The plan domain is mature relative to other modules and has strong boundary test
 
 The fixed roles and unavailable-role fail-closed behavior exist. Real model calls over one immutable evidence package, rule-first authority, four conflict levels, fallback, and trace quality require P3 validation.
 
+### Eight Scores
+
+`GET /api/score/list` returns all eight named dimensions, but its current path derives scores from a constructed environment and an empty analysis object while using fixed base/default values and light rules. It is `PARTIAL / FUNCTIONAL_UNVALIDATED` with `FALLBACK_PRESENT`; it is not evidence-driven complete, calibrated, production-ready, or authorized as the formal Home confidence source.
+
 ### Positions and Monitoring
 
 Manual user facts, exact IDs, owner isolation, read pages, logs, and state resolver are present. The product plan additionally requires real moving-price scenarios, plan-versus-actual comparison, wick filtering, reversal classification, risk and suggestion quality, alerts, and full archive.
@@ -105,9 +112,13 @@ The backend privacy/state contract is meaningful, but the Message Center and Pus
 
 Read models and classifications exist. No recorded real closed-position or missed-opportunity scenario establishes product validity.
 
-### My, iPhone, Server, Production Data, Observability
+### My, Server, Production Data, Observability
 
-These remain material delivery gaps. A browser shell, status endpoint, simulator, or test environment is not equivalent to real account content, a shipped iPhone experience, a deployed server, sustained production data, or operational readiness.
+These remain material delivery gaps. A browser shell, status endpoint, or test environment is not equivalent to real account content, a deployed server, sustained production data, or operational readiness.
+
+### iPhone
+
+The merged Xcode project, SwiftUI/WKWebView client, Session/Cookie/CSRF compatibility foundation, simulator Debug/Release builds, 47 unit/security/project tests, one UI launch test, and simulator install/launch establish a real simulator-level app foundation. They do not establish real-device login/session persistence, production-server connectivity, background recovery, final size/accessibility interaction acceptance, TestFlight/distribution, or production effectiveness.
 
 ## 6. Completion Rule
 

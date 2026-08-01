@@ -15,6 +15,29 @@ Governance First is paused. Governance, Workflow, and tests remain delivery safe
 - Real data is required; fixtures and fallback values may test failure behavior but cannot prove product acceptance.
 - Product completion follows `docs/PRODUCT_ACCEPTANCE_STANDARD.md`.
 
+Every phase uses four distinct task modes. They cannot be combined to turn an audit result into implementation permission:
+
+| Task mode | Purpose | May change business code/UI/tests | May merge business capability |
+|---|---|---|---|
+| `READINESS_AND_GAP_AUDIT` / `READ_ONLY_PRODUCT_AUDIT` | compare formal product/design/data requirements with current runtime and record exact gaps | no | no |
+| `IMPLEMENTATION` | implement only the bounded package authorized by a reviewed, merged-main audit decision | only explicitly authorized scope | no; implementation first returns to review |
+| `VALIDATION` | exact-Head review, real/controlled scenarios, screenshots, payload/source checks, regression and scope validation | no remediation inside a read-only review | no |
+| `MERGE` | final identity/check/thread gate and separately authorized merge/merged-main validation | no feature expansion | only the exact reviewed Head |
+
+| Phase | READINESS_AND_GAP_AUDIT | IMPLEMENTATION | VALIDATION | MERGE |
+|---|---|---|---|---|
+| P0 Product Foundation | source/fact inventory and product baseline | docs/minimal gate only | source hashes, mappings, workflow, Maven | independent P0 Draft review and explicit merge gate |
+| P1 Home | P1A Home alignment audit | P1B bounded Home package | Home payload, screenshot, interaction, five-state and real/fallback review | exact reviewed Home Head only |
+| P2 Position | position/monitor identity, state, data and scenario audit | bounded manual position/monitor package | owner, exact-ID, real/historical monitor and UI validation | exact reviewed Position Head only |
+| P3 AI Analysis | evidence/score/model/role/fallback audit | bounded rule-first AI analysis package | immutable evidence, role availability, conflict/fallback review | exact reviewed AI Head only |
+| P4 Detail Pages | exact identity/navigation/source audit | bounded detail package | route, source, state and navigation validation | exact reviewed Detail Head only |
+| P5 Message/Push | public/private projection and field audit | bounded read-only Message/Push UI | payload privacy, owner denial, UI/state validation | exact reviewed Message/Push Head only |
+| P6 My/Settings | real account/settings field audit | bounded real-backed account/settings package | session/logout/unsupported-field validation | exact reviewed My/Settings Head only |
+| P7 Integration | cross-module identity/state/privacy audit | bounded integration corrections | full journeys, browser matrix, failure/recovery | exact reviewed integration Head only |
+| P8 Server | infrastructure/security/operations readiness audit | bounded deployment package | deployment, migration, rollback and observability drills | exact reviewed server/deployment Head only |
+| P9 iPhone | existing simulator foundation and real-device gap audit | bounded device/server integration | physical-device, network, lifecycle, accessibility evidence | exact reviewed iPhone Head only |
+| P10 Real-World Validation | scenario/corpus/readiness audit | only reviewed calibration or defect corrections | sustained representative operation and outcome review | exact reviewed correction Head only |
+
 ## P0 — Product Foundation Freeze
 
 **Input:** four formal product source classes, frozen design references, current runtime evidence, and the decision to pause Governance First.
@@ -25,9 +48,9 @@ Governance First is paused. Governance, Workflow, and tests remain delivery safe
 
 **Allowed scope:** product documentation, permanent agent/workflow instructions, minimal deterministic source gate, workflow invocation.
 
-**Blocked scope:** Java, business APIs, schema, UI, Figma, tests, business features, semantic-parser expansion, PR #1156 modification.
+**Blocked scope:** Java, business APIs, schema, UI, Figma, business tests, business features, semantic-parser expansion, PR #1156 modification. Minimal deterministic Product Source/audit-policy workflow assertions are permitted only inside P0.
 
-**Acceptance evidence:** source hashes; gate output; Home/Position/AI simulations; Markdown/YAML/link/path checks; workflow contract; scope check; Maven when required; Draft PR.
+**Acceptance evidence:** source hashes; gate output; Home/Position/AI simulations; six fixed audit-policy boundary cases; Markdown/YAML/link/path checks; workflow contract; scope check; Maven when required; Draft PR.
 
 **Real scenario requirement:** not a business scenario; deterministic simulation proves missing mappings fail closed and three representative tasks request the right sources/boundaries.
 
@@ -35,21 +58,39 @@ Governance First is paused. Governance, Workflow, and tests remain delivery safe
 
 ## P1 — Home Alignment
 
-**Input:** P0 baseline, Home interaction source bundle, Figma Home nodes, exact Home field source audit, current `GET /api/dashboard/home` behavior.
+### P1A — Home Alignment Readiness and Gap Audit
 
-**Deliverables:** final Home module order; focus-asset cards; context-only asset selection; complete verified ExecutionPlan summary; three-AI summary; Top3 positions; alerts/events; five-state handling; responsive desktop/mobile views.
+**Task mode:** `READINESS_AND_GAP_AUDIT` / `READ_ONLY_PRODUCT_AUDIT`.
 
-**Dependencies:** P0 merged; real Home source data available; exact analysis/plan/position identity contracts; no unresolved public/private leakage.
+**Input:** P0 baseline effective on clean/synced merged main, Home interaction source bundle, Figma Home nodes, current `GET /api/dashboard/home`, current UI/runtime, and exact field-source evidence.
 
-**Allowed scope:** Home template/CSS/JS/read projection changes and focused tests explicitly required by the accepted package; read-only data wiring.
+**Deliverables:** read-only comparison of final module order, field provenance, real/derived/fallback status, context-only asset click, plan/three-AI/Top3 linkage, all five states, desktop/mobile screenshots, and a prioritized bounded gap list.
 
-**Blocked scope:** automatic trading, watch writes, market search not formally authorized, message feature expansion, new AI model, fake counts/percentages/records.
+**Allowed scope:** source/code/API/test/Figma inspection, runtime/network inspection, screenshots, evidence capture, and audit output. A paused unrelated `PAUSED_TECHNICAL_DEBT` PR such as #1156 does not block this audit when `PRODUCT_AUDIT_ALLOWED=YES`.
+
+**Blocked scope:** code or test modification, business PR creation, PR #1156 changes, UI/API/schema/Figma changes, implementation, Ready transition, merge, deployment, Telegram/notification/trading, and presenting fallback scores as real confidence.
+
+**Audit exit:** findings receive independent review and a separate merged-main authorization record. Audit completion alone does not authorize implementation.
+
+### P1B — Home Alignment First Implementation
+
+**Task mode:** `IMPLEMENTATION`, followed separately by `VALIDATION` and `MERGE`.
+
+**Input:** accepted P1A artifacts and explicit bounded P1B authorization effective on merged main.
+
+**Deliverables:** only the authorized subset of final Home module order, focus-asset cards, context-only selection, verified ExecutionPlan summary, three-AI summary, Top3 positions, alerts/events, five-state handling, and responsive desktop/mobile views.
+
+**Dependencies:** P0 and P1A authorization merged; real Home source data available; exact analysis/plan/position identity contracts; no unresolved public/private leakage.
+
+**Allowed scope:** Home template/CSS/JS/read projection changes and focused tests explicitly named by the accepted P1B package; read-only data wiring.
+
+**Blocked scope:** automatic trading, watch writes, market search not formally authorized, message expansion, new AI model, fake counts/percentages/records, or treating `/api/score/list` as calibrated formal confidence without a proven evidence chain.
 
 **Acceptance evidence:** field-source trace; API payload; Playwright/browser screenshots at desktop and mobile widths; asset selection interaction recording; accessibility checks; five-state tests; stale-cache failure test.
 
 **Real scenario requirement:** at least two real assets with different plan/AI contexts, one partial-data asset, and one forced read failure; selection must update linked regions without navigating or changing a position.
 
-**Exit criteria:** all Home acceptance items pass; screenshots and payload traces are archived; no unsupported field shown; merged main effective.
+**Exit criteria:** all authorized Home acceptance items pass in a separate validation; screenshots and payload traces are archived; no unsupported field shown; the exact reviewed Head is merged and effective on main.
 
 ## P2 — Position and Position Monitoring
 
@@ -179,9 +220,9 @@ Governance First is paused. Governance, Workflow, and tests remain delivery safe
 
 ## P9 — iPhone Usable Version
 
-**Input:** P7 integrated web product and P8 reachable secure server; approved native/WKWebView technical route; frozen mobile Figma.
+**Input:** P7 integrated web product, P8 reachable secure server, the existing merged Xcode SwiftUI/WKWebView simulator foundation, and frozen mobile Figma.
 
-**Deliverables:** Xcode project/container or formal native route; Session/Cookie/CSRF; five-tab navigation; exact deep links; Dynamic Type; safe area; installable build; real-device logs/screenshots.
+**Deliverables:** complete and validate the existing Xcode route; real-device Session/Cookie/CSRF; five-tab navigation; exact deep links; Dynamic Type; safe area; signed/installable build; background recovery; real-device logs/screenshots.
 
 **Dependencies:** secure deployed environment and Apple development setup.
 
@@ -215,4 +256,4 @@ Governance First is paused. Governance, Workflow, and tests remain delivery safe
 
 ## Roadmap Boundary
 
-P0 creates truth and measurement only. It does not make P1 automatic. P1 begins with a read-only Home readiness and gap audit after P0 is reviewed and merged. PR #1156 remains `PAUSED_TECHNICAL_DEBT` and is resumed only if a real product regression proves that its missing governance capability is necessary.
+P0 creates truth and measurement only. It does not make P1 implementation automatic. P1 begins with P1A, a `READ_ONLY_PRODUCT_AUDIT`, only after P0 is reviewed, merged, and effective on clean/synced main. An explicitly paused, unrelated Draft PR such as #1156 may coexist with that audit, while active/conflicting PRs, dirty worktrees, failed Product Source Gate, code/test changes, business PR creation, implementation, merge, and deployment remain blocked. P1B starts only after P1A is independently reviewed and its bounded authorization is effective on merged main. PR #1156 remains `PAUSED_TECHNICAL_DEBT` and is resumed only if a real product regression proves that its missing governance capability is necessary.

@@ -100,6 +100,30 @@ This analysis compares the formal product requirement with the baseline at main 
 
 **NEXT DELIVERY PACKAGE:** P3 AI Analysis real-input and role-boundary integration.
 
+## GAP-04A Eight-Score Real Evidence Chain
+
+**MODULE:** Evidence / Eight Scores / Home Confidence
+
+**PRODUCT REQUIREMENT:** Real raw market/event/macro data must become standardized evidence before scoring rules/models produce the eight named scores. Each score needs traceable inputs, freshness, exact analysis snapshot, calibration evidence, and fail-closed behavior before it can support formal Home confidence.
+
+**CURRENT IMPLEMENTATION:** `GET /api/score/list` constructs a `MarketEnvironmentVO` from `symbol` and `timeframe`, then calls `ScoreServiceImpl.buildScoreListFromEnvironment`. That path supplies an empty `AssetAnalysisVO` and computes all eight dimensions with fixed base/default values and light-rule adjustments.
+
+**GAP:** The endpoint is `PARTIAL / FUNCTIONAL_UNVALIDATED` with `FALLBACK_PRESENT`. Complete per-dimension real evidence, persisted exact-analysis linkage, real-market calibration, and one accepted end-to-end scenario are not proven. The endpoint's existence cannot establish an evidence-driven complete score product, and its numeric output is not authorized as formal Home confidence.
+
+**USER IMPACT:** A plausible score can appear more certain than its inputs justify, causing users to over-trust Home or AI summaries.
+
+**REAL_DATA_STATUS:** PARTIAL / FALLBACK_PRESENT
+
+**DESIGN_STATUS:** PARTIAL
+
+**SEMANTIC_STATUS:** PARTIAL
+
+**PRIORITY:** P1
+
+**BLOCKS_USABLE_VERSION:** YES
+
+**NEXT DELIVERY PACKAGE:** P1A Home Alignment Readiness and Gap Audit must trace every visible score/confidence field; scoring implementation remains unauthorized until that audit is reviewed and merged-main authorization exists.
+
 ## GAP-05 Manual UserPosition Workflow
 
 **MODULE:** Positions
@@ -250,9 +274,9 @@ This analysis compares the formal product requirement with the baseline at main 
 
 **PRODUCT REQUIREMENT:** Five-tab usable iPhone experience with exact identities, Session/Cookie/CSRF, Dynamic Type, safe areas, touch targets, navigation, errors, and real installation.
 
-**CURRENT IMPLEMENTATION:** Mobile responsive templates, WKWebView/DOM contract tests, and mobile bridge protections exist.
+**CURRENT IMPLEMENTATION:** A merged Xcode project under `ios/TradeModelApp` provides a SwiftUI/WKWebView client, environment-based server configuration, Session/Cookie/CSRF compatibility foundations, native fail-closed states, Debug and Release simulator builds, 47 unit/security/project tests, one UI launch test, and a passing iPhone 17 Pro Simulator install/launch check.
 
-**GAP:** No complete Xcode container/route, real iPhone installation, actual device session/network lifecycle, accessibility, or screenshot evidence.
+**GAP:** The remaining gap is real-device and production validation: physical iPhone install, login/logout/session expiry and persistence, Cookie/CSRF behavior over an authorized server, background/foreground recovery, real network conditions, push permission if later authorized, final 375/390/430-point interaction/accessibility acceptance, long-term personal use, and an approved TestFlight/installation route where applicable.
 
 **USER IMPACT:** The product cannot yet be considered an iPhone application or reliably usable on a real device.
 
@@ -266,7 +290,7 @@ This analysis compares the formal product requirement with the baseline at main 
 
 **BLOCKS_USABLE_VERSION:** YES
 
-**NEXT DELIVERY PACKAGE:** P9 iPhone Usable Version after full web-product integration.
+**NEXT DELIVERY PACKAGE:** P9 iPhone Usable Version validates and completes the existing simulator-level foundation after full web-product integration and server readiness; it does not restart from a nonexistent-Xcode assumption.
 
 ## GAP-12 Production Data
 
@@ -343,8 +367,8 @@ This analysis compares the formal product requirement with the baseline at main 
 ## 15. Highest-Impact Sequence
 
 1. Preserve this Product Source baseline and require source mapping before edits.
-2. Align Home, Focus Assets, plan, three-AI summaries, and Top3 position interactions with real fields.
+2. Run P1A as a read-only Home alignment and gap audit, including exact eight-score/confidence provenance and explicit real/derived/fallback labels; authorize implementation only through a later merged-main decision.
 3. Validate real UserPosition and PositionMonitor behavior under historical/real movement.
 4. Complete deep evidence/detail and AI integration.
 5. Build Message/Push UI only on the existing public/private contract.
-6. Integrate the full product, deploy safely, then prove iPhone and real-world operation.
+6. Integrate and deploy safely, then validate the existing iPhone simulator foundation on real hardware, a real server, and real-world operation.

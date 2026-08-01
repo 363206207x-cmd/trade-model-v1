@@ -13,6 +13,111 @@ ACTIVE_FILE="docs/ACTIVE_MAINLINE_STATUS.yml"
 
 blockers=()
 
+readonly_audit_scope_contract="NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_PAUSED_PR_CHANGES"
+
+evaluate_product_audit_policy() {
+  local requested_mode="$1"
+  local source_gate_status="$2"
+  local worktree_status="$3"
+  local synced_main_status="$4"
+  local current_pr_count="$5"
+  local active_conflict_count="$6"
+  local paused_unrelated_count="$7"
+  local scope_contract="$8"
+  local baseline_effective="$9"
+
+  product_audit_allowed="NO"
+  read_only_product_audit_status="BLOCKED_NOT_READ_ONLY_PRODUCT_AUDIT"
+  paused_open_pr_blocks_audit="NOT_APPLICABLE"
+  paused_open_pr_blocks_implementation="NO"
+  product_audit_blocker="NOT_READ_ONLY_PRODUCT_AUDIT"
+
+  if [[ "$paused_unrelated_count" != "0" ]]; then
+    paused_open_pr_blocks_implementation="YES"
+  fi
+
+  [[ "$requested_mode" == "READ_ONLY_PRODUCT_AUDIT" ]] || return 0
+
+  paused_open_pr_blocks_audit="NO"
+  if [[ "$source_gate_status" != "PASS" ]]; then
+    read_only_product_audit_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    product_audit_blocker="PRODUCT_SOURCE_GATE_FAILED"
+  elif [[ "$worktree_status" != "Yes" ]]; then
+    read_only_product_audit_status="BLOCKED_WORKTREE_DIRTY"
+    product_audit_blocker="WORKTREE_DIRTY"
+  elif [[ "$synced_main_status" != "YES" ]]; then
+    read_only_product_audit_status="BLOCKED_NOT_CLEAN_SYNCED_MAIN"
+    product_audit_blocker="NOT_CLEAN_SYNCED_MAIN"
+  elif [[ "$baseline_effective" != "YES" ]]; then
+    read_only_product_audit_status="BLOCKED_PENDING_P0_MERGED_MAIN"
+    product_audit_blocker="P0_NOT_EFFECTIVE_MERGED_MAIN"
+  elif [[ "$scope_contract" != "$readonly_audit_scope_contract" ]]; then
+    read_only_product_audit_status="BLOCKED_READ_ONLY_SCOPE"
+    product_audit_blocker="READ_ONLY_SCOPE_NOT_LOCKED"
+  elif [[ "$current_pr_count" != "0" ]]; then
+    read_only_product_audit_status="BLOCKED_CURRENT_PACKAGE_PR"
+    product_audit_blocker="CURRENT_PACKAGE_PR_PRESENT"
+  elif [[ "$active_conflict_count" != "0" ]]; then
+    read_only_product_audit_status="BLOCKED_ACTIVE_CONFLICTING_PR"
+    product_audit_blocker="ACTIVE_CONFLICTING_PR_PRESENT"
+  else
+    product_audit_allowed="YES"
+    product_audit_blocker="NONE"
+    if [[ "$paused_unrelated_count" == "0" ]]; then
+      read_only_product_audit_status="ALLOWED"
+    else
+      read_only_product_audit_status="ALLOWED_WITH_PAUSED_UNRELATED_PR"
+    fi
+  fi
+}
+
+run_product_audit_policy_self_test() {
+  local failed=0
+
+  assert_audit_case() {
+    local name="$1" expected_allowed="$2" expected_status="$3" expected_audit_block="$4" expected_implementation_block="$5"
+    shift 5
+    evaluate_product_audit_policy "$@"
+    if [[ "$product_audit_allowed" == "$expected_allowed" \
+      && "$read_only_product_audit_status" == "$expected_status" \
+      && "$paused_open_pr_blocks_audit" == "$expected_audit_block" \
+      && "$paused_open_pr_blocks_implementation" == "$expected_implementation_block" ]]; then
+      echo "$name: PASS"
+    else
+      echo "$name: FAIL"
+      failed=1
+    fi
+  }
+
+  assert_audit_case AUDIT_POLICY_TEST_PAUSED_UNRELATED_READ_ONLY YES ALLOWED_WITH_PAUSED_UNRELATED_PR NO YES \
+    READ_ONLY_PRODUCT_AUDIT PASS Yes YES 0 0 1 "$readonly_audit_scope_contract" YES
+  assert_audit_case AUDIT_POLICY_TEST_PAUSED_IMPLEMENTATION_BLOCKED_PENDING_P0_MERGED_MAIN NO BLOCKED_NOT_READ_ONLY_PRODUCT_AUDIT NOT_APPLICABLE YES \
+    IMPLEMENTATION PASS Yes NO 0 0 1 "$readonly_audit_scope_contract" NO
+  assert_audit_case AUDIT_POLICY_TEST_ACTIVE_CONFLICTING_PR NO BLOCKED_ACTIVE_CONFLICTING_PR NO YES \
+    READ_ONLY_PRODUCT_AUDIT PASS Yes YES 0 1 1 "$readonly_audit_scope_contract" YES
+  assert_audit_case AUDIT_POLICY_TEST_DIRTY_WORKTREE NO BLOCKED_WORKTREE_DIRTY NO YES \
+    READ_ONLY_PRODUCT_AUDIT PASS No YES 0 0 1 "$readonly_audit_scope_contract" YES
+  assert_audit_case AUDIT_POLICY_TEST_PRODUCT_SOURCE_GATE_FAILED NO BLOCKED_PRODUCT_SOURCE_GATE NO YES \
+    READ_ONLY_PRODUCT_AUDIT BLOCKED Yes YES 0 0 1 "$readonly_audit_scope_contract" YES
+  assert_audit_case AUDIT_POLICY_TEST_ATTEMPTED_CODE_CHANGE NO BLOCKED_READ_ONLY_SCOPE NO YES \
+    READ_ONLY_PRODUCT_AUDIT PASS Yes YES 0 0 1 CODE_CHANGES_ATTEMPTED YES
+
+  if [[ "$failed" -eq 0 ]]; then
+    echo "PRODUCT_AUDIT_POLICY_TESTS: PASS"
+    return 0
+  fi
+  echo "PRODUCT_AUDIT_POLICY_TESTS: BLOCKED"
+  return 1
+}
+
+if [[ "${1:-}" == "--self-test-product-audit-policy" ]]; then
+  run_product_audit_policy_self_test
+  exit $?
+elif [[ "$#" -gt 0 ]]; then
+  echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy]" >&2
+  exit 2
+fi
+
 trim() { sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
 
 yaml_value() {
@@ -117,6 +222,18 @@ active_status="$(yaml_value "$ACTIVE_FILE" current_phase_status)"
 task_phase="$(yaml_value "$TASK_FILE" current_phase)"
 active_allowed="$(yaml_value "$ACTIVE_FILE" next_business_phase_allowed)"
 task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
+task_mode="$(yaml_value "$TASK_FILE" task_mode)"
+audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
+paused_governance_pr="$(yaml_value "$TASK_FILE" paused_governance_pr)"
+paused_governance_status="$(yaml_value "$TASK_FILE" paused_governance_status)"
+paused_governance_branch="$(yaml_value "$TASK_FILE" paused_governance_branch)"
+paused_governance_head="$(yaml_value "$TASK_FILE" paused_governance_head)"
+paused_governance_pr_number="${paused_governance_pr#\#}"
+
+product_source_gate_status="BLOCKED"
+if bash scripts/product-source-gate.sh --task-file "$TASK_FILE" >/dev/null 2>&1; then
+  product_source_gate_status="PASS"
+fi
 
 if [[ "$active_compat" != "DERIVED_ONLY" || "$task_compat" != "DERIVED_ONLY" ]]; then
   blockers+=("COMPATIBILITY_FACT_CONFLICT")
@@ -208,14 +325,24 @@ open_pr_status="UNKNOWN"
 open_prs="none"
 current_package_pr="none"
 unrelated_open_prs="none"
+paused_unrelated_open_prs="none"
+active_conflicting_open_prs="none"
+current_package_pr_count="0"
+paused_unrelated_pr_count="0"
+active_conflicting_pr_count="0"
 block_next_business_phase_only="NO"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   open_pr_check_source="gh CLI"
-  if ! pr_rows="$(gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | [.number, .headRefName, .title, .isDraft] | @tsv' 2>/dev/null)"; then
+  if ! pr_rows="$(gh pr list --state open --json number,title,headRefName,headRefOid,isDraft --jq '.[] | [.number, .headRefName, .headRefOid, .title, .isDraft] | @tsv' 2>/dev/null)"; then
     pr_rows=""
     open_prs="GH_NOT_AVAILABLE"
     current_package_pr="GH_NOT_AVAILABLE"
     unrelated_open_prs="GH_NOT_AVAILABLE"
+    paused_unrelated_open_prs="GH_NOT_AVAILABLE"
+    active_conflicting_open_prs="GH_NOT_AVAILABLE"
+    current_package_pr_count="UNKNOWN"
+    paused_unrelated_pr_count="UNKNOWN"
+    active_conflicting_pr_count="UNKNOWN"
     open_pr_status="UNKNOWN"
     blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
   else
@@ -227,17 +354,32 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     open_pr_lines=()
     current_package_pr_lines=()
     unrelated_open_pr_lines=()
-    while IFS=$'\t' read -r pr_number pr_head pr_title pr_draft; do
+    paused_unrelated_open_pr_lines=()
+    active_conflicting_open_pr_lines=()
+    while IFS=$'\t' read -r pr_number pr_head pr_oid pr_title pr_draft; do
       [[ -z "${pr_number:-}" ]] && continue
       ((open_pr_count+=1))
-      pr_line="#$pr_number $pr_head $pr_title draft=$pr_draft"
+      pr_line="#$pr_number $pr_head head=$pr_oid $pr_title draft=$pr_draft"
       open_pr_lines+=("$pr_line")
       if [[ "$pr_head" == "$current_package_branch" || "$pr_head" == "$branch" ]]; then
         current_package_pr_lines+=("$pr_line")
+        ((current_package_pr_count+=1))
       else
         unrelated_open_pr_lines+=("$pr_line")
         block_next_business_phase_only="YES"
-        blockers+=("UNRELATED_OPEN_PR_${pr_number}_BLOCKS_NEXT_BUSINESS_PHASE")
+        if [[ "$pr_number" == "$paused_governance_pr_number" \
+          && "$pr_head" == "$paused_governance_branch" \
+          && "$pr_oid" == "$paused_governance_head" \
+          && "$paused_governance_status" == "PAUSED_TECHNICAL_DEBT" \
+          && "$pr_draft" == "true" ]]; then
+          paused_unrelated_open_pr_lines+=("$pr_line status=PAUSED_TECHNICAL_DEBT")
+          ((paused_unrelated_pr_count+=1))
+          blockers+=("PAUSED_UNRELATED_OPEN_PR_${pr_number}_BLOCKS_IMPLEMENTATION_BY_PHASE_RULE")
+        else
+          active_conflicting_open_pr_lines+=("$pr_line status=ACTIVE_CONFLICTING_PR")
+          ((active_conflicting_pr_count+=1))
+          blockers+=("ACTIVE_CONFLICTING_PR_${pr_number}_BLOCKS_NEXT_BUSINESS_PHASE")
+        fi
       fi
     done <<<"$pr_rows"
     open_prs="$(printf '%s\n' "${open_pr_lines[@]}")"
@@ -247,12 +389,23 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     if (( ${#unrelated_open_pr_lines[@]} > 0 )); then
       unrelated_open_prs="$(printf '%s\n' "${unrelated_open_pr_lines[@]}")"
     fi
+    if (( ${#paused_unrelated_open_pr_lines[@]} > 0 )); then
+      paused_unrelated_open_prs="$(printf '%s\n' "${paused_unrelated_open_pr_lines[@]}")"
+    fi
+    if (( ${#active_conflicting_open_pr_lines[@]} > 0 )); then
+      active_conflicting_open_prs="$(printf '%s\n' "${active_conflicting_open_pr_lines[@]}")"
+    fi
   fi
 else
   open_pr_check_source="unavailable"
   open_prs="GH_NOT_AVAILABLE"
   current_package_pr="GH_NOT_AVAILABLE"
   unrelated_open_prs="GH_NOT_AVAILABLE"
+  paused_unrelated_open_prs="GH_NOT_AVAILABLE"
+  active_conflicting_open_prs="GH_NOT_AVAILABLE"
+  current_package_pr_count="UNKNOWN"
+  paused_unrelated_pr_count="UNKNOWN"
+  active_conflicting_pr_count="UNKNOWN"
   open_pr_status="UNKNOWN"
   blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
 fi
@@ -290,7 +443,22 @@ if [[ "$next_business_phase_allowed" == "NO" ]]; then
   fi
 fi
 
-can_continue="$can_start_next_business_phase"
+evaluate_product_audit_policy \
+  "$task_mode" \
+  "$product_source_gate_status" \
+  "$worktree_clean" \
+  "$clean_synced_main" \
+  "$current_package_pr_count" \
+  "$active_conflicting_pr_count" \
+  "$paused_unrelated_pr_count" \
+  "$audit_scope_contract" \
+  "$p0_0_effective"
+
+if [[ "$task_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then
+  can_continue="$product_audit_allowed"
+else
+  can_continue="$can_start_next_business_phase"
+fi
 
 printf 'BRANCH: %s\n' "$branch"
 printf 'WORKTREE_CLEAN: %s\n' "$worktree_clean"
@@ -304,6 +472,8 @@ printf 'OPEN_PR_COUNT: %s\n' "$open_pr_count"
 printf 'OPEN_PR_STATUS: %s\n' "$open_pr_status"
 printf 'CURRENT_PACKAGE_PR: %s\n' "$current_package_pr"
 printf 'UNRELATED_OPEN_PRS: %s\n' "$unrelated_open_prs"
+printf 'PAUSED_UNRELATED_OPEN_PRS: %s\n' "$paused_unrelated_open_prs"
+printf 'ACTIVE_CONFLICTING_OPEN_PRS: %s\n' "$active_conflicting_open_prs"
 printf 'BLOCK_NEXT_BUSINESS_PHASE_ONLY: %s\n' "$block_next_business_phase_only"
 printf 'MAIN_SYNC: %s\n' "$main_sync"
 printf 'HEAD_IN_ORIGIN_MAIN: %s\n' "$head_in_origin_main"
@@ -316,6 +486,13 @@ printf 'CURRENT_PHASE_STATUS: %s\n' "$current_phase_status"
 printf 'EXISTING_MODULE_MATURITY: %s\n' "$existing_module_maturity"
 printf 'COMPLETION_EFFECTIVE_STATE: %s\n' "$completion_effective_state"
 printf 'P0_0_EFFECTIVE: %s\n' "$p0_0_effective"
+printf 'TASK_MODE: %s\n' "${task_mode:-UNDECLARED}"
+printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
+printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
+printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"
+printf 'PAUSED_OPEN_PR_BLOCKS_AUDIT: %s\n' "$paused_open_pr_blocks_audit"
+printf 'PAUSED_OPEN_PR_BLOCKS_IMPLEMENTATION: %s\n' "$paused_open_pr_blocks_implementation"
+printf 'PRODUCT_AUDIT_BLOCKER: %s\n' "$product_audit_blocker"
 printf 'CURRENT_WORK_PACKAGE: %s\n' "$current_work_package"
 printf 'NEXT_BUSINESS_PHASE: %s\n' "$next_business_phase"
 printf 'NEXT_BUSINESS_PHASE_ALLOWED: %s\n' "$next_business_phase_allowed"

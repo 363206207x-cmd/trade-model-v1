@@ -23,7 +23,7 @@ BLOCKED_BY_PRODUCT_SOURCE_GATE
 
 and must not enter editing.
 
-The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit is blocked only when its required source or mapping is missing or a hard conflict exists.
+The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit remains fail closed for a missing/failed source gate, dirty worktree, unsynced main, active/conflicting PR, editable scope, or overlap with paused work; an explicitly paused and unrelated technical-debt PR alone is not a hard conflict.
 
 ---
 
@@ -70,7 +70,11 @@ The script prints:
 - `HEAD:`
 - `RECENT_COMMITS:`
 - `OPEN_PRS:`
+- `PAUSED_UNRELATED_OPEN_PRS:`
+- `ACTIVE_CONFLICTING_OPEN_PRS:`
 - `MAIN_SYNC:`
+- `PRODUCT_AUDIT_ALLOWED:`
+- `READ_ONLY_PRODUCT_AUDIT_STATUS:`
 - `CAN_CONTINUE_NEXT_PACKAGE:`
 - `BLOCKERS:`
 
@@ -80,9 +84,31 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 
 如果 `gh` 不可用，脚本在 open PR 字段输出 `GH_NOT_AVAILABLE`，不得输出不可读错误。
 
-When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If `gh` is unavailable or any open PR exists, the gate remains fail-closed.
+When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If `gh` is unavailable, both audit and implementation gates remain fail closed. Open PR handling is task-mode specific: implementation/merge/deployment keep the strict phase gate; a declared `READ_ONLY_PRODUCT_AUDIT` may ignore only a task-configured Draft `PAUSED_TECHNICAL_DEBT` PR that is unrelated to its scope.
 
-当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。如果 `gh` 不可用或存在任何 open PR，门禁继续 fail-closed（失败关闭）。
+当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。若 `gh` 不可用，审计与实现都失败关闭。若存在 open PR，实现/合并/部署仍走严格门禁；只有任务明确声明 `READ_ONLY_PRODUCT_AUDIT` 时，配置中精确列出的 Draft `PAUSED_TECHNICAL_DEBT` 且范围无关 PR 才不阻塞只读审计。
+
+### Read-Only Product Audit Boundary / 只读产品审计边界
+
+`PRODUCT_AUDIT_ALLOWED=YES` requires all of the following:
+
+- `task_mode: READ_ONLY_PRODUCT_AUDIT`;
+- Product Source Gate `PASS`;
+- the exact `read_only_product_audit_scope_contract` forbidding code/test changes, business PR creation, and paused-PR changes;
+- clean worktree and clean/synced `main`;
+- no current business-package PR;
+- no `ACTIVE_CONFLICTING_PR`;
+- every tolerated open PR matches the exact configured number, branch, Head, Draft state, and `PAUSED_TECHNICAL_DEBT` status, whose frozen Head establishes the unrelated scope.
+
+The state output distinguishes `PAUSED_UNRELATED_TECHNICAL_DEBT_PR` from `ACTIVE_CONFLICTING_PR`. It reports `PAUSED_OPEN_PR_BLOCKS_AUDIT=NO` only for the former under read-only mode. `PAUSED_OPEN_PR_BLOCKS_IMPLEMENTATION=YES` remains the current strict phase behavior; audit permission never authorizes implementation, Ready transition, merge, deployment, code/test changes, or edits to the paused PR.
+
+Run the six deterministic boundary cases with:
+
+```bash
+bash scripts/v1-state.sh --self-test-product-audit-policy
+```
+
+The self-test covers paused/unrelated audit allowance, paused-PR implementation blocking, active conflict, dirty worktree, failed Product Source Gate, and attempted editable scope. It is a small fixed policy test, not a natural-language parser or governance engine.
 
 ## V1 Auto Operator / V1 自动操作台
 

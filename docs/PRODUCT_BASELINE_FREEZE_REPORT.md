@@ -10,7 +10,7 @@ Direction: `PRODUCT_FIRST`
 
 Trade Model V1 now has one product authority index: `docs/PRODUCT_SOURCE_OF_TRUTH.md`. Formal product plans precede current code, current UI, phase records, Workflow, Governance, and tests. Current implementation differences are product gaps; the plans are not weakened to match code.
 
-Governance First is paused. PR #1156 and its unfinished semantic-parser/inventory/digest/metadata work are retained as `PAUSED_TECHNICAL_DEBT`, not deleted and not treated as the default blocker for product-source work, read-only product audits, or explicitly authorized non-trading product development.
+Governance First is paused. PR #1156 and its unfinished semantic-parser/inventory/digest/metadata work are retained as `PAUSED_TECHNICAL_DEBT`, not deleted. After P0 is effective on clean/synced merged main, this exact paused and unrelated Draft PR does not block a declared read-only product audit; it does not grant or relax implementation, Ready, merge, or deployment permission.
 
 ## 2. Registered Formal Sources
 
@@ -57,12 +57,13 @@ These are P0 product-foundation deliverables. They do not make Home, Positions, 
 
 - authentication and web session foundation;
 - Home dashboard read projection and desktop/mobile shells;
-- evidence, scoring, rule, decision, plan, and three-AI foundations;
+- evidence, scoring, rule, decision, plan, and three-AI foundations; the eight-score path remains `PARTIAL / FUNCTIONAL_UNVALIDATED` with fixed base/default and light-rule behavior, not a proven real-evidence chain or formal confidence source;
 - manual owner-scoped UserPosition APIs and position pages;
 - PositionMonitor state/log/read foundation;
 - Analysis Detail and Review read foundations;
 - OPPORTUNITY public and POSITION_RISK private message/read projections;
 - system/data/trace/status foundations;
+- merged Xcode SwiftUI/WKWebView iPhone foundation with Debug/Release simulator builds, 47 unit/security/project tests, one UI test, and simulator install/launch evidence;
 - substantial automated test coverage.
 
 Most of these are `PARTIAL` or `FUNCTIONAL_UNVALIDATED`, not product-complete.
@@ -78,16 +79,16 @@ Most of these are `PARTIAL` or `FUNCTIONAL_UNVALIDATED`, not product-complete.
 - real My/Settings field contract and data;
 - full product integration journey;
 - production deployment and sustained real multi-source operation;
-- installable, real-device iPhone version;
+- real-device iPhone installation/login/session lifecycle, production-server connectivity, background recovery, final device-size interaction acceptance, and distribution route;
 - real-world outcome calibration and feedback loop.
 
 ## 7. Most Important Usability Blockers
 
 1. Home is not accepted against the final interaction and real field sources.
 2. Real UserPosition-to-live-PositionMonitor behavior is not scenario-validated.
-3. Three AI are not proven over one real traceable evidence package with rule-first authority.
+3. The eight-score chain and three AI are not proven over one complete, calibrated, traceable real-evidence package with rule-first authority.
 4. Deep details and navigation are incomplete as a coherent product.
-5. The server, production data, observability, and iPhone path are not deployment-ready.
+5. The server, production data, observability, and existing simulator-level iPhone foundation are not real-device or deployment-ready.
 
 Message/Push UI is incomplete, but it remains secondary to Home, Position, AI, and Detail alignment in Roadmap V2.
 
@@ -110,11 +111,11 @@ Message/Push UI is incomplete, but it remains secondary to Home, Position, AI, a
 ```text
 PR: #1156
 STATUS: PAUSED_TECHNICAL_DEBT
-PAUSE_REASON: Product direction reset; governance parser work no longer blocks product-first read-only and non-trading development.
+PAUSE_REASON: Product direction reset; governance parser work no longer blocks a specifically declared, non-overlapping read-only product audit after P0 is effective on merged main.
 RESUME_CONDITION: Only resume when a real product regression demonstrates that the missing governance capability is necessary.
 ```
 
-The PR remains open, Draft, and unmerged. This P0 package does not edit its branch, metadata, review threads, or content. The three paused local script modifications are separately preserved by a named stash and an external patch outside the P0 worktree.
+The PR remains open, Draft, and unmerged. This P0 package does not edit its branch, metadata, review threads, or content. The three paused local script modifications are separately preserved by a named stash and an external patch outside the P0 worktree. Its paused unrelated state does not block a specifically declared `READ_ONLY_PRODUCT_AUDIT` after P0 is effective on clean/synced merged main; it continues to block implementation/merge/deployment according to the strict phase gate.
 
 ## 10. Product Source Gate Boundary
 
@@ -124,9 +125,9 @@ The gate proves only that sources are registered/present/hash-matched and the ta
 
 After independent review and merged-main effectiveness of P0, the only next product package is:
 
-`P1 Home Alignment Readiness and Gap Audit`
+`P1A Home Alignment Readiness and Gap Audit`
 
-That first P1 step is an audit, not automatic implementation. It must read the registered sources, map final Home/Figma/data behavior, compare current runtime, and authorize only a bounded implementation package. P0 itself stops before all business coding.
+That first P1 step is `READ_ONLY_PRODUCT_AUDIT`, not automatic implementation. It must read the registered sources, map final Home/Figma/data behavior, distinguish real/derived/fallback fields, compare current runtime, and produce an independently reviewed gap decision without changing code/tests or creating a business implementation PR. Only a later merged-main authorization may open `P1B Home Alignment First Implementation`. P0 itself stops before all business coding.
 
 ## 12. Freeze Statement
 

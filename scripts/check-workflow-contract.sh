@@ -25,7 +25,7 @@ require_file() {
 require_contains() {
   local file="$1"
   local text="$2"
-  if [[ ! -f "$file" ]] || ! grep -Fq "$text" "$file"; then
+  if [[ ! -f "$file" ]] || ! grep -Fq -- "$text" "$file"; then
     fail "missing required text in $file: $text"
   fi
 }
@@ -119,6 +119,7 @@ require_contains "AGENTS.md" "docs/PROJECT_DELIVERY_CONTRACT.md"
 require_contains "AGENTS.md" "docs/PROJECT_CURRENT_STATE.md"
 require_contains "AGENTS.md" "docs/DELIVERY_PROGRESS_MATRIX.md"
 require_contains "AGENTS.md" "docs/CODEX_TASK_TEMPLATE.md"
+require_contains "AGENTS.md" "task_mode=READ_ONLY_PRODUCT_AUDIT"
 require_contains "docs/PROJECT_DELIVERY_CONTRACT.md" "Contract Status: ACTIVE"
 require_contains "docs/PROJECT_DELIVERY_CONTRACT.md" "docs-only"
 require_contains "docs/PROJECT_DELIVERY_CONTRACT.md" "DTO-only"
@@ -163,6 +164,24 @@ require_contains "scripts/v1-state.sh" "OPEN_PR_CHECK_SOURCE"
 require_contains "scripts/v1-state.sh" "OPEN_PR_COUNT"
 require_contains "scripts/v1-state.sh" "OPEN_PR_STATUS"
 require_contains "scripts/v1-state.sh" "CLEAN_SYNCED_MAIN"
+require_contains "scripts/v1-state.sh" "PRODUCT_AUDIT_ALLOWED"
+require_contains "scripts/v1-state.sh" "READ_ONLY_PRODUCT_AUDIT_STATUS"
+require_contains "scripts/v1-state.sh" "PAUSED_UNRELATED_OPEN_PRS"
+require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_OPEN_PRS"
+require_contains "scripts/v1-state.sh" "--self-test-product-audit-policy"
+require_contains "docs/CODEX_NEXT_TASK.yml" "task_mode: \"PRODUCT_FOUNDATION_FACT_CORRECTION_ONLY\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "read_only_product_audit_scope_contract: \"NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_PAUSED_PR_CHANGES\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "paused_governance_head: \"75d04e95bc7aa5eb761299b0192dfbc2caec3792\""
+require_contains "docs/SESSION_BOOTSTRAP.md" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
+require_contains "docs/WORKFLOW_COMMAND_AUTOMATION.md" "PAUSED_OPEN_PR_BLOCKS_AUDIT=NO"
+require_contains "docs/PRODUCT_FIELD_SOURCE.md" "REAL_DATA_STATUS=PARTIAL/FALLBACK_PRESENT"
+require_contains "docs/PRODUCT_FIELD_SOURCE.md" "fixed base/default values and light-rule adjustments"
+require_contains "docs/PRODUCT_COMPLETION_MATRIX.md" "| Eight Scores | PARTIAL"
+require_contains "docs/PRODUCT_COMPLETION_MATRIX.md" "| iPhone | FUNCTIONAL_UNVALIDATED"
+require_contains "docs/PRODUCT_COMPLETION_MATRIX.md" "simulator install/launch"
+require_contains "docs/PRODUCT_GAP_ANALYSIS.md" "The remaining gap is real-device and production validation"
+require_contains "docs/PRODUCT_ROADMAP_V2.md" "P1A — Home Alignment Readiness and Gap Audit"
+require_contains "docs/PRODUCT_ROADMAP_V2.md" "P1B — Home Alignment First Implementation"
 require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
@@ -177,6 +196,27 @@ active_status="$(yaml_value docs/ACTIVE_MAINLINE_STATUS.yml current_phase_status
 task_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_phase)"
 task_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml next_business_phase_allowed)"
 active_allowed="$(yaml_value docs/ACTIVE_MAINLINE_STATUS.yml next_business_phase_allowed)"
+audit_policy_text="$(bash scripts/v1-state.sh --self-test-product-audit-policy)" || fail "product audit policy self-test failed"
+printf '%s\n' "$audit_policy_text" | grep -Fq "PRODUCT_AUDIT_POLICY_TESTS: PASS" \
+  || fail "product audit policy self-test did not report PASS"
+for expected_case in \
+  AUDIT_POLICY_TEST_PAUSED_UNRELATED_READ_ONLY \
+  AUDIT_POLICY_TEST_PAUSED_IMPLEMENTATION_BLOCKED_PENDING_P0_MERGED_MAIN \
+  AUDIT_POLICY_TEST_ACTIVE_CONFLICTING_PR \
+  AUDIT_POLICY_TEST_DIRTY_WORKTREE \
+  AUDIT_POLICY_TEST_PRODUCT_SOURCE_GATE_FAILED \
+  AUDIT_POLICY_TEST_ATTEMPTED_CODE_CHANGE; do
+  printf '%s\n' "$audit_policy_text" | grep -Fq "$expected_case: PASS" \
+    || fail "missing product audit policy case: $expected_case"
+done
+
+if grep -F '| AI Detail | Scores | eightScores' docs/PRODUCT_FIELD_SOURCE.md | grep -Fq 'functional/partial'; then
+  fail "eight-score field source must not retain the false functional/partial claim"
+fi
+if grep -Fq 'no complete Xcode' docs/PRODUCT_COMPLETION_MATRIX.md docs/PRODUCT_GAP_ANALYSIS.md docs/PRODUCT_BASELINE_FREEZE_REPORT.md docs/PRODUCT_ROADMAP_V2.md; then
+  fail "iPhone baseline must not claim that the merged Xcode foundation is absent"
+fi
+
 state_text="$(bash scripts/v1-state.sh)"
 runtime_completion_effective_state="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "COMPLETION_EFFECTIVE_STATE" {print $2; exit}')"
 

@@ -21,7 +21,7 @@ Permanent authority rules:
 4. When a required source or mapping is missing, or formal sources have a real unresolved conflict, stop instead of guessing.
 5. Governance, Workflow, and tests remain delivery controls; none can override `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
 6. The Product Source Gate must remain deterministic and minimal. Do not extend it into a natural-language parser, synonym inventory, digest system, or independent governance roadmap.
-7. Read-only product-gap audits may proceed when source registration and task mapping pass, even while unrelated governance technical debt is paused.
+7. A read-only product-gap audit may proceed only when `task_mode=READ_ONLY_PRODUCT_AUDIT`, Product Source Gate passes, P0 is effective on clean/synced merged main, the worktree is clean, editable scope is locked out, no current/active conflicting PR exists, and any tolerated PR matches the exact configured Draft `PAUSED_TECHNICAL_DEBT` number/branch/Head. This exception never authorizes implementation, Ready, merge, deployment, or edits to the paused PR.
 
 The permanent hard boundaries remain: no automatic open/close/add/reduce/reverse/order/trade; no Push Recheck trading authorization; no fake data as real; no owner-scope bypass; no public/private leakage; no ExecutionPlan-as-UserPosition; no `triggered`-as-opened.
 
