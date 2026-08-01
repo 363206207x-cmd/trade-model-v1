@@ -10,10 +10,11 @@ CURRENT_STATE_FILE="docs/PROJECT_CURRENT_STATE.md"
 MATRIX_FILE="docs/DELIVERY_PROGRESS_MATRIX.md"
 TEMPLATE_FILE="docs/CODEX_TASK_TEMPLATE.md"
 TASK_FILE="docs/CODEX_NEXT_TASK.yml"
+STATE_ARGS=()
 
 usage() {
   cat <<'EOF'
-usage: bash scripts/codex-next-task.sh [--validate]
+usage: bash scripts/codex-next-task.sh [--validate] [--open-pr-none-confirmed] [--request-package PACKAGE]
 
 Reads the Project Delivery Contract, Delivery Progress Matrix, Project Current State,
 Codex Task Template, and the derived CODEX_NEXT_TASK.yml handoff.
@@ -114,7 +115,7 @@ validate_contract_task() {
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
   current_phase="$(current_state_value "Current Phase")"
   current_status="$(current_state_value "Current Phase Status")"
-  state_text="$(bash scripts/v1-state.sh)"
+  state_text="$(bash scripts/v1-state.sh ${STATE_ARGS[@]+"${STATE_ARGS[@]}"})"
   effective="$(printf '%s\n' "$state_text" | awk -F': ' '$1 == "COMPLETION_EFFECTIVE_STATE" {print $2; exit}')"
   compat="$(yaml_value "$TASK_FILE" compatibility_status)"
   current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
@@ -152,19 +153,41 @@ validate_contract_task() {
   echo "CODEX_TASK_VALIDATION_OK"
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  usage
-  exit 0
-fi
+validate_only="NO"
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --validate)
+      validate_only="YES"
+      shift
+      ;;
+    --open-pr-none-confirmed)
+      STATE_ARGS+=("--open-pr-none-confirmed")
+      shift
+      ;;
+    --request-package)
+      [[ -n "${2:-}" ]] || { echo "--request-package requires a package identifier" >&2; exit 2; }
+      STATE_ARGS+=("--request-package" "$2")
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
 
-if [[ "${1:-}" == "--validate" ]]; then
+if [[ "$validate_only" == "YES" ]]; then
   validate_contract_task
   exit 0
 fi
 
 validate_contract_task >/dev/null
 
-if ! state_text="$(bash scripts/v1-state.sh 2>&1)"; then
+if ! state_text="$(bash scripts/v1-state.sh ${STATE_ARGS[@]+"${STATE_ARGS[@]}"} 2>&1)"; then
   echo "STOP: authoritative state resolver failed." >&2
   printf '%s\n' "$state_text" >&2
   exit 1
@@ -177,8 +200,15 @@ open_prs="$(state_value "$state_text" OPEN_PRS)"
 completion_effective_state="$(state_value "$state_text" COMPLETION_EFFECTIVE_STATE)"
 next_package_allowed="$(state_value "$state_text" NEXT_PACKAGE_ALLOWED)"
 next_package_block_reason="$(state_value "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+current_package_action_allowed="$(state_value "$state_text" CURRENT_PACKAGE_ACTION_ALLOWED)"
+current_package_block_reason="$(state_value "$state_text" CURRENT_PACKAGE_BLOCK_REASON)"
+open_pr_evidence_source="$(state_value "$state_text" OPEN_PR_EVIDENCE_SOURCE)"
+open_pr_none_confirmed="$(state_value "$state_text" OPEN_PR_NONE_CONFIRMED)"
+active_conflicting_prs="$(state_value "$state_text" ACTIVE_CONFLICTING_PRS)"
+request_class="$(state_value "$state_text" REQUEST_CLASS)"
 resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
 resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
+resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
 resolved_package="$(state_value "$state_text" RESOLVED_PACKAGE)"
 resolved_mode="$(state_value "$state_text" RESOLVED_MODE)"
 resolved_branch="$(state_value "$state_text" RESOLVED_BRANCH)"
@@ -200,6 +230,7 @@ RESOLVED_MODE: ${resolved_mode:-BLOCKED}
 RESOLVED_EDIT_PERMISSION: ${resolved_edit_permission:-false}
 NEXT_PACKAGE_ALLOWED: ${next_package_allowed:-NO}
 NEXT_PACKAGE_BLOCK_REASON: ${next_package_block_reason:-BLOCKED_UNKNOWN_STATE}
+RESOLUTION_BLOCK_REASON: ${resolution_block_reason:-BLOCKED_UNKNOWN_STATE}
 GENERATED_TASK: BLOCKED
 EOF
   exit 1
@@ -207,10 +238,14 @@ fi
 
 case "$resolved_scope_profile" in
   CURRENT_PACKAGE)
+    [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" && "$current_package_action_allowed" == "YES" ]] \
+      || { echo "STOP: current package was not authorized by the authoritative resolver." >&2; exit 1; }
     generated_allowed_scope="$(yaml_list "$TASK_FILE" current_package_allowed_scope)"
     generated_blocked_scope="$(yaml_list "$TASK_FILE" current_package_blocked_scope)"
     ;;
   AUTHORIZED_NEXT_PACKAGE)
+    [[ "$request_class" == "SUCCESSOR_PACKAGE" && "$next_package_allowed" == "YES" ]] \
+      || { echo "STOP: successor package was not authorized by the authoritative resolver." >&2; exit 1; }
     generated_allowed_scope="$(yaml_list "$TASK_FILE" authorized_next_allowed_scope)"
     generated_blocked_scope="$(yaml_list "$TASK_FILE" authorized_next_blocked_scope)"
     [[ "$resolved_edit_permission" == "false" ]] || { echo "STOP: read-only audit resolved with repository edits enabled." >&2; exit 1; }
@@ -239,8 +274,14 @@ RESOLVED_IMPLEMENTATION_PERMISSION: $resolved_implementation_permission
 RESOLVED_PR_CREATION_PERMISSION: $resolved_pr_creation_permission
 RESOLVED_BRANCH: $resolved_branch
 RESOLVED_HANDOFF_STAGE: $resolved_handoff_stage
+REQUEST_CLASS: $request_class
+CURRENT_PACKAGE_ACTION_ALLOWED: $current_package_action_allowed
+CURRENT_PACKAGE_BLOCK_REASON: $current_package_block_reason
 NEXT_PACKAGE_ALLOWED: $next_package_allowed
 NEXT_PACKAGE_BLOCK_REASON: $next_package_block_reason
+OPEN_PR_EVIDENCE_SOURCE: $open_pr_evidence_source
+OPEN_PR_NONE_CONFIRMED: $open_pr_none_confirmed
+ACTIVE_CONFLICTING_PRS: $active_conflicting_prs
 
 GENERATED_TASK: $resolved_active_block
 GENERATED_PACKAGE: $resolved_package

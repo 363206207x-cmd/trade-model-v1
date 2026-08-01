@@ -84,6 +84,10 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
+if [[ "$OPEN_PR_NONE_CONFIRMED" == "true" ]]; then
+  export V1_OPEN_PR_NONE_CONFIRMED="YES"
+fi
+
 echo "V1 Codex Run Next（一键启动下一步 Codex 任务）"
 print_hr
 

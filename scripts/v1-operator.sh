@@ -4,13 +4,16 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+STATE_ARGS=()
+TASK_ARGS=()
+STATE_ARG_COUNT=0
 
 usage() {
   cat <<'EOF'
 V1 Operator（一键总控编排器）
 
 用法:
-  bash scripts/v1-operator.sh
+  bash scripts/v1-operator.sh [--open-pr-none-confirmed] [--request-package PACKAGE]
       从 v1-state 的 resolved task 结果选择任务。只读审计仅打印任务且禁止仓库写入；可写包仍需通过全部状态门禁。
 
   bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>
@@ -59,7 +62,7 @@ subject_from_task() {
 
 print_task_text() {
   local task_file="${TMPDIR:-/tmp}/v1-operator-next-task.txt"
-  bash scripts/codex-next-task.sh >"$task_file"
+  bash scripts/codex-next-task.sh ${TASK_ARGS[@]+"${TASK_ARGS[@]}"} >"$task_file"
   echo "任务文件 task file（任务文件）: $task_file"
   echo "请复制下方任务全文给 Codex:"
   print_hr
@@ -69,7 +72,7 @@ print_task_text() {
 
 run_codex_or_print_task() {
   local task_file="${TMPDIR:-/tmp}/v1-operator-next-task.txt"
-  bash scripts/codex-next-task.sh >"$task_file"
+  bash scripts/codex-next-task.sh ${TASK_ARGS[@]+"${TASK_ARGS[@]}"} >"$task_file"
   echo "任务文件 task file（任务文件）: $task_file"
   if ! command -v codex >/dev/null 2>&1; then
     echo "Codex CLI 不存在；请复制下方任务全文给 Codex。"
@@ -117,18 +120,42 @@ confirm_reviewed() {
 }
 
 main() {
-  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    usage
+  local confirm_reviewed_pr=""
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --open-pr-none-confirmed)
+        STATE_ARGS+=("--open-pr-none-confirmed")
+        TASK_ARGS+=("--open-pr-none-confirmed")
+        ((STATE_ARG_COUNT+=1))
+        shift
+        ;;
+      --request-package)
+        [[ -n "${2:-}" ]] || stop "--request-package requires a package identifier."
+        STATE_ARGS+=("--request-package" "$2")
+        TASK_ARGS+=("--request-package" "$2")
+        ((STATE_ARG_COUNT+=2))
+        shift 2
+        ;;
+      --confirm-reviewed)
+        [[ -n "${2:-}" ]] || stop "缺少 PR_NUMBER。"
+        confirm_reviewed_pr="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ -n "$confirm_reviewed_pr" ]]; then
+    [[ "$STATE_ARG_COUNT" -eq 0 ]] || stop "--confirm-reviewed cannot be combined with task-resolution options."
+    confirm_reviewed "$confirm_reviewed_pr"
     exit 0
-  fi
-  if [[ "${1:-}" == "--confirm-reviewed" ]]; then
-    [[ -n "${2:-}" ]] || stop "缺少 PR_NUMBER。"
-    confirm_reviewed "$2"
-    exit 0
-  fi
-  if [[ "$#" -gt 0 ]]; then
-    usage >&2
-    exit 1
   fi
 
   echo "V1 Operator（一键总控编排器）"
@@ -137,8 +164,9 @@ main() {
   local state_text branch worktree open_prs main_sync can_continue blockers
   local resolved_from resolution_status resolved_package resolved_mode resolved_branch
   local resolved_active_block resolved_risk resolved_stage resolved_edit_permission
-  local resolved_implementation_permission resolved_pr_creation_permission block_reason
-  state_text="$(bash scripts/v1-state.sh 2>&1)" || stop "权威状态解析失败。"
+  local resolved_implementation_permission resolved_pr_creation_permission block_reason resolution_block_reason
+  local request_class current_package_action_allowed current_package_block_reason next_package_allowed
+  state_text="$(bash scripts/v1-state.sh ${STATE_ARGS[@]+"${STATE_ARGS[@]}"} 2>&1)" || stop "权威状态解析失败。"
   echo "$state_text"
   echo
 
@@ -160,9 +188,14 @@ main() {
   resolved_implementation_permission="$(state_value "$state_text" RESOLVED_IMPLEMENTATION_PERMISSION)"
   resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
   block_reason="$(state_value "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+  resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
+  request_class="$(state_value "$state_text" REQUEST_CLASS)"
+  current_package_action_allowed="$(state_value "$state_text" CURRENT_PACKAGE_ACTION_ALLOWED)"
+  current_package_block_reason="$(state_value "$state_text" CURRENT_PACKAGE_BLOCK_REASON)"
+  next_package_allowed="$(state_value "$state_text" NEXT_PACKAGE_ALLOWED)"
 
   [[ "$resolved_from" == "YES" ]] || stop "状态输出缺少 RESOLVED_FROM_STATE=YES。"
-  [[ "$resolution_status" == "PASS" ]] || stop "状态解析已阻断: ${block_reason:-UNKNOWN}."
+  [[ "$resolution_status" == "PASS" ]] || stop "状态解析已阻断: ${resolution_block_reason:-UNKNOWN}."
 
   echo "Resolved Package（解析包）: ${resolved_package:-UNKNOWN}"
   echo "Resolved Mode（解析模式）: ${resolved_mode:-UNKNOWN}"
@@ -171,11 +204,28 @@ main() {
   echo "Risk（风险等级）: ${resolved_risk:-UNKNOWN}"
   print_hr
 
+  if [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" ]]; then
+    [[ "$current_package_action_allowed" == "YES" ]] \
+      || stop "当前 package continuation 未获 resolver 授权: ${current_package_block_reason:-UNKNOWN}."
+    echo "OPERATOR_MODE: CURRENT_PACKAGE_CONTINUATION"
+    echo "CURRENT_PACKAGE_ACTION: ALLOWED"
+    echo "CURRENT_PACKAGE_BRANCH: ACCEPTED"
+    if [[ "${V1_WORKFLOW_SELF_TEST:-0}" == "1" ]]; then
+      print_task_text
+    else
+      run_codex_or_print_task
+    fi
+    exit 0
+  fi
+
+  [[ "$request_class" == "SUCCESSOR_PACKAGE" ]] || stop "未知 request class: ${request_class:-UNKNOWN}."
+  [[ "$next_package_allowed" == "YES" ]] || stop "Successor package 未获 resolver 授权: ${block_reason:-UNKNOWN}."
+
   if [[ "$resolved_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then
     [[ "$resolved_edit_permission" == "false" ]] || stop "只读审计错误地获得了仓库编辑权限。"
     [[ "$resolved_implementation_permission" == "false" ]] || stop "只读审计错误地获得了实现权限。"
     [[ "$resolved_pr_creation_permission" == "false" ]] || stop "只读审计错误地获得了 PR 创建权限。"
-    [[ "$can_continue" == "YES" ]] || stop "只读审计尚未通过完整状态门禁。Blockers: ${blockers:-UNKNOWN}"
+    [[ "$can_continue" == "YES" ]] || stop "Resolver 输出不一致。Blockers: ${blockers:-UNKNOWN}"
     echo "OPERATOR_MODE: READ_ONLY_AUDIT"
     echo "REPOSITORY_MUTATION: DISABLED"
     echo "PR_CREATION: DISABLED"

@@ -210,6 +210,12 @@ require_contains "scripts/v1-state.sh" "RESOLVED_FROM_STATE"
 require_contains "scripts/v1-state.sh" "RESOLVED_PACKAGE"
 require_contains "scripts/v1-state.sh" "RESOLVED_MODE"
 require_contains "scripts/v1-state.sh" "RESOLVED_EDIT_PERMISSION"
+require_contains "scripts/v1-state.sh" "CURRENT_PACKAGE_ACTION_ALLOWED"
+require_contains "scripts/v1-state.sh" "CURRENT_PACKAGE_BLOCK_REASON"
+require_contains "scripts/v1-state.sh" "OPEN_PR_EVIDENCE_SOURCE"
+require_contains "scripts/v1-state.sh" "OPEN_PR_NONE_CONFIRMED"
+require_contains "scripts/v1-state.sh" "ACTIVE_CONFLICTING_PRS"
+require_contains "scripts/v1-state.sh" "REQUEST_CLASS"
 require_not_contains "scripts/v1-state.sh" "classify_paused_pr_scope"
 require_not_contains "scripts/v1-state.sh" "PAUSED_PR_SCOPE_RELATION"
 require_not_contains "scripts/v1-state.sh" "ALLOWED_WITH_PAUSED_UNRELATED_PR"
@@ -230,9 +236,13 @@ require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_package_mode:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "blocked_package_phase:"
 require_contains "scripts/codex-next-task.sh" "RESOLVED_FROM_STATE"
 require_contains "scripts/codex-next-task.sh" "RESOLVED_SCOPE_PROFILE"
+require_contains "scripts/codex-next-task.sh" "CURRENT_PACKAGE_ACTION_ALLOWED"
+require_contains "scripts/codex-next-task.sh" "OPEN_PR_EVIDENCE_SOURCE"
 require_contains "scripts/v1-operator.sh" "OPERATOR_MODE: READ_ONLY_AUDIT"
+require_contains "scripts/v1-operator.sh" "OPERATOR_MODE: CURRENT_PACKAGE_CONTINUATION"
 require_contains "scripts/v1-operator.sh" "REPOSITORY_MUTATION: DISABLED"
 require_contains "scripts/v1-operator.sh" "PR_CREATION: DISABLED"
+require_contains "scripts/v1-codex-run-next.sh" "export V1_OPEN_PR_NONE_CONFIRMED"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_modules:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_paths:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "audit_scope_source_domains:"
@@ -327,7 +337,14 @@ done
 
 run_handoff_scenario() {
   local scenario="$1"
-  V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/codex-next-task.sh
+  shift
+  V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/codex-next-task.sh "$@"
+}
+
+run_operator_scenario() {
+  local scenario="$1"
+  shift
+  V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO="$scenario" bash scripts/v1-operator.sh "$@"
 }
 
 assert_handoff_blocked() {
@@ -341,7 +358,7 @@ assert_handoff_blocked() {
   [[ "$status" -ne 0 ]] || fail "handoff scenario must be blocked: $scenario"
   printf '%s\n' "$output" | grep -Fq "RESOLUTION_STATUS: BLOCKED" \
     || fail "blocked handoff scenario omitted blocked status: $scenario"
-  printf '%s\n' "$output" | grep -Fq "NEXT_PACKAGE_BLOCK_REASON: $expected_reason" \
+  printf '%s\n' "$output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason" \
     || fail "blocked handoff scenario reason mismatch: $scenario"
   printf '%s\n' "$output" | grep -Fq "GENERATED_TASK: BLOCKED" \
     || fail "blocked handoff scenario generated a task: $scenario"
@@ -386,7 +403,7 @@ assert_handoff_blocked p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
 assert_handoff_blocked conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR
 assert_handoff_blocked dirty_worktree BLOCKED_WORKTREE_DIRTY
 assert_handoff_blocked product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
-assert_handoff_blocked unknown_state BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE
+assert_handoff_blocked unknown_state BLOCKED_UNKNOWN_REQUEST_CLASS
 
 closed_debt_handoff="$(run_handoff_scenario closed_pr_1156)" || fail "closed debt handoff failed"
 printf '%s\n' "$closed_debt_handoff" | grep -Fq "RESOLVED_PACKAGE: $authorized_next_package_phase" \
@@ -414,6 +431,87 @@ done
 [[ "$operator_branch_before" == "$operator_branch_after" ]] || fail "P1A operator changed branch"
 [[ "$operator_head_before" == "$operator_head_after" ]] || fail "P1A operator changed HEAD"
 [[ "$operator_status_before" == "$operator_status_after" ]] || fail "P1A operator changed worktree or index"
+
+assert_chain_allowed() {
+  local name="$1" scenario="$2" expected_class="$3" expected_operator_mode="$4" expected_evidence="$5"
+  local handoff_output operator_output
+  shift 5
+  handoff_output="$(run_handoff_scenario "$scenario" "$@")" || { fail "$name handoff was blocked"; return; }
+  operator_output="$(run_operator_scenario "$scenario" "$@")" || { fail "$name operator was blocked"; return; }
+  printf '%s\n' "$handoff_output" | grep -Fq "RESOLUTION_STATUS: PASS" \
+    || fail "$name handoff omitted PASS"
+  printf '%s\n' "$handoff_output" | grep -Fq "REQUEST_CLASS: $expected_class" \
+    || fail "$name request classification mismatch"
+  printf '%s\n' "$handoff_output" | grep -Fq "OPEN_PR_EVIDENCE_SOURCE: $expected_evidence" \
+    || fail "$name evidence source mismatch"
+  printf '%s\n' "$operator_output" | grep -Fq "OPERATOR_MODE: $expected_operator_mode" \
+    || fail "$name operator mode mismatch"
+  echo "WORKFLOW_CHAIN_$name: PASS"
+}
+
+assert_chain_blocked() {
+  local name="$1" scenario="$2" expected_reason="$3"
+  local handoff_output handoff_status operator_output operator_status
+  shift 3
+  set +e
+  handoff_output="$(run_handoff_scenario "$scenario" "$@" 2>&1)"
+  handoff_status=$?
+  operator_output="$(run_operator_scenario "$scenario" "$@" 2>&1)"
+  operator_status=$?
+  set -e
+  [[ "$handoff_status" -ne 0 ]] || fail "$name handoff unexpectedly passed"
+  [[ "$operator_status" -ne 0 ]] || fail "$name operator unexpectedly passed"
+  printf '%s\n' "$handoff_output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason" \
+    || fail "$name handoff block reason mismatch"
+  printf '%s\n' "$operator_output" | grep -Fq "RESOLUTION_BLOCK_REASON: $expected_reason" \
+    || fail "$name operator block reason mismatch"
+  echo "WORKFLOW_CHAIN_$name: PASS"
+}
+
+# Full handoff chain: CODEX_NEXT_TASK.yml -> v1-state -> codex-next-task -> v1-operator.
+assert_chain_allowed CURRENT_P0_REMEDIATION current_p0_remediation \
+  CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
+assert_chain_allowed CURRENT_P0_FINAL_GATE current_p0_final_gate \
+  CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
+final_gate_handoff="$(run_handoff_scenario current_p0_final_gate)" || fail "current P0 final gate handoff failed"
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P0_FINAL_MERGE_PATH" \
+  || fail "current P0 final gate stage mismatch"
+assert_chain_blocked P0_OPEN_TO_P1A p0_open BLOCKED_PENDING_P0_MERGED_MAIN \
+  --request-package "$authorized_next_package_phase"
+assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
+  SUCCESSOR_PACKAGE READ_ONLY_AUDIT GH_QUERY
+assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
+  BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE
+assert_chain_allowed MERGED_WITH_EXPLICIT_EVIDENCE merged_gh_unavailable \
+  SUCCESSOR_PACKAGE READ_ONLY_AUDIT EXPLICIT_CONFIRMED --open-pr-none-confirmed
+assert_chain_blocked EXPLICIT_EVIDENCE_WITH_CONFLICT explicit_with_conflict \
+  BLOCKED_ACTIVE_CONFLICTING_PR --open-pr-none-confirmed
+assert_chain_allowed CURRENT_PR_SELF_CONFLICT current_pr_self_conflict \
+  CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
+assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
+  BLOCKED_ACTIVE_CONFLICTING_PR
+assert_chain_allowed SEPARATE_CONFLICT_CURRENT_P0 separate_conflicting_pr_current \
+  CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
+assert_chain_blocked P1A_MUTATION p1a_mutation BLOCKED_P1A_NOT_READ_ONLY
+assert_chain_blocked P1B_BEFORE_AUTHORIZATION p1b_request BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED
+assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY
+assert_chain_blocked PRODUCT_SOURCE_FAILURE product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
+assert_chain_blocked UNKNOWN_RESOLVER unknown_state BLOCKED_UNKNOWN_REQUEST_CLASS
+
+set +e
+invalid_evidence_output="$(V1_OPEN_PR_NONE_CONFIRMED=INVALID V1_WORKFLOW_SELF_TEST=1 \
+  V1_HANDOFF_SELF_TEST_SCENARIO=merged_gh_no_pr bash scripts/codex-next-task.sh 2>&1)"
+invalid_evidence_status=$?
+set -e
+[[ "$invalid_evidence_status" -ne 0 ]] || fail "invalid Open PR evidence unexpectedly passed"
+printf '%s\n' "$invalid_evidence_output" | grep -Fq "RESOLUTION_BLOCK_REASON: BLOCKED_INVALID_OPEN_PR_EVIDENCE" \
+  || fail "invalid Open PR evidence did not fail closed"
+
+run_next_output="$(CODEX_RUNNER_COMMAND=true V1_WORKFLOW_SELF_TEST=1 \
+  V1_HANDOFF_SELF_TEST_SCENARIO=merged_gh_unavailable bash scripts/v1-codex-run-next.sh \
+  --open-pr-none-confirmed)" || fail "v1-codex-run-next did not propagate explicit Open PR evidence"
+printf '%s\n' "$run_next_output" | grep -Fq "OPEN_PR_EVIDENCE_SOURCE: EXPLICIT_CONFIRMED" \
+  || fail "v1-codex-run-next omitted explicit evidence at the authoritative resolver"
 
 audit_policy_text="$(bash scripts/v1-state.sh --self-test-product-audit-policy)" || fail "product audit policy self-test failed"
 printf '%s\n' "$audit_policy_text" | grep -Fq "PRODUCT_AUDIT_POLICY_TESTS: PASS" \

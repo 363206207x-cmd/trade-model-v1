@@ -15,6 +15,21 @@ blockers=()
 
 readonly_audit_scope_contract="NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
 
+open_pr_none_confirmed="NO"
+open_pr_evidence_input_valid="YES"
+case "${V1_OPEN_PR_NONE_CONFIRMED:-NO}" in
+  YES|yes|true|1)
+    open_pr_none_confirmed="YES"
+    ;;
+  NO|no|false|0|"")
+    open_pr_none_confirmed="NO"
+    ;;
+  *)
+    open_pr_evidence_input_valid="NO"
+    ;;
+esac
+requested_package="${V1_REQUESTED_PACKAGE:-}"
+
 trim() { sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
 
 is_false_flag() {
@@ -23,17 +38,24 @@ is_false_flag() {
 
 emit_resolved_task_state() {
   printf 'CURRENT_PACKAGE: %s\n' "${current_package_phase:-UNDECLARED}"
+  printf 'CURRENT_PACKAGE_ACTION_ALLOWED: %s\n' "${current_package_action_allowed:-NO}"
+  printf 'CURRENT_PACKAGE_BLOCK_REASON: %s\n' "${current_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'CURRENT_EFFECTIVE_STATUS: %s\n' "${completion_effective_state:-UNKNOWN}"
   printf 'AUTHORIZED_NEXT_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
   printf 'AUTHORIZED_NEXT_TASK_MODE: %s\n' "${authorized_next_package_mode:-UNDECLARED}"
   printf 'NEXT_PACKAGE_ALLOWED: %s\n' "${next_package_allowed:-NO}"
   printf 'NEXT_PACKAGE_BLOCK_REASON: %s\n' "${next_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
+  printf 'OPEN_PR_EVIDENCE_SOURCE: %s\n' "${open_pr_evidence_source:-UNAVAILABLE}"
+  printf 'OPEN_PR_NONE_CONFIRMED: %s\n' "${open_pr_none_confirmed:-NO}"
+  printf 'ACTIVE_CONFLICTING_PRS: %s\n' "${active_conflicting_pr_count:-UNKNOWN}"
+  printf 'REQUEST_CLASS: %s\n' "${request_class:-UNKNOWN}"
   printf 'REPOSITORY_EDITS_ALLOWED: %s\n' "${authorized_next_repository_edits_allowed:-false}"
   printf 'IMPLEMENTATION_ALLOWED: %s\n' "${authorized_next_implementation_allowed:-false}"
   printf 'IMPLEMENTATION_PR_ALLOWED: %s\n' "${authorized_next_implementation_pr_allowed:-false}"
   printf 'P1B_AUTHORIZATION_STATUS: %s\n' "${p1b_authorization_declared_status:-UNDECLARED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
   printf 'RESOLUTION_STATUS: %s\n' "${resolution_status:-BLOCKED}"
+  printf 'RESOLUTION_BLOCK_REASON: %s\n' "${resolution_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'RESOLVED_PACKAGE: %s\n' "${resolved_package:-BLOCKED}"
   printf 'RESOLVED_MODE: %s\n' "${resolved_mode:-BLOCKED}"
   printf 'RESOLVED_BRANCH: %s\n' "${resolved_branch:-NONE}"
@@ -47,8 +69,33 @@ emit_resolved_task_state() {
   printf 'RESOLVED_NEXT_ACTION: %s\n' "${resolved_next_action:-No task is authorized}"
 }
 
+classify_package_request() {
+  request_class="UNKNOWN"
+  if [[ -n "${requested_package:-}" ]]; then
+    if [[ "$requested_package" == "${current_package_phase:-UNDECLARED}" ]]; then
+      request_class="CURRENT_PACKAGE_CONTINUATION"
+    elif [[ "$requested_package" == "${authorized_next_package_phase:-UNDECLARED}" \
+      || "$requested_package" == "${blocked_package_phase:-UNDECLARED}" ]]; then
+      request_class="SUCCESSOR_PACKAGE"
+    fi
+    return 0
+  fi
+
+  case "${completion_effective_state:-UNKNOWN}" in
+    PENDING_MERGED_MAIN)
+      request_class="CURRENT_PACKAGE_CONTINUATION"
+      ;;
+    EFFECTIVE_MERGED_MAIN)
+      request_class="SUCCESSOR_PACKAGE"
+      ;;
+  esac
+}
+
 resolve_task_handoff() {
   resolution_status="BLOCKED"
+  resolution_block_reason="BLOCKED_UNKNOWN_STATE"
+  current_package_action_allowed="NO"
+  current_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_STATE"
   next_package_allowed="NO"
   next_package_block_reason="${next_task_authorization_status:-BLOCKED_UNKNOWN_STATE}"
   resolved_package="BLOCKED"
@@ -63,6 +110,111 @@ resolve_task_handoff() {
   resolved_pr_creation_permission="false"
   resolved_next_action="No task is authorized until runtime state resolution succeeds"
 
+  classify_package_request
+
+  if [[ "$open_pr_evidence_input_valid" != "YES" ]]; then
+    current_package_block_reason="BLOCKED_INVALID_OPEN_PR_EVIDENCE"
+    next_package_block_reason="BLOCKED_INVALID_OPEN_PR_EVIDENCE"
+  elif [[ "${product_source_gate_status:-BLOCKED}" != "PASS" ]]; then
+    current_package_block_reason="BLOCKED_PRODUCT_SOURCE_GATE"
+    next_package_block_reason="BLOCKED_PRODUCT_SOURCE_GATE"
+  elif [[ "${worktree_clean:-No}" != "Yes" ]]; then
+    current_package_block_reason="BLOCKED_WORKTREE_DIRTY"
+    next_package_block_reason="BLOCKED_WORKTREE_DIRTY"
+  else
+    if [[ "${completion_effective_state:-UNKNOWN}" != "PENDING_MERGED_MAIN" ]]; then
+      current_package_block_reason="BLOCKED_CURRENT_PACKAGE_NOT_PENDING"
+    elif [[ "${branch:-UNKNOWN}" != "${current_package_branch:-UNDECLARED}" ]]; then
+      current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
+    elif [[ "${current_package_pr_count:-UNKNOWN}" != "0" \
+      && "${current_package_pr_count:-UNKNOWN}" != "1" ]]; then
+      current_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE"
+    else
+      current_package_action_allowed="YES"
+      current_package_block_reason="NONE"
+    fi
+
+    if [[ "${completion_effective_state:-UNKNOWN}" != "EFFECTIVE_MERGED_MAIN" ]]; then
+      next_package_block_reason="${next_task_authorization_status:-BLOCKED_PENDING_P0_MERGED_MAIN}"
+    elif [[ "${current_package_pr_count:-UNKNOWN}" == "UNKNOWN" ]]; then
+      next_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE"
+    elif [[ "${current_package_pr_count:-0}" != "0" ]]; then
+      next_package_block_reason="BLOCKED_CURRENT_PACKAGE_PR_PRESENT_OR_UNKNOWN"
+    elif [[ "${active_conflicting_pr_count:-UNKNOWN}" == "UNKNOWN" ]]; then
+      next_package_block_reason="BLOCKED_UNKNOWN_ACTIVE_PR_STATE"
+    elif [[ "${active_conflicting_pr_count:-0}" != "0" ]]; then
+      next_package_block_reason="BLOCKED_ACTIVE_CONFLICTING_PR"
+    elif [[ "${p1a_transition_allowed:-NO}" != "YES" ]]; then
+      next_package_block_reason="${next_task_authorization_status:-BLOCKED_P1A_TRANSITION}"
+    elif [[ "${product_audit_allowed:-NO}" != "YES" ]]; then
+      next_package_block_reason="${product_audit_blocker:-BLOCKED_PRODUCT_AUDIT_POLICY}"
+    else
+      next_package_allowed="YES"
+      next_package_block_reason="NONE"
+    fi
+  fi
+
+  if [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" ]]; then
+    if [[ "$current_package_action_allowed" != "YES" ]]; then
+      resolution_block_reason="$current_package_block_reason"
+      return 0
+    fi
+
+    resolution_status="PASS"
+    resolution_block_reason="NONE"
+    resolved_package="$current_package_phase"
+    resolved_mode="$current_package_mode"
+    resolved_branch="$current_package_branch"
+    resolved_active_block="$current_package_active_block"
+    resolved_risk="$current_package_risk"
+    resolved_scope_profile="CURRENT_PACKAGE"
+    resolved_handoff_stage="P0_REMEDIATION_REVIEW"
+    if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
+      resolved_handoff_stage="P0_FINAL_MERGE_PATH"
+    fi
+    resolved_edit_permission="$current_package_repository_edits_allowed"
+    resolved_implementation_permission="$current_package_implementation_allowed"
+    resolved_pr_creation_permission="$current_package_implementation_pr_allowed"
+    resolved_next_action="$current_package_next_action"
+    return 0
+  fi
+
+  if [[ "$request_class" != "SUCCESSOR_PACKAGE" ]]; then
+    resolution_block_reason="BLOCKED_UNKNOWN_REQUEST_CLASS"
+    return 0
+  fi
+
+  if [[ -n "${requested_package:-}" && "$requested_package" == "${blocked_package_phase:-UNDECLARED}" ]]; then
+    resolution_block_reason="BLOCKED_REQUESTED_PACKAGE_NOT_AUTHORIZED"
+    return 0
+  fi
+
+  if [[ -n "${requested_package:-}" && "$requested_package" != "${authorized_next_package_phase:-UNDECLARED}" ]]; then
+    resolution_block_reason="BLOCKED_UNKNOWN_REQUESTED_PACKAGE"
+    return 0
+  fi
+
+  if [[ "$next_package_allowed" != "YES" ]]; then
+    resolution_block_reason="$next_package_block_reason"
+    return 0
+  fi
+
+  resolution_status="PASS"
+  resolution_block_reason="NONE"
+  resolved_package="$authorized_next_package_phase"
+  resolved_mode="$authorized_next_package_mode"
+  resolved_branch="$authorized_next_package_branch"
+  resolved_active_block="$authorized_next_package_active_block"
+  resolved_risk="$authorized_next_package_risk"
+  resolved_scope_profile="AUTHORIZED_NEXT_PACKAGE"
+  resolved_handoff_stage="P1A_READ_ONLY_AUDIT"
+  resolved_edit_permission="$authorized_next_repository_edits_allowed"
+  resolved_implementation_permission="$authorized_next_implementation_allowed"
+  resolved_pr_creation_permission="$authorized_next_implementation_pr_allowed"
+  resolved_next_action="$authorized_next_package_next_action"
+}
+
+resolve_task_handoff_legacy_reference() {
   if [[ "${product_source_gate_status:-BLOCKED}" != "PASS" ]]; then
     next_package_block_reason="BLOCKED_PRODUCT_SOURCE_GATE"
     return 0
@@ -288,12 +440,33 @@ run_product_audit_policy_self_test() {
   return 1
 }
 
-if [[ "${1:-}" == "--self-test-product-audit-policy" ]]; then
+run_policy_self_test="NO"
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --self-test-product-audit-policy)
+      run_policy_self_test="YES"
+      shift
+      ;;
+    --open-pr-none-confirmed)
+      open_pr_none_confirmed="YES"
+      open_pr_evidence_input_valid="YES"
+      shift
+      ;;
+    --request-package)
+      [[ -n "${2:-}" ]] || { echo "--request-package requires a package identifier" >&2; exit 2; }
+      requested_package="$2"
+      shift 2
+      ;;
+    *)
+      echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy] [--open-pr-none-confirmed] [--request-package PACKAGE]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$run_policy_self_test" == "YES" ]]; then
   run_product_audit_policy_self_test
   exit $?
-elif [[ "$#" -gt 0 ]]; then
-  echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy]" >&2
-  exit 2
 fi
 
 yaml_value() {
@@ -365,6 +538,9 @@ load_task_package_contract() {
 
 run_handoff_resolution_simulation() {
   local scenario="$1"
+  local provided_open_pr_confirmation="$open_pr_none_confirmed"
+  local provided_evidence_valid="$open_pr_evidence_input_valid"
+  local provided_requested_package="$requested_package"
 
   load_task_package_contract
   current_task_mode="$current_package_mode"
@@ -385,13 +561,19 @@ run_handoff_resolution_simulation() {
   open_prs="#1157 current-package"
   can_continue="NO"
   blockers_text="P0_PENDING_MERGED_MAIN"
-  requested_package=""
+  requested_package="$provided_requested_package"
+  open_pr_evidence_source="GH_QUERY"
+  open_pr_none_confirmed="NO"
+  open_pr_evidence_input_valid="$provided_evidence_valid"
 
   case "$scenario" in
-    p0_open)
+    p0_open|current_p0_remediation)
       ;;
-    p0_ready_unmerged)
+    p0_ready_unmerged|current_p0_final_gate|current_pr_self_conflict)
       current_package_pr_draft="false"
+      ;;
+    p0_open_request_p1a)
+      requested_package="$authorized_next_package_phase"
       ;;
     p0_merged_unsynced)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
@@ -402,7 +584,7 @@ run_handoff_resolution_simulation() {
       open_prs="none"
       blockers_text="MAIN_BEHIND_ORIGIN"
       ;;
-    p0_merged_validated|p1a_operator|closed_pr_1156)
+    p0_merged_validated|p1a_operator|closed_pr_1156|merged_gh_no_pr)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -412,6 +594,54 @@ run_handoff_resolution_simulation() {
       open_prs="none"
       can_continue="YES"
       blockers_text="none"
+      ;;
+    merged_gh_unavailable_no_evidence|merged_gh_unavailable)
+      completion_effective_state="EFFECTIVE_MERGED_MAIN"
+      clean_synced_main="YES"
+      p0_merged_main_validation_status="PASS"
+      branch="main"
+      current_package_pr_count="UNKNOWN"
+      current_package_pr_draft="UNKNOWN"
+      active_conflicting_pr_count="UNKNOWN"
+      open_prs="GH_NOT_AVAILABLE"
+      open_pr_evidence_source="UNAVAILABLE"
+      blockers_text="OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE"
+      if [[ "$scenario" == "merged_gh_unavailable" \
+        && "$provided_open_pr_confirmation" == "YES" \
+        && "$provided_evidence_valid" == "YES" ]]; then
+        current_package_pr_count="0"
+        current_package_pr_draft="NONE"
+        active_conflicting_pr_count="0"
+        open_prs="none"
+        open_pr_evidence_source="EXPLICIT_CONFIRMED"
+        open_pr_none_confirmed="YES"
+        blockers_text="none"
+      fi
+      ;;
+    merged_explicit_no_pr)
+      completion_effective_state="EFFECTIVE_MERGED_MAIN"
+      clean_synced_main="YES"
+      p0_merged_main_validation_status="PASS"
+      branch="main"
+      current_package_pr_count="0"
+      current_package_pr_draft="NONE"
+      open_prs="none"
+      open_pr_evidence_source="EXPLICIT_CONFIRMED"
+      open_pr_none_confirmed="YES"
+      blockers_text="none"
+      ;;
+    explicit_with_conflict)
+      completion_effective_state="EFFECTIVE_MERGED_MAIN"
+      clean_synced_main="YES"
+      p0_merged_main_validation_status="PASS"
+      branch="main"
+      current_package_pr_count="0"
+      current_package_pr_draft="NONE"
+      active_conflicting_pr_count="1"
+      open_prs="#2000 active-conflicting-pr"
+      open_pr_evidence_source="GH_QUERY"
+      open_pr_none_confirmed="$provided_open_pr_confirmation"
+      blockers_text="ACTIVE_CONFLICTING_PR"
       ;;
     p1b_request)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
@@ -424,7 +654,7 @@ run_handoff_resolution_simulation() {
       requested_package="$blocked_package_phase"
       blockers_text="P1B_NOT_AUTHORIZED"
       ;;
-    conflicting_pr)
+    conflicting_pr|separate_conflicting_pr_successor)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -434,6 +664,23 @@ run_handoff_resolution_simulation() {
       active_conflicting_pr_count="1"
       open_prs="#2000 active-conflicting-pr"
       blockers_text="ACTIVE_CONFLICTING_PR"
+      ;;
+    separate_conflicting_pr_current)
+      active_conflicting_pr_count="1"
+      open_prs=$'#1157 current-package\n#2000 active-conflicting-pr'
+      blockers_text="ACTIVE_CONFLICTING_PR_BLOCKS_SUCCESSOR_ONLY"
+      ;;
+    p1a_mutation)
+      completion_effective_state="EFFECTIVE_MERGED_MAIN"
+      clean_synced_main="YES"
+      p0_merged_main_validation_status="PASS"
+      branch="main"
+      current_package_pr_count="0"
+      current_package_pr_draft="NONE"
+      open_prs="none"
+      authorized_next_repository_edits_allowed="true"
+      p1a_repository_edits_allowed="true"
+      blockers_text="P1A_MUTATION_BLOCKED"
       ;;
     dirty_worktree)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
@@ -502,6 +749,12 @@ run_handoff_resolution_simulation() {
     "$p1a_implementation_pr_allowed"
 
   resolve_task_handoff
+
+  if [[ "$resolution_status" == "PASS" ]]; then
+    can_continue="YES"
+  else
+    can_continue="NO"
+  fi
 
   printf 'BRANCH: %s\n' "$branch"
   printf 'WORKTREE_CLEAN: %s\n' "$worktree_clean"
@@ -746,6 +999,7 @@ fi
 [[ -n "$current_package_branch" ]] || current_package_branch="$branch"
 
 open_pr_check_source="not_checked"
+open_pr_evidence_source="UNAVAILABLE"
 open_pr_count="UNKNOWN"
 open_pr_status="UNKNOWN"
 open_prs="none"
@@ -760,16 +1014,27 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   open_pr_check_source="gh CLI"
   if ! pr_rows="$(gh pr list --state open --json number,title,headRefName,headRefOid,isDraft --jq '.[] | [.number, .headRefName, .headRefOid, .title, .isDraft] | @tsv' 2>/dev/null)"; then
     pr_rows=""
-    open_prs="GH_NOT_AVAILABLE"
-    current_package_pr="GH_NOT_AVAILABLE"
-    unrelated_open_prs="GH_NOT_AVAILABLE"
-    active_conflicting_open_prs="GH_NOT_AVAILABLE"
-    current_package_pr_count="UNKNOWN"
-    current_package_pr_draft="UNKNOWN"
-    active_conflicting_pr_count="UNKNOWN"
-    open_pr_status="UNKNOWN"
-    blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
+    if [[ "$open_pr_none_confirmed" == "YES" \
+      && "$open_pr_evidence_input_valid" == "YES" \
+      && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" ]]; then
+      open_pr_check_source="explicit confirmed"
+      open_pr_evidence_source="EXPLICIT_CONFIRMED"
+      open_pr_count="0"
+      open_pr_status="NONE"
+    else
+      open_pr_evidence_source="UNAVAILABLE"
+      open_prs="GH_NOT_AVAILABLE"
+      current_package_pr="GH_NOT_AVAILABLE"
+      unrelated_open_prs="GH_NOT_AVAILABLE"
+      active_conflicting_open_prs="GH_NOT_AVAILABLE"
+      current_package_pr_count="UNKNOWN"
+      current_package_pr_draft="UNKNOWN"
+      active_conflicting_pr_count="UNKNOWN"
+      open_pr_status="UNKNOWN"
+      blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
+    fi
   else
+    open_pr_evidence_source="GH_QUERY"
     open_pr_count="0"
     open_pr_status="NONE"
   fi
@@ -809,15 +1074,25 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   fi
 else
   open_pr_check_source="unavailable"
-  open_prs="GH_NOT_AVAILABLE"
-  current_package_pr="GH_NOT_AVAILABLE"
-  unrelated_open_prs="GH_NOT_AVAILABLE"
-  active_conflicting_open_prs="GH_NOT_AVAILABLE"
-  current_package_pr_count="UNKNOWN"
-  current_package_pr_draft="UNKNOWN"
-  active_conflicting_pr_count="UNKNOWN"
-  open_pr_status="UNKNOWN"
-  blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
+  if [[ "$open_pr_none_confirmed" == "YES" \
+    && "$open_pr_evidence_input_valid" == "YES" \
+    && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" ]]; then
+    open_pr_check_source="explicit confirmed"
+    open_pr_evidence_source="EXPLICIT_CONFIRMED"
+    open_pr_count="0"
+    open_pr_status="NONE"
+  else
+    open_pr_evidence_source="UNAVAILABLE"
+    open_prs="GH_NOT_AVAILABLE"
+    current_package_pr="GH_NOT_AVAILABLE"
+    unrelated_open_prs="GH_NOT_AVAILABLE"
+    active_conflicting_open_prs="GH_NOT_AVAILABLE"
+    current_package_pr_count="UNKNOWN"
+    current_package_pr_draft="UNKNOWN"
+    active_conflicting_pr_count="UNKNOWN"
+    open_pr_status="UNKNOWN"
+    blockers+=("OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE")
+  fi
 fi
 
 # Phase gate.
@@ -894,6 +1169,8 @@ resolve_task_handoff
 
 if [[ "$resolution_status" != "PASS" ]]; then
   can_continue="NO"
+elif [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" ]]; then
+  can_continue="$current_package_action_allowed"
 elif [[ "$resolved_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then
   can_continue="$product_audit_allowed"
 else
