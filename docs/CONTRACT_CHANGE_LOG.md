@@ -381,3 +381,63 @@ Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.
 Human confirmation required: Yes before B-risk PR #1155 merge. The candidate
 is not effective until exact-head review and merged main.
+
+---
+
+## v2.0-product-foundation-freeze-candidate
+
+Date: 2026-08-01
+Changed by: Codex
+Reason: Explicit human authorization to stop Governance First and establish a
+single Product First authority, permanent source gate, complete product
+baseline, evidence-based maturity model, Product Roadmap V2, and product
+acceptance standard.
+Before: Delivery-contract, workflow, compatibility, PR, and test evidence could
+dominate task selection even though the four formal product source classes had
+not been indexed as the highest product authority. PR #1156 governance-parser
+work remained an implicit default blocker.
+After: `docs/PRODUCT_SOURCE_OF_TRUTH.md` indexes and hashes the formal sources;
+every editable task must pass a minimal Product Source Gate and provide
+product/design/data/gap mappings; product maturity is recalculated separately
+from technical delivery status; Governance First is paused; PR #1156 is
+retained as `PAUSED_TECHNICAL_DEBT`; the next product package after P0 merged
+main is a read-only P1 Home Alignment readiness and gap audit.
+Does this change phase order: It creates a separate explicit Product First
+P0-P10 roadmap while preserving legacy delivery rows as technical evidence.
+Does this change done criteria: It strengthens product completion by requiring
+simultaneous product, design, semantic, real-data, interaction, failure-state,
+real-scenario, screenshot, and traceability evidence.
+Does this weaken safety boundaries: No. No-trading, exact identity, owner
+scope, public/private separation, fail-closed behavior, and no-fake-data rules
+are retained or strengthened.
+Human confirmation required: Already explicitly authorized for this Draft P0
+candidate; independent review and merged main are still required before it is
+effective or P1 may begin.
+
+---
+
+## v2.0-product-foundation-close-paused-debt-candidate
+
+Date: 2026-08-01
+Changed by: Codex
+Reason: Explicit human decision to remove overlapping unfinished governance
+work from the active open-PR set without merging, deleting, or representing it
+as complete.
+Before: PR #1156 remained open as `PAUSED_TECHNICAL_DEBT`; the P1A read-only
+audit gate needed a changed-file/module/source-domain exception to decide
+whether that open PR could coexist.
+After: PR #1156 is closed without merge and recorded as
+`CLOSED_PAUSED_TECHNICAL_DEBT`. Its exact Head, remote branch, eight unresolved
+review threads, named stash object, external patch/hash, and GitHub history are
+preserved. Closed unmerged debt is not an active open-PR blocker and is not
+effective/current content. Every active non-current open PR is conflicting;
+P1A remains blocked until P0 is reviewed, merged, synced, and validated, while
+P1B remains unauthorized.
+Does this change phase order: No.
+Does this change done criteria: No. Closure is explicitly `NOT_COMPLETED` and
+does not resolve review findings.
+Does this weaken safety boundaries: No. It adds no Java, API, schema, UI,
+Figma, notification, or trading capability.
+Human confirmation required: The close-without-merge decision was explicitly
+provided. PR #1157 still requires a new exact-Head review before any Ready or
+merge action.

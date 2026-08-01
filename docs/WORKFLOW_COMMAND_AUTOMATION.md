@@ -1,12 +1,42 @@
+# Product-First Workflow Entry
+
+The standard command order for every editable task is:
+
+```bash
+bash scripts/product-source-gate.sh
+git branch --show-current
+git status --short
+git rev-parse HEAD
+# task-specific read/audit checks
+# authorized implementation only after the gate passes
+# task-specific validation, product gate, workflow contract, diff and scope checks
+```
+
+`scripts/check-workflow-contract.sh` invokes the Product Source Gate first. Before editing, implementation, test modification, PR creation, Ready transition, merge gate, or deployment, the gate must pass for the declared task mapping.
+
+If the gate fails, the workflow must report:
+
+```text
+WORKFLOW_STATUS:
+BLOCKED_BY_PRODUCT_SOURCE_GATE
+```
+
+and must not enter editing.
+
+The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit remains fail closed for a missing/failed source gate, dirty worktree, unsynced main, any active non-current open PR, or editable scope. Closed unmerged technical debt is not an active blocker and is never effective/current content.
+
+---
+
 # Contract-First Workflow Automation
 
 Workflow automation must read facts in this priority order:
 
-1. `docs/PROJECT_DELIVERY_CONTRACT.md`
-2. `docs/DELIVERY_PROGRESS_MATRIX.md`
-3. `docs/PROJECT_CURRENT_STATE.md`
-4. derived compatibility files (`docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/CODEX_NEXT_TASK.yml`)
-5. legacy V1 documents as historical audit and asset evidence only
+1. `docs/PRODUCT_SOURCE_OF_TRUTH.md` for product direction and registered product sources
+2. `docs/PROJECT_DELIVERY_CONTRACT.md` for delivery controls
+3. `docs/DELIVERY_PROGRESS_MATRIX.md`
+4. `docs/PROJECT_CURRENT_STATE.md`
+5. derived compatibility files (`docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/CODEX_NEXT_TASK.yml`)
+6. legacy V1 documents as historical audit and asset evidence only
 
 `v1-auto.sh`, `v1-state.sh`, and `codex-next-task.sh` must not use review-only slice count as delivery progress or to select the next business package.
 `ACTIVE_MAINLINE_STATUS.yml` no longer independently defines the current task; it is a derived compatibility mirror.
@@ -40,7 +70,17 @@ The script prints:
 - `HEAD:`
 - `RECENT_COMMITS:`
 - `OPEN_PRS:`
+- `ACTIVE_CONFLICTING_OPEN_PRS:`
+- `CLOSED_TECHNICAL_DEBT_STATUS:`
+- `CLOSED_TECHNICAL_DEBT_EFFECTIVE:`
+- `CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT:`
 - `MAIN_SYNC:`
+- `CURRENT_TASK_MODE:`
+- `AUTHORIZED_NEXT_TASK_MODE:`
+- `NEXT_TASK_AUTHORIZATION_STATUS:`
+- `P1A_TRANSITION_ALLOWED:`
+- `PRODUCT_AUDIT_ALLOWED:`
+- `READ_ONLY_PRODUCT_AUDIT_STATUS:`
 - `CAN_CONTINUE_NEXT_PACKAGE:`
 - `BLOCKERS:`
 
@@ -50,9 +90,33 @@ If `gh` is unavailable, it prints `GH_NOT_AVAILABLE` in the open PR field and mu
 
 如果 `gh` 不可用，脚本在 open PR 字段输出 `GH_NOT_AVAILABLE`，不得输出不可读错误。
 
-When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If `gh` is unavailable or any open PR exists, the gate remains fail-closed.
+When `gh CLI` is available and open PR count is `0`, `GH_NOT_AVAILABLE` must not remain as a next-business-phase blocker. The state output must report `OPEN_PR_CHECK_SOURCE=gh CLI`, `OPEN_PR_COUNT=0`, and `OPEN_PR_STATUS=NONE`. If open-PR state is unavailable, audit and implementation gates remain fail closed. Every active non-current open PR is conflicting. Closed unmerged technical debt is not in the active open-PR set, does not block a read-only audit, and is never effective/current content.
 
-当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。如果 `gh` 不可用或存在任何 open PR，门禁继续 fail-closed（失败关闭）。
+当 `gh CLI` 可用且 open PR（未合并 PR）数量为 `0` 时，`GH_NOT_AVAILABLE`（GitHub 状态不可用）不得继续阻塞下一业务阶段。状态输出必须报告 `OPEN_PR_CHECK_SOURCE=gh CLI`、`OPEN_PR_COUNT=0`、`OPEN_PR_STATUS=NONE`。若 open PR 状态不可用，审计与实现都失败关闭。任何非当前活动 open PR 都按冲突处理；已关闭且未合并的技术债不阻塞只读审计，也绝不作为已生效或当前内容。
+
+### Read-Only Product Audit Boundary / 只读产品审计边界
+
+The persisted task contract separates `current_task_mode=PRODUCT_FOUNDATION_REMEDIATION` from `authorized_next_task_mode=READ_ONLY_PRODUCT_AUDIT`. P0 open or Ready/unmerged remains blocked. After P0 is effective on clean/synced merged main, merged-main validation and Product Source Gate pass, `v1-state.sh` derives the effective mode as P1A without a second YAML edit. P1A remains read-only and P1B remains unauthorized.
+
+`PRODUCT_AUDIT_ALLOWED=YES` requires all of the following:
+
+- effective `TASK_MODE: READ_ONLY_PRODUCT_AUDIT` after the explicit P0-to-P1A transition;
+- Product Source Gate `PASS`;
+- the exact `read_only_product_audit_scope_contract` forbidding code/test changes, business PR creation, and closed-debt recovery-content changes;
+- `p1a_repository_edits_allowed=false`, `p1a_implementation_allowed=false`, and `p1a_implementation_pr_allowed=false`;
+- clean worktree and clean/synced `main`;
+- no current business-package PR;
+- no `ACTIVE_CONFLICTING_PR`.
+
+The state output reports `CLOSED_TECHNICAL_DEBT_BLOCKS_AUDIT=NO` and `CLOSED_TECHNICAL_DEBT_EFFECTIVE=NO`. Those fields record non-effectivity only; audit permission never authorizes implementation, Ready transition, merge, deployment, code/test changes, reopening debt, or applying its stash/patch.
+
+Run the deterministic transition and active-open/closed-debt boundary cases with:
+
+```bash
+bash scripts/v1-state.sh --self-test-product-audit-policy
+```
+
+The self-test covers P0 open, Ready/unmerged, merged/unsynced, merged/validated, P1B blocking, closed-unmerged technical debt, current and active-conflicting PRs, dirty worktree, failed Product Source Gate, implementation attempts, and attempted editable scope. It is a small state-policy test, not a natural-language parser, inventory, digest, or governance engine.
 
 ## V1 Auto Operator / V1 自动操作台
 
@@ -135,9 +199,9 @@ One-command runner entry:
 bash scripts/v1-codex-run-next.sh
 ```
 
-This generates the next task through `v1-auto.sh next` and starts Codex CLI when available. It never stages, commits, pushes, creates PRs, or merges.
+This thin launcher delegates only through `v1-operator.sh -> codex-next-task.sh -> v1-state.sh` and starts Codex CLI when the operator authorizes the resolved task. It does not call `v1-auto.sh next` as an authoritative task selector and does not independently decide current/successor package, branch legality, Open PR conflicts, read-only mode, or Product Source status. It never stages, commits, pushes, creates PRs, or merges.
 
-一键执行入口通过 `v1-auto.sh next` 生成下一任务，并在 Codex CLI 可用时启动 Codex。它不会 stage、commit、push、创建 PR 或合并。
+一键执行入口只通过 `v1-operator.sh -> codex-next-task.sh -> v1-state.sh` 权威链解析并启动任务；它不再通过 `v1-auto.sh next` 选择任务，也不会 stage、commit、push、创建 PR 或合并。
 
 If Codex shell cannot confirm Open PR（未合并 PR）status because local `gh` is unavailable, but GPT connector or the user's terminal has confirmed Open PR none, use:
 
@@ -145,7 +209,7 @@ If Codex shell cannot confirm Open PR（未合并 PR）status because local `gh`
 bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
 ```
 
-This flag only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync（主分支同步）, `CAN_CONTINUE_NEXT_PACKAGE: NO` from other blockers, or merge approval rules.
+This flag is forwarded unchanged to the authoritative resolver. It does not bypass dirty worktree, an explicit conflicting PR, failed Product Source Gate, failed successor Main Sync（主分支同步）, another resolver blocker, or merge approval rules. A legal current-package branch is not rejected merely because it is not `main`; successor-package branch requirements remain resolver-controlled.
 
 如果 Codex shell 因本地 `gh` 不可用无法确认 Open PR 状态，但 GPT connector 或用户本机 terminal 已确认 Open PR none，可使用 `--open-pr-none-confirmed`。该参数只处理 Codex GitHub 状态未知，不绕过其他安全条件。
 

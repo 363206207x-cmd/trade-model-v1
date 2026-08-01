@@ -13,6 +13,114 @@ GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITH
 
 Use both English and Chinese labels. Do not answer only in English or only in Chinese.
 
+## Product-First Start Contract / 产品优先启动契约
+
+Before editing, every task response or working record must include:
+
+```text
+PRODUCT_SOURCE_GATE_STATUS:
+PASS / BLOCKED
+
+PRODUCT_SOURCES_READ:
+- <registered source_id and real path>
+
+PRODUCT_CONTRACT_MAPPING:
+- product module
+- applicable source chapter
+- required business semantics
+- forbidden boundary changes
+
+DESIGN_INTERACTION_MAPPING:
+- page / component
+- module order
+- click / linkage
+- detail entry
+- Loading / Empty / Error / Partial / Missing
+
+DATA_SOURCE_MAPPING:
+- field
+- source domain
+- API / Service / provider
+- cadence and cache
+- null / error behavior
+- public / private scope
+
+CURRENT_IMPLEMENTATION_GAP:
+- product requirement
+- current implementation
+- gap
+- bounded part allowed in this task
+
+STOP_CONDITIONS:
+- <task-specific hard stops>
+```
+
+At task end, every product-affecting answer must additionally include:
+
+```text
+PRODUCT_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED
+
+DESIGN_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED / NOT_APPLICABLE
+
+SEMANTIC_ALIGNMENT_STATUS:
+PASS / BLOCKED
+
+DATA_SOURCE_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED
+
+REAL_SCENARIO_STATUS:
+PASS / NOT_RUN / BLOCKED
+
+DEVIATIONS:
+- <difference from the registered product sources, or NONE>
+```
+
+Maven PASS, Workflow PASS, Governance PASS, test count, an open PR, or a merged technical slice cannot by itself mark a product module complete.
+
+## PRODUCT_FIRST_STOP_RULE
+
+This permanent rule is a simple human review rule. It must not become a new governance product or automated semantic engine.
+
+A review finding may block the current product stage only when it is classified as exactly one of:
+
+- `PRODUCT_SEMANTIC_BLOCKER`: a reproducible conflict with formal product semantics or interaction, including AI authority, ExecutionPlan/UserPosition separation, state separation, Home interaction, or Position Monitoring.
+- `SECURITY_OR_PRIVACY_BLOCKER`: privacy leakage, owner-scope bypass, unauthorized mutation, automatic open/close/reverse/trade, or Push Recheck used as trading authorization.
+- `REAL_DATA_INTEGRITY_BLOCKER`: mock/default/fallback data presented as real, failure presented as success, or fabricated product/AI fields.
+- `NEXT_PRODUCT_STAGE_BLOCKER`: reproducible evidence that the current stage cannot merge or the next formal Product Roadmap stage cannot start after merge, creating a real delivery deadlock.
+- `BUILD_OR_RUNTIME_BLOCKER`: compile failure, required-test failure, application startup failure, or failure of a core runtime chain.
+
+Every other finding is `NON_BLOCKING_TECHNICAL_DEBT` and must set `BLOCKS_CURRENT_STAGE: NO`. Examples include non-critical wording or metadata, formatting/naming preference, theoretical future cases, non-critical Workflow improvement, parser/inventory/digest/helper refinement, non-security test idealization, maintainability advice, or refactoring outside the current product package.
+
+Every review finding must report:
+
+```text
+FINDING_ID:
+BLOCKER_CLASS:
+DIRECT_PRODUCT_IMPACT:
+REPRODUCTION_EVIDENCE:
+BLOCKS_CURRENT_STAGE: YES / NO
+```
+
+A finding with `BLOCKS_CURRENT_STAGE: YES` must also identify the affected formal product source and explain why it cannot be deferred. Without concrete product impact, a reproducible path, the affected formal product source, and a non-deferrable reason, it must set `BLOCKS_CURRENT_STAGE: NO`. P1/P2/P3 priority and blocking status are independent.
+
+Workflow, Governance, Metadata, and Review tooling together may consume at most an estimated 10% of a product stage. At 10%, stop expanding them, register remaining items as `NON_BLOCKING_TECHNICAL_DEBT`, and resume product work. Exceptions require a demonstrated product-semantic, security/privacy, build/runtime, or actual next-stage blocker. Use a reasonable human estimate; do not build a statistics system. Task reports include:
+
+```text
+PRODUCT_WORK_RATIO:
+NON_PRODUCT_WORK_RATIO:
+STOP_RULE_TRIGGERED: YES / NO
+```
+
+Implementation is limited to plain documentation, fixed review fields, minimal shell assertions, and explicit human classification. Do not build a natural-language classifier, synonym list, semantic parser, inventory, digest, whole-review analyzer, independent Stop Rule phase, or large meta-test suite.
+
+Fixed examples:
+
+- naming preference -> `NON_BLOCKING_TECHNICAL_DEBT` -> `BLOCKS_CURRENT_STAGE: NO`
+- reproducible cross-user data leak -> `SECURITY_OR_PRIVACY_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+- reproducible post-merge P1A deadlock -> `NEXT_PRODUCT_STAGE_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+
 ## Fixed Codex Output Contract / Codex 固定输出契约
 
 All Codex final outputs must include the fixed fields below.

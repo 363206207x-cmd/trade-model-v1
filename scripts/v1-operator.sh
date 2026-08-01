@@ -4,43 +4,25 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-
-TASK_FILE="docs/CODEX_NEXT_TASK.yml"
-ACTIVE_FILE="docs/ACTIVE_MAINLINE_STATUS.yml"
+STATE_ARGS=()
+TASK_ARGS=()
+STATE_ARG_COUNT=0
 
 usage() {
   cat <<'EOF'
 V1 Operator（一键总控编排器）
 
 用法:
-  bash scripts/v1-operator.sh
-      自动判断当前状态：main clean 时创建任务分支并启动/打印 Codex 任务；dirty worktree 时打包当前工作；A-risk PR 可自动检查并合并。
+  bash scripts/v1-operator.sh [--open-pr-none-confirmed] [--request-package PACKAGE]
+      从 v1-state 的 resolved task 结果选择任务。只读审计仅打印任务且禁止仓库写入；可写包仍需通过全部状态门禁。
 
   bash scripts/v1-operator.sh --confirm-reviewed <PR_NUMBER>
       B-risk 经 GPT/人工复核后，继续检查并合并指定 Pull Request（拉取请求）。
 
 说明:
   Codex 不再负责 git branch / commit / push / PR；Git 操作由终端脚本统一处理。
-  本脚本不会改业务代码，也不会绕过 v1-state / codex-next-task / v1-package-dirty-work / v1-pr-complete。
+  本脚本不会绕过 v1-state / codex-next-task / v1-pr-complete，也不会为未知状态选择静态回退任务。
 EOF
-}
-
-yaml_value() {
-  local file="$1"
-  local key="$2"
-  if [[ ! -f "$file" ]]; then
-    return 0
-  fi
-  awk -v key="$key" '
-    $0 ~ "^" key ":" {
-      value=$0
-      sub("^[^:]*:[[:space:]]*", "", value)
-      gsub(/^"/, "", value)
-      gsub(/"$/, "", value)
-      print value
-      exit
-    }
-  ' "$file"
 }
 
 state_value() {
@@ -56,6 +38,19 @@ print_hr() {
 stop() {
   echo "STOP（停止）: $*" >&2
   exit 1
+}
+
+require_resolved_field() {
+  local state_text="$1"
+  local key="$2"
+  local value
+  value="$(state_value "$state_text" "$key")"
+  case "$value" in
+    ""|UNKNOWN|UNDECLARED|UNAVAILABLE)
+      stop "BLOCKED_UNKNOWN_RESOLVED_STATE: missing or unresolved $key."
+      ;;
+  esac
+  printf '%s\n' "$value"
 }
 
 subject_from_task() {
@@ -80,7 +75,7 @@ subject_from_task() {
 
 print_task_text() {
   local task_file="${TMPDIR:-/tmp}/v1-operator-next-task.txt"
-  bash scripts/codex-next-task.sh >"$task_file"
+  bash scripts/codex-next-task.sh ${TASK_ARGS[@]+"${TASK_ARGS[@]}"} >"$task_file"
   echo "任务文件 task file（任务文件）: $task_file"
   echo "请复制下方任务全文给 Codex:"
   print_hr
@@ -90,7 +85,7 @@ print_task_text() {
 
 run_codex_or_print_task() {
   local task_file="${TMPDIR:-/tmp}/v1-operator-next-task.txt"
-  bash scripts/codex-next-task.sh >"$task_file"
+  bash scripts/codex-next-task.sh ${TASK_ARGS[@]+"${TASK_ARGS[@]}"} >"$task_file"
   echo "任务文件 task file（任务文件）: $task_file"
   if ! command -v codex >/dev/null 2>&1; then
     echo "Codex CLI 不存在；请复制下方任务全文给 Codex。"
@@ -122,34 +117,71 @@ run_codex_or_print_task() {
 
 confirm_reviewed() {
   local pr_number="$1"
-  local risk
-  local subject
-  risk="$(yaml_value "$TASK_FILE" risk)"
-  subject="$(subject_from_task "${risk:-B}" "$(yaml_value "$TASK_FILE" branch)" "$(yaml_value "$TASK_FILE" active_block)")" || stop "无法安全生成合并 subject。"
+  local state_text resolved_from resolution_status resolved_mode risk task_branch active_block subject
+  state_text="$(bash scripts/v1-state.sh 2>&1)" || stop "权威状态解析失败。"
+  resolved_from="$(state_value "$state_text" RESOLVED_FROM_STATE)"
+  resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
+  resolved_mode="$(state_value "$state_text" RESOLVED_MODE)"
+  risk="$(state_value "$state_text" RESOLVED_RISK)"
+  task_branch="$(state_value "$state_text" RESOLVED_BRANCH)"
+  active_block="$(state_value "$state_text" RESOLVED_ACTIVE_BLOCK)"
+  [[ "$resolved_from" == "YES" && "$resolution_status" == "PASS" ]] || stop "无法从 v1-state 解析可执行任务。"
+  [[ "$resolved_mode" != "READ_ONLY_PRODUCT_AUDIT" ]] || stop "只读审计禁止 PR merge 操作。"
+  subject="$(subject_from_task "${risk:-B}" "$task_branch" "$active_block")" || stop "无法安全生成合并 subject。"
   [[ "$risk" == "B" ]] || stop "--confirm-reviewed 仅用于 B-risk；当前 risk: ${risk:-UNKNOWN}"
   bash scripts/v1-pr-complete.sh "$pr_number" B "$subject" --confirm-reviewed
 }
 
 main() {
-  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    usage
+  local confirm_reviewed_pr=""
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --open-pr-none-confirmed)
+        STATE_ARGS+=("--open-pr-none-confirmed")
+        TASK_ARGS+=("--open-pr-none-confirmed")
+        ((STATE_ARG_COUNT+=1))
+        shift
+        ;;
+      --request-package)
+        [[ -n "${2:-}" ]] || stop "--request-package requires a package identifier."
+        STATE_ARGS+=("--request-package" "$2")
+        TASK_ARGS+=("--request-package" "$2")
+        ((STATE_ARG_COUNT+=2))
+        shift 2
+        ;;
+      --confirm-reviewed)
+        [[ -n "${2:-}" ]] || stop "缺少 PR_NUMBER。"
+        confirm_reviewed_pr="$2"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ -n "$confirm_reviewed_pr" ]]; then
+    [[ "$STATE_ARG_COUNT" -eq 0 ]] || stop "--confirm-reviewed cannot be combined with task-resolution options."
+    confirm_reviewed "$confirm_reviewed_pr"
     exit 0
-  fi
-  if [[ "${1:-}" == "--confirm-reviewed" ]]; then
-    [[ -n "${2:-}" ]] || stop "缺少 PR_NUMBER。"
-    confirm_reviewed "$2"
-    exit 0
-  fi
-  if [[ "$#" -gt 0 ]]; then
-    usage >&2
-    exit 1
   fi
 
   echo "V1 Operator（一键总控编排器）"
   print_hr
 
   local state_text branch worktree open_prs main_sync can_continue blockers
-  state_text="$(bash scripts/v1-state.sh 2>&1 || true)"
+  local resolved_from resolution_status resolved_package resolved_mode resolved_branch
+  local resolved_active_block resolved_risk resolved_stage resolved_edit_permission
+  local resolved_implementation_permission resolved_pr_creation_permission block_reason resolution_block_reason
+  local current_package authorized_next_package request_class
+  local current_package_action_allowed current_package_block_reason next_package_allowed
+  local repository_edits_allowed implementation_allowed pr_creation_allowed open_pr_evidence_source
+  state_text="$(bash scripts/v1-state.sh ${STATE_ARGS[@]+"${STATE_ARGS[@]}"} 2>&1)" || stop "权威状态解析失败。"
   echo "$state_text"
   echo
 
@@ -159,67 +191,82 @@ main() {
   main_sync="$(state_value "$state_text" MAIN_SYNC)"
   can_continue="$(state_value "$state_text" CAN_CONTINUE_NEXT_PACKAGE)"
   blockers="$(state_value "$state_text" BLOCKERS)"
+  resolved_from="$(state_value "$state_text" RESOLVED_FROM_STATE)"
+  resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
+  resolved_package="$(state_value "$state_text" RESOLVED_PACKAGE)"
+  resolved_mode="$(state_value "$state_text" RESOLVED_MODE)"
+  resolved_branch="$(state_value "$state_text" RESOLVED_BRANCH)"
+  resolved_active_block="$(state_value "$state_text" RESOLVED_ACTIVE_BLOCK)"
+  resolved_risk="$(state_value "$state_text" RESOLVED_RISK)"
+  resolved_stage="$(state_value "$state_text" RESOLVED_HANDOFF_STAGE)"
+  resolved_edit_permission="$(state_value "$state_text" RESOLVED_EDIT_PERMISSION)"
+  resolved_implementation_permission="$(state_value "$state_text" RESOLVED_IMPLEMENTATION_PERMISSION)"
+  resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
+  block_reason="$(state_value "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+  resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
+  current_package="$(require_resolved_field "$state_text" CURRENT_PACKAGE)"
+  current_package_action_allowed="$(require_resolved_field "$state_text" CURRENT_PACKAGE_ACTION_ALLOWED)"
+  current_package_block_reason="$(require_resolved_field "$state_text" CURRENT_PACKAGE_BLOCK_REASON)"
+  authorized_next_package="$(require_resolved_field "$state_text" AUTHORIZED_NEXT_PACKAGE)"
+  next_package_allowed="$(require_resolved_field "$state_text" NEXT_PACKAGE_ALLOWED)"
+  block_reason="$(require_resolved_field "$state_text" NEXT_PACKAGE_BLOCK_REASON)"
+  request_class="$(require_resolved_field "$state_text" REQUEST_CLASS)"
+  resolved_mode="$(require_resolved_field "$state_text" RESOLVED_MODE)"
+  repository_edits_allowed="$(require_resolved_field "$state_text" REPOSITORY_EDITS_ALLOWED)"
+  implementation_allowed="$(require_resolved_field "$state_text" IMPLEMENTATION_ALLOWED)"
+  pr_creation_allowed="$(require_resolved_field "$state_text" PR_CREATION_ALLOWED)"
+  open_pr_evidence_source="$(require_resolved_field "$state_text" OPEN_PR_EVIDENCE_SOURCE)"
+  require_resolved_field "$state_text" PRODUCT_SOURCE_GATE_STATUS >/dev/null
 
-  local task_branch risk active_block subject
-  local source_head actual_head
-  task_branch="$(yaml_value "$TASK_FILE" branch)"
-  risk="$(yaml_value "$TASK_FILE" risk)"
-  active_block="$(yaml_value "$TASK_FILE" active_block)"
-  subject="$(subject_from_task "${risk:-A}" "$task_branch" "$active_block")" || subject="docs(workflow): package $task_branch"
-  source_head="$(yaml_value "$ACTIVE_FILE" current_head)"
-  actual_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  [[ "$repository_edits_allowed" == "$resolved_edit_permission" \
+    && "$implementation_allowed" == "$resolved_implementation_permission" \
+    && "$pr_creation_allowed" == "$resolved_pr_creation_permission" ]] \
+    || stop "BLOCKED_UNKNOWN_RESOLVED_STATE: resolved permissions are inconsistent."
 
-  echo "当前任务: ${active_block:-UNKNOWN}"
-  echo "任务分支: ${task_branch:-UNKNOWN}"
-  echo "Risk（风险等级）: ${risk:-UNKNOWN}"
-  echo "Subject（提交/PR 标题）: $subject"
-  echo "Source of Truth 当前主线 HEAD: ${source_head:-UNKNOWN}"
-  echo "实际当前 HEAD: ${actual_head:-UNKNOWN}"
+  [[ "$resolved_from" == "YES" ]] || stop "状态输出缺少 RESOLVED_FROM_STATE=YES。"
+  [[ "$resolution_status" == "PASS" ]] || stop "状态解析已阻断: ${resolution_block_reason:-UNKNOWN}."
+
+  echo "Resolved Package（解析包）: ${resolved_package:-UNKNOWN}"
+  echo "Resolved Mode（解析模式）: ${resolved_mode:-UNKNOWN}"
+  echo "Resolved Stage（解析阶段）: ${resolved_stage:-UNKNOWN}"
+  echo "Resolved Branch（解析分支）: ${resolved_branch:-UNKNOWN}"
+  echo "Risk（风险等级）: ${resolved_risk:-UNKNOWN}"
   print_hr
 
-  if [[ "$worktree" == "No" ]]; then
-    echo "检测到 dirty worktree（脏工作区），进入自动打包流程。"
-    echo "如果当前分支不是 main，将优先按当前分支打包，避免被 dirty CODEX_NEXT_TASK 下一阶段覆盖。"
-    local package_output pr_number
-    set +e
-    package_output="$(bash scripts/v1-package-dirty-work.sh 2>&1)"
-    local package_status=$?
-    set -e
-    echo "$package_output"
-    if [[ "$package_status" -ne 0 ]]; then
-      stop "dirty worktree（脏工作区）打包失败。"
+  if [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" ]]; then
+    [[ "$current_package_action_allowed" == "YES" ]] \
+      || stop "当前 package continuation 未获 resolver 授权: ${current_package_block_reason:-UNKNOWN}."
+    echo "OPERATOR_MODE: CURRENT_PACKAGE_CONTINUATION"
+    echo "CURRENT_PACKAGE_ACTION: ALLOWED"
+    echo "CURRENT_PACKAGE_BRANCH: ACCEPTED"
+    echo "OPERATOR_RESULT_STATUS: PASS"
+    if [[ "${V1_WORKFLOW_SELF_TEST:-0}" == "1" ]]; then
+      print_task_text
+    else
+      run_codex_or_print_task
     fi
-    pr_number="$(printf '%s\n' "$package_output" | grep -Eo 'pull/[0-9]+' | tail -1 | sed -E 's#pull/##' || true)"
-    echo
-    if [[ -z "$pr_number" ]]; then
-      echo "未能解析 Pull Request（拉取请求）编号；请查看上方输出。"
-      exit 0
-    fi
-    echo "已识别 Pull Request（拉取请求）: #$pr_number"
-    case "$risk" in
-      A)
-        echo "A-risk（低风险）: 自动进入 PR 检查 / ready / merge / next 流程。"
-        bash scripts/v1-pr-complete.sh "$pr_number" A "$subject"
-        ;;
-      B)
-        echo "B-risk（实现包）: 自动检查但不自动合并。"
-        bash scripts/v1-pr-complete.sh "$pr_number" B "$subject" || true
-        echo
-        echo "GPT review summary（给 GPT 的复核摘要）:"
-        print_hr
-        echo "PR: #$pr_number"
-        echo "Risk（风险等级）: B"
-        echo "Subject: $subject"
-        echo "请复核 changed files、forbidden semantics、CI 和实现边界。若明确同意合并，运行:"
-        echo "bash scripts/v1-operator.sh --confirm-reviewed $pr_number"
-        ;;
-      *)
-        echo "Risk（风险等级）: $risk，不自动合并。"
-        ;;
-    esac
     exit 0
   fi
 
+  [[ "$request_class" == "SUCCESSOR_PACKAGE" ]] || stop "未知 request class: ${request_class:-UNKNOWN}."
+  [[ "$next_package_allowed" == "YES" ]] || stop "Successor package 未获 resolver 授权: ${block_reason:-UNKNOWN}."
+
+  if [[ "$resolved_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then
+    [[ "$resolved_edit_permission" == "false" ]] || stop "只读审计错误地获得了仓库编辑权限。"
+    [[ "$resolved_implementation_permission" == "false" ]] || stop "只读审计错误地获得了实现权限。"
+    [[ "$resolved_pr_creation_permission" == "false" ]] || stop "只读审计错误地获得了 PR 创建权限。"
+    [[ "$can_continue" == "YES" ]] || stop "Resolver 输出不一致。Blockers: ${blockers:-UNKNOWN}"
+    echo "OPERATOR_MODE: READ_ONLY_AUDIT"
+    echo "REPOSITORY_MUTATION: DISABLED"
+    echo "PR_CREATION: DISABLED"
+    echo "IMPLEMENTATION: DISABLED"
+    echo "OPERATOR_RESULT_STATUS: PASS"
+    print_task_text
+    exit 0
+  fi
+
+  [[ "$resolved_edit_permission" == "true" ]] || stop "当前 resolved task 不允许仓库编辑。"
+  [[ "$worktree" == "Yes" ]] || stop "工作区不是 clean，resolved task 不允许自动打包或回退。"
   if [[ "$branch" != "main" ]]; then
     stop "当前不是 main 且工作区干净。请切回 main 或在当前分支产生/打包任务改动。当前分支: ${branch:-UNKNOWN}"
   fi
@@ -229,37 +276,31 @@ main() {
   fi
 
   if [[ "$open_prs" != "none" ]]; then
-    if [[ "$open_prs" == "GH_NOT_AVAILABLE" ]]; then
-      echo "Open PR（未合并 PR）状态未知；如果 GPT connector / 用户本机 gh 已确认 none，可继续生成任务，但不会自动 PR/merge。"
-    else
-      stop "存在 Open PR（未合并 PR）: $open_prs"
-    fi
+    stop "存在或无法确认 Open PR（未合并 PR）: $open_prs"
   fi
 
-  if [[ "$can_continue" != "YES" && "$blockers" != "OPEN_PR_STATUS_UNKNOWN_GH_NOT_AVAILABLE" ]]; then
+  if [[ "$can_continue" != "YES" ]]; then
     stop "CAN_CONTINUE_NEXT_PACKAGE 不是 YES。Blockers（阻塞）: ${blockers:-UNKNOWN}"
   fi
 
-  if [[ -n "${source_head:-}" && -n "${actual_head:-}" && "$source_head" != "$actual_head" ]]; then
-    echo "Source of Truth baseline（事实源基线）落后，但当前 main clean / synced / open PR none。"
-    echo "本次使用 actual HEAD（实际 HEAD）作为 Effective execution baseline（实际执行基线）。"
-    echo "不再创建 baseline sync（基线同步）小包；后续业务包会顺手更新 source-of-truth（事实源）。"
-    print_hr
-  fi
+  [[ -n "$resolved_branch" && "$resolved_branch" != "NONE" && "$resolved_branch" != "NONE_READ_ONLY_AUDIT" ]] || stop "resolved task 缺少可写分支。"
 
-  [[ -n "$task_branch" ]] || stop "CODEX_NEXT_TASK.yml 缺少 branch。"
+  local subject
+  subject="$(subject_from_task "${resolved_risk:-A}" "$resolved_branch" "$resolved_active_block")" || stop "无法从 resolved task 生成 subject。"
+  echo "Subject（提交/PR 标题）: $subject"
 
-  if git show-ref --verify --quiet "refs/heads/$task_branch"; then
-    echo "任务分支已存在，切换到: $task_branch"
-    git switch "$task_branch"
+  if git show-ref --verify --quiet "refs/heads/$resolved_branch"; then
+    echo "任务分支已存在，切换到: $resolved_branch"
+    git switch "$resolved_branch"
   else
-    echo "创建任务分支: $task_branch"
-    git switch -c "$task_branch"
+    echo "创建任务分支: $resolved_branch"
+    git switch -c "$resolved_branch"
   fi
 
   echo
   echo "已由终端脚本创建/切换任务分支；Codex 不需要再创建 branch。"
   echo "尝试启动 Codex；失败时会直接打印完整任务文本。"
+  echo "OPERATOR_RESULT_STATUS: PASS"
   run_codex_or_print_task
 }
 

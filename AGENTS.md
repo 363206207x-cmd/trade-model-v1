@@ -1,6 +1,77 @@
-# Trade Model V1 Contract-First Agent Rules
+# Trade Model V1 Product-First Agent Rules
 
-Before each task, read these files first:
+Before any audit, design, coding, test, repair, PR, merge-gate, or deployment task, Codex must complete this order before editing:
+
+1. confirm repository identity and current worktree;
+2. run `bash scripts/product-source-gate.sh`;
+3. read `docs/PRODUCT_SOURCE_OF_TRUTH.md` and every task-specific registered product source;
+4. output Product Contract Mapping;
+5. output Design / Interaction Mapping;
+6. output Data Source Mapping;
+7. state the Current Implementation Gap;
+8. state allowed scope, blocked scope, hard boundaries, real-scenario requirement, and stop conditions;
+9. edit only after `PRODUCT_SOURCE_GATE_STATUS: PASS`;
+10. validate and finish with a Product Alignment Report.
+
+Permanent authority rules:
+
+1. Formal product plans are higher product authority than current code, current UI, Governance, Workflow, and tests.
+2. Do not reverse-engineer product requirements from the current implementation.
+3. Do not invent a module, field, identity, state, interaction, route, weakening copy, or completion claim.
+4. When a required source or mapping is missing, or formal sources have a real unresolved conflict, stop instead of guessing.
+5. Governance, Workflow, and tests remain delivery controls; none can override `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
+6. The Product Source Gate must remain deterministic and minimal. Do not extend it into a natural-language parser, synonym inventory, digest system, or independent governance roadmap.
+7. A read-only product-gap audit may proceed only when `task_mode=READ_ONLY_PRODUCT_AUDIT`, Product Source Gate passes, P0 is effective on clean/synced merged main, the worktree is clean, editable scope is locked out, and no current or active conflicting open PR exists. Closed unmerged technical debt is not a blocker and is not effective/current content. This never authorizes implementation, Ready, merge, deployment, reopening debt, or using recovery content as current implementation.
+
+The permanent hard boundaries remain: no automatic open/close/add/reduce/reverse/order/trade; no Push Recheck trading authorization; no fake data as real; no owner-scope bypass; no public/private leakage; no ExecutionPlan-as-UserPosition; no `triggered`-as-opened.
+
+## PRODUCT_FIRST_STOP_RULE
+
+This permanent rule is a simple human review rule. It must not become a new governance product or automated semantic engine.
+
+A review finding may block the current product stage only when it is classified as exactly one of:
+
+- `PRODUCT_SEMANTIC_BLOCKER`: a reproducible conflict with formal product semantics or interaction, including AI authority, ExecutionPlan/UserPosition separation, state separation, Home interaction, or Position Monitoring.
+- `SECURITY_OR_PRIVACY_BLOCKER`: privacy leakage, owner-scope bypass, unauthorized mutation, automatic open/close/reverse/trade, or Push Recheck used as trading authorization.
+- `REAL_DATA_INTEGRITY_BLOCKER`: mock/default/fallback data presented as real, failure presented as success, or fabricated product/AI fields.
+- `NEXT_PRODUCT_STAGE_BLOCKER`: reproducible evidence that the current stage cannot merge or the next formal Product Roadmap stage cannot start after merge, creating a real delivery deadlock.
+- `BUILD_OR_RUNTIME_BLOCKER`: compile failure, required-test failure, application startup failure, or failure of a core runtime chain.
+
+Every other finding is `NON_BLOCKING_TECHNICAL_DEBT` and must set `BLOCKS_CURRENT_STAGE: NO`. Examples include non-critical wording or metadata, formatting/naming preference, theoretical future cases, non-critical Workflow improvement, parser/inventory/digest/helper refinement, non-security test idealization, maintainability advice, or refactoring outside the current product package.
+
+Every review finding must report:
+
+```text
+FINDING_ID:
+BLOCKER_CLASS:
+DIRECT_PRODUCT_IMPACT:
+REPRODUCTION_EVIDENCE:
+BLOCKS_CURRENT_STAGE: YES / NO
+```
+
+A finding with `BLOCKS_CURRENT_STAGE: YES` must also identify the affected formal product source and explain why it cannot be deferred. Without concrete product impact, a reproducible path, the affected formal product source, and a non-deferrable reason, it must set `BLOCKS_CURRENT_STAGE: NO`. P1/P2/P3 priority and blocking status are independent.
+
+Workflow, Governance, Metadata, and Review tooling together may consume at most an estimated 10% of a product stage. At 10%, stop expanding them, register remaining items as `NON_BLOCKING_TECHNICAL_DEBT`, and resume product work. Exceptions require a demonstrated product-semantic, security/privacy, build/runtime, or actual next-stage blocker. Use a reasonable human estimate; do not build a statistics system. Task reports include:
+
+```text
+PRODUCT_WORK_RATIO:
+NON_PRODUCT_WORK_RATIO:
+STOP_RULE_TRIGGERED: YES / NO
+```
+
+Implementation is limited to plain documentation, fixed review fields, minimal shell assertions, and explicit human classification. Do not build a natural-language classifier, synonym list, semantic parser, inventory, digest, whole-review analyzer, independent Stop Rule phase, or large meta-test suite.
+
+Fixed examples:
+
+- naming preference -> `NON_BLOCKING_TECHNICAL_DEBT` -> `BLOCKS_CURRENT_STAGE: NO`
+- reproducible cross-user data leak -> `SECURITY_OR_PRIVACY_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+- reproducible post-merge P1A deadlock -> `NEXT_PRODUCT_STAGE_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+
+---
+
+# Trade Model V1 Contract-First Delivery Rules
+
+After the Product First gate and mappings above, read these delivery-control files:
 
 1. `docs/PROJECT_DELIVERY_CONTRACT.md`
 2. `docs/PROJECT_CURRENT_STATE.md`
@@ -34,7 +105,7 @@ All development must follow:
 4. `docs/CODEX_TASK_TEMPLATE.md`
 5. `docs/PROJECT_GLOBAL_AUDIT.md` when present
 
-Before any task, read:
+After the Product First gate and mappings above, also read:
 
 1. `docs/PROJECT_DELIVERY_CONTRACT.md`
 2. `docs/PROJECT_CURRENT_STATE.md`
@@ -70,7 +141,7 @@ Rules:
 
 # Codex Project Rules
 
-Codex must read these files before each task:
+After product-source reading and mapping, Codex must also read these delivery and compatibility files:
 
 - `docs/SESSION_BOOTSTRAP.md`
 - `docs/ACTIVE_MAINLINE_STATUS.yml`
@@ -119,13 +190,17 @@ Every task must declare:
 
 Do not continue into the next business package until the current package is merged on `main`.
 
-Current task selection must use `docs/ACTIVE_MAINLINE_STATUS.yml`:
+Product-package selection must follow `docs/PRODUCT_SOURCE_OF_TRUTH.md` and
+`docs/PRODUCT_ROADMAP_V2.md`, then use the delivery contract, progress matrix,
+current state, merged `main`, and `bash scripts/v1-state.sh` for delivery and
+runtime facts. `docs/ACTIVE_MAINLINE_STATUS.yml` is a derived compatibility
+mirror: its `active_block` and `next_required_action` cannot define product
+direction or override the Product First roadmap.
 
-- `active_block` defines the current block.
-- `next_required_action` defines the next allowed action.
-- If chat memory, branch names, PR state, and docs conflict, merged `main` plus `bash scripts/v1-state.sh` wins.
+- If chat memory, branch names, PR state, and docs conflict, the registered product sources decide product meaning; merged `main`, the delivery matrix/current state, and `bash scripts/v1-state.sh` decide implementation effectivity.
 - If Codex shell reports `GH_NOT_AVAILABLE`, treat Codex GitHub status as unknown, not as project state failure. GPT connector evidence or the user's local terminal `gh` output may be used as handoff evidence for open PR / main sync / clean worktree status.
 - Do not open the next package until the current package is merged on `main`, local `main` is synced, and the worktree is clean.
+- Every active non-current open PR is conflicting for the next product package. Closed unmerged technical debt is not an active blocker, is not effective/current content, and must not be used as implementation evidence.
 - Prefer fixed workflow commands over handwritten long `gh pr create` / `gh pr merge` commands.
 
 ## Duplicate Skeleton Freeze
@@ -138,4 +213,4 @@ Do not continue P359 or start P360 by default.
 
 Do not connect auto-trading, Push, external channels, Candidate generation, Point generation, order, execution, or executable trade semantics unless a future task explicitly authorizes that scope.
 
-The next allowed track is not hard-coded here. It is whatever merged `main`, `docs/ACTIVE_MAINLINE_STATUS.yml`, and `bash scripts/v1-state.sh` jointly confirm as safe.
+The next allowed track is the next Product First package authorized by the Product Source of Truth and Product Roadmap, after merged `main`, the delivery matrix/current state, and `bash scripts/v1-state.sh` confirm it is safe to start.

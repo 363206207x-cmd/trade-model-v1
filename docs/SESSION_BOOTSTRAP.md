@@ -1,6 +1,79 @@
-# Contract-First Session Bootstrap
+# Product-First Session Bootstrap
 
-Read these files first, in this order:
+Every new task starts in this exact order:
+
+1. **Repository Identity** — confirm canonical repository, branch, exact Head, local/origin relationship, index, worktree, merge/rebase/cherry-pick state, and relevant PR state.
+2. **Product Source Gate** — run `bash scripts/product-source-gate.sh`; editing is forbidden when it returns `BLOCKED`.
+3. **Product Sources Read** — read `docs/PRODUCT_SOURCE_OF_TRUTH.md` and all `required_product_sources` for the task.
+4. **Product Contract Mapping** — map module, source chapters, required meanings, identities, state boundaries, privacy, and forbidden reinterpretations.
+5. **Design / Interaction Mapping** — map page, Figma/interaction source, module order, clicks, linked refresh, detail entry, and Loading/Empty/Error/Partial/Missing.
+6. **Data Source Mapping** — map each affected field to domain, service/API/provider, cadence, cache, nullable/error behavior, and public/private scope.
+7. **Current Implementation Gap** — state product requirement, current behavior, exact gap, and the bounded part authorized for this task.
+8. **Scope and Stop Conditions** — state allowed/blocked scope, real-scenario requirement, hard boundaries, and stop conditions.
+9. **Editing** — begin only after the preceding steps pass.
+10. **Validation** — run product gate, task-specific checks, tests, failure scenarios, diff/scope checks, and real scenario when applicable.
+11. **Product Alignment Report** — report product/design/semantic/data/real-scenario alignment and deviations; tests alone never prove completion.
+
+Product sources are the highest business authority. Delivery contracts, current-state files, Workflow, Governance, and tests are read after the product gate as delivery controls and implementation evidence. They cannot redefine the product.
+
+## Task-Mode Gate
+
+`bash scripts/v1-state.sh` has a persisted P0-to-P1A transition and two deliberately separate continuation decisions. `current_task_mode` remains `PRODUCT_FOUNDATION_REMEDIATION` while the P0 package is unmerged; `authorized_next_task_mode` is `READ_ONLY_PRODUCT_AUDIT`. Only P0 effective merged main, local/origin main match, merged-main validation, and Product Source Gate `PASS` derive the effective task mode as P1A. No YAML rewrite is required after those runtime facts become true.
+
+- `PRODUCT_AUDIT_ALLOWED` applies only after the effective task mode becomes `READ_ONLY_PRODUCT_AUDIT` and the fixed `read_only_product_audit_scope_contract` remains locked. It requires Product Source Gate `PASS`, a clean worktree, clean/synced `main`, no current business-package PR, no active/conflicting open PR, and a complete machine-readable audit scope.
+- `NEXT_BUSINESS_PHASE_ALLOWED` and `CAN_START_NEXT_BUSINESS_PHASE` remain the strict implementation/merge/deployment gates. Every active non-current open PR is conflicting. A closed unmerged technical-debt PR is not an active blocker and is never effective/current content.
+
+A read-only product audit may inspect product sources, merged code, APIs, tests, runtime, network payloads, screenshots, and Figma. It may not change code or tests, create a business implementation PR, reopen or use closed technical-debt content as current implementation, transition Ready, merge, deploy, or begin implementation. An active/conflicting open PR, dirty worktree, failed Product Source Gate, missing clean/synced main, or attempted editable scope makes `PRODUCT_AUDIT_ALLOWED=NO`.
+
+P1A may start only after the P0 baseline is effective and validated on clean/synced merged main. P1A has `repository_edits_allowed=false`, `implementation_allowed=false`, and `implementation_pr_allowed=false`. P1B remains blocked until the P1A decision and bounded implementation authorization are independently reviewed and effective on merged main; completing P1A does not mark Home implementation complete.
+
+## PRODUCT_FIRST_STOP_RULE
+
+This permanent rule is a simple human review rule. It must not become a new governance product or automated semantic engine.
+
+A review finding may block the current product stage only when it is classified as exactly one of:
+
+- `PRODUCT_SEMANTIC_BLOCKER`: a reproducible conflict with formal product semantics or interaction, including AI authority, ExecutionPlan/UserPosition separation, state separation, Home interaction, or Position Monitoring.
+- `SECURITY_OR_PRIVACY_BLOCKER`: privacy leakage, owner-scope bypass, unauthorized mutation, automatic open/close/reverse/trade, or Push Recheck used as trading authorization.
+- `REAL_DATA_INTEGRITY_BLOCKER`: mock/default/fallback data presented as real, failure presented as success, or fabricated product/AI fields.
+- `NEXT_PRODUCT_STAGE_BLOCKER`: reproducible evidence that the current stage cannot merge or the next formal Product Roadmap stage cannot start after merge, creating a real delivery deadlock.
+- `BUILD_OR_RUNTIME_BLOCKER`: compile failure, required-test failure, application startup failure, or failure of a core runtime chain.
+
+Every other finding is `NON_BLOCKING_TECHNICAL_DEBT` and must set `BLOCKS_CURRENT_STAGE: NO`. Examples include non-critical wording or metadata, formatting/naming preference, theoretical future cases, non-critical Workflow improvement, parser/inventory/digest/helper refinement, non-security test idealization, maintainability advice, or refactoring outside the current product package.
+
+Every review finding must report:
+
+```text
+FINDING_ID:
+BLOCKER_CLASS:
+DIRECT_PRODUCT_IMPACT:
+REPRODUCTION_EVIDENCE:
+BLOCKS_CURRENT_STAGE: YES / NO
+```
+
+A finding with `BLOCKS_CURRENT_STAGE: YES` must also identify the affected formal product source and explain why it cannot be deferred. Without concrete product impact, a reproducible path, the affected formal product source, and a non-deferrable reason, it must set `BLOCKS_CURRENT_STAGE: NO`. P1/P2/P3 priority and blocking status are independent.
+
+Workflow, Governance, Metadata, and Review tooling together may consume at most an estimated 10% of a product stage. At 10%, stop expanding them, register remaining items as `NON_BLOCKING_TECHNICAL_DEBT`, and resume product work. Exceptions require a demonstrated product-semantic, security/privacy, build/runtime, or actual next-stage blocker. Use a reasonable human estimate; do not build a statistics system. Task reports include:
+
+```text
+PRODUCT_WORK_RATIO:
+NON_PRODUCT_WORK_RATIO:
+STOP_RULE_TRIGGERED: YES / NO
+```
+
+Implementation is limited to plain documentation, fixed review fields, minimal shell assertions, and explicit human classification. Do not build a natural-language classifier, synonym list, semantic parser, inventory, digest, whole-review analyzer, independent Stop Rule phase, or large meta-test suite.
+
+Fixed examples:
+
+- naming preference -> `NON_BLOCKING_TECHNICAL_DEBT` -> `BLOCKS_CURRENT_STAGE: NO`
+- reproducible cross-user data leak -> `SECURITY_OR_PRIVACY_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+- reproducible post-merge P1A deadlock -> `NEXT_PRODUCT_STAGE_BLOCKER` -> `BLOCKS_CURRENT_STAGE: YES`
+
+---
+
+# Contract-First Delivery Compatibility
+
+After the Product Source Gate and product mappings above, read these delivery-control files in this order:
 
 1. `docs/PROJECT_DELIVERY_CONTRACT.md`
 2. `docs/PROJECT_CURRENT_STATE.md`
@@ -102,7 +175,7 @@ One-command Codex runner:
 bash scripts/v1-codex-run-next.sh
 ```
 
-This starts from clean/synced `main`, generates the next Codex task through `v1-auto.sh next`, and tries to launch Codex CLI. It does not stage, commit, push, create PRs, or merge.
+This is a thin entry over the authoritative chain `v1-codex-run-next.sh -> v1-operator.sh -> codex-next-task.sh -> v1-state.sh`. It forwards current/successor package requests and evidence without independently deciding branch legality, Open PR policy, task mode, or package authorization. A current P0 package branch may continue when the resolver authorizes it; only a successor package requires its merged-main and clean/synced-main conditions. The launcher does not stage, commit, push, create PRs, or merge.
 
 If Codex shell cannot confirm Open PR because local `gh` is unavailable, but GPT connector or the user's terminal has already confirmed Open PR none, the allowed handoff form is:
 
@@ -110,7 +183,7 @@ If Codex shell cannot confirm Open PR because local `gh` is unavailable, but GPT
 bash scripts/v1-codex-run-next.sh --open-pr-none-confirmed
 ```
 
-This only bypasses Codex GitHub status unknown. It does not bypass non-main branch, dirty worktree, explicit open PR, failed Main Sync, or other blockers.
+The launcher forwards this evidence unchanged to the resolver. It does not bypass dirty worktree, an explicit conflicting PR, failed Product Source Gate, failed successor Main Sync, or another resolver blocker, and it does not itself impose a `main` requirement on a legal current-package continuation.
 
 If Codex CLI fails after task generation because of local session permission, readonly database, or `codex exec` failure, `v1-codex-run-next.sh` prints the full task text directly. Copy the printed task into Codex; do not run extra business steps.
 
@@ -156,7 +229,7 @@ Use it only when Codex wrote files but did not successfully create the task bran
 11. Open PR / branch / Issue does not count as done.
 12. Do not continue P359 or start P360 by default.
 13. Do not default back to a historical track. The current active block comes from `docs/ACTIVE_MAINLINE_STATUS.yml`.
-14. Continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms clean/synced `main`, no open PR, and no blockers.
+14. For editable implementation, merge, or deployment, continue only when `bash scripts/v1-state.sh` or accepted handoff evidence confirms the strict phase gate. For an effective `READ_ONLY_PRODUCT_AUDIT`, use `PRODUCT_AUDIT_ALLOWED`; every active non-current open PR blocks. Closed unmerged technical debt does not block, but its content is not effective and must not be treated as current implementation.
 
 If Codex shell prints `OPEN_PRS: GH_NOT_AVAILABLE`, treat it as Codex GitHub status unknown. It is not, by itself, proof that the project has an open PR or an unsynced main. GPT connector evidence or the user's local terminal `gh` output may be accepted as handoff evidence when it explicitly confirms open PR none, main sync, and clean worktree.
 
