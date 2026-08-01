@@ -150,10 +150,6 @@ echo
 echo "当前任务: ${active_block:-UNKNOWN}"
 echo "task file（任务文件）: $task_file"
 
-if ! command -v codex >/dev/null 2>&1; then
-  stop_with_task_path "codex CLI 不存在，无法自动启动 Codex。" "$task_file"
-fi
-
 if [[ -n "${CODEX_RUNNER_COMMAND:-}" ]]; then
   echo "使用 CODEX_RUNNER_COMMAND（可配置执行命令）启动 Codex。"
   if CODEX_TASK_FILE="$task_file" bash -lc "$CODEX_RUNNER_COMMAND"; then
@@ -161,6 +157,10 @@ if [[ -n "${CODEX_RUNNER_COMMAND:-}" ]]; then
     exit 0
   fi
   stop_with_task_path "CODEX_RUNNER_COMMAND 执行失败。" "$task_file"
+fi
+
+if ! command -v codex >/dev/null 2>&1; then
+  stop_with_task_path "codex CLI 不存在，无法自动启动 Codex。" "$task_file"
 fi
 
 echo "使用默认命令: codex exec <task>"
