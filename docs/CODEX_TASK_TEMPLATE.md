@@ -2,13 +2,33 @@
 
 Every Codex task must start by reading:
 
-1. docs/PROJECT_DELIVERY_CONTRACT.md
-2. docs/PROJECT_CURRENT_STATE.md
-3. docs/DELIVERY_PROGRESS_MATRIX.md
-4. AGENTS.md
+1. AGENTS.md
+2. docs/PRODUCT_SOURCE_OF_TRUTH.md
+3. the task's registered required product sources
+4. docs/PROJECT_DELIVERY_CONTRACT.md
+5. docs/PROJECT_CURRENT_STATE.md
+6. docs/DELIVERY_PROGRESS_MATRIX.md
+7. docs/CODEX_NEXT_TASK.yml
 
-Chat history is not the source of truth.
-The repository contract is the source of truth.
+Before editing, run `bash scripts/product-source-gate.sh` and record:
+
+1. Product Source Gate Status
+2. Product Sources Read
+3. Product Contract Mapping
+4. Design / Interaction Mapping
+5. Data Source Mapping
+6. Current Implementation Gap
+7. Allowed Scope
+8. Blocked Scope
+9. Real Scenario Requirement
+10. Stop Conditions
+
+Do not edit when the Product Source Gate is blocked. Product plans are higher product authority than current code, current UI, Governance, Workflow, and tests.
+
+Chat history is not a product source of truth.
+`docs/PRODUCT_SOURCE_OF_TRUTH.md` is the highest product authority. The delivery
+contract, progress matrix, current state, Workflow, Governance, and tests remain
+delivery controls and implementation evidence.
 
 ---
 
@@ -18,12 +38,19 @@ Before making changes, answer:
 
 1. Current branch:
 2. Current phase:
-3. Is this task allowed in current phase:
-4. Previous phase DONE:
-5. Files expected to change:
-6. Tests expected to run:
-7. Safety boundaries:
-8. Stop conditions:
+3. Product module:
+4. Required product sources:
+5. Product contract mapping:
+6. Design / interaction mapping:
+7. Data source mapping:
+8. Current implementation gap:
+9. Is this task allowed in current phase:
+10. Previous phase DONE:
+11. Files expected to change:
+12. Tests and real scenarios expected to run:
+13. Allowed and blocked scope:
+14. Safety boundaries:
+15. Stop conditions:
 
 ---
 
@@ -31,15 +58,19 @@ Before making changes, answer:
 
 Stop immediately if:
 
-1. Worktree is not clean.
-2. Maven tests fail before changes.
-3. Task is outside current phase.
-4. Task requires changing the contract without explicit approval.
-5. Task may create auto-trading behavior.
-6. Task treats execution_plan as user_position.
-7. Task treats triggered as opened.
-8. Task treats tm_real_position as user_position.
-9. Task marks docs-only / DTO-only / review-only as DONE.
+1. Product Source Gate is blocked.
+2. A required product source is missing, changed, unread, or in unresolved conflict.
+3. Product/design/data/gap mapping is absent.
+4. Worktree is unexpectedly dirty.
+5. Maven tests fail before changes when a clean baseline is required.
+6. Task is outside current phase or product package.
+7. Task requires changing a product/contract source without explicit approval.
+8. Task may create auto-trading behavior.
+9. Task treats execution_plan as user_position.
+10. Task treats triggered as opened.
+11. Task treats tm_real_position as user_position.
+12. Task marks docs-only / DTO-only / review-only as a completed business module.
+13. Task invents a field, interaction, route, state, source, percentage, or successful unsupported capability.
 
 ---
 
@@ -51,15 +82,18 @@ Every task must end with:
 2. Changed files
 3. Added files
 4. Deleted files
-5. Tests run
-6. Maven result
-7. Contract compliance
-8. Whether current phase is DONE
-9. Evidence for DONE
-10. Whether next phase is allowed
-11. Next allowed task
-12. Whether files were staged
-13. Whether files were committed
+5. Product/design/semantic/data alignment status
+6. Real scenario status and evidence
+7. Deviations
+8. Tests run
+9. Maven result
+10. Contract compliance
+11. Whether current phase is DONE
+12. Evidence for DONE
+13. Whether next phase is allowed
+14. Next allowed task
+15. Whether files were staged
+16. Whether files were committed
 
 ## Final Output Template / 最终输出模板
 

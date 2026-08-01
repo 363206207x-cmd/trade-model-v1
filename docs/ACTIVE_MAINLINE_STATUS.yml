@@ -1,34 +1,45 @@
 current_head: "DERIVED_BY_GIT_HEAD"
+source_of_truth_product: "docs/PRODUCT_SOURCE_OF_TRUTH.md"
 source_of_truth_contract: "docs/PROJECT_DELIVERY_CONTRACT.md"
 source_of_truth_matrix: "docs/DELIVERY_PROGRESS_MATRIX.md"
 source_of_truth_current_state: "docs/PROJECT_CURRENT_STATE.md"
 compatibility_status: "DERIVED_ONLY"
 
-active_mainline: "Project Delivery Contract Mainline"
-active_mainline_cn: "项目交付契约主线"
+active_mainline: "Product First Mainline"
+active_mainline_cn: "产品优先主线"
 
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-active_block: "FE-04E cross-endpoint Opportunity/Recheck privacy and state-contract remediation implemented on the PR #1155 branch, pending exact-head review; Message/Push UI is not started"
-active_block_cn: "FE-04E 跨端点 Opportunity/Recheck 隐私与状态合同修复已在 PR #1155 分支实现，等待 exact-head 复审；Message/Push UI 尚未开始"
+product_phase: "P0 Product Foundation Freeze"
+product_phase_status: "CANDIDATE_PENDING_REVIEW_AND_MERGED_MAIN"
+product_source_gate_required: true
+product_implementation_allowed: false
 
-next_required_action: "Perform a read-only exact-head review of PR #1155 for the unified public OPPORTUNITY projection, private-state oracle removal, complete raw user PushRecheck route/service denial, owner-scoped POSITION_RISK state machine, and regression evidence."
-next_business_phase: "FE-04E Full Privacy Boundary and State Machine Exact Head Review"
+active_block: "P0 Product Foundation Freeze candidate; business implementation is stopped"
+active_block_cn: "P0 产品基础冻结候选；业务实现已停止"
+
+next_required_action: "Create the P0 Draft Product Foundation PR if absent; otherwise keep it Draft and stop for independent review."
+next_business_phase: "P1 Home Alignment Readiness and Gap Audit"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize a later phase. Only read-only exact-head review of PR #1155 is allowed; Message/Push UI, system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or data, FE-04F, P4, trading, and production deployment remain blocked."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize a later phase. P1 begins only after P0 is independently reviewed and merged to clean/synced main; P1 implementation still requires a separate bounded authorization."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "#1155 OPEN / READY / UNMERGED"
-current_branch: "codex/fe04e-message-push-ui-governance"
-current_package_pr: "#1155 privacy and state contract remediation pending exact-head review"
-unrelated_open_prs: "NOT_REVERIFIED_BY_LOCAL_DOCS_TASK; runtime remains derived by v1-state"
-block_next_business_phase_only: false
+current_pr: "P0 DRAFT PR; derive exact number and state from GitHub"
+current_branch: "codex/product-foundation-freeze-p0"
+current_package_pr: "P0 Product Foundation Freeze Draft PR; derive exact number and state from GitHub"
+unrelated_open_prs: "#1156 OPEN / DRAFT / UNMERGED / PAUSED_TECHNICAL_DEBT"
+block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
 pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, reopen, or include its code"
+
+paused_governance_pr: "#1156"
+paused_governance_status: "PAUSED_TECHNICAL_DEBT"
+paused_governance_reason: "Product direction reset; governance parser work no longer blocks product-first read-only and non-trading development"
+paused_governance_resume_condition: "Only resume when a real product regression demonstrates that the missing governance capability is necessary"
 
 p1_4_status: "DONE on merged main by PR #1017"
 p1_4_effective: true
@@ -420,9 +431,9 @@ notes:
   - "FE-04C read-only Position Monitoring is effective on merged main cc39f0c6315812b1178427c29b8b422da511ba0d through PR #1148; exact string positionId, owner scope, GET-only reads, monitor-log fail-closed behavior, and no trading actions remain mandatory."
   - "FE-04D AI Analysis first package is effective on merged main 66362746fe3bd932061087bcd3496c5273cc218b through PR #1151: authoritative analysisId, FE-03 reuse, exactly three returned AI roles, five-state fail-closed behavior, unavailable-role isolation, and stale Dashboard cache protection are implemented."
   - "The FE-04E Message/Push Contract Foundation is effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8 through PR #1154: exact string identities, exact OPPORTUNITY/POSITION_RISK source identity, authenticated shared read-only OPPORTUNITY access, owner-scoped POSITION_RISK access, read-only Push Detail GET, and explicit READY/EMPTY/ERROR/MISSING/PARTIAL states are available."
-  - "PR #1155 contains the FE-04E full privacy/state remediation candidate: Dashboard Home, Opportunity Log, and Message Detail use one public OPPORTUNITY policy restricted to exact public identity, safe allowlisted public lifecycle/status, public timestamp, and public description; UserPosition, account-risk, position-risk, raw Recheck, failReasonJson, and private risk data neither influence nor appear in the public response."
+  - "PR #1155 is effective on merged main 2552dd24b1b756d5eb517e640baa772e1c5bcab6: Dashboard Home, Opportunity Log, and Message Detail use one public OPPORTUNITY policy restricted to exact public identity, safe allowlisted public lifecycle/status, public timestamp, and public description; UserPosition, account-risk, position-risk, raw Recheck, failReasonJson, and private risk data neither influence nor appear in the public response."
   - "All raw user PushRecheck latest/log/preview/config/audit/summary/ops/trigger/replay routes and public service methods fail closed before repository access because no authoritative owner relationship exists. POSITION_RISK READY requires complete legal owner/position/monitor data; incomplete valid data is PARTIAL, invalid/malformed/conflicting data is ERROR, inaccessible exact data is MISSING, and only a valid empty collection is EMPTY."
-  - "POSITION_RISK remains a separate owner-scoped private projection. Message/Push UI stays NOT_STARTED and blocked until the privacy/state candidate passes exact-head review, is merged to clean/synced main, and governance is re-evaluated."
+  - "POSITION_RISK remains a separate owner-scoped private projection. Message/Push UI stays NOT_STARTED; merged PR #1155 did not authorize UI implementation, and Product-First P0 pauses all further implementation until the product baseline is reviewed and merged."
   - "Figma example values without returned or source-authorized fields must be hidden or fail closed."
   - "System notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message/push data, mutation, unrelated API/schema expansion, FE-04F, P4, trading, and production deployment remain blocked."
   - "P2 business stress is DONE/effective on merged main by PR #1104 with PASS evidence."

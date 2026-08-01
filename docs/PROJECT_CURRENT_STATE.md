@@ -6,11 +6,44 @@ Current Phase: P0-0 Contract Lock + Baseline + Dead Code Candidate Report
 Current Phase Status: DONE
 Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
-Current Work Package: FE-04E cross-endpoint Opportunity/Recheck privacy and state-contract remediation is implemented on the PR #1155 branch and pending a new exact-head review; the Message/Push Contract Foundation remains effective on merged main 5ad8ddb24a8253180b3e2b0a34fec66b9928ace8, while Message/Push UI remains NOT_STARTED
-Next Business Phase: FE-04E Full Privacy Boundary and State Machine Exact Head Review
-Next Business Phase Allowed: EXACT_HEAD_REVIEW_ONLY; Message Center and Push Detail UI remain blocked until the server-side public projection is reviewed, merged to clean/synced main, and governance is re-evaluated; system notifications, Telegram, external send, automatic notification, fabricated unread/message counts or message data, private-risk-derived OPPORTUNITY fields, trading capability, FE-04F, P4, and production deployment remain blocked
+Product Direction: PRODUCT_FIRST
+Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
+Product Phase: P0 Product Foundation Freeze
+Product Phase Status: CANDIDATE_PENDING_REVIEW_AND_MERGED_MAIN
+Current Work Package: Establish the immutable product-source registry, permanent Product Source Gate, full product baseline, Product First roadmap, and acceptance standard; no business implementation is authorized in this package
+Next Business Phase: P1 Home Alignment Readiness and Gap Audit
+Next Business Phase Allowed: NO; P0 must be independently reviewed and merged to clean/synced main before a read-only P1 audit, and P1 implementation requires a separate bounded authorization
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## Product-First Baseline Candidate
+
+The P0 Product Foundation Freeze candidate is based on main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6`. It registers the formal V1
+architecture, Position Monitoring, AI Conflict/Confused/Push Recheck/Review,
+final Home interaction, frozen Figma, and formal business-contract sources.
+Product plans now precede current implementation, current UI, phase records,
+Workflow, Governance, and tests as product authority.
+
+This package changes product documentation and a minimal deterministic source
+gate only. It does not change Java, business APIs, schema, business UI, Figma,
+business tests, notification delivery, or trading capability. No business
+module becomes complete because of P0.
+
+PR #1156 is `PAUSED_TECHNICAL_DEBT`.
+
+- Pause reason: Product direction reset; governance parser work no longer
+  blocks product-first read-only and non-trading development.
+- Resume condition: only when a real product regression demonstrates that the
+  missing governance capability is necessary.
+- Boundary: keep PR #1156 open, Draft, unmerged, and unchanged; do not resolve
+  its review threads or make it the default P1 blocker.
+
+The only action after this candidate is a Draft PR and independent review. P1
+Home implementation, PR #1156 remediation, Telegram, external notification,
+automatic notification, and trading remain blocked.
 
 ---
 
@@ -32,14 +65,14 @@ The design baseline is `FROZEN` and its repository registration is
 FE-04B, the bounded FE-04C read-only Position Monitoring package, and the
 bounded FE-04D AI Analysis first package are effective on merged main. The
 FE-04E Message/Push Contract Foundation is effective on merged main
-`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154. FE-04E UI and
-FE-04F remain unimplemented. The FE-04E UI readiness re-evaluation identified
-a server-side privacy prerequisite: shared `OPPORTUNITY` responses must not
-carry UserPosition- or account-risk-derived fields for a frontend to discard.
-PR #1155 now contains that B-risk public-projection candidate plus
-cross-endpoint PushRecheck isolation and explicit Message/Push state validation,
-and is pending a new exact-head review. No Message/Push UI, schema, Figma node, notification
-delivery, AI capability, or trading capability is authorized by this package.
+`5ad8ddb24a8253180b3e2b0a34fec66b9928ace8` through PR #1154. Its privacy and
+state remediation is also effective on merged main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6` through PR #1155. That merged
+boundary keeps shared `OPPORTUNITY` responses free of UserPosition- and
+account-risk-derived fields, isolates cross-endpoint PushRecheck access, and
+applies explicit Message/Push state validation. FE-04E UI and FE-04F remain
+unimplemented. No Message/Push UI, schema, Figma node, notification delivery,
+AI capability, or trading capability was authorized by either package.
 
 ---
 
@@ -118,11 +151,14 @@ The FE-04E Message/Push Contract Foundation is
 
 The read-only UI readiness re-evaluation passed the message-list, Push Detail,
 source-specific access, state-model, registered Figma, Telegram-boundary, and
-capability gates, but subsequent P1 review found that the shared response still
-carried private-risk-derived fields. FE-04E Message/Push UI therefore remains
-`NOT_STARTED` and `BLOCKED_PENDING_PRIVACY_BOUNDARY_REVIEW_AND_MERGED_MAIN`.
+capability gates. Subsequent P1 review found that the shared response still
+carried private-risk-derived fields; merged PR #1155 closed that server-side
+prerequisite. FE-04E Message/Push UI nevertheless remains `NOT_STARTED`. The P0
+Product Foundation Freeze pauses implementation, and any future UI package must
+be selected by the Product-First roadmap after P0 is independently reviewed and
+merged.
 
-PR #1155 introduces source-specific server-side read projections:
+Merged PR #1155 provides source-specific server-side read projections:
 
 - `OPPORTUNITY` is
   `AUTHENTICATED_SHARED_PUBLIC_PROJECTION`. Its response contains only exact
@@ -159,10 +195,11 @@ PR #1155 introduces source-specific server-side read projections:
   data maps to `ERROR`, missing or inaccessible exact resources map to
   `MISSING`, and only a successful empty collection maps to `EMPTY`.
 
-This privacy-boundary candidate changes the read API response projection but
-does not add a new endpoint, mutation, schema, Message/Push UI, notification
-send, or trading capability. It is not effective until reviewed and merged to
-main. Only exact-head review is currently authorized.
+This privacy boundary is effective on merged main
+`2552dd24b1b756d5eb517e640baa772e1c5bcab6`. It changed the read API response
+projection but added no new endpoint, mutation, schema, Message/Push UI,
+notification send, or trading capability. Product-First P0 now stops further
+implementation until its own baseline is independently reviewed and merged.
 
 System notifications, Telegram, external send, automatic notification,
 delivery acknowledgement, fabricated unread/message counts, fabricated
@@ -225,11 +262,12 @@ Safari/Chrome, real reverse-proxy Session/CSRF, real staging, Secret Store
 injection/rotation, and production deployment were not run.
 Production readiness remains `BLOCKED`. FE-02, P3-H1, FE-03, P3-H3, FE-04A,
 FE-04B, FE-04C, the bounded FE-04D first package, and the FE-04E Contract
-Foundation are effective on merged main. The FE-04 Figma baseline is
-registered on main. PR #1155 remains pending a new exact-head privacy review
-and merged-main validation; Message/Push UI is not authorized while that
-boundary is pending. System notifications, Telegram, external/automatic
-notification, fabricated UI data, market search, watch-asset writes,
+Foundation and PR #1155 privacy/state boundary are effective on merged main.
+The FE-04 Figma baseline is registered on main. Message/Push UI remains
+unimplemented and is not authorized by those merged backend packages. The P0
+Product Foundation Freeze is the current work package; after P0 is merged, only
+the Product-First P1 Home audit may begin. System notifications, Telegram,
+external/automatic notification, fabricated UI data, market search, watch-asset writes,
 unsupported deep analysis, unrelated API expansion, delivery/write actions,
 FE-04F, P4, and production deployment remain blocked.
 

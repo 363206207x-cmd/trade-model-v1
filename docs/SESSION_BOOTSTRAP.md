@@ -1,6 +1,26 @@
-# Contract-First Session Bootstrap
+# Product-First Session Bootstrap
 
-Read these files first, in this order:
+Every new task starts in this exact order:
+
+1. **Repository Identity** — confirm canonical repository, branch, exact Head, local/origin relationship, index, worktree, merge/rebase/cherry-pick state, and relevant PR state.
+2. **Product Source Gate** — run `bash scripts/product-source-gate.sh`; editing is forbidden when it returns `BLOCKED`.
+3. **Product Sources Read** — read `docs/PRODUCT_SOURCE_OF_TRUTH.md` and all `required_product_sources` for the task.
+4. **Product Contract Mapping** — map module, source chapters, required meanings, identities, state boundaries, privacy, and forbidden reinterpretations.
+5. **Design / Interaction Mapping** — map page, Figma/interaction source, module order, clicks, linked refresh, detail entry, and Loading/Empty/Error/Partial/Missing.
+6. **Data Source Mapping** — map each affected field to domain, service/API/provider, cadence, cache, nullable/error behavior, and public/private scope.
+7. **Current Implementation Gap** — state product requirement, current behavior, exact gap, and the bounded part authorized for this task.
+8. **Scope and Stop Conditions** — state allowed/blocked scope, real-scenario requirement, hard boundaries, and stop conditions.
+9. **Editing** — begin only after the preceding steps pass.
+10. **Validation** — run product gate, task-specific checks, tests, failure scenarios, diff/scope checks, and real scenario when applicable.
+11. **Product Alignment Report** — report product/design/semantic/data/real-scenario alignment and deviations; tests alone never prove completion.
+
+Product sources are the highest business authority. Delivery contracts, current-state files, Workflow, Governance, and tests are read after the product gate as delivery controls and implementation evidence. They cannot redefine the product.
+
+---
+
+# Contract-First Delivery Compatibility
+
+After the Product Source Gate and product mappings above, read these delivery-control files in this order:
 
 1. `docs/PROJECT_DELIVERY_CONTRACT.md`
 2. `docs/PROJECT_CURRENT_STATE.md`

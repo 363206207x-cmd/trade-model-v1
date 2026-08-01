@@ -1,12 +1,42 @@
+# Product-First Workflow Entry
+
+The standard command order for every editable task is:
+
+```bash
+bash scripts/product-source-gate.sh
+git branch --show-current
+git status --short
+git rev-parse HEAD
+# task-specific read/audit checks
+# authorized implementation only after the gate passes
+# task-specific validation, product gate, workflow contract, diff and scope checks
+```
+
+`scripts/check-workflow-contract.sh` invokes the Product Source Gate first. Before editing, implementation, test modification, PR creation, Ready transition, merge gate, or deployment, the gate must pass for the declared task mapping.
+
+If the gate fails, the workflow must report:
+
+```text
+WORKFLOW_STATUS:
+BLOCKED_BY_PRODUCT_SOURCE_GATE
+```
+
+and must not enter editing.
+
+The gate only verifies registered files/hashes, task mappings, and explicit hard boundaries. It must not parse all natural-language semantics, enumerate synonyms, build semantic inventories/digests, create a new governance mainline, or claim that an agent understood the product. A read-only product-gap audit is blocked only when its required source or mapping is missing or a hard conflict exists.
+
+---
+
 # Contract-First Workflow Automation
 
 Workflow automation must read facts in this priority order:
 
-1. `docs/PROJECT_DELIVERY_CONTRACT.md`
-2. `docs/DELIVERY_PROGRESS_MATRIX.md`
-3. `docs/PROJECT_CURRENT_STATE.md`
-4. derived compatibility files (`docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/CODEX_NEXT_TASK.yml`)
-5. legacy V1 documents as historical audit and asset evidence only
+1. `docs/PRODUCT_SOURCE_OF_TRUTH.md` for product direction and registered product sources
+2. `docs/PROJECT_DELIVERY_CONTRACT.md` for delivery controls
+3. `docs/DELIVERY_PROGRESS_MATRIX.md`
+4. `docs/PROJECT_CURRENT_STATE.md`
+5. derived compatibility files (`docs/ACTIVE_MAINLINE_STATUS.yml`, `docs/CODEX_NEXT_TASK.yml`)
+6. legacy V1 documents as historical audit and asset evidence only
 
 `v1-auto.sh`, `v1-state.sh`, and `codex-next-task.sh` must not use review-only slice count as delivery progress or to select the next business package.
 `ACTIVE_MAINLINE_STATUS.yml` no longer independently defines the current task; it is a derived compatibility mirror.

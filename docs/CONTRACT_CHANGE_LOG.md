@@ -381,3 +381,35 @@ Does this change done criteria: No.
 Does this weaken safety boundaries: No; it strengthens transport-level privacy.
 Human confirmation required: Yes before B-risk PR #1155 merge. The candidate
 is not effective until exact-head review and merged main.
+
+---
+
+## v2.0-product-foundation-freeze-candidate
+
+Date: 2026-08-01
+Changed by: Codex
+Reason: Explicit human authorization to stop Governance First and establish a
+single Product First authority, permanent source gate, complete product
+baseline, evidence-based maturity model, Product Roadmap V2, and product
+acceptance standard.
+Before: Delivery-contract, workflow, compatibility, PR, and test evidence could
+dominate task selection even though the four formal product source classes had
+not been indexed as the highest product authority. PR #1156 governance-parser
+work remained an implicit default blocker.
+After: `docs/PRODUCT_SOURCE_OF_TRUTH.md` indexes and hashes the formal sources;
+every editable task must pass a minimal Product Source Gate and provide
+product/design/data/gap mappings; product maturity is recalculated separately
+from technical delivery status; Governance First is paused; PR #1156 is
+retained as `PAUSED_TECHNICAL_DEBT`; the next product package after P0 merged
+main is a read-only P1 Home Alignment readiness and gap audit.
+Does this change phase order: It creates a separate explicit Product First
+P0-P10 roadmap while preserving legacy delivery rows as technical evidence.
+Does this change done criteria: It strengthens product completion by requiring
+simultaneous product, design, semantic, real-data, interaction, failure-state,
+real-scenario, screenshot, and traceability evidence.
+Does this weaken safety boundaries: No. No-trading, exact identity, owner
+scope, public/private separation, fail-closed behavior, and no-fake-data rules
+are retained or strengthened.
+Human confirmation required: Already explicitly authorized for this Draft P0
+candidate; independent review and merged main are still required before it is
+effective or P1 may begin.

@@ -13,6 +13,72 @@ GitHub auth and GPT / Codex / local `gh` handoff must follow `docs/WORKFLOW_GITH
 
 Use both English and Chinese labels. Do not answer only in English or only in Chinese.
 
+## Product-First Start Contract / 产品优先启动契约
+
+Before editing, every task response or working record must include:
+
+```text
+PRODUCT_SOURCE_GATE_STATUS:
+PASS / BLOCKED
+
+PRODUCT_SOURCES_READ:
+- <registered source_id and real path>
+
+PRODUCT_CONTRACT_MAPPING:
+- product module
+- applicable source chapter
+- required business semantics
+- forbidden boundary changes
+
+DESIGN_INTERACTION_MAPPING:
+- page / component
+- module order
+- click / linkage
+- detail entry
+- Loading / Empty / Error / Partial / Missing
+
+DATA_SOURCE_MAPPING:
+- field
+- source domain
+- API / Service / provider
+- cadence and cache
+- null / error behavior
+- public / private scope
+
+CURRENT_IMPLEMENTATION_GAP:
+- product requirement
+- current implementation
+- gap
+- bounded part allowed in this task
+
+STOP_CONDITIONS:
+- <task-specific hard stops>
+```
+
+At task end, every product-affecting answer must additionally include:
+
+```text
+PRODUCT_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED
+
+DESIGN_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED / NOT_APPLICABLE
+
+SEMANTIC_ALIGNMENT_STATUS:
+PASS / BLOCKED
+
+DATA_SOURCE_ALIGNMENT_STATUS:
+PASS / PARTIAL / BLOCKED
+
+REAL_SCENARIO_STATUS:
+PASS / NOT_RUN / BLOCKED
+
+DEVIATIONS:
+- <difference from the registered product sources, or NONE>
+```
+
+Maven PASS, Workflow PASS, Governance PASS, test count, an open PR, or a merged technical slice cannot by itself mark a product module complete.
+
 ## Fixed Codex Output Contract / Codex 固定输出契约
 
 All Codex final outputs must include the fixed fields below.

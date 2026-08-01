@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+if ! bash scripts/product-source-gate.sh; then
+  echo "WORKFLOW_STATUS:"
+  echo "BLOCKED_BY_PRODUCT_SOURCE_GATE"
+  exit 1
+fi
+
 failed=0
 
 fail() {

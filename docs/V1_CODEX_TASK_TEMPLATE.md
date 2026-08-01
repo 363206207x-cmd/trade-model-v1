@@ -11,6 +11,16 @@ Terminal scripts are fallback only except local main sync after merge.
 Codex must output PR number and stop.
 （Codex 必须输出 PR 编号并停止。）
 
+## 0. Product Source Gate（产品方案门禁）
+
+This legacy task template is subordinate to `docs/PRODUCT_SOURCE_OF_TRUTH.md` and `docs/CODEX_TASK_TEMPLATE.md`. Before any edit:
+
+```bash
+bash scripts/product-source-gate.sh
+```
+
+The task must declare `product_module`, `required_product_sources`, Product Contract Mapping, Design / Interaction Mapping, Data Source Mapping, Current Implementation Gap, allowed/blocked scope, real-scenario requirement, hard boundaries, and stop conditions. A blocked gate stops editing. Product plans override current implementation, Governance, Workflow, and tests. Do not infer product behavior from legacy task placeholders.
+
 ## 1. 固定开头
 
 ```text
