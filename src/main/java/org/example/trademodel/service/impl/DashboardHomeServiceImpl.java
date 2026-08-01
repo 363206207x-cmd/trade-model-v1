@@ -106,6 +106,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
     private DecisionResultMapper decisionResultMapper;
+    private ExecutionPlanMapper executionPlanMapper;
     private PositionPlanSourceResolver positionPlanSourceResolver;
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
@@ -179,6 +180,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                 AnalysisRunMapper analysisRunMapper) {
         this.decisionResultMapper = decisionResultMapper;
         this.analysisRunMapper = analysisRunMapper;
+        this.executionPlanMapper = executionPlanMapper;
         this.positionPlanSourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
     }
 
@@ -249,18 +251,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
         home.setPositions(positionRows);
         home.setSelectedSymbol(normalizedSelected);
-        PositionSelectionResult positionSelection = resolveSelectedPosition(
-                positionRows, normalizedSelected, selectedPositionId);
+        PositionSelectionResult positionSelection = resolveSelectedPosition(positionRows, selectedPositionId);
         DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        PositionPlanSourceResolver.Resolution activePositionSource = activePosition == null
-                ? null : positionRowsResult.trustedSources().get(activePosition.getPositionId());
-        ResolvedOriginalPlan resolvedOriginalPlan = resolveOriginalPlan(activePosition, activePositionSource);
-        home.setExecutionSuggestion(positionSelection.blocked()
-                ? buildPositionSelectionSuggestion(positionSelection)
-                : buildExecutionSuggestion(selectedDecision, activePosition, resolvedOriginalPlan));
+        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision));
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
@@ -915,36 +911,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         position.setSourceTraceId(null);
     }
 
-    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(
-            DecisionResultVO selectedDecisionForNewOpportunity,
-            DashboardHomeVO.PositionVO activePosition,
-            ResolvedOriginalPlan resolvedOriginalPlan) {
+    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(DecisionResultVO selectedDecision) {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
-        if (activePosition != null) {
-            suggestion.setStatus("POSITION_MONITORING");
-            suggestion.setStatusLabel("持仓监控");
-            suggestion.setPositionMode(true);
-            suggestion.setPositionMonitor(activePosition);
-            if (resolvedOriginalPlan == null || !resolvedOriginalPlan.verified()) {
-                suggestion.setOriginalPlanIdentity("UNVERIFIED");
-                suggestion.setOriginalPlanCurrentValidity("UNVERIFIED");
-                suggestion.setOriginalPlanLabel("暂无可关联的原执行计划");
-                return suggestion;
-            }
-
-            DecisionResultVO originalDecision = resolvedOriginalPlan.decision();
-            OriginalPlanPresentation presentation = originalPlanPresentation(resolvedOriginalPlan);
-            suggestion.setOriginalPlanIdentity("VERIFIED");
-            suggestion.setOriginalPlanCurrentValidity(presentation.status());
-            suggestion.setOriginalPlanLabel(presentation.label());
-            suggestion.setSourceAnalysisId(resolvedOriginalPlan.analysisId());
-            suggestion.setSourceExecutionPlanId(resolvedOriginalPlan.executionPlanId());
-            suggestion.setSourceTraceId(resolvedOriginalPlan.traceId());
-            populateOriginalPlan(suggestion, resolvedOriginalPlan.executionPlan(),
-                    originalDecision, presentation.validity());
-            return suggestion;
-        }
-        DecisionResultVO decision = selectedDecisionForNewOpportunity;
+        suggestion.setPositionMode(false);
+        suggestion.setPositionMonitor(null);
+        DecisionResultVO decision = selectedDecision;
         if (decision == null) {
             blockSuggestion(suggestion, "NO_COMPLETE_PLAN", "当前暂无完整执行计划", "暂无有效分析快照");
             return suggestion;
@@ -1038,19 +1009,62 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
 
+        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
+        if (!assetPlan.verified()) {
+            blockSuggestion(suggestion, "PLAN_SOURCE_UNVERIFIED", "当前暂无完整执行计划",
+                    "执行计划来源不可验证");
+            return suggestion;
+        }
+        ExecutionPlanDO executionPlan = assetPlan.executionPlan();
+        if (!ExecutionPlanReviewPolicy.hasCompleteBoundaries(executionPlan)) {
+            blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "当前暂无完整执行计划",
+                    BOUNDARY_INCOMPLETE_VALID_PERIOD);
+            return suggestion;
+        }
+
         suggestion.setStatus("USABLE_REVIEW_PLAN");
         suggestion.setStatusLabel("完整执行计划，仅供人工复核");
+        suggestion.setSourceAnalysisId(assetPlan.analysisId());
+        suggestion.setSourceExecutionPlanId(assetPlan.executionPlanId());
+        suggestion.setSourceTraceId(assetPlan.sourceTraceId());
         suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
-        suggestion.setEntryZone(entryZone);
-        suggestion.setStopLoss(stopLoss);
-        suggestion.setTakeProfitRules(takeProfitRules);
-        suggestion.setLeverageSuggestion(planLeverageLabel(decision.getLeverageSuggestion()));
-        suggestion.setPositionSuggestion(trimToNull(decision.getPositionSuggestion()));
+        suggestion.setEntryZone(trimPlanValue(executionPlan.getEntryZone()));
+        suggestion.setStopLoss(trimPlanValue(executionPlan.getStopLoss()));
+        suggestion.setTakeProfitRules(trimPlanValue(executionPlan.getTakeProfitRules()));
+        suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageSuggestion()));
+        suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionSuggestion()));
         suggestion.setValidPeriod(planValidityDisplay(decision, planValidity));
         suggestion.setValidFrom(planValidity.validFrom());
         suggestion.setExpiresAt(planValidity.expiresAt());
-        suggestion.setInvalidCondition(trimToNull(decision.getInvalidCondition()));
+        suggestion.setInvalidCondition(firstNonBlank(
+                trimPlanValue(executionPlan.getInvalidCondition()),
+                trimToNull(decision.getInvalidCondition())));
         return suggestion;
+    }
+
+    private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {
+        String analysisId = trimToNull(decision != null ? decision.getAnalysisId() : null);
+        String symbol = normalizeSymbol(decision != null ? decision.getSymbol() : null);
+        if (analysisId == null || symbol == null || executionPlanMapper == null || analysisRunMapper == null) {
+            return AssetExecutionPlanResolution.unverified();
+        }
+        try {
+            ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(analysisId);
+            String planId = trimToNull(plan != null ? plan.getPlanId() : null);
+            if (planId == null || !analysisId.equals(trimToNull(plan.getAnalysisId()))) {
+                return AssetExecutionPlanResolution.unverified();
+            }
+            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+            if (run == null
+                    || !analysisId.equals(trimToNull(run.getAnalysisId()))
+                    || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
+                return AssetExecutionPlanResolution.unverified();
+            }
+            return new AssetExecutionPlanResolution(
+                    plan, analysisId, planId, trimToNull(run.getTraceId()));
+        } catch (RuntimeException ignored) {
+            return AssetExecutionPlanResolution.unverified();
+        }
     }
 
     private DashboardHomeVO.ExecutionSuggestionVO buildPositionSelectionSuggestion(
@@ -1746,18 +1760,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private PositionSelectionResult resolveSelectedPosition(List<DashboardHomeVO.PositionVO> positions,
-                                                            String symbol,
                                                             Long selectedPositionId) {
-        String normalized = normalizeSymbol(symbol);
         List<DashboardHomeVO.PositionVO> available = positions == null ? List.of() : positions;
-        List<DashboardHomeVO.PositionVO> matching = normalized == null ? List.of() : available.stream()
-                .filter(position -> normalized.equals(normalizeSymbol(position.getSymbol())))
-                .toList();
 
         if (selectedPositionId != null) {
             if (selectedPositionId <= 0) {
                 return PositionSelectionResult.blocked(
-                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
+                        PositionSelectionStatus.POSITION_NOT_FOUND, 0);
             }
             DashboardHomeVO.PositionVO selected = available.stream()
                     .filter(position -> Objects.equals(position.getPositionId(), selectedPositionId))
@@ -1765,24 +1774,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     .orElse(null);
             if (selected == null) {
                 return PositionSelectionResult.blocked(
-                        PositionSelectionStatus.POSITION_NOT_FOUND, matching.size());
-            }
-            if (normalized == null || !normalized.equals(normalizeSymbol(selected.getSymbol()))) {
-                return PositionSelectionResult.blocked(
-                        PositionSelectionStatus.POSITION_SYMBOL_MISMATCH, matching.size());
+                        PositionSelectionStatus.POSITION_NOT_FOUND, 0);
             }
             return new PositionSelectionResult(
-                    PositionSelectionStatus.EXACT_POSITION_SELECTED, selected, matching.size());
+                    PositionSelectionStatus.EXACT_POSITION_SELECTED, selected, 1);
         }
-        if (matching.isEmpty()) {
+        if (available.isEmpty()) {
             return new PositionSelectionResult(PositionSelectionStatus.NO_POSITION, null, 0);
         }
-        if (matching.size() == 1) {
-            return new PositionSelectionResult(
-                    PositionSelectionStatus.UNIQUE_POSITION_SELECTED, matching.get(0), 1);
-        }
         return PositionSelectionResult.blocked(
-                PositionSelectionStatus.POSITION_SELECTION_REQUIRED, matching.size());
+                PositionSelectionStatus.POSITION_SELECTION_REQUIRED, available.size());
     }
 
     private boolean planAllowedAssetState(String state) {
@@ -2223,6 +2224,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private record PositionRowsResult(
             List<DashboardHomeVO.PositionVO> rows,
             Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
+    }
+
+    private record AssetExecutionPlanResolution(ExecutionPlanDO executionPlan,
+                                                String analysisId,
+                                                String executionPlanId,
+                                                String sourceTraceId) {
+        private boolean verified() {
+            return executionPlan != null && analysisId != null && executionPlanId != null;
+        }
+
+        private static AssetExecutionPlanResolution unverified() {
+            return new AssetExecutionPlanResolution(null, null, null, null);
+        }
     }
 
     private enum PositionSelectionStatus {

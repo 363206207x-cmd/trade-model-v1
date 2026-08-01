@@ -7082,7 +7082,6 @@
                 var sym = el.getAttribute("data-symbol");
                 if (!sym) return;
                 selectedSymbol = sym;
-                selectedPositionId = null;
                 Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (tile) {
                     tile.classList.toggle("selected", tile === el);
                 });
@@ -7578,7 +7577,6 @@
                 var sym = el.getAttribute("data-symbol");
                 if (!sym) return;
                 selectedSymbol = sym;
-                selectedPositionId = null;
                 syncDashboardSelectionUrl();
                 refreshAssetContext();
             });
@@ -10551,7 +10549,6 @@
         var symbol = normalizeSymbolInput(rawSymbol);
         if (!symbol) return;
         selectedSymbol = symbol;
-        selectedPositionId = null;
         syncDashboardSelectionUrl();
         searchQuery = symbol;
         var topSearch = document.getElementById("symbolSearch");

@@ -624,14 +624,17 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void assetClickClearsSelectedPositionId() throws Exception {
+    void assetClickPreservesExplicitPositionIdentity() throws Exception {
         String sidebar = functionBody("renderSidebarSlots");
         String tiles = functionBody("renderHomeAssetsFromPayload");
         String searchSelection = functionBody("selectDashboardAsset");
 
-        assertSelectionRefreshOrder(sidebar, "selectedPositionId = null", "refreshAssetContext()");
-        assertSelectionRefreshOrder(tiles, "selectedPositionId = null", "refreshAssetContext()");
-        assertSelectionRefreshOrder(searchSelection, "selectedPositionId = null", "refreshAssetContext()");
+        assertThat(sidebar).doesNotContain("selectedPositionId = null");
+        assertThat(tiles).doesNotContain("selectedPositionId = null");
+        assertThat(searchSelection).doesNotContain("selectedPositionId = null");
+        assertSelectionRefreshOrder(sidebar, "selectedSymbol = sym", "refreshAssetContext()");
+        assertSelectionRefreshOrder(tiles, "selectedSymbol = sym", "refreshAssetContext()");
+        assertSelectionRefreshOrder(searchSelection, "selectedSymbol = symbol", "refreshAssetContext()");
     }
 
     @Test
