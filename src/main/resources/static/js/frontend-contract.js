@@ -72,6 +72,18 @@
     "POSITION_SYMBOL_MISMATCH"
   ]);
 
+  var MODULE_STATES = Object.freeze([
+    "LOADING", "READY", "PARTIAL", "EMPTY", "ERROR", "MISSING"
+  ]);
+
+  var FIELD_SOURCE_VIEWS = Object.freeze({
+    REAL: Object.freeze({ label: "真实", tone: "real" }),
+    DERIVED: Object.freeze({ label: "派生", tone: "derived" }),
+    FALLBACK: Object.freeze({ label: "降级", tone: "fallback" }),
+    MISSING: Object.freeze({ label: "缺失", tone: "missing" }),
+    ERROR: Object.freeze({ label: "错误", tone: "error" })
+  });
+
   function hasText(value) {
     return value !== null
       && value !== undefined
@@ -86,6 +98,18 @@
     return value === null || value === undefined || value === ""
       ? "--"
       : String(value);
+  }
+
+  function normalizeModuleState(value, fallback) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return MODULE_STATES.indexOf(normalized) >= 0
+      ? normalized
+      : String(fallback || "MISSING").toUpperCase();
+  }
+
+  function fieldSourceView(value) {
+    var normalized = String(value || "MISSING").trim().toUpperCase();
+    return FIELD_SOURCE_VIEWS[normalized] || FIELD_SOURCE_VIEWS.ERROR;
   }
 
   function parseApiEnvelope(envelope) {
@@ -276,13 +300,23 @@
     return match ? match[1] + " " + match[2] + " UTC" : displayText(value, "--");
   }
 
+  function formatBusinessTimeCompact(value) {
+    var raw = String(value || "").trim();
+    var match = raw.match(/^\d{4}-(\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+    return match ? match[1] + " " + match[2] : displayText(value, "--");
+  }
+
   global.TradeModelFrontendContract = Object.freeze({
     AI_ROLES: AI_ROLES,
     ASSET_STATES: ASSET_STATES,
     AI_ANALYSIS_STATE_VIEWS: AI_ANALYSIS_STATE_VIEWS,
+    MODULE_STATES: MODULE_STATES,
+    FIELD_SOURCE_VIEWS: FIELD_SOURCE_VIEWS,
     hasText: hasText,
     displayText: displayText,
     displayNumber: displayNumber,
+    normalizeModuleState: normalizeModuleState,
+    fieldSourceView: fieldSourceView,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,
@@ -293,6 +327,7 @@
     clearTextFields: clearTextFields,
     readUrlParam: readUrlParam,
     replaceUrlParam: replaceUrlParam,
-    formatUtcNaive: formatUtcNaive
+    formatUtcNaive: formatUtcNaive,
+    formatBusinessTimeCompact: formatBusinessTimeCompact
   });
 })(window);

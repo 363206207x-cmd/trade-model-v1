@@ -140,6 +140,20 @@
     if (node) node.textContent = text(value, fallback);
   }
 
+  function setAssetCardSource(card, field, source) {
+    var node = card && card.querySelector('[data-asset-source="' + field + '"]');
+    if (!node) return;
+    var view = frontendContract.fieldSourceView(source);
+    var label = field === "latestPrice" ? "价格" : (field === "score" ? "评分" : "置信");
+    node.textContent = label + "·" + view.label;
+    node.dataset.sourceTone = view.tone;
+  }
+
+  function setMobileRetryVisible(visible) {
+    var button = document.querySelector("[data-home-retry]");
+    if (button) button.hidden = !visible;
+  }
+
   function assetStateText(asset) {
     var state = String(asset && asset.assetState || "").toUpperCase();
     if (state === "TRIGGERED") return "条件已触发，不代表已开仓";
@@ -150,24 +164,41 @@
     if (!card || !asset) return;
     syncCardNavigationIdentity(card, asset);
     card.dataset.assetState = String(asset.assetState || "unknown").toLowerCase();
+    card.dataset.moduleState = frontendContract.normalizeModuleState(asset.moduleState, "MISSING").toLowerCase();
     setAssetCardField(card, "state", assetStateText(asset), "状态待同步");
     setAssetCardField(card, "latestPrice", asset.latestPrice, "--");
     setAssetCardField(card, "compositeScore", asset.compositeScore, "--");
     setAssetCardField(card, "marketBias", asset.marketBiasLabel || asset.marketBias, "当前判断不可用");
     setAssetCardField(card, "confidence", asset.confidenceLabel || asset.confidenceLevel, "--");
     setAssetCardField(card, "risk", asset.riskLabel || asset.riskLevel, "--");
+    setAssetCardField(card, "dataQuality", asset.dataQuality, "MISSING");
+    setAssetCardField(card, "multiTimeframeState", asset.multiTimeframeState, "MISSING");
+    setAssetCardField(card, "confused", asset.confused === true ? "是" : (asset.confused === false ? "否" : null), "MISSING");
+    setAssetCardField(card, "updatedAt", frontendContract.formatBusinessTimeCompact(asset.updatedAt), "--");
+    var fieldSources = asset.fieldSourceStatus || {};
+    setAssetCardSource(card, "latestPrice", fieldSources.latestPrice);
+    setAssetCardSource(card, "score", fieldSources.score);
+    setAssetCardSource(card, "confidence", fieldSources.confidence);
   }
 
   function clearAssetCardProjection(card, stateLabel) {
     if (!card) return;
     syncCardNavigationIdentity(card, null);
     card.dataset.assetState = "unavailable";
+    card.dataset.moduleState = "error";
     setAssetCardField(card, "state", stateLabel, "当前不可查看");
     setAssetCardField(card, "latestPrice", null, "--");
     setAssetCardField(card, "compositeScore", null, "--");
     setAssetCardField(card, "marketBias", null, "--");
     setAssetCardField(card, "confidence", null, "--");
     setAssetCardField(card, "risk", null, "--");
+    setAssetCardField(card, "dataQuality", null, "MISSING");
+    setAssetCardField(card, "multiTimeframeState", null, "MISSING");
+    setAssetCardField(card, "confused", null, "MISSING");
+    setAssetCardField(card, "updatedAt", null, "--");
+    setAssetCardSource(card, "latestPrice", "MISSING");
+    setAssetCardSource(card, "score", "MISSING");
+    setAssetCardSource(card, "confidence", "MISSING");
   }
 
   function updateMobileStatusProjection(systemState, header) {
@@ -226,8 +257,12 @@
     var statusRoot = document.getElementById("mobile-status");
     var assetRoot = document.getElementById("watch-assets");
     if (assetRoot) {
-      assetRoot.dataset.contextState = statusRoot ? statusRoot.dataset.contextState : "partial";
+      assetRoot.dataset.contextState = frontendContract.normalizeModuleState(
+        home && home.states && home.states.assets,
+        statusRoot ? statusRoot.dataset.contextState : "PARTIAL"
+      ).toLowerCase();
     }
+    setMobileRetryVisible(false);
     return setSelectedAsset(selectedSymbol);
   }
 
@@ -566,6 +601,7 @@
       },
       tabs: []
     });
+    setMobileRetryVisible(true);
   }
 
   function matchingAsset(assets, symbol) {
@@ -604,6 +640,7 @@
     activeRequest = request;
     sourceCard.dataset.requestSequence = String(sequence);
     sourceCard.setAttribute("aria-busy", "true");
+    setMobileRetryVisible(false);
     clearMobileAssetContext(symbol, "loading", "正在同步");
     setWatchActionStatus("正在同步当前资产上下文。");
     updateExecution({
@@ -673,6 +710,19 @@
         next.focus({ preventScroll: true });
         keepAssetCardVisible(next, "smooth");
         selectAsset(next.dataset.symbol, next);
+      });
+    });
+  }
+
+  function bindHomeRetry() {
+    var button = document.querySelector("[data-home-retry]");
+    if (!button) return;
+    button.addEventListener("click", function () {
+      var selected = selectedAssetCard();
+      if (!selected || !selected.dataset.symbol) return;
+      button.disabled = true;
+      Promise.resolve(selectAsset(selected.dataset.symbol, selected)).finally(function () {
+        button.disabled = false;
       });
     });
   }
@@ -870,6 +920,7 @@
     bindPreferredColorScheme();
     bindRootHorizontalContainment();
     bindAssetPager();
+    bindHomeRetry();
     bindWatchTools();
     var initialAsset = selectedAssetCard();
     keepAssetCardVisible(initialAsset, "auto");

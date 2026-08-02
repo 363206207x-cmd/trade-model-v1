@@ -123,6 +123,12 @@ class DashboardMobileProjectionContractTest {
                 .contains("asset.riskLabel")
                 .contains("asset.assetState")
                 .contains("asset.analysisId")
+                .contains("asset.dataQuality")
+                .contains("asset.multiTimeframeState")
+                .contains("asset.confused")
+                .contains("asset.updatedAt")
+                .contains("asset.fieldSourceStatus")
+                .contains("data-home-retry")
                 .doesNotContain("asset.currentConclusion")
                 .doesNotContain("一致性评分")
                 .doesNotContain("资产方向阻断")
@@ -224,7 +230,13 @@ class DashboardMobileProjectionContractTest {
                         "data-mobile-status-field=\"aiConflict\"",
                         "data-asset-field=\"state\"",
                         "data-asset-field=\"latestPrice\"",
-                        "data-asset-field=\"compositeScore\"");
+                        "data-asset-field=\"compositeScore\"",
+                        "data-asset-field=\"dataQuality\"",
+                        "data-asset-field=\"multiTimeframeState\"",
+                        "data-asset-field=\"confused\"",
+                        "data-asset-field=\"updatedAt\"",
+                        "data-asset-source=\"latestPrice\"",
+                        "data-home-retry");
         assertThat(clearContext).contains(
                 "window.__lastDashboardHome = null",
                 "clearAssetCardProjection(card",
@@ -235,6 +247,7 @@ class DashboardMobileProjectionContractTest {
                 "updateSelectedSymbolUrl(symbol)");
         assertThat(failure).contains(
                 "clearMobileAssetContext(symbol, missing ? \"missing\" : \"error\"",
+                "setMobileRetryVisible(true)",
                 "status: missing ? \"MISSING\" : \"LOAD_FAILED\"",
                 "}, null, null)",
                 "aiApplicable: false",
@@ -242,6 +255,7 @@ class DashboardMobileProjectionContractTest {
         assertThat(selection.indexOf("clearMobileAssetContext(symbol, \"loading\", \"正在同步\")"))
                 .isLessThan(selection.indexOf("await fetch("));
         assertThat(selection).contains(
+                "setMobileRetryVisible(false)",
                 "syncMobileAssetContext(parsed.data, selectedSymbol)",
                 "failClosedAfterLoadError(selectedSymbol, \"missing\")",
                 "failClosedAfterLoadError(symbol, \"error\")");

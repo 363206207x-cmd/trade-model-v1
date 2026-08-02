@@ -160,6 +160,7 @@
           <a class="watch-tool-button watch-detail-link" data-asset-detail-link
              data-enabled-label="分析详情" data-disabled-label="当前不可查看"
              aria-disabled="true" tabindex="-1">当前不可查看</a>
+          <button class="watch-tool-button" type="button" data-home-retry hidden>重试</button>
         </div>
       </div>
       <p class="section-note watch-limit-note"
@@ -184,7 +185,7 @@
                 th:each="asset, stat : ${mobileAssets}"
                 th:with="assetKey=${asset.rawSymbol != null ? asset.rawSymbol : asset.symbol},selected=${home.selectedSymbol == assetKey or (home.selectedSymbol == null and stat.first)},stateKey=${asset.assetState != null ? #strings.toLowerCase(asset.assetState) : 'unknown'}"
                 th:classappend="${selected ? ' is-selected' : ''}"
-                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-direction-label=${asset.marketBiasLabel != null ? asset.marketBiasLabel : asset.marketBias},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
+                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-direction-label=${asset.marketBiasLabel != null ? asset.marketBiasLabel : asset.marketBias},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},data-module-state=${asset.moduleState != null ? #strings.toLowerCase(asset.moduleState) : 'missing'},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
           <span class="visually-hidden"
                 th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
@@ -200,6 +201,17 @@
             <span><small>方向</small><b data-asset-field="marketBias" th:text="${asset.marketBiasLabel != null ? asset.marketBiasLabel : (asset.marketBias != null ? asset.marketBias : '当前判断不可用')}">当前判断不可用</b></span>
             <span><small>置信度</small><b data-asset-field="confidence" th:text="${asset.confidenceLabel != null ? asset.confidenceLabel : (asset.confidenceLevel != null ? asset.confidenceLevel : '--')}">--</b></span>
             <span><small>风险等级</small><b data-asset-field="risk" th:text="${asset.riskLabel != null ? asset.riskLabel : (asset.riskLevel != null ? asset.riskLevel : '--')}">--</b></span>
+          </span>
+          <span class="asset-secondary-strip" aria-label="资产辅助状态">
+            <span><small>数据</small><b data-asset-field="dataQuality" th:text="${asset.dataQuality != null ? asset.dataQuality : 'MISSING'}">MISSING</b></span>
+            <span><small>多周期</small><b data-asset-field="multiTimeframeState" th:text="${asset.multiTimeframeState != null ? asset.multiTimeframeState : 'MISSING'}">MISSING</b></span>
+            <span><small>Confused</small><b data-asset-field="confused" th:text="${asset.confused != null ? (asset.confused ? '是' : '否') : 'MISSING'}">MISSING</b></span>
+            <span><small>更新</small><b data-asset-field="updatedAt" th:text="${asset.updatedAt != null ? asset.updatedAt : '--'}">--</b></span>
+          </span>
+          <span class="asset-source-line" aria-label="字段来源">
+            <small data-asset-source="latestPrice" th:text="${'价格·' + (asset.fieldSourceStatus != null and asset.fieldSourceStatus['latestPrice'] != null ? asset.fieldSourceStatus['latestPrice'] : 'MISSING')}">价格·MISSING</small>
+            <small data-asset-source="score" th:text="${'评分·' + (asset.fieldSourceStatus != null and asset.fieldSourceStatus['score'] != null ? asset.fieldSourceStatus['score'] : 'MISSING')}">评分·MISSING</small>
+            <small data-asset-source="confidence" th:text="${'置信·' + (asset.fieldSourceStatus != null and asset.fieldSourceStatus['confidence'] != null ? asset.fieldSourceStatus['confidence'] : 'MISSING')}">置信·MISSING</small>
           </span>
         </button>
       </div>
@@ -266,17 +278,26 @@
       <div class="position-list" th:unless="${#lists.isEmpty(home.positions)}">
         <article class="position-card" th:each="position, stat : ${home.positions}" th:if="${stat.index < 3}"
                  th:classappend="${stat.index == 2 ? ' position-third' : ''}"
-                 th:attr="data-position-id=${position.positionId}">
+                 th:attr="data-position-id=${position.positionId},data-module-state=${position.moduleState != null ? #strings.toLowerCase(position.moduleState) : 'partial'}">
           <div class="position-heading">
             <h3 th:text="${position.symbol != null ? position.symbol : '--'}">--</h3>
             <span th:text="${position.directionLabel != null ? position.directionLabel : '--'}">--</span>
           </div>
           <dl class="position-core position-summary">
-            <div><dt>入场逻辑</dt><dd th:text="${position.entryLogicStatusLabel != null ? position.entryLogicStatusLabel : '待同步'}">待同步</dd></div>
-            <div><dt>方向支持</dt><dd th:text="${position.directionSupportStatusLabel != null ? position.directionSupportStatusLabel : '待同步'}">待同步</dd></div>
-            <div><dt>反转状态</dt><dd th:text="${position.reversalStatusLabel != null ? position.reversalStatusLabel : '待同步'}">待同步</dd></div>
-            <div><dt>风险等级</dt><dd th:text="${position.riskLevelLabel != null ? position.riskLevelLabel : '待同步'}">待同步</dd></div>
-            <div class="full-row"><dt>当前建议</dt><dd th:text="${position.suggestedManualActionText != null ? position.suggestedManualActionText : '当前不可查看'}">当前不可查看</dd></div>
+            <div><dt>持仓 ID</dt><dd th:text="${position.positionId != null ? position.positionId : '--'}">--</dd></div>
+            <div><dt>状态</dt><dd th:text="${position.positionStatusLabel != null ? position.positionStatusLabel : (position.positionStatus != null ? position.positionStatus : '--')}">--</dd></div>
+            <div><dt>入场价</dt><dd th:text="${position.entryPrice != null ? position.entryPrice : '--'}">--</dd></div>
+            <div><dt>数量</dt><dd th:text="${position.positionSize != null ? position.positionSize : '--'}">--</dd></div>
+            <div><dt>杠杆</dt><dd th:text="${position.leverage != null ? position.leverage : '--'}">--</dd></div>
+            <div><dt>风险等级</dt><dd th:text="${position.riskLevelLabel != null ? position.riskLevelLabel : (position.riskLevel != null ? position.riskLevel : '--')}">--</dd></div>
+            <div><dt>止损</dt><dd th:text="${position.userStopLoss != null ? position.userStopLoss : '--'}">--</dd></div>
+            <div><dt>止盈</dt><dd th:text="${position.userTakeProfit != null ? position.userTakeProfit : '--'}">--</dd></div>
+            <div><dt>入场逻辑</dt><dd th:text="${position.entryLogicStatusLabel != null ? position.entryLogicStatusLabel : (position.entryLogicStatus != null ? position.entryLogicStatus : '--')}">--</dd></div>
+            <div><dt>方向支持</dt><dd th:text="${position.directionSupportStatusLabel != null ? position.directionSupportStatusLabel : (position.directionSupportStatus != null ? position.directionSupportStatus : '--')}">--</dd></div>
+            <div><dt>反转状态</dt><dd th:text="${position.reversalStatusLabel != null ? position.reversalStatusLabel : (position.reversalStatus != null ? position.reversalStatus : '--')}">--</dd></div>
+            <div><dt>当前建议</dt><dd th:text="${position.suggestedManualActionText != null ? position.suggestedManualActionText : (position.suggestedManualAction != null ? position.suggestedManualAction : '--')}">--</dd></div>
+            <div><dt>告警</dt><dd th:text="${position.warningState != null ? position.warningState : '--'}">--</dd></div>
+            <div class="full-row"><dt>更新时间</dt><dd th:text="${position.updatedAt != null ? position.updatedAt : '--'}">--</dd></div>
           </dl>
         </article>
       </div>

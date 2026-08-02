@@ -471,6 +471,51 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void homeCoreDataProjectionRendersSourcesStatesRetryAndClearsStaleAssetContext() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String assets = functionBody("renderHomeAssetsFromPayload");
+        String loading = functionBody("renderAssetContextLoading");
+        String unavailable = functionBody("renderAssetContextUnavailable");
+        String retry = functionBody("bindHomeRetry");
+
+        assertThat(assets).contains(
+                "当前价格", "综合评分", "方向", "置信度", "风险等级",
+                "state.label", "data-asset-state",
+                "数据", "多周期", "Confused", "更新",
+                "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
+                "fieldSourceBadge(\"置信\"");
+        assertThat(html).contains("data-home-retry", "homeRetryButton");
+        assertThat(loading).contains(
+                "window.__lastDashboardHome = null",
+                "window.__lastHomeDiagnostics = {}",
+                "allDecisions = []", "displayDecisions = []",
+                "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload",
+                "updateAssetDetailLink(null)", "旧资产上下文已清除");
+        assertThat(unavailable).contains(
+                "window.__lastDashboardHome = null",
+                "setHomeRetryVisible(true, true)",
+                "updateAssetDetailLink(null)",
+                "当前资产不可查看");
+        assertThat(retry).contains(
+                "preservePositionSummary", "refreshAssetContext()", "refreshDashboard()");
+        assertThat(loading + unavailable).doesNotContain("renderHomePositionsFromPayload");
+    }
+
+    @Test
+    void visualFixtureCoversHomeCoreDataAcceptanceScenarios() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(fixture).contains(
+                "\"partial\"", "\"empty\"", "\"missing\"", "\"retry\"",
+                "\"asset-switch-failure\"", "\"exact-plan\"", "\"top3-independent\"",
+                "\"fieldSourceStatus\"", "\"multiTimeframeState\"", "\"confused\"",
+                "\"moduleState\"", "\"states\"",
+                "\"sourceExecutionPlanId\"", "\"positions\": [",
+                "should_fail = home_request_count > 0 if scenario == \"home-failure\" else home_request_count == 0",
+                "scenario == \"asset-switch-failure\" and symbol != \"BTCUSDT\"");
+    }
+
+    @Test
     void assetCardsDoNotRenderDetailConclusionOrEvidenceFields() throws Exception {
         String renderer = functionBody("renderHomeAssetsFromPayload");
 
@@ -1919,14 +1964,16 @@ public class DashboardControllerTest {
 
         assertThat(renderHomePositions).contains(
                 "positions", "list.slice(0, 3)", "p.symbol", "p.direction",
+                "p.entryPrice", "p.positionSize", "p.leverage",
+                "p.userStopLoss", "p.userTakeProfit", "p.positionStatusLabel",
                 "p.entryLogicStatusLabel", "p.directionSupportStatusLabel",
-                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText");
+                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText",
+                "p.warningState", "p.updatedAt");
         assertThat(renderHomePositions).doesNotContain("fetch(");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/manual-open");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/");
         assertThat(renderHomePositions).doesNotContain(
-                "tradeType", "recommendedAction", "executionPlanDisplay",
-                "p.entryPrice", "p.positionSize", "p.floatingPnl");
+                "tradeType", "recommendedAction", "executionPlanDisplay", "p.floatingPnl");
         assertThat(renderHomePositions).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
         assertThat(renderHomePositions).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
     }

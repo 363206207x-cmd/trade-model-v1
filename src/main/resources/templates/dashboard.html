@@ -1767,6 +1767,48 @@
             border-color: rgba(217, 119, 6, 0.35);
             background: rgba(245, 158, 11, 0.12);
         }
+        .asset-secondary-strip {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 3px 8px;
+            margin-top: 7px;
+            padding-top: 7px;
+            border-top: 1px solid rgba(226, 232, 240, 0.58);
+            color: var(--text-secondary);
+            font-size: 0.64rem;
+            line-height: 1.35;
+        }
+        .asset-secondary-strip span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .asset-secondary-strip span:last-child {
+            grid-column: 1 / -1;
+            white-space: nowrap;
+        }
+        .asset-secondary-strip strong {
+            color: var(--text-primary);
+            font-weight: 650;
+        }
+        .asset-source-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin-top: 6px;
+        }
+        .field-source-badge {
+            padding: 1px 4px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.6rem;
+            line-height: 1.3;
+        }
+        .field-source-badge.fallback,
+        .field-source-badge.missing { color: var(--status-warn); }
+        .field-source-badge.error { color: var(--status-error); }
+        .coin-tile[data-module-state="error"] { border-color: rgba(239, 68, 68, 0.48); }
+        .coin-tile[data-module-state="partial"] { border-color: rgba(245, 158, 11, 0.4); }
         [data-theme="dark"] .mini-tag.conflict {
             color: #fbbf24;
             border-color: rgba(251, 191, 36, 0.35);
@@ -3333,6 +3375,7 @@
                 <button type="button" class="btn" id="btnAdd" disabled aria-disabled="true"
                         title="添加资产暂未开放">添加资产暂未开放</button>
                 <a class="btn" id="assetDetailLink" aria-disabled="true" tabindex="-1">当前不可查看</a>
+                <button type="button" class="btn" id="homeRetryButton" data-home-retry hidden>重试</button>
                 <button type="button" class="btn custom-only-action" id="btnRemove" disabled hidden>删除</button>
                 <button type="button" class="btn asset-pool-toggle" id="assetPoolToggle"
                         aria-expanded="false" disabled hidden>资产池 ▾</button>
@@ -7034,9 +7077,30 @@
         link.textContent = "分析详情";
     }
 
-    function renderHomeAssetsFromPayload(assets) {
+    function homeBusinessTime(value) {
+        return frontendContract.hasText(value) ? frontendContract.formatUtcNaive(value) : "--";
+    }
+
+    function homeAssetBusinessTime(value) {
+        return frontendContract.hasText(value) ? frontendContract.formatBusinessTimeCompact(value) : "--";
+    }
+
+    function dataQualityText(value) {
+        return ({ GOOD: "良好", PARTIAL: "部分", STALE: "过期", MISSING: "缺失", ERROR: "错误" })[
+            String(value || "MISSING").toUpperCase()
+        ] || "错误";
+    }
+
+    function fieldSourceBadge(label, source) {
+        var view = frontendContract.fieldSourceView(source);
+        return '<span class="field-source-badge ' + escapeHtml(view.tone) + '">'
+            + escapeHtml(label + "·" + view.label) + '</span>';
+    }
+
+    function renderHomeAssetsFromPayload(assets, moduleState) {
         var box = document.getElementById("tilesRow");
         if (!box) return;
+        box.dataset.homeState = frontendContract.normalizeModuleState(moduleState, "MISSING").toLowerCase();
         var list = fixedHomeAssetList(assets);
         if (!list.length) {
             updateAssetDetailLink(null);
@@ -7061,9 +7125,14 @@
             if (!priceText || priceText === "—") priceText = "--";
             var scoreText = asset.compositeScore != null ? String(asset.compositeScore) : "--";
             var coinCls = coinAvatarClass(rawSymbol);
+            var fieldSources = asset.fieldSourceStatus || {};
+            var assetModuleState = frontendContract.normalizeModuleState(asset.moduleState, "MISSING").toLowerCase();
+            var multiTimeframe = cleanBlankValue(asset.multiTimeframeState) || "缺失";
+            var confused = asset.confused === true ? "是" : (asset.confused === false ? "否" : "缺失");
             return '<div class="coin-tile bias-' + bcls + selected + '" role="button" tabindex="0"'
                 + ' data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '"'
                 + ' data-analysis-id="' + escapeHtml(analysisId) + '"'
+                + ' data-module-state="' + escapeHtml(assetModuleState) + '"'
                 + ' data-asset-state="' + escapeHtml(state.code) + '">' +
                 '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
                 + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span></span>'
@@ -7075,7 +7144,18 @@
                 '<div class="tile-compact-row"><span class="label">方向</span><span class="value tile-bias ' + bcls + '">' + escapeHtml(bias || "当前判断不可用") + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">置信度</span><span class="value">' + escapeHtml(confidenceText || "--") + '</span></div>' +
                 '<div class="tile-compact-row"><span class="label">风险等级</span><span class="value">' + escapeHtml(riskText || "--") + '</span></div>' +
-                '</div></div></div>';
+                '</div>'
+                + '<div class="asset-secondary-strip" aria-label="资产辅助状态">'
+                + '<span>数据 <strong>' + escapeHtml(dataQualityText(asset.dataQuality)) + '</strong></span>'
+                + '<span>多周期 <strong>' + escapeHtml(multiTimeframe) + '</strong></span>'
+                + '<span>Confused <strong>' + escapeHtml(confused) + '</strong></span>'
+                + '<span>更新 <strong>' + escapeHtml(homeAssetBusinessTime(asset.updatedAt)) + '</strong></span>'
+                + '</div>'
+                + '<div class="asset-source-line" aria-label="字段来源">'
+                + fieldSourceBadge("价格", fieldSources.latestPrice)
+                + fieldSourceBadge("评分", fieldSources.score)
+                + fieldSourceBadge("置信", fieldSources.confidence)
+                + '</div></div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
             function selectAsset() {
@@ -7088,13 +7168,7 @@
                 var selectedAsset = list.find(function (asset) {
                     return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === sym;
                 }) || null;
-                updateAssetDetailLink(selectedAsset);
-                renderDesktopAiAnalysis({
-                    runStatus: "LOADING",
-                    runStatusLabel: "正在同步",
-                    consistency: {},
-                    tabs: []
-                }, selectedAsset);
+                renderAssetContextLoading(sym);
                 syncDashboardSelectionUrl();
                 refreshAssetContext();
             }
@@ -7126,16 +7200,26 @@
             var positionId = p.positionId != null ? p.positionId : p.id;
             var direction = value(p.directionLabel || positionSideText(p.direction), "--");
             return '<article class="home-position-summary-card" data-position-id="'
-                + escapeHtml(normalizePositionId(positionId)) + '">'
+                + escapeHtml(normalizePositionId(positionId)) + '" data-module-state="'
+                + escapeHtml(frontendContract.normalizeModuleState(p.moduleState, "PARTIAL").toLowerCase()) + '">'
                 + '<div class="home-position-summary-head"><strong>'
                 + escapeHtml(value(p.symbol, "--")) + '</strong><span>'
                 + escapeHtml(direction) + '</span></div>'
                 + '<dl class="home-position-summary-grid">'
-                + '<div><dt>入场逻辑</dt><dd>' + escapeHtml(value(p.entryLogicStatusLabel, "待同步")) + '</dd></div>'
-                + '<div><dt>方向支持</dt><dd>' + escapeHtml(value(p.directionSupportStatusLabel, "待同步")) + '</dd></div>'
-                + '<div><dt>反转状态</dt><dd>' + escapeHtml(value(p.reversalStatusLabel, "待同步")) + '</dd></div>'
-                + '<div><dt>风险等级</dt><dd>' + escapeHtml(value(p.riskLevelLabel, "待同步")) + '</dd></div>'
-                + '<div class="wide"><dt>当前建议</dt><dd>' + escapeHtml(value(p.suggestedManualActionText, "当前不可查看")) + '</dd></div>'
+                + '<div><dt>持仓 ID</dt><dd>' + escapeHtml(value(normalizePositionId(positionId), "--")) + '</dd></div>'
+                + '<div><dt>状态</dt><dd>' + escapeHtml(value(p.positionStatusLabel || p.positionStatus, "--")) + '</dd></div>'
+                + '<div><dt>入场价</dt><dd>' + escapeHtml(value(p.entryPrice, "--")) + '</dd></div>'
+                + '<div><dt>数量</dt><dd>' + escapeHtml(value(p.positionSize, "--")) + '</dd></div>'
+                + '<div><dt>杠杆</dt><dd>' + escapeHtml(value(p.leverage, "--")) + '</dd></div>'
+                + '<div><dt>风险等级</dt><dd>' + escapeHtml(value(p.riskLevelLabel || p.riskLevel, "--")) + '</dd></div>'
+                + '<div><dt>止损</dt><dd>' + escapeHtml(value(p.userStopLoss, "--")) + '</dd></div>'
+                + '<div><dt>止盈</dt><dd>' + escapeHtml(value(p.userTakeProfit, "--")) + '</dd></div>'
+                + '<div><dt>入场逻辑</dt><dd>' + escapeHtml(value(p.entryLogicStatusLabel || p.entryLogicStatus, "--")) + '</dd></div>'
+                + '<div><dt>方向支持</dt><dd>' + escapeHtml(value(p.directionSupportStatusLabel || p.directionSupportStatus, "--")) + '</dd></div>'
+                + '<div><dt>反转状态</dt><dd>' + escapeHtml(value(p.reversalStatusLabel || p.reversalStatus, "--")) + '</dd></div>'
+                + '<div><dt>当前建议</dt><dd>' + escapeHtml(value(p.suggestedManualActionText || p.suggestedManualAction, "--")) + '</dd></div>'
+                + '<div><dt>告警</dt><dd>' + escapeHtml(value(p.warningState, "--")) + '</dd></div>'
+                + '<div class="wide"><dt>更新时间</dt><dd>' + escapeHtml(homeBusinessTime(p.updatedAt)) + '</dd></div>'
                 + '</dl></article>';
         });
         box.innerHTML = '<div class="home-position-summary-list" data-home-position-summary>'
@@ -7146,6 +7230,7 @@
         var box = document.getElementById("homeExecutionContent");
         if (!box) return;
         var s = suggestion || {};
+        box.dataset.moduleState = frontendContract.normalizeModuleState(s.moduleState, "MISSING").toLowerCase();
         var access = frontendContract.executionPlanAccess(s);
         function displayValue(value, fallback) {
             var cleaned = cleanBlankValue(value);
@@ -7244,10 +7329,54 @@
         }) || null;
     }
 
+    function setHomeRetryVisible(visible, preservePositionSummary) {
+        var button = document.getElementById("homeRetryButton");
+        if (!button) return;
+        button.hidden = !visible;
+        button.dataset.preservePositionSummary = String(preservePositionSummary === true);
+    }
+
+    function renderAssetContextLoading(symbol) {
+        window.__lastDashboardHome = null;
+        window.__lastHomeDiagnostics = {};
+        allDecisions = [];
+        displayDecisions = [];
+        setHomeRetryVisible(false, true);
+        setRuntimeStatus("LOADING");
+        setHeaderAiStatus("LOADING", "正在同步");
+        setText("headerSourceStatusText", "正在同步当前资产");
+        renderHomeSystemStateFromPayload({}, { aiStatus: "LOADING", aiStatusLabel: "正在同步" });
+        renderHomeAlertEventRowsFromPayload({});
+        updateAssetDetailLink(null);
+        var assets = document.getElementById("tilesRow");
+        if (assets) {
+            assets.dataset.homeState = "loading";
+            assets.innerHTML = '<div class="overview-empty-state" role="status">'
+                + '<strong>正在同步 ' + escapeHtml(symbol || "当前资产") + '</strong><span>旧资产上下文已清除</span></div>';
+        }
+        renderSidebarSlots();
+        renderHomeExecutionFromPayload({
+            status: "LOADING",
+            moduleState: "LOADING",
+            statusLabel: "正在同步",
+            blockedReason: "当前资产上下文同步中",
+            positionMode: false
+        }, null);
+        renderHomeAiDecisionFromPayload({
+            runStatus: "LOADING",
+            runStatusLabel: "正在同步",
+            consistency: { aiApplicable: false, consistencySummary: "正在同步当前资产一致性摘要" },
+            tabs: []
+        }, null);
+        document.getElementById("lastUpdatedText").textContent = "正在同步";
+    }
+
     function renderDashboardHomePayload(home, preservePositionSummary) {
         if (!home) return;
         var header = home.header || {};
-        setRuntimeStatus(header.dataStatus || "WAITING_SYNC");
+        var states = home.states || {};
+        setHomeRetryVisible(false, preservePositionSummary === true);
+        setRuntimeStatus(header.dataStatus || states.overall || "WAITING_SYNC");
         setHeaderAiStatus(header.aiStatus, header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || "");
@@ -7273,7 +7402,7 @@
         displayDecisions = allDecisions.slice(0, 6);
         renderHomeSystemStateFromPayload(home.systemState || {}, header);
         renderHomeAlertEventRowsFromPayload(home);
-        renderHomeAssetsFromPayload(home.assets || []);
+        renderHomeAssetsFromPayload(home.assets || [], states.assets);
         renderSidebarSlots();
         if (!preservePositionSummary) renderHomePositionsFromPayload(home.positions || []);
         var selectedAsset = selectedHomeAsset(home);
@@ -7281,7 +7410,7 @@
         renderHomeAiDecisionFromPayload(home.aiDecision || {}, selectedAsset);
         renderHomePushInboxFromPayload(home.pushInbox || {});
         updateAssetPoolPanel();
-        document.getElementById("lastUpdatedText").textContent = nowText();
+        document.getElementById("lastUpdatedText").textContent = homeBusinessTime(header.updatedAt);
     }
 
     function renderDashboardHomeUnavailable() {
@@ -7296,7 +7425,7 @@
         setText("headerSourceStatusText", "等待重新同步");
         renderHomeSystemStateFromPayload({}, {});
         renderHomeAlertEventRowsFromPayload({});
-        renderHomeAssetsFromPayload([]);
+        renderHomeAssetsFromPayload([], "ERROR");
         renderSidebarSlots();
         var position = document.getElementById("homePositionContent");
         if (position) {
@@ -7317,7 +7446,8 @@
             consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
         }
         renderHomePushInboxFromPayload({});
-        document.getElementById("lastUpdatedText").textContent = nowText();
+        setHomeRetryVisible(true, false);
+        document.getElementById("lastUpdatedText").textContent = "--";
     }
 
     function renderAssetContextUnavailable(contextState) {
@@ -7341,6 +7471,7 @@
         setRuntimeStatus(runtimeState);
         setHeaderAiStatus("LOAD_FAILED", "当前不可查看");
         setText("headerSourceStatusText", sourceLabel);
+        setHomeRetryVisible(true, true);
         renderHomeSystemStateFromPayload({}, { aiStatus: "LOAD_FAILED", aiStatusLabel: "当前不可查看" });
         renderHomeAlertEventRowsFromPayload({});
         updateAssetDetailLink(null);
@@ -7371,7 +7502,7 @@
             tabs: []
         }, null);
         updateAssetPoolPanel();
-        document.getElementById("lastUpdatedText").textContent = nowText();
+        document.getElementById("lastUpdatedText").textContent = "--";
     }
 
     function fetchDashboardHome(preservePositionSummary) {
@@ -10357,6 +10488,20 @@
             });
     }
 
+    function bindHomeRetry() {
+        var button = document.getElementById("homeRetryButton");
+        if (!button) return;
+        button.addEventListener("click", function () {
+            var preservePositionSummary = button.dataset.preservePositionSummary === "true";
+            button.disabled = true;
+            if (preservePositionSummary) renderAssetContextLoading(selectedSymbol);
+            var request = preservePositionSummary ? refreshAssetContext() : refreshDashboard();
+            Promise.resolve(request).finally(function () {
+                button.disabled = false;
+            });
+        });
+    }
+
     function refreshDashboardDiagnostics() {
         return fetch("/api/dashboard/summary?limit=12")
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
@@ -10372,7 +10517,6 @@
                 fetchHotResetEventImpactSourceStatus(selectedSymbol);
             })
             .catch(function () {
-                document.getElementById("lastUpdatedText").textContent = nowText();
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
                 fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
@@ -11224,7 +11368,8 @@
             providerProfileSaveButton.addEventListener("click", saveProviderBaseProfile);
         }
         wireNav();
-        document.getElementById("lastUpdatedText").textContent = nowText();
+        bindHomeRetry();
+        document.getElementById("lastUpdatedText").textContent = "正在同步";
         refreshDashboard();
         REFRESH_MS = 30000;
         scheduleRefresh();

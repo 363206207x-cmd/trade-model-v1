@@ -17,6 +17,7 @@ import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.messagepush.MessageReadState;
 import org.example.trademodel.messagepush.PublicOpportunityProjectionPolicy;
+import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallResult;
@@ -62,10 +63,13 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -204,9 +208,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO getHome(Long userId, String selectedSymbol, Integer limit, Long selectedPositionId) {
         int effectiveLimit = normalizeLimit(limit);
         LightSystemStatusVO systemStatus = safeSystemStatus();
-        List<DecisionResultVO> decisions = safeDecisions(userId, Math.max(effectiveLimit, DEFAULT_LIMIT));
+        DecisionReadResult decisionRead = safeDecisionRead(userId, Math.max(effectiveLimit, DEFAULT_LIMIT));
+        List<DecisionResultVO> decisions = decisionRead.rows();
         List<MonitorAlertDO> alerts = safeAlerts();
-        List<UserPositionVO> positions = safePositions(userId);
+        PositionReadResult positionRead = safePositionRead(userId);
+        List<UserPositionVO> positions = positionRead.rows();
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
 
@@ -220,8 +226,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
 
         DecisionResultVO selectedDecision = findDecision(decisions, normalizedSelected);
+        boolean selectedDecisionReadFailed = false;
         if (selectedDecision == null) {
-            selectedDecision = safeDecisionBySymbol(userId, normalizedSelected);
+            DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
+            selectedDecision = lookup.decision();
+            selectedDecisionReadFailed = lookup.failed();
         }
         List<DashboardHomeVO.AssetVO> assets =
                 buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
@@ -231,7 +240,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 normalizedSelected = firstRenderableSymbol;
                 selectedDecision = findDecision(decisions, normalizedSelected);
                 if (selectedDecision == null) {
-                    selectedDecision = safeDecisionBySymbol(userId, normalizedSelected);
+                    DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
+                    selectedDecision = lookup.decision();
+                    selectedDecisionReadFailed = selectedDecisionReadFailed || lookup.failed();
                 }
                 assets = buildAssets(decisions, selectedDecision, normalizedSelected, effectiveLimit);
             }
@@ -248,22 +259,114 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
-        List<DashboardHomeVO.PositionVO> positionRows = positionRowsResult.rows();
-        home.setPositions(positionRows);
+        home.setPositions(positionRowsResult.topRows());
         home.setSelectedSymbol(normalizedSelected);
-        PositionSelectionResult positionSelection = resolveSelectedPosition(positionRows, selectedPositionId);
+        PositionSelectionResult positionSelection = resolveSelectedPosition(positionRowsResult.allRows(), selectedPositionId);
         DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        home.setExecutionSuggestion(buildExecutionSuggestion(selectedDecision));
+        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(selectedDecision);
+        home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
                 pushInboxContext, providerReadiness));
         home.setSafety(new DashboardHomeVO.SafetyVO());
+        DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
+        DashboardHomeVO.ModuleStatesVO moduleStates = buildModuleStates(
+                selectedAsset, executionSuggestion, positionRowsResult, aiDecision,
+                decisionRead.failed() || selectedDecisionReadFailed, positionRead.failed());
+        home.setStates(moduleStates);
+        home.getHeader().setDataStatus(moduleStates.getOverall());
+        home.getHeader().setUpdatedAt(selectedAsset != null ? selectedAsset.getUpdatedAt() : null);
         return home;
+    }
+
+    private DashboardHomeVO.ModuleStatesVO buildModuleStates(
+            DashboardHomeVO.AssetVO selectedAsset,
+            DashboardHomeVO.ExecutionSuggestionVO executionSuggestion,
+            PositionRowsResult positionRows,
+            DashboardHomeVO.AiDecisionVO aiDecision,
+            boolean assetReadFailed,
+            boolean positionReadFailed) {
+        DashboardHomeVO.ModuleStatesVO states = new DashboardHomeVO.ModuleStatesVO();
+        String assetsState = assetReadFailed
+                ? "ERROR"
+                : selectedAsset == null ? "MISSING" : normalizedModuleState(selectedAsset.getModuleState(), "MISSING");
+        String positionsState;
+        if (positionReadFailed) {
+            positionsState = "ERROR";
+        } else if (positionRows == null || positionRows.allRows().isEmpty()) {
+            positionsState = "EMPTY";
+        } else if (positionRows.allRows().stream().anyMatch(row -> "ERROR".equals(row.getModuleState()))) {
+            positionsState = "ERROR";
+        } else if (positionRows.allRows().stream().anyMatch(row -> !"READY".equals(row.getModuleState()))) {
+            positionsState = "PARTIAL";
+        } else {
+            positionsState = "READY";
+        }
+        String executionState = executionSuggestion == null
+                ? "MISSING" : normalizedModuleState(executionSuggestion.getModuleState(), "MISSING");
+        String aiState = aiModuleState(aiDecision);
+        String consistencyState = consistencyModuleState(aiDecision, aiState);
+
+        states.setAssets(assetsState);
+        states.setExecutionPlan(executionState);
+        states.setPositions(positionsState);
+        states.setAi(aiState);
+        states.setConsistency(consistencyState);
+        if ("ERROR".equals(assetsState)) {
+            states.setOverall("ERROR");
+        } else if ("MISSING".equals(assetsState)) {
+            states.setOverall("MISSING");
+        } else if ("EMPTY".equals(assetsState)) {
+            states.setOverall("EMPTY");
+        } else if (List.of(executionState, positionsState, aiState, consistencyState).stream()
+                .anyMatch(state -> "ERROR".equals(state) || "PARTIAL".equals(state) || "MISSING".equals(state))) {
+            states.setOverall("PARTIAL");
+        } else {
+            states.setOverall("READY");
+        }
+        return states;
+    }
+
+    private DashboardHomeVO.AssetVO findHomeAsset(List<DashboardHomeVO.AssetVO> assets, String symbol) {
+        String normalized = normalizeSymbol(symbol);
+        if (normalized == null || assets == null) return null;
+        return assets.stream()
+                .filter(this::isRenderableAsset)
+                .filter(asset -> normalized.equals(normalizeSymbol(asset.getRawSymbol())))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String aiModuleState(DashboardHomeVO.AiDecisionVO aiDecision) {
+        String status = upper(aiDecision != null ? aiDecision.getRunStatus() : null);
+        return switch (status) {
+            case "SUCCESS" -> "READY";
+            case "PARTIAL_SUCCESS", "STARTED" -> "PARTIAL";
+            case "FAILED", "INVALID_RESPONSE", "TIMEOUT", "MODEL_UNAVAILABLE", "RATE_LIMITED" -> "ERROR";
+            case "DISABLED", "NOT_CONFIGURED", "NOT_CALLED", "" -> "MISSING";
+            default -> "ERROR";
+        };
+    }
+
+    private String consistencyModuleState(DashboardHomeVO.AiDecisionVO aiDecision, String aiState) {
+        if ("ERROR".equals(aiState)) return "ERROR";
+        if (aiDecision == null || aiDecision.getConsistency() == null
+                || !hasText(aiDecision.getConsistency().getConsistencySummary())) {
+            return "MISSING";
+        }
+        return "READY".equals(aiState) ? "READY" : "PARTIAL";
+    }
+
+    private String normalizedModuleState(String state, String fallback) {
+        return switch (upper(state)) {
+            case "LOADING", "READY", "PARTIAL", "EMPTY", "ERROR", "MISSING" -> upper(state);
+            default -> fallback;
+        };
     }
 
     private DashboardHomeVO.DerivativesSummaryVO buildDerivativesSummary(String symbol,
@@ -344,7 +447,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (localRealReadinessService != null) {
             header.setDataSourceText(localRealDataSourceText());
         }
-        header.setUpdatedAt(LocalDateTime.now());
+        header.setUpdatedAt(null);
         return header;
     }
 
@@ -602,23 +705,57 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setAnalysisId(authoritativeAnalysisId(decision, asset));
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
+        setFieldSource(asset, "direction", hasText(asset.getMarketBias()) ? "DERIVED" : "MISSING");
         applyPersistedMarketData(asset, normalizeSymbol(decision.getSymbol()));
         if (analysisRunMapper != null && hasText(decision.getAnalysisId())) {
-            Double average = analysisRunMapper.selectAverageScoreByAnalysisId(decision.getAnalysisId());
-            asset.setCompositeScore(average == null ? null : (int) Math.round(average));
-            asset.setEvidenceCount(analysisRunMapper.countEvidenceByAnalysisId(decision.getAnalysisId()));
+            try {
+                Double average = analysisRunMapper.selectAverageScoreByAnalysisId(decision.getAnalysisId());
+                asset.setCompositeScore(average == null ? null : (int) Math.round(average));
+                asset.setEvidenceCount(analysisRunMapper.countEvidenceByAnalysisId(decision.getAnalysisId()));
+                setFieldSource(asset, "score", average == null ? "MISSING" : "DERIVED");
+            } catch (RuntimeException ignored) {
+                asset.setCompositeScore(null);
+                asset.setEvidenceCount(null);
+                setFieldSource(asset, "score", "ERROR");
+            }
+        } else {
+            setFieldSource(asset, "score", "MISSING");
         }
         asset.setLatestAnalysisTime(decision.getCreateTime());
         asset.setConfidenceLevel(trimToNull(decision.getConfidenceLevel()));
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
+        setFieldSource(asset, "confidence", hasText(asset.getConfidenceLevel()) ? "DERIVED" : "MISSING");
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
         asset.setRiskLabel(riskLabel(decision.getRiskLevel()));
-        String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
-                decision.getAssetStateSnapshot());
+        setFieldSource(asset, "riskLevel", hasText(asset.getRiskLevel()) ? "DERIVED" : "MISSING");
+        AssetStateResolution stateResolution = authoritativeAssetStateResolution(
+                normalizeSymbol(decision.getSymbol()), decision.getAssetStateSnapshot());
+        String assetState = stateResolution.value();
         asset.setAssetState(assetState);
         asset.setAssetStateLabel(assetStateLabel(assetState));
+        setFieldSource(asset, "assetState", stateResolution.sourceStatus());
+        asset.setMultiTimeframeState(trimToNull(decision.getMultiTfConvergence()));
+        setFieldSource(asset, "multiTimeframeState",
+                hasText(asset.getMultiTimeframeState()) ? "DERIVED" : "MISSING");
+        if (assetState != null || decision.getConfusedScore() != null) {
+            asset.setConfused("CONFUSED".equals(assetState)
+                    || decision.getConfusedScore() != null
+                    && decision.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD);
+            setFieldSource(asset, "confused", "DERIVED");
+        } else {
+            asset.setConfused(null);
+            setFieldSource(asset, "confused", "MISSING");
+        }
+        applyDataQuality(asset, decision);
+        asset.setUpdatedAt(maxTime(asset.getUpdatedAt(), decision.getCreateTime()));
+        if (asset.getUpdatedAt() != null) {
+            setFieldSource(asset, "updatedAt", "REAL");
+        } else if (!"ERROR".equals(asset.getFieldSourceStatus().get("updatedAt"))) {
+            setFieldSource(asset, "updatedAt", "MISSING");
+        }
         asset.setWorthOpening(decision.getIsWorthOpening());
         asset.setCurrentConclusion(currentConclusion(decision, assetState));
+        asset.setModuleState(assetModuleState(asset));
         return asset;
     }
 
@@ -649,21 +786,37 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AssetVO asset = assetBase(slot, symbol);
         applyPersistedMarketData(asset, symbol);
         asset.setSlotType(asset.getLatestPrice() == null ? "DEFAULT_SLOT" : "MARKET_DATA");
+        applyDataQuality(asset, null);
+        asset.setModuleState(asset.getLatestPrice() == null ? "MISSING" : "PARTIAL");
         return asset;
     }
 
     private void applyPersistedMarketData(DashboardHomeVO.AssetVO asset, String symbol) {
         if (asset == null || persistedOhlcvBarMapper == null || !hasText(symbol)) {
+            if (asset != null) {
+                setFieldSource(asset, "latestPrice", "MISSING");
+                setFieldSource(asset, "updatedAt", "MISSING");
+            }
             return;
         }
         Map<String, String> timeframeFreshness = new LinkedHashMap<>();
         PersistedOhlcvBarDO latest = null;
-        for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
-            List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, timeframe, 1);
-            PersistedOhlcvBarDO timeframeLatest = rows == null || rows.isEmpty() ? null : rows.get(0);
-            timeframeFreshness.put(timeframe, timeframeLatest == null
-                    ? "NO_DATA" : firstNonBlank(timeframeLatest.getFreshnessStatus(), "UNKNOWN"));
-            if ("5m".equals(timeframe)) latest = timeframeLatest;
+        try {
+            for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
+                List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, timeframe, 1);
+                PersistedOhlcvBarDO timeframeLatest = rows == null || rows.isEmpty() ? null : rows.get(0);
+                timeframeFreshness.put(timeframe, timeframeLatest == null
+                        ? "NO_DATA" : firstNonBlank(timeframeLatest.getFreshnessStatus(), "UNKNOWN"));
+                if ("5m".equals(timeframe)) latest = timeframeLatest;
+            }
+        } catch (RuntimeException ignored) {
+            asset.setDataFreshness("ERROR");
+            asset.setDataQuality("ERROR");
+            asset.setTimeframeFreshness(Map.copyOf(timeframeFreshness));
+            setFieldSource(asset, "latestPrice", "ERROR");
+            setFieldSource(asset, "dataQuality", "ERROR");
+            setFieldSource(asset, "updatedAt", "ERROR");
+            return;
         }
         asset.setTimeframeFreshness(Map.copyOf(timeframeFreshness));
         if (latest == null) {
@@ -675,13 +828,27 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             } else {
                 asset.setDataFreshness("NO_DATA");
             }
+            setFieldSource(asset, "latestPrice", "MISSING");
+            setFieldSource(asset, "updatedAt", "MISSING");
             return;
         }
-        asset.setLatestPrice(latest.getClosePrice());
+        if (!positive(latest.getClosePrice())) {
+            asset.setDataFreshness("ERROR");
+            asset.setDataQuality("ERROR");
+            setFieldSource(asset, "latestPrice", "ERROR");
+            setFieldSource(asset, "dataQuality", "ERROR");
+        } else {
+            asset.setLatestPrice(latest.getClosePrice());
+            setFieldSource(asset, "latestPrice", "REAL");
+        }
         boolean allFresh = timeframeFreshness.values().stream().allMatch("FRESH"::equalsIgnoreCase);
         boolean anyData = timeframeFreshness.values().stream().anyMatch(value -> !"NO_DATA".equals(value));
-        asset.setDataFreshness(allFresh ? "FRESH" : anyData ? "PARTIAL" : "NO_DATA");
+        if (!"ERROR".equals(asset.getDataFreshness())) {
+            asset.setDataFreshness(allFresh ? "FRESH" : anyData ? "PARTIAL" : "NO_DATA");
+        }
         asset.setSourceProvider(providerLabel(latest.getProvider()));
+        asset.setUpdatedAt(latestBusinessTime(latest));
+        setFieldSource(asset, "updatedAt", asset.getUpdatedAt() == null ? "MISSING" : "REAL");
     }
 
     private DashboardHomeVO.AssetVO assetBase(int slot, String normalizedSymbol) {
@@ -689,7 +856,68 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setSlot(slot);
         asset.setRawSymbol(normalizedSymbol);
         asset.setSymbol(toDisplaySymbol(normalizedSymbol));
+        setFieldSource(asset, "symbol", hasText(normalizedSymbol) ? "REAL" : "MISSING");
+        for (String field : List.of("latestPrice", "direction", "score", "confidence", "riskLevel",
+                "assetState", "dataQuality", "multiTimeframeState", "confused", "updatedAt")) {
+            setFieldSource(asset, field, "MISSING");
+        }
         return asset;
+    }
+
+    private void applyDataQuality(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
+        if (asset == null || "ERROR".equals(asset.getDataQuality())) return;
+        Map<String, String> freshness = asset.getTimeframeFreshness();
+        if (asset.getLatestPrice() == null) {
+            asset.setDataQuality("MISSING");
+        } else if (freshness != null && freshness.values().stream().anyMatch("STALE"::equalsIgnoreCase)) {
+            asset.setDataQuality("STALE");
+        } else {
+            boolean allFresh = freshness != null && freshness.size() == 4
+                    && freshness.values().stream().allMatch("FRESH"::equalsIgnoreCase);
+            boolean qualityScoreGood = decision == null || decision.getDataQualityScore() != null
+                    && decision.getDataQualityScore() >= MIN_DATA_QUALITY_SCORE_FOR_PLAN;
+            asset.setDataQuality(allFresh && qualityScoreGood ? "GOOD" : "PARTIAL");
+        }
+        setFieldSource(asset, "dataQuality", "MISSING".equals(asset.getDataQuality()) ? "MISSING" : "DERIVED");
+    }
+
+    private String assetModuleState(DashboardHomeVO.AssetVO asset) {
+        if (asset == null) return "MISSING";
+        Map<String, String> sources = asset.getFieldSourceStatus();
+        if (sources.values().stream().anyMatch("ERROR"::equals)) return "ERROR";
+        List<String> core = List.of("symbol", "latestPrice", "direction", "score", "confidence", "riskLevel", "assetState");
+        long availableCore = core.stream().filter(field -> !"MISSING".equals(sources.get(field))).count();
+        if (availableCore <= 1) return "MISSING";
+        boolean complete = core.stream().allMatch(field -> {
+            String source = sources.get(field);
+            return source != null && !"MISSING".equals(source) && !"FALLBACK".equals(source);
+        });
+        boolean secondaryComplete = List.of("dataQuality", "multiTimeframeState", "confused", "updatedAt")
+                .stream().allMatch(field -> !"MISSING".equals(sources.get(field)));
+        return complete && secondaryComplete && "GOOD".equals(asset.getDataQuality()) ? "READY" : "PARTIAL";
+    }
+
+    private void setFieldSource(DashboardHomeVO.AssetVO asset, String field, String sourceStatus) {
+        if (asset == null || field == null) return;
+        Map<String, String> updated = new LinkedHashMap<>(asset.getFieldSourceStatus());
+        updated.put(field, sourceStatus);
+        asset.setFieldSourceStatus(Map.copyOf(updated));
+    }
+
+    private LocalDateTime latestBusinessTime(PersistedOhlcvBarDO row) {
+        if (row == null) return null;
+        LocalDateTime closeTime = row.getCloseTimeMs() != null && row.getCloseTimeMs() > 0
+                ? LocalDateTime.ofInstant(Instant.ofEpochMilli(row.getCloseTimeMs()), ZoneOffset.UTC) : null;
+        return maxTime(row.getUpdatedAt(), row.getIngestedAt(), row.getFetchTime(), closeTime);
+    }
+
+    private LocalDateTime maxTime(LocalDateTime... values) {
+        LocalDateTime latest = null;
+        if (values == null) return null;
+        for (LocalDateTime value : values) {
+            if (value != null && (latest == null || value.isAfter(latest))) latest = value;
+        }
+        return latest;
     }
 
     private PositionRowsResult buildPositions(Long userId, List<UserPositionVO> positions) {
@@ -699,7 +927,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (!isActiveManualPosition(position)) {
                 continue;
             }
-            PositionMonitorLogDTO latestMonitorLog = latestPositionMonitorLog(userId, position.getId());
+            MonitorReadResult monitorRead = latestPositionMonitorLog(userId, position.getId());
+            PositionMonitorLogDTO latestMonitorLog = monitorRead.log();
             DashboardHomeVO.PositionVO row = new DashboardHomeVO.PositionVO();
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
@@ -721,15 +950,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setSystemSuggestedTakeProfit(null);
             row.setMonitorConclusion(latestMonitorLog != null
                     ? positionLogicStatusLabel(latestMonitorLog.getLogicStatus()) : null);
-            row.setEntryLogicStatus(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : "WAITING_MONITOR");
+            row.setEntryLogicStatus(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null);
             row.setEntryLogicStatusLabel(positionLogicStatusLabel(row.getEntryLogicStatus()));
             row.setDirectionSupportStatus(directionSupportStatus(latestMonitorLog));
             row.setDirectionSupportStatusLabel(directionSupportStatusLabel(row.getDirectionSupportStatus()));
             row.setReversalStatus(reversalStatus(latestMonitorLog));
             row.setReversalStatusLabel(reversalStatusLabel(row.getReversalStatus()));
-            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : "WAITING_MONITOR");
+            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : null);
             row.setRiskLevelLabel(positionRiskLevelLabel(row.getRiskLevel()));
-            row.setSuggestedManualAction(latestMonitorLog != null ? trimToNull(latestMonitorLog.getSuggestedAction()) : "MANUAL_REVIEW");
+            row.setSuggestedManualAction(latestMonitorLog != null ? trimToNull(latestMonitorLog.getSuggestedAction()) : null);
             row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedManualAction(), latestMonitorLog));
             row.setUpdatedAt(position.getUpdatedAt());
             row.setOpenedAt(position.getOpenedAt());
@@ -750,9 +979,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     trustedSources.put(position.getId(), trustedSource);
                 }
             }
+            row.setWarningState(positionWarningState(latestMonitorLog, monitorRead.failed()));
+            row.setModuleState(positionModuleState(row, latestMonitorLog, monitorRead.failed()));
             rows.add(row);
         }
-        return new PositionRowsResult(List.copyOf(rows), Map.copyOf(trustedSources));
+        rows.sort(positionPriorityComparator());
+        List<DashboardHomeVO.PositionVO> allRows = List.copyOf(rows);
+        List<DashboardHomeVO.PositionVO> topRows = allRows.stream().limit(3).toList();
+        return new PositionRowsResult(allRows, topRows, Map.copyOf(trustedSources));
     }
 
     private boolean isManualPosition(UserPositionVO position) {
@@ -768,20 +1002,85 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return "OPEN".equalsIgnoreCase(normalized) || "PARTIALLY_CLOSED".equalsIgnoreCase(normalized);
     }
 
-    private PositionMonitorLogDTO latestPositionMonitorLog(Long userId, Long positionId) {
+    private MonitorReadResult latestPositionMonitorLog(Long userId, Long positionId) {
         if (userId == null || userId <= 0 || positionId == null) {
-            return null;
+            return new MonitorReadResult(null, false);
         }
         try {
             List<PositionMonitorLogDTO> logs = positionMonitorLogService
                     .listByPositionIdForUser(userId, positionId, 1);
             if (logs == null || logs.isEmpty()) {
-                return null;
+                return new MonitorReadResult(null, false);
             }
-            return logs.get(0);
+            return new MonitorReadResult(logs.get(0), false);
         } catch (RuntimeException ignored) {
-            return null;
+            return new MonitorReadResult(null, true);
         }
+    }
+
+    private Comparator<DashboardHomeVO.PositionVO> positionPriorityComparator() {
+        return Comparator
+                .comparingInt((DashboardHomeVO.PositionVO row) -> positionWarningRank(row.getWarningState())).reversed()
+                .thenComparing(row -> maxTime(row.getLastMonitorAt(), row.getUpdatedAt()),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(DashboardHomeVO.PositionVO::getPositionId,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    private int positionWarningRank(String warningState) {
+        return switch (upper(warningState)) {
+            case "ERROR" -> 5;
+            case "HIGH_RISK" -> 4;
+            case "PLAN_INVALIDATED" -> 3;
+            case "WATCH" -> 2;
+            case "MISSING" -> 1;
+            default -> 0;
+        };
+    }
+
+    private String positionWarningState(PositionMonitorLogDTO monitor, boolean readFailed) {
+        if (readFailed) return "ERROR";
+        if (monitor == null) return "MISSING";
+        String risk = upper(monitor.getRiskLevel());
+        String logic = upper(monitor.getLogicStatus());
+        if ("HIGH".equals(risk) || "EXTREME".equals(risk) || "HIGH_RISK".equals(logic)) return "HIGH_RISK";
+        if ("PLAN_INVALIDATED".equals(logic)) return "PLAN_INVALIDATED";
+        if ("LOGIC_WEAKENED".equals(logic)) return "WATCH";
+        return "NONE";
+    }
+
+    private String positionModuleState(DashboardHomeVO.PositionVO row,
+                                       PositionMonitorLogDTO monitor,
+                                       boolean readFailed) {
+        if (readFailed) return "ERROR";
+        if (row == null || row.getPositionId() == null || !hasText(row.getSymbol())
+                || !hasText(row.getDirection()) || !positive(row.getEntryPrice())
+                || !positive(row.getPositionSize()) || !hasText(row.getPositionStatus())) {
+            return "ERROR";
+        }
+        if (monitor != null && (!recognizedPositionLogic(monitor.getLogicStatus())
+                || !recognizedPositionRisk(monitor.getRiskLevel()))) {
+            return "ERROR";
+        }
+        if (monitor == null || row.getLeverage() == null || row.getUserStopLoss() == null
+                || row.getUserTakeProfit() == null || row.getUpdatedAt() == null) {
+            return "PARTIAL";
+        }
+        return "READY";
+    }
+
+    private boolean recognizedPositionLogic(String logicStatus) {
+        return switch (upper(logicStatus)) {
+            case "LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "HIGH_RISK" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedPositionRisk(String riskLevel) {
+        return switch (upper(riskLevel)) {
+            case "LOW", "MEDIUM", "HIGH", "EXTREME" -> true;
+            default -> false;
+        };
     }
 
     private BigDecimal safeCurrentPrice(String assetSymbol) {
@@ -921,10 +1220,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         suggestion.setSourceAnalysisId(trimToNull(decision.getAnalysisId()));
-        String entryZone = trimPlanValue(decision.getEntryZone());
-        String stopLoss = trimPlanValue(decision.getStopLoss());
-        String takeProfitRules = trimPlanValue(decision.getTakeProfitRules());
-        boolean boundaryComplete = entryZone != null && stopLoss != null && takeProfitRules != null;
 
         if (!AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(decision.getTimeframe())) {
             blockSuggestion(suggestion, "UNSUPPORTED_TIMEFRAME", "当前暂无完整执行计划",
@@ -982,9 +1277,34 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "当前条件不足，暂不形成新计划");
             return suggestion;
         }
+        if (!hasText(decision.getDecisionId())) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
+                    "决策缺少精确身份，不能关联执行计划");
+            return suggestion;
+        }
+        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
+        if (assetPlan.state() == ExactPlanIdentityState.MISSING) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
+                    assetPlan.reason());
+            return suggestion;
+        }
+        if (assetPlan.state() == ExactPlanIdentityState.ERROR || !assetPlan.verified()) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_ERROR", "当前执行计划不可用",
+                    assetPlan.reason());
+            return suggestion;
+        }
+        ExecutionPlanDO executionPlan = assetPlan.executionPlan();
+        boolean boundaryComplete = trimPlanValue(executionPlan.getEntryZone()) != null
+                && trimPlanValue(executionPlan.getStopLoss()) != null
+                && trimPlanValue(executionPlan.getTakeProfitRules()) != null;
         if (!boundaryComplete) {
             blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "当前暂无完整执行计划",
                     BOUNDARY_INCOMPLETE_VALID_PERIOD);
+            return suggestion;
+        }
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.persistedPlanState(executionPlan);
+        if (planState != PersistedPlanState.ACTIVE) {
+            blockPersistedAssetPlan(suggestion, executionPlan, planState);
             return suggestion;
         }
         PlanValidity planValidity = resolvePlanValidity(decision);
@@ -1009,21 +1329,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
 
-        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
-        if (!assetPlan.verified()) {
-            blockSuggestion(suggestion, "PLAN_SOURCE_UNVERIFIED", "当前暂无完整执行计划",
-                    "执行计划来源不可验证");
-            return suggestion;
-        }
-        ExecutionPlanDO executionPlan = assetPlan.executionPlan();
-        PersistedPlanState planState = ExecutionPlanReviewPolicy.persistedPlanState(executionPlan);
-        if (planState != PersistedPlanState.ACTIVE) {
-            blockPersistedAssetPlan(suggestion, executionPlan, planState);
-            return suggestion;
-        }
-
         suggestion.setStatus("USABLE_REVIEW_PLAN");
         suggestion.setStatusLabel("完整执行计划，仅供人工复核");
+        suggestion.setModuleState("READY");
         suggestion.setSourceAnalysisId(assetPlan.analysisId());
         suggestion.setSourceExecutionPlanId(assetPlan.executionPlanId());
         suggestion.setSourceTraceId(assetPlan.sourceTraceId());
@@ -1065,26 +1373,58 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {
         String analysisId = trimToNull(decision != null ? decision.getAnalysisId() : null);
+        String decisionId = trimToNull(decision != null ? decision.getDecisionId() : null);
         String symbol = normalizeSymbol(decision != null ? decision.getSymbol() : null);
-        if (analysisId == null || symbol == null || executionPlanMapper == null || analysisRunMapper == null) {
-            return AssetExecutionPlanResolution.unverified();
+        if (analysisId == null || decisionId == null || symbol == null) {
+            return AssetExecutionPlanResolution.missing("决策或分析精确身份缺失");
+        }
+        if (executionPlanMapper == null || analysisRunMapper == null || opportunityLogService == null) {
+            return AssetExecutionPlanResolution.error("执行计划精确身份读取能力不可用");
         }
         try {
-            ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(analysisId);
-            String planId = trimToNull(plan != null ? plan.getPlanId() : null);
-            if (planId == null || !analysisId.equals(trimToNull(plan.getAnalysisId()))) {
-                return AssetExecutionPlanResolution.unverified();
+            List<OpportunityLogDTO> relations = opportunityLogService.queryForSystem(
+                    analysisId, decisionId, null, symbol, null, null, null, null, 2);
+            if (relations == null || relations.isEmpty()) {
+                return AssetExecutionPlanResolution.missing("未找到决策与执行计划的精确持久化关系");
+            }
+            LinkedHashSet<String> planIds = new LinkedHashSet<>();
+            for (OpportunityLogDTO relation : relations) {
+                if (relation == null
+                        || !analysisId.equals(trimToNull(relation.getAnalysisId()))
+                        || !decisionId.equals(trimToNull(relation.getDecisionId()))
+                        || !symbol.equals(normalizeSymbol(relation.getSymbol()))
+                        || !"AUTHORITATIVE_ANALYSIS".equalsIgnoreCase(trimToNull(relation.getSourceType()))) {
+                    return AssetExecutionPlanResolution.error("执行计划来源身份与当前决策不一致");
+                }
+                String relatedPlanId = trimToNull(relation.getExecutionPlanId());
+                if (relatedPlanId == null) {
+                    return AssetExecutionPlanResolution.missing("精确关系缺少 executionPlanId");
+                }
+                planIds.add(relatedPlanId);
+            }
+            if (planIds.size() != 1) {
+                return AssetExecutionPlanResolution.error("同一决策关联了多个执行计划身份");
+            }
+            String planId = planIds.iterator().next();
+            ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(planId);
+            if (plan == null) {
+                return AssetExecutionPlanResolution.missing("精确执行计划记录不存在");
+            }
+            if (!planId.equals(trimToNull(plan.getPlanId()))
+                    || !analysisId.equals(trimToNull(plan.getAnalysisId()))) {
+                return AssetExecutionPlanResolution.error("执行计划记录与精确关系不一致");
             }
             AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
             if (run == null
                     || !analysisId.equals(trimToNull(run.getAnalysisId()))
                     || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
-                return AssetExecutionPlanResolution.unverified();
+                return AssetExecutionPlanResolution.error("分析来源与当前资产身份不一致");
             }
             return new AssetExecutionPlanResolution(
-                    plan, analysisId, planId, trimToNull(run.getTraceId()));
+                    ExactPlanIdentityState.READY, plan, analysisId, planId,
+                    trimToNull(run.getTraceId()), null);
         } catch (RuntimeException ignored) {
-            return AssetExecutionPlanResolution.unverified();
+            return AssetExecutionPlanResolution.error("执行计划精确身份读取失败");
         }
     }
 
@@ -1204,6 +1544,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setStatus(status);
         suggestion.setStatusLabel(statusLabel);
         suggestion.setBlockedReason(reason);
+        suggestion.setModuleState(executionModuleState(status));
+    }
+
+    private String executionModuleState(String status) {
+        return switch (upper(status)) {
+            case "USABLE_REVIEW_PLAN" -> "READY";
+            case "NO_COMPLETE_PLAN", "NOT_WORTH_OPENING" -> "EMPTY";
+            case "ANALYSIS_SNAPSHOT_MISSING", "PLAN_IDENTITY_MISSING", "PLAN_MISSING" -> "MISSING";
+            case "DATA_QUALITY_BLOCKED", "STATE_SNAPSHOT_UNVERIFIED", "BOUNDARY_INCOMPLETE",
+                    "REVALIDATION_REQUIRED", "PLAN_INCOMPLETE", "PLAN_REVIEW_ONLY" -> "PARTIAL";
+            default -> "ERROR";
+        };
     }
 
     private DashboardHomeVO.AiDecisionVO buildAiDecision(DecisionResultVO decision) {
@@ -1483,27 +1835,28 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<DecisionResultVO> safeDecisions(Long userId, int limit) {
+    private DecisionReadResult safeDecisionRead(Long userId, int limit) {
         try {
             List<DecisionResultVO> decisions = userId == null
                     ? decisionService.getLatestDecisionResults(limit)
                     : decisionService.getLatestDecisionResultsForUser(userId, limit);
-            return decisions != null ? decisions : List.of();
+            return new DecisionReadResult(decisions != null ? List.copyOf(decisions) : List.of(), false);
         } catch (RuntimeException ignored) {
-            return List.of();
+            return new DecisionReadResult(List.of(), true);
         }
     }
 
-    private DecisionResultVO safeDecisionBySymbol(Long userId, String symbol) {
+    private DecisionLookupResult safeDecisionLookup(Long userId, String symbol) {
         try {
             if (!hasText(symbol)) {
-                return null;
+                return new DecisionLookupResult(null, false);
             }
-            return userId == null
+            DecisionResultVO decision = userId == null
                     ? decisionService.getLatestDecisionResultBySymbol(symbol)
                     : decisionService.getLatestDecisionResultBySymbolForUser(userId, symbol);
+            return new DecisionLookupResult(decision, false);
         } catch (RuntimeException ignored) {
-            return null;
+            return new DecisionLookupResult(null, true);
         }
     }
 
@@ -1516,15 +1869,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<UserPositionVO> safePositions(Long userId) {
+    private PositionReadResult safePositionRead(Long userId) {
         if (userId == null || userId <= 0) {
-            return List.of();
+            return new PositionReadResult(List.of(), false);
         }
         try {
             List<UserPositionVO> positions = userPositionService.listOpenPositionsForUser(userId);
-            return positions != null ? positions : List.of();
+            return new PositionReadResult(positions != null ? List.copyOf(positions) : List.of(), false);
         } catch (RuntimeException ignored) {
-            return List.of();
+            return new PositionReadResult(List.of(), true);
         }
     }
 
@@ -1721,17 +2074,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String authoritativeAssetState(String symbol, String compatibilitySnapshot) {
+        return authoritativeAssetStateResolution(symbol, compatibilitySnapshot).value();
+    }
+
+    private AssetStateResolution authoritativeAssetStateResolution(String symbol, String compatibilitySnapshot) {
         if (assetStateMapper != null && hasText(symbol)) {
             try {
                 AssetStateDO row = assetStateMapper.selectBySymbol(symbol);
                 String state = row != null && row.getState() != null
                         ? recognizedAssetStateValue(row.getState().name()) : null;
-                if (state != null) return state;
+                if (state != null) return new AssetStateResolution(state, "REAL");
+                if (row != null && row.getState() != null) {
+                    return new AssetStateResolution(null, "ERROR");
+                }
             } catch (RuntimeException ignored) {
-                // Compatibility snapshot is used only when the authoritative state read is unavailable.
+                String fallback = recognizedAssetStateFromSnapshot(compatibilitySnapshot);
+                return fallback == null
+                        ? new AssetStateResolution(null, "ERROR")
+                        : new AssetStateResolution(fallback, "FALLBACK");
             }
         }
-        return recognizedAssetStateFromSnapshot(compatibilitySnapshot);
+        String fallback = recognizedAssetStateFromSnapshot(compatibilitySnapshot);
+        return fallback == null
+                ? new AssetStateResolution(null, "MISSING")
+                : new AssetStateResolution(fallback, "FALLBACK");
     }
 
     private String recognizedAssetStateValue(JsonNode node) {
@@ -2242,21 +2608,52 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private record DecisionReadResult(List<DecisionResultVO> rows, boolean failed) {
+    }
+
+    private record DecisionLookupResult(DecisionResultVO decision, boolean failed) {
+    }
+
+    private record PositionReadResult(List<UserPositionVO> rows, boolean failed) {
+    }
+
+    private record MonitorReadResult(PositionMonitorLogDTO log, boolean failed) {
+    }
+
+    private record AssetStateResolution(String value, String sourceStatus) {
+    }
+
     private record PositionRowsResult(
-            List<DashboardHomeVO.PositionVO> rows,
+            List<DashboardHomeVO.PositionVO> allRows,
+            List<DashboardHomeVO.PositionVO> topRows,
             Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
     }
 
-    private record AssetExecutionPlanResolution(ExecutionPlanDO executionPlan,
+    private enum ExactPlanIdentityState {
+        READY,
+        MISSING,
+        ERROR
+    }
+
+    private record AssetExecutionPlanResolution(ExactPlanIdentityState state,
+                                                ExecutionPlanDO executionPlan,
                                                 String analysisId,
                                                 String executionPlanId,
-                                                String sourceTraceId) {
+                                                String sourceTraceId,
+                                                String reason) {
         private boolean verified() {
-            return executionPlan != null && analysisId != null && executionPlanId != null;
+            return state == ExactPlanIdentityState.READY
+                    && executionPlan != null && analysisId != null && executionPlanId != null;
         }
 
-        private static AssetExecutionPlanResolution unverified() {
-            return new AssetExecutionPlanResolution(null, null, null, null);
+        private static AssetExecutionPlanResolution missing(String reason) {
+            return new AssetExecutionPlanResolution(
+                    ExactPlanIdentityState.MISSING, null, null, null, null, reason);
+        }
+
+        private static AssetExecutionPlanResolution error(String reason) {
+            return new AssetExecutionPlanResolution(
+                    ExactPlanIdentityState.ERROR, null, null, null, null, reason);
         }
     }
 
