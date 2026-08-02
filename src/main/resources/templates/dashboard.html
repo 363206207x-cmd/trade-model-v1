@@ -7086,9 +7086,7 @@
     }
 
     function dataQualityText(value) {
-        return ({ GOOD: "良好", PARTIAL: "部分", STALE: "过期", MISSING: "缺失", ERROR: "错误" })[
-            String(value || "MISSING").toUpperCase()
-        ] || "错误";
+        return frontendContract.dataQualityLabel(value);
     }
 
     function fieldSourceBadge(label, source) {

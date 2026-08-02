@@ -14,6 +14,7 @@ import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
@@ -70,7 +71,6 @@ public class DecisionEngineService {
 
     private static final String KEY_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE = "decision.action_priority.high_min_score_exclusive";
     private static final int DEFAULT_ACTION_PRIORITY_HIGH_MIN_SCORE_EXCLUSIVE = 85;
-    private static final int MIN_DATA_QUALITY_SCORE_FOR_OPENING = 60;
     private static final int MIN_TREND_STRUCTURE_SCORE_FOR_OPENING = 50;
     private static final String KEY_DERIVATIVES_EIGHT_SCORE_ADJUSTMENT_CAP =
             "derivatives_decision_config.eight_score_adjustment_cap";
@@ -209,8 +209,7 @@ public class DecisionEngineService {
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
             boolean hasUsableMarketStructure = !"WAIT".equals(ruleMarketBias) && !"RANGE".equals(ruleMarketBias);
-            boolean dataQualitySufficient = dataQualityScore != null
-                    && dataQualityScore >= MIN_DATA_QUALITY_SCORE_FOR_OPENING;
+            boolean dataQualitySufficient = DataQualityCircuitBreakerPolicy.passes(dataQualityScore);
             boolean decisionInputsSufficient = dataQualitySufficient && hasUsableMarketStructure;
             boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence
                     && decisionInputsSufficient;

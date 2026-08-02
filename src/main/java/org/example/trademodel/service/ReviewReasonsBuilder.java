@@ -2,6 +2,7 @@ package org.example.trademodel.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.enums.AiConflictLevelEnum;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -41,7 +42,7 @@ public final class ReviewReasonsBuilder {
         if (aiConflictScore != null && aiConflictScore >= 50) {
             codes.add("AI_CONFLICT_SCORE_HIGH");
         }
-        if (dataQualityScore != null && dataQualityScore < 60) {
+        if (DataQualityCircuitBreakerPolicy.isBlocked(dataQualityScore)) {
             codes.add("DATA_QUALITY_INSUFFICIENT");
         }
         if (trendStructureScore != null && trendStructureScore < 50) {

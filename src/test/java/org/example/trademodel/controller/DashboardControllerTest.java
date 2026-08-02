@@ -508,11 +508,54 @@ public class DashboardControllerTest {
         assertThat(fixture).contains(
                 "\"partial\"", "\"empty\"", "\"missing\"", "\"retry\"",
                 "\"asset-switch-failure\"", "\"exact-plan\"", "\"top3-independent\"",
+                "\"data-quality-60\"", "\"data-quality-69\"", "\"data-quality-70\"",
                 "\"fieldSourceStatus\"", "\"multiTimeframeState\"", "\"confused\"",
                 "\"moduleState\"", "\"states\"",
                 "\"sourceExecutionPlanId\"", "\"positions\": [",
                 "should_fail = home_request_count > 0 if scenario == \"home-failure\" else home_request_count == 0",
                 "scenario == \"asset-switch-failure\" and symbol != \"BTCUSDT\"");
+    }
+
+    @Test
+    void visualFixtureUsesTheSeventyPointCircuitBreakerWithoutClearingPositions() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        int helperStart = fixture.indexOf("def apply_data_quality_boundary(");
+        int helperEnd = fixture.indexOf("def apply_module_states(", helperStart);
+        int scenarioStart = fixture.indexOf(
+                "elif scenario in {\"low-quality\", \"data-quality-60\", \"data-quality-69\", \"data-quality-70\"}");
+        int scenarioEnd = fixture.indexOf("elif scenario == \"ai-disabled-blocked\"", scenarioStart);
+
+        assertThat(helperStart).isGreaterThanOrEqualTo(0);
+        assertThat(helperEnd).isGreaterThan(helperStart);
+        assertThat(fixture.substring(helperStart, helperEnd)).contains(
+                "passes_minimum_gate = score >= 70",
+                "\"dataQuality\": \"PARTIAL\"",
+                "\"moduleState\": \"PARTIAL\"",
+                "\"status\": \"DATA_QUALITY_BLOCKED\"",
+                "数据质量不足，暂不交易 / 事件观望",
+                "\"dataQualityMinimumGatePassed\"")
+                .doesNotContain("home[\"positions\"] = []", "sourceExecutionPlanId");
+        assertThat(scenarioStart).isGreaterThanOrEqualTo(0);
+        assertThat(scenarioEnd).isGreaterThan(scenarioStart);
+        assertThat(fixture.substring(scenarioStart, scenarioEnd)).contains(
+                "\"data-quality-60\": 60",
+                "\"data-quality-69\": 69",
+                "\"data-quality-70\": 70",
+                "apply_data_quality_boundary(home, selected_asset, score)");
+    }
+
+    @Test
+    void frontendMapsBackendDataQualityStateWithoutRecomputingTheThreshold() throws Exception {
+        String contract = Files.readString(FRONTEND_CONTRACT);
+        String desktopMapper = functionBody("dataQualityText");
+
+        assertThat(contract).contains(
+                "var DATA_QUALITY_LABELS",
+                "GOOD: \"良好\"",
+                "PARTIAL: \"数据不足\"",
+                "function dataQualityLabel(value)");
+        assertThat(desktopMapper).contains("frontendContract.dataQualityLabel(value)")
+                .doesNotContain("60", "69", "70", "dataQualityScore");
     }
 
     @Test

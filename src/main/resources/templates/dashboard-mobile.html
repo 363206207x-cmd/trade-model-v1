@@ -203,7 +203,8 @@
             <span><small>风险等级</small><b data-asset-field="risk" th:text="${asset.riskLabel != null ? asset.riskLabel : (asset.riskLevel != null ? asset.riskLevel : '--')}">--</b></span>
           </span>
           <span class="asset-secondary-strip" aria-label="资产辅助状态">
-            <span><small>数据</small><b data-asset-field="dataQuality" th:text="${asset.dataQuality != null ? asset.dataQuality : 'MISSING'}">MISSING</b></span>
+            <span><small>数据</small><b data-asset-field="dataQuality"
+                                      th:text="${asset.dataQuality == 'GOOD' ? '良好' : (asset.dataQuality == 'PARTIAL' ? '数据不足' : (asset.dataQuality == 'STALE' ? '数据过期' : (asset.dataQuality == 'ERROR' ? '数据错误' : '数据缺失')))}">数据缺失</b></span>
             <span><small>多周期</small><b data-asset-field="multiTimeframeState" th:text="${asset.multiTimeframeState != null ? asset.multiTimeframeState : 'MISSING'}">MISSING</b></span>
             <span><small>Confused</small><b data-asset-field="confused" th:text="${asset.confused != null ? (asset.confused ? '是' : '否') : 'MISSING'}">MISSING</b></span>
             <span><small>更新</small><b data-asset-field="updatedAt" th:text="${asset.updatedAt != null ? asset.updatedAt : '--'}">--</b></span>

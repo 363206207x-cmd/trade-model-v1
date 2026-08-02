@@ -306,6 +306,23 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
+    void mobileProjectionUsesBackendDataQualityStateAndShowsFailClosedCopy() throws Exception {
+        String script = Files.readString(SCRIPT);
+        String foundation = Files.readString(FRONTEND_CONTRACT);
+        String projection = slice(
+                script,
+                "function syncAssetCardProjection(card, asset)",
+                "function clearAssetCardProjection(card, stateLabel)");
+
+        assertThat(foundation).contains(
+                "PARTIAL: \"数据不足\"",
+                "function dataQualityLabel(value)");
+        assertThat(projection)
+                .contains("frontendContract.dataQualityLabel(asset.dataQuality)")
+                .doesNotContain("dataQualityScore", ">= 70", "< 70");
+    }
+
+    @Test
     void interactionsCoverPagerUnavailableDestinationsAndHomeResetAccessibly() throws Exception {
         String source = Files.readString(SCRIPT) + Files.readString(TEMPLATE);
 

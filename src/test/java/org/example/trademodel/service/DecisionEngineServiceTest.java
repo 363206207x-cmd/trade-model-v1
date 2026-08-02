@@ -29,6 +29,8 @@ import org.example.trademodel.vo.ExecutionPlanVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -129,12 +131,19 @@ class DecisionEngineServiceTest {
                         : bullishKlines());
     }
 
-    @Test
-    void makeDecision_forcesWorthOpeningFalseWhenDataQualityBelow60_andKeepsReasonPresent() {
-        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-1", 59, 65);
+    @ParameterizedTest
+    @ValueSource(ints = {59, 60, 69})
+    void makeDecision_blocksEveryDataQualityScoreBelowSeventy(int score) {
+        DecisionBundleVO decision = service.makeDecision(
+                "BTCUSDT", "1m", "analysis-dq-blocked-" + score, score, 65);
 
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getReviewReasons()).contains("DATA_QUALITY_INSUFFICIENT");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(decision.getConfidenceLevel()).isEqualTo("LOW");
+        assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(decision.getAiPlanMode()).isNull();
+        assertThat(decision.getConclusionSummary()).contains("数据质量门控：BLOCKED");
     }
 
     @Test
@@ -231,11 +240,13 @@ class DecisionEngineServiceTest {
     }
 
     @Test
-    void makeDecision_dataQualityAtOrAbove60_doesNotChangeExistingWorthOpeningOutcome() {
+    void makeDecision_dataQualityAtSeventyPassesOnlyTheMinimumQualityGate() {
         DecisionBundleVO baseline = service.makeDecision("BTCUSDT", "1m", "analysis-2", 85, 65);
-        DecisionBundleVO withGateBoundaryScore = service.makeDecision("BTCUSDT", "1m", "analysis-3", 60, 65);
+        DecisionBundleVO withGateBoundaryScore = service.makeDecision("BTCUSDT", "1m", "analysis-3", 70, 65);
 
         assertThat(withGateBoundaryScore.getIsWorthOpening()).isEqualTo(baseline.getIsWorthOpening());
+        assertThat(withGateBoundaryScore.getReviewReasons()).doesNotContain("DATA_QUALITY_INSUFFICIENT");
+        assertThat(withGateBoundaryScore.getConclusionSummary()).contains("数据质量门控：PASS");
     }
 
     @Test
@@ -250,8 +261,8 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_dataQualityGateDowngradesUserConclusionConsistently() {
-        DecisionBundleVO normal = service.makeDecision("BTCUSDT", "1m", "analysis-4", 60, 65);
-        DecisionBundleVO gated = service.makeDecision("BTCUSDT", "1m", "analysis-5", 59, 65);
+        DecisionBundleVO normal = service.makeDecision("BTCUSDT", "1m", "analysis-4", 70, 65);
+        DecisionBundleVO gated = service.makeDecision("BTCUSDT", "1m", "analysis-5", 69, 65);
 
         assertThat(gated.getIsWorthOpening()).isFalse();
         assertThat(gated.getConfidenceLevel()).isEqualTo("LOW");
@@ -264,21 +275,39 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_forcesWorthOpeningFalseWhenTrendStructureScoreBelow50_andKeepsReasonPresent() {
-        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-6", 60, 49);
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-6", 70, 49);
 
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getReviewReasons()).contains("TREND_STRUCTURE_SCORE_INSUFFICIENT");
+        assertThat(decision.getReviewReasons()).doesNotContain("DATA_QUALITY_INSUFFICIENT");
     }
 
     @Test
     void makeDecision_trendStructureGate_runsBeforeDataQualityGateButDqRemainsFinalFallback() {
-        DecisionBundleVO trendOnlyGate = service.makeDecision("BTCUSDT", "1m", "analysis-7", 60, 49);
-        DecisionBundleVO dqOnlyGate = service.makeDecision("BTCUSDT", "1m", "analysis-8", 59, 65);
+        DecisionBundleVO trendOnlyGate = service.makeDecision("BTCUSDT", "1m", "analysis-7", 70, 49);
+        DecisionBundleVO dqOnlyGate = service.makeDecision("BTCUSDT", "1m", "analysis-8", 69, 65);
 
         assertThat(trendOnlyGate.getIsWorthOpening()).isFalse();
         assertThat(trendOnlyGate.getReviewReasons()).contains("TREND_STRUCTURE_SCORE_INSUFFICIENT");
         assertThat(dqOnlyGate.getIsWorthOpening()).isFalse();
         assertThat(dqOnlyGate.getReviewReasons()).contains("DATA_QUALITY_INSUFFICIENT");
+    }
+
+    @Test
+    void makeDecision_failsClosedForMissingAndOutOfRangeDataQualityScores() {
+        List<Integer> invalidScores = new ArrayList<>();
+        invalidScores.add(null);
+        invalidScores.add(-1);
+        invalidScores.add(101);
+
+        for (int i = 0; i < invalidScores.size(); i++) {
+            DecisionBundleVO decision = service.makeDecision(
+                    "BTCUSDT", "1m", "analysis-invalid-dq-" + i, invalidScores.get(i), 65);
+
+            assertThat(decision.getIsWorthOpening()).isFalse();
+            assertThat(decision.getMarketBiasHierarchy()).isEqualTo("WAIT");
+            assertThat(decision.getReviewReasons()).contains("DATA_QUALITY_INSUFFICIENT");
+        }
     }
 
     @Test

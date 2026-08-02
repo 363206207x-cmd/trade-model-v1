@@ -73,7 +73,7 @@ class DashboardHomeControllerTest {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
         suggestion.setStatus("DATA_QUALITY_BLOCKED");
         suggestion.setStatusLabel("当前暂无完整执行计划");
-        suggestion.setBlockedReason("数据质量不足，等待有效分析");
+        suggestion.setBlockedReason("数据质量不足，暂不交易 / 事件观望");
         home.setExecutionSuggestion(suggestion);
 
         DashboardHomeVO.AiDecisionVO ai = new DashboardHomeVO.AiDecisionVO();

@@ -4,6 +4,7 @@ import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.mapper.MonitorAlertMapper;
 import org.example.trademodel.service.MonitorAlertWriteService;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
@@ -23,7 +24,7 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
     /** 与决策引擎 {@code riskLevelLabel == "HIGH"} 对齐。 */
     public static final String ALERT_TYPE_HIGH_RISK_DECISION = "HIGH_RISK_DECISION";
 
-    /** 与 AnalysisAssemblerServiceImpl#estimateDataQualityScore 档位一致：低于 60 视为不足。 */
+    /** 与正式产品数据质量断路器一致：低于 70 视为不足。 */
     public static final String ALERT_TYPE_DATA_QUALITY_INSUFFICIENT = "DATA_QUALITY_INSUFFICIENT";
 
     /**
@@ -38,8 +39,6 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
     public static final String ALERT_TYPE_OPEN_BLOCKED_BY_CONFLICT = "OPEN_BLOCKED_BY_CONFLICT";
     /** 同一 analysis 内：冲突升高且多周期弱收敛。 */
     public static final String ALERT_TYPE_CONFLUENCE_BREAKDOWN = "CONFLUENCE_BREAKDOWN";
-
-    private static final int DATA_QUALITY_THRESHOLD = 60;
 
     /** 与 AiConflictResolverServiceImpl：LEVEL_3 下界一致（显著分歧及以上才告警）。 */
     private static final int AI_CONFLICT_SCORE_ELEVATED_MIN = 46;
@@ -78,10 +77,15 @@ public class MonitorAlertWriteServiceImpl implements MonitorAlertWriteService {
         }
 
         Integer dqs = analysis.getDataQualityScore();
-        if (dqs != null && dqs < DATA_QUALITY_THRESHOLD) {
+        if (dqs != null && DataQualityCircuitBreakerPolicy.isBlocked(dqs)) {
+            String qualityReason = DataQualityCircuitBreakerPolicy.isValid(dqs)
+                    ? String.format("低于阈值 %d", DataQualityCircuitBreakerPolicy.MIN_PASS_SCORE)
+                    : String.format("不在合法范围 %d-%d",
+                    DataQualityCircuitBreakerPolicy.MIN_VALID_SCORE,
+                    DataQualityCircuitBreakerPolicy.MAX_VALID_SCORE);
             tryEmitOpenOrSuppressed(analysisId, symbol, ALERT_TYPE_DATA_QUALITY_INSUFFICIENT, "WARN",
-                    String.format("数据质量不足：dataQualityScore=%d（低于阈值 %d，analysisId=%s, symbol=%s）",
-                            dqs, DATA_QUALITY_THRESHOLD, analysisId, symbol),
+                    String.format("数据质量不足：dataQualityScore=%d（%s，analysisId=%s, symbol=%s）",
+                            dqs, qualityReason, analysisId, symbol),
                     traceId, ruleVersion);
         }
 

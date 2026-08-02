@@ -135,7 +135,7 @@ class RunBaselineServiceImplTest {
                 "SUPPRESSED", MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT,
                 windowStartUtc, asOfUtc);
         verify(analysisRunMapper).countInWindow(windowStartUtc, asOfUtc);
-        verify(analysisRunMapper).countLowQualityInWindow(windowStartUtc, asOfUtc, 60);
+        verify(analysisRunMapper).countLowQualityInWindow(windowStartUtc, asOfUtc, 70);
         verifyNoInteractions(pushRecheckLogMapper);
         verify(hotResetEventMapper).countInWindow(windowStartUtc, asOfUtc);
         verify(hotResetEventMapper).selectTriggerTypeCountsInWindow(windowStartUtc, asOfUtc);
@@ -164,7 +164,7 @@ class RunBaselineServiceImplTest {
         LocalDateTime windowStartUtc = LocalDateTime.parse("2026-07-14T11:30:00");
         LocalDateTime asOfUtc = LocalDateTime.parse("2026-07-14T12:00:00");
         verify(analysisRunMapper, times(3)).countInWindow(windowStartUtc, asOfUtc);
-        verify(analysisRunMapper, times(3)).countLowQualityInWindow(windowStartUtc, asOfUtc, 60);
+        verify(analysisRunMapper, times(3)).countLowQualityInWindow(windowStartUtc, asOfUtc, 70);
     }
 
     @Test

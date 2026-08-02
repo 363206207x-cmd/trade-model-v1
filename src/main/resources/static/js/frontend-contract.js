@@ -84,6 +84,14 @@
     ERROR: Object.freeze({ label: "错误", tone: "error" })
   });
 
+  var DATA_QUALITY_LABELS = Object.freeze({
+    GOOD: "良好",
+    PARTIAL: "数据不足",
+    STALE: "数据过期",
+    MISSING: "数据缺失",
+    ERROR: "数据错误"
+  });
+
   function hasText(value) {
     return value !== null
       && value !== undefined
@@ -110,6 +118,11 @@
   function fieldSourceView(value) {
     var normalized = String(value || "MISSING").trim().toUpperCase();
     return FIELD_SOURCE_VIEWS[normalized] || FIELD_SOURCE_VIEWS.ERROR;
+  }
+
+  function dataQualityLabel(value) {
+    var normalized = String(value || "MISSING").trim().toUpperCase();
+    return DATA_QUALITY_LABELS[normalized] || DATA_QUALITY_LABELS.ERROR;
   }
 
   function parseApiEnvelope(envelope) {
@@ -312,11 +325,13 @@
     AI_ANALYSIS_STATE_VIEWS: AI_ANALYSIS_STATE_VIEWS,
     MODULE_STATES: MODULE_STATES,
     FIELD_SOURCE_VIEWS: FIELD_SOURCE_VIEWS,
+    DATA_QUALITY_LABELS: DATA_QUALITY_LABELS,
     hasText: hasText,
     displayText: displayText,
     displayNumber: displayNumber,
     normalizeModuleState: normalizeModuleState,
     fieldSourceView: fieldSourceView,
+    dataQualityLabel: dataQualityLabel,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,

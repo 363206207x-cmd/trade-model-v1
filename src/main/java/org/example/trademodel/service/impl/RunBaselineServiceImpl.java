@@ -9,6 +9,7 @@ import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.RunBaselineService;
 import org.example.trademodel.service.RuntimeMetricService;
 import org.example.trademodel.service.SystemHealthService;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.vo.KeyCountVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
@@ -29,7 +30,6 @@ import java.util.Map;
 public class RunBaselineServiceImpl implements RunBaselineService {
 
     private static final int DEFAULT_WINDOW_MINUTES = 60;
-    private static final int DATA_QUALITY_THRESHOLD = 60;
     private static final String STATUS_FRESH = "FRESH";
     private static final String STATUS_STALE = "STALE";
     private static final String STATUS_UNKNOWN = "UNKNOWN";
@@ -176,13 +176,13 @@ public class RunBaselineServiceImpl implements RunBaselineService {
             LocalDateTime asOfUtc) {
         int totalRuns = safeCount(analysisRunMapper.countInWindow(windowStartUtc, asOfUtc));
         int lowQualityRuns = safeCount(analysisRunMapper.countLowQualityInWindow(
-                windowStartUtc, asOfUtc, DATA_QUALITY_THRESHOLD));
+                windowStartUtc, asOfUtc, DataQualityCircuitBreakerPolicy.MIN_PASS_SCORE));
 
         RunBaselineVO.DataQualitySummary summary = new RunBaselineVO.DataQualitySummary();
         summary.setAnalysisRunCountWindow(totalRuns);
         summary.setLowQualityCountWindow(lowQualityRuns);
         summary.setLowQualityRatioWindow(ratio(lowQualityRuns, totalRuns));
-        summary.setLowQualityThreshold(DATA_QUALITY_THRESHOLD);
+        summary.setLowQualityThreshold(DataQualityCircuitBreakerPolicy.MIN_PASS_SCORE);
         return summary;
     }
 

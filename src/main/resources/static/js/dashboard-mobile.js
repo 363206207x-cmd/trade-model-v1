@@ -171,7 +171,7 @@
     setAssetCardField(card, "marketBias", asset.marketBiasLabel || asset.marketBias, "当前判断不可用");
     setAssetCardField(card, "confidence", asset.confidenceLabel || asset.confidenceLevel, "--");
     setAssetCardField(card, "risk", asset.riskLabel || asset.riskLevel, "--");
-    setAssetCardField(card, "dataQuality", asset.dataQuality, "MISSING");
+    setAssetCardField(card, "dataQuality", frontendContract.dataQualityLabel(asset.dataQuality), "数据缺失");
     setAssetCardField(card, "multiTimeframeState", asset.multiTimeframeState, "MISSING");
     setAssetCardField(card, "confused", asset.confused === true ? "是" : (asset.confused === false ? "否" : null), "MISSING");
     setAssetCardField(card, "updatedAt", frontendContract.formatBusinessTimeCompact(asset.updatedAt), "--");

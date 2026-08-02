@@ -32,6 +32,9 @@ SCENARIOS = {
     "exact-plan",
     "top3-independent",
     "low-quality",
+    "data-quality-60",
+    "data-quality-69",
+    "data-quality-70",
     "ai-disabled-blocked",
     "ai-all-abstain",
     "ai-timeout",
@@ -432,6 +435,57 @@ def unavailable_asset_execution_suggestion(
     }
 
 
+def apply_data_quality_boundary(
+    home: dict[str, object],
+    selected_asset: dict[str, object],
+    score: int,
+) -> None:
+    passes_minimum_gate = score >= 70
+    home["systemState"]["dataQuality"] = status_card(
+        str(score),
+        "已通过最低数据质量门槛；仍需其他正式门禁"
+        if passes_minimum_gate
+        else "低于 70，数据质量断路器已触发",
+        "OK" if passes_minimum_gate else "BLOCKED",
+    )
+    home["diagnostics"]["dataQualityScore"] = score
+    home["diagnostics"]["dataQualityMinimumGatePassed"] = passes_minimum_gate
+    if passes_minimum_gate:
+        selected_asset["dataQuality"] = "GOOD"
+        selected_asset["fieldSourceStatus"]["dataQuality"] = "DERIVED"
+        home["diagnostics"]["allOtherPlanGatesValid"] = True
+        return
+
+    selected_asset.update({
+        "assetState": "HIGH_RISK",
+        "assetStateLabel": "高风险观察",
+        "marketBias": "WAIT",
+        "marketBiasLabel": "观望",
+        "confidenceLevel": "LOW",
+        "confidenceLabel": "低",
+        "riskLevel": "HIGH",
+        "riskLabel": "高",
+        "worthOpening": False,
+        "currentConclusion": "数据质量不足，暂不交易 / 事件观望",
+        "dataQuality": "PARTIAL",
+        "moduleState": "PARTIAL",
+    })
+    selected_asset["fieldSourceStatus"]["dataQuality"] = "DERIVED"
+    home["executionSuggestion"] = {
+        "status": "DATA_QUALITY_BLOCKED",
+        "statusLabel": "当前暂无完整执行计划",
+        "blockedReason": "数据质量不足，暂不交易 / 事件观望",
+        "positionMode": False,
+        "positionMonitor": None,
+        "moduleState": "PARTIAL",
+    }
+    home["aiDecision"] = unavailable_ai(
+        "NOT_CALLED",
+        "未调用",
+        "数据质量不足，暂不交易 / 事件观望",
+    )
+
+
 def apply_module_states(home: dict[str, object]) -> None:
     assets = home.get("assets") or []
     selected_symbol = home.get("selectedSymbol")
@@ -555,24 +609,14 @@ def scenario_home(
         home["executionSuggestion"]["sourceExecutionPlanId"] = f"plan-{marker}-exact"
         home["diagnostics"]["decoyLatestExecutionPlanId"] = f"plan-{marker}-latest"
 
-    elif scenario == "low-quality":
-        selected_asset.update({
-            "assetState": "HIGH_RISK", "assetStateLabel": "高风险观察", "marketBias": "WAIT",
-            "marketBiasLabel": "观望", "confidenceLevel": "LOW", "confidenceLabel": "低",
-            "riskLevel": "HIGH", "riskLabel": "高", "worthOpening": False,
-            "currentConclusion": "数据质量不足，暂不形成执行建议",
-        })
-        home["systemState"]["dataQuality"] = status_card("不足", "关键行情窗口尚未齐备", "BLOCKED")
-        home["executionSuggestion"] = {
-            "status": "DATA_QUALITY_BLOCKED", "statusLabel": "当前暂无完整执行计划",
-            "blockedReason": "数据质量不足，暂不形成执行建议", "positionMode": False,
-        }
-        abstain = ai_role("GPT_FINAL", "最终裁决官")
-        abstain.update({
-            "stance": "ABSTAIN", "direction": None, "finalMarketBias": None, "finalPlanMode": None,
-            "resultAvailable": True, "reviewConclusion": "证据不足，暂不判断",
-        })
-        home["aiDecision"]["tabs"][0] = abstain
+    elif scenario in {"low-quality", "data-quality-60", "data-quality-69", "data-quality-70"}:
+        score = {
+            "low-quality": 69,
+            "data-quality-60": 60,
+            "data-quality-69": 69,
+            "data-quality-70": 70,
+        }[scenario]
+        apply_data_quality_boundary(home, selected_asset, score)
 
     elif scenario == "ai-disabled-blocked":
         home["header"].update({"aiStatus": "DISABLED", "aiStatusLabel": "已禁用"})

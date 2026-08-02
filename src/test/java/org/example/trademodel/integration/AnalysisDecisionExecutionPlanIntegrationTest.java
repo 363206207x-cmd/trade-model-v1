@@ -250,7 +250,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，暂不交易 / 事件观望");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -284,7 +284,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，暂不交易 / 事件观望");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();

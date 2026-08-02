@@ -45,6 +45,7 @@ import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
@@ -88,7 +89,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     );
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
-    private static final int MIN_DATA_QUALITY_SCORE_FOR_PLAN = 60;
     private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*~\\s*"
                     + "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})$");
@@ -874,8 +874,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } else {
             boolean allFresh = freshness != null && freshness.size() == 4
                     && freshness.values().stream().allMatch("FRESH"::equalsIgnoreCase);
-            boolean qualityScoreGood = decision == null || decision.getDataQualityScore() != null
-                    && decision.getDataQualityScore() >= MIN_DATA_QUALITY_SCORE_FOR_PLAN;
+            boolean qualityScoreGood = decision != null
+                    && DataQualityCircuitBreakerPolicy.passes(decision.getDataQualityScore());
             asset.setDataQuality(allFresh && qualityScoreGood ? "GOOD" : "PARTIAL");
         }
         setFieldSource(asset, "dataQuality", "MISSING".equals(asset.getDataQuality()) ? "MISSING" : "DERIVED");
@@ -1231,10 +1231,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "分析快照不完整，暂不展示计划");
             return suggestion;
         }
-        if (decision.getDataQualityScore() == null
-                || decision.getDataQualityScore() < MIN_DATA_QUALITY_SCORE_FOR_PLAN) {
+        if (DataQualityCircuitBreakerPolicy.isBlocked(decision.getDataQualityScore())) {
             blockSuggestion(suggestion, "DATA_QUALITY_BLOCKED", "当前暂无完整执行计划",
-                    "数据质量不足，等待有效分析");
+                    "数据质量不足，暂不交易 / 事件观望");
             return suggestion;
         }
         String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
@@ -2137,8 +2136,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private String currentConclusion(DecisionResultVO decision, String assetState) {
         if (decision == null) return "等待分析";
         if (decision.getDataQualityScore() == null) return "等待数据质量同步";
-        if (decision.getDataQualityScore() < MIN_DATA_QUALITY_SCORE_FOR_PLAN) {
-            return "数据质量不足，暂不形成执行建议";
+        if (DataQualityCircuitBreakerPolicy.isBlocked(decision.getDataQualityScore())) {
+            return "数据质量不足，暂不交易 / 事件观望";
         }
         if ("CONFUSED".equals(assetState)) return "冲突状态，等待人工复核";
         if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) return "风险较高，仅供人工复核";
