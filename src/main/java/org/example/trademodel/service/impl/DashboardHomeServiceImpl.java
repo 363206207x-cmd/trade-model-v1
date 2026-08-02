@@ -1016,9 +1016,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         ExecutionPlanDO executionPlan = assetPlan.executionPlan();
-        if (!ExecutionPlanReviewPolicy.hasCompleteBoundaries(executionPlan)) {
-            blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "当前暂无完整执行计划",
-                    BOUNDARY_INCOMPLETE_VALID_PERIOD);
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.persistedPlanState(executionPlan);
+        if (planState != PersistedPlanState.ACTIVE) {
+            blockPersistedAssetPlan(suggestion, executionPlan, planState);
             return suggestion;
         }
 
@@ -1040,6 +1040,27 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 trimPlanValue(executionPlan.getInvalidCondition()),
                 trimToNull(decision.getInvalidCondition())));
         return suggestion;
+    }
+
+    private void blockPersistedAssetPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                         ExecutionPlanDO executionPlan,
+                                         PersistedPlanState planState) {
+        switch (planState) {
+            case MISSING -> blockSuggestion(suggestion, "PLAN_MISSING", "当前暂无完整执行计划",
+                    "执行计划不存在或当前不可查看");
+            case INVALID -> blockSuggestion(suggestion, "PLAN_INVALID", "当前执行计划不可用",
+                    "执行计划已失效，等待重新分析");
+            case BLOCKED -> blockSuggestion(suggestion, "PLAN_BLOCKED", "当前执行计划已阻断",
+                    "执行计划未通过来源或风险门控");
+            case REVALIDATION_REQUIRED -> blockSuggestion(suggestion, "REVALIDATION_REQUIRED",
+                    "执行计划需要重新验证", revalidationReviewCopy(executionPlan));
+            case REVIEW_ONLY -> blockSuggestion(suggestion, "PLAN_REVIEW_ONLY",
+                    "当前计划仅供历史复核", "该计划不能作为当前资产的可用计划");
+            case INCOMPLETE -> blockSuggestion(suggestion, "PLAN_INCOMPLETE", "当前暂无完整执行计划",
+                    "执行计划状态、来源或边界信息不完整");
+            case ACTIVE -> blockSuggestion(suggestion, "PLAN_STATE_ERROR", "当前执行计划状态异常",
+                    "执行计划状态校验不一致");
+        }
     }
 
     private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {

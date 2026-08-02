@@ -27,6 +27,10 @@ SCENARIOS = {
     "ai-timeout",
     "plan-expired",
     "trace-mismatch",
+    "plan-blocked-position",
+    "plan-needs-revalidation",
+    "plan-partial",
+    "plan-missing",
     "position-monitored",
     "position-waiting",
     "multi-position",
@@ -364,6 +368,23 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
     }
 
 
+def unavailable_asset_execution_suggestion(
+    symbol: str,
+    status: str,
+    status_label: str,
+    blocked_reason: str,
+) -> dict[str, object]:
+    marker = symbol.removesuffix("USDT") or symbol
+    return {
+        "status": status,
+        "statusLabel": status_label,
+        "blockedReason": blocked_reason,
+        "positionMode": False,
+        "positionMonitor": None,
+        "sourceAnalysisId": f"analysis-{marker.lower()}-asset",
+    }
+
+
 def scenario_home(
     scenario: str,
     selected_symbol: str,
@@ -421,6 +442,46 @@ def scenario_home(
         home["executionSuggestion"] = {
             "status": "STATE_SNAPSHOT_MISMATCH", "statusLabel": "当前暂无完整执行计划",
             "blockedReason": "状态已更新，原计划需重新分析", "positionMode": False,
+        }
+
+    elif scenario == "plan-blocked-position":
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "PLAN_BLOCKED",
+            "当前执行计划已阻断",
+            "执行计划未通过来源或风险门控",
+        )
+        position = monitored_position(selected_symbol, True)
+        home["positions"] = [position]
+        home["pushInbox"]["hasOpenPosition"] = True
+        home["pushInbox"]["counts"]["positionRisk"] = 1
+        home["selectedPositionId"] = None
+        home["positionSelectionStatus"] = "POSITION_SELECTION_REQUIRED"
+        home["matchingPositionCount"] = 1
+
+    elif scenario == "plan-needs-revalidation":
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "REVALIDATION_REQUIRED",
+            "执行计划需要重新验证",
+            "极端价格波动触发重新验证",
+        )
+
+    elif scenario == "plan-partial":
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "PLAN_INCOMPLETE",
+            "当前暂无完整执行计划",
+            "执行计划状态、来源或边界信息不完整",
+        )
+
+    elif scenario == "plan-missing":
+        home["executionSuggestion"] = {
+            "status": "PLAN_MISSING",
+            "statusLabel": "当前暂无完整执行计划",
+            "blockedReason": "执行计划不存在或当前不可查看",
+            "positionMode": False,
+            "positionMonitor": None,
         }
 
     elif scenario in {"position-monitored", "position-waiting"}:

@@ -557,6 +557,47 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void persistedPlanFailureStatesRemainFailClosedInFrontendAndVisualFixtures() throws Exception {
+        String contract = Files.readString(FRONTEND_CONTRACT);
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        int accessStart = contract.indexOf("function executionPlanAccess(suggestion)");
+        int accessEnd = contract.indexOf("function csrfHeaders", accessStart);
+        int unavailableStart = fixture.indexOf("def unavailable_asset_execution_suggestion(");
+        int unavailableEnd = fixture.indexOf("def scenario_home(", unavailableStart);
+        int blockedStart = fixture.indexOf("elif scenario == \"plan-blocked-position\"");
+        int blockedEnd = fixture.indexOf("elif scenario == \"plan-needs-revalidation\"", blockedStart);
+
+        assertThat(accessStart).isGreaterThanOrEqualTo(0);
+        assertThat(accessEnd).isGreaterThan(accessStart);
+        assertThat(contract.substring(accessStart, accessEnd)).contains(
+                "if (status !== \"USABLE_REVIEW_PLAN\")",
+                "visible: false",
+                "reason: displayText(plan.blockedReason, \"执行建议不可用\")");
+        assertThat(fixture).contains(
+                "\"plan-blocked-position\"",
+                "\"plan-needs-revalidation\"",
+                "\"plan-partial\"",
+                "\"plan-missing\"",
+                "\"PLAN_BLOCKED\"",
+                "\"REVALIDATION_REQUIRED\"",
+                "\"PLAN_INCOMPLETE\"",
+                "\"status\": \"PLAN_MISSING\"");
+        assertThat(unavailableStart).isGreaterThanOrEqualTo(0);
+        assertThat(unavailableEnd).isGreaterThan(unavailableStart);
+        assertThat(fixture.substring(unavailableStart, unavailableEnd))
+                .contains("\"status\": status", "\"blockedReason\": blocked_reason")
+                .doesNotContain(
+                        "sourceExecutionPlanId", "entryZone", "stopLoss", "takeProfitRules");
+        assertThat(blockedStart).isGreaterThanOrEqualTo(0);
+        assertThat(blockedEnd).isGreaterThan(blockedStart);
+        assertThat(fixture.substring(blockedStart, blockedEnd))
+                .contains(
+                        "home[\"positions\"] = [position]",
+                        "home[\"executionSuggestion\"] = unavailable_asset_execution_suggestion(")
+                .doesNotContain("USABLE_REVIEW_PLAN", "POSITION_MONITORING");
+    }
+
+    @Test
     void dashboardDefinesDedicatedChineseStatusLabelMappers() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
 

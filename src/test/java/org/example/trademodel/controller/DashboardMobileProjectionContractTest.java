@@ -270,6 +270,28 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
+    void mobileProjectionCannotPromoteNonActivePersistedPlanStates() throws Exception {
+        String foundation = Files.readString(FRONTEND_CONTRACT);
+        String access = slice(
+                foundation,
+                "function executionPlanAccess(suggestion)",
+                "function csrfHeaders(headers, root)");
+
+        assertThat(access)
+                .contains(
+                        "if (!hasText(plan.sourceExecutionPlanId))",
+                        "if (status !== \"USABLE_REVIEW_PLAN\")",
+                        "visible: false",
+                        "reason: displayText(plan.blockedReason, \"执行建议不可用\")")
+                .doesNotContain(
+                        "status === \"PLAN_BLOCKED\"",
+                        "status === \"PLAN_INVALID\"",
+                        "status === \"PLAN_INCOMPLETE\"",
+                        "status === \"PLAN_REVIEW_ONLY\"",
+                        "status === \"REVALIDATION_REQUIRED\"");
+    }
+
+    @Test
     void interactionsCoverPagerUnavailableDestinationsAndHomeResetAccessibly() throws Exception {
         String source = Files.readString(SCRIPT) + Files.readString(TEMPLATE);
 

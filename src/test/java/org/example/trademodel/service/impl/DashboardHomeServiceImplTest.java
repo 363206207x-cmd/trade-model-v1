@@ -652,6 +652,171 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void activePersistedPlanWithCompleteBoundariesRemainsUsable() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertAssetExecutionPlan(suggestion, decision, "plan-" + decision.getAnalysisId());
+    }
+
+    @Test
+    void blockedPersistedPlanWithCompleteBoundariesFailsClosedAndKeepsPosition() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("BLOCKED");
+        UserPositionVO position = activeManualPosition(302L, "BTCUSDT", null);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, 302L);
+
+        assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
+                .containsExactly(302L);
+        assertUnavailableAssetExecutionPlan(home.getExecutionSuggestion(), "PLAN_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getStatus()).isNotEqualTo("POSITION_MONITORING");
+    }
+
+    @Test
+    void invalidPersistedPlanWithCompleteBoundariesFailsClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setSourceGateStatus("INVALID");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_INVALID");
+    }
+
+    @Test
+    void incompletePersistedPlanWithCompleteLookingFieldsFailsClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("INCOMPLETE");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_INCOMPLETE");
+    }
+
+    @Test
+    void reviewOnlyPersistedPlanDoesNotBecomeCurrentAssetPlan() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("REVIEW_ONLY");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_REVIEW_ONLY");
+    }
+
+    @Test
+    void persistedPlanNeedingRevalidationFailsClosedDespiteCompleteBoundaries() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setNeedsRevalidation(true);
+        plan.setRevalidationReason("EXTREME_PRICE_MOVE");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "REVALIDATION_REQUIRED");
+        assertThat(suggestion.getBlockedReason()).isEqualTo("极端价格波动触发重新验证");
+    }
+
+    @Test
+    void persistedPlanWithIncompleteSourceGateFailsClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setSourceGateComplete(false);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_INCOMPLETE");
+    }
+
+    @Test
+    void activeStatusWithMissingPersistedBoundaryFailsClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setStopLoss(null);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_INCOMPLETE");
+    }
+
+    @Test
+    void unknownAndNullPersistedPlanStatesFailClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        plan.setExecutionPlanStatus("UNRECOGNIZED");
+        assertUnavailableAssetExecutionPlan(service.getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion(), "PLAN_INCOMPLETE");
+
+        plan.setExecutionPlanStatus(null);
+        assertUnavailableAssetExecutionPlan(service.getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion(), "PLAN_INCOMPLETE");
+    }
+
+    @Test
+    void mismatchedPersistedPlanIdentityFailsClosed() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setAnalysisId("analysis-other-asset");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_SOURCE_UNVERIFIED");
+    }
+
+    @Test
     void multiplePositionsForSameAssetDoNotBlockAssetExecutionPlan() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         decision.setEntryZone("BTC-ASSET-entry");
@@ -753,6 +918,9 @@ class DashboardHomeServiceImplTest {
 
         verify(userPositionService, never()).manualOpenForUser(any(), any());
         verify(userPositionService, never()).manualCloseForUser(any(), any(), any());
+        verify(executionPlanMapper, never()).insert(any());
+        verify(executionPlanMapper, never()).markNeedsRevalidationForHotReset(
+                any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1754,6 +1922,28 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getTakeProfitRules()).isEqualTo(decision.getTakeProfitRules());
     }
 
+    private void assertUnavailableAssetExecutionPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                                      String expectedStatus) {
+        assertThat(suggestion.getStatus()).isEqualTo(expectedStatus);
+        assertThat(suggestion.getStatus()).isNotEqualTo("USABLE_REVIEW_PLAN");
+        assertThat(suggestion.getStatusLabel()).isNotBlank();
+        assertThat(suggestion.getBlockedReason()).isNotBlank();
+        assertThat(suggestion.getPositionMode()).isFalse();
+        assertThat(suggestion.getPositionMonitor()).isNull();
+        assertThat(suggestion.getSourceExecutionPlanId()).isNull();
+        assertThat(suggestion.getSourceTraceId()).isNull();
+        assertThat(suggestion.getDirection()).isNull();
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
+        assertThat(suggestion.getLeverageSuggestion()).isNull();
+        assertThat(suggestion.getPositionSuggestion()).isNull();
+        assertThat(suggestion.getValidPeriod()).isNull();
+        assertThat(suggestion.getValidFrom()).isNull();
+        assertThat(suggestion.getExpiresAt()).isNull();
+        assertThat(suggestion.getInvalidCondition()).isNull();
+    }
+
     private void setActivePlanValidity(DecisionResultVO decision) {
         decision.setValidFrom(OffsetDateTime.parse("2026-07-01T00:00:00Z"));
         decision.setExpiresAt(OffsetDateTime.parse("2026-07-02T00:00:00Z"));
@@ -2129,7 +2319,7 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getSourceTraceId()).isNull();
     }
 
-    private void allowMatchingSnapshot(DecisionResultVO decision) {
+    private ExecutionPlanDO allowMatchingSnapshot(DecisionResultVO decision) {
         String traceId = "trace-" + decision.getAnalysisId();
         AssetStateDO state = new AssetStateDO();
         state.setSymbol(decision.getSymbol());
@@ -2141,7 +2331,7 @@ class DashboardHomeServiceImplTest {
         run.setTraceId(traceId);
         when(assetStateMapper.selectBySymbol(decision.getSymbol())).thenReturn(state);
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
-        allowAssetExecutionPlan(decision, "plan-" + decision.getAnalysisId());
+        return allowAssetExecutionPlan(decision, "plan-" + decision.getAnalysisId());
     }
 
     private ExecutionPlanDO allowAssetExecutionPlan(DecisionResultVO decision, String planId) {
