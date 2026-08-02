@@ -471,6 +471,94 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void homeCoreDataProjectionRendersSourcesStatesRetryAndClearsStaleAssetContext() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String assets = functionBody("renderHomeAssetsFromPayload");
+        String loading = functionBody("renderAssetContextLoading");
+        String unavailable = functionBody("renderAssetContextUnavailable");
+        String retry = functionBody("bindHomeRetry");
+
+        assertThat(assets).contains(
+                "当前价格", "综合评分", "方向", "置信度", "风险等级",
+                "state.label", "data-asset-state",
+                "数据", "多周期", "Confused", "更新",
+                "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
+                "fieldSourceBadge(\"置信\"");
+        assertThat(html).contains("data-home-retry", "homeRetryButton");
+        assertThat(loading).contains(
+                "window.__lastDashboardHome = null",
+                "window.__lastHomeDiagnostics = {}",
+                "allDecisions = []", "displayDecisions = []",
+                "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload",
+                "updateAssetDetailLink(null)", "旧资产上下文已清除");
+        assertThat(unavailable).contains(
+                "window.__lastDashboardHome = null",
+                "setHomeRetryVisible(true, true)",
+                "updateAssetDetailLink(null)",
+                "当前资产不可查看");
+        assertThat(retry).contains(
+                "preservePositionSummary", "refreshAssetContext()", "refreshDashboard()");
+        assertThat(loading + unavailable).doesNotContain("renderHomePositionsFromPayload");
+    }
+
+    @Test
+    void visualFixtureCoversHomeCoreDataAcceptanceScenarios() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(fixture).contains(
+                "\"partial\"", "\"empty\"", "\"missing\"", "\"retry\"",
+                "\"asset-switch-failure\"", "\"exact-plan\"", "\"top3-independent\"",
+                "\"data-quality-60\"", "\"data-quality-69\"", "\"data-quality-70\"",
+                "\"fieldSourceStatus\"", "\"multiTimeframeState\"", "\"confused\"",
+                "\"moduleState\"", "\"states\"",
+                "\"sourceExecutionPlanId\"", "\"positions\": [",
+                "should_fail = home_request_count > 0 if scenario == \"home-failure\" else home_request_count == 0",
+                "scenario == \"asset-switch-failure\" and symbol != \"BTCUSDT\"");
+    }
+
+    @Test
+    void visualFixtureUsesTheSeventyPointCircuitBreakerWithoutClearingPositions() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+        int helperStart = fixture.indexOf("def apply_data_quality_boundary(");
+        int helperEnd = fixture.indexOf("def apply_module_states(", helperStart);
+        int scenarioStart = fixture.indexOf(
+                "elif scenario in {\"low-quality\", \"data-quality-60\", \"data-quality-69\", \"data-quality-70\"}");
+        int scenarioEnd = fixture.indexOf("elif scenario == \"ai-disabled-blocked\"", scenarioStart);
+
+        assertThat(helperStart).isGreaterThanOrEqualTo(0);
+        assertThat(helperEnd).isGreaterThan(helperStart);
+        assertThat(fixture.substring(helperStart, helperEnd)).contains(
+                "passes_minimum_gate = score >= 70",
+                "\"dataQuality\": \"PARTIAL\"",
+                "\"moduleState\": \"PARTIAL\"",
+                "\"status\": \"DATA_QUALITY_BLOCKED\"",
+                "数据质量不足，暂不交易 / 事件观望",
+                "\"dataQualityMinimumGatePassed\"")
+                .doesNotContain("home[\"positions\"] = []", "sourceExecutionPlanId");
+        assertThat(scenarioStart).isGreaterThanOrEqualTo(0);
+        assertThat(scenarioEnd).isGreaterThan(scenarioStart);
+        assertThat(fixture.substring(scenarioStart, scenarioEnd)).contains(
+                "\"data-quality-60\": 60",
+                "\"data-quality-69\": 69",
+                "\"data-quality-70\": 70",
+                "apply_data_quality_boundary(home, selected_asset, score)");
+    }
+
+    @Test
+    void frontendMapsBackendDataQualityStateWithoutRecomputingTheThreshold() throws Exception {
+        String contract = Files.readString(FRONTEND_CONTRACT);
+        String desktopMapper = functionBody("dataQualityText");
+
+        assertThat(contract).contains(
+                "var DATA_QUALITY_LABELS",
+                "GOOD: \"良好\"",
+                "PARTIAL: \"数据不足\"",
+                "function dataQualityLabel(value)");
+        assertThat(desktopMapper).contains("frontendContract.dataQualityLabel(value)")
+                .doesNotContain("60", "69", "70", "dataQualityScore");
+    }
+
+    @Test
     void assetCardsDoNotRenderDetailConclusionOrEvidenceFields() throws Exception {
         String renderer = functionBody("renderHomeAssetsFromPayload");
 
@@ -1919,14 +2007,16 @@ public class DashboardControllerTest {
 
         assertThat(renderHomePositions).contains(
                 "positions", "list.slice(0, 3)", "p.symbol", "p.direction",
+                "p.entryPrice", "p.positionSize", "p.leverage",
+                "p.userStopLoss", "p.userTakeProfit", "p.positionStatusLabel",
                 "p.entryLogicStatusLabel", "p.directionSupportStatusLabel",
-                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText");
+                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText",
+                "p.warningState", "p.updatedAt");
         assertThat(renderHomePositions).doesNotContain("fetch(");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/manual-open");
         assertThat(renderHomePositions).doesNotContain("/api/user-positions/");
         assertThat(renderHomePositions).doesNotContain(
-                "tradeType", "recommendedAction", "executionPlanDisplay",
-                "p.entryPrice", "p.positionSize", "p.floatingPnl");
+                "tradeType", "recommendedAction", "executionPlanDisplay", "p.floatingPnl");
         assertThat(renderHomePositions).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
         assertThat(renderHomePositions).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
     }

@@ -55,6 +55,11 @@ class DataQualityContextSourceBindingValidatorTest {
     }
 
     @Test
+    void scoreOutsideTheValidRangeFailsClosed() {
+        assertIncompleteFor(validator.validate(contextWithScore(bd("100.01"))), "DATA_QUALITY_SCORE_LOW");
+    }
+
+    @Test
     void scoreSeventyToEightyFourWithDegradedReasonReturnsDegraded() {
         DataQualityContextSourceBindingValidator.ValidationResult result =
                 validator.validate(degradedContextWithScore(bd("80")));

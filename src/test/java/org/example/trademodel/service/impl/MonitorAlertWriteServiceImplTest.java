@@ -160,6 +160,28 @@ class MonitorAlertWriteServiceImplTest {
         assertThat(row.getValue().getUpdatedAtUtc()).isEqualTo(FIXED_UTC);
     }
 
+    @Test
+    void dataQualityAlertUsesTheSharedSeventyPointCircuitBreaker() {
+        stubNoExistingAlert();
+        AssetAnalysisVO blocked = analysis();
+        blocked.setDataQualityScore(69);
+
+        service.emitAfterAnalysisPersist(run(), blocked, null);
+
+        ArgumentCaptor<MonitorAlertDO> row = ArgumentCaptor.forClass(MonitorAlertDO.class);
+        verify(monitorAlertMapper).insert(row.capture());
+        assertThat(row.getValue().getAlertType())
+                .isEqualTo(MonitorAlertWriteServiceImpl.ALERT_TYPE_DATA_QUALITY_INSUFFICIENT);
+        assertThat(row.getValue().getAlertMessage()).contains("dataQualityScore=69", "低于阈值 70");
+
+        AssetAnalysisVO passed = analysis();
+        passed.setAnalysisId("a-70");
+        passed.setDataQualityScore(70);
+        service.emitAfterAnalysisPersist(run(), passed, null);
+
+        verify(monitorAlertMapper, times(1)).insert(any(MonitorAlertDO.class));
+    }
+
     private void stubNoExistingAlert() {
         when(monitorAlertMapper.countByAnalysisIdAndAlertType(any(), any())).thenReturn(0);
         when(monitorAlertMapper.countOpenInThrottleWindow(any(), any(), any(), any())).thenReturn(0);

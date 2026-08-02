@@ -18,6 +18,7 @@ public class DashboardHomeVO {
     private List<EventRowVO> events = new ArrayList<>();
     private List<AssetVO> assets = new ArrayList<>();
     private List<PositionVO> positions = new ArrayList<>();
+    private ModuleStatesVO states = new ModuleStatesVO();
     private String selectedSymbol;
     private Long selectedPositionId;
     private String positionSelectionStatus;
@@ -75,6 +76,14 @@ public class DashboardHomeVO {
 
     public void setPositions(List<PositionVO> positions) {
         this.positions = positions;
+    }
+
+    public ModuleStatesVO getStates() {
+        return states;
+    }
+
+    public void setStates(ModuleStatesVO states) {
+        this.states = states;
     }
 
     public String getSelectedSymbol() {
@@ -208,6 +217,28 @@ public class DashboardHomeVO {
         public void setUpdatedAt(LocalDateTime updatedAt) {
             this.updatedAt = updatedAt;
         }
+    }
+
+    public static class ModuleStatesVO {
+        private String overall = "LOADING";
+        private String assets = "LOADING";
+        private String executionPlan = "LOADING";
+        private String positions = "LOADING";
+        private String ai = "LOADING";
+        private String consistency = "LOADING";
+
+        public String getOverall() { return overall; }
+        public void setOverall(String overall) { this.overall = overall; }
+        public String getAssets() { return assets; }
+        public void setAssets(String assets) { this.assets = assets; }
+        public String getExecutionPlan() { return executionPlan; }
+        public void setExecutionPlan(String executionPlan) { this.executionPlan = executionPlan; }
+        public String getPositions() { return positions; }
+        public void setPositions(String positions) { this.positions = positions; }
+        public String getAi() { return ai; }
+        public void setAi(String ai) { this.ai = ai; }
+        public String getConsistency() { return consistency; }
+        public void setConsistency(String consistency) { this.consistency = consistency; }
     }
 
     public static class SystemStateVO {
@@ -453,6 +484,12 @@ public class DashboardHomeVO {
         private Integer evidenceCount;
         private LocalDateTime latestAnalysisTime;
         private String currentConclusion;
+        private String moduleState = "MISSING";
+        private Map<String, String> fieldSourceStatus = Map.of();
+        private String dataQuality = "MISSING";
+        private String multiTimeframeState;
+        private Boolean confused;
+        private LocalDateTime updatedAt;
 
         public Integer getSlot() {
             return slot;
@@ -590,6 +627,20 @@ public class DashboardHomeVO {
         public void setLatestAnalysisTime(LocalDateTime latestAnalysisTime) { this.latestAnalysisTime = latestAnalysisTime; }
         public String getCurrentConclusion() { return currentConclusion; }
         public void setCurrentConclusion(String currentConclusion) { this.currentConclusion = currentConclusion; }
+        public String getModuleState() { return moduleState; }
+        public void setModuleState(String moduleState) { this.moduleState = moduleState; }
+        public Map<String, String> getFieldSourceStatus() { return fieldSourceStatus; }
+        public void setFieldSourceStatus(Map<String, String> fieldSourceStatus) {
+            this.fieldSourceStatus = fieldSourceStatus == null ? Map.of() : fieldSourceStatus;
+        }
+        public String getDataQuality() { return dataQuality; }
+        public void setDataQuality(String dataQuality) { this.dataQuality = dataQuality; }
+        public String getMultiTimeframeState() { return multiTimeframeState; }
+        public void setMultiTimeframeState(String multiTimeframeState) { this.multiTimeframeState = multiTimeframeState; }
+        public Boolean getConfused() { return confused; }
+        public void setConfused(Boolean confused) { this.confused = confused; }
+        public LocalDateTime getUpdatedAt() { return updatedAt; }
+        public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     }
 
     public static class PositionVO {
@@ -629,6 +680,8 @@ public class DashboardHomeVO {
         private String sourceAnalysisId;
         private String sourceExecutionPlanId;
         private String sourceTraceId;
+        private String moduleState = "MISSING";
+        private String warningState = "MISSING";
 
         @JsonSerialize(using = ToStringSerializer.class)
         public Long getPositionId() {
@@ -822,6 +875,10 @@ public class DashboardHomeVO {
         public void setSourceExecutionPlanId(String sourceExecutionPlanId) { this.sourceExecutionPlanId = sourceExecutionPlanId; }
         public String getSourceTraceId() { return sourceTraceId; }
         public void setSourceTraceId(String sourceTraceId) { this.sourceTraceId = sourceTraceId; }
+        public String getModuleState() { return moduleState; }
+        public void setModuleState(String moduleState) { this.moduleState = moduleState; }
+        public String getWarningState() { return warningState; }
+        public void setWarningState(String warningState) { this.warningState = warningState; }
     }
 
     public static class ExecutionSuggestionVO {
@@ -846,6 +903,7 @@ public class DashboardHomeVO {
         private OffsetDateTime validFrom;
         private OffsetDateTime expiresAt;
         private String invalidCondition;
+        private String moduleState = "MISSING";
 
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
@@ -940,6 +998,9 @@ public class DashboardHomeVO {
         public void setInvalidCondition(String invalidCondition) {
             this.invalidCondition = invalidCondition;
         }
+
+        public String getModuleState() { return moduleState; }
+        public void setModuleState(String moduleState) { this.moduleState = moduleState; }
     }
 
     public static class AiDecisionVO {

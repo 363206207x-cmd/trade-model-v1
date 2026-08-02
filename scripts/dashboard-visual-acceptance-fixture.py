@@ -17,11 +17,24 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "src/main/resources/templates/dashboard.html"
+MOBILE_TEMPLATE = ROOT / "src/main/resources/templates/dashboard-mobile.html"
 FRONTEND_CONTRACT = ROOT / "src/main/resources/static/js/frontend-contract.js"
+MOBILE_SCRIPT = ROOT / "src/main/resources/static/js/dashboard-mobile.js"
+MOBILE_STYLE = ROOT / "src/main/resources/static/css/dashboard-mobile.css"
 ALERT_EXPLAIN = ROOT / "src/main/resources/static/js/alert-explain.js"
 SCENARIOS = {
     "normal",
+    "partial",
+    "empty",
+    "missing",
+    "retry",
+    "asset-switch-failure",
+    "exact-plan",
+    "top3-independent",
     "low-quality",
+    "data-quality-60",
+    "data-quality-69",
+    "data-quality-70",
     "ai-disabled-blocked",
     "ai-all-abstain",
     "ai-timeout",
@@ -80,9 +93,28 @@ def asset(
         "riskLabel": risk_label,
         "worthOpening": worth_opening,
         "latestPrice": price,
+        "compositeScore": 94 - slot * 3,
         "currentConclusion": conclusion,
         "sourceProvider": "离线视觉验收 fixture",
-        "dataFreshness": "FIXTURE_ONLY",
+        "dataFreshness": "FRESH",
+        "dataQuality": "GOOD",
+        "multiTimeframeState": "CONFLICTED" if state == "CONFUSED" else "ALIGNED",
+        "confused": state == "CONFUSED",
+        "updatedAt": "2026-07-13T12:00:00Z",
+        "moduleState": "READY",
+        "fieldSourceStatus": {
+            "symbol": "REAL",
+            "latestPrice": "REAL",
+            "direction": "DERIVED",
+            "score": "DERIVED",
+            "confidence": "DERIVED",
+            "riskLevel": "DERIVED",
+            "assetState": "REAL",
+            "dataQuality": "DERIVED",
+            "multiTimeframeState": "DERIVED",
+            "confused": "DERIVED",
+            "updatedAt": "REAL",
+        },
         "evidenceCount": 4,
         "latestAnalysisTime": "2026-07-13T12:00:00Z",
     }
@@ -285,24 +317,37 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             {"label": "暂无高影响外部事件", "impactLevel": "低", "timeWindow": "当前窗口"},
         ],
         "assets": assets,
-        "positions": [],
+        "positions": [
+            monitored_position("BTC/USDT", True, 9001),
+            monitored_position("ETH/USDT", True, 9002),
+            monitored_position("SOL/USDT", True, 9003),
+        ],
         "selectedSymbol": selected_symbol,
         "executionSuggestion": {
             "status": "INCOMPLETE_BOUNDARY",
             "statusLabel": "当前暂无完整执行计划",
             "blockedReason": "边界不足，等待结构确认",
             "positionMode": False,
+            "moduleState": "PARTIAL",
         },
         "aiDecision": ai_decision_success(),
         "pushInbox": {
             "telegramStatus": "NOT_CONNECTED",
-            "hasOpenPosition": False,
+            "hasOpenPosition": True,
             "mode": "OPPORTUNITY_ONLY",
-            "counts": {"executable": 0, "waiting": 2, "invalidated": 0, "positionRisk": 0},
+            "counts": {"executable": 0, "waiting": 2, "invalidated": 0, "positionRisk": 3},
             "items": [],
         },
         "diagnostics": {"fixture": True, "scenario": "normal"},
         "safety": {"reviewOnly": True, "notExecutable": True},
+        "states": {
+            "overall": "READY",
+            "assets": "READY",
+            "executionPlan": "READY",
+            "positions": "READY",
+            "ai": "READY",
+            "consistency": "READY",
+        },
     }
 
 
@@ -326,6 +371,9 @@ def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001)
         "systemSuggestedStopLoss": None,
         "systemSuggestedTakeProfit": None,
         "openedAt": "2026-07-13T09:10:00",
+        "updatedAt": "2026-07-13T11:55:00",
+        "warningState": "NONE" if with_monitor else "MISSING",
+        "moduleState": "READY" if with_monitor else "PARTIAL",
     }
     if with_monitor:
         position.update({
@@ -351,6 +399,7 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
     return {
         "status": "USABLE_REVIEW_PLAN",
         "statusLabel": "资产执行计划，仅供人工复核",
+        "moduleState": "READY",
         "positionMode": False,
         "positionMonitor": None,
         "sourceAnalysisId": f"analysis-{marker.lower()}-asset",
@@ -378,11 +427,126 @@ def unavailable_asset_execution_suggestion(
     return {
         "status": status,
         "statusLabel": status_label,
+        "moduleState": "MISSING" if "MISSING" in status else "PARTIAL",
         "blockedReason": blocked_reason,
         "positionMode": False,
         "positionMonitor": None,
         "sourceAnalysisId": f"analysis-{marker.lower()}-asset",
     }
+
+
+def apply_data_quality_boundary(
+    home: dict[str, object],
+    selected_asset: dict[str, object],
+    score: int,
+) -> None:
+    passes_minimum_gate = score >= 70
+    home["systemState"]["dataQuality"] = status_card(
+        str(score),
+        "已通过最低数据质量门槛；仍需其他正式门禁"
+        if passes_minimum_gate
+        else "低于 70，数据质量断路器已触发",
+        "OK" if passes_minimum_gate else "BLOCKED",
+    )
+    home["diagnostics"]["dataQualityScore"] = score
+    home["diagnostics"]["dataQualityMinimumGatePassed"] = passes_minimum_gate
+    if passes_minimum_gate:
+        selected_asset["dataQuality"] = "GOOD"
+        selected_asset["fieldSourceStatus"]["dataQuality"] = "DERIVED"
+        home["diagnostics"]["allOtherPlanGatesValid"] = True
+        return
+
+    selected_asset.update({
+        "assetState": "HIGH_RISK",
+        "assetStateLabel": "高风险观察",
+        "marketBias": "WAIT",
+        "marketBiasLabel": "观望",
+        "confidenceLevel": "LOW",
+        "confidenceLabel": "低",
+        "riskLevel": "HIGH",
+        "riskLabel": "高",
+        "worthOpening": False,
+        "currentConclusion": "数据质量不足，暂不交易 / 事件观望",
+        "dataQuality": "PARTIAL",
+        "moduleState": "PARTIAL",
+    })
+    selected_asset["fieldSourceStatus"]["dataQuality"] = "DERIVED"
+    home["executionSuggestion"] = {
+        "status": "DATA_QUALITY_BLOCKED",
+        "statusLabel": "当前暂无完整执行计划",
+        "blockedReason": "数据质量不足，暂不交易 / 事件观望",
+        "positionMode": False,
+        "positionMonitor": None,
+        "moduleState": "PARTIAL",
+    }
+    home["aiDecision"] = unavailable_ai(
+        "NOT_CALLED",
+        "未调用",
+        "数据质量不足，暂不交易 / 事件观望",
+    )
+
+
+def apply_module_states(home: dict[str, object]) -> None:
+    assets = home.get("assets") or []
+    selected_symbol = home.get("selectedSymbol")
+    selected_asset = next(
+        (item for item in assets if item.get("rawSymbol") == selected_symbol),
+        None,
+    )
+    asset_state_override = home.pop("_assetStateOverride", None)
+    asset_state = str(asset_state_override) if asset_state_override else (
+        selected_asset.get("moduleState", "MISSING") if selected_asset else "MISSING"
+    )
+    positions = home.get("positions") or []
+    if not positions:
+        position_state = "EMPTY"
+    elif any(item.get("moduleState") == "ERROR" for item in positions):
+        position_state = "ERROR"
+    elif any(item.get("moduleState") != "READY" for item in positions):
+        position_state = "PARTIAL"
+    else:
+        position_state = "READY"
+    execution = home.get("executionSuggestion") or {}
+    execution_state = execution.get("moduleState")
+    if not execution_state:
+        status = str(execution.get("status") or "").upper()
+        if status == "USABLE_REVIEW_PLAN":
+            execution_state = "READY"
+        elif status in {"PLAN_MISSING", "PLAN_IDENTITY_MISSING"}:
+            execution_state = "MISSING"
+        elif status in {"PLAN_INVALID", "PLAN_BLOCKED", "PLAN_IDENTITY_ERROR"}:
+            execution_state = "ERROR"
+        else:
+            execution_state = "PARTIAL"
+    ai_status = str((home.get("aiDecision") or {}).get("runStatus") or "").upper()
+    if ai_status == "SUCCESS":
+        ai_state = "READY"
+    elif ai_status in {"PARTIAL_SUCCESS", "STARTED"}:
+        ai_state = "PARTIAL"
+    elif ai_status in {"DISABLED", "NOT_CONFIGURED", "NOT_CALLED", ""}:
+        ai_state = "MISSING"
+    else:
+        ai_state = "ERROR"
+    consistency_state = "READY" if ai_state == "READY" else (
+        "ERROR" if ai_state == "ERROR" else "PARTIAL"
+    )
+    if asset_state in {"ERROR", "MISSING", "EMPTY"}:
+        overall = asset_state
+    elif any(state in {"ERROR", "PARTIAL", "MISSING"} for state in (
+        execution_state, position_state, ai_state, consistency_state
+    )):
+        overall = "PARTIAL"
+    else:
+        overall = "READY"
+    home["states"] = {
+        "overall": overall,
+        "assets": asset_state,
+        "executionPlan": execution_state,
+        "positions": position_state,
+        "ai": ai_state,
+        "consistency": consistency_state,
+    }
+    home["header"]["dataStatus"] = overall
 
 
 def scenario_home(
@@ -395,24 +559,64 @@ def scenario_home(
     selected_asset = next((item for item in home["assets"] if item["rawSymbol"] == selected_symbol), home["assets"][0])
     home["executionSuggestion"] = asset_execution_suggestion(selected_symbol)
 
-    if scenario == "low-quality":
+    if scenario == "partial":
         selected_asset.update({
-            "assetState": "HIGH_RISK", "assetStateLabel": "高风险观察", "marketBias": "WAIT",
-            "marketBiasLabel": "观望", "confidenceLevel": "LOW", "confidenceLabel": "低",
-            "riskLevel": "HIGH", "riskLabel": "高", "worthOpening": False,
-            "currentConclusion": "数据质量不足，暂不形成执行建议",
+            "compositeScore": 61,
+            "confidenceLevel": "LOW",
+            "confidenceLabel": "低",
+            "dataQuality": "PARTIAL",
+            "multiTimeframeState": None,
+            "moduleState": "PARTIAL",
         })
-        home["systemState"]["dataQuality"] = status_card("不足", "关键行情窗口尚未齐备", "BLOCKED")
+        selected_asset["fieldSourceStatus"].update({
+            "score": "FALLBACK",
+            "confidence": "FALLBACK",
+            "multiTimeframeState": "MISSING",
+        })
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "PLAN_INCOMPLETE",
+            "当前暂无完整执行计划",
+            "执行计划字段不完整",
+        )
+
+    elif scenario == "empty":
+        home["assets"] = []
+        home["positions"] = []
+        home["_assetStateOverride"] = "EMPTY"
         home["executionSuggestion"] = {
-            "status": "DATA_QUALITY_BLOCKED", "statusLabel": "当前暂无完整执行计划",
-            "blockedReason": "数据质量不足，暂不形成执行建议", "positionMode": False,
+            "status": "NO_COMPLETE_PLAN",
+            "statusLabel": "暂无执行计划",
+            "blockedReason": "当前合法集合无结果",
+            "positionMode": False,
+            "moduleState": "EMPTY",
         }
-        abstain = ai_role("GPT_FINAL", "最终裁决官")
-        abstain.update({
-            "stance": "ABSTAIN", "direction": None, "finalMarketBias": None, "finalPlanMode": None,
-            "resultAvailable": True, "reviewConclusion": "证据不足，暂不判断",
-        })
-        home["aiDecision"]["tabs"][0] = abstain
+        home["aiDecision"] = unavailable_ai("NOT_CALLED", "未调用", "当前无可复核资产")
+
+    elif scenario == "missing":
+        home["assets"] = []
+        home["executionSuggestion"] = {
+            "status": "PLAN_IDENTITY_MISSING",
+            "statusLabel": "当前不可查看",
+            "blockedReason": "当前资产或精确计划身份缺失",
+            "positionMode": False,
+            "moduleState": "MISSING",
+        }
+        home["aiDecision"] = unavailable_ai("NOT_CALLED", "未调用", "当前资产身份缺失")
+
+    elif scenario == "exact-plan":
+        marker = selected_symbol.removesuffix("USDT").lower() or selected_symbol.lower()
+        home["executionSuggestion"]["sourceExecutionPlanId"] = f"plan-{marker}-exact"
+        home["diagnostics"]["decoyLatestExecutionPlanId"] = f"plan-{marker}-latest"
+
+    elif scenario in {"low-quality", "data-quality-60", "data-quality-69", "data-quality-70"}:
+        score = {
+            "low-quality": 69,
+            "data-quality-60": 60,
+            "data-quality-69": 69,
+            "data-quality-70": 70,
+        }[scenario]
+        apply_data_quality_boundary(home, selected_asset, score)
 
     elif scenario == "ai-disabled-blocked":
         home["header"].update({"aiStatus": "DISABLED", "aiStatusLabel": "已禁用"})
@@ -516,6 +720,7 @@ def scenario_home(
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]
 
+    apply_module_states(home)
     return home
 
 
@@ -624,6 +829,15 @@ class FixtureHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _stylesheet(self, path: Path) -> None:
+        body = path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/css; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _empty(self, status: HTTPStatus) -> None:
         self.send_response(status)
         self.send_header("Content-Length", "0")
@@ -636,7 +850,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
         self._record(parsed)
         query = parse_qs(parsed.query)
 
-        if parsed.path in {"/", "/dashboard"}:
+        if parsed.path in {"/", "/dashboard", "/dashboard-mobile"}:
             scenario = query.get("scenario", ["normal"])[0]
             if scenario not in SCENARIOS:
                 self._json({"error": "unknown fixture scenario"}, HTTPStatus.BAD_REQUEST)
@@ -644,7 +858,10 @@ class FixtureHandler(BaseHTTPRequestHandler):
             with SCENARIO_LOCK:
                 ACTIVE_SCENARIO = scenario
                 HOME_REQUEST_COUNTS[scenario] = 0
-            html = TEMPLATE.read_text(encoding="utf-8").replace("REFRESH_MS = 30000;", "REFRESH_MS = 0;").encode("utf-8")
+            source_template = MOBILE_TEMPLATE if parsed.path == "/dashboard-mobile" else TEMPLATE
+            html = source_template.read_text(encoding="utf-8").replace(
+                "REFRESH_MS = 30000;", "REFRESH_MS = 0;"
+            ).encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(html)))
@@ -656,6 +873,14 @@ class FixtureHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/js/frontend-contract.js":
             self._javascript(FRONTEND_CONTRACT)
+            return
+
+        if parsed.path == "/js/dashboard-mobile.js":
+            self._javascript(MOBILE_SCRIPT)
+            return
+
+        if parsed.path == "/css/dashboard-mobile.css":
+            self._stylesheet(MOBILE_STYLE)
             return
 
         if parsed.path == "/js/alert-explain.js":
@@ -685,15 +910,22 @@ class FixtureHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/dashboard/home":
             scenario = self._scenario()
-            if scenario == "home-failure":
+            if scenario in {"home-failure", "retry"}:
                 with SCENARIO_LOCK:
                     home_request_count = HOME_REQUEST_COUNTS.get(scenario, 0)
                     HOME_REQUEST_COUNTS[scenario] = home_request_count + 1
-                if home_request_count > 0:
+                should_fail = home_request_count > 0 if scenario == "home-failure" else home_request_count == 0
+                if should_fail:
                     self._json({"code": 503, "msg": "fixture home failure", "data": None}, HTTPStatus.SERVICE_UNAVAILABLE)
                     return
             symbol = query.get("selectedSymbol", ["BTCUSDT"])[0].upper()
-            home_scenario = "normal" if scenario == "detail-late" else scenario
+            if scenario == "asset-switch-failure" and symbol != "BTCUSDT":
+                self._json({"code": 503, "msg": "fixture asset switch failure", "data": None}, HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            home_scenario = "normal" if scenario in {
+                "detail-late", "home-failure", "retry", "asset-switch-failure",
+                "top3-independent"
+            } else scenario
             raw_position_id = query.get("positionId", [None])[0]
             try:
                 selected_position_id = int(raw_position_id) if raw_position_id is not None else None

@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.example.trademodel.dto.point.DataQualityContextSourceBindingDTO;
+import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 
 public class DataQualityContextSourceBindingValidator {
 
-    private static final BigDecimal MIN_PASS_SCORE = new BigDecimal("70");
     private static final BigDecimal MIN_REVIEW_ONLY_SCORE = new BigDecimal("85");
 
     private static final String REASON_CONTEXT_MISSING = "DATA_QUALITY_CONTEXT_BINDING_MISSING";
@@ -168,7 +168,7 @@ public class DataQualityContextSourceBindingValidator {
     }
 
     private static ValidationResult thresholdResult(DataQualityContextSourceBindingDTO context) {
-        if (context.getDataQualityScore().compareTo(MIN_PASS_SCORE) < 0) {
+        if (!DataQualityCircuitBreakerPolicy.passes(context.getDataQualityScore())) {
             return ValidationResult.incomplete(List.of(REASON_DATA_QUALITY_SCORE_LOW));
         }
         if (context.getDataQualityScore().compareTo(MIN_REVIEW_ONLY_SCORE) < 0) {
@@ -241,7 +241,7 @@ public class DataQualityContextSourceBindingValidator {
     private static void addCompletenessReason(BigDecimal score, String missingReason, List<String> reasons) {
         if (score == null) {
             reasons.add(missingReason);
-        } else if (score.compareTo(MIN_PASS_SCORE) < 0) {
+        } else if (score.compareTo(DataQualityCircuitBreakerPolicy.MIN_PASS_SCORE_DECIMAL) < 0) {
             reasons.add(REASON_COMPLETENESS_SCORE_LOW);
         }
     }

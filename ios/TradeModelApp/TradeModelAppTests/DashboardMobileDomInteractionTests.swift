@@ -38,6 +38,78 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
+    func testLowDataQualityPayloadStaysFailClosedAndKeepsPositionDom() throws {
+        let webView = try loadFixture()
+        let originalPosition = try stringValue(
+            "document.querySelector('[data-position-independent]').outerHTML",
+            in: webView
+        )
+
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
+        XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
+        try run(
+            """
+            window.__pendingRequests[0].resolve({
+              ok: true,
+              json: function() {
+                return Promise.resolve({
+                  code: 200,
+                  data: {
+                    selectedSymbol: 'ETHUSDT',
+                    header: { dataStatus: 'PARTIAL' },
+                    systemState: {},
+                    states: { assets: 'PARTIAL' },
+                    assets: [{
+                      symbol: 'ETHUSDT',
+                      rawSymbol: 'ETHUSDT',
+                      analysisId: 'ANA_ETHUSDT_DQ69',
+                      dataQuality: 'PARTIAL',
+                      moduleState: 'PARTIAL',
+                      worthOpening: false
+                    }],
+                    executionSuggestion: {
+                      status: 'DATA_QUALITY_BLOCKED',
+                      statusLabel: '当前暂无完整执行计划',
+                      blockedReason: '数据质量不足，暂不交易 / 事件观望',
+                      moduleState: 'PARTIAL',
+                      positionMode: false
+                    },
+                    aiDecision: {
+                      runStatus: 'NOT_CALLED',
+                      runStatusLabel: '未调用',
+                      consistency: { aiApplicable: false },
+                      tabs: []
+                    }
+                  }
+                });
+              }
+            })
+            """,
+            in: webView
+        )
+
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-symbol=\"ETHUSDT\"] [data-asset-field=\"dataQuality\"]').textContent === '数据不足'",
+            in: webView
+        ))
+        XCTAssertEqual(
+            try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
+            "false"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"direction\"]').textContent", in: webView),
+            "--"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-field=\"blockedReason\"]').textContent", in: webView),
+            "数据质量不足，暂不交易 / 事件观望"
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-position-independent]').outerHTML", in: webView),
+            originalPosition
+        )
+    }
+
     func testDesktopOverviewRuntimeRefreshUsesOnlyHomeProjection() throws {
         let webView = try loadDesktopTemplate()
 
@@ -271,10 +343,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             timeout: 2
         ))
 
-        XCTAssertTrue(try booleanValue(
-            "window.__lastDashboardHome.assets.find(asset => asset.symbol === 'ETHUSDT').analysisId === 'ANA_ETHUSDT_INITIAL'",
-            in: webView
-        ))
+        XCTAssertTrue(try booleanValue("window.__lastDashboardHome === null", in: webView))
         XCTAssertEqual(
             try stringValue("document.getElementById('desktopAiStateStatus').textContent", in: webView),
             "当前不可查看"
@@ -316,10 +385,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             "true"
         )
 
-        try run(
-            "document.querySelector('.sidebar-slot[data-symbol=\"ETHUSDT\"]').click()",
-            in: webView
-        )
+        try run("document.getElementById('homeRetryButton').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__overviewRequests.length === 3", in: webView, timeout: 2))
         try run("window.__resolveDesktopAssetHome(2, 'ETHUSDT', 'RETRY')", in: webView)
         XCTAssertTrue(waitUntil(
@@ -2366,16 +2432,19 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
                 <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-direction-label="偏多" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
                 <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-direction-label="偏空" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
               </div>
             </section>

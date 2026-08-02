@@ -19,6 +19,7 @@ import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.ScoreItemDO;
 import org.example.trademodel.dto.ohlcv.OhlcvBarInput;
 import org.example.trademodel.dto.ohlcv.OhlcvIngestionBatch;
@@ -30,6 +31,7 @@ import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
 import org.example.trademodel.service.DashboardHomeService;
@@ -96,6 +98,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     private ExecutionPlanMapper executionPlanMapper;
     @Autowired
     private DashboardHomeService dashboardHomeService;
+    @Autowired
+    private OpportunityLogMapper opportunityLogMapper;
     @Autowired
     private AnalysisRunOrchestrator analysisRunOrchestrator;
     @Autowired
@@ -246,7 +250,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，暂不交易 / 事件观望");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -280,7 +284,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，等待有效分析");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).isEqualTo("数据质量不足，暂不交易 / 事件观望");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -642,6 +646,30 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         plan.setNotUserPositionCreation(true);
         plan.setCreateTime(now.plusSeconds(2));
         executionPlanMapper.insert(plan);
+
+        OpportunityLogDO relation = new OpportunityLogDO();
+        relation.setOpportunityId("opp-int-decision-plan-1");
+        relation.setOpportunityKey(ANALYSIS_ID + ":dec-int-1");
+        relation.setAnalysisId(ANALYSIS_ID);
+        relation.setDecisionId("dec-int-1");
+        relation.setExecutionPlanId("plan-int-1");
+        relation.setSymbol(SYMBOL);
+        relation.setTimeframe("1h");
+        relation.setDirection("LONG");
+        relation.setLifecycleStatus("PENDING_EVALUATION");
+        relation.setAnchorTime(now.plusSeconds(2));
+        relation.setTargetHit(false);
+        relation.setInvalidationHit(false);
+        relation.setPushPresent(false);
+        relation.setRiskBlockedEvidence(false);
+        relation.setUserPositionPresent(false);
+        relation.setSourceType("AUTHORITATIVE_ANALYSIS");
+        relation.setSourceReference("analysisId=" + ANALYSIS_ID + ";decisionId=dec-int-1");
+        relation.setReasonCodes("AUTHORITATIVE_PLAN_RELATION");
+        relation.setTraceId("trace-int-1");
+        relation.setCreatedAt(now.plusSeconds(2));
+        relation.setUpdatedAt(now.plusSeconds(2));
+        opportunityLogMapper.insert(relation);
         return validPeriod;
     }
 
