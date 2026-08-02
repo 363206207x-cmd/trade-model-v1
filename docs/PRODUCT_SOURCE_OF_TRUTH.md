@@ -46,6 +46,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-POSITION-MONITORING|docs/product-sources/POSITION_MONITORING_COMPLETE_PLAN.md|c1a42a7d6dc7c0275ebccf2a61ceece157602b3e5327b062369d5e5c641369c3|POSITION_AND_REVIEW -->
 <!-- PRODUCT_SOURCE|PS-AI-CONFLICT-RECHECK-REVIEW|docs/product-sources/AI_CONFLICT_RECHECK_REVIEW_PLAN.md|10c2f96c145371baa75bb46a7e6e6aa2c5f27ae4a43da4d96f008b42800feb3c|AI_STATE_PUSH_REVIEW -->
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
+<!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
 <!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|598c5628f1a179c19c38215a6fcfde67b96c7a55e2fb778c5caaaa4d2a99079a|DELIVERY_AND_SAFETY -->
 
@@ -115,6 +116,29 @@ Companion files are part of this registered source bundle:
 | `docs/design/P3_U2_IPHONE_HOME_FIELD_MAPPING.md` | `f19809ccec520eb4c2b5048b0857e03a520b3baf7bdbdab9820eb04df5e3a429` | exact field ownership and empty behavior |
 | `docs/design/FE04_SEMANTIC_CONTRACT_V2.md` | `09abda774c51f6a1c84cdffe89ad4c6fb21f8c04cc5d1e4af16e45ffc6fa0834` | FE-04 navigation and semantic overlay |
 | `docs/INTERACTION_CONTRACT_V3.md` | `a68e1efbc98e0d2e2952ca8081cf63b189b6bb0942928e7ec050e5735d494133` | desktop/mobile page, identity, state, and fail-closed interaction contract |
+
+### PS-HOME-CORE-DATA-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | P1B Home Core Data Completion Authorization |
+| Repository path | `docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md` |
+| Repository SHA-256 | `3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628` |
+| Version/date | Product decision candidate; authorization effective only after merged-main validation |
+| Authority | Explicit Product Source reconciliation for the P1B Home core-data package |
+| Applicable modules | Asset Card, exact ExecutionPlan read projection, Top3 UserPosition, Home state handling |
+| Required concepts | seven-field primary card body; subordinate four-field status strip; truthful source classification; exact persisted plan identity; owner-scoped independent UserPosition; LOADING/READY/PARTIAL/EMPTY/ERROR/MISSING; retry and stale-context clearing |
+| Forbidden reinterpretations | no replacement of the seven primary fields; no latest/symbol/timeframe plan inference; no `tm_real_position`; no stale-success recovery; no AI/Score/notification/trading expansion |
+
+For Home core-data work, the phrase "card body displays exactly" freezes the
+seven primary business fields. It does not prohibit a visually subordinate,
+non-navigating status strip containing `dataQuality`,
+`multiTimeframeState`, `Confused`, and `updatedAt`. The strip is metadata, not
+an eighth through eleventh primary field, and it must not displace or visually
+outrank direction, confidence, risk, or AssetState. This explicit decision
+resolves the prior ambiguity without changing the existing interaction rule:
+card selection changes asset context and never selects a position or performs
+a mutation.
 
 ### PS-FIGMA-BASELINE
 

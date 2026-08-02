@@ -1,61 +1,63 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "P1B authorization operational handoff remediation; Home implementation remains stopped until merged-main effectivity"
+active_block: "P1B Home Core Data product-contract reconciliation and runtime authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "P1A Home Audit Completion and P1B Authorization Handoff"
-branch: "codex/p1b-home-projection-authorization"
-task_mode: "AUTHORIZATION_FLOW_REMEDIATION_ONLY"
-current_task_mode: "AUTHORIZATION_FLOW_REMEDIATION_ONLY"
+module: "P1B Home Core Data Authorization"
+branch: "codex/p1b-home-core-data-authorization"
+task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
+current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
-current_effective_status: "EFFECTIVE_PENDING_MERGED_MAIN"
-authorized_next_product_phase: "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
+current_effective_status: "PENDING_MERGED_MAIN"
+authorized_next_product_phase: "P1B_HOME_CORE_DATA_COMPLETION"
 
 # Runtime selection is owned by scripts/v1-state.sh. These declarations define
-# the completed P1A audit, its only bounded P1B successor, and an explicitly
-# blocked unscoped package. Candidate permissions do not become effective until
-# this authorization package is present on clean, synced merged main.
-current_package_phase: "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT"
-current_package_name: "P1A Home Alignment Readiness and Gap Audit"
-current_package_active_block: "P1B Authorization Operational Handoff Fix"
-current_package_mode: "AUTHORIZATION_FLOW_REMEDIATION_ONLY"
+# the effective P1B-1 predecessor, the only bounded Home core-data successor,
+# and an explicitly blocked unscoped package. Candidate permissions do not
+# become effective until this authorization is on clean, synced merged main.
+current_package_phase: "P1B_HOME_CORE_DATA_AUTHORIZATION"
+current_package_name: "P1B Home Core Data Product Contract and Runtime Authorization"
+current_package_active_block: "Home Core Data Product Contract and Runtime Authorization"
+current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/p1b-home-projection-authorization"
+current_package_branch: "codex/p1b-home-core-data-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
-current_package_implementation_pr_allowed: false
-current_package_next_action: "Complete and review the authorization handoff; do not implement Home before merged-main effectivity"
+current_package_implementation_pr_allowed: true
+current_package_next_action: "Review and merge only this authorization package; do not implement Home before merged-main effectivity"
 current_package_allowed_scope:
-  - "Record the completed P1A read-only audit and bounded P1B authorization"
-  - "Update the minimal P1A-to-P1B runtime resolver and deterministic transition tests"
-  - "Update delivery and bootstrap records without changing product capability"
+  - "Freeze the seven-field Asset Card body plus four-field secondary status strip"
+  - "Record exact ExecutionPlan, owner-scoped Top3 UserPosition, and six-state implementation boundaries"
+  - "Update the minimal P1B-1-to-Home-Core-Data runtime transition and deterministic simulations"
+  - "Update only the named product/delivery records without changing business capability"
 current_package_blocked_scope:
   - "DashboardHomeServiceImpl, Java business code, API, schema, HTML, CSS, JavaScript, UI, Figma, or business tests"
-  - "P1B implementation before this authorization package is effective on merged main"
+  - "P1B Home Core Data implementation before this authorization package is effective on merged main"
   - "PR #1156, stash, patch, or closed technical-debt mutation"
-  - "Telegram, notification, order, execution, or trading capability"
+  - "Three AI, Score, Telegram, notification, order, execution, or trading capability"
 
-authorized_next_package_phase: "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
-authorized_next_package_name: "P1B-1 Home Structure and Projection Alignment"
-authorized_next_package_active_block: "P1B-1 Home Projection Separation Implementation"
+authorized_next_package_phase: "P1B_HOME_CORE_DATA_COMPLETION"
+authorized_next_package_name: "P1B Home Core Data Completion"
+authorized_next_package_active_block: "Asset Card, Exact ExecutionPlan, Top3 UserPosition, and Home State Completion"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/p1b-home-alignment-first-implementation"
+authorized_next_package_branch: "codex/p1b-home-core-data-completion"
 authorized_next_package_risk: "B"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
-authorized_next_package_next_action: "Implement only the reviewed HOME_READ_PROJECTION_ONLY package and return for exact-Head validation"
+authorized_next_package_next_action: "Implement only the reviewed HOME_CORE_DATA_READ_ONLY package and return for independent exact-Head validation"
 
-blocked_package_phase: "P1B_HOME_ALIGNMENT_UNSCOPED_IMPLEMENTATION"
-blocked_package_status: "BLOCKED_OUTSIDE_HOME_READ_PROJECTION_ONLY"
-next_task_authorization_status: "BLOCKED_PENDING_P1B_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "P1B_HOME_CORE_DATA_UNSCOPED_IMPLEMENTATION"
+blocked_package_status: "BLOCKED_OUTSIDE_HOME_CORE_DATA_READ_ONLY"
+next_task_authorization_status: "BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "P0_EFFECTIVE_MERGED_MAIN"
   - "P1A_AUDIT_COMPLETED"
-  - "P1B_SCOPE_APPROVED"
-  - "P1B_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "P1B_1_EFFECTIVE_MERGED_MAIN"
+  - "P1B_HOME_CORE_DATA_SCOPE_APPROVED"
+  - "P1B_HOME_CORE_DATA_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "CLEAN_WORKTREE"
@@ -65,28 +67,31 @@ p1a_implementation_allowed: false
 p1a_implementation_pr_allowed: false
 p1a_allowed_changes:
   - "NONE"
-p1b_authorization_status: "EFFECTIVE_PENDING_MERGED_MAIN"
-authorized_next_package: "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
-scope: "HOME_READ_PROJECTION_ONLY"
+p1b_1_status: "EFFECTIVE_MERGED_MAIN"
+p1b_authorization_status: "EFFECTIVE_MERGED_MAIN"
+p1b_home_core_data_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+p1b_home_core_data_implementation_status: "NOT_STARTED"
+authorized_next_package: "P1B_HOME_CORE_DATA_COMPLETION"
+scope: "HOME_CORE_DATA_READ_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk operational authorization handoff correction; no Java business code, business API, schema, UI, Figma, business test, notification, or trading change"
-current_pr: "P1B Authorization Package / PENDING_REVIEW"
-current_package_pr: "P1B Home Projection Authorization Package"
+risk: "A-risk bounded product decision and deterministic runtime authorization; no Java business code, business API, schema, UI, Figma, business test, notification, or trading change"
+current_pr: "P1B Home Core Data Authorization / PENDING_REVIEW"
+current_package_pr: "P1B Home Core Data Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "not applicable before independent exact-Head review and an explicit merge gate"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "P1B Home Alignment First Implementation"
+next_business_phase: "P1B Home Core Data Completion"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Review and merge this authorization package; only then request P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION"
+next_allowed_action: "Review and merge this authorization package; only then request P1B_HOME_CORE_DATA_COMPLETION"
 
 product_phase: "P1 Home Alignment"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Home read projection and interaction alignment"
+product_module: "P1B Home core data read-only completion authorization"
 
 audit_scope_modules:
   - "HOME"
@@ -142,45 +147,46 @@ required_product_sources:
   - PS-POSITION-MONITORING
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-HOME-INTERACTION
+  - PS-HOME-CORE-DATA-AUTHORIZATION
   - PS-FIGMA-BASELINE
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  Apply the formal Home rule that ExecutionPlan is the selected asset's system suggestion while Position Monitor is the owner-scoped read model for a manual UserPosition. Both projections remain visible and independent; neither creates a trade or position mutation.
+  Preserve seven primary Asset Card fields and allow dataQuality, multiTimeframeState, Confused, and updatedAt only in a subordinate status strip. ExecutionPlan requires exact persisted identity; Top3 remains owner-scoped UserPosition and independent of selectedSymbol; Home states fail closed. No part creates a trade, notification, or position mutation.
 
 design_interaction_mapping: |
-  Preserve the five primary tabs, final Home module order, context-only focus-asset click, linked ExecutionPlan and exactly three AI summaries, independent Top3 positions, explicit detail links, and distinct READY/PARTIAL/EMPTY/ERROR/MISSING behavior. This authorization task does not edit UI or Figma.
+  Preserve the five primary tabs, frozen Home order, context-only Asset Card click, seven-field primary visual hierarchy, lower-emphasis secondary status strip, independent Top3 positions, and distinct LOADING/READY/PARTIAL/EMPTY/ERROR/MISSING behavior. This authorization task does not edit UI or Figma.
 
 data_source_mapping: |
-  Keep executionSuggestion sourced from selectedDecision plus the existing asset ExecutionPlan projection. Keep positions sourced from owner-scoped UserPosition reads. selectedSymbol may scope asset state, plan, AI, and consistency only; it may not infer or select a UserPosition.
+  Require persisted market/OHLCV for price, valid decision data for direction/score/confidence, asset-only risk, backend data-quality/multi-timeframe/Confused state, and real business time. Resolve executionSuggestion only through selectedDecision to an exact persisted ExecutionPlan relation. Keep positions sourced from owner-scoped UserPosition reads; selectedSymbol may not infer or select a UserPosition.
 
 current_implementation_gap: |
-  P0 is effective on merged main and the P1A read-only audit is complete. The bounded P1B scope is approved, but the task resolver still reads the obsolete P0-to-P1A successor declaration and blocks P1B. This package corrects only that operational handoff. Home implementation and acceptance remain incomplete.
+  P1B-1 projection separation is effective on merged main. Asset Card source truth, exact plan identity, owner-scoped complete Top3, six-state handling, retry/stale clearing, visual evidence, and real scenarios remain incomplete. This package resolves the product-contract ambiguity and authorizes, but does not implement, that bounded core-data work.
 
 allowed_scope:
-  - "Record the completed P1A audit in one minimal repository artifact"
-  - "Align the P1B authorization declaration, delivery matrix, roadmap, completion note, and bootstrap"
-  - "Resolve P1B only after the authorization package is effective on clean, synced merged main"
-  - "Add focused incomplete, pending-merge, allowed, unauthorized, conflict, and Product Source Gate failure simulations"
+  - "Create the single P1B Home Core Data authorization record and register its hash"
+  - "Align Product Source, roadmap, acceptance, delivery matrix, and runtime task declaration"
+  - "Resolve P1B Home Core Data only after the authorization is effective on clean, synced merged main"
+  - "Add focused predecessor, pending-merge, allowed, name-mismatch, conflict, dirty, Product Source Gate, and permission simulations"
   - "Preserve PR #1156 as closed, unmerged, non-effective technical debt"
 
 authorized_next_allowed_scope:
-  - "Adjust DashboardHomeServiceImpl read-only projection assembly within the existing endpoint and JSON shape"
-  - "Keep executionSuggestion sourced from selectedDecision and the existing asset ExecutionPlan"
-  - "Keep positions sourced from owner-scoped UserPosition reads"
-  - "Bind desktop and mobile Home structure and selected-asset context within the approved scope"
-  - "Add focused service, contract, DOM, WKWebView, accessibility, and stale-cache tests"
+  - "Complete the seven-field Asset Card body and subordinate four-field status strip with truthful source classification"
+  - "Resolve executionSuggestion through selectedDecision and exact persisted ExecutionPlan identity"
+  - "Complete independent owner-scoped Top3 UserPosition read projection"
+  - "Implement LOADING/READY/PARTIAL/EMPTY/ERROR/MISSING, retry, and stale asset-context clearing"
+  - "Bind desktop/mobile Home and add focused service, contract, DOM, accessibility, fixture, and stale-cache tests"
 
 authorized_next_blocked_scope:
-  - "New API, endpoint, request parameter, response field, DTO variant, schema migration, or Mapper refactor"
-  - "UserPosition write, position creation/selection inference, ExecutionPlan state change, or PositionMonitor algorithm change"
+  - "Schema migration, guessed plan identity, broad Mapper refactor, or unrelated endpoint expansion"
+  - "UserPosition write, position creation/selection inference, ExecutionPlan mutation, or PositionMonitor algorithm change"
   - "AI role/model/logic, evidence, score, confidence, or conflict change"
   - "Telegram, external notification, automatic notification, order, execution, or trading capability"
   - "PR #1156, stash, patch, or closed technical-debt mutation"
 
 blocked_scope:
   - "DashboardHomeServiceImpl, Java business code, business API, schema, HTML, CSS, JavaScript, business tests, or Figma in this authorization task"
-  - "P1B implementation before authorization is effective on clean, synced merged main"
+  - "P1B Home Core Data implementation before authorization is effective on clean, synced merged main"
   - "Natural-language governance parser, synonym inventory, semantic digest, or self-governing gate expansion"
   - "Any branch-content edit, thread resolution, Ready transition, merge, branch deletion, stash/patch application, or technical-completion claim for PR #1156"
   - "Any unscoped Home, Position, AI, Message, iPhone, notification, or trading implementation"
@@ -190,10 +196,10 @@ forbidden_scope:
   - "Business code/API/schema/UI/Figma/test changes in this authorization task"
   - "Automatic trading or position mutation"
   - "PR #1156 branch-content modification, thread resolution, recovery-asset mutation, or reopen"
-  - "P1B implementation before merged-main authorization effectivity or outside HOME_READ_PROJECTION_ONLY"
+  - "P1B implementation before merged-main authorization effectivity or outside HOME_CORE_DATA_READ_ONLY"
 
 real_scenario_requirement: |
-  This authorization handoff has no business execution scenario. It must deterministically prove that incomplete or unmerged P1A/P1B state remains blocked, while reviewed authorization on clean/synced merged main permits only P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION.
+  This authorization handoff has no business execution scenario. It must deterministically prove that incomplete P1B-1 or unmerged authorization remains blocked, while reviewed authorization on clean/synced merged main permits only P1B_HOME_CORE_DATA_COMPLETION. Business real-scenario evidence remains required in the implementation package.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -204,21 +210,21 @@ hard_boundaries:
 
 checks:
   - "Product source paths exist, are non-empty, and match registered SHA-256 hashes"
-  - "P1A incomplete and authorization pending-merge simulations block P1B"
-  - "P1A complete plus effective merged-main authorization permits the bounded P1B implementation and PR"
-  - "Unauthorized, active-conflict, dirty-worktree, and Product Source Gate failure simulations remain blocked"
+  - "P1B-1 incomplete and authorization pending-merge simulations block Home Core Data"
+  - "P1B-1 effective plus merged-main authorization permits the exact bounded implementation and PR"
+  - "Wrong package, unauthorized scope, active-conflict, dirty-worktree, and Product Source Gate failure simulations remain blocked"
   - "Workflow contract, Markdown/YAML, links/paths, diff checks, and Maven pass"
   - "Changed scope contains no Java, business API, schema, UI, Figma, business test, notification, or trading files"
   - "PR #1156 is closed without merge; Head, remote branch, eight unresolved threads, stash object, patch hash, and history remain preserved"
 
 stop_conditions:
   - "A required formal product source is missing, empty, hash-mismatched, or in unresolved conflict"
-  - "P1A completion, bounded P1B scope approval, merged-main effectivity, clean/synced main, or active PR state cannot be verified"
+  - "P1B-1 effectivity, bounded Home Core Data scope approval, merged-main effectivity, clean/synced main, or active PR state cannot be verified"
   - "Product/design/data/gap/task mappings are absent or the Product Source Gate is blocked"
   - "The change would touch Java, business API, schema, UI, Figma, business tests, notification, or trading"
   - "The task would present fake data as real, weaken owner scope/privacy/fail-closed behavior, or infer exact identity from symbol/latest"
   - "The gate starts expanding into a semantic parser, inventory, digest, or independent governance roadmap"
-  - "P1B implementation or merge would begin before this authorization package passes independent review and merged-main validation"
+  - "Home Core Data implementation or merge would begin before this authorization package passes independent review and merged-main validation"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"

@@ -61,6 +61,9 @@ emit_resolved_task_state() {
   printf 'IMPLEMENTATION_PR_ALLOWED: %s\n' "${resolved_pr_creation_permission:-false}"
   printf 'P1B_AUTHORIZATION_STATUS: %s\n' "${p1b_authorization_declared_status:-UNDECLARED}"
   printf 'P1B_AUTHORIZATION_RUNTIME_STATUS: %s\n' "${p1b_authorization_runtime_status:-BLOCKED}"
+  printf 'P1B_1_STATUS: %s\n' "${p1b_1_declared_status:-UNDECLARED}"
+  printf 'P1B_HOME_CORE_DATA_AUTHORIZATION_STATUS: %s\n' "${home_core_data_authorization_runtime_status:-BLOCKED}"
+  printf 'P1B_HOME_CORE_DATA_COMPLETION_STATUS: %s\n' "${home_core_data_implementation_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -184,6 +187,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="P0_REMEDIATION_REVIEW"
     elif [[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" ]]; then
       resolved_handoff_stage="P1B_AUTHORIZATION_REMEDIATION_REVIEW"
+    elif [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -191,6 +196,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="P0_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" ]]; then
         resolved_handoff_stage="P1B_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -233,6 +240,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="P1A_READ_ONLY_AUDIT"
   elif [[ "$authorized_next_package_phase" == "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION" ]]; then
     resolved_handoff_stage="P1B_HOME_IMPLEMENTATION"
+  elif [[ "$authorized_next_package_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]]; then
+    resolved_handoff_stage="P1B_HOME_CORE_DATA_IMPLEMENTATION"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -418,7 +427,96 @@ evaluate_p1a_to_p1b_transition() {
   p1b_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
+evaluate_home_core_data_transition() {
+  local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
+  local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
+  local merged_main_validation_status="$9" repository_edits_allowed="${10}"
+  local implementation_allowed="${11}" implementation_pr_allowed="${12}"
+  local declared_authorization_status="${13}" predecessor_status="${14}"
+
+  effective_task_mode="$current_mode"
+  p1a_transition_allowed="YES"
+  p1a_completion_status="PASS"
+  p1b_1_completion_status="BLOCKED"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
+  home_core_data_authorization_runtime_status="BLOCKED"
+  p1b_authorization_runtime_status="BLOCKED"
+
+  [[ "$current_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]] || return 0
+  [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
+  [[ "$next_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]] || return 0
+  [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
+
+  if [[ "$predecessor_status" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_P1B_1_NOT_EFFECTIVE_MERGED_MAIN"
+    return 0
+  fi
+  p1b_1_completion_status="PASS"
+  p1b_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+
+  if [[ "$current_status" != "COMPLETED" ]]; then
+    next_task_authorization_status="BLOCKED_HOME_CORE_DATA_AUTHORIZATION_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$declared_authorization_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_HOME_CORE_DATA_SCOPE_NOT_AUTHORIZED"
+    return 0
+  fi
+  if ! is_true_flag "$repository_edits_allowed" \
+    || ! is_true_flag "$implementation_allowed" \
+    || ! is_true_flag "$implementation_pr_allowed"; then
+    next_task_authorization_status="BLOCKED_HOME_CORE_DATA_IMPLEMENTATION_PERMISSIONS_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$completion_state" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN"
+    home_core_data_authorization_runtime_status="PENDING_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "$synced_main_status" != "YES" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH"
+    return 0
+  fi
+  if [[ "$source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "$merged_main_validation_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_HOME_CORE_DATA_AUTHORIZATION_MERGED_MAIN_VALIDATION"
+    return 0
+  fi
+
+  effective_task_mode="$next_mode"
+  next_transition_allowed="YES"
+  authorization_status="APPROVED"
+  next_task_authorization_status="ALLOWED"
+  home_core_data_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  p1b_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]]; then
+    evaluate_home_core_data_transition \
+      "$current_package_phase" \
+      "$current_package_status" \
+      "$current_task_mode" \
+      "$authorized_next_package_phase" \
+      "$authorized_next_task_mode" \
+      "$completion_effective_state" \
+      "$clean_synced_main" \
+      "$product_source_gate_status" \
+      "$p0_merged_main_validation_status" \
+      "$authorized_next_repository_edits_allowed" \
+      "$authorized_next_implementation_allowed" \
+      "$authorized_next_implementation_pr_allowed" \
+      "$home_core_data_declared_status" \
+      "$p1b_1_declared_status"
+    return 0
+  fi
+
   if [[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" \
     && "$authorized_next_package_phase" == "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION" ]]; then
     evaluate_p1a_to_p1b_transition \
@@ -694,7 +792,10 @@ load_task_package_contract() {
   authorized_next_package_next_action="$(yaml_value "$TASK_FILE" authorized_next_package_next_action)"
   blocked_package_phase="$(yaml_value "$TASK_FILE" blocked_package_phase)"
   blocked_package_status="$(yaml_value "$TASK_FILE" blocked_package_status)"
+  p1b_1_declared_status="$(yaml_value "$TASK_FILE" p1b_1_status)"
   p1b_authorization_declared_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
+  home_core_data_declared_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_authorization_status)"
+  home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_implementation_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -736,6 +837,10 @@ run_handoff_resolution_simulation() {
       ;;
     p1a_incomplete)
       current_package_status="IN_PROGRESS"
+      requested_package="$authorized_next_package_phase"
+      ;;
+    predecessor_incomplete)
+      p1b_1_declared_status="IN_PROGRESS"
       requested_package="$authorized_next_package_phase"
       ;;
     authorization_pending_request_p1b)
@@ -818,7 +923,7 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      p1b_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+      home_core_data_declared_status="BLOCKED_PENDING_REVIEW"
       blockers_text="P1B_NOT_AUTHORIZED"
       ;;
     conflicting_pr|separate_conflicting_pr_successor)
@@ -1042,7 +1147,10 @@ authorized_next_product_phase="$(yaml_value "$TASK_FILE" authorized_next_product
 p1a_repository_edits_allowed="$(yaml_value "$TASK_FILE" p1a_repository_edits_allowed)"
 p1a_implementation_allowed="$(yaml_value "$TASK_FILE" p1a_implementation_allowed)"
 p1a_implementation_pr_allowed="$(yaml_value "$TASK_FILE" p1a_implementation_pr_allowed)"
+p1b_1_declared_status="$(yaml_value "$TASK_FILE" p1b_1_status)"
 p1b_authorization_declared_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
+home_core_data_declared_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_authorization_status)"
+home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_implementation_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1070,6 +1178,23 @@ if [[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" ]
     || "$authorized_next_package_mode" != "IMPLEMENTATION" \
     || "$p1b_authorization_declared_status" != "EFFECTIVE_PENDING_MERGED_MAIN" \
     || "$p1b_scope" != "HOME_READ_PROJECTION_ONLY" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed"; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+fi
+if [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
+  if [[ "$current_package_status" != "COMPLETED" \
+    || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
+    || "$authorized_next_package_phase" != "P1B_HOME_CORE_DATA_COMPLETION" \
+    || "$authorized_next_package_mode" != "IMPLEMENTATION" \
+    || "$p1b_1_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$p1b_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$home_core_data_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$home_core_data_implementation_status" != "NOT_STARTED" \
+    || "$p1b_scope" != "HOME_CORE_DATA_READ_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
@@ -1382,6 +1507,9 @@ printf 'P1A_REPOSITORY_EDITS_ALLOWED: %s\n' "${p1a_repository_edits_allowed:-UND
 printf 'P1A_IMPLEMENTATION_ALLOWED: %s\n' "${p1a_implementation_allowed:-UNDECLARED}"
 printf 'P1A_IMPLEMENTATION_PR_ALLOWED: %s\n' "${p1a_implementation_pr_allowed:-UNDECLARED}"
 printf 'P1B_AUTHORIZATION_DECLARED_STATUS: %s\n' "${p1b_authorization_declared_status:-UNDECLARED}"
+printf 'P1B_1_STATUS: %s\n' "${p1b_1_declared_status:-UNDECLARED}"
+printf 'P1B_HOME_CORE_DATA_DECLARED_STATUS: %s\n' "${home_core_data_declared_status:-UNDECLARED}"
+printf 'P1B_HOME_CORE_DATA_COMPLETION_STATUS: %s\n' "${home_core_data_implementation_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"
