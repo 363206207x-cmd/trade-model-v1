@@ -90,6 +90,10 @@ class Fe04ShellHomeDashboardContractTest {
                 desktop,
                 "function refreshAssetContext()",
                 "function refreshDashboardDiagnostics()");
+        String desktopContextFailure = slice(
+                desktop,
+                "function renderAssetContextUnavailable(contextState)",
+                "function fetchDashboardHome(");
 
         assertThat(mobileScript)
                 .contains("updateExecution(parsed.data.executionSuggestion, selectedAsset, selectedCard)")
@@ -103,13 +107,22 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("renderHomeAiDecisionFromPayload(home.aiDecision || {}, selectedAsset)");
         assertThat(desktopContextRefresh)
                 .contains("fetchDashboardHome(true)")
-                .contains("renderHomeExecutionFromPayload({}, null)")
-                .contains("runStatus: \"LOAD_FAILED\"")
-                .contains("runStatusLabel: \"当前不可查看\"")
-                .contains("consistency: { aiApplicable: false }")
-                .contains("}, null);")
+                .contains("renderAssetContextUnavailable()")
                 .doesNotContain("renderHomePositionsFromPayload")
                 .doesNotContain("renderDashboardHomeUnavailable");
+        assertThat(desktopContextFailure)
+                .contains("window.__lastDashboardHome = null")
+                .contains("setRuntimeStatus(runtimeState)")
+                .contains("runtimeState = missing ? \"MISSING\" : \"ERROR\"")
+                .contains("renderHomeSystemStateFromPayload({},")
+                .contains("renderHomeAlertEventRowsFromPayload({})")
+                .contains("assets.dataset.homeState = missing ? \"missing\" : \"error\"")
+                .contains("renderHomeExecutionFromPayload({")
+                .contains("runStatus: \"LOAD_FAILED\"")
+                .contains("runStatusLabel: \"当前不可查看\"")
+                .contains("}, null);")
+                .doesNotContain("renderHomePositionsFromPayload")
+                .doesNotContain("selectedPositionId = null");
     }
 
     @Test
@@ -281,7 +294,7 @@ class Fe04ShellHomeDashboardContractTest {
                         "frontendContract.aiAnalysisStateView(analysisState)",
                         "root.dataset.analysisState = analysisState",
                         "runStatus: \"LOADING\"",
-                        "runStatus: \"LOAD_FAILED\"",
+                        "runStatus: missing ? \"MISSING\" : \"LOAD_FAILED\"",
                         "renderAiAnalysisRoles(safeAi.tabs, analysisState)")
                 .doesNotContain("/api/analysis/create")
                 .doesNotContain("/api/watch");

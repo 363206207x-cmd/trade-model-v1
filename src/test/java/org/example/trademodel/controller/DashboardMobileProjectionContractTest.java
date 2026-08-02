@@ -199,6 +199,58 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
+    void assetSwitchFailureClearsStaleMobileAssetContextAndRecoversOnlyFromFreshPayload()
+            throws Exception {
+        String script = Files.readString(SCRIPT);
+        String html = Files.readString(TEMPLATE);
+        String clearContext = slice(
+                script,
+                "function clearMobileAssetContext(symbol, contextState, stateLabel)",
+                "function syncMobileAssetContext(home, selectedSymbol)");
+        String failure = slice(
+                script,
+                "function failClosedAfterLoadError(symbol, contextState)",
+                "function matchingAsset(assets, symbol)");
+        String selection = slice(
+                script,
+                "async function selectAsset(symbol, sourceCard)",
+                "function bindAssetPager()");
+
+        assertThat(html)
+                .contains(
+                        "data-mobile-status-field=\"marketTrend\"",
+                        "data-mobile-status-field=\"riskLevel\"",
+                        "data-mobile-status-field=\"dataQuality\"",
+                        "data-mobile-status-field=\"aiConflict\"",
+                        "data-asset-field=\"state\"",
+                        "data-asset-field=\"latestPrice\"",
+                        "data-asset-field=\"compositeScore\"");
+        assertThat(clearContext).contains(
+                "window.__lastDashboardHome = null",
+                "clearAssetCardProjection(card",
+                "node.textContent = node.dataset.mobileStatusField === \"aiStatus\" ? stateLabel : \"--\"",
+                "statusRoot.dataset.contextState = contextState",
+                "assetRoot.dataset.contextState = contextState",
+                "updateAssetDetailLink(null)",
+                "updateSelectedSymbolUrl(symbol)");
+        assertThat(failure).contains(
+                "clearMobileAssetContext(symbol, missing ? \"missing\" : \"error\"",
+                "status: missing ? \"MISSING\" : \"LOAD_FAILED\"",
+                "}, null, null)",
+                "aiApplicable: false",
+                "无法生成一致性摘要");
+        assertThat(selection.indexOf("clearMobileAssetContext(symbol, \"loading\", \"正在同步\")"))
+                .isLessThan(selection.indexOf("await fetch("));
+        assertThat(selection).contains(
+                "syncMobileAssetContext(parsed.data, selectedSymbol)",
+                "failClosedAfterLoadError(selectedSymbol, \"missing\")",
+                "failClosedAfterLoadError(symbol, \"error\")");
+        assertThat(script).contains("safeHeader.dataStatus || \"PARTIAL\"");
+        assertThat(clearContext + failure).doesNotContain(
+                "position-list", "data-position-independent", "selectedPositionId");
+    }
+
+    @Test
     void executionSuggestionRequiresExactPlanIdentityAndClearsBoundariesOtherwise() throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
@@ -215,6 +267,28 @@ class DashboardMobileProjectionContractTest {
                 .contains("? text(safeSuggestion[field], \"--\")")
                 .contains("data-execution-conflict")
                 .doesNotContain("positionMonitor");
+    }
+
+    @Test
+    void mobileProjectionCannotPromoteNonActivePersistedPlanStates() throws Exception {
+        String foundation = Files.readString(FRONTEND_CONTRACT);
+        String access = slice(
+                foundation,
+                "function executionPlanAccess(suggestion)",
+                "function csrfHeaders(headers, root)");
+
+        assertThat(access)
+                .contains(
+                        "if (!hasText(plan.sourceExecutionPlanId))",
+                        "if (status !== \"USABLE_REVIEW_PLAN\")",
+                        "visible: false",
+                        "reason: displayText(plan.blockedReason, \"执行建议不可用\")")
+                .doesNotContain(
+                        "status === \"PLAN_BLOCKED\"",
+                        "status === \"PLAN_INVALID\"",
+                        "status === \"PLAN_INCOMPLETE\"",
+                        "status === \"PLAN_REVIEW_ONLY\"",
+                        "status === \"REVALIDATION_REQUIRED\"");
     }
 
     @Test
@@ -266,5 +340,13 @@ class DashboardMobileProjectionContractTest {
 
     private int count(String source, String target) {
         return (source.length() - source.replace(target, "").length()) / target.length();
+    }
+
+    private String slice(String source, String start, String end) {
+        int startIndex = source.indexOf(start);
+        int endIndex = source.indexOf(end, startIndex + start.length());
+        assertThat(startIndex).isGreaterThanOrEqualTo(0);
+        assertThat(endIndex).isGreaterThan(startIndex);
+        return source.substring(startIndex, endIndex);
     }
 }
