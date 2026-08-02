@@ -34,19 +34,23 @@
       <dl class="status-grid status-grid-primary" data-top-status-count="4">
         <div class="status-cell">
           <dt>市场趋势</dt>
-          <dd th:text="${home.systemState.marketTrend.valueLabel != null ? home.systemState.marketTrend.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="marketTrend"
+              th:text="${home.systemState.marketTrend.valueLabel != null ? home.systemState.marketTrend.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
           <dt>风险等级</dt>
-          <dd th:text="${home.systemState.riskLevel.valueLabel != null ? home.systemState.riskLevel.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="riskLevel"
+              th:text="${home.systemState.riskLevel.valueLabel != null ? home.systemState.riskLevel.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
           <dt>数据质量</dt>
-          <dd th:text="${home.systemState.dataQuality.valueLabel != null ? home.systemState.dataQuality.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="dataQuality"
+              th:text="${home.systemState.dataQuality.valueLabel != null ? home.systemState.dataQuality.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
           <dt>AI 冲突</dt>
-          <dd th:text="${home.systemState.aiConflict.valueLabel != null ? home.systemState.aiConflict.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="aiConflict"
+              th:text="${home.systemState.aiConflict.valueLabel != null ? home.systemState.aiConflict.valueLabel : '--'}">--</dd>
         </div>
       </dl>
       <div class="system-summary-heading">
@@ -56,19 +60,23 @@
       <dl class="status-grid status-grid-system" data-system-status-count="4">
         <div class="status-cell">
           <dt>AI 系统</dt>
-          <dd th:text="${home.header.aiStatusLabel != null ? home.header.aiStatusLabel : '待同步'}">待同步</dd>
+          <dd data-mobile-status-field="aiStatus"
+              th:text="${home.header.aiStatusLabel != null ? home.header.aiStatusLabel : '待同步'}">待同步</dd>
         </div>
         <div class="status-cell">
           <dt>待复核</dt>
-          <dd th:text="${home.systemState.pendingReview.valueLabel != null ? home.systemState.pendingReview.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="pendingReview"
+              th:text="${home.systemState.pendingReview.valueLabel != null ? home.systemState.pendingReview.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell status-warning">
           <dt>冲突阻断</dt>
-          <dd th:text="${home.systemState.confused.valueLabel != null ? home.systemState.confused.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="confused"
+              th:text="${home.systemState.confused.valueLabel != null ? home.systemState.confused.valueLabel : '--'}">--</dd>
         </div>
         <div class="status-cell">
           <dt>Hot Reset</dt>
-          <dd th:text="${home.systemState.hotReset.valueLabel != null ? home.systemState.hotReset.valueLabel : '--'}">--</dd>
+          <dd data-mobile-status-field="hotReset"
+              th:text="${home.systemState.hotReset.valueLabel != null ? home.systemState.hotReset.valueLabel : '--'}">--</dd>
         </div>
       </dl>
     </section>
@@ -181,17 +189,17 @@
                 th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
             <span class="asset-symbol" th:text="${asset.symbol != null ? asset.symbol : '--'}">--</span>
-            <span class="asset-state"
+            <span class="asset-state" data-asset-field="state"
                   th:text="${stateKey == 'triggered' ? '条件已触发，不代表已开仓' : (asset.assetStateLabel != null ? asset.assetStateLabel : (asset.assetState != null ? asset.assetState : '状态待同步'))}">状态待同步</span>
           </span>
           <span class="asset-price-score">
-            <span><small>当前价格</small><b th:text="${asset.latestPrice != null ? asset.latestPrice : '--'}">--</b></span>
-            <span><small>综合评分</small><b th:text="${asset.compositeScore != null ? asset.compositeScore : '--'}">--</b></span>
+            <span><small>当前价格</small><b data-asset-field="latestPrice" th:text="${asset.latestPrice != null ? asset.latestPrice : '--'}">--</b></span>
+            <span><small>综合评分</small><b data-asset-field="compositeScore" th:text="${asset.compositeScore != null ? asset.compositeScore : '--'}">--</b></span>
           </span>
           <span class="asset-core-grid">
-            <span><small>方向</small><b th:text="${asset.marketBiasLabel != null ? asset.marketBiasLabel : (asset.marketBias != null ? asset.marketBias : '当前判断不可用')}">当前判断不可用</b></span>
-            <span><small>置信度</small><b th:text="${asset.confidenceLabel != null ? asset.confidenceLabel : (asset.confidenceLevel != null ? asset.confidenceLevel : '--')}">--</b></span>
-            <span><small>风险等级</small><b th:text="${asset.riskLabel != null ? asset.riskLabel : (asset.riskLevel != null ? asset.riskLevel : '--')}">--</b></span>
+            <span><small>方向</small><b data-asset-field="marketBias" th:text="${asset.marketBiasLabel != null ? asset.marketBiasLabel : (asset.marketBias != null ? asset.marketBias : '当前判断不可用')}">当前判断不可用</b></span>
+            <span><small>置信度</small><b data-asset-field="confidence" th:text="${asset.confidenceLabel != null ? asset.confidenceLabel : (asset.confidenceLevel != null ? asset.confidenceLevel : '--')}">--</b></span>
+            <span><small>风险等级</small><b data-asset-field="risk" th:text="${asset.riskLabel != null ? asset.riskLabel : (asset.riskLevel != null ? asset.riskLevel : '--')}">--</b></span>
           </span>
         </button>
       </div>

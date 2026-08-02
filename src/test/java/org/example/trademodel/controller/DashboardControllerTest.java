@@ -537,23 +537,23 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void positionSourceFixtureSeparatesVerifiedAndUnverifiedOriginalPlans() throws Exception {
+    void visualFixtureSeparatesAssetExecutionPlanFromUserPositions() throws Exception {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
-        int unverifiedStart = fixture.indexOf("\"originalPlanIdentity\": \"UNVERIFIED\"");
-        int unverifiedEnd = fixture.indexOf("elif scenario == \"multi-position\"", unverifiedStart);
+        int positionStart = fixture.indexOf("elif scenario in {\"position-monitored\", \"position-waiting\"}");
+        int positionEnd = fixture.indexOf("elif scenario == \"multi-position\"", positionStart);
 
         assertThat(fixture).contains(
-                "\"sourceAnalysisId\": \"analysis-position-source\"",
-                "\"sourceExecutionPlanId\": \"plan-position-source\"",
-                "\"sourceTraceId\": \"trace-position-source\"",
-                "\"originalPlanIdentity\": \"VERIFIED\"",
-                "\"originalPlanCurrentValidity\": \"ACTIVE\"");
-        assertThat(unverifiedStart).isGreaterThanOrEqualTo(0);
-        assertThat(unverifiedEnd).isGreaterThan(unverifiedStart);
-        assertThat(fixture.substring(unverifiedStart, unverifiedEnd))
-                .contains("暂无可关联的原执行计划")
-                .doesNotContain("\"entryZone\"", "\"stopLoss\"", "\"takeProfitRules\"",
-                        "\"sourceAnalysisId\"", "\"sourceExecutionPlanId\"");
+                "def asset_execution_suggestion(symbol: str)",
+                "\"status\": \"USABLE_REVIEW_PLAN\"",
+                "\"statusLabel\": \"资产执行计划，仅供人工复核\"",
+                "\"positionMode\": False",
+                "\"positionMonitor\": None",
+                "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)");
+        assertThat(positionStart).isGreaterThanOrEqualTo(0);
+        assertThat(positionEnd).isGreaterThan(positionStart);
+        assertThat(fixture.substring(positionStart, positionEnd))
+                .contains("home[\"positions\"] = [position]", "POSITION_SELECTION_REQUIRED")
+                .doesNotContain("POSITION_MONITORING", "position_review_suggestion");
     }
 
     @Test
@@ -613,6 +613,40 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void assetContextFailureClearsEveryCachedAssetProjectionButPreservesPositions() throws Exception {
+        String refresh = functionBody("refreshAssetContext");
+        String payload = functionBody("renderDashboardHomePayload");
+        String unavailable = functionBody("renderAssetContextUnavailable");
+
+        assertThat(directFunctionCalls(refresh))
+                .contains("fetchDashboardHome", "renderAssetContextUnavailable")
+                .doesNotContain("renderDashboardHomeUnavailable", "renderHomePositionsFromPayload");
+        assertThat(payload).contains(
+                "if (preservePositionSummary === true && !selectedHomeAsset(home))",
+                "renderAssetContextUnavailable(\"MISSING\")");
+        assertThat(unavailable).contains(
+                "window.__lastDashboardHome = null",
+                "window.__lastHomeDiagnostics = {}",
+                "window.__lastSystemStatus =",
+                "allDecisions = []",
+                "displayDecisions = []",
+                "setRuntimeStatus(runtimeState)",
+                "setHeaderAiStatus(\"LOAD_FAILED\", \"当前不可查看\")",
+                "renderHomeSystemStateFromPayload({},",
+                "renderHomeAlertEventRowsFromPayload({})",
+                "updateAssetDetailLink(null)",
+                "当前资产不可查看",
+                "执行计划已清除",
+                "无法生成一致性摘要");
+        assertThat(unavailable).contains(
+                "runtimeState = missing ? \"MISSING\" : \"ERROR\"",
+                "assets.dataset.homeState = missing ? \"missing\" : \"error\"",
+                "status: missing ? \"MISSING\" : \"LOAD_FAILED\"");
+        assertThat(unavailable).doesNotContain(
+                "renderHomePositionsFromPayload", "selectedPositionId = null", "POSITION_MONITORING");
+    }
+
+    @Test
     void homePositionSummaryRemainsPassiveAndIndependent() throws Exception {
         String positionRows = functionBody("renderHomePositionsFromPayload");
 
@@ -661,7 +695,7 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void multiPositionOfflineFixtureRequiresExactPositionSelection() throws Exception {
+    void multiPositionOfflineFixtureKeepsAssetPlanIndependentOfPositionSelection() throws Exception {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
         int multiPositionStart = fixture.indexOf("elif scenario == \"multi-position\"");
         int placeholderStart = fixture.indexOf("elif scenario == \"placeholder\"", multiPositionStart);
@@ -669,13 +703,29 @@ public class DashboardControllerTest {
         assertThat(fixture).contains(
                 "\"multi-position\"", "selected_position_id == 9101", "selected_position_id == 9102",
                 "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND",
-                "position_review_suggestion(position_a, \"POSITION-A\")",
-                "position_review_suggestion(position_b, \"POSITION-B\")",
-                "\"entryZone\": f\"{marker}-entry\"");
+                "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)",
+                "\"entryZone\": f\"{marker}-asset-entry\"");
         assertThat(multiPositionStart).isGreaterThanOrEqualTo(0);
         assertThat(placeholderStart).isGreaterThan(multiPositionStart);
         assertThat(fixture.substring(multiPositionStart, placeholderStart))
-                .contains("请选择具体持仓", "originalPlanIdentity", "UNVERIFIED");
+                .contains("home[\"positions\"] = [position_a, position_b]", "EXACT_POSITION_SELECTED")
+                .doesNotContain("POSITION_MONITORING", "position_review_suggestion",
+                        "home[\"executionSuggestion\"] = {");
+    }
+
+    @Test
+    void visualFixtureUsesProductionHomeEnvelopeAndServesRequiredFrontendScripts() throws Exception {
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(fixture).contains(
+                "FRONTEND_CONTRACT = ROOT / \"src/main/resources/static/js/frontend-contract.js\"",
+                "ALERT_EXPLAIN = ROOT / \"src/main/resources/static/js/alert-explain.js\"",
+                "def _javascript(self, path: Path)",
+                "if parsed.path == \"/js/frontend-contract.js\"",
+                "if parsed.path == \"/js/alert-explain.js\"",
+                "\"code\": 200",
+                "\"msg\": \"success\"",
+                "\"data\": scenario_home(home_scenario, symbol, selected_position_id)");
     }
 
     @Test

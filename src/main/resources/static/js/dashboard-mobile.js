@@ -135,6 +135,102 @@
     return selectedCard;
   }
 
+  function setAssetCardField(card, field, value, fallback) {
+    var node = card && card.querySelector('[data-asset-field="' + field + '"]');
+    if (node) node.textContent = text(value, fallback);
+  }
+
+  function assetStateText(asset) {
+    var state = String(asset && asset.assetState || "").toUpperCase();
+    if (state === "TRIGGERED") return "条件已触发，不代表已开仓";
+    return text(asset && (asset.assetStateLabel || asset.assetState), "状态待同步");
+  }
+
+  function syncAssetCardProjection(card, asset) {
+    if (!card || !asset) return;
+    syncCardNavigationIdentity(card, asset);
+    card.dataset.assetState = String(asset.assetState || "unknown").toLowerCase();
+    setAssetCardField(card, "state", assetStateText(asset), "状态待同步");
+    setAssetCardField(card, "latestPrice", asset.latestPrice, "--");
+    setAssetCardField(card, "compositeScore", asset.compositeScore, "--");
+    setAssetCardField(card, "marketBias", asset.marketBiasLabel || asset.marketBias, "当前判断不可用");
+    setAssetCardField(card, "confidence", asset.confidenceLabel || asset.confidenceLevel, "--");
+    setAssetCardField(card, "risk", asset.riskLabel || asset.riskLevel, "--");
+  }
+
+  function clearAssetCardProjection(card, stateLabel) {
+    if (!card) return;
+    syncCardNavigationIdentity(card, null);
+    card.dataset.assetState = "unavailable";
+    setAssetCardField(card, "state", stateLabel, "当前不可查看");
+    setAssetCardField(card, "latestPrice", null, "--");
+    setAssetCardField(card, "compositeScore", null, "--");
+    setAssetCardField(card, "marketBias", null, "--");
+    setAssetCardField(card, "confidence", null, "--");
+    setAssetCardField(card, "risk", null, "--");
+  }
+
+  function updateMobileStatusProjection(systemState, header) {
+    var state = systemState || {};
+    var safeHeader = header || {};
+    document.querySelectorAll("[data-mobile-status-field]").forEach(function (node) {
+      var field = node.dataset.mobileStatusField;
+      if (field === "aiStatus") {
+        node.textContent = text(safeHeader.aiStatusLabel, "待同步");
+        return;
+      }
+      var card = state[field] || {};
+      node.textContent = text(card.valueLabel != null ? card.valueLabel : card.value, "--");
+    });
+    var root = document.getElementById("mobile-status");
+    if (root) {
+      var rawState = String(safeHeader.dataStatus || "PARTIAL").toLowerCase();
+      root.dataset.contextState = ["ready", "partial", "empty", "error", "missing"].indexOf(rawState) >= 0
+        ? rawState : "partial";
+    }
+  }
+
+  function clearMobileAssetContext(symbol, contextState, stateLabel) {
+    window.__lastDashboardHome = null;
+    var normalized = normalizeSymbol(symbol);
+    var selectedCard = null;
+    assetCards().forEach(function (card) {
+      var selected = normalized && normalizeSymbol(card.dataset.symbol) === normalized;
+      clearAssetCardProjection(card, selected ? stateLabel : "当前不可查看");
+      card.classList.toggle("is-selected", selected);
+      card.dataset.selected = String(selected);
+      card.setAttribute("aria-checked", String(selected));
+      card.tabIndex = selected ? 0 : -1;
+      if (selected) selectedCard = card;
+    });
+    document.querySelectorAll("[data-mobile-status-field]").forEach(function (node) {
+      node.textContent = node.dataset.mobileStatusField === "aiStatus" ? stateLabel : "--";
+    });
+    var statusRoot = document.getElementById("mobile-status");
+    if (statusRoot) statusRoot.dataset.contextState = contextState;
+    var assetRoot = document.getElementById("watch-assets");
+    if (assetRoot) assetRoot.dataset.contextState = contextState;
+    setText("[data-selected-asset-token]", selectedCard ? selectedCard.dataset.symbol : symbol, "--");
+    updateAssetDetailLink(null);
+    updateSelectedSymbolUrl(symbol);
+  }
+
+  function syncMobileAssetContext(home, selectedSymbol) {
+    var assets = home && Array.isArray(home.assets) ? home.assets : [];
+    assetCards().forEach(function (card) {
+      var asset = matchingAsset(assets, card.dataset.symbol);
+      if (asset) syncAssetCardProjection(card, asset);
+      else clearAssetCardProjection(card, "当前不可查看");
+    });
+    updateMobileStatusProjection(home && home.systemState, home && home.header);
+    var statusRoot = document.getElementById("mobile-status");
+    var assetRoot = document.getElementById("watch-assets");
+    if (assetRoot) {
+      assetRoot.dataset.contextState = statusRoot ? statusRoot.dataset.contextState : "partial";
+    }
+    return setSelectedAsset(selectedSymbol);
+  }
+
   function worthOpeningText(asset, card) {
     var value = asset && Object.prototype.hasOwnProperty.call(asset, "worthOpening")
       ? asset.worthOpening
@@ -448,15 +544,26 @@
     renderAiAnalysis(safeAi, selectedAssetCard());
   }
 
-  function failClosedAfterLoadError() {
+  function failClosedAfterLoadError(symbol, contextState) {
+    var missing = contextState === "missing";
+    clearMobileAssetContext(symbol, missing ? "missing" : "error", missing ? "当前不可查看" : "同步失败");
+    setWatchActionStatus(missing
+      ? "当前资产不存在或不可访问，旧资产数据已清除。"
+      : "当前资产同步失败，旧资产数据已清除。");
     updateExecution({
-      statusLabel: "数据加载失败",
-      blockedReason: "无法同步当前资产，请稍后重试。"
-    }, null, selectedAssetCard());
+      status: missing ? "MISSING" : "LOAD_FAILED",
+      statusLabel: missing ? "当前不可查看" : "数据加载失败",
+      blockedReason: missing ? "当前资产不存在或不可访问。" : "无法同步当前资产，请稍后重试。"
+    }, null, null);
     updateAi({
-      runStatus: "LOAD_FAILED",
-      runStatusLabel: "同步失败",
-      consistency: {},
+      runStatus: missing ? "MISSING" : "LOAD_FAILED",
+      runStatusLabel: missing ? "当前不可查看" : "同步失败",
+      consistency: {
+        aiApplicable: false,
+        consistencySummary: missing
+          ? "当前资产不存在或不可访问，无法生成一致性摘要"
+          : "当前资产同步失败，无法生成一致性摘要"
+      },
       tabs: []
     });
   }
@@ -497,7 +604,10 @@
     activeRequest = request;
     sourceCard.dataset.requestSequence = String(sequence);
     sourceCard.setAttribute("aria-busy", "true");
+    clearMobileAssetContext(symbol, "loading", "正在同步");
+    setWatchActionStatus("正在同步当前资产上下文。");
     updateExecution({
+      status: "LOADING",
       statusLabel: "正在同步",
       blockedReason: "当前资产上下文同步中"
     }, null, sourceCard);
@@ -526,17 +636,19 @@
       if (!parsed.ok) throw new Error("HOME_RESPONSE_INVALID");
       var selectedSymbol = text(parsed.data.selectedSymbol, symbol);
       var selectedAsset = matchingAsset(parsed.data.assets, selectedSymbol);
-      var selectedCard = assetCards().find(function (card) {
-        return normalizeSymbol(card.dataset.symbol) === normalizeSymbol(selectedSymbol);
-      }) || null;
+      if (!selectedAsset) {
+        failClosedAfterLoadError(selectedSymbol, "missing");
+        return;
+      }
+      var selectedCard = syncMobileAssetContext(parsed.data, selectedSymbol);
       syncCardNavigationIdentity(selectedCard, selectedAsset);
-      selectedCard = setSelectedAsset(selectedSymbol);
       updateSelectedSymbolUrl(selectedSymbol);
+      setWatchActionStatus("");
       updateExecution(parsed.data.executionSuggestion, selectedAsset, selectedCard);
       updateAi(parsed.data.aiDecision);
     } catch (error) {
       if (error.name !== "AbortError" && sequence === requestSequence) {
-        failClosedAfterLoadError();
+        failClosedAfterLoadError(symbol, "error");
       }
     } finally {
       if (sourceCard.dataset.requestSequence === String(sequence)) {

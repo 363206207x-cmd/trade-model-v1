@@ -7251,6 +7251,10 @@
         setHeaderAiStatus(header.aiStatus, header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || "");
+        if (preservePositionSummary === true && !selectedHomeAsset(home)) {
+            renderAssetContextUnavailable("MISSING");
+            return;
+        }
         var positionSelectionStatus = String(home.positionSelectionStatus || "").toUpperCase();
         if (home.selectedPositionId != null) {
             selectedPositionId = normalizePositionId(home.selectedPositionId);
@@ -7313,6 +7317,60 @@
             consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
         }
         renderHomePushInboxFromPayload({});
+        document.getElementById("lastUpdatedText").textContent = nowText();
+    }
+
+    function renderAssetContextUnavailable(contextState) {
+        var missing = String(contextState || "ERROR").toUpperCase() === "MISSING";
+        var runtimeState = missing ? "MISSING" : "ERROR";
+        var sourceLabel = missing ? "当前资产不存在或不可查看" : "当前资产同步失败";
+        var statusLabel = missing ? "当前不可查看" : "数据加载失败";
+        var blockedReason = missing
+            ? "当前资产不存在或不可访问，执行计划已清除"
+            : "当前资产同步失败，执行计划已清除";
+        window.__lastDashboardHome = null;
+        window.__lastHomeDiagnostics = {};
+        window.__lastSystemStatus = {
+            pendingCount: null,
+            confusedCount: null,
+            hotResetFired: null
+        };
+        syncDashboardSelectionUrl();
+        allDecisions = [];
+        displayDecisions = [];
+        setRuntimeStatus(runtimeState);
+        setHeaderAiStatus("LOAD_FAILED", "当前不可查看");
+        setText("headerSourceStatusText", sourceLabel);
+        renderHomeSystemStateFromPayload({}, { aiStatus: "LOAD_FAILED", aiStatusLabel: "当前不可查看" });
+        renderHomeAlertEventRowsFromPayload({});
+        updateAssetDetailLink(null);
+        var assets = document.getElementById("tilesRow");
+        if (assets) {
+            assets.dataset.homeState = missing ? "missing" : "error";
+            assets.innerHTML = '<div class="overview-empty-state" role="alert">'
+                + '<strong>当前资产不可查看</strong><span>'
+                + (missing ? "资源不存在或不可访问" : "切换失败，等待重新同步")
+                + '</span></div>';
+        }
+        renderSidebarSlots();
+        renderHomeExecutionFromPayload({
+            status: missing ? "MISSING" : "LOAD_FAILED",
+            statusLabel: statusLabel,
+            blockedReason: blockedReason,
+            positionMode: false
+        }, null);
+        renderHomeAiDecisionFromPayload({
+            runStatus: "LOAD_FAILED",
+            runStatusLabel: "当前不可查看",
+            consistency: {
+                aiApplicable: false,
+                consistencySummary: missing
+                    ? "当前资产不存在或不可访问，无法生成一致性摘要"
+                    : "当前资产同步失败，无法生成一致性摘要"
+            },
+            tabs: []
+        }, null);
+        updateAssetPoolPanel();
         document.getElementById("lastUpdatedText").textContent = nowText();
     }
 
@@ -10294,14 +10352,7 @@
     function refreshAssetContext() {
         return fetchDashboardHome(true)
             .catch(function () {
-                updateAssetDetailLink(null);
-                renderHomeExecutionFromPayload({}, null);
-                renderHomeAiDecisionFromPayload({
-                    runStatus: "LOAD_FAILED",
-                    runStatusLabel: "当前不可查看",
-                    consistency: { aiApplicable: false },
-                    tabs: []
-                }, null);
+                renderAssetContextUnavailable();
                 return null;
             });
     }

@@ -17,6 +17,8 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "src/main/resources/templates/dashboard.html"
+FRONTEND_CONTRACT = ROOT / "src/main/resources/static/js/frontend-contract.js"
+ALERT_EXPLAIN = ROOT / "src/main/resources/static/js/alert-explain.js"
 SCENARIOS = {
     "normal",
     "low-quality",
@@ -63,6 +65,7 @@ def asset(
         "slotType": "ANALYZED",
         "symbol": symbol.replace("USDT", "/USDT"),
         "rawSymbol": symbol,
+        "analysisId": f"analysis-{symbol.removesuffix('USDT').lower()}-asset",
         "assetState": state,
         "assetStateLabel": state_label,
         "marketBias": bias,
@@ -77,6 +80,7 @@ def asset(
         "sourceProvider": "离线视觉验收 fixture",
         "dataFreshness": "FIXTURE_ONLY",
         "evidenceCount": 4,
+        "latestAnalysisTime": "2026-07-13T12:00:00Z",
     }
 
 
@@ -338,19 +342,25 @@ def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001)
     return position
 
 
-def position_review_suggestion(position: dict[str, object], marker: str) -> dict[str, object]:
+def asset_execution_suggestion(symbol: str) -> dict[str, object]:
+    marker = symbol.removesuffix("USDT") or symbol
     return {
-        "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
-        "positionMonitor": copy.deepcopy(position),
-        "originalPlanIdentity": "VERIFIED", "originalPlanCurrentValidity": "ACTIVE",
-        "sourceAnalysisId": f"analysis-{marker}",
-        "sourceExecutionPlanId": f"plan-{marker}",
-        "sourceTraceId": f"trace-{marker}",
-        "originalPlanLabel": "原执行计划，仅用于持仓复核和复盘对照",
-        "direction": "BULLISH", "entryZone": f"{marker}-entry", "stopLoss": f"{marker}-stop",
-        "takeProfitRules": f"{marker}-tp", "leverageSuggestion": "不高于 2 倍",
-        "positionSuggestion": "仅供人工复核", "validPeriod": "有效至 07-14 12:00",
-        "invalidCondition": f"{marker}-invalid",
+        "status": "USABLE_REVIEW_PLAN",
+        "statusLabel": "资产执行计划，仅供人工复核",
+        "positionMode": False,
+        "positionMonitor": None,
+        "sourceAnalysisId": f"analysis-{marker.lower()}-asset",
+        "sourceExecutionPlanId": f"plan-{marker.lower()}-asset",
+        "sourceTraceId": f"trace-{marker.lower()}-asset",
+        "direction": "BULLISH",
+        "entryZone": f"{marker}-asset-entry",
+        "stopLoss": f"{marker}-asset-stop",
+        "takeProfitRules": f"{marker}-asset-tp",
+        "leverageSuggestion": "不高于 2 倍",
+        "positionSuggestion": "仅供人工复核",
+        "validFrom": "2026-07-13T12:00:00Z",
+        "expiresAt": "2026-07-14T12:00:00Z",
+        "invalidCondition": f"{marker}-asset-invalid",
     }
 
 
@@ -362,6 +372,7 @@ def scenario_home(
     home = base_home(selected_symbol)
     home["diagnostics"]["scenario"] = scenario
     selected_asset = next((item for item in home["assets"] if item["rawSymbol"] == selected_symbol), home["assets"][0])
+    home["executionSuggestion"] = asset_execution_suggestion(selected_symbol)
 
     if scenario == "low-quality":
         selected_asset.update({
@@ -417,28 +428,9 @@ def scenario_home(
         home["positions"] = [position]
         home["pushInbox"]["hasOpenPosition"] = True
         home["pushInbox"]["counts"]["positionRisk"] = 1 if scenario == "position-monitored" else 0
-        if scenario == "position-monitored":
-            position.update({
-                "sourceAnalysisId": "analysis-position-source",
-                "sourceExecutionPlanId": "plan-position-source",
-                "sourceTraceId": "trace-position-source",
-            })
-            home["selectedPositionId"] = position["positionId"]
-            home["positionSelectionStatus"] = "UNIQUE_POSITION_SELECTED"
-            home["matchingPositionCount"] = 1
-            home["executionSuggestion"] = position_review_suggestion(position, "position-source")
-            home["executionSuggestion"].update({
-                "entryZone": "62800 - 63200", "stopLoss": "61200",
-                "takeProfitRules": "第一目标 65500；第二目标 67500",
-                "invalidCondition": "结构破坏后重新分析",
-            })
-        else:
-            home["executionSuggestion"] = {
-                "status": "POSITION_MONITORING", "statusLabel": "持仓监控", "positionMode": True,
-                "positionMonitor": copy.deepcopy(position),
-                "originalPlanIdentity": "UNVERIFIED", "originalPlanCurrentValidity": "UNVERIFIED",
-                "originalPlanLabel": "暂无可关联的原执行计划",
-            }
+        home["selectedPositionId"] = None
+        home["positionSelectionStatus"] = "POSITION_SELECTION_REQUIRED"
+        home["matchingPositionCount"] = 1
 
     elif scenario == "multi-position":
         position_a = monitored_position(selected_symbol, True, 9101)
@@ -451,25 +443,14 @@ def scenario_home(
         if selected_position_id == 9101:
             home["selectedPositionId"] = 9101
             home["positionSelectionStatus"] = "EXACT_POSITION_SELECTED"
-            home["executionSuggestion"] = position_review_suggestion(position_a, "POSITION-A")
         elif selected_position_id == 9102:
             home["selectedPositionId"] = 9102
             home["positionSelectionStatus"] = "EXACT_POSITION_SELECTED"
-            home["executionSuggestion"] = position_review_suggestion(position_b, "POSITION-B")
         else:
             home["selectedPositionId"] = None
             home["positionSelectionStatus"] = (
                 "POSITION_SELECTION_REQUIRED" if selected_position_id is None else "POSITION_NOT_FOUND"
             )
-            home["executionSuggestion"] = {
-                "status": home["positionSelectionStatus"],
-                "statusLabel": "请选择具体持仓" if selected_position_id is None else "所选持仓不存在",
-                "blockedReason": "当前标的存在多笔开放手动持仓",
-                "positionMode": False,
-                "originalPlanIdentity": "UNVERIFIED",
-                "originalPlanCurrentValidity": "UNVERIFIED",
-                "originalPlanLabel": "请选择具体持仓",
-            }
 
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]
@@ -500,7 +481,7 @@ def detail_fixture(symbol: str) -> dict[str, object]:
 
 def render_static_fixture(scenario: str, output: Path) -> None:
     """Build a self-contained fixture for browser environments that cannot bind localhost."""
-    home_payload = {"success": True, "data": scenario_home(scenario, "BTCUSDT")}
+    home_payload = {"code": 200, "msg": "success", "data": scenario_home(scenario, "BTCUSDT")}
     detail_payload = detail_fixture("BTCUSDT")
     fixtures = json.dumps({
         "home": home_payload,
@@ -517,7 +498,7 @@ def render_static_fixture(scenario: str, output: Path) -> None:
     if (method !== "GET") {{
       return Promise.resolve(new Response(JSON.stringify({{success:false,message:"离线视觉验收 fixture 拒绝所有写请求"}}), {{status:405,headers:{{"Content-Type":"application/json"}}}}));
     }}
-    let payload = {{success:true,data:{{}},status:"NOT_APPLICABLE",statusLabel:"不适用"}};
+    let payload = {{code:200,msg:"success",data:{{}},status:"NOT_APPLICABLE",statusLabel:"不适用"}};
     if (url.indexOf("/api/dashboard/home") >= 0) payload = fixtures.home;
     else if (url.indexOf("/api/dashboard/detail") >= 0) payload = fixtures.detail;
     else if (url.indexOf("/api/local-real/status") >= 0) payload = fixtures.localReal;
@@ -527,6 +508,14 @@ def render_static_fixture(scenario: str, output: Path) -> None:
 }})();
 </script>"""
     html = TEMPLATE.read_text(encoding="utf-8").replace("REFRESH_MS = 30000;", "REFRESH_MS = 0;")
+    html = html.replace(
+        '<script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js"></script>',
+        "<script>" + FRONTEND_CONTRACT.read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="/js/alert-explain.js"></script>',
+        "<script>" + ALERT_EXPLAIN.read_text(encoding="utf-8") + "</script>",
+    )
     html = html.replace("</head>", interceptor + "\n</head>", 1)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
@@ -565,6 +554,15 @@ class FixtureHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _javascript(self, path: Path) -> None:
+        body = path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _empty(self, status: HTTPStatus) -> None:
         self.send_response(status)
         self.send_header("Content-Length", "0")
@@ -595,6 +593,14 @@ class FixtureHandler(BaseHTTPRequestHandler):
             self.wfile.write(html)
             return
 
+        if parsed.path == "/js/frontend-contract.js":
+            self._javascript(FRONTEND_CONTRACT)
+            return
+
+        if parsed.path == "/js/alert-explain.js":
+            self._javascript(ALERT_EXPLAIN)
+            return
+
         if parsed.path == "/__fixture__/scenario":
             scenario = query.get("name", [""])[0]
             if scenario not in SCENARIOS:
@@ -623,7 +629,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
                     home_request_count = HOME_REQUEST_COUNTS.get(scenario, 0)
                     HOME_REQUEST_COUNTS[scenario] = home_request_count + 1
                 if home_request_count > 0:
-                    self._json({"success": False, "message": "fixture home failure"}, HTTPStatus.SERVICE_UNAVAILABLE)
+                    self._json({"code": 503, "msg": "fixture home failure", "data": None}, HTTPStatus.SERVICE_UNAVAILABLE)
                     return
             symbol = query.get("selectedSymbol", ["BTCUSDT"])[0].upper()
             home_scenario = "normal" if scenario == "detail-late" else scenario
@@ -633,7 +639,8 @@ class FixtureHandler(BaseHTTPRequestHandler):
             except ValueError:
                 selected_position_id = -1
             self._json({
-                "success": True,
+                "code": 200,
+                "msg": "success",
                 "data": scenario_home(home_scenario, symbol, selected_position_id),
             })
             return
@@ -658,7 +665,13 @@ class FixtureHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path.startswith("/api/"):
-            self._json({"success": True, "data": {}, "status": "NOT_APPLICABLE", "statusLabel": "不适用"})
+            self._json({
+                "code": 200,
+                "msg": "success",
+                "data": {},
+                "status": "NOT_APPLICABLE",
+                "statusLabel": "不适用",
+            })
             return
 
         self._empty(HTTPStatus.NOT_FOUND)
