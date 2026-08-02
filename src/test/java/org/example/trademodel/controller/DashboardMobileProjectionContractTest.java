@@ -178,6 +178,10 @@ class DashboardMobileProjectionContractTest {
     void assetSwitchUpdatesExecutionAndAiButNeverPositionDom() throws Exception {
         String script = Files.readString(SCRIPT);
         String foundation = Files.readString(FRONTEND_CONTRACT);
+        String assetSelection = slice(
+                script,
+                "async function selectAsset(symbol, sourceCard)",
+                "function bindAssetPager()");
 
         assertThat(script)
                 .contains("/api/dashboard/home?")
@@ -194,14 +198,35 @@ class DashboardMobileProjectionContractTest {
                 .contains("assetCards()")
                 .doesNotContain("localStorage")
                 .doesNotContain("saveCustomSymbols")
-                .doesNotContain("position-list")
-                .doesNotContain("data-position-independent")
                 .doesNotContain("innerHTML");
+        assertThat(assetSelection)
+                .doesNotContain(
+                        "renderMobilePositions",
+                        "data-mobile-position-list",
+                        "position-list",
+                        "data-position-independent");
         assertThat(foundation)
                 .contains("global.history.replaceState")
                 .contains("function executionPlanAccess")
                 .contains("sourceExecutionPlanId")
                 .doesNotContain("localStorage");
+    }
+
+    @Test
+    void serverRenderedMobileHomeOnlyBootstrapsFromApiWhenTheFixtureExplicitlyOptsIn()
+            throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String initialize = slice(script, "function initialize()", "if (document.readyState");
+
+        assertThat(html).doesNotContain("data-client-home-bootstrap");
+        assertThat(initialize)
+                .contains(
+                        "homeRoot.hasAttribute(\"data-client-home-bootstrap\")",
+                        "loadInitialMobileHome()");
+        assertThat(initialize.indexOf("homeRoot.hasAttribute(\"data-client-home-bootstrap\")"))
+                .isLessThan(initialize.indexOf("loadInitialMobileHome()"));
+        assertThat(count(initialize, "loadInitialMobileHome()")).isEqualTo(1);
     }
 
     @Test
@@ -361,9 +386,19 @@ class DashboardMobileProjectionContractTest {
                 .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
                 .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
                 .contains("scroll-snap-type: x mandatory")
+                .contains("contain: inline-size layout paint")
+                .contains("isolation: isolate")
                 .contains("background: var(--surface)")
+                .contains("@media (prefers-reduced-motion: reduce)")
                 .doesNotContain("transform: scale")
                 .doesNotContain("font-size: clamp")
+                .doesNotContain(
+                        "font-size: 0.62rem",
+                        "font-size: 0.65rem",
+                        "font-size: 0.66rem",
+                        "font-size: 0.69rem",
+                        "font-size: 0.7rem",
+                        "font-size: 0.72rem")
                 .doesNotContain("color-mix(")
                 .doesNotContain("url(http")
                 .doesNotContain("cdn");

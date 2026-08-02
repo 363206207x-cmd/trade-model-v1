@@ -17,6 +17,8 @@
         <h1 class="page-heading" id="mobile-page-context" tabindex="-1">首页</h1>
       </div>
       <div class="header-actions" aria-label="首页快捷入口">
+        <button class="header-action theme-action" type="button" data-mobile-theme-toggle
+                aria-label="切换明暗主题" title="切换明暗主题"><span class="visually-hidden">切换主题</span></button>
         <button class="header-action" type="button" data-header-search>搜索</button>
         <button class="header-action" type="button" data-header-alerts-nav>消息</button>
       </div>
@@ -30,6 +32,18 @@
         </div>
         <span class="section-note" data-selected-asset-token
               th:text="${home.selectedSymbol != null ? home.selectedSymbol : '--'}">--</span>
+      </div>
+      <div class="mobile-focus-summary" data-mobile-focus-root data-module-state="loading">
+        <div class="mobile-focus-identity">
+          <div><span>当前资产</span><strong data-mobile-focus-field="symbol">--</strong></div>
+          <span class="mobile-focus-state" data-mobile-focus-field="assetState">正在同步</span>
+        </div>
+        <dl class="mobile-focus-decision">
+          <div class="focus-direction"><dt>方向</dt><dd data-mobile-focus-field="direction">--</dd></div>
+          <div><dt>置信度</dt><dd data-mobile-focus-field="confidence">--</dd></div>
+          <div><dt>风险</dt><dd data-mobile-focus-field="risk">--</dd></div>
+          <div><dt>数据质量</dt><dd data-mobile-focus-field="dataQuality">--</dd></div>
+        </dl>
       </div>
       <dl class="status-grid status-grid-primary" data-top-status-count="4">
         <div class="status-cell">
@@ -91,8 +105,8 @@
             </div>
             <span>最多 2 条</span>
           </div>
-          <p class="empty-state" th:if="${#lists.isEmpty(home.alerts)}">暂无告警</p>
-          <details class="signal-disclosure" th:unless="${#lists.isEmpty(home.alerts)}">
+          <p class="empty-state" data-mobile-alert-empty th:if="${#lists.isEmpty(home.alerts)}">暂无告警</p>
+          <details class="signal-disclosure" data-mobile-alert-list th:unless="${#lists.isEmpty(home.alerts)}">
             <summary>
               <span class="signal-summary" th:with="alert=${home.alerts[0]}">
                 <span class="signal-line">
@@ -121,8 +135,8 @@
             </div>
             <span>最多 2 条</span>
           </div>
-          <p class="empty-state" th:if="${#lists.isEmpty(home.events)}">暂无关键事件</p>
-          <details class="signal-disclosure" th:unless="${#lists.isEmpty(home.events)}">
+          <p class="empty-state" data-mobile-event-empty th:if="${#lists.isEmpty(home.events)}">暂无关键事件</p>
+          <details class="signal-disclosure" data-mobile-event-list th:unless="${#lists.isEmpty(home.events)}">
             <summary>
               <span class="signal-summary" th:with="event=${home.events[0]}">
                 <span class="signal-line">
@@ -178,14 +192,14 @@
                          th:text="${home.selectedSymbol != null ? home.selectedSymbol : '--'}">--</strong>
       </p>
 
-      <p class="empty-state" th:if="${#lists.isEmpty(mobileAssets)}">暂无重点资产</p>
-      <div class="asset-pager" role="radiogroup" aria-label="选择重点资产"
+      <p class="empty-state" data-mobile-assets-empty th:if="${#lists.isEmpty(mobileAssets)}">暂无重点资产</p>
+      <div class="asset-pager" data-mobile-assets-pager role="radiogroup" aria-label="选择重点资产"
            th:unless="${#lists.isEmpty(mobileAssets)}">
         <button class="asset-card asset-select" type="button" role="radio"
                 th:each="asset, stat : ${mobileAssets}"
                 th:with="assetKey=${asset.rawSymbol != null ? asset.rawSymbol : asset.symbol},selected=${home.selectedSymbol == assetKey or (home.selectedSymbol == null and stat.first)},stateKey=${asset.assetState != null ? #strings.toLowerCase(asset.assetState) : 'unknown'}"
                 th:classappend="${selected ? ' is-selected' : ''}"
-                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-direction-label=${asset.marketBiasLabel != null ? asset.marketBiasLabel : asset.marketBias},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},data-module-state=${asset.moduleState != null ? #strings.toLowerCase(asset.moduleState) : 'missing'},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
+                th:attr="data-symbol=${assetKey},data-analysis-id=${asset.analysisId},data-direction-label=${asset.marketBiasLabel != null ? asset.marketBiasLabel : asset.marketBias},data-confidence-label=${asset.confidenceLabel != null ? asset.confidenceLabel : asset.confidenceLevel},data-risk-label=${asset.riskLabel != null ? asset.riskLabel : asset.riskLevel},data-quality-label=${asset.dataQuality},data-worth-opening=${asset.worthOpening},data-asset-state=${stateKey},data-module-state=${asset.moduleState != null ? #strings.toLowerCase(asset.moduleState) : 'missing'},aria-checked=${selected},aria-posinset=${stat.index + 1},aria-setsize=${#lists.size(mobileAssets)},data-selected=${selected},tabindex=${selected ? 0 : -1}">
           <span class="visually-hidden"
                 th:text="${'重点资产 ' + (stat.index + 1) + '，共 ' + #lists.size(mobileAssets) + ' 个'}">重点资产</span>
           <span class="asset-card-top">
@@ -274,9 +288,9 @@
         </div>
       </div>
       <p class="section-description">只展示用户手动录入的开放持仓及其持续验证结论。</p>
-      <p class="empty-state" th:if="${#lists.isEmpty(home.positions)}">暂无手动持仓</p>
+      <p class="empty-state" data-mobile-positions-empty th:if="${#lists.isEmpty(home.positions)}">暂无手动持仓</p>
 
-      <div class="position-list" th:unless="${#lists.isEmpty(home.positions)}">
+      <div class="position-list" data-mobile-position-list th:unless="${#lists.isEmpty(home.positions)}">
         <article class="position-card" th:each="position, stat : ${home.positions}" th:if="${stat.index < 3}"
                  th:classappend="${stat.index == 2 ? ' position-third' : ''}"
                  th:attr="data-position-id=${position.positionId},data-module-state=${position.moduleState != null ? #strings.toLowerCase(position.moduleState) : 'partial'}">

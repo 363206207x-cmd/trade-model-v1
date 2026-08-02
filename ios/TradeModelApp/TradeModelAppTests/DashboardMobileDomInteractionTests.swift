@@ -583,10 +583,17 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
         XCTAssertEqual(
             try numberValue(
-                "document.querySelector('[data-mobile-home-view]').querySelectorAll('[data-role-panel], [role=\"tablist\"]').length",
+                "document.querySelector('[data-mobile-home-view]').querySelectorAll('[role=\"tablist\"]').length",
                 in: webView
             ),
-            0
+            1
+        )
+        XCTAssertEqual(
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-mobile-home-view] [data-home-ai-tab]')).map(node => node.dataset.homeAiTab).join('|')",
+                in: webView
+            ),
+            "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
         )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
@@ -1098,9 +1105,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             try run("document.documentElement.dataset.mobileTextSize = '\(textSize)'", in: webView)
             let background = try stringValue("getComputedStyle(document.body).backgroundColor", in: webView)
             if style == .dark {
-                XCTAssertEqual(background, "rgb(16, 18, 20)")
+                XCTAssertEqual(background, "rgb(12, 16, 20)")
             } else {
-                XCTAssertEqual(background, "rgb(232, 235, 239)")
+                XCTAssertEqual(background, "rgb(238, 242, 244)")
             }
             let captured = expectation(description: "captured \(name)")
             var snapshot: UIImage?
@@ -2427,7 +2434,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <p class="watch-action-status" data-watch-action-status></p>
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
               <strong data-selected-asset-token>\(selectedSymbol)</strong>
-              <div class="asset-pager" role="radiogroup">
+              <div class="asset-pager" role="radiogroup" data-mobile-assets-pager>
                 <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-direction-label="震荡" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>

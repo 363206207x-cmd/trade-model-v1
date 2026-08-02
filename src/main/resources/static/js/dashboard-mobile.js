@@ -9,16 +9,32 @@
   var requestSequence = 0;
   var activeRequest = null;
   var activeAiRole = "GPT_FINAL";
+  var manualMobileTheme = null;
 
   function bindPreferredColorScheme() {
-    if (!window.matchMedia) return;
-    var preference = window.matchMedia("(prefers-color-scheme: dark)");
+    var preference = window.matchMedia
+      ? window.matchMedia("(prefers-color-scheme: dark)")
+      : { matches: false };
     var apply = function () {
-      document.documentElement.dataset.mobileTheme = preference.matches ? "dark" : "light";
+      document.documentElement.dataset.mobileTheme = manualMobileTheme
+        || (preference.matches ? "dark" : "light");
     };
     apply();
     if (preference.addEventListener) preference.addEventListener("change", apply);
     else if (preference.addListener) preference.addListener(apply);
+    var toggle = document.querySelector("[data-mobile-theme-toggle]");
+    if (toggle) {
+      toggle.addEventListener("click", function () {
+        manualMobileTheme = document.documentElement.dataset.mobileTheme === "dark"
+          ? "light" : "dark";
+        apply();
+        toggle.setAttribute("aria-pressed", String(manualMobileTheme === "dark"));
+      });
+      toggle.setAttribute(
+        "aria-pressed",
+        String(document.documentElement.dataset.mobileTheme === "dark")
+      );
+    }
   }
 
   function text(value, fallback) {
@@ -149,6 +165,310 @@
     node.dataset.sourceTone = view.tone;
   }
 
+  function appendAssetMetric(parent, label, value, className) {
+    var metric = element("span", className || "");
+    metric.appendChild(element("small", "", label));
+    metric.appendChild(element("b", "", text(value, "--")));
+    parent.appendChild(metric);
+    return metric;
+  }
+
+  function createMobileAssetCard(asset, selected, index, count) {
+    var symbol = text(asset && (asset.rawSymbol || asset.symbol), "--");
+    var card = element("button", "asset-card asset-select" + (selected ? " is-selected" : ""));
+    card.type = "button";
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", String(selected));
+    card.setAttribute("aria-posinset", String(index + 1));
+    card.setAttribute("aria-setsize", String(count));
+    card.setAttribute("aria-label", "切换到 " + symbol + " 决策上下文");
+    card.tabIndex = selected ? 0 : -1;
+    card.dataset.symbol = symbol;
+    card.dataset.selected = String(selected);
+    syncCardNavigationIdentity(card, asset);
+
+    var hidden = element("span", "visually-hidden", "重点资产 " + (index + 1) + "，共 " + count + " 个");
+    card.appendChild(hidden);
+
+    var top = element("span", "asset-card-top");
+    top.appendChild(element("span", "asset-symbol", text(asset && asset.symbol, symbol)));
+    var state = element("span", "asset-state", assetStateText(asset));
+    state.dataset.assetField = "state";
+    top.appendChild(state);
+    card.appendChild(top);
+
+    var priceScore = element("span", "asset-price-score");
+    var priceMetric = appendAssetMetric(priceScore, "最新价格", asset && asset.latestPrice);
+    priceMetric.querySelector("b").dataset.assetField = "latestPrice";
+    var scoreMetric = appendAssetMetric(priceScore, "综合评分", asset && asset.compositeScore);
+    scoreMetric.querySelector("b").dataset.assetField = "compositeScore";
+    card.appendChild(priceScore);
+
+    var core = element("span", "asset-core-grid");
+    var directionMetric = appendAssetMetric(core, "方向", asset && (asset.marketBiasLabel || asset.marketBias));
+    directionMetric.querySelector("b").dataset.assetField = "marketBias";
+    var confidenceMetric = appendAssetMetric(core, "置信度", asset && (asset.confidenceLabel || asset.confidenceLevel));
+    confidenceMetric.querySelector("b").dataset.assetField = "confidence";
+    var riskMetric = appendAssetMetric(core, "风险", asset && (asset.riskLabel || asset.riskLevel));
+    riskMetric.querySelector("b").dataset.assetField = "risk";
+    card.appendChild(core);
+
+    var secondary = element("span", "asset-secondary-strip");
+    [
+      ["数据", frontendContract.dataQualityLabel(asset && asset.dataQuality), "dataQuality"],
+      ["多周期", asset && asset.multiTimeframeState, "multiTimeframeState"],
+      ["Confused", asset && asset.confused === true ? "是" : (asset && asset.confused === false ? "否" : null), "confused"],
+      ["更新", frontendContract.formatBusinessTimeCompact(asset && asset.updatedAt), "updatedAt"]
+    ].forEach(function (item) {
+      var metric = appendAssetMetric(secondary, item[0], item[1]);
+      metric.querySelector("b").dataset.assetField = item[2];
+    });
+    card.appendChild(secondary);
+
+    var sourceLine = element("span", "asset-source-line");
+    sourceLine.setAttribute("aria-label", "字段来源");
+    var sourceFields = [
+      ["latestPrice", "价格"], ["score", "评分"], ["confidence", "置信"]
+    ];
+    sourceFields.forEach(function (item) {
+      var source = element("small");
+      source.dataset.assetSource = item[0];
+      sourceLine.appendChild(source);
+    });
+    card.appendChild(sourceLine);
+    syncAssetCardProjection(card, asset);
+    return card;
+  }
+
+  function renderMobileAssets(assets, selectedSymbol, moduleState) {
+    var pager = document.querySelector("[data-mobile-assets-pager]");
+    var empty = document.querySelector("[data-mobile-assets-empty]");
+    var list = (Array.isArray(assets) ? assets : []).slice(0, MOBILE_ASSET_LIMIT);
+    if (empty) empty.hidden = list.length > 0;
+    if (!pager) return null;
+    pager.hidden = list.length === 0;
+    pager.replaceChildren();
+    var normalizedSelected = normalizeSymbol(selectedSymbol);
+    list.forEach(function (asset, index) {
+      var symbol = normalizeSymbol(asset && (asset.rawSymbol || asset.symbol));
+      var selected = normalizedSelected ? symbol === normalizedSelected : index === 0;
+      pager.appendChild(createMobileAssetCard(asset, selected, index, list.length));
+    });
+    var root = document.getElementById("watch-assets");
+    if (root) {
+      root.dataset.contextState = frontendContract.normalizeModuleState(
+        moduleState,
+        list.length ? "READY" : "EMPTY"
+      ).toLowerCase();
+    }
+    var note = document.querySelector(".watch-limit-note");
+    if (note) note.textContent = list.length ? (list.length + " 个资产 · 横向切换") : "暂无可验证资产";
+    var searchToggle = document.querySelector("[data-asset-search-toggle]");
+    if (searchToggle) searchToggle.disabled = list.length === 0;
+    return selectedAssetCard();
+  }
+
+  function updateMobileFocus(asset, moduleState, requestedSymbol) {
+    var root = document.querySelector("[data-mobile-focus-root]");
+    if (!root) return;
+    var normalizedState = frontendContract.normalizeModuleState(
+      asset && asset.moduleState || moduleState,
+      "MISSING"
+    ).toLowerCase();
+    root.dataset.moduleState = normalizedState;
+    var values = {
+      symbol: asset && (asset.symbol || asset.rawSymbol) || requestedSymbol,
+      assetState: asset ? assetStateText(asset) : (normalizedState === "loading" ? "正在同步" : "当前不可查看"),
+      direction: asset && (asset.marketBiasLabel || asset.marketBias),
+      confidence: asset && (asset.confidenceLabel || asset.confidenceLevel),
+      risk: asset && (asset.riskLabel || asset.riskLevel),
+      dataQuality: asset ? frontendContract.dataQualityLabel(asset.dataQuality) : null
+    };
+    Object.keys(values).forEach(function (field) {
+      setText('[data-mobile-focus-field="' + field + '"]', values[field], "--");
+    });
+  }
+
+  function renderMobileSignalList(kind, items) {
+    var isAlert = kind === "alert";
+    var empty = document.querySelector(isAlert ? "[data-mobile-alert-empty]" : "[data-mobile-event-empty]");
+    var details = document.querySelector(isAlert ? "[data-mobile-alert-list]" : "[data-mobile-event-list]");
+    var list = (Array.isArray(items) ? items : []).slice(0, 2);
+    if (empty) {
+      empty.hidden = list.length > 0;
+      empty.textContent = isAlert ? "暂无高优先级告警" : "暂无高影响关键事件";
+    }
+    if (!details) return;
+    details.hidden = list.length === 0;
+    details.open = false;
+    details.replaceChildren();
+    if (!list.length) return;
+
+    var first = list[0] || {};
+    var summary = element("summary");
+    var summaryBody = element("span", "signal-summary");
+    var summaryLine = element("span", "signal-line");
+    summaryLine.appendChild(element("strong", "", text(
+      isAlert ? first.level : first.impactLevel,
+      "状态未知"
+    )));
+    summaryLine.appendChild(element("span", "", text(
+      isAlert ? first.symbol : first.timeWindow,
+      "--"
+    )));
+    summaryBody.appendChild(summaryLine);
+    summaryBody.appendChild(element("span", "", text(
+      isAlert ? first.message : first.label,
+      isAlert ? "暂无告警说明" : "暂无事件说明"
+    )));
+    summary.appendChild(summaryBody);
+    details.appendChild(summary);
+
+    var expanded = element("div", "signal-expanded");
+    list.forEach(function (item) {
+      var article = element("article");
+      var title = element("p");
+      title.appendChild(element("strong", "", text(
+        isAlert ? item.level : item.impactLevel,
+        "状态未知"
+      )));
+      title.appendChild(document.createTextNode(" · " + text(
+        isAlert ? item.symbol : item.label,
+        "--"
+      )));
+      article.appendChild(title);
+      article.appendChild(element("p", "", text(
+        isAlert ? item.message : item.type,
+        isAlert ? "暂无告警说明" : "事件类型未提供"
+      )));
+      article.appendChild(element("p", "", (isAlert ? "时间：" : "窗口：") + text(
+        isAlert ? item.time : item.timeWindow,
+        "--"
+      )));
+      expanded.appendChild(article);
+    });
+    details.appendChild(expanded);
+  }
+
+  function renderMobilePositions(positions, moduleState) {
+    var root = document.querySelector("[data-mobile-position-list]");
+    var empty = document.querySelector("[data-mobile-positions-empty]");
+    var list = (Array.isArray(positions) ? positions : []).slice(0, 3);
+    var state = frontendContract.normalizeModuleState(
+      moduleState,
+      list.length ? "READY" : "EMPTY"
+    ).toLowerCase();
+    if (empty) {
+      empty.hidden = list.length > 0;
+      empty.textContent = state === "error"
+        ? "持仓数据当前不可查看"
+        : (state === "missing" ? "持仓身份当前不可查看" : "暂无手动持仓");
+    }
+    if (!root) return;
+    root.hidden = list.length === 0;
+    root.replaceChildren();
+    list.forEach(function (position, index) {
+      var card = element("article", "position-card" + (index === 2 ? " position-third" : ""));
+      card.dataset.positionId = text(position.positionId, "");
+      card.dataset.moduleState = frontendContract.normalizeModuleState(
+        position.moduleState,
+        "PARTIAL"
+      ).toLowerCase();
+      var heading = element("div", "position-heading");
+      heading.appendChild(element("h3", "", text(position.symbol, "--")));
+      heading.appendChild(element("span", "", text(position.directionLabel || position.direction, "--")));
+      card.appendChild(heading);
+
+      var core = element("dl", "position-core position-summary");
+      appendDefinition(core, "入场价", position.entryPrice, false);
+      appendDefinition(core, "数量 / 杠杆", text(position.positionSize, "--") + " / " + text(position.leverage, "--"), false);
+      appendDefinition(core, "当前风险", position.riskLevelLabel || position.riskLevel, false);
+      appendDefinition(core, "告警", position.warningState, false);
+      appendDefinition(core, "止损", position.userStopLoss, false);
+      appendDefinition(core, "止盈", position.userTakeProfit, false);
+      appendDefinition(core, "逻辑状态", position.entryLogicStatusLabel || position.entryLogicStatus, true);
+      card.appendChild(core);
+
+      var more = element("details", "position-details");
+      more.appendChild(element("summary", "", "更多监控状态"));
+      var moreList = element("dl", "definition-list");
+      appendDefinition(moreList, "方向支持", position.directionSupportStatusLabel || position.directionSupportStatus, false);
+      appendDefinition(moreList, "反转状态", position.reversalStatusLabel || position.reversalStatus, false);
+      appendDefinition(moreList, "当前建议", position.suggestedManualActionText || position.suggestedManualAction, true);
+      appendDefinition(moreList, "更新时间", frontendContract.formatBusinessTimeCompact(position.updatedAt), true);
+      more.appendChild(moreList);
+      card.appendChild(more);
+      root.appendChild(card);
+    });
+  }
+
+  function applyMobileHomePayload(home) {
+    var safeHome = home || {};
+    var states = safeHome.states || {};
+    var selectedSymbol = normalizeSymbol(
+      safeHome.selectedSymbol
+        || (safeHome.assets && safeHome.assets[0]
+          && (safeHome.assets[0].rawSymbol || safeHome.assets[0].symbol))
+        || ""
+    );
+    window.__lastDashboardHome = safeHome;
+    renderMobileAssets(safeHome.assets, selectedSymbol, states.assets);
+    updateMobileStatusProjection(safeHome.systemState, safeHome.header);
+    var selectedCard = syncMobileAssetContext(safeHome, selectedSymbol);
+    renderMobileSignalList("alert", safeHome.alerts);
+    renderMobileSignalList("event", safeHome.events);
+    renderMobilePositions(safeHome.positions, states.positions);
+    updateExecution(safeHome.executionSuggestion, matchingAsset(safeHome.assets, selectedSymbol), selectedCard);
+    updateAi(safeHome.aiDecision);
+    updateSelectedSymbolUrl(selectedSymbol);
+    setWatchActionStatus("");
+    var homeRoot = document.querySelector("[data-mobile-home-root]");
+    if (homeRoot) {
+      homeRoot.dataset.homeState = frontendContract.normalizeModuleState(
+        states.overall || (safeHome.header && safeHome.header.dataStatus),
+        "PARTIAL"
+      ).toLowerCase();
+      homeRoot.removeAttribute("aria-busy");
+    }
+  }
+
+  async function loadInitialMobileHome() {
+    var homeRoot = document.querySelector("[data-mobile-home-root]");
+    var requestedSymbol = frontendContract.readUrlParam("selectedSymbol")
+      || (selectedAssetCard() && selectedAssetCard().dataset.symbol)
+      || "";
+    window.__lastRequestedMobileSymbol = requestedSymbol;
+    if (homeRoot) homeRoot.setAttribute("aria-busy", "true");
+    updateMobileFocus(null, "LOADING", requestedSymbol);
+    try {
+      var query = new URLSearchParams({ limit: String(MOBILE_ASSET_LIMIT) });
+      if (requestedSymbol) query.set("selectedSymbol", requestedSymbol);
+      var response = await fetch("/api/dashboard/home?" + query.toString(), {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) throw new Error("HOME_REQUEST_FAILED");
+      var envelope = await response.json();
+      var parsed = frontendContract.parseApiEnvelope(envelope);
+      if (!parsed.ok) throw new Error("HOME_RESPONSE_INVALID");
+      applyMobileHomePayload(parsed.data);
+      return parsed.data;
+    } catch (error) {
+      window.__lastDashboardHome = null;
+      renderMobileAssets([], requestedSymbol, "ERROR");
+      renderMobileSignalList("alert", []);
+      renderMobileSignalList("event", []);
+      renderMobilePositions([], "ERROR");
+      failClosedAfterLoadError(requestedSymbol, "error");
+      if (homeRoot) {
+        homeRoot.dataset.homeState = "error";
+        homeRoot.removeAttribute("aria-busy");
+      }
+      return null;
+    }
+  }
+
   function setMobileRetryVisible(visible) {
     var button = document.querySelector("[data-home-retry]");
     if (button) button.hidden = !visible;
@@ -241,6 +561,7 @@
     if (statusRoot) statusRoot.dataset.contextState = contextState;
     var assetRoot = document.getElementById("watch-assets");
     if (assetRoot) assetRoot.dataset.contextState = contextState;
+    updateMobileFocus(null, contextState, symbol);
     setText("[data-selected-asset-token]", selectedCard ? selectedCard.dataset.symbol : symbol, "--");
     updateAssetDetailLink(null);
     updateSelectedSymbolUrl(symbol);
@@ -263,7 +584,9 @@
       ).toLowerCase();
     }
     setMobileRetryVisible(false);
-    return setSelectedAsset(selectedSymbol);
+    var selectedCard = setSelectedAsset(selectedSymbol);
+    updateMobileFocus(matchingAsset(assets, selectedSymbol), assetRoot && assetRoot.dataset.contextState, selectedSymbol);
+    return selectedCard;
   }
 
   function worthOpeningText(asset, card) {
@@ -400,8 +723,60 @@
     if (!root) return;
     root.replaceChildren();
     var orderedTabs = frontendContract.normalizeAiTabs(tabs);
-    orderedTabs.forEach(function (tab) {
-      root.appendChild(createRoleSummaryCard(tab));
+    var tabList = element("div", "mobile-ai-role-tabs");
+    tabList.setAttribute("role", "tablist");
+    tabList.setAttribute("aria-label", "AI 三角色摘要");
+    var panels = element("div", "mobile-ai-role-panels");
+    var buttons = [];
+    orderedTabs.forEach(function (tab, index) {
+      var button = element(
+        "button",
+        "mobile-ai-role-tab",
+        tab.role === "GPT_FINAL" ? "GPT Final" : (tab.role === "GEMINI_REVIEW" ? "Gemini Review" : "Grok Challenge")
+      );
+      button.type = "button";
+      button.id = "mobile-home-ai-tab-" + tab.role;
+      button.dataset.homeAiTab = tab.role;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(index === 0));
+      button.setAttribute("aria-controls", "mobile-home-ai-panel-" + tab.role);
+      button.tabIndex = index === 0 ? 0 : -1;
+      tabList.appendChild(button);
+      buttons.push(button);
+
+      var panel = createRoleSummaryCard(tab);
+      panel.id = "mobile-home-ai-panel-" + tab.role;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", button.id);
+      panel.tabIndex = 0;
+      panel.hidden = index !== 0;
+      panels.appendChild(panel);
+    });
+    root.appendChild(tabList);
+    root.appendChild(panels);
+
+    function activate(role, focus) {
+      buttons.forEach(function (button) {
+        var selected = button.dataset.homeAiTab === role;
+        button.setAttribute("aria-selected", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+        if (selected && focus) button.focus();
+      });
+      panels.querySelectorAll("[data-ai-role-summary]").forEach(function (panel) {
+        panel.hidden = panel.dataset.aiRoleSummary !== role;
+      });
+    }
+    buttons.forEach(function (button, index) {
+      button.addEventListener("click", function () {
+        activate(button.dataset.homeAiTab, false);
+      });
+      button.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        event.preventDefault();
+        var offset = event.key === "ArrowRight" ? 1 : -1;
+        var next = buttons[(index + offset + buttons.length) % buttons.length];
+        activate(next.dataset.homeAiTab, true);
+      });
     });
   }
 
@@ -629,17 +1004,28 @@
     } else {
       delete card.dataset.directionLabel;
     }
+    var confidenceLabel = asset && (asset.confidenceLabel || asset.confidenceLevel);
+    var riskLabel = asset && (asset.riskLabel || asset.riskLevel);
+    if (frontendContract.hasText(confidenceLabel)) card.dataset.confidenceLabel = String(confidenceLabel);
+    else delete card.dataset.confidenceLabel;
+    if (frontendContract.hasText(riskLabel)) card.dataset.riskLabel = String(riskLabel);
+    else delete card.dataset.riskLabel;
+    if (asset && frontendContract.hasText(asset.dataQuality)) card.dataset.qualityLabel = String(asset.dataQuality);
+    else delete card.dataset.qualityLabel;
   }
 
   async function selectAsset(symbol, sourceCard) {
     if (!symbol) return;
+    window.__lastRequestedMobileSymbol = symbol;
     requestSequence += 1;
     var sequence = requestSequence;
     if (activeRequest) activeRequest.abort();
     var request = new AbortController();
     activeRequest = request;
-    sourceCard.dataset.requestSequence = String(sequence);
-    sourceCard.setAttribute("aria-busy", "true");
+    if (sourceCard) {
+      sourceCard.dataset.requestSequence = String(sequence);
+      sourceCard.setAttribute("aria-busy", "true");
+    }
     setMobileRetryVisible(false);
     clearMobileAssetContext(symbol, "loading", "正在同步");
     setWatchActionStatus("正在同步当前资产上下文。");
@@ -679,6 +1065,7 @@
       }
       var selectedCard = syncMobileAssetContext(parsed.data, selectedSymbol);
       syncCardNavigationIdentity(selectedCard, selectedAsset);
+      window.__lastDashboardHome = parsed.data;
       updateSelectedSymbolUrl(selectedSymbol);
       setWatchActionStatus("");
       updateExecution(parsed.data.executionSuggestion, selectedAsset, selectedCard);
@@ -688,7 +1075,7 @@
         failClosedAfterLoadError(symbol, "error");
       }
     } finally {
-      if (sourceCard.dataset.requestSequence === String(sequence)) {
+      if (sourceCard && sourceCard.dataset.requestSequence === String(sequence)) {
         sourceCard.removeAttribute("aria-busy");
         delete sourceCard.dataset.requestSequence;
       }
@@ -697,20 +1084,24 @@
   }
 
   function bindAssetPager() {
-    var cards = assetCards();
-    cards.forEach(function (card, index) {
-      card.addEventListener("click", function () {
-        selectAsset(card.dataset.symbol, card);
-      });
-      card.addEventListener("keydown", function (event) {
-        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-        event.preventDefault();
-        var offset = event.key === "ArrowRight" ? 1 : -1;
-        var next = cards[(index + offset + cards.length) % cards.length];
-        next.focus({ preventScroll: true });
-        keepAssetCardVisible(next, "smooth");
-        selectAsset(next.dataset.symbol, next);
-      });
+    var pager = document.querySelector("[data-mobile-assets-pager]");
+    if (!pager) return;
+    pager.addEventListener("click", function (event) {
+      var card = event.target.closest(".asset-select");
+      if (card && pager.contains(card)) selectAsset(card.dataset.symbol, card);
+    });
+    pager.addEventListener("keydown", function (event) {
+      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+      var cards = assetCards();
+      var current = event.target.closest(".asset-select");
+      var index = cards.indexOf(current);
+      if (index < 0 || !cards.length) return;
+      event.preventDefault();
+      var offset = event.key === "ArrowRight" ? 1 : -1;
+      var next = cards[(index + offset + cards.length) % cards.length];
+      next.focus({ preventScroll: true });
+      keepAssetCardVisible(next, "smooth");
+      selectAsset(next.dataset.symbol, next);
     });
   }
 
@@ -719,9 +1110,11 @@
     if (!button) return;
     button.addEventListener("click", function () {
       var selected = selectedAssetCard();
-      if (!selected || !selected.dataset.symbol) return;
       button.disabled = true;
-      Promise.resolve(selectAsset(selected.dataset.symbol, selected)).finally(function () {
+      var retry = selected && selected.dataset.symbol
+        ? selectAsset(selected.dataset.symbol, selected)
+        : loadInitialMobileHome();
+      Promise.resolve(retry).finally(function () {
         button.disabled = false;
       });
     });
@@ -737,15 +1130,10 @@
     var panel = document.getElementById("mobile-asset-search");
     var input = document.querySelector("[data-asset-search-input]");
     var results = document.querySelector("[data-asset-search-results]");
-    var cards = assetCards();
-
-    if (cards.length === 0) {
-      if (toggle) toggle.disabled = true;
-      return;
-    }
 
     function renderSearchResults(query) {
       if (!results) return;
+      var cards = assetCards();
       var normalizedQuery = normalizeSymbol(query);
       var matches = cards.filter(function (card) {
         return normalizeSymbol(card.dataset.symbol).includes(normalizedQuery);
@@ -936,6 +1324,10 @@
     bindAiRoleTabs();
     updateAi(initialAiDecisionFromHome());
     bindNavigation();
+    var homeRoot = document.querySelector("[data-mobile-home-root]");
+    if (homeRoot && homeRoot.hasAttribute("data-client-home-bootstrap")) {
+      loadInitialMobileHome();
+    }
   }
 
   if (document.readyState === "loading") {

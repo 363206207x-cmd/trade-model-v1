@@ -81,6 +81,10 @@ class Fe04ShellHomeDashboardContractTest {
     @Test
     void assetContextRefreshUpdatesExecutionAndAiWithoutRenderingPositions() throws Exception {
         String mobileScript = Files.readString(MOBILE_SCRIPT);
+        String mobileContextRefresh = slice(
+                mobileScript,
+                "async function selectAsset(symbol, sourceCard)",
+                "function bindAssetPager()");
         String desktop = Files.readString(DESKTOP);
         String desktopPayload = slice(
                 desktop,
@@ -95,7 +99,7 @@ class Fe04ShellHomeDashboardContractTest {
                 "function renderAssetContextUnavailable(contextState)",
                 "function fetchDashboardHome(");
 
-        assertThat(mobileScript)
+        assertThat(mobileContextRefresh)
                 .contains("updateExecution(parsed.data.executionSuggestion, selectedAsset, selectedCard)")
                 .contains("updateAi(parsed.data.aiDecision)")
                 .doesNotContain("position-list")
@@ -189,8 +193,8 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("<a href=\"/dashboard/mobile/positions\" data-position-nav>持仓</a>")
                 .doesNotContain("data-position-nav data-unavailable-nav");
         assertThat(desktop)
-                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">Position</a>")
-                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">Position");
+                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">持仓</a>")
+                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">持仓");
     }
 
     @Test
