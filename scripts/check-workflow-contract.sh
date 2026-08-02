@@ -236,7 +236,7 @@ require_contains "docs/CODEX_NEXT_TASK.yml" "next_task_authorization_conditions:
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_repository_edits_allowed: false"
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_allowed: false"
 require_contains "docs/CODEX_NEXT_TASK.yml" "p1a_implementation_pr_allowed: false"
-require_contains "docs/CODEX_NEXT_TASK.yml" "p1b_authorization_status: \"EFFECTIVE_PENDING_MERGED_MAIN\""
+require_contains "docs/CODEX_NEXT_TASK.yml" "p1b_authorization_status: \"EFFECTIVE_MERGED_MAIN\""
 require_contains "docs/CODEX_NEXT_TASK.yml" "current_package_phase:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "current_package_mode:"
 require_contains "docs/CODEX_NEXT_TASK.yml" "authorized_next_package_phase:"
@@ -285,8 +285,12 @@ require_contains "docs/PRODUCT_ROADMAP_V2.md" "P1A — Home Alignment Readiness 
 require_contains "docs/PRODUCT_ROADMAP_V2.md" "P1B — Home Alignment First Implementation"
 require_file "docs/P1A_HOME_ALIGNMENT_AUDIT.md"
 require_file "docs/P1B_AUTHORIZATION_SCOPE.md"
+require_file "docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md"
 require_contains "docs/P1A_HOME_ALIGNMENT_AUDIT.md" "P1A_COMPLETION_STATUS: COMPLETED"
 require_contains "docs/P1B_AUTHORIZATION_SCOPE.md" "HOME_READ_PROJECTION_ONLY"
+require_contains "docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md" "P1B_HOME_CORE_DATA_COMPLETION"
+require_contains "docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md" "Seven-Field Primary Card Body"
+require_contains "docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md" "Four-Field Secondary Status Strip"
 require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
@@ -335,6 +339,9 @@ p1a_repository_edits_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_reposito
 p1a_implementation_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_allowed)"
 p1a_implementation_pr_allowed="$(yaml_value docs/CODEX_NEXT_TASK.yml p1a_implementation_pr_allowed)"
 p1b_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_authorization_status)"
+p1b_1_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_1_status)"
+home_core_data_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_home_core_data_authorization_status)"
+home_core_data_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p1b_home_core_data_implementation_status)"
 current_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_phase)"
 current_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_mode)"
 current_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_status)"
@@ -358,31 +365,35 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ -n "$current_task_mode" ]] || fail "current_task_mode must be declared"
 [[ -n "$authorized_next_task_mode" ]] || fail "authorized_next_task_mode must be declared"
 [[ "$current_task_mode" != "$authorized_next_task_mode" ]] || fail "current and authorized next task modes must remain distinct"
-[[ "$current_task_mode" == "AUTHORIZATION_FLOW_REMEDIATION_ONLY" ]] || fail "current task mode must remain authorization-only"
+[[ "$current_task_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || fail "current task mode must remain bounded product authorization"
 [[ "$authorized_next_task_mode" == "IMPLEMENTATION" ]] || fail "authorized next task mode must be IMPLEMENTATION"
 [[ "$p1a_repository_edits_allowed" == "false" ]] || fail "P1A repository edits must remain false"
 [[ "$p1a_implementation_allowed" == "false" ]] || fail "P1A implementation must remain false"
 [[ "$p1a_implementation_pr_allowed" == "false" ]] || fail "P1A implementation PR creation must remain false"
-[[ "$p1b_authorization_status" == "EFFECTIVE_PENDING_MERGED_MAIN" ]] || fail "P1B authorization must remain pending merged-main effectivity"
+[[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "P1B-1 authorization must be effective on merged main"
+[[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "P1B-1 predecessor must be effective on merged main"
+[[ "$home_core_data_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Home Core Data authorization must remain pending merged-main effectivity"
+[[ "$home_core_data_implementation_status" == "NOT_STARTED" ]] || fail "Home Core Data implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "P1A_HOME_ALIGNMENT_READINESS_AND_GAP_AUDIT" && "$current_package_status" == "COMPLETED" ]] || fail "P1A completion declaration mismatch"
+[[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Home Core Data authorization declaration mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]] || fail "authorized next package phase mismatch"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized P1B repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized P1B implementation must be true"
 [[ "$authorized_next_package_pr" == "true" ]] || fail "authorized P1B PR creation must be true"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "HOME_READ_PROJECTION_ONLY" ]] || fail "P1B scope must remain HOME_READ_PROJECTION_ONLY"
+[[ "$p1b_scope" == "HOME_CORE_DATA_READ_ONLY" ]] || fail "P1B scope must remain HOME_CORE_DATA_READ_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
   P0_EFFECTIVE_MERGED_MAIN \
   P1A_AUDIT_COMPLETED \
-  P1B_SCOPE_APPROVED \
-  P1B_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
+  P1B_1_EFFECTIVE_MERGED_MAIN \
+  P1B_HOME_CORE_DATA_SCOPE_APPROVED \
+  P1B_HOME_CORE_DATA_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   LOCAL_ORIGIN_MAIN_MATCH \
   PRODUCT_SOURCE_GATE_PASS \
   CLEAN_WORKTREE \
@@ -413,8 +424,9 @@ assert_handoff_blocked() {
   local scenario="$1"
   local expected_reason="$2"
   local output status
+  shift 2
   set +e
-  output="$(run_handoff_scenario "$scenario" 2>&1)"
+  output="$(run_handoff_scenario "$scenario" "$@" 2>&1)"
   status=$?
   set -e
   [[ "$status" -ne 0 ]] || fail "handoff scenario must be blocked: $scenario"
@@ -428,18 +440,18 @@ assert_handoff_blocked() {
 
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
-  || fail "authorization handoff did not resolve the current P1A package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_AUTHORIZATION_REMEDIATION_REVIEW" \
+  || fail "authorization handoff did not resolve the current Home Core Data authorization package"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_HOME_CORE_DATA_AUTHORIZATION_REVIEW" \
   || fail "authorization remediation stage mismatch"
 printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep P1B blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_HOME_CORE_DATA_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "ready authorization did not resolve final merge path"
 
-assert_handoff_blocked p1a_incomplete BLOCKED_P1A_AUDIT_INCOMPLETE
-assert_handoff_blocked authorization_pending_request_p1b BLOCKED_PENDING_P1B_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked predecessor_incomplete BLOCKED_P1B_1_NOT_EFFECTIVE_MERGED_MAIN
+assert_handoff_blocked authorization_pending_request_p1b BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN
 assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH
 
 p1b_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
@@ -449,6 +461,8 @@ for p1b_expected in \
   "REQUESTED_PACKAGE: $authorized_next_package_phase" \
   "AUTHORIZATION_STATUS: APPROVED" \
   "P1B_AUTHORIZATION_RUNTIME_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "P1B_HOME_CORE_DATA_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "P1B_HOME_CORE_DATA_COMPLETION_STATUS: NOT_STARTED" \
   "RESOLVED_PACKAGE: $authorized_next_package_phase" \
   "RESOLVED_MODE: IMPLEMENTATION" \
   "RESOLVED_EDIT_PERMISSION: true" \
@@ -459,8 +473,16 @@ for p1b_expected in \
     || fail "P1B handoff omitted: $p1b_expected"
 done
 
-assert_handoff_blocked p1b_unauthorized BLOCKED_P1B_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked p1b_permission_missing BLOCKED_P1B_IMPLEMENTATION_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked p1b_unauthorized BLOCKED_HOME_CORE_DATA_SCOPE_NOT_AUTHORIZED
+assert_handoff_blocked p1b_permission_missing BLOCKED_HOME_CORE_DATA_IMPLEMENTATION_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
+  --request-package P1B_HOME_CORE_DATA_COMPLETION_WRONG
+assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
+  --request-package P1B_THREE_AI_EVIDENCE_PACKAGE
+assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
+  --request-package P1B_NOTIFICATION_IMPLEMENTATION
+assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
+  --request-package P1B_TRADING_IMPLEMENTATION
 assert_handoff_blocked conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR
 assert_handoff_blocked dirty_worktree BLOCKED_WORKTREE_DIRTY
 assert_handoff_blocked product_source_failure BLOCKED_PRODUCT_SOURCE_GATE
@@ -536,9 +558,9 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: P1B_HOME_CORE_DATA_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "authorization final gate stage mismatch"
-assert_chain_blocked P1A_INCOMPLETE p1a_incomplete BLOCKED_P1A_AUDIT_INCOMPLETE \
+assert_chain_blocked P1B_1_INCOMPLETE predecessor_incomplete BLOCKED_P1B_1_NOT_EFFECTIVE_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
   SUCCESSOR_PACKAGE IMPLEMENTATION GH_QUERY --request-package "$authorized_next_package_phase"
@@ -555,11 +577,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked P1B_PERMISSION_MISSING p1b_permission_missing BLOCKED_P1B_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked P1B_PERMISSION_MISSING p1b_permission_missing BLOCKED_HOME_CORE_DATA_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked P1B_BEFORE_AUTHORIZATION authorization_pending_request_p1b BLOCKED_PENDING_P1B_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked P1B_BEFORE_AUTHORIZATION authorization_pending_request_p1b BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked P1B_UNAUTHORIZED p1b_unauthorized BLOCKED_P1B_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked P1B_UNAUTHORIZED p1b_unauthorized BLOCKED_HOME_CORE_DATA_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -597,15 +619,15 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked P1A_INCOMPLETE p1a_incomplete BLOCKED_P1A_AUDIT_INCOMPLETE \
+assert_outer_blocked P1B_1_INCOMPLETE predecessor_incomplete BLOCKED_P1B_1_NOT_EFFECTIVE_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
 assert_outer_allowed P1B_AUTHORIZATION_EFFECTIVE authorization_merged_validated IMPLEMENTATION \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked P1B_PERMISSION_MISSING p1b_permission_missing BLOCKED_P1B_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked P1B_PERMISSION_MISSING p1b_permission_missing BLOCKED_HOME_CORE_DATA_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked P1B_PENDING_MERGE authorization_pending_request_p1b BLOCKED_PENDING_P1B_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked P1B_PENDING_MERGE authorization_pending_request_p1b BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked P1B_UNAUTHORIZED p1b_unauthorized BLOCKED_P1B_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked P1B_UNAUTHORIZED p1b_unauthorized BLOCKED_HOME_CORE_DATA_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \

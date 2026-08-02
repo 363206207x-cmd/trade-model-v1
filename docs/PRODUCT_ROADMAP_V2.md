@@ -125,7 +125,9 @@ Every phase uses four distinct task modes. They cannot be combined to turn an au
 
 #### P1B-1 Authorization
 
-**Status:** `EFFECTIVE_PENDING_MERGED_MAIN`.
+**Status:** `EFFECTIVE_MERGED_MAIN`. The bounded P1B-1 implementation is
+effective on merged main through PR #1159 / commit
+`458c7fe49a9eee929fa90ad2de2d9d10ad86adb2`.
 
 **Authorization record:** `docs/P1B_AUTHORIZATION_SCOPE.md`.
 
@@ -136,14 +138,10 @@ endpoint and JSON shape remain unchanged. No trading, position mutation, AI,
 score, notification, Telegram, schema, or ExecutionPlan/PositionMonitor state
 machine change is authorized.
 
-**Effectivity:** this candidate status is not implementation authorization on
-its branch. P1B-1 may start only after the authorization package is
-independently reviewed, merged to clean/synced `main`, and recognized by the
-runtime task gate. At that point a request for
-`P1B_HOME_ALIGNMENT_FIRST_IMPLEMENTATION` resolves to `IMPLEMENTATION` with
-repository-edit, implementation, and implementation-PR permissions enabled.
-Before merged-main effectivity, the same request remains blocked. This does not
-mark P1B-1 implemented.
+**Effectivity:** the authorization and bounded implementation have both passed
+their independent merged-main gates. This proves only P1B-1 projection
+separation; it does not complete the remaining Home core-data fields, exact
+plan identity, Top3 projection, six-state behavior, or full Home acceptance.
 
 **Input:** accepted P1A artifacts and explicit bounded P1B authorization effective on merged main.
 
@@ -160,6 +158,34 @@ mark P1B-1 implemented.
 **Real scenario requirement:** at least two real assets with different plan/AI contexts, one partial-data asset, and one forced read failure; selection must update linked regions without navigating or changing a position.
 
 **Exit criteria:** all authorized Home acceptance items pass in a separate validation; screenshots and payload traces are archived; no unsupported field shown; the exact reviewed Head is merged and effective on main.
+
+#### P1B Home Core Data Authorization
+
+**Status:** `AUTHORIZED_PENDING_MERGED_MAIN`.
+
+**Authorization record:** `docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md`.
+
+**Product decision:** an Asset Card retains seven primary business fields and
+may add a visually subordinate four-field status strip for `dataQuality`,
+`multiTimeframeState`, `Confused`, and `updatedAt`. Supporting metadata does
+not replace or outrank the primary fields.
+
+**Bounded implementation scope after effectivity:** complete the Asset Card
+read projection and source classifications, connect exact persisted
+ExecutionPlan identity without latest/symbol/timeframe inference, expose
+owner-scoped independent Top3 UserPosition data, and complete module-local
+LOADING/READY/PARTIAL/EMPTY/ERROR/MISSING plus retry/stale-context handling.
+
+**Effectivity:** this authorization is not effective on its branch. Before it
+is merged and validated on clean/synced `main`, a request for
+`P1B_HOME_CORE_DATA_COMPLETION` must remain blocked with repository edits,
+implementation, and PR creation disabled. After merged-main effectivity, the
+exact request may resolve to `IMPLEMENTATION` with those permissions enabled.
+The implementation package remains `NOT_STARTED`.
+
+**Blocked scope:** Three AI Evidence Package, AI provider/model expansion,
+Score redesign, notification, Telegram, UserPosition mutation, order/trading,
+broad schema change, guessed plan identity, and PR #1156 recovery content.
 
 ## P2 — Position and Position Monitoring
 

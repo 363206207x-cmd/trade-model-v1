@@ -157,6 +157,21 @@ Home passes only when all of the following are demonstrated:
 10. Loading, Empty, Error, Partial, Missing, stale cache, and retry behave independently.
 11. Desktop/mobile screenshots and interaction evidence exist.
 12. At least two real assets and one failure/partial case pass.
+13. Each Asset Card preserves the seven-field primary body: symbol, latest
+    price, direction, score, confidence, asset risk, and AssetState.
+14. `dataQuality`, `multiTimeframeState`, `Confused`, and `updatedAt` may
+    appear only in a subordinate status strip or disclosure; each value has a
+    truthful source classification and never replaces or visually outranks a
+    primary field.
+15. ExecutionPlan is loaded through an exact persisted identity from the
+    selected decision. Latest, symbol, timeframe, and fuzzy-analysis fallback
+    selection are forbidden, and missing/mismatched/incomplete plans fail
+    closed.
+16. Top3 uses authenticated owner-scoped UserPosition only, remains
+    independent of selected asset context, and never uses `tm_real_position`.
+17. LOADING, READY, PARTIAL, EMPTY, ERROR, and MISSING may coexist across Home
+    modules; an asset-context failure clears stale asset data while retaining
+    independent UserPosition data.
 
 ## 4. Position and Position Monitor Acceptance
 
