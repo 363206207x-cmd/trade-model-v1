@@ -1,0 +1,1149 @@
+{
+  "title": "P1B Home Final Product UI Visual Acceptance",
+  "generatedAt": "2026-08-03T07:08:06Z",
+  "source": "Real dashboard templates served by scripts/dashboard-visual-acceptance-fixture.py; production defaults unchanged.",
+  "desktop": [
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "true",
+      "focusRisk": "低",
+      "focusState": "ready",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-complete-light",
+      "order": {
+        "ai": 1761.7734375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 859.4765625,
+        "positions": 859.4765625,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "ready",
+      "planStatus": "资产执行计划，仅供人工复核",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "normal",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-complete-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "true",
+      "focusRisk": "低",
+      "focusState": "ready",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-complete-dark",
+      "order": {
+        "ai": 1761.7734375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 859.4765625,
+        "positions": 859.4765625,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "ready",
+      "planStatus": "资产执行计划，仅供人工复核",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "normal",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "dark",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-complete-dark.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "false",
+      "focusRisk": "低",
+      "focusState": "partial",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-partial-light",
+      "order": {
+        "ai": 1761.7734375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 859.4765625,
+        "positions": 859.4765625,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "partial",
+      "planStatus": "当前暂无完整执行计划",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "partial",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-partial-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 0,
+      "auxFieldsPresent": false,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": false,
+      "exactPlanVisible": "false",
+      "focusRisk": "--",
+      "focusState": "missing",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-missing-light",
+      "order": {
+        "ai": 1590.984375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 688.6875,
+        "positions": 688.6875,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "missing",
+      "planStatus": "当前不可查看",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "missing",
+      "selectedState": null,
+      "selectedSymbol": null,
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-missing-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "true",
+      "focusRisk": "高",
+      "focusState": "ready",
+      "focusSymbol": "BNB/USDT",
+      "name": "desktop-confused-high-risk-light",
+      "order": {
+        "ai": 1761.7734375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 859.4765625,
+        "positions": 859.4765625,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "ready",
+      "planStatus": "资产执行计划，仅供人工复核",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "normal",
+      "selectedState": "confused",
+      "selectedSymbol": "BNBUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-confused-high-risk-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "false",
+      "focusRisk": "低",
+      "focusState": "ready",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-plan-unavailable-light",
+      "order": {
+        "ai": 1061.7734375,
+        "assets": -203.3125,
+        "focus": -620,
+        "plan": 159.4765625,
+        "positions": 159.4765625,
+        "signals": -389.203125
+      },
+      "orderPass": true,
+      "planState": "missing",
+      "planStatus": "当前暂无完整执行计划",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "plan-missing",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-plan-unavailable-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "true",
+      "focusRisk": "低",
+      "focusState": "ready",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-top3-positions-light",
+      "order": {
+        "ai": 1061.7734375,
+        "assets": -203.3125,
+        "focus": -620,
+        "plan": 159.4765625,
+        "positions": 159.4765625,
+        "signals": -389.203125
+      },
+      "orderPass": true,
+      "planState": "ready",
+      "planStatus": "资产执行计划，仅供人工复核",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "top3-independent",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-top3-positions-light.jpg"
+    },
+    {
+      "aiRoles": 3,
+      "assetCount": 6,
+      "auxFieldsPresent": true,
+      "bodyNoOverflow": true,
+      "coreFieldsPresent": true,
+      "exactPlanVisible": "true",
+      "focusRisk": "低",
+      "focusState": "ready",
+      "focusSymbol": "BTC/USDT",
+      "name": "desktop-viewport-1440x1000-light",
+      "order": {
+        "ai": 1761.7734375,
+        "assets": 496.6875,
+        "focus": 80,
+        "plan": 859.4765625,
+        "positions": 859.4765625,
+        "signals": 310.796875
+      },
+      "orderPass": true,
+      "planState": "ready",
+      "planStatus": "资产执行计划，仅供人工复核",
+      "positionCount": 3,
+      "positionIds": [
+        "9001",
+        "9002",
+        "9003"
+      ],
+      "reducedMotionRule": true,
+      "rootNoOverflow": true,
+      "scenario": "normal",
+      "selectedState": "observing",
+      "selectedSymbol": "BTCUSDT",
+      "theme": "light",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/desktop-viewport-1440x1000-light.jpg"
+    }
+  ],
+  "mobile": [
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "高",
+        "dataQuality": "良好",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "ready",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "ready",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 227.9140625
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 345.921875
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 593.9453125
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 827.0078125
+        },
+        {
+          "selector": "#ai-review",
+          "top": 1701.9140625
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 440,
+        "html": false,
+        "htmlWidth": 440
+      },
+      "plan": {
+        "direction": "BULLISH",
+        "status": "资产执行计划，仅供人工复核",
+        "visible": "true"
+      },
+      "firstScreen": {
+        "entryBottom": 762.0078125,
+        "executionDisclosureBottom": 816.0078125,
+        "navigationTop": 880,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 3,
+      "positionDomCount": 3,
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "ready",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "light",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 956,
+        "width": 440
+      },
+      "name": "iphone-large-complete-light",
+      "scenario": "normal",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-large-complete-light.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "高",
+        "dataQuality": "良好",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "ready",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "ready",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 227.9140625
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 345.921875
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 593.9453125
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 827.0078125
+        },
+        {
+          "selector": "#ai-review",
+          "top": 1701.9140625
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 440,
+        "html": false,
+        "htmlWidth": 440
+      },
+      "plan": {
+        "direction": "BULLISH",
+        "status": "资产执行计划，仅供人工复核",
+        "visible": "true"
+      },
+      "firstScreen": {
+        "entryBottom": 762.0078125,
+        "executionDisclosureBottom": 816.0078125,
+        "navigationTop": 880,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 3,
+      "positionDomCount": 3,
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "ready",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "dark",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 956,
+        "width": 440
+      },
+      "name": "iphone-large-complete-dark",
+      "scenario": "normal",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-large-complete-dark.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "高",
+        "dataQuality": "良好",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "ready",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "ready",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 227.9140625
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 345.921875
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 608.9453125
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 849.0078125
+        },
+        {
+          "selector": "#ai-review",
+          "top": 1464.6328125
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 428,
+        "html": false,
+        "htmlWidth": 428
+      },
+      "plan": {
+        "direction": "BULLISH",
+        "status": "资产执行计划，仅供人工复核",
+        "visible": "true"
+      },
+      "firstScreen": {
+        "entryBottom": 784.0078125,
+        "executionDisclosureBottom": 838.0078125,
+        "navigationTop": 850,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 2,
+      "positionDomCount": 3,
+      "positionEvidence": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-top2-positions-light.jpg",
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "ready",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "light",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 926,
+        "width": 428
+      },
+      "name": "iphone-12-pro-max-complete-light",
+      "scenario": "normal",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-complete-light.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "高",
+        "dataQuality": "良好",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "ready",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "ready",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 227.9140625
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 345.921875
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 608.9453125
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 849.0078125
+        },
+        {
+          "selector": "#ai-review",
+          "top": 1464.6328125
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 428,
+        "html": false,
+        "htmlWidth": 428
+      },
+      "plan": {
+        "direction": "BULLISH",
+        "status": "资产执行计划，仅供人工复核",
+        "visible": "true"
+      },
+      "firstScreen": {
+        "entryBottom": 784.0078125,
+        "executionDisclosureBottom": 838.0078125,
+        "navigationTop": 850,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 2,
+      "positionDomCount": 3,
+      "positionEvidence": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-top2-positions-dark.jpg",
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "ready",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "dark",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 926,
+        "width": 428
+      },
+      "name": "iphone-12-pro-max-complete-dark",
+      "scenario": "normal",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-complete-dark.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "低",
+        "dataQuality": "数据不足",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "partial",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "partial",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 341
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 484
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 902
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 1386
+        },
+        {
+          "selector": "#ai-review",
+          "top": 2558
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 440,
+        "html": false,
+        "htmlWidth": 440
+      },
+      "plan": {
+        "direction": "--",
+        "status": "当前暂无完整执行计划",
+        "visible": "false"
+      },
+      "positionCount": 3,
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "partial",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "light",
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=partial&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 956,
+        "width": 440
+      },
+      "name": "iphone-large-partial-light",
+      "scenario": "partial",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-large-partial-light.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 0,
+      "assetCoreFields": 2,
+      "assetCount": 0,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "当前不可查看",
+        "confidence": "--",
+        "dataQuality": "--",
+        "direction": "--",
+        "risk": "--",
+        "symbol": "BTCUSDT"
+      },
+      "focusState": "missing",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "missing",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 59
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 341
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 484
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 683
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 1168
+        },
+        {
+          "selector": "#ai-review",
+          "top": 2340
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 440,
+        "html": false,
+        "htmlWidth": 440
+      },
+      "plan": {
+        "direction": "--",
+        "status": "当前不可查看",
+        "visible": "false"
+      },
+      "positionCount": 3,
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": null,
+        "state": null,
+        "symbol": null
+      },
+      "theme": "light",
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=missing&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 956,
+        "width": 440
+      },
+      "name": "iphone-large-missing-light",
+      "scenario": "missing",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-large-missing-light.jpg"
+    },
+    {
+      "aiRoleTabs": 3,
+      "assetAuxFields": 4,
+      "assetCoreFields": 7,
+      "assetCount": 3,
+      "cachePresent": false,
+      "effectiveModuleOrder": true,
+      "focus": {
+        "assetState": "观察",
+        "confidence": "高",
+        "dataQuality": "良好",
+        "direction": "偏多",
+        "risk": "低",
+        "symbol": "BTC/USDT"
+      },
+      "focusState": "ready",
+      "font": {
+        "body": 16,
+        "smallest": 12
+      },
+      "homeState": "ready",
+      "moduleOrder": [
+        {
+          "selector": "#mobile-status",
+          "top": 73
+        },
+        {
+          "selector": "#mobile-alerts",
+          "top": 384
+        },
+        {
+          "selector": "#watch-assets",
+          "top": 570
+        },
+        {
+          "selector": "#execution-advice",
+          "top": 1031
+        },
+        {
+          "selector": "#position-monitor",
+          "top": 1641
+        },
+        {
+          "selector": "#ai-review",
+          "top": 2812
+        }
+      ],
+      "navCount": 5,
+      "overflow": {
+        "body": false,
+        "bodyWidth": 428,
+        "html": false,
+        "htmlWidth": 428
+      },
+      "plan": {
+        "direction": "BULLISH",
+        "status": "资产执行计划，仅供人工复核",
+        "visible": "true"
+      },
+      "positionCount": 3,
+      "reducedMotion": true,
+      "retryVisible": false,
+      "selected": {
+        "moduleState": "ready",
+        "state": "observing",
+        "symbol": "BTCUSDT"
+      },
+      "theme": "light",
+      "touch": {
+        "minHeight": 44,
+        "undersized": []
+      },
+      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=long-content&selectedSymbol=BTCUSDT",
+      "viewport": {
+        "height": 926,
+        "width": 428
+      },
+      "name": "iphone-12-pro-max-long-content-light",
+      "scenario": "long-content",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-long-content-light.jpg"
+    },
+    {
+      "name": "iphone-large-retry-light",
+      "scenario": "retry",
+      "file": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-large-retry-light.jpg",
+      "before": {
+        "aiRoleTabs": 3,
+        "assetAuxFields": 0,
+        "assetCoreFields": 2,
+        "assetCount": 0,
+        "cachePresent": false,
+        "effectiveModuleOrder": true,
+        "focus": {
+          "assetState": "当前不可查看",
+          "confidence": "--",
+          "dataQuality": "--",
+          "direction": "--",
+          "risk": "--",
+          "symbol": "--"
+        },
+        "focusState": "error",
+        "font": {
+          "body": 16,
+          "smallest": 12
+        },
+        "homeState": "error",
+        "moduleOrder": [
+          {
+            "selector": "#mobile-status",
+            "top": 59
+          },
+          {
+            "selector": "#mobile-alerts",
+            "top": 341
+          },
+          {
+            "selector": "#watch-assets",
+            "top": 467
+          },
+          {
+            "selector": "#execution-advice",
+            "top": 688
+          },
+          {
+            "selector": "#position-monitor",
+            "top": 1172
+          },
+          {
+            "selector": "#ai-review",
+            "top": 1332
+          }
+        ],
+        "navCount": 5,
+        "overflow": {
+          "body": false,
+          "bodyWidth": 440,
+          "html": false,
+          "htmlWidth": 440
+        },
+        "plan": {
+          "direction": "--",
+          "status": "数据加载失败",
+          "visible": "false"
+        },
+        "positionCount": 0,
+        "reducedMotion": true,
+        "retryVisible": true,
+        "selected": {
+          "moduleState": null,
+          "state": null,
+          "symbol": null
+        },
+        "theme": "light",
+        "touch": {
+          "minHeight": 44,
+          "undersized": []
+        },
+        "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=retry",
+        "viewport": {
+          "height": 956,
+          "width": 440
+        }
+      },
+      "after": {
+        "aiRoleTabs": 3,
+        "assetAuxFields": 4,
+        "assetCoreFields": 7,
+        "assetCount": 3,
+        "cachePresent": false,
+        "effectiveModuleOrder": true,
+        "focus": {
+          "assetState": "观察",
+          "confidence": "高",
+          "dataQuality": "良好",
+          "direction": "偏多",
+          "risk": "低",
+          "symbol": "BTC/USDT"
+        },
+        "focusState": "ready",
+        "font": {
+          "body": 16,
+          "smallest": 12
+        },
+        "homeState": "ready",
+        "moduleOrder": [
+          {
+            "selector": "#mobile-status",
+            "top": 42
+          },
+          {
+            "selector": "#mobile-alerts",
+            "top": 324
+          },
+          {
+            "selector": "#watch-assets",
+            "top": 467
+          },
+          {
+            "selector": "#execution-advice",
+            "top": 885
+          },
+          {
+            "selector": "#position-monitor",
+            "top": 1369
+          },
+          {
+            "selector": "#ai-review",
+            "top": 2541
+          }
+        ],
+        "navCount": 5,
+        "overflow": {
+          "body": false,
+          "bodyWidth": 440,
+          "html": false,
+          "htmlWidth": 440
+        },
+        "plan": {
+          "direction": "BULLISH",
+          "status": "资产执行计划，仅供人工复核",
+          "visible": "true"
+        },
+        "positionCount": 3,
+        "reducedMotion": true,
+        "retryVisible": false,
+        "selected": {
+          "moduleState": "ready",
+          "state": "observing",
+          "symbol": "BTCUSDT"
+        },
+        "theme": "light",
+        "touch": {
+          "minHeight": 44,
+          "undersized": []
+        },
+        "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=retry&selectedSymbol=BTCUSDT",
+        "viewport": {
+          "height": 956,
+          "width": 440
+        }
+      }
+    }
+  ],
+  "assertions": {
+    "moduleOrder": "status, signals, assets, execution plan, Top3 positions, Three AI",
+    "mobileTouchTargetMinimumPx": 44,
+    "mobileBodyTextMinimumPx": 12,
+    "noHorizontalOverflow": true,
+    "reducedMotion": true,
+    "themeCoverage": [
+      "light",
+      "dark"
+    ],
+    "stateCoverage": [
+      "ready",
+      "partial",
+      "missing",
+      "error/retry"
+    ],
+    "realRenderedPage": true
+  }
+}

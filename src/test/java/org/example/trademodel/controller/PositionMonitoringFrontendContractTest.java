@@ -174,11 +174,11 @@ class PositionMonitoringFrontendContractTest {
                 .contains("data-profile-nav data-unavailable-nav")
                 .doesNotContain("data-ai-nav data-unavailable-nav");
         assertThat(desktop)
-                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">Position</a>")
-                .contains("data-desktop-ai-nav>AI Analysis</a>")
-                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">Message")
-                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">Profile")
-                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">AI Analysis");
+                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">持仓</a>")
+                .contains("data-desktop-ai-nav>AI 分析</a>")
+                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">消息")
+                .contains("data-desktop-unavailable-nav aria-disabled=\"true\">我的")
+                .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">AI 分析");
     }
 
     @Test

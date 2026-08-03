@@ -282,7 +282,7 @@ public class DashboardControllerTest {
         assertThat(card).contains(
                 "一致性等级",
                 "冲突等级",
-                "是否进入冲突阻断",
+                "AI 一致性阻断",
                 "一句话摘要");
         assertThat(card).doesNotContain(
                 "一致性评分",
@@ -329,7 +329,7 @@ public class DashboardControllerTest {
         assertThat(functionBody("renderHomeConsistencyCard"))
                 .contains(
                         "冲突等级", "aiApplicable ? options.conflictLevel : \"不适用\"",
-                        "是否进入冲突阻断", "不适用")
+                        "AI 一致性阻断", "不适用")
                 .doesNotContain("AI 计划模式", "资产方向阻断", "finalPlanMode");
     }
 
@@ -833,7 +833,7 @@ public class DashboardControllerTest {
                 "\"multi-position\"", "selected_position_id == 9101", "selected_position_id == 9102",
                 "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND",
                 "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)",
-                "\"entryZone\": f\"{marker}-asset-entry\"");
+                "\"entryZone\": entry_zone", "\"riskRewardRatio\": risk_reward");
         assertThat(multiPositionStart).isGreaterThanOrEqualTo(0);
         assertThat(placeholderStart).isGreaterThan(multiPositionStart);
         assertThat(fixture.substring(multiPositionStart, placeholderStart))
@@ -850,6 +850,7 @@ public class DashboardControllerTest {
                 "FRONTEND_CONTRACT = ROOT / \"src/main/resources/static/js/frontend-contract.js\"",
                 "ALERT_EXPLAIN = ROOT / \"src/main/resources/static/js/alert-explain.js\"",
                 "def _javascript(self, path: Path)",
+                "data-client-home-bootstrap",
                 "if parsed.path == \"/js/frontend-contract.js\"",
                 "if parsed.path == \"/js/alert-explain.js\"",
                 "\"code\": 200",
@@ -1062,6 +1063,43 @@ public class DashboardControllerTest {
                 "[data-theme=\"dark\"] .execution-plan-table th",
                 "background: var(--bg-elevated)",
                 "color: var(--text-secondary)");
+    }
+
+    @Test
+    void finalHomeProductUiKeepsTheFrozenDecisionHierarchyAndStateBoundaries() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        int focus = html.indexOf("id=\"homeFocusSummary\"");
+        int signals = html.indexOf("class=\"home-alert-event-row\"");
+        int assets = html.indexOf("id=\"tilesRow\"");
+        int execution = html.indexOf("id=\"homeExecutionCard\"");
+        int positions = html.indexOf("id=\"homePositionCard\"");
+        int ai = html.indexOf("id=\"homeAiPanel\"");
+
+        assertThat(focus).isGreaterThanOrEqualTo(0);
+        assertThat(signals).isGreaterThan(focus);
+        assertThat(assets).isGreaterThan(signals);
+        assertThat(execution).isGreaterThan(assets);
+        assertThat(positions).isGreaterThan(execution);
+        assertThat(ai).isGreaterThan(positions);
+        assertThat(html).contains(
+                "--ui-space-1", "--ui-radius-md", "--ui-number-font",
+                "--ui-motion-standard", "[data-theme=\"dark\"]",
+                "@media (prefers-reduced-motion: reduce)",
+                "id=\"homeFocusSymbol\"", "id=\"homeFocusAssetState\"",
+                "id=\"homeFocusDirection\"", "id=\"homeFocusConfidence\"",
+                "id=\"homeFocusRisk\"", "id=\"homeFocusDataQuality\"",
+                "id=\"homeFocusScore\"", "id=\"homeFocusMultiTimeframe\"",
+                "id=\"homeFocusConfused\"", "id=\"homeFocusUpdatedAt\"",
+                "Execution Plan", "Top 3 UserPosition",
+                "data-home-ai-role=\"GPT_FINAL\"",
+                "data-home-ai-role=\"GEMINI_REVIEW\"",
+                "data-home-ai-role=\"GROK_CHALLENGE\"");
+        assertThat(fixture).contains(
+                "\"long-content\"",
+                "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)",
+                "monitored_position(\"SOL/USDT\", True, 9003)");
     }
 
     @Test

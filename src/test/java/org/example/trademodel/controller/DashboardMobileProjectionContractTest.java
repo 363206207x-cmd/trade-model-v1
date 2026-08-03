@@ -156,6 +156,77 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
+    void mobileDecisionFlowKeepsCoreFactsAboveNativeDisclosuresAndScopesStateLabels()
+            throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String css = Files.readString(STYLES);
+        String compactPlan = slice(
+                html,
+                "<dl class=\"definition-list execution-grid execution-compact-grid\"",
+                "</dl>");
+        String fullPlan = slice(
+                html,
+                "<details class=\"long-details execution-details\">",
+                "</details>");
+        String positionSummary = slice(
+                html,
+                "<dl class=\"position-core position-summary\"",
+                "</dl>");
+        String positionDetails = slice(
+                html,
+                "<details class=\"position-details\">",
+                "</details>");
+
+        assertThat(html)
+                .contains(
+                        "<details class=\"long-details status-details\">",
+                        "资产状态 · 正在同步",
+                        "系统冲突阻断",
+                        "计划冲突阻断",
+                        "AI 一致性阻断",
+                        "Top 3 · 小屏默认 Top 2")
+                .doesNotContain(">冲突阻断</dt>");
+        assertThat(compactPlan)
+                .contains(
+                        "data-execution-field=\"direction\"",
+                        "data-execution-context-field=\"confidence\"",
+                        "data-execution-context-field=\"risk\"",
+                        "data-execution-field=\"entryZone\"")
+                .doesNotContain(
+                        "data-execution-field=\"stopLoss\"",
+                        "data-execution-field=\"takeProfitRules\"",
+                        "data-execution-field=\"invalidCondition\"");
+        assertThat(fullPlan)
+                .contains(
+                        "查看完整计划",
+                        "data-execution-field=\"stopLoss\"",
+                        "data-execution-field=\"takeProfitRules\"",
+                        "data-execution-field=\"riskRewardRatio\"",
+                        "data-execution-field=\"invalidCondition\"",
+                        "data-execution-field=\"sourceExecutionPlanId\"",
+                        "不是交易指令");
+        assertThat(positionSummary)
+                .contains("当前风险", "入场逻辑", "方向支持", "反转状态", "当前建议")
+                .doesNotContain("持仓 ID", "入场价", "止损", "止盈", "更新时间");
+        assertThat(positionDetails)
+                .contains("查看完整持仓", "持仓 ID", "入场价", "止损", "止盈", "更新时间");
+        assertThat(script)
+                .contains(
+                        "data-execution-context-field",
+                        "optionalRiskReward.hidden",
+                        "if (disclosure) disclosure.open = false",
+                        "资产状态 · ")
+                .contains("position-card\" + (index === 2 ? \" position-third\" : \"\")");
+        assertThat(css)
+                .contains(
+                        ".execution-compact-grid",
+                        ".status-details",
+                        ".position-third {",
+                        "display: none;");
+    }
+
+    @Test
     void mobileTemplateHasFailClosedEmptyAndDisabledAiStates() throws Exception {
         String html = Files.readString(TEMPLATE);
 
@@ -178,6 +249,10 @@ class DashboardMobileProjectionContractTest {
     void assetSwitchUpdatesExecutionAndAiButNeverPositionDom() throws Exception {
         String script = Files.readString(SCRIPT);
         String foundation = Files.readString(FRONTEND_CONTRACT);
+        String assetSelection = slice(
+                script,
+                "async function selectAsset(symbol, sourceCard)",
+                "function bindAssetPager()");
 
         assertThat(script)
                 .contains("/api/dashboard/home?")
@@ -194,14 +269,35 @@ class DashboardMobileProjectionContractTest {
                 .contains("assetCards()")
                 .doesNotContain("localStorage")
                 .doesNotContain("saveCustomSymbols")
-                .doesNotContain("position-list")
-                .doesNotContain("data-position-independent")
                 .doesNotContain("innerHTML");
+        assertThat(assetSelection)
+                .doesNotContain(
+                        "renderMobilePositions",
+                        "data-mobile-position-list",
+                        "position-list",
+                        "data-position-independent");
         assertThat(foundation)
                 .contains("global.history.replaceState")
                 .contains("function executionPlanAccess")
                 .contains("sourceExecutionPlanId")
                 .doesNotContain("localStorage");
+    }
+
+    @Test
+    void serverRenderedMobileHomeOnlyBootstrapsFromApiWhenTheFixtureExplicitlyOptsIn()
+            throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String initialize = slice(script, "function initialize()", "if (document.readyState");
+
+        assertThat(html).doesNotContain("data-client-home-bootstrap");
+        assertThat(initialize)
+                .contains(
+                        "homeRoot.hasAttribute(\"data-client-home-bootstrap\")",
+                        "loadInitialMobileHome()");
+        assertThat(initialize.indexOf("homeRoot.hasAttribute(\"data-client-home-bootstrap\")"))
+                .isLessThan(initialize.indexOf("loadInitialMobileHome()"));
+        assertThat(count(initialize, "loadInitialMobileHome()")).isEqualTo(1);
     }
 
     @Test
@@ -361,9 +457,19 @@ class DashboardMobileProjectionContractTest {
                 .contains("grid-template-columns: repeat(5, minmax(0, 1fr))")
                 .contains("grid-template-columns: repeat(3, minmax(0, 1fr))")
                 .contains("scroll-snap-type: x mandatory")
+                .contains("contain: inline-size layout paint")
+                .contains("isolation: isolate")
                 .contains("background: var(--surface)")
+                .contains("@media (prefers-reduced-motion: reduce)")
                 .doesNotContain("transform: scale")
                 .doesNotContain("font-size: clamp")
+                .doesNotContain(
+                        "font-size: 0.62rem",
+                        "font-size: 0.65rem",
+                        "font-size: 0.66rem",
+                        "font-size: 0.69rem",
+                        "font-size: 0.7rem",
+                        "font-size: 0.72rem")
                 .doesNotContain("color-mix(")
                 .doesNotContain("url(http")
                 .doesNotContain("cdn");

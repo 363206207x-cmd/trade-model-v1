@@ -50,6 +50,7 @@ SCENARIOS = {
     "placeholder",
     "home-failure",
     "detail-late",
+    "long-content",
 }
 REQUEST_LOG: list[dict[str, object]] = []
 REQUEST_LOCK = threading.Lock()
@@ -396,6 +397,18 @@ def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001)
 
 def asset_execution_suggestion(symbol: str) -> dict[str, object]:
     marker = symbol.removesuffix("USDT") or symbol
+    levels = {
+        "BTC": ("63600 - 64200", "61200", "目标一 66000；目标二 67500", "1 : 2.3", "4H 收盘跌破 61200"),
+        "ETH": ("3460 - 3525", "3340", "目标一 3650；目标二 3780", "1 : 2.1", "4H 收盘跌破 3340"),
+        "SOL": ("145.0 - 149.0", "138.0", "目标一 158.0；目标二 166.0", "1 : 2.0", "4H 收盘跌破 138.0"),
+        "BNB": ("584 - 594", "566", "目标一 618；目标二 636", "1 : 2.2", "4H 收盘跌破 566"),
+        "XRP": ("0.510 - 0.525", "0.488", "目标一 0.552；目标二 0.578", "1 : 2.0", "4H 收盘跌破 0.488"),
+        "DOGE": ("0.124 - 0.130", "0.117", "目标一 0.139；目标二 0.147", "1 : 2.1", "4H 收盘跌破 0.117"),
+    }
+    entry_zone, stop_loss, take_profit, risk_reward, invalid_condition = levels.get(
+        marker,
+        ("--", "--", "--", "--", "当前计划边界不可验证"),
+    )
     return {
         "status": "USABLE_REVIEW_PLAN",
         "statusLabel": "资产执行计划，仅供人工复核",
@@ -406,14 +419,15 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
         "sourceExecutionPlanId": f"plan-{marker.lower()}-asset",
         "sourceTraceId": f"trace-{marker.lower()}-asset",
         "direction": "BULLISH",
-        "entryZone": f"{marker}-asset-entry",
-        "stopLoss": f"{marker}-asset-stop",
-        "takeProfitRules": f"{marker}-asset-tp",
+        "entryZone": entry_zone,
+        "stopLoss": stop_loss,
+        "takeProfitRules": take_profit,
+        "riskRewardRatio": risk_reward,
         "leverageSuggestion": "不高于 2 倍",
         "positionSuggestion": "仅供人工复核",
         "validFrom": "2026-07-13T12:00:00Z",
         "expiresAt": "2026-07-14T12:00:00Z",
-        "invalidCondition": f"{marker}-asset-invalid",
+        "invalidCondition": invalid_condition,
     }
 
 
@@ -720,6 +734,27 @@ def scenario_home(
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]
 
+    elif scenario == "long-content":
+        selected_asset["currentConclusion"] = (
+            "中周期结构仍保持偏多，但短周期流动性、成交延续性与外部事件窗口尚未完全收敛，"
+            "当前只保留人工复核，不形成自动执行动作。"
+        )
+        home["alerts"][0]["message"] = (
+            "短周期波动与盘口价差同步上升，需等待成交延续性恢复后再复核原计划边界"
+        )
+        home["events"][0]["label"] = (
+            "未来两小时存在可能影响当前资产风险收益结构的外部事件窗口"
+        )
+        home["executionSuggestion"]["invalidCondition"] = (
+            "4H 收盘跌破关键结构、数据质量降至最低门槛以下，或多周期状态转为冲突阻断"
+        )
+        home["aiDecision"]["tabs"][0]["finalConclusion"] = (
+            "规则方向仍可观察，但在成交延续、流动性与风险边界同时完成复核前，不应把该结论解释为交易授权。"
+        )
+        home["aiDecision"]["consistency"]["consistencySummary"] = (
+            "三角色对规则方向大体一致，同时保留短周期流动性和外部事件窗口两项明确异议。"
+        )
+
     apply_module_states(home)
     return home
 
@@ -859,9 +894,16 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 ACTIVE_SCENARIO = scenario
                 HOME_REQUEST_COUNTS[scenario] = 0
             source_template = MOBILE_TEMPLATE if parsed.path == "/dashboard-mobile" else TEMPLATE
-            html = source_template.read_text(encoding="utf-8").replace(
+            html_text = source_template.read_text(encoding="utf-8").replace(
                 "REFRESH_MS = 30000;", "REFRESH_MS = 0;"
-            ).encode("utf-8")
+            )
+            if parsed.path == "/dashboard-mobile":
+                html_text = html_text.replace(
+                    "data-mobile-home-root",
+                    "data-mobile-home-root data-client-home-bootstrap",
+                    1,
+                )
+            html = html_text.encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(html)))

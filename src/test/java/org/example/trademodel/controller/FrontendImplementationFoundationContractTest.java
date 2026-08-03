@@ -56,6 +56,10 @@ class FrontendImplementationFoundationContractTest {
         String mobileScript = Files.readString(MOBILE_SCRIPT);
         String desktopRefresh = sourceSlice(
                 desktop, "function refreshDashboard()", "function refreshDashboardDiagnostics()");
+        String mobileBootstrap = sourceSlice(
+                mobileScript, "async function loadInitialMobileHome()", "function setMobileRetryVisible");
+        String mobileAssetSelection = sourceSlice(
+                mobileScript, "async function selectAsset(symbol, sourceCard)", "function bindAssetPager()");
 
         assertThat(desktop)
                 .contains("/js/frontend-contract.js")
@@ -78,9 +82,14 @@ class FrontendImplementationFoundationContractTest {
                 .doesNotContain(
                         "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
                         "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics");
-        assertThat(mobileScript)
-                .containsOnlyOnce("fetch(")
-                .contains("fetch(\"/api/dashboard/home?\" + query.toString()");
+        assertThat(mobileBootstrap)
+                .contains("fetch(\"/api/dashboard/home?\" + query.toString()")
+                .contains("method: \"GET\"")
+                .doesNotContain("method: \"POST\"");
+        assertThat(mobileAssetSelection)
+                .contains("fetch(\"/api/dashboard/home?\" + query.toString()")
+                .contains("method: \"GET\"")
+                .doesNotContain("method: \"POST\"");
         assertThat(desktop)
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
@@ -100,7 +109,7 @@ class FrontendImplementationFoundationContractTest {
                 .doesNotContain(">买入</button>", ">卖出</button>", ">下单</button>", ">执行交易</button>");
         assertThat(desktop)
                 .contains("系统执行建议（非交易指令）")
-                .contains("不会生成真实持仓或交易执行")
+                .contains("不会自动下单或创建持仓")
                 .doesNotContain("AI 投票", "投票比例");
     }
 
