@@ -282,7 +282,7 @@ public class DashboardControllerTest {
         assertThat(card).contains(
                 "一致性等级",
                 "冲突等级",
-                "是否进入冲突阻断",
+                "AI 一致性阻断",
                 "一句话摘要");
         assertThat(card).doesNotContain(
                 "一致性评分",
@@ -329,7 +329,7 @@ public class DashboardControllerTest {
         assertThat(functionBody("renderHomeConsistencyCard"))
                 .contains(
                         "冲突等级", "aiApplicable ? options.conflictLevel : \"不适用\"",
-                        "是否进入冲突阻断", "不适用")
+                        "AI 一致性阻断", "不适用")
                 .doesNotContain("AI 计划模式", "资产方向阻断", "finalPlanMode");
     }
 

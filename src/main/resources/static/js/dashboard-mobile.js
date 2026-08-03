@@ -192,7 +192,7 @@
 
     var top = element("span", "asset-card-top");
     top.appendChild(element("span", "asset-symbol", text(asset && asset.symbol, symbol)));
-    var state = element("span", "asset-state", assetStateText(asset));
+    var state = element("span", "asset-state", "资产状态 · " + assetStateText(asset));
     state.dataset.assetField = "state";
     top.appendChild(state);
     card.appendChild(top);
@@ -278,7 +278,7 @@
     root.dataset.moduleState = normalizedState;
     var values = {
       symbol: asset && (asset.symbol || asset.rawSymbol) || requestedSymbol,
-      assetState: asset ? assetStateText(asset) : (normalizedState === "loading" ? "正在同步" : "当前不可查看"),
+      assetState: "资产状态 · " + (asset ? assetStateText(asset) : (normalizedState === "loading" ? "正在同步" : "当前不可查看")),
       direction: asset && (asset.marketBiasLabel || asset.marketBias),
       confidence: asset && (asset.confidenceLabel || asset.confidenceLevel),
       risk: asset && (asset.riskLabel || asset.riskLevel),
@@ -380,21 +380,23 @@
       card.appendChild(heading);
 
       var core = element("dl", "position-core position-summary");
-      appendDefinition(core, "入场价", position.entryPrice, false);
-      appendDefinition(core, "数量 / 杠杆", text(position.positionSize, "--") + " / " + text(position.leverage, "--"), false);
       appendDefinition(core, "当前风险", position.riskLevelLabel || position.riskLevel, false);
-      appendDefinition(core, "告警", position.warningState, false);
-      appendDefinition(core, "止损", position.userStopLoss, false);
-      appendDefinition(core, "止盈", position.userTakeProfit, false);
-      appendDefinition(core, "逻辑状态", position.entryLogicStatusLabel || position.entryLogicStatus, true);
+      appendDefinition(core, "入场逻辑", position.entryLogicStatusLabel || position.entryLogicStatus, false);
+      appendDefinition(core, "方向支持", position.directionSupportStatusLabel || position.directionSupportStatus, false);
+      appendDefinition(core, "反转状态", position.reversalStatusLabel || position.reversalStatus, false);
+      appendDefinition(core, "当前建议", position.suggestedManualActionText || position.suggestedManualAction, true);
       card.appendChild(core);
 
       var more = element("details", "position-details");
-      more.appendChild(element("summary", "", "更多监控状态"));
+      more.appendChild(element("summary", "", "查看完整持仓"));
       var moreList = element("dl", "definition-list");
-      appendDefinition(moreList, "方向支持", position.directionSupportStatusLabel || position.directionSupportStatus, false);
-      appendDefinition(moreList, "反转状态", position.reversalStatusLabel || position.reversalStatus, false);
-      appendDefinition(moreList, "当前建议", position.suggestedManualActionText || position.suggestedManualAction, true);
+      appendDefinition(moreList, "持仓 ID", position.positionId, false);
+      appendDefinition(moreList, "状态", position.positionStatusLabel || position.positionStatus, false);
+      appendDefinition(moreList, "入场价", position.entryPrice, false);
+      appendDefinition(moreList, "数量 / 杠杆", text(position.positionSize, "--") + " / " + text(position.leverage, "--"), false);
+      appendDefinition(moreList, "止损", position.userStopLoss, false);
+      appendDefinition(moreList, "止盈", position.userTakeProfit, false);
+      appendDefinition(moreList, "告警", position.warningState, false);
       appendDefinition(moreList, "更新时间", frontendContract.formatBusinessTimeCompact(position.updatedAt), true);
       more.appendChild(moreList);
       card.appendChild(more);
@@ -485,7 +487,7 @@
     syncCardNavigationIdentity(card, asset);
     card.dataset.assetState = String(asset.assetState || "unknown").toLowerCase();
     card.dataset.moduleState = frontendContract.normalizeModuleState(asset.moduleState, "MISSING").toLowerCase();
-    setAssetCardField(card, "state", assetStateText(asset), "状态待同步");
+    setAssetCardField(card, "state", "资产状态 · " + assetStateText(asset), "资产状态 · 状态待同步");
     setAssetCardField(card, "latestPrice", asset.latestPrice, "--");
     setAssetCardField(card, "compositeScore", asset.compositeScore, "--");
     setAssetCardField(card, "marketBias", asset.marketBiasLabel || asset.marketBias, "当前判断不可用");
@@ -506,7 +508,7 @@
     syncCardNavigationIdentity(card, null);
     card.dataset.assetState = "unavailable";
     card.dataset.moduleState = "error";
-    setAssetCardField(card, "state", stateLabel, "当前不可查看");
+    setAssetCardField(card, "state", "资产状态 · " + text(stateLabel, "当前不可查看"), "资产状态 · 当前不可查看");
     setAssetCardField(card, "latestPrice", null, "--");
     setAssetCardField(card, "compositeScore", null, "--");
     setAssetCardField(card, "marketBias", null, "--");
@@ -610,7 +612,9 @@
       "positionSuggestion",
       "invalidCondition",
       "validFrom",
-      "expiresAt"
+      "expiresAt",
+      "sourceExecutionPlanId",
+      "riskRewardRatio"
     ];
     document.querySelectorAll("[data-execution-field]").forEach(function (node) {
       var field = node.dataset.executionField;
@@ -630,6 +634,21 @@
         ? text(safeSuggestion[field], "--")
         : "--";
     });
+    var context = {
+      confidence: selectedAsset && (selectedAsset.confidenceLabel || selectedAsset.confidenceLevel)
+        || (selectedCard && selectedCard.dataset.confidenceLabel),
+      risk: selectedAsset && (selectedAsset.riskLabel || selectedAsset.riskLevel)
+        || (selectedCard && selectedCard.dataset.riskLabel)
+    };
+    Object.keys(context).forEach(function (field) {
+      setText('[data-execution-context-field="' + field + '"]', context[field], "--");
+    });
+    var optionalRiskReward = document.querySelector('[data-execution-optional="riskRewardRatio"]');
+    if (optionalRiskReward) {
+      optionalRiskReward.hidden = !(access.visible && text(safeSuggestion.riskRewardRatio, "") !== "");
+    }
+    var disclosure = document.querySelector(".execution-details");
+    if (disclosure) disclosure.open = false;
     setText("[data-execution-conflict]", safeSuggestion.blockedReason, "--");
     var section = document.getElementById("execution-advice");
     if (section) section.dataset.exactPlanVisible = String(access.visible);

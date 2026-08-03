@@ -1,6 +1,6 @@
 {
   "title": "P1B Home Final Product UI Visual Acceptance",
-  "generatedAt": "2026-08-02T20:43:03.620Z",
+  "generatedAt": "2026-08-03T07:08:06Z",
   "source": "Real dashboard templates served by scripts/dashboard-visual-acceptance-fixture.py; production defaults unchanged.",
   "desktop": [
     {
@@ -353,23 +353,23 @@
         },
         {
           "selector": "#mobile-alerts",
-          "top": 341
+          "top": 227.9140625
         },
         {
           "selector": "#watch-assets",
-          "top": 484
+          "top": 345.921875
         },
         {
           "selector": "#execution-advice",
-          "top": 902
+          "top": 593.9453125
         },
         {
           "selector": "#position-monitor",
-          "top": 1386
+          "top": 827.0078125
         },
         {
           "selector": "#ai-review",
-          "top": 2558
+          "top": 1701.9140625
         }
       ],
       "navCount": 5,
@@ -384,7 +384,19 @@
         "status": "资产执行计划，仅供人工复核",
         "visible": "true"
       },
+      "firstScreen": {
+        "entryBottom": 762.0078125,
+        "executionDisclosureBottom": 816.0078125,
+        "navigationTop": 880,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
       "positionCount": 3,
+      "positionDomCount": 3,
       "reducedMotion": true,
       "retryVisible": false,
       "selected": {
@@ -393,11 +405,17 @@
         "symbol": "BTCUSDT"
       },
       "theme": "light",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
       "touch": {
         "minHeight": 44,
         "undersized": []
       },
-      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
       "viewport": {
         "height": 956,
         "width": 440
@@ -434,23 +452,23 @@
         },
         {
           "selector": "#mobile-alerts",
-          "top": 341
+          "top": 227.9140625
         },
         {
           "selector": "#watch-assets",
-          "top": 484
+          "top": 345.921875
         },
         {
           "selector": "#execution-advice",
-          "top": 902
+          "top": 593.9453125
         },
         {
           "selector": "#position-monitor",
-          "top": 1386
+          "top": 827.0078125
         },
         {
           "selector": "#ai-review",
-          "top": 2558
+          "top": 1701.9140625
         }
       ],
       "navCount": 5,
@@ -465,7 +483,19 @@
         "status": "资产执行计划，仅供人工复核",
         "visible": "true"
       },
+      "firstScreen": {
+        "entryBottom": 762.0078125,
+        "executionDisclosureBottom": 816.0078125,
+        "navigationTop": 880,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
       "positionCount": 3,
+      "positionDomCount": 3,
       "reducedMotion": true,
       "retryVisible": false,
       "selected": {
@@ -474,11 +504,17 @@
         "symbol": "BTCUSDT"
       },
       "theme": "dark",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
       "touch": {
         "minHeight": 44,
         "undersized": []
       },
-      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
       "viewport": {
         "height": 956,
         "width": 440
@@ -511,27 +547,27 @@
       "moduleOrder": [
         {
           "selector": "#mobile-status",
-          "top": 73
+          "top": 59
         },
         {
           "selector": "#mobile-alerts",
-          "top": 384
+          "top": 227.9140625
         },
         {
           "selector": "#watch-assets",
-          "top": 552
+          "top": 345.921875
         },
         {
           "selector": "#execution-advice",
-          "top": 1013
+          "top": 608.9453125
         },
         {
           "selector": "#position-monitor",
-          "top": 1605
+          "top": 849.0078125
         },
         {
           "selector": "#ai-review",
-          "top": 2776
+          "top": 1464.6328125
         }
       ],
       "navCount": 5,
@@ -546,7 +582,20 @@
         "status": "资产执行计划，仅供人工复核",
         "visible": "true"
       },
-      "positionCount": 3,
+      "firstScreen": {
+        "entryBottom": 784.0078125,
+        "executionDisclosureBottom": 838.0078125,
+        "navigationTop": 850,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 2,
+      "positionDomCount": 3,
+      "positionEvidence": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-top2-positions-light.jpg",
       "reducedMotion": true,
       "retryVisible": false,
       "selected": {
@@ -555,11 +604,17 @@
         "symbol": "BTCUSDT"
       },
       "theme": "light",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
       "touch": {
         "minHeight": 44,
         "undersized": []
       },
-      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
       "viewport": {
         "height": 926,
         "width": 428
@@ -592,27 +647,27 @@
       "moduleOrder": [
         {
           "selector": "#mobile-status",
-          "top": 73
+          "top": 59
         },
         {
           "selector": "#mobile-alerts",
-          "top": 384
+          "top": 227.9140625
         },
         {
           "selector": "#watch-assets",
-          "top": 552
+          "top": 345.921875
         },
         {
           "selector": "#execution-advice",
-          "top": 1013
+          "top": 608.9453125
         },
         {
           "selector": "#position-monitor",
-          "top": 1605
+          "top": 849.0078125
         },
         {
           "selector": "#ai-review",
-          "top": 2776
+          "top": 1464.6328125
         }
       ],
       "navCount": 5,
@@ -627,7 +682,20 @@
         "status": "资产执行计划，仅供人工复核",
         "visible": "true"
       },
-      "positionCount": 3,
+      "firstScreen": {
+        "entryBottom": 784.0078125,
+        "executionDisclosureBottom": 838.0078125,
+        "navigationTop": 850,
+        "pass": true
+      },
+      "disclosures": {
+        "executionOpen": false,
+        "positionDetailsOpen": false,
+        "statusOpen": false
+      },
+      "positionCount": 2,
+      "positionDomCount": 3,
+      "positionEvidence": "docs/implementation-screenshots/home-final-product-ui-v1/iphone-12-pro-max-top2-positions-dark.jpg",
       "reducedMotion": true,
       "retryVisible": false,
       "selected": {
@@ -636,11 +704,17 @@
         "symbol": "BTCUSDT"
       },
       "theme": "dark",
+      "stateScopes": [
+        "ASSET",
+        "SYSTEM",
+        "PLAN",
+        "AI_CONSISTENCY"
+      ],
       "touch": {
         "minHeight": 44,
         "undersized": []
       },
-      "url": "http://127.0.0.1:18084/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
+      "url": "http://127.0.0.1:18087/dashboard-mobile?scenario=normal&selectedSymbol=BTCUSDT",
       "viewport": {
         "height": 926,
         "width": 428

@@ -156,6 +156,77 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
+    void mobileDecisionFlowKeepsCoreFactsAboveNativeDisclosuresAndScopesStateLabels()
+            throws Exception {
+        String html = Files.readString(TEMPLATE);
+        String script = Files.readString(SCRIPT);
+        String css = Files.readString(STYLES);
+        String compactPlan = slice(
+                html,
+                "<dl class=\"definition-list execution-grid execution-compact-grid\"",
+                "</dl>");
+        String fullPlan = slice(
+                html,
+                "<details class=\"long-details execution-details\">",
+                "</details>");
+        String positionSummary = slice(
+                html,
+                "<dl class=\"position-core position-summary\"",
+                "</dl>");
+        String positionDetails = slice(
+                html,
+                "<details class=\"position-details\">",
+                "</details>");
+
+        assertThat(html)
+                .contains(
+                        "<details class=\"long-details status-details\">",
+                        "资产状态 · 正在同步",
+                        "系统冲突阻断",
+                        "计划冲突阻断",
+                        "AI 一致性阻断",
+                        "Top 3 · 小屏默认 Top 2")
+                .doesNotContain(">冲突阻断</dt>");
+        assertThat(compactPlan)
+                .contains(
+                        "data-execution-field=\"direction\"",
+                        "data-execution-context-field=\"confidence\"",
+                        "data-execution-context-field=\"risk\"",
+                        "data-execution-field=\"entryZone\"")
+                .doesNotContain(
+                        "data-execution-field=\"stopLoss\"",
+                        "data-execution-field=\"takeProfitRules\"",
+                        "data-execution-field=\"invalidCondition\"");
+        assertThat(fullPlan)
+                .contains(
+                        "查看完整计划",
+                        "data-execution-field=\"stopLoss\"",
+                        "data-execution-field=\"takeProfitRules\"",
+                        "data-execution-field=\"riskRewardRatio\"",
+                        "data-execution-field=\"invalidCondition\"",
+                        "data-execution-field=\"sourceExecutionPlanId\"",
+                        "不是交易指令");
+        assertThat(positionSummary)
+                .contains("当前风险", "入场逻辑", "方向支持", "反转状态", "当前建议")
+                .doesNotContain("持仓 ID", "入场价", "止损", "止盈", "更新时间");
+        assertThat(positionDetails)
+                .contains("查看完整持仓", "持仓 ID", "入场价", "止损", "止盈", "更新时间");
+        assertThat(script)
+                .contains(
+                        "data-execution-context-field",
+                        "optionalRiskReward.hidden",
+                        "if (disclosure) disclosure.open = false",
+                        "资产状态 · ")
+                .contains("position-card\" + (index === 2 ? \" position-third\" : \"\")");
+        assertThat(css)
+                .contains(
+                        ".execution-compact-grid",
+                        ".status-details",
+                        ".position-third {",
+                        "display: none;");
+    }
+
+    @Test
     void mobileTemplateHasFailClosedEmptyAndDisabledAiStates() throws Exception {
         String html = Files.readString(TEMPLATE);
 

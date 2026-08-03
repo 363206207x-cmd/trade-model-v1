@@ -707,6 +707,46 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
+    func testCompactDecisionDisclosuresScopeStatesAndLimitSmallPhonePositions() throws {
+        let smallWebView = try loadFixture(width: 428, height: 926)
+
+        XCTAssertFalse(try booleanValue("document.querySelector('.execution-details').open", in: smallWebView))
+        XCTAssertEqual(
+            try numberValue("document.querySelector('[data-execution-field=\"stopLoss\"]').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
+        XCTAssertGreaterThan(
+            try numberValue("document.querySelector('.execution-entry-summary').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
+        XCTAssertEqual(
+            try numberValue("Array.from(document.querySelectorAll('.position-card')).filter(node => getComputedStyle(node).display !== 'none').length", in: smallWebView),
+            2
+        )
+        XCTAssertEqual(
+            try stringValue("getComputedStyle(document.querySelector('.position-third')).display", in: smallWebView),
+            "none"
+        )
+        XCTAssertTrue(try booleanValue(
+            "document.querySelector('[data-mobile-home-view]').textContent.includes('系统冲突阻断')"
+                + " && document.querySelector('[data-mobile-home-view]').textContent.includes('计划冲突阻断')"
+                + " && document.querySelector('[data-mobile-home-view]').textContent.includes('AI 一致性阻断')",
+            in: smallWebView
+        ))
+
+        try run("document.querySelector('.execution-details').open = true", in: smallWebView)
+        XCTAssertGreaterThan(
+            try numberValue("document.querySelector('[data-execution-field=\"stopLoss\"]').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
+
+        let largeWebView = try loadFixture(width: 440, height: 956)
+        XCTAssertEqual(
+            try numberValue("Array.from(document.querySelectorAll('.position-card')).filter(node => getComputedStyle(node).display !== 'none').length", in: largeWebView),
+            3
+        )
+    }
+
     func testNativeToolbarProjectionDoesNotRepeatVisibleProductTitle() throws {
         let webView = try loadFixture()
 
@@ -2182,7 +2222,12 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         let loaded = expectation(description: "mobile fixture loaded")
         let delegate = NavigationDelegate { loaded.fulfill() }
         navigationDelegate = delegate
-        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(
+            frame: CGRect(x: 0, y: 0, width: width, height: height),
+            configuration: configuration
+        )
         webView.overrideUserInterfaceStyle = interfaceStyle
         webView.navigationDelegate = delegate
         webView.loadHTMLString(
@@ -2312,7 +2357,12 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   symbol: symbol,
                   rawSymbol: symbol,
                   analysisId: analysisAvailable === false ? null : 'ANA_' + symbol,
-                  worthOpening: true
+                  worthOpening: true,
+                  marketBiasLabel: '偏多',
+                  confidenceLabel: '中',
+                  riskLabel: '中',
+                  dataQuality: 'GOOD',
+                  moduleState: 'READY'
                 }],
                 executionSuggestion: {
                   status: 'USABLE_REVIEW_PLAN',
@@ -2394,16 +2444,16 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             <section class="status-section" id="mobile-status">
               <h2 id="mobile-status-title" tabindex="-1">决策状态</h2>
               <dl class="status-grid status-grid-primary">
-                <div class="status-cell"><dt>市场趋势</dt><dd>震荡</dd></div>
-                <div class="status-cell"><dt>风险等级</dt><dd>中</dd></div>
-                <div class="status-cell"><dt>数据质量</dt><dd>82</dd></div>
+                <div class="status-cell"><dt>资产趋势</dt><dd>震荡</dd></div>
+                <div class="status-cell"><dt>资产风险</dt><dd>中</dd></div>
+                <div class="status-cell"><dt>资产数据</dt><dd>82</dd></div>
                 <div class="status-cell"><dt>AI 冲突</dt><dd>低</dd></div>
               </dl>
               <div class="system-summary-heading"><h3>系统摘要</h3><span>全局状态</span></div>
               <dl class="status-grid status-grid-system">
                 <div class="status-cell"><dt>AI 系统</dt><dd>正常</dd></div>
                 <div class="status-cell"><dt>待复核机会</dt><dd>2</dd></div>
-                <div class="status-cell"><dt>冲突阻断</dt><dd>否</dd></div>
+                <div class="status-cell"><dt>系统冲突阻断</dt><dd>否</dd></div>
                 <div class="status-cell"><dt>Hot Reset</dt><dd>未触发</dd></div>
               </dl>
             </section>
@@ -2435,20 +2485,20 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
               <strong data-selected-asset-token>\(selectedSymbol)</strong>
               <div class="asset-pager" role="radiogroup" data-mobile-assets-pager>
-                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-direction-label="震荡" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
-                  <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">观察中</span></span>
+                <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-direction-label="震荡" data-confidence-label="中" data-risk-label="中" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">资产状态 · 观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                   <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
-                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-direction-label="偏多" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
-                  <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">待复核候选</span></span>
+                <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-direction-label="偏多" data-confidence-label="中" data-risk-label="中" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">资产状态 · 待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
                   <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
-                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-direction-label="偏空" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
-                  <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">高风险</span></span>
+                <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-direction-label="偏空" data-confidence-label="低" data-risk-label="高" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
+                  <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">资产状态 · 高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
                   <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
@@ -2457,32 +2507,44 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             </section>
             <section class="execution-section" id="execution-advice" data-exact-plan-visible="false">
               <h2 id="mobile-execution-title" tabindex="-1">执行建议</h2>
-              <strong data-execution-field="statusLabel">等待同步</strong>
-              <p data-execution-field="blockedReason">暂无补充说明</p>
-              <dl class="definition-list execution-grid">
+              <div class="semantic-state-line"><span>执行建议状态</span><strong data-execution-field="statusLabel">等待同步</strong></div>
+              <dl class="definition-list execution-grid execution-compact-grid">
                 <div><dt>方向</dt><dd data-execution-field="direction">--</dd></div>
-                <div><dt>是否值得开仓</dt><dd data-execution-field="worthOpening">待同步</dd></div>
-                <div><dt>入场区间</dt><dd data-execution-field="entryZone">--</dd></div>
-                <div><dt>止损</dt><dd data-execution-field="stopLoss">--</dd></div>
-                <div><dt>止盈方案</dt><dd data-execution-field="takeProfitRules">--</dd></div>
-                <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion">--</dd></div>
-                <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion">--</dd></div>
-                <div><dt>计划失效条件</dt><dd data-execution-field="invalidCondition">--</dd></div>
-                <div><dt>有效开始</dt><dd data-execution-field="validFrom">--</dd></div>
-                <div><dt>有效结束</dt><dd data-execution-field="expiresAt">--</dd></div>
+                <div><dt>资产置信</dt><dd data-execution-context-field="confidence">--</dd></div>
+                <div><dt>资产风险</dt><dd data-execution-context-field="risk">--</dd></div>
+                <div class="execution-entry-summary"><dt>入场区间</dt><dd data-execution-field="entryZone">--</dd></div>
               </dl>
-              <div class="conflict-block-summary"><span>冲突阻断</span><strong data-execution-conflict>--</strong></div>
+              <details class="long-details execution-details">
+                <summary>查看完整计划</summary>
+                <p data-execution-field="blockedReason">暂无补充说明</p>
+                <dl class="definition-list execution-detail-grid">
+                  <div><dt>是否值得开仓</dt><dd data-execution-field="worthOpening">待同步</dd></div>
+                  <div><dt>止损</dt><dd data-execution-field="stopLoss">--</dd></div>
+                  <div><dt>止盈方案</dt><dd data-execution-field="takeProfitRules">--</dd></div>
+                  <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion">--</dd></div>
+                  <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion">--</dd></div>
+                  <div><dt>计划失效条件</dt><dd data-execution-field="invalidCondition">--</dd></div>
+                  <div><dt>有效开始</dt><dd data-execution-field="validFrom">--</dd></div>
+                  <div><dt>有效结束</dt><dd data-execution-field="expiresAt">--</dd></div>
+                  <div><dt>计划来源</dt><dd data-execution-field="sourceExecutionPlanId">--</dd></div>
+                </dl>
+                <div class="conflict-block-summary"><span>计划冲突阻断</span><strong data-execution-conflict>--</strong></div>
+              </details>
             </section>
             <section class="position-section" id="position-monitor" data-position-independent>
               <h2 id="mobile-position-title" tabindex="-1">持仓监控</h2>
-              <p>BTCUSDT / 多 · 等待首次监控</p>
+              <div class="position-list" data-mobile-position-list>
+                <article class="position-card"><div class="position-heading"><h3>BTCUSDT</h3><span>多</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>中</dd></div><div><dt>入场逻辑</dt><dd>有效</dd></div><div><dt>方向支持</dt><dd>支持</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>继续观察</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
+                <article class="position-card"><div class="position-heading"><h3>ETHUSDT</h3><span>多</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>中</dd></div><div><dt>入场逻辑</dt><dd>有效</dd></div><div><dt>方向支持</dt><dd>支持</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>继续观察</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
+                <article class="position-card position-third"><div class="position-heading"><h3>SOLUSDT</h3><span>空</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>高</dd></div><div><dt>入场逻辑</dt><dd>复核</dd></div><div><dt>方向支持</dt><dd>待确认</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>人工复核</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
+              </div>
             </section>
             <section class="ai-section" id="ai-review">
               <h2 id="mobile-ai-title" tabindex="-1">AI 三角色复核</h2>
               <strong data-ai-run-status>等待同步</strong>
               <span data-consistency-field="consistencyLevel">等待同步</span>
               <span data-consistency-field="level">--</span>
-              <span data-consistency-field="confused">否</span>
+              <span>AI 一致性阻断</span><span data-consistency-field="confused">否</span>
               <span data-consistency-field="consistencySummary">等待同步</span>
               <div class="ai-role-summary-list" data-ai-role-root>
                 <article class="ai-role-summary-card" data-ai-role-summary="GPT_FINAL" data-result-available="false" data-role-status-message="INITIAL_STATUS_GPT"><div class="role-heading"><div><span>GPT_FINAL</span><h3>最终裁决官</h3></div><strong>未调用</strong></div><p class="role-status">LEAKED_INITIAL_GPT_CONCLUSION</p><dl class="role-summary-metrics"><div><dt>方向</dt><dd>LEAKED_INITIAL_DIRECTION</dd></div><div><dt>置信度</dt><dd>LEAKED_INITIAL_CONFIDENCE</dd></div></dl></article>

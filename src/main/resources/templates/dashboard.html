@@ -3758,7 +3758,7 @@
                 <p class="home-section-kicker">当前资产决策</p>
                 <div class="home-focus-title-row">
                     <h2 id="home-focus-title"><span id="homeFocusSymbol">--</span></h2>
-                    <span class="home-state-badge" id="homeFocusAssetState">正在同步</span>
+                    <span class="home-state-badge" id="homeFocusAssetState">资产状态 · 正在同步</span>
                 </div>
                 <p id="homeFocusConclusion">等待当前资产上下文同步</p>
             </div>
@@ -3802,7 +3802,7 @@
                 <div id="kpi-opportunity"></div>
             </div>
             <div class="card kpi-card" id="cardConfused">
-                <h3>冲突阻断</h3>
+                <h3>系统冲突阻断</h3>
                 <div id="kpi-confused"></div>
             </div>
             <div class="card kpi-card" id="cardHotReset">
@@ -3917,7 +3917,7 @@
                         <tr><th>有效开始</th><td></td></tr>
                         <tr><th>有效结束</th><td></td></tr>
                         <tr><th>计划失效条件</th><td></td></tr>
-                        <tr><th>冲突阻断</th><td></td></tr>
+                        <tr><th>计划冲突阻断</th><td></td></tr>
                     </tbody></table></div></div>
                 </div>
             </section>
@@ -3958,7 +3958,7 @@
                         <div class="consistency-list">
                             <div class="consistency-row"><span>一致性等级</span><span class="value">等待同步</span></div>
                             <div class="consistency-row"><span>冲突等级</span><span class="value">等待同步</span></div>
-                            <div class="consistency-row"><span>是否进入冲突阻断</span><span class="value">否</span></div>
+                            <div class="consistency-row"><span>AI 一致性阻断</span><span class="value">否</span></div>
                         </div>
                         <div class="consistency-summary">
                             <span>一句话摘要</span>
@@ -7040,7 +7040,7 @@
             + '<div class="consistency-list">'
             + consistencyRow("一致性等级", status, "等待同步")
             + consistencyRow("冲突等级", aiApplicable ? options.conflictLevel : "不适用", aiApplicable ? "等待同步" : "不适用")
-            + consistencyRow("是否进入冲突阻断", aiApplicable && options.confused ? "是" : "否", "否")
+            + consistencyRow("AI 一致性阻断", aiApplicable && options.confused ? "是" : "否", "否")
             + '</div>'
             + '<div class="consistency-summary"><span>一句话摘要</span><p>' + escapeHtml(summary) + '</p></div>';
     }
@@ -7302,7 +7302,7 @@
             helper: "系统级 AI 运行状态"
         });
         put("kpi-opportunity", "待复核机会", s.pendingReview);
-        put("kpi-confused", "冲突阻断", s.confused);
+        put("kpi-confused", "系统冲突阻断", s.confused);
         put("kpi-hot-reset", "热重置", s.hotReset);
     }
 
@@ -7594,7 +7594,7 @@
         setText("homeFocusSymbol", formatSymbolPair(symbol) || "--");
         setText(
             "homeFocusAssetState",
-            asset ? state.label : (normalizedState === "loading" ? "正在同步" : "当前不可查看")
+            "资产状态 · " + (asset ? state.label : (normalizedState === "loading" ? "正在同步" : "当前不可查看"))
         );
         setText(
             "homeFocusConclusion",
@@ -7786,7 +7786,7 @@
             + '<div><dt>有效开始</dt><dd>' + escapeHtml(homeBusinessTime(verified(s.validFrom))) + '</dd></div>'
             + '<div><dt>有效结束</dt><dd>' + escapeHtml(homeBusinessTime(verified(s.expiresAt))) + '</dd></div>'
             + '<div class="wide"><dt>计划失效条件</dt><dd>' + escapeHtml(displayValue(verified(s.invalidCondition))) + '</dd></div>'
-            + '<div class="wide"><dt>冲突阻断</dt><dd>' + escapeHtml(cleanBlankValue(s.blockedReason) || "--") + '</dd></div></dl>'
+            + '<div class="wide"><dt>计划冲突阻断</dt><dd>' + escapeHtml(cleanBlankValue(s.blockedReason) || "--") + '</dd></div></dl>'
             + '<p class="position-source-note">系统建议，仅供人工复核；不会自动下单或创建持仓。</p></div>';
     }
 
@@ -10641,7 +10641,7 @@
         document.getElementById("kpi-data-quality").innerHTML = kpiHtml("数据质量分", dqAvg != null ? dqAvg : "—", dqAvg != null ? "摘要均值" : "等待同步", dataQualityLevel(dqAvg));
         document.getElementById("kpi-ai-conflict").innerHTML = kpiHtml("AI 冲突等级", conflict.value, conflict.note, conflict.level);
         document.getElementById("kpi-opportunity").innerHTML = kpiHtml("待复核机会", opportunity.value, opportunity.note, opportunity.level);
-        document.getElementById("kpi-confused").innerHTML = kpiHtml("冲突阻断", confusedValue, confusedNote, ccMetric.value > 0 ? 3 : (ccMetric.value === 0 ? 1 : 0));
+        document.getElementById("kpi-confused").innerHTML = kpiHtml("系统冲突阻断", confusedValue, confusedNote, ccMetric.value > 0 ? 3 : (ccMetric.value === 0 ? 1 : 0));
         document.getElementById("kpi-hot-reset").innerHTML = kpiHtml("热重置", hotValue, hotNote, hot.fired ? 3 : 1);
         renderHomeAlertEventRow(systemStatus, alerts);
         renderSidebarPanel(systemStatus, alerts, openPositionCount);

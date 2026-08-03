@@ -162,10 +162,11 @@ class Fe04ShellHomeDashboardContractTest {
                         "计划失效条件",
                         "有效开始",
                         "有效结束",
-                        "冲突阻断")
+                        "计划冲突阻断",
+                        "查看完整计划")
                 .doesNotContain("validPeriod");
         assertThat(mobilePosition)
-                .contains("Top 3", "入场逻辑", "方向支持", "反转状态", "风险等级", "当前建议")
+                .contains("Top 3", "小屏默认 Top 2", "查看完整持仓", "入场逻辑", "方向支持", "反转状态", "当前风险", "当前建议")
                 .doesNotContain("手动录入持仓</button>")
                 .doesNotContain("记录平仓")
                 .doesNotContain("复盘中心");
@@ -174,6 +175,12 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("manualPositionBtn")
                 .doesNotContain("reviewCenterLink")
                 .doesNotContain("position-action-btn");
+        assertThat(desktop)
+                .contains(
+                        "资产状态 · 正在同步",
+                        "系统冲突阻断",
+                        "计划冲突阻断",
+                        "AI 一致性阻断");
         assertThat(mobileAi)
                 .contains("data-ai-role-summary")
                 .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")
@@ -379,7 +386,7 @@ class Fe04ShellHomeDashboardContractTest {
                         "AI 一致性摘要",
                         "一致性等级",
                         "冲突等级",
-                        "是否进入冲突阻断",
+                        "AI 一致性阻断",
                         "一句话摘要",
                         "GPT_FINAL",
                         "GEMINI_REVIEW",
