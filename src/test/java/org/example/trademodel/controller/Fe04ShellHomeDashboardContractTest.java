@@ -160,13 +160,12 @@ class Fe04ShellHomeDashboardContractTest {
                         "杠杆建议",
                         "仓位建议",
                         "计划失效条件",
-                        "有效开始",
-                        "有效结束",
-                        "计划冲突阻断",
-                        "查看完整计划")
-                .doesNotContain("validPeriod");
+                        "有效期",
+                        "data-execution-field=\"validPeriod\"")
+                .doesNotContain("查看完整计划", "execution-details");
         assertThat(mobilePosition)
-                .contains("Top 3", "小屏默认 Top 2", "查看完整持仓", "入场逻辑", "方向支持", "反转状态", "当前风险", "当前建议")
+                .contains("Top3", "查看完整持仓", "入场逻辑", "方向支持", "反转状态", "当前风险", "当前建议")
+                .doesNotContain("data-position-expand", "position-third")
                 .doesNotContain("手动录入持仓</button>")
                 .doesNotContain("记录平仓")
                 .doesNotContain("复盘中心");

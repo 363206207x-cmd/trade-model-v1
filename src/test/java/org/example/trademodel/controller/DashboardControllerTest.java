@@ -467,7 +467,8 @@ public class DashboardControllerTest {
                 "data-asset-state", "state.label");
         assertThat(renderer).doesNotContain(
                 "一句话结论", "是否值得开仓", "数据来源", "数据状态",
-                "四周期新鲜度", "证据数", "分析时间");
+                "四周期新鲜度", "证据数", "分析时间",
+                "数据质量", "多周期", "Confused", "fieldSourceBadge");
     }
 
     @Test
@@ -480,10 +481,11 @@ public class DashboardControllerTest {
 
         assertThat(assets).contains(
                 "当前价格", "综合评分", "方向", "置信度", "风险等级",
-                "state.label", "data-asset-state",
-                "数据", "多周期", "Confused", "更新",
-                "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
-                "fieldSourceBadge(\"置信\"");
+                "state.label", "data-asset-state")
+                .doesNotContain(
+                        "数据质量", "多周期", "Confused", "更新",
+                        "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
+                        "fieldSourceBadge(\"置信\"");
         assertThat(html).contains("data-home-retry", "homeRetryButton");
         assertThat(loading).contains(
                 "window.__lastDashboardHome = null",
@@ -578,8 +580,8 @@ public class DashboardControllerTest {
                 .contains("frontendContract.executionPlanAccess(s)")
                 .contains(
                         "方向", "是否值得开仓", "入场区间", "止损", "止盈方案",
-                        "杠杆建议", "仓位建议", "有效开始", "有效结束",
-                        "计划失效条件", "冲突阻断")
+                        "杠杆建议", "仓位建议", "有效期",
+                        "计划失效条件", "function validityPeriod()")
                 .doesNotContain(
                         "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
                         "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
@@ -713,11 +715,12 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void homePositionSummaryDoesNotAddUncontractedPnl() throws Exception {
+    void homePositionSummaryUsesOnlyContractedPnlPercentage() throws Exception {
         String homePayloadRows = functionBody("renderHomePositionsFromPayload");
 
+        assertThat(homePayloadRows).contains("p.pnlPct", "formatPct");
         assertThat(homePayloadRows).doesNotContain(
-                "p.floatingPnl", "formatSignedAmount", "formatPct", "浮动盈亏");
+                "p.floatingPnl", "formatSignedAmount", "浮动盈亏");
     }
 
     @Test
@@ -4234,7 +4237,7 @@ public class DashboardControllerTest {
 
     private String consistencyCardSection() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
-        int startIndex = html.indexOf("<div class=\"home-consistency-summary\"");
+        int startIndex = html.indexOf("<div class=\"home-consistency-summary");
         assertThat(startIndex).isGreaterThanOrEqualTo(0);
         int endIndex = html.indexOf("<div class=\"home-ai-summary-cards\"", startIndex);
         assertThat(endIndex).isGreaterThan(startIndex);

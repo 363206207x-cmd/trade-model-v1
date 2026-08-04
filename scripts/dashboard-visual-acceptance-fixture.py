@@ -427,6 +427,7 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
         "positionSuggestion": "仅供人工复核",
         "validFrom": "2026-07-13T12:00:00Z",
         "expiresAt": "2026-07-14T12:00:00Z",
+        "validPeriod": "2026-07-13 12:00 至 2026-07-14 12:00",
         "invalidCondition": invalid_condition,
     }
 
@@ -903,6 +904,17 @@ class FixtureHandler(BaseHTTPRequestHandler):
                     "data-mobile-home-root data-client-home-bootstrap",
                     1,
                 )
+            visual_theme = query.get("visualTheme", [""])[0].lower()
+            if visual_theme in {"light", "dark"}:
+                theme_override = f"""<script id="dashboard-visual-theme">
+window.addEventListener("load", function () {{
+  var root = document.documentElement;
+  root.setAttribute("data-mobile-theme", "{visual_theme}");
+  if ("{visual_theme}" === "dark") root.setAttribute("data-theme", "dark");
+  else root.removeAttribute("data-theme");
+}});
+</script>"""
+                html_text = html_text.replace("</body>", theme_override + "\n</body>", 1)
             html = html_text.encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
