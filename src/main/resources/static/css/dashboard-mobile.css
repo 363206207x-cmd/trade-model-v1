@@ -2357,17 +2357,17 @@ body {
 }
 
 .asset-state {
-  max-width: 54%;
+  max-width: 190px;
   padding: 4px 7px;
-  overflow: hidden;
+  justify-self: end;
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.75rem;
   font-weight: 730;
   line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: right;
+  white-space: normal;
 }
 
 .asset-price-score {
@@ -2448,21 +2448,22 @@ body {
 
 .execution-section h2 {
   color: inherit;
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   font-weight: 780;
 }
 
 .execution-status-badge {
-  max-width: 145px;
+  max-width: 180px;
   padding: 5px 7px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #3d535d;
   border-radius: 4px;
   color: #9fd6df;
   font-size: 0.75rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  text-align: right;
+  white-space: normal;
 }
 
 .execution-section .semantic-state-line {
