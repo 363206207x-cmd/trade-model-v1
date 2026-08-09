@@ -3697,6 +3697,606 @@
             .home-ai-summary-cards { grid-column: 1; grid-row: auto; }
             .home-position-summary-list { grid-template-columns: 1fr; }
         }
+
+        /* Home Final Product Design: Figma is the visual baseline for the Home view. */
+        :root {
+            --home-canvas: #eef2f4;
+            --home-surface: #ffffff;
+            --home-surface-subtle: #f6f8f9;
+            --home-strong: #17212b;
+            --home-strong-panel: #e3f0f3;
+            --home-strong-panel-text: #17212b;
+            --home-text: #17212b;
+            --home-muted: #627080;
+            --home-line: #cfd8df;
+            --home-line-strong: #8ba2b2;
+            --home-accent: #087c99;
+            --home-accent-soft: #e1f1f4;
+            --home-positive: #00815f;
+            --home-warning: #a76b00;
+            --home-negative: #c43343;
+            --home-nav-width: 208px;
+        }
+        [data-theme="dark"] {
+            --home-canvas: #0a0f13;
+            --home-surface: #141a20;
+            --home-surface-subtle: #182128;
+            --home-strong: #102a32;
+            --home-strong-panel: #19414c;
+            --home-strong-panel-text: #f2f6f8;
+            --home-text: #f2f5f7;
+            --home-muted: #a8b4bf;
+            --home-line: #35414d;
+            --home-line-strong: #557180;
+            --home-accent: #5fc4dc;
+            --home-accent-soft: #173b45;
+            --home-positive: #55d6a7;
+            --home-warning: #f0b848;
+            --home-negative: #ff8492;
+        }
+        body {
+            padding-left: var(--home-nav-width);
+            background: var(--home-canvas);
+            color: var(--home-text);
+        }
+        .top-bar {
+            position: absolute;
+            inset: 0 0 auto var(--home-nav-width);
+            width: auto;
+            min-height: 88px;
+            padding: 24px 32px 8px 24px;
+            border: 0;
+            background: transparent;
+            backdrop-filter: none;
+        }
+        .desktop-breadcrumb {
+            margin: 0 0 5px;
+            color: var(--home-accent);
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .brand-block h1 {
+            font-size: 28px;
+            font-weight: 760;
+            line-height: 1.15;
+        }
+        .top-right { align-self: center; }
+        .top-right > :not(.header-update) { display: none !important; }
+        .header-update {
+            color: var(--home-muted);
+            font-family: var(--ui-number-font);
+            font-size: 10px;
+            font-weight: 500;
+        }
+        .wrap {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 88px 32px 34px 24px;
+        }
+        .dashboard-shell { display: block; }
+        .home-sidebar {
+            inset: 0 auto 0 0;
+            width: var(--home-nav-width);
+            padding: 28px 16px 24px;
+            border-right: 1px solid var(--home-line);
+            background: var(--home-surface);
+        }
+        .sidebar-brand { padding: 0 8px 50px; }
+        .sidebar-logo { display: none; }
+        .sidebar-brand-title {
+            color: var(--home-text);
+            font-size: 16px;
+            font-weight: 780;
+            white-space: nowrap;
+        }
+        .sidebar-brand-subtitle {
+            margin-top: 3px;
+            color: var(--home-muted);
+            font-size: 10px;
+        }
+        .product-navigation { gap: 8px; }
+        .product-nav-item {
+            min-height: 42px;
+            padding: 11px 16px;
+            border-radius: 4px;
+            color: var(--home-muted);
+            font-size: 14px;
+            font-weight: 570;
+        }
+        .product-nav-item.active {
+            background: var(--home-accent-soft);
+            color: var(--home-accent);
+            box-shadow: none;
+        }
+        .sidebar-nav-status,
+        .sidebar-divider { display: none; }
+        .sidebar-product-boundary {
+            position: absolute;
+            inset: auto 24px 28px;
+            color: var(--home-muted);
+        }
+        .sidebar-product-boundary p { margin: 0 0 10px; font-size: 11px; }
+        .sidebar-product-boundary span { font-family: var(--ui-number-font); font-size: 9px; }
+        .dashboard-main { width: 100%; }
+
+        .home-focus-summary {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 4fr) minmax(0, 3fr);
+            height: 84px;
+            margin: 0;
+            border: 1px solid var(--home-line-strong);
+            border-radius: 8px;
+            background: var(--home-surface);
+            overflow: hidden;
+        }
+        .home-focus-identity,
+        .home-focus-primary,
+        .home-focus-secondary {
+            min-width: 0;
+            margin: 0;
+            padding: 14px 18px;
+            border: 0;
+            background: transparent;
+            color: var(--home-text);
+        }
+        .home-focus-identity { display: grid; align-content: center; }
+        .home-focus-title-row h2 {
+            color: var(--home-text);
+            font-family: var(--ui-number-font);
+            font-size: 18px;
+            font-weight: 740;
+        }
+        .home-focus-price {
+            margin-top: 4px;
+            font-family: var(--ui-number-font);
+            font-size: 20px;
+            line-height: 1;
+        }
+        .home-focus-primary,
+        .home-focus-secondary {
+            display: grid;
+            align-items: center;
+            gap: 12px;
+            border-left: 0;
+        }
+        .home-focus-primary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .home-focus-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .home-focus-primary dt,
+        .home-focus-secondary dt {
+            color: var(--home-muted);
+            font-size: 10px;
+        }
+        .home-focus-primary dd,
+        .home-focus-secondary dd {
+            margin: 5px 0 0;
+            color: var(--home-text);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 720;
+            line-height: 1.25;
+        }
+        .home-focus-primary .focus-direction dd,
+        #homeFocusConfidence,
+        #homeFocusDataQuality,
+        #homeFocusAiSystem,
+        #homeFocusHotReset { color: var(--home-positive); }
+        #homeFocusRisk { color: var(--home-warning); }
+        .layer1 { display: none; }
+
+        .home-signal-heading { display: none; }
+        .home-alert-event-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            height: 48px;
+            margin: 12px 0 0;
+            gap: 0;
+            border: 1px solid var(--home-line);
+            border-radius: 4px;
+            background: var(--home-surface);
+            overflow: hidden;
+        }
+        .compact-list-card {
+            display: grid;
+            grid-template-columns: 68px 1fr;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            padding: 0 16px;
+            border: 0;
+            border-right: 1px solid var(--home-line);
+            border-radius: 0;
+            background: transparent;
+        }
+        .compact-list-card:last-child { border-right: 0; }
+        .compact-list-card h3 {
+            margin: 0;
+            color: var(--home-warning);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .compact-list-card:first-child h3 { color: var(--home-negative); }
+        .compact-list { min-width: 0; }
+        .compact-list-item {
+            display: none;
+            min-height: 0;
+            padding: 0;
+            border: 0;
+        }
+        .compact-list-item:first-child {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .compact-list-item .item-main {
+            overflow: hidden;
+            color: var(--home-text);
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .compact-list-item .item-meta {
+            margin-left: auto;
+            color: var(--home-muted);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .compact-list .empty-hint { margin: 0; font-size: 11px; }
+
+        .layer2-head {
+            display: flex;
+            align-items: end;
+            min-height: 28px;
+            margin: 16px 0 8px;
+        }
+        .module-title { display: block; color: var(--home-text); font-size: 17px; }
+        .module-title small { display: none; }
+        .asset-context-helper {
+            margin: 0 120px 1px auto;
+            color: var(--home-muted);
+            font-size: 10px;
+        }
+        .layer2-head .ctl { display: none; }
+        .tiles-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-auto-flow: row;
+            grid-auto-columns: auto;
+            gap: 16px;
+            height: 126px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .coin-tile {
+            width: 100%;
+            min-height: 126px;
+            height: 126px;
+            padding: 14px 16px;
+            border: 1px solid var(--home-line);
+            border-radius: 8px;
+            background: var(--home-surface);
+        }
+        .coin-tile:hover { transform: none; border-color: var(--home-line-strong); }
+        .coin-tile.selected {
+            border: 2px solid var(--home-accent);
+            padding: 13px 15px;
+            background: var(--home-surface);
+            box-shadow: none;
+        }
+        .tile-headline { display: flex; align-items: center; justify-content: space-between; min-height: 18px; }
+        .tile-symbol-text { color: var(--home-text); font-size: 14px; font-weight: 750; }
+        .tile-score-pill {
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--home-accent);
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .asset-price-line {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 168px;
+            align-items: center;
+            gap: 16px;
+            margin: 8px 0 0;
+        }
+        .asset-price-value {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .asset-price-value small { color: var(--home-muted); font-size: 10px; }
+        .asset-price-value strong { font-family: var(--ui-number-font); font-size: 20px; }
+        .asset-decision-pair {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 3px 10px;
+            align-items: baseline;
+        }
+        .asset-decision-pair small { color: var(--home-muted); font-size: 9px; }
+        .asset-decision-pair b { font-size: 12px; }
+        .asset-decision-pair .tile-bias { color: var(--home-accent); font-size: 13px; }
+        .asset-secondary-strip {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 0;
+            color: var(--home-muted);
+            font-size: 9px;
+            white-space: nowrap;
+        }
+        .asset-secondary-strip span:not(:last-child)::after { content: " ·"; }
+        .asset-secondary-strip strong { color: inherit; font-size: inherit; font-weight: 620; }
+        .dashboard-boundary-note { display: none; }
+
+        .position-execution-row {
+            display: block;
+            margin-top: 24px;
+        }
+        #homeExecutionCard {
+            display: grid;
+            grid-template-rows: 43px minmax(0, 1fr);
+            min-height: 226px;
+            height: 226px;
+            padding: 18px 22px;
+            border: 1px solid var(--home-line-strong);
+            border-radius: 8px;
+            background: var(--home-strong);
+            color: #f2f6f8;
+        }
+        #homeExecutionCard .position-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0;
+        }
+        #homeExecutionCard .position-card-title { margin-top: 3px; color: #f2f6f8; font-size: 18px; }
+        #homeExecutionCard .position-card-helper { display: none; }
+        #homeExecutionCard .home-section-kicker { color: #5cc2dc; }
+        .execution-header-state {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #a9bac3;
+            font-size: 10px;
+        }
+        .execution-header-state strong { color: #f2f6f8; font-weight: 650; }
+        #homeExecutionCard .context-symbol {
+            display: inline-flex;
+            border-color: #4b626e;
+            background: transparent;
+            color: #a9bac3;
+        }
+        #homeExecutionContent { min-height: 0; margin: 0; }
+        .execution-card-body {
+            display: grid;
+            grid-template-columns: 430px 1fr;
+            grid-template-rows: minmax(0, 1fr);
+            gap: 28px;
+            height: 100%;
+        }
+        .execution-status-band {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+        .execution-status-band strong { color: #f2f6f8; font-size: 21px; }
+        .execution-status-band span span { margin-top: 2px; color: #8fa2ae; font-size: 10px; }
+        .execution-status-band .plan-identity { display: none; }
+        .execution-primary-grid {
+            grid-column: 1;
+            display: grid;
+            grid-template-columns: 112px 1fr;
+            gap: 10px;
+            margin: 0;
+            align-self: stretch;
+            align-items: end;
+        }
+        .execution-primary-grid > div,
+        .execution-level-grid > div,
+        .execution-advisory-grid > div {
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+        }
+        .execution-primary-grid .plan-worth { display: none; }
+        .execution-primary-grid .plan-direction { align-self: end; }
+        .execution-primary-grid .plan-entry {
+            align-self: end;
+            padding: 12px 14px;
+            border-radius: 4px;
+            background: var(--home-strong-panel);
+        }
+        .execution-primary-grid dt,
+        .execution-level-grid dt { color: #8fa2ae; font-size: 9px; }
+        .execution-primary-grid dd,
+        .execution-level-grid dd { margin-top: 5px; color: #f2f6f8; font-size: 13px; }
+        .execution-primary-grid .plan-direction dd { color: #f2f6f8; font-size: 25px; }
+        .execution-primary-grid .plan-entry dd { color: var(--home-strong-panel-text); font-size: 19px; }
+        .execution-level-grid {
+            grid-column: 2;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(2, 1fr);
+            gap: 12px 34px;
+            margin: 0;
+            align-items: center;
+        }
+        .execution-level-grid .take-profit { grid-column: auto; }
+        .execution-level-grid .plan-invalid { grid-column: span 2; }
+        #homeExecutionContent[data-module-state="partial"] .execution-status-band,
+        #homeExecutionContent[data-module-state="error"] .execution-status-band,
+        #homeExecutionContent[data-module-state="missing"] .execution-status-band { background: transparent; }
+
+        #homePositionCard {
+            min-height: 136px;
+            margin-top: 18px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+        #homePositionCard .position-card-head {
+            display: flex;
+            align-items: center;
+            min-height: 24px;
+            margin: 0 0 8px;
+        }
+        #homePositionCard .position-card-head > div {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            width: 100%;
+        }
+        #homePositionCard .position-card-title { color: var(--home-text); font-size: 17px; }
+        #homePositionCard .position-card-helper { color: var(--home-muted); font-size: 9px; }
+        #homePositionCard .position-overview-link { display: none; }
+        .position-flow-message { display: none; }
+        #homePositionContent { min-height: 136px; overflow: visible; }
+        .home-position-summary-list {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .home-position-summary-card {
+            min-height: 136px;
+            height: 136px;
+            padding: 12px 14px;
+            border: 1px solid var(--home-line);
+            border-radius: 8px;
+            background: var(--home-surface);
+        }
+        .home-position-summary-head {
+            display: grid;
+            grid-template-columns: 1fr 78px 88px;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: var(--home-muted);
+            font-size: 9px;
+        }
+        .home-position-summary-head strong { justify-self: end; color: var(--home-text); font-size: 14px; }
+        .position-pnl.positive { color: var(--home-positive); }
+        .position-pnl.negative { color: var(--home-negative); }
+        .position-pnl.neutral { color: var(--home-muted); }
+        .home-position-symbol-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 7px;
+        }
+        .home-position-symbol-row strong { font-family: var(--ui-number-font); font-size: 14px; }
+        .home-position-semantic-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 8px;
+            margin: 9px 0 0;
+            padding-top: 8px;
+            border-top: 1px solid var(--home-line);
+        }
+        .home-position-semantic-grid > div { min-width: 0; }
+        .home-position-semantic-grid dt {
+            color: var(--home-muted);
+            font-size: 9px;
+        }
+        .home-position-semantic-grid dd {
+            margin: 3px 0 0;
+            overflow: hidden;
+            color: var(--home-text);
+            font-size: 10px;
+            font-weight: 650;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .position-risk-badge {
+            padding: 0;
+            background: transparent;
+            color: var(--home-positive);
+            font-size: 10px;
+        }
+
+        .ai-decision-row { margin-top: 16px; }
+        #homeAiPanel {
+            display: block;
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+        #homeAiPanel > .ai-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 24px;
+            margin-bottom: 8px;
+        }
+        .ai-card-title { color: var(--home-text); font-size: 17px; }
+        .home-ai-consistency-status { color: var(--home-positive); font-size: 10px; }
+        .home-consistency-contract { display: none; }
+        .home-ai-summary-cards {
+            display: block;
+            padding: 10px;
+            border: 1px solid var(--home-line);
+            border-radius: 8px;
+            background: var(--home-surface);
+        }
+        .home-ai-role-tabs {
+            display: flex;
+            gap: 4px;
+            margin: 0;
+            padding: 3px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--home-surface-subtle);
+        }
+        .home-ai-role-tab {
+            min-height: 34px;
+            border-radius: 4px;
+            color: var(--home-muted);
+            font-family: var(--ui-number-font);
+            font-size: 10px;
+        }
+        .home-ai-role-tab[aria-selected="true"] {
+            background: var(--home-surface);
+            color: var(--home-accent);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+        }
+        .home-ai-role-panels {
+            min-height: 84px;
+            padding: 12px 4px 2px;
+        }
+        .home-ai-summary-card {
+            min-height: 70px;
+            height: auto;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+        .home-ai-summary-card[hidden] { display: none; }
+        .home-ai-summary-head {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            color: var(--home-muted);
+            font-size: 9px;
+        }
+        .home-ai-summary-head strong { color: var(--home-accent); font-size: 9px; }
+        .home-ai-summary-head span { color: var(--home-muted); }
+        .home-ai-summary-head em { margin-left: auto; font-size: 9px; }
+        .home-ai-summary-card > p { margin-top: 16px; color: var(--home-text); font-size: 13px; font-weight: 650; line-height: 1.45; }
+
+        @media (max-width: 1080px) {
+            .home-focus-summary { grid-template-columns: 190px 1fr 1fr; }
+            .asset-context-helper { margin-right: 0; }
+            .execution-card-body { grid-template-columns: 360px 1fr; }
+        }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
         }
@@ -3705,9 +4305,11 @@
 <body data-monitor-mode="system">
     <header class="top-bar">
         <div class="brand-block">
-            <h1><span data-desktop-page-title tabindex="-1">首页总览</span> <span class="header-update">更新时间：<span id="lastUpdatedText">--:--:--</span></span></h1>
+            <p class="desktop-breadcrumb">HOME · 当前资产上下文</p>
+            <h1><span data-desktop-page-title tabindex="-1">首页决策总览</span></h1>
         </div>
         <div class="top-right">
+            <span class="header-update">数据更新 <span id="lastUpdatedText">--:--:--</span> · 当前读取 <span id="headerReadStateText">同步中</span></span>
             <span class="status-pill"><span class="runtime-dot" id="runtimeDot"></span><span class="pill-label">数据状态</span><span class="pill-value status-muted" id="runtimeText">待同步</span></span>
             <span class="status-pill"><span class="pill-label">AI 状态</span><span class="pill-value status-muted" id="headerAiStatusText">待同步</span></span>
             <span class="status-pill"><span class="pill-label">数据源</span><span class="pill-value" id="headerSourceStatusText">待同步</span></span>
@@ -3734,8 +4336,8 @@
                 <div class="sidebar-brand">
                     <span class="sidebar-logo" aria-hidden="true"></span>
                     <span>
-                        <span class="sidebar-brand-title">TRADE MODEL V1</span>
-                        <span class="sidebar-brand-subtitle">决策复核工作台</span>
+                        <span class="sidebar-brand-title">TRADE MODEL</span>
+                        <span class="sidebar-brand-subtitle">V1 · PRODUCT FIRST</span>
                     </span>
                 </div>
                 <nav class="product-navigation" aria-label="产品页面">
@@ -3748,32 +4350,39 @@
                 <div class="sidebar-slot-list" id="sidebarSlotList" hidden></div>
                 <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">消息与个人页暂未开放</p>
                 <div class="sidebar-divider" aria-hidden="true"></div>
-                <p class="sidebar-brand-subtitle">状态与方向分开显示，结论仅供人工复核。</p>
+                <div class="sidebar-product-boundary">
+                    <p>只读决策 · 不自动交易</p>
+                    <span>PRODUCT_CONTRACT_ONLY</span>
+                </div>
             </aside>
             <main class="dashboard-main">
         <div data-desktop-home-view data-desktop-dashboard-root>
         <section class="home-focus-summary" id="homeFocusSummary" data-module-state="loading"
                  aria-labelledby="home-focus-title">
             <div class="home-focus-identity">
-                <p class="home-section-kicker">当前资产决策</p>
                 <div class="home-focus-title-row">
                     <h2 id="home-focus-title"><span id="homeFocusSymbol">--</span></h2>
-                    <span class="home-state-badge" id="homeFocusAssetState">资产状态 · 正在同步</span>
                 </div>
-                <p id="homeFocusConclusion">等待当前资产上下文同步</p>
+                <strong class="home-focus-price" id="homeFocusPrice">--</strong>
+                <p class="visually-hidden" id="homeFocusConclusion">等待当前资产上下文同步</p>
             </div>
             <dl class="home-focus-primary" aria-label="当前资产核心状态">
-                <div class="focus-direction"><dt>方向</dt><dd id="homeFocusDirection">--</dd></div>
+                <div class="focus-direction"><dt>市场趋势</dt><dd id="homeFocusDirection">--</dd></div>
                 <div><dt>置信度</dt><dd id="homeFocusConfidence">--</dd></div>
                 <div><dt>风险</dt><dd id="homeFocusRisk">--</dd></div>
-                <div><dt>数据质量</dt><dd id="homeFocusDataQuality">--</dd></div>
+                <div><dt>资产状态</dt><dd id="homeFocusAssetState">资产状态 · 正在同步</dd></div>
             </dl>
             <dl class="home-focus-secondary" aria-label="当前资产辅助状态">
-                <div><dt>综合评分</dt><dd id="homeFocusScore">--</dd></div>
-                <div><dt>多周期</dt><dd id="homeFocusMultiTimeframe">--</dd></div>
-                <div><dt>Confused</dt><dd id="homeFocusConfused">--</dd></div>
-                <div><dt>更新时间</dt><dd id="homeFocusUpdatedAt">--</dd></div>
+                <div><dt>数据质量</dt><dd id="homeFocusDataQuality">--</dd></div>
+                <div><dt>AI 系统</dt><dd id="homeFocusAiSystem">--</dd></div>
+                <div><dt>Hot Reset</dt><dd id="homeFocusHotReset">--</dd></div>
             </dl>
+            <div class="home-focus-contract-anchors" hidden>
+                <span id="homeFocusScore">--</span>
+                <span id="homeFocusMultiTimeframe">--</span>
+                <span id="homeFocusConfused">--</span>
+                <span id="homeFocusUpdatedAt">--</span>
+            </div>
         </section>
         <!-- 第一层 -->
         <div class="layer1">
@@ -3833,6 +4442,7 @@
         <!-- 第二层 -->
         <div class="layer2-head">
             <span class="module-title"><small>决策观察</small>重点资产</span>
+            <p class="asset-context-helper">点击仅切换资产计划、AI 与一致性；不改变 UserPosition</p>
             <div class="ctl">
                 <label class="muted homepage-secondary-control" hidden>模式
                     <select id="modeSelect" class="btn" disabled>
@@ -3899,11 +4509,14 @@
             <section class="card" id="homeExecutionCard" aria-label="执行建议">
                 <div class="position-card-head">
                     <div>
-                        <p class="home-section-kicker">核心决策</p>
-                        <p class="position-card-title">Execution Plan<span class="visually-hidden">系统执行建议（非交易指令）</span></p>
-                        <p class="position-card-helper">当前资产的精确计划 · 仅供人工复核</p>
+                        <p class="home-section-kicker">EXECUTION PLAN · 系统资产计划</p>
+                        <p class="position-card-title">Execution Plan · 当前资产系统建议<span class="visually-hidden">系统执行建议（非交易指令）</span></p>
+                        <p class="position-card-helper">不是持仓，不是订单，不代表已执行</p>
                     </div>
-                    <span class="context-symbol" id="homeExecutionSymbol">--</span>
+                    <div class="execution-header-state">
+                        <strong id="homeExecutionStatus">是否值得开仓 · 待同步</strong>
+                        <span class="context-symbol" id="homeExecutionSymbol">--</span>
+                    </div>
                 </div>
                 <div id="homeExecutionContent">
                     <div class="execution-card-body"><div class="execution-plan-panel"><table class="execution-plan-table"><tbody>
@@ -3914,23 +4527,20 @@
                         <tr><th>止盈方案</th><td></td></tr>
                         <tr><th>杠杆建议</th><td></td></tr>
                         <tr><th>仓位建议</th><td></td></tr>
-                        <tr><th>有效开始</th><td></td></tr>
-                        <tr><th>有效结束</th><td></td></tr>
                         <tr><th>计划失效条件</th><td></td></tr>
-                        <tr><th>计划冲突阻断</th><td></td></tr>
+                        <tr><th>有效期</th><td></td></tr>
                     </tbody></table></div></div>
                 </div>
             </section>
             <section class="card" id="homePositionCard" aria-label="持仓监控">
                 <div class="position-card-head">
                     <div>
-                        <p class="home-section-kicker">用户真实持仓 · 持仓摘要</p>
-                        <p class="position-card-title">Top 3 UserPosition<span class="visually-hidden">用户真实持仓 Top 3 摘要</span></p>
-                        <p class="position-card-helper">独立于当前资产上下文</p>
+                        <p class="position-card-title">Top 3 UserPosition · 持仓摘要<span class="visually-hidden">用户真实持仓 Top 3 摘要</span></p>
+                        <p class="position-card-helper">OWNER SCOPED · 与资产选择独立</p>
                     </div>
                     <a href="/dashboard/positions" class="position-overview-link">查看持仓</a>
                 </div>
-                <p class="position-source-note">仅显示手动录入持仓；数据来自当前用户只读持仓模型</p>
+                <p class="position-source-note visually-hidden">仅显示手动录入持仓；数据来自当前用户只读持仓模型</p>
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <div class="overview-empty-state" role="status">
@@ -3944,12 +4554,12 @@
             <section class="card" id="homeAiPanel" aria-label="AI 三角色摘要">
                 <div class="ai-panel-head">
                     <div>
-                        <p class="home-section-kicker">现有结果的只读复核</p>
-                        <p class="ai-card-title">Three AI 摘要</p>
-                        <p class="ai-boundary-line">GPT Final 为主视图；Gemini Review 与 Grok Challenge 提供固定职责复核。</p>
+                        <p class="ai-card-title">三 AI 摘要</p>
+                        <p class="ai-boundary-line visually-hidden">GPT Final 为主视图；Gemini Review 与 Grok Challenge 提供固定职责复核。</p>
                     </div>
+                    <strong class="home-ai-consistency-status" id="homeAiConsistencyStatus">AI 一致性 · 等待同步</strong>
                 </div>
-                <div class="home-consistency-summary" aria-label="AI 一致性摘要">
+                <div class="home-consistency-summary home-consistency-contract" aria-label="AI 一致性摘要">
                     <p class="ai-card-title">AI 一致性摘要</p>
                     <div id="homeConsistencyContent" class="consistency-panel">
                         <div class="consistency-topline">
@@ -3967,9 +4577,17 @@
                     </div>
                 </div>
                 <div class="home-ai-summary-cards" id="homeAiSummaryCards" aria-label="AI 三角色摘要">
-                    <article class="home-ai-summary-card" data-home-ai-role="GPT_FINAL"><strong>GPT_FINAL</strong><span>最终裁决官</span><p>当前观点待同步</p></article>
-                    <article class="home-ai-summary-card" data-home-ai-role="GEMINI_REVIEW"><strong>GEMINI_REVIEW</strong><span>冲突复核官</span><p>当前复核待同步</p></article>
-                    <article class="home-ai-summary-card" data-home-ai-role="GROK_CHALLENGE"><strong>GROK_CHALLENGE</strong><span>反方挑战官</span><p>当前挑战待同步</p></article>
+                    <div class="home-ai-role-tabs" role="tablist" aria-label="AI 三角色">
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="true" aria-disabled="true">GPT_FINAL</button>
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1">GEMINI_REVIEW</button>
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1">GROK_CHALLENGE</button>
+                    </div>
+                    <div class="home-ai-role-panels">
+                        <article class="home-ai-summary-card" role="tabpanel" data-home-ai-role="GPT_FINAL">
+                            <div class="home-ai-summary-head"><strong>GPT_FINAL</strong><span> · 最终裁决官</span><em>待同步</em></div>
+                            <p>当前观点待同步</p>
+                        </article>
+                    </div>
                 </div>
             </section>
         </div>
@@ -6462,6 +7080,25 @@
         return key ? (labels[key] || "未知状态") : "等待首次监控";
     }
 
+    function monitorConclusionLabel(raw) {
+        var labels = {
+            LOGIC_VALID: "逻辑仍成立",
+            LOGIC_WEAKENED: "逻辑弱化",
+            PLAN_INVALIDATED: "计划失效",
+            NEAR_STOP_LOSS: "接近止损",
+            NEAR_TAKE_PROFIT: "接近止盈",
+            HIGH_RISK: "高风险观察",
+            HIGH_RISK_OBSERVATION: "高风险观察",
+            WAIT_USER_CONFIRM_CLOSE: "等待用户确认平仓",
+            WAITING_CONFIRMATION: "等待用户确认平仓"
+        };
+        var text = cleanBlankValue(raw);
+        if (!text) return "当前不可查看";
+        var key = text.toUpperCase();
+        if (labels[key]) return labels[key];
+        return /^[A-Z0-9_]+$/.test(key) ? "当前不可查看" : text;
+    }
+
     function directionSupportStatusLabel(raw) {
         var labels = {
             SUPPORTED: "当前方向仍获支持",
@@ -7304,6 +7941,8 @@
         put("kpi-opportunity", "待复核机会", s.pendingReview);
         put("kpi-confused", "系统冲突阻断", s.confused);
         put("kpi-hot-reset", "热重置", s.hotReset);
+        setText("homeFocusAiSystem", cleanBlankValue(h.aiStatusLabel) || "--");
+        setText("homeFocusHotReset", homeCardValue(s.hotReset));
     }
 
     function renderHomeCompactRows(id, rows, fallbackRows) {
@@ -7592,6 +8231,7 @@
         root.dataset.moduleState = normalizedState;
         root.dataset.direction = String(safeAsset.marketBias || "MISSING").toLowerCase();
         setText("homeFocusSymbol", formatSymbolPair(symbol) || "--");
+        setText("homeFocusPrice", asset && safeAsset.latestPrice != null ? formatPrice(safeAsset.latestPrice) : "--");
         setText(
             "homeFocusAssetState",
             "资产状态 · " + (asset ? state.label : (normalizedState === "loading" ? "正在同步" : "当前不可查看"))
@@ -7616,7 +8256,7 @@
         var box = document.getElementById("tilesRow");
         if (!box) return;
         box.dataset.homeState = frontendContract.normalizeModuleState(moduleState, "MISSING").toLowerCase();
-        var list = fixedHomeAssetList(assets);
+        var list = fixedHomeAssetList(assets).slice(0, 3);
         if (!list.length) {
             updateAssetDetailLink(null);
             box.innerHTML = '<div class="overview-empty-state" role="status">'
@@ -7639,39 +8279,25 @@
             var priceText = asset.latestPrice != null ? formatPrice(asset.latestPrice) : "--";
             if (!priceText || priceText === "—") priceText = "--";
             var scoreText = asset.compositeScore != null ? String(asset.compositeScore) : "--";
-            var coinCls = coinAvatarClass(rawSymbol);
-            var fieldSources = asset.fieldSourceStatus || {};
             var assetModuleState = frontendContract.normalizeModuleState(asset.moduleState, "MISSING").toLowerCase();
-            var multiTimeframe = cleanBlankValue(asset.multiTimeframeState) || "缺失";
-            var confused = asset.confused === true ? "是" : (asset.confused === false ? "否" : "缺失");
             return '<div class="coin-tile bias-' + bcls + selected + '" role="button" tabindex="0"'
                 + ' data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '"'
                 + ' data-analysis-id="' + escapeHtml(analysisId) + '"'
                 + ' data-module-state="' + escapeHtml(assetModuleState) + '"'
                 + ' data-asset-state="' + escapeHtml(state.code) + '"'
-                + ' aria-label="切换到 ' + escapeHtml(formatSymbolPair(rawSymbol)) + ' 决策上下文">' +
-                '<div class="tile-headline"><span class="coin-avatar ' + bcls + (coinCls ? ' ' + coinCls : '') + '">' + escapeHtml(coinAvatarText(rawSymbol)) + '</span>'
-                + '<span><span class="tile-symbol-text">' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span></span>'
-                + '<span class="tile-score-pill ' + escapeHtml(state.tone) + '">' + escapeHtml(state.label) + '</span></div>' +
-                '<div class="tile-primary">' +
-                '<div class="asset-price-line"><span><small>当前价格</small><strong>' + escapeHtml(priceText) + '</strong></span>'
-                + '<span class="asset-score">综合评分 ' + escapeHtml(scoreText) + '</span></div>'
-                + '<div class="asset-decision-line">'
-                + '<span class="asset-direction"><small>方向</small><strong class="tile-bias ' + bcls + '">' + escapeHtml(bias || "当前判断不可用") + '</strong></span>'
-                + '<span><small>置信度</small><strong>' + escapeHtml(confidenceText || "--") + '</strong></span>'
-                + '<span><small>风险等级</small><strong>' + escapeHtml(riskText || "--") + '</strong></span>'
-                + '</div>'
+                + ' aria-label="切换到 ' + escapeHtml(formatSymbolPair(rawSymbol)) + ' 决策上下文">'
+                + '<div class="tile-headline"><span class="tile-symbol-text">'
+                + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "") + '</span>'
+                + '<span class="tile-score-pill ' + escapeHtml(state.tone) + '">资产状态 · '
+                + escapeHtml(state.label) + '</span></div>'
+                + '<div class="asset-price-line"><span class="asset-price-value"><small>当前价格</small><strong>' + escapeHtml(priceText) + '</strong></span>'
+                + '<span class="asset-decision-pair"><small>方向</small><b class="tile-bias ' + bcls + '">'
+                + escapeHtml(bias || "当前判断不可用") + '</b><small>综合评分</small><b>'
+                + escapeHtml(scoreText) + '</b></span></div>'
                 + '<div class="asset-secondary-strip" aria-label="资产辅助状态">'
-                + '<span>数据 <strong>' + escapeHtml(dataQualityText(asset.dataQuality)) + '</strong></span>'
-                + '<span>多周期 <strong>' + escapeHtml(multiTimeframe) + '</strong></span>'
-                + '<span>Confused <strong>' + escapeHtml(confused) + '</strong></span>'
-                + '<span>更新 <strong>' + escapeHtml(homeAssetBusinessTime(asset.updatedAt)) + '</strong></span>'
-                + '</div>'
-                + '<div class="asset-source-line" aria-label="字段来源">'
-                + fieldSourceBadge("价格", fieldSources.latestPrice)
-                + fieldSourceBadge("评分", fieldSources.score)
-                + fieldSourceBadge("置信", fieldSources.confidence)
-                + '</div></div></div>';
+                + '<span>置信度 <strong>' + escapeHtml(confidenceText || "--") + '</strong></span>'
+                + '<span>风险等级 <strong>' + escapeHtml(riskText || "--") + '</strong></span>'
+                + '</div></div>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".coin-tile"), function (el) {
             function selectAsset() {
@@ -7716,29 +8342,39 @@
             var positionId = p.positionId != null ? p.positionId : p.id;
             var direction = value(p.directionLabel || positionSideText(p.direction), "--");
             var risk = value(p.riskLevelLabel || p.riskLevel, "--");
+            var monitorConclusion = monitorConclusionLabel(p.monitorConclusion);
+            var suggestedAction = value(p.suggestedManualActionText, "当前不可查看");
+            var entryLogicStatus = cleanBlankValue(p.entryLogicStatusLabel)
+                || (cleanBlankValue(p.entryLogicStatus) ? positionLogicStatusLabel(p.entryLogicStatus) : "当前不可查看");
             var monitorMetadata = [
                 "持仓状态 " + value(p.positionStatusLabel || p.positionStatus, "--"),
                 "方向支持 " + value(p.directionSupportStatusLabel || p.directionSupportStatus, "--"),
                 "反转状态 " + value(p.reversalStatusLabel || p.reversalStatus, "--"),
                 "更新时间 " + homeAssetBusinessTime(p.updatedAt)
             ].join("；");
+            var pnl = p.pnlPct != null ? formatPct(p.pnlPct) : "--";
+            var pnlNumber = Number(p.pnlPct);
+            var pnlTone = Number.isFinite(pnlNumber) ? (pnlNumber > 0 ? "positive" : (pnlNumber < 0 ? "negative" : "neutral")) : "neutral";
             return '<article class="home-position-summary-card" data-position-id="'
                 + escapeHtml(normalizePositionId(positionId)) + '" data-module-state="'
                 + escapeHtml(frontendContract.normalizeModuleState(p.moduleState, "PARTIAL").toLowerCase())
                 + '" aria-label="' + escapeHtml(value(p.symbol, "--") + " " + direction + "；" + monitorMetadata) + '">'
-                + '<div class="home-position-summary-head"><strong>'
-                + escapeHtml(value(p.symbol, "--")) + '</strong><span>' + escapeHtml(direction) + '</span>'
-                + '<em class="position-risk-badge">风险 ' + escapeHtml(risk) + '</em></div>'
-                + '<dl class="position-keyline">'
+                + '<div class="home-position-summary-head"><span>MY POSITION</span><span>方向 ' + escapeHtml(direction) + '</span>'
+                + '<strong class="position-pnl ' + pnlTone + '">' + escapeHtml(pnl) + '</strong></div>'
+                + '<div class="home-position-symbol-row"><strong>' + escapeHtml(value(p.symbol, "--")) + '</strong>'
+                + '<span class="position-risk-badge">持仓风险 · ' + escapeHtml(risk) + '</span></div>'
+                + '<dl class="home-position-semantic-grid">'
+                + '<div><dt>监控结论</dt><dd>' + escapeHtml(monitorConclusion) + '</dd></div>'
+                + '<div><dt>建议动作</dt><dd>' + escapeHtml(suggestedAction) + '</dd></div>'
+                + '<div><dt>入场逻辑状态</dt><dd>' + escapeHtml(entryLogicStatus) + '</dd></div></dl>'
+                + '<dl class="position-keyline visually-hidden">'
                 + '<div><dt>入场价</dt><dd>' + escapeHtml(value(p.entryPrice, "--")) + '</dd></div>'
                 + '<div><dt>数量</dt><dd>' + escapeHtml(value(p.positionSize, "--")) + '</dd></div>'
                 + '<div><dt>杠杆</dt><dd>' + escapeHtml(value(p.leverage, "--")) + '</dd></div>'
-                + '</dl><dl class="position-monitor-line">'
-                + '<div><dt>止损 / 止盈</dt><dd>' + escapeHtml(value(p.userStopLoss, "--")) + ' / ' + escapeHtml(value(p.userTakeProfit, "--")) + '</dd></div>'
-                + '<div><dt>告警</dt><dd>' + escapeHtml(value(p.warningState, "--")) + '</dd></div>'
-                + '<div class="wide"><dt>逻辑状态</dt><dd>' + escapeHtml(value(p.entryLogicStatusLabel || p.entryLogicStatus, "--")) + '</dd></div>'
-                + '<div class="wide"><dt>当前建议</dt><dd>' + escapeHtml(value(p.suggestedManualActionText || p.suggestedManualAction, "--")) + '</dd></div>'
-                + '</dl></article>';
+                + '<div><dt>止损</dt><dd>' + escapeHtml(value(p.userStopLoss, "--")) + '</dd></div>'
+                + '<div><dt>止盈</dt><dd>' + escapeHtml(value(p.userTakeProfit, "--")) + '</dd></div>'
+                + '<div><dt>告警</dt><dd>' + escapeHtml(value(p.warningState, "--")) + '</dd></div></dl>'
+                + '<span class="visually-hidden">' + escapeHtml(monitorMetadata) + '</span></article>';
         });
         box.innerHTML = '<div class="home-position-summary-list" data-home-position-summary>'
             + cards.join("") + '</div>';
@@ -7762,8 +8398,17 @@
         box.dataset.exactPlanVisible = String(access.visible);
         var worthOpening = access.visible && selectedAsset && selectedAsset.worthOpening === true
             ? "是" : (access.visible && selectedAsset && selectedAsset.worthOpening === false ? "否" : "--");
+        setText("homeExecutionStatus", "是否值得开仓 · " + (worthOpening === "--" ? "待同步" : worthOpening));
         function verified(value) {
             return access.visible ? value : "--";
+        }
+        function validityPeriod() {
+            if (!access.visible) return "--";
+            var direct = cleanBlankValue(s.validPeriod);
+            if (direct) return direct;
+            var from = homeBusinessTime(verified(s.validFrom));
+            var until = homeBusinessTime(verified(s.expiresAt));
+            return (from !== "--" || until !== "--") ? from + " 至 " + until : "--";
         }
         var identity = access.visible ? displayValue(s.sourceExecutionPlanId, "--") : "--";
         box.innerHTML = '<div class="execution-card-body">'
@@ -7771,23 +8416,21 @@
             + escapeHtml(access.statusLabel) + '</strong><span>' + escapeHtml(access.reason)
             + '</span></span><span class="plan-identity">Plan · ' + escapeHtml(identity) + '</span></div>'
             + '<dl class="execution-primary-grid">'
-            + '<div class="plan-direction"><dt>最终方向</dt><dd>' + escapeHtml(displayValue(verified(s.direction ? marketBiasLabel(s.direction) : "--"))) + '</dd></div>'
-            + '<div class="plan-worth"><dt>是否值得开仓</dt><dd>' + escapeHtml(worthOpening) + '</dd></div>'
-            + '<div><dt>入场区间</dt><dd>' + escapeHtml(displayValue(verified(s.entryZone))) + '</dd></div></dl>'
+            + '<div class="plan-direction"><dt>推荐方向</dt><dd>' + escapeHtml(displayValue(verified(s.direction ? marketBiasLabel(s.direction) : "--"))) + '</dd></div>'
+            + '<div class="plan-entry"><dt>入场区间</dt><dd>' + escapeHtml(displayValue(verified(s.entryZone))) + '</dd></div>'
+            + '</dl>'
             + '<dl class="execution-level-grid">'
             + '<div><dt>止损</dt><dd>' + escapeHtml(displayValue(verified(s.stopLoss))) + '</dd></div>'
             + '<div class="take-profit"><dt>止盈方案</dt><dd>' + escapeHtml(displayValue(verified(s.takeProfitRules))) + '</dd></div>'
-            + '<div><dt>风险收益</dt><dd>' + escapeHtml(displayValue(verified(s.riskRewardRatio))) + '</dd></div></dl>'
-            + '<dl class="execution-advisory-grid">'
             + '<div><dt>杠杆建议</dt><dd>' + escapeHtml(displayValue(verified(s.leverageSuggestion))) + '</dd></div>'
             + '<div><dt>仓位建议</dt><dd>' + escapeHtml(displayValue(verified(s.positionSuggestion))) + '</dd></div>'
-            + '<div><dt>计划状态</dt><dd>' + escapeHtml(displayValue(s.statusLabel, localizeVisibleStatus(s.status || "MISSING"))) + '</dd></div></dl>'
-            + '<dl class="execution-validity">'
+            + '<div class="plan-invalid"><dt>计划失效条件</dt><dd>' + escapeHtml(displayValue(verified(s.invalidCondition))) + '</dd></div>'
+            + '<div><dt>有效期</dt><dd>' + escapeHtml(validityPeriod()) + '</dd></div></dl>'
+            + '<dl class="execution-validity visually-hidden">'
             + '<div><dt>有效开始</dt><dd>' + escapeHtml(homeBusinessTime(verified(s.validFrom))) + '</dd></div>'
-            + '<div><dt>有效结束</dt><dd>' + escapeHtml(homeBusinessTime(verified(s.expiresAt))) + '</dd></div>'
-            + '<div class="wide"><dt>计划失效条件</dt><dd>' + escapeHtml(displayValue(verified(s.invalidCondition))) + '</dd></div>'
+            + '<div><dt>风险收益</dt><dd>' + escapeHtml(displayValue(verified(s.riskRewardRatio))) + '</dd></div>'
             + '<div class="wide"><dt>计划冲突阻断</dt><dd>' + escapeHtml(cleanBlankValue(s.blockedReason) || "--") + '</dd></div></dl>'
-            + '<p class="position-source-note">系统建议，仅供人工复核；不会自动下单或创建持仓。</p></div>';
+            + '<p class="position-source-note visually-hidden">系统建议，仅供人工复核；不会自动下单或创建持仓。</p></div>';
     }
 
     function renderHomeAiDecisionFromPayload(aiDecision, asset) {
@@ -7818,8 +8461,7 @@
                         + ' aria-controls="home-ai-panel-' + escapeHtml(tab.role) + '"'
                         + ' aria-selected="' + (index === 0 ? "true" : "false") + '"'
                         + ' tabindex="' + (index === 0 ? "0" : "-1") + '">'
-                        + escapeHtml(tab.role === "GPT_FINAL" ? "GPT Final" : (tab.role === "GEMINI_REVIEW" ? "Gemini Review" : "Grok Challenge"))
-                        + '</button>';
+                        + escapeHtml(tab.role) + '</button>';
                 }).join("") + '</div><div class="home-ai-role-panels">'
                 + tabList.map(function (tab, index) {
                 return '<article class="home-ai-summary-card" role="tabpanel" tabindex="0"'
@@ -7827,10 +8469,10 @@
                     + ' aria-labelledby="home-ai-tab-' + escapeHtml(tab.role) + '"'
                     + ' data-home-ai-role="' + escapeHtml(tab.role) + '"'
                     + ' data-result-available="' + String(tab.resultAvailable === true) + '"'
-                    + (index === 0 ? '' : ' hidden') + '>'
-                    + '<div class="home-ai-summary-head"><strong>' + escapeHtml(tab.role) + '</strong><em>'
+                    + (index === 0 ? '' : ' hidden')
+                    + '><div class="home-ai-summary-head"><strong>' + escapeHtml(tab.role) + '</strong><span> · '
+                    + escapeHtml(aiTabLabel(tab.role)) + '</span><em>'
                     + escapeHtml(tab.runStatusLabel || "待同步") + '</em></div>'
-                    + '<span>' + escapeHtml(aiTabLabel(tab.role)) + '</span>'
                     + '<p>' + escapeHtml(summary(tab)) + '</p></article>';
             }).join("") + '</div>';
             var roleTabs = Array.prototype.slice.call(cards.querySelectorAll("[data-home-ai-tab]"));
@@ -7870,6 +8512,8 @@
                 confused: !!c.confused,
                 summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
             });
+            setText("homeAiConsistencyStatus", "AI 一致性 · "
+                + (cleanBlankValue(c.consistencyLevel || c.consistency_level) || "等待同步"));
         }
         renderDesktopAiAnalysis(ai, asset || null);
     }
@@ -7905,6 +8549,7 @@
         displayDecisions = [];
         setHomeRetryVisible(false, true);
         setRuntimeStatus("LOADING");
+        setText("headerReadStateText", "LOADING");
         setHeaderAiStatus("LOADING", "正在同步");
         setText("headerSourceStatusText", "正在同步当前资产");
         renderHomeSystemStateFromPayload({}, { aiStatus: "LOADING", aiStatusLabel: "正在同步" });
@@ -7940,6 +8585,7 @@
         var states = home.states || {};
         setHomeRetryVisible(false, preservePositionSummary === true);
         setRuntimeStatus(header.dataStatus || states.overall || "WAITING_SYNC");
+        setText("headerReadStateText", localizeVisibleStatus(header.dataStatus || states.overall || "PARTIAL"));
         setHeaderAiStatus(header.aiStatus, header.aiStatusLabel || headerAiStatusLabel(header.aiStatus));
         setText("headerSourceStatusText", localizeVisibleStatus(header.dataSourceText || "WAITING_SYNC"));
         selectedSymbol = normalizeDisplaySymbol(home.selectedSymbol || selectedSymbol || "");
@@ -7985,6 +8631,7 @@
         allDecisions = [];
         displayDecisions = [];
         setRuntimeStatus("WAITING_SYNC");
+        setText("headerReadStateText", "ERROR");
         setHeaderAiStatus("WAITING_SYNC", "等待同步");
         setText("headerSourceStatusText", "等待重新同步");
         renderHomeSystemStateFromPayload({}, {});
@@ -8035,6 +8682,7 @@
         allDecisions = [];
         displayDecisions = [];
         setRuntimeStatus(runtimeState);
+        setText("headerReadStateText", runtimeState);
         setHeaderAiStatus("LOAD_FAILED", "当前不可查看");
         setText("headerSourceStatusText", sourceLabel);
         setHomeRetryVisible(true, true);
@@ -11848,7 +12496,7 @@
             else aiControl.removeAttribute("aria-current");
         }
         var pageTitle = document.querySelector("[data-desktop-page-title]");
-        if (pageTitle) pageTitle.textContent = showAi ? "AI 分析" : "首页总览";
+        if (pageTitle) pageTitle.textContent = showAi ? "AI 分析" : "首页决策总览";
         frontendContract.replaceUrlParam("view", showAi ? "ai" : null);
         if (focusHeading) {
             window.scrollTo({ top: 0, behavior: "smooth" });

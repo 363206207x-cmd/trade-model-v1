@@ -393,13 +393,31 @@ public class DashboardControllerTest {
                 "list.slice(0, 3)",
                 "p.symbol",
                 "p.direction",
+                "var monitorConclusion = monitorConclusionLabel(p.monitorConclusion)",
+                "var suggestedAction = value(p.suggestedManualActionText",
+                "p.entryLogicStatusLabel",
+                "positionLogicStatusLabel(p.entryLogicStatus)",
+                "<dt>监控结论</dt>",
+                "<dt>建议动作</dt>",
+                "<dt>入场逻辑状态</dt>",
                 "entryLogicStatusLabel",
                 "directionSupportStatusLabel",
                 "reversalStatusLabel",
                 "riskLevelLabel",
                 "suggestedManualActionText");
         assertThat(positionRows).doesNotContain(
+                "p.monitorConclusion || p.suggestedManualActionText",
+                "p.suggestedManualActionText || p.entryLogicStatusLabel",
                 "lastMonitorAt", "nextMonitorAt", "fetch(", "position-action-btn", "bindHomePositionRows");
+        assertThat(functionBody("monitorConclusionLabel")).contains(
+                "LOGIC_VALID", "逻辑仍成立",
+                "LOGIC_WEAKENED", "逻辑弱化",
+                "PLAN_INVALIDATED", "计划失效",
+                "NEAR_STOP_LOSS", "接近止损",
+                "NEAR_TAKE_PROFIT", "接近止盈",
+                "HIGH_RISK_OBSERVATION", "高风险观察",
+                "WAIT_USER_CONFIRM_CLOSE", "等待用户确认平仓",
+                "当前不可查看");
     }
 
     @Test
@@ -467,7 +485,8 @@ public class DashboardControllerTest {
                 "data-asset-state", "state.label");
         assertThat(renderer).doesNotContain(
                 "一句话结论", "是否值得开仓", "数据来源", "数据状态",
-                "四周期新鲜度", "证据数", "分析时间");
+                "四周期新鲜度", "证据数", "分析时间",
+                "数据质量", "多周期", "Confused", "fieldSourceBadge");
     }
 
     @Test
@@ -480,10 +499,11 @@ public class DashboardControllerTest {
 
         assertThat(assets).contains(
                 "当前价格", "综合评分", "方向", "置信度", "风险等级",
-                "state.label", "data-asset-state",
-                "数据", "多周期", "Confused", "更新",
-                "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
-                "fieldSourceBadge(\"置信\"");
+                "state.label", "data-asset-state")
+                .doesNotContain(
+                        "数据质量", "多周期", "Confused", "更新",
+                        "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
+                        "fieldSourceBadge(\"置信\"");
         assertThat(html).contains("data-home-retry", "homeRetryButton");
         assertThat(loading).contains(
                 "window.__lastDashboardHome = null",
@@ -578,8 +598,8 @@ public class DashboardControllerTest {
                 .contains("frontendContract.executionPlanAccess(s)")
                 .contains(
                         "方向", "是否值得开仓", "入场区间", "止损", "止盈方案",
-                        "杠杆建议", "仓位建议", "有效开始", "有效结束",
-                        "计划失效条件", "冲突阻断")
+                        "杠杆建议", "仓位建议", "有效期",
+                        "计划失效条件", "function validityPeriod()")
                 .doesNotContain(
                         "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
                         "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
@@ -713,11 +733,12 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void homePositionSummaryDoesNotAddUncontractedPnl() throws Exception {
+    void homePositionSummaryUsesOnlyContractedPnlPercentage() throws Exception {
         String homePayloadRows = functionBody("renderHomePositionsFromPayload");
 
+        assertThat(homePayloadRows).contains("p.pnlPct", "formatPct");
         assertThat(homePayloadRows).doesNotContain(
-                "p.floatingPnl", "formatSignedAmount", "formatPct", "浮动盈亏");
+                "p.floatingPnl", "formatSignedAmount", "浮动盈亏");
     }
 
     @Test
@@ -1066,6 +1087,24 @@ public class DashboardControllerTest {
     }
 
     @Test
+    void desktopHomeUsesOneThreeAiWorkspaceWithOneVisibleRole() throws Exception {
+        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String aiRenderer = functionBody("renderHomeAiDecisionFromPayload");
+
+        assertThat(html).contains(
+                "class=\"home-ai-role-tabs\" role=\"tablist\"",
+                "GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        assertThat(aiRenderer).contains(
+                "data-home-ai-tab=",
+                "role=\"tabpanel\"",
+                "(index === 0 ? '' : ' hidden')",
+                "panel.hidden = panel.getAttribute(\"data-home-ai-role\") !== role",
+                "ArrowRight", "ArrowLeft");
+        assertThat(aiRenderer).doesNotContain(
+                "cards.innerHTML = tabList.map(function (tab, index)");
+    }
+
+    @Test
     void finalHomeProductUiKeepsTheFrozenDecisionHierarchyAndStateBoundaries() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
@@ -1093,9 +1132,8 @@ public class DashboardControllerTest {
                 "id=\"homeFocusScore\"", "id=\"homeFocusMultiTimeframe\"",
                 "id=\"homeFocusConfused\"", "id=\"homeFocusUpdatedAt\"",
                 "Execution Plan", "Top 3 UserPosition",
-                "data-home-ai-role=\"GPT_FINAL\"",
-                "data-home-ai-role=\"GEMINI_REVIEW\"",
-                "data-home-ai-role=\"GROK_CHALLENGE\"");
+                "class=\"home-ai-role-tabs\" role=\"tablist\"",
+                "GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(fixture).contains(
                 "\"long-content\"",
                 "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)",
@@ -4234,7 +4272,7 @@ public class DashboardControllerTest {
 
     private String consistencyCardSection() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
-        int startIndex = html.indexOf("<div class=\"home-consistency-summary\"");
+        int startIndex = html.indexOf("<div class=\"home-consistency-summary");
         assertThat(startIndex).isGreaterThanOrEqualTo(0);
         int endIndex = html.indexOf("<div class=\"home-ai-summary-cards\"", startIndex);
         assertThat(endIndex).isGreaterThan(startIndex);

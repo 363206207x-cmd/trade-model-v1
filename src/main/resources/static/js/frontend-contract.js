@@ -92,6 +92,17 @@
     ERROR: "数据错误"
   });
 
+  var MARKET_BIAS_HIERARCHY_LABELS = Object.freeze({
+    STRONG_BULLISH: "强偏多",
+    BULLISH: "偏多",
+    WEAK_BULLISH: "弱偏多",
+    RANGE: "震荡",
+    WEAK_BEARISH: "弱偏空",
+    BEARISH: "偏空",
+    STRONG_BEARISH: "强偏空",
+    WAIT: "观望"
+  });
+
   function hasText(value) {
     return value !== null
       && value !== undefined
@@ -123,6 +134,11 @@
   function dataQualityLabel(value) {
     var normalized = String(value || "MISSING").trim().toUpperCase();
     return DATA_QUALITY_LABELS[normalized] || DATA_QUALITY_LABELS.ERROR;
+  }
+
+  function marketBiasHierarchyLabel(value) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return MARKET_BIAS_HIERARCHY_LABELS[normalized] || "--";
   }
 
   function parseApiEnvelope(envelope) {
@@ -326,12 +342,14 @@
     MODULE_STATES: MODULE_STATES,
     FIELD_SOURCE_VIEWS: FIELD_SOURCE_VIEWS,
     DATA_QUALITY_LABELS: DATA_QUALITY_LABELS,
+    MARKET_BIAS_HIERARCHY_LABELS: MARKET_BIAS_HIERARCHY_LABELS,
     hasText: hasText,
     displayText: displayText,
     displayNumber: displayNumber,
     normalizeModuleState: normalizeModuleState,
     fieldSourceView: fieldSourceView,
     dataQualityLabel: dataQualityLabel,
+    marketBiasHierarchyLabel: marketBiasHierarchyLabel,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,
