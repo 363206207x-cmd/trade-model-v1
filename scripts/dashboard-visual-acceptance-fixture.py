@@ -909,7 +909,6 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 theme_override = f"""<script id="dashboard-visual-theme">
 window.addEventListener("load", function () {{
   var root = document.documentElement;
-  root.setAttribute("data-mobile-theme", "{visual_theme}");
   if ("{visual_theme}" === "dark") root.setAttribute("data-theme", "dark");
   else root.removeAttribute("data-theme");
 }});

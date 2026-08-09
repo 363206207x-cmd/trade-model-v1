@@ -4157,15 +4157,15 @@
         #homePositionCard .position-card-helper { color: var(--home-muted); font-size: 9px; }
         #homePositionCard .position-overview-link { display: none; }
         .position-flow-message { display: none; }
-        #homePositionContent { min-height: 104px; overflow: visible; }
+        #homePositionContent { min-height: 136px; overflow: visible; }
         .home-position-summary-list {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 16px;
         }
         .home-position-summary-card {
-            min-height: 104px;
-            height: 104px;
+            min-height: 136px;
+            height: 136px;
             padding: 12px 14px;
             border: 1px solid var(--home-line);
             border-radius: 8px;
@@ -4184,19 +4184,42 @@
         .position-pnl.positive { color: var(--home-positive); }
         .position-pnl.negative { color: var(--home-negative); }
         .position-pnl.neutral { color: var(--home-muted); }
-        .home-position-symbol-row { margin-top: 7px; }
-        .home-position-symbol-row strong { font-family: var(--ui-number-font); font-size: 14px; }
-        .home-position-monitor-row {
-            display: grid;
-            grid-template-columns: 110px 1fr;
+        .home-position-symbol-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             gap: 8px;
-            margin-top: 9px;
+            margin-top: 7px;
+        }
+        .home-position-symbol-row strong { font-family: var(--ui-number-font); font-size: 14px; }
+        .home-position-semantic-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 8px;
+            margin: 9px 0 0;
+            padding-top: 8px;
+            border-top: 1px solid var(--home-line);
+        }
+        .home-position-semantic-grid > div { min-width: 0; }
+        .home-position-semantic-grid dt {
+            color: var(--home-muted);
+            font-size: 9px;
+        }
+        .home-position-semantic-grid dd {
+            margin: 3px 0 0;
+            overflow: hidden;
+            color: var(--home-text);
             font-size: 10px;
+            font-weight: 650;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .position-risk-badge {
             padding: 0;
             background: transparent;
             color: var(--home-positive);
+            font-size: 10px;
         }
 
         .ai-decision-row { margin-top: 16px; }
@@ -4217,22 +4240,46 @@
         .home-ai-consistency-status { color: var(--home-positive); font-size: 10px; }
         .home-consistency-contract { display: none; }
         .home-ai-summary-cards {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 16px;
-        }
-        .home-ai-summary-card {
-            min-height: 108px;
-            height: 108px;
-            padding: 14px;
+            display: block;
+            padding: 10px;
             border: 1px solid var(--home-line);
             border-radius: 8px;
             background: var(--home-surface);
         }
-        .home-ai-summary-card:first-child {
-            border-color: var(--home-accent);
-            background: var(--home-accent-soft);
+        .home-ai-role-tabs {
+            display: flex;
+            gap: 4px;
+            margin: 0;
+            padding: 3px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--home-surface-subtle);
         }
+        .home-ai-role-tab {
+            min-height: 34px;
+            border-radius: 4px;
+            color: var(--home-muted);
+            font-family: var(--ui-number-font);
+            font-size: 10px;
+        }
+        .home-ai-role-tab[aria-selected="true"] {
+            background: var(--home-surface);
+            color: var(--home-accent);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+        }
+        .home-ai-role-panels {
+            min-height: 84px;
+            padding: 12px 4px 2px;
+        }
+        .home-ai-summary-card {
+            min-height: 70px;
+            height: auto;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+        }
+        .home-ai-summary-card[hidden] { display: none; }
         .home-ai-summary-head {
             display: flex;
             align-items: center;
@@ -4530,9 +4577,17 @@
                     </div>
                 </div>
                 <div class="home-ai-summary-cards" id="homeAiSummaryCards" aria-label="AI 三角色摘要">
-                    <article class="home-ai-summary-card" data-home-ai-role="GPT_FINAL"><strong>GPT_FINAL</strong><span>最终裁决官</span><p>当前观点待同步</p></article>
-                    <article class="home-ai-summary-card" data-home-ai-role="GEMINI_REVIEW"><strong>GEMINI_REVIEW</strong><span>冲突复核官</span><p>当前复核待同步</p></article>
-                    <article class="home-ai-summary-card" data-home-ai-role="GROK_CHALLENGE"><strong>GROK_CHALLENGE</strong><span>反方挑战官</span><p>当前挑战待同步</p></article>
+                    <div class="home-ai-role-tabs" role="tablist" aria-label="AI 三角色">
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="true" aria-disabled="true">GPT_FINAL</button>
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1">GEMINI_REVIEW</button>
+                        <button type="button" class="home-ai-role-tab" role="tab" aria-selected="false" aria-disabled="true" tabindex="-1">GROK_CHALLENGE</button>
+                    </div>
+                    <div class="home-ai-role-panels">
+                        <article class="home-ai-summary-card" role="tabpanel" data-home-ai-role="GPT_FINAL">
+                            <div class="home-ai-summary-head"><strong>GPT_FINAL</strong><span> · 最终裁决官</span><em>待同步</em></div>
+                            <p>当前观点待同步</p>
+                        </article>
+                    </div>
                 </div>
             </section>
         </div>
@@ -7025,6 +7080,25 @@
         return key ? (labels[key] || "未知状态") : "等待首次监控";
     }
 
+    function monitorConclusionLabel(raw) {
+        var labels = {
+            LOGIC_VALID: "逻辑仍成立",
+            LOGIC_WEAKENED: "逻辑弱化",
+            PLAN_INVALIDATED: "计划失效",
+            NEAR_STOP_LOSS: "接近止损",
+            NEAR_TAKE_PROFIT: "接近止盈",
+            HIGH_RISK: "高风险观察",
+            HIGH_RISK_OBSERVATION: "高风险观察",
+            WAIT_USER_CONFIRM_CLOSE: "等待用户确认平仓",
+            WAITING_CONFIRMATION: "等待用户确认平仓"
+        };
+        var text = cleanBlankValue(raw);
+        if (!text) return "当前不可查看";
+        var key = text.toUpperCase();
+        if (labels[key]) return labels[key];
+        return /^[A-Z0-9_]+$/.test(key) ? "当前不可查看" : text;
+    }
+
     function directionSupportStatusLabel(raw) {
         var labels = {
             SUPPORTED: "当前方向仍获支持",
@@ -8268,6 +8342,10 @@
             var positionId = p.positionId != null ? p.positionId : p.id;
             var direction = value(p.directionLabel || positionSideText(p.direction), "--");
             var risk = value(p.riskLevelLabel || p.riskLevel, "--");
+            var monitorConclusion = monitorConclusionLabel(p.monitorConclusion);
+            var suggestedAction = value(p.suggestedManualActionText, "当前不可查看");
+            var entryLogicStatus = cleanBlankValue(p.entryLogicStatusLabel)
+                || (cleanBlankValue(p.entryLogicStatus) ? positionLogicStatusLabel(p.entryLogicStatus) : "当前不可查看");
             var monitorMetadata = [
                 "持仓状态 " + value(p.positionStatusLabel || p.positionStatus, "--"),
                 "方向支持 " + value(p.directionSupportStatusLabel || p.directionSupportStatus, "--"),
@@ -8283,12 +8361,12 @@
                 + '" aria-label="' + escapeHtml(value(p.symbol, "--") + " " + direction + "；" + monitorMetadata) + '">'
                 + '<div class="home-position-summary-head"><span>MY POSITION</span><span>方向 ' + escapeHtml(direction) + '</span>'
                 + '<strong class="position-pnl ' + pnlTone + '">' + escapeHtml(pnl) + '</strong></div>'
-                + '<div class="home-position-symbol-row"><strong>' + escapeHtml(value(p.symbol, "--")) + '</strong></div>'
-                + '<div class="home-position-monitor-row"><span class="position-risk-badge">持仓风险 · '
-                + escapeHtml(risk) + '</span><span>'
-                + escapeHtml(value(p.monitorConclusion || p.suggestedManualActionText
-                    || p.entryLogicStatusLabel || p.entryLogicStatus, "当前不可查看"))
-                + '</span></div>'
+                + '<div class="home-position-symbol-row"><strong>' + escapeHtml(value(p.symbol, "--")) + '</strong>'
+                + '<span class="position-risk-badge">持仓风险 · ' + escapeHtml(risk) + '</span></div>'
+                + '<dl class="home-position-semantic-grid">'
+                + '<div><dt>监控结论</dt><dd>' + escapeHtml(monitorConclusion) + '</dd></div>'
+                + '<div><dt>建议动作</dt><dd>' + escapeHtml(suggestedAction) + '</dd></div>'
+                + '<div><dt>入场逻辑状态</dt><dd>' + escapeHtml(entryLogicStatus) + '</dd></div></dl>'
                 + '<dl class="position-keyline visually-hidden">'
                 + '<div><dt>入场价</dt><dd>' + escapeHtml(value(p.entryPrice, "--")) + '</dd></div>'
                 + '<div><dt>数量</dt><dd>' + escapeHtml(value(p.positionSize, "--")) + '</dd></div>'
@@ -8375,16 +8453,53 @@
                 || "当前挑战待同步";
         }
         if (cards) {
-            cards.innerHTML = tabList.map(function (tab, index) {
-                return '<article class="home-ai-summary-card" tabindex="0"'
+            cards.innerHTML = '<div class="home-ai-role-tabs" role="tablist" aria-label="AI 三角色">'
+                + tabList.map(function (tab, index) {
+                    return '<button type="button" class="home-ai-role-tab" role="tab"'
+                        + ' id="home-ai-tab-' + escapeHtml(tab.role) + '"'
+                        + ' data-home-ai-tab="' + escapeHtml(tab.role) + '"'
+                        + ' aria-controls="home-ai-panel-' + escapeHtml(tab.role) + '"'
+                        + ' aria-selected="' + (index === 0 ? "true" : "false") + '"'
+                        + ' tabindex="' + (index === 0 ? "0" : "-1") + '">'
+                        + escapeHtml(tab.role) + '</button>';
+                }).join("") + '</div><div class="home-ai-role-panels">'
+                + tabList.map(function (tab, index) {
+                return '<article class="home-ai-summary-card" role="tabpanel" tabindex="0"'
                     + ' id="home-ai-panel-' + escapeHtml(tab.role) + '"'
+                    + ' aria-labelledby="home-ai-tab-' + escapeHtml(tab.role) + '"'
                     + ' data-home-ai-role="' + escapeHtml(tab.role) + '"'
                     + ' data-result-available="' + String(tab.resultAvailable === true) + '"'
+                    + (index === 0 ? '' : ' hidden')
                     + '><div class="home-ai-summary-head"><strong>' + escapeHtml(tab.role) + '</strong><span> · '
                     + escapeHtml(aiTabLabel(tab.role)) + '</span><em>'
                     + escapeHtml(tab.runStatusLabel || "待同步") + '</em></div>'
                     + '<p>' + escapeHtml(summary(tab)) + '</p></article>';
-            }).join("");
+            }).join("") + '</div>';
+            var roleTabs = Array.prototype.slice.call(cards.querySelectorAll("[data-home-ai-tab]"));
+            function activate(role, focus) {
+                roleTabs.forEach(function (button) {
+                    var selected = button.getAttribute("data-home-ai-tab") === role;
+                    button.setAttribute("aria-selected", String(selected));
+                    button.tabIndex = selected ? 0 : -1;
+                    if (selected && focus) button.focus();
+                });
+                Array.prototype.forEach.call(cards.querySelectorAll("[data-home-ai-role]"), function (panel) {
+                    panel.hidden = panel.getAttribute("data-home-ai-role") !== role;
+                });
+            }
+            roleTabs.forEach(function (button, index) {
+                button.addEventListener("click", function () {
+                    activate(button.getAttribute("data-home-ai-tab"), false);
+                });
+                button.addEventListener("keydown", function (event) {
+                    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                    event.preventDefault();
+                    var offset = event.key === "ArrowRight" ? 1 : -1;
+                    var nextIndex = (index + offset + roleTabs.length) % roleTabs.length;
+                    var next = roleTabs[nextIndex];
+                    activate(next.getAttribute("data-home-ai-tab"), true);
+                });
+            });
         }
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {

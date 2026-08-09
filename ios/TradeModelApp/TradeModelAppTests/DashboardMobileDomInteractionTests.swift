@@ -12,21 +12,17 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             in: webView
         )
 
-        try run("document.querySelector('[data-mobile-asset-tab=\"ETHUSDT\"]').click()", in: webView)
+        try run("document.querySelector('[data-symbol=\"ETHUSDT\"]').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
         try run("window.__resolveDashboard(0, 'ETHUSDT')", in: webView)
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-execution-field=\"entryZone\"]').textContent === 'ENTRY_ETHUSDT'",
+            "document.querySelector('[data-execution-field=\"direction\"]').textContent === 'DIR_ETHUSDT'",
             in: webView
         ))
-        XCTAssertEqual(
-            try stringValue("document.querySelector('[data-execution-field=\"direction\"]').textContent", in: webView),
-            "偏多"
-        )
 
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
-            "ETH/USDT"
+            "ETHUSDT"
         )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-ai-run-status]').textContent", in: webView),
@@ -93,13 +89,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
 
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-symbol=\"ETHUSDT\"]').dataset.moduleState === 'partial'",
+            "document.querySelector('[data-symbol=\"ETHUSDT\"] [data-asset-field=\"dataQuality\"]').textContent === '数据不足'",
             in: webView
         ))
-        XCTAssertEqual(
-            try numberValue("document.querySelectorAll('[data-asset-field=\"dataQuality\"]').length", in: webView),
-            0
-        )
         XCTAssertEqual(
             try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
             "false"
@@ -464,7 +456,10 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             try stringValue("document.querySelector('[data-execution-field=\"blockedReason\"]').textContent", in: webView),
             "RISK_ETHUSDT"
         )
-        XCTAssertTrue(try booleanValue("document.querySelector('[data-execution-conflict]') === null", in: webView))
+        XCTAssertEqual(
+            try stringValue("document.querySelector('[data-execution-conflict]').textContent", in: webView),
+            "RISK_ETHUSDT"
+        )
         XCTAssertEqual(
             try stringValue("document.getElementById('execution-advice').dataset.exactPlanVisible", in: webView),
             "false"
@@ -484,22 +479,25 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
-    func testSelectedThirdAssetTabStaysVisibleWithoutMovingTheDocument() throws {
+    func testSelectedThirdAssetStaysVisibleWithoutMovingTheDocument() throws {
         let webView = try loadFixture()
 
-        try run("document.querySelector('[data-mobile-asset-tab=\"SOLUSDT\"]').click()", in: webView)
+        try run("document.querySelector('[data-symbol=\"SOLUSDT\"]').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
         try run("window.__resolveDashboard(0, 'SOLUSDT')", in: webView)
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-mobile-asset-tab=\"SOLUSDT\"]').getAttribute('aria-checked') === 'true'"
-                + " && document.querySelector('[data-symbol=\"SOLUSDT\"]').getAttribute('aria-checked') === 'true'",
+            "document.querySelector('[data-symbol=\"SOLUSDT\"]').getAttribute('aria-checked') === 'true'",
             in: webView
+        ))
+        XCTAssertTrue(waitUntil(
+            "(() => { const pager = document.querySelector('.asset-pager').getBoundingClientRect(); const card = document.querySelector('[data-symbol=\"SOLUSDT\"]').getBoundingClientRect(); return document.querySelector('.asset-pager').scrollLeft > 0 && card.left >= pager.left - 1 && card.right <= pager.right + 1; })()",
+            in: webView,
+            timeout: 2
         ))
 
         XCTAssertEqual(try numberValue("window.scrollX", in: webView), 0)
-        XCTAssertEqual(try numberValue("document.querySelector('.asset-pager').scrollLeft", in: webView), 0)
         XCTAssertTrue(try booleanValue(
-            "(() => { const tabs = document.querySelector('[data-mobile-asset-tabs]').getBoundingClientRect(); const tab = document.querySelector('[data-mobile-asset-tab=\"SOLUSDT\"]').getBoundingClientRect(); const pager = document.querySelector('.asset-pager').getBoundingClientRect(); const card = document.querySelector('[data-symbol=\"SOLUSDT\"]').getBoundingClientRect(); return tab.left >= tabs.left - 1 && tab.right <= tabs.right + 1 && card.left >= pager.left - 1 && card.right <= pager.right + 1; })()",
+            "(() => { const pager = document.querySelector('.asset-pager').getBoundingClientRect(); const card = document.querySelector('[data-symbol=\"SOLUSDT\"]').getBoundingClientRect(); return card.left >= pager.left - 1 && card.right <= pager.right + 1; })()",
             in: webView
         ))
     }
@@ -588,14 +586,14 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 "document.querySelector('[data-mobile-home-view]').querySelectorAll('[role=\"tablist\"]').length",
                 in: webView
             ),
-            0
+            1
         )
         XCTAssertEqual(
-            try numberValue(
-                "Array.from(document.querySelectorAll('[data-ai-role-summary]')).filter(node => getComputedStyle(node).display !== 'none').length",
+            try stringValue(
+                "Array.from(document.querySelectorAll('[data-mobile-home-view] [data-home-ai-tab]')).map(node => node.dataset.homeAiTab).join('|')",
                 in: webView
             ),
-            3
+            "GPT_FINAL|GEMINI_REVIEW|GROK_CHALLENGE"
         )
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-selected-asset-token]').textContent", in: webView),
@@ -628,29 +626,40 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
-    func testFrozenAssetTabsKeepExistingThreeAssetContractWithoutCustomSymbols() throws {
+    func testWatchSearchAndUnavailableAddKeepExistingThreeAssetContract() throws {
         let webView = try loadFixture()
 
         XCTAssertEqual(try numberValue("document.querySelectorAll('.asset-select').length", in: webView), 3)
-        XCTAssertEqual(try numberValue("document.querySelectorAll('[data-mobile-asset-tab]').length", in: webView), 3)
-        XCTAssertTrue(try booleanValue(
-            "Array.from(document.querySelectorAll('[data-mobile-asset-tab]')).every(node => node.getBoundingClientRect().height >= 28)",
-            in: webView
-        ))
-        XCTAssertEqual(
+        XCTAssertGreaterThanOrEqual(
             try numberValue("document.querySelector('[data-asset-search-toggle]').getBoundingClientRect().height", in: webView),
-            0
+            44
         )
-        XCTAssertEqual(
+        XCTAssertGreaterThanOrEqual(
             try numberValue("document.querySelector('[data-asset-add]').getBoundingClientRect().height", in: webView),
-            0
+            44
         )
 
-        try run("document.querySelector('[data-mobile-asset-tab=\"ETHUSDT\"]').click()", in: webView)
+        try run("document.querySelector('[data-asset-search-toggle]').click()", in: webView)
+        try run("""
+            const input = document.querySelector('[data-asset-search-input]');
+            input.value = 'ETH';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            """, in: webView)
+
+        XCTAssertEqual(
+            try numberValue("document.querySelectorAll('.asset-search-result').length", in: webView),
+            1
+        )
+        XCTAssertEqual(
+            try stringValue("document.querySelector('.asset-search-result').textContent", in: webView),
+            "ETHUSDT"
+        )
+
+        try run("document.querySelector('.asset-search-result').click()", in: webView)
         XCTAssertTrue(waitUntil("window.__pendingRequests.length === 1", in: webView))
         try run("window.__resolveDashboard(0, 'ETHUSDT')", in: webView)
         XCTAssertTrue(waitUntil(
-            "document.querySelector('[data-selected-asset-token]').textContent === 'ETH/USDT'",
+            "document.querySelector('[data-selected-asset-token]').textContent === 'ETHUSDT'",
             in: webView
         ))
         XCTAssertTrue(try booleanValue("document.querySelector('[data-asset-add]').disabled", in: webView))
@@ -698,37 +707,44 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
-    func testApprovedMobileBaselineShowsFullPlanTopThreePositionsAndScopedStates() throws {
+    func testCompactDecisionDisclosuresScopeStatesAndLimitSmallPhonePositions() throws {
         let smallWebView = try loadFixture(width: 428, height: 926)
 
-        XCTAssertEqual(try numberValue("document.querySelectorAll('.execution-details').length", in: smallWebView), 0)
-        for field in [
-            "direction", "worthOpening", "entryZone", "stopLoss", "takeProfitRules",
-            "leverageSuggestion", "positionSuggestion", "invalidCondition", "validPeriod"
-        ] {
-            XCTAssertGreaterThan(
-                try numberValue("document.querySelector('[data-execution-field=\"\(field)\"]').getBoundingClientRect().height", in: smallWebView),
-                0
-            )
-        }
+        XCTAssertFalse(try booleanValue("document.querySelector('.execution-details').open", in: smallWebView))
+        XCTAssertEqual(
+            try numberValue("document.querySelector('[data-execution-field=\"stopLoss\"]').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
+        XCTAssertGreaterThan(
+            try numberValue("document.querySelector('.execution-entry-summary').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
         XCTAssertEqual(
             try numberValue("Array.from(document.querySelectorAll('.position-card')).filter(node => getComputedStyle(node).display !== 'none').length", in: smallWebView),
-            3
+            2
+        )
+        XCTAssertEqual(
+            try stringValue("getComputedStyle(document.querySelector('.position-third')).display", in: smallWebView),
+            "none"
         )
         XCTAssertTrue(try booleanValue(
             "document.querySelector('[data-mobile-home-view]').textContent.includes('系统冲突阻断')"
+                + " && document.querySelector('[data-mobile-home-view]').textContent.includes('计划冲突阻断')"
                 + " && document.querySelector('[data-mobile-home-view]').textContent.includes('AI 一致性阻断')",
             in: smallWebView
         ))
-        XCTAssertEqual(try numberValue("document.documentElement.scrollWidth", in: smallWebView), 428)
+
+        try run("document.querySelector('.execution-details').open = true", in: smallWebView)
+        XCTAssertGreaterThan(
+            try numberValue("document.querySelector('[data-execution-field=\"stopLoss\"]').getBoundingClientRect().height", in: smallWebView),
+            0
+        )
 
         let largeWebView = try loadFixture(width: 440, height: 956)
         XCTAssertEqual(
             try numberValue("Array.from(document.querySelectorAll('.position-card')).filter(node => getComputedStyle(node).display !== 'none').length", in: largeWebView),
             3
         )
-        XCTAssertEqual(try numberValue("document.querySelectorAll('[data-position-expand]').length", in: largeWebView), 0)
-        XCTAssertEqual(try numberValue("document.documentElement.scrollWidth", in: largeWebView), 440)
     }
 
     func testNativeToolbarProjectionDoesNotRepeatVisibleProductTitle() throws {
@@ -749,13 +765,15 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         ))
     }
 
-    func testHiddenHeaderActionsDoNotCompeteWithExistingMobileNavigation() throws {
+    func testHeaderSearchAndPositionNavigationStayInsideExistingMobileProjection() throws {
         let webView = try loadFixture()
 
-        XCTAssertEqual(
-            try stringValue("getComputedStyle(document.querySelector('.header-actions')).display", in: webView),
-            "none"
-        )
+        try run("document.querySelector('[data-header-search]').click()", in: webView)
+        XCTAssertTrue(waitUntil(
+            "document.querySelector('[data-asset-search-toggle]').getAttribute('aria-expanded') === 'true' && document.activeElement.matches('[data-asset-search-input]')",
+            in: webView,
+            timeout: 2
+        ))
         XCTAssertEqual(
             try stringValue("document.querySelector('[data-home-nav]').getAttribute('aria-current')", in: webView),
             "page"
@@ -1096,16 +1114,12 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
         )
     }
 
-    func testAssetTabsAndVisibleNavigationTargetsFitWithoutHorizontalOverflow() throws {
+    func testOnlyAssetPagerCanOverflowHorizontallyAndAllVisibleNavigationTargetsFit() throws {
         let webView = try loadFixture(width: 440, height: 852)
 
-        XCTAssertLessThanOrEqual(
+        XCTAssertGreaterThan(
             try numberValue("document.querySelector('.asset-pager').scrollWidth", in: webView),
             try numberValue("document.querySelector('.asset-pager').clientWidth", in: webView)
-        )
-        XCTAssertLessThanOrEqual(
-            try numberValue("document.querySelector('[data-mobile-asset-tabs]').scrollWidth", in: webView),
-            try numberValue("document.querySelector('[data-mobile-asset-tabs]').clientWidth", in: webView)
         )
         XCTAssertEqual(try booleanValue("document.documentElement.scrollWidth > window.innerWidth", in: webView), false)
         XCTAssertEqual(try booleanValue("document.body.scrollWidth > window.innerWidth", in: webView), false)
@@ -1131,9 +1145,9 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
             try run("document.documentElement.dataset.mobileTextSize = '\(textSize)'", in: webView)
             let background = try stringValue("getComputedStyle(document.body).backgroundColor", in: webView)
             if style == .dark {
-                XCTAssertEqual(background, "rgb(8, 13, 17)")
+                XCTAssertEqual(background, "rgb(12, 16, 20)")
             } else {
-                XCTAssertEqual(background, "rgb(233, 238, 241)")
+                XCTAssertEqual(background, "rgb(238, 242, 244)")
             }
             let captured = expectation(description: "captured \(name)")
             var snapshot: UIImage?
@@ -1181,7 +1195,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                 "body overflow at width \(width), style \(style.rawValue), text \(textSize)"
             )
             XCTAssertEqual(try numberValue("window.scrollX", in: webView), 0)
-            XCTAssertLessThanOrEqual(
+            XCTAssertGreaterThan(
                 try numberValue("document.querySelector('.asset-pager').scrollWidth", in: webView),
                 try numberValue("document.querySelector('.asset-pager').clientWidth", in: webView)
             )
@@ -2355,7 +2369,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   statusLabel: 'READY_' + symbol,
                   blockedReason: 'RISK_' + symbol,
                   sourceExecutionPlanId: verified === false ? null : 'PLAN_' + symbol,
-                  direction: 'BULLISH',
+                  direction: 'DIR_' + symbol,
                   entryZone: 'ENTRY_' + symbol,
                   stopLoss: 'STOP_' + symbol,
                   takeProfitRules: 'TP_' + symbol,
@@ -2363,9 +2377,7 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
                   positionSuggestion: 'POS_' + symbol,
                   invalidCondition: 'INVALID_' + symbol,
                   validFrom: 'FROM_' + symbol,
-                  expiresAt: 'UNTIL_' + symbol,
-                  validPeriod: 'PERIOD_' + symbol,
-                  moduleState: 'READY'
+                  expiresAt: 'UNTIL_' + symbol
                 },
                 aiDecision: {
                   runStatusLabel: 'AI_' + symbol,
@@ -2472,53 +2484,59 @@ final class DashboardMobileDomInteractionTests: XCTestCase {
               <p class="watch-action-status" data-watch-action-status></p>
               <p class="watch-contract-note" id="watch-add-contract-status">添加资产暂未开放</p>
               <strong data-selected-asset-token>\(selectedSymbol)</strong>
-              <div class="mobile-asset-tabs" data-mobile-asset-tabs role="radiogroup" aria-label="切换重点资产">
-                <button type="button" class="mobile-asset-tab\(btcSelected ? " is-selected" : "")" data-mobile-asset-tab="BTCUSDT" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">BTCUSDT</button>
-                <button type="button" class="mobile-asset-tab\(ethSelected ? " is-selected" : "")" data-mobile-asset-tab="ETHUSDT" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">ETHUSDT</button>
-                <button type="button" class="mobile-asset-tab\(solSelected ? " is-selected" : "")" data-mobile-asset-tab="SOLUSDT" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">SOLUSDT</button>
-              </div>
               <div class="asset-pager" role="radiogroup" data-mobile-assets-pager>
                 <button class="asset-card asset-select\(btcSelected ? " is-selected" : "")" data-symbol="BTCUSDT" data-analysis-id="ANA_BTCUSDT" data-direction-label="震荡" data-confidence-label="中" data-risk-label="中" data-worth-opening="true" data-asset-state="observing" data-selected="\(btcSelected)" aria-checked="\(btcSelected)" tabindex="\(btcSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">BTCUSDT</span><span class="asset-state">资产状态 · 观察中</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>66000</b></span><span><small>综合评分</small><b>82</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>震荡</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
                 <button class="asset-card asset-select\(ethSelected ? " is-selected" : "")" data-symbol="ETHUSDT" data-analysis-id="ANA_ETHUSDT" data-direction-label="偏多" data-confidence-label="中" data-risk-label="中" data-worth-opening="true" data-asset-state="candidate" data-selected="\(ethSelected)" aria-checked="\(ethSelected)" tabindex="\(ethSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">ETHUSDT</span><span class="asset-state">资产状态 · 待复核候选</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>3500</b></span><span><small>综合评分</small><b>78</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏多</b></span><span><small>置信度</small><b>中</b></span><span><small>风险等级</small><b>中</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
                 <button class="asset-card asset-select\(solSelected ? " is-selected" : "")" data-symbol="SOLUSDT" data-analysis-id="ANA_SOLUSDT" data-direction-label="偏空" data-confidence-label="低" data-risk-label="高" data-worth-opening="false" data-asset-state="high_risk" data-selected="\(solSelected)" aria-checked="\(solSelected)" tabindex="\(solSelected ? 0 : -1)">
                   <span class="asset-card-top"><span class="asset-symbol">SOLUSDT</span><span class="asset-state">资产状态 · 高风险</span></span>
                   <span class="asset-price-score"><span><small>当前价格</small><b>144</b></span><span><small>综合评分</small><b>73</b></span></span>
                   <span class="asset-core-grid"><span><small>方向</small><b>偏空</b></span><span><small>置信度</small><b>低</b></span><span><small>风险等级</small><b>高</b></span></span>
+                  <span class="asset-secondary-strip"><span><small>数据</small><b data-asset-field="dataQuality">良好</b></span></span>
                 </button>
               </div>
             </section>
-            <section class="execution-section" id="execution-advice" data-exact-plan-visible="false" data-module-state="missing">
-              <div class="section-heading"><div><p class="section-kicker">核心决策</p><h2 id="mobile-execution-title" tabindex="-1">Execution Plan · 执行计划</h2></div><strong class="execution-status-badge" data-execution-field="statusLabel">等待同步</strong></div>
-              <div class="semantic-state-line"><span>是否值得开仓</span><strong data-execution-field="worthOpening">待同步</strong></div>
-              <dl class="definition-list execution-grid execution-primary-grid">
-                <div><dt>推荐方向</dt><dd data-execution-field="direction">--</dd></div>
+            <section class="execution-section" id="execution-advice" data-exact-plan-visible="false">
+              <h2 id="mobile-execution-title" tabindex="-1">执行建议</h2>
+              <div class="semantic-state-line"><span>执行建议状态</span><strong data-execution-field="statusLabel">等待同步</strong></div>
+              <dl class="definition-list execution-grid execution-compact-grid">
+                <div><dt>方向</dt><dd data-execution-field="direction">--</dd></div>
+                <div><dt>资产置信</dt><dd data-execution-context-field="confidence">--</dd></div>
+                <div><dt>资产风险</dt><dd data-execution-context-field="risk">--</dd></div>
                 <div class="execution-entry-summary"><dt>入场区间</dt><dd data-execution-field="entryZone">--</dd></div>
               </dl>
-              <dl class="definition-list execution-detail-grid">
-                <div><dt>止损</dt><dd data-execution-field="stopLoss">--</dd></div>
-                <div><dt>止盈方案</dt><dd data-execution-field="takeProfitRules">--</dd></div>
-                <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion">--</dd></div>
-                <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion">--</dd></div>
-                <div class="full-row"><dt>计划失效条件</dt><dd data-execution-field="invalidCondition">--</dd></div>
-                <div class="full-row"><dt>有效期</dt><dd data-execution-field="validPeriod">--</dd></div>
-              </dl>
-              <p class="execution-plan-reason" data-execution-field="blockedReason">暂无补充说明</p>
-              <span class="visually-hidden" data-execution-field="sourceExecutionPlanId">--</span>
+              <details class="long-details execution-details">
+                <summary>查看完整计划</summary>
+                <p data-execution-field="blockedReason">暂无补充说明</p>
+                <dl class="definition-list execution-detail-grid">
+                  <div><dt>是否值得开仓</dt><dd data-execution-field="worthOpening">待同步</dd></div>
+                  <div><dt>止损</dt><dd data-execution-field="stopLoss">--</dd></div>
+                  <div><dt>止盈方案</dt><dd data-execution-field="takeProfitRules">--</dd></div>
+                  <div><dt>杠杆建议</dt><dd data-execution-field="leverageSuggestion">--</dd></div>
+                  <div><dt>仓位建议</dt><dd data-execution-field="positionSuggestion">--</dd></div>
+                  <div><dt>计划失效条件</dt><dd data-execution-field="invalidCondition">--</dd></div>
+                  <div><dt>有效开始</dt><dd data-execution-field="validFrom">--</dd></div>
+                  <div><dt>有效结束</dt><dd data-execution-field="expiresAt">--</dd></div>
+                  <div><dt>计划来源</dt><dd data-execution-field="sourceExecutionPlanId">--</dd></div>
+                </dl>
+                <div class="conflict-block-summary"><span>计划冲突阻断</span><strong data-execution-conflict>--</strong></div>
+              </details>
             </section>
             <section class="position-section" id="position-monitor" data-position-independent>
               <h2 id="mobile-position-title" tabindex="-1">持仓监控</h2>
               <div class="position-list" data-mobile-position-list>
                 <article class="position-card"><div class="position-heading"><h3>BTCUSDT</h3><span>多</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>中</dd></div><div><dt>入场逻辑</dt><dd>有效</dd></div><div><dt>方向支持</dt><dd>支持</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>继续观察</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
                 <article class="position-card"><div class="position-heading"><h3>ETHUSDT</h3><span>多</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>中</dd></div><div><dt>入场逻辑</dt><dd>有效</dd></div><div><dt>方向支持</dt><dd>支持</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>继续观察</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
-                <article class="position-card"><div class="position-heading"><h3>SOLUSDT</h3><span>空</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>高</dd></div><div><dt>入场逻辑</dt><dd>复核</dd></div><div><dt>方向支持</dt><dd>待确认</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>人工复核</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
+                <article class="position-card position-third"><div class="position-heading"><h3>SOLUSDT</h3><span>空</span></div><dl class="position-core position-summary"><div><dt>当前风险</dt><dd>高</dd></div><div><dt>入场逻辑</dt><dd>复核</dd></div><div><dt>方向支持</dt><dd>待确认</dd></div><div><dt>反转状态</dt><dd>未反转</dd></div><div class="full-row"><dt>当前建议</dt><dd>人工复核</dd></div></dl><details class="position-details"><summary>查看完整持仓</summary><p>完整字段</p></details></article>
               </div>
             </section>
             <section class="ai-section" id="ai-review">

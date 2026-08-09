@@ -60,14 +60,6 @@
       .replace(/[^A-Z0-9]/g, "");
   }
 
-  function formatSymbolPair(value) {
-    var symbol = normalizeSymbol(value);
-    var quote = ["USDT", "USDC", "USD", "BTC", "ETH"].find(function (candidate) {
-      return symbol.length > candidate.length && symbol.endsWith(candidate);
-    });
-    return quote ? symbol.slice(0, -quote.length) + "/" + quote : symbol;
-  }
-
   function assetCards() {
     return Array.from(document.querySelectorAll(".asset-select"));
   }
@@ -149,16 +141,9 @@
       card.tabIndex = selected ? 0 : -1;
       if (selected) selectedCard = card;
     });
-    document.querySelectorAll("[data-mobile-asset-tab]").forEach(function (tab) {
-      var selected = normalized && normalizeSymbol(tab.dataset.mobileAssetTab) === normalized;
-      tab.classList.toggle("is-selected", selected);
-      tab.dataset.selected = String(selected);
-      tab.setAttribute("aria-checked", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
-    });
     setText(
       "[data-selected-asset-token]",
-      formatSymbolPair(selectedCard ? selectedCard.dataset.symbol : symbol),
+      selectedCard ? selectedCard.dataset.symbol : symbol,
       "--"
     );
     keepAssetCardVisible(selectedCard, "auto");
@@ -169,6 +154,15 @@
   function setAssetCardField(card, field, value, fallback) {
     var node = card && card.querySelector('[data-asset-field="' + field + '"]');
     if (node) node.textContent = text(value, fallback);
+  }
+
+  function setAssetCardSource(card, field, source) {
+    var node = card && card.querySelector('[data-asset-source="' + field + '"]');
+    if (!node) return;
+    var view = frontendContract.fieldSourceView(source);
+    var label = field === "latestPrice" ? "价格" : (field === "score" ? "评分" : "置信");
+    node.textContent = label + "·" + view.label;
+    node.dataset.sourceTone = view.tone;
   }
 
   function appendAssetMetric(parent, label, value, className) {
@@ -204,7 +198,7 @@
     card.appendChild(top);
 
     var priceScore = element("span", "asset-price-score");
-    var priceMetric = appendAssetMetric(priceScore, "当前价格", asset && asset.latestPrice);
+    var priceMetric = appendAssetMetric(priceScore, "最新价格", asset && asset.latestPrice);
     priceMetric.querySelector("b").dataset.assetField = "latestPrice";
     var scoreMetric = appendAssetMetric(priceScore, "综合评分", asset && asset.compositeScore);
     scoreMetric.querySelector("b").dataset.assetField = "compositeScore";
@@ -215,32 +209,35 @@
     directionMetric.querySelector("b").dataset.assetField = "marketBias";
     var confidenceMetric = appendAssetMetric(core, "置信度", asset && (asset.confidenceLabel || asset.confidenceLevel));
     confidenceMetric.querySelector("b").dataset.assetField = "confidence";
-    var riskMetric = appendAssetMetric(core, "风险等级", asset && (asset.riskLabel || asset.riskLevel));
+    var riskMetric = appendAssetMetric(core, "风险", asset && (asset.riskLabel || asset.riskLevel));
     riskMetric.querySelector("b").dataset.assetField = "risk";
     card.appendChild(core);
+
+    var secondary = element("span", "asset-secondary-strip");
+    [
+      ["数据", frontendContract.dataQualityLabel(asset && asset.dataQuality), "dataQuality"],
+      ["多周期", asset && asset.multiTimeframeState, "multiTimeframeState"],
+      ["Confused", asset && asset.confused === true ? "是" : (asset && asset.confused === false ? "否" : null), "confused"],
+      ["更新", frontendContract.formatBusinessTimeCompact(asset && asset.updatedAt), "updatedAt"]
+    ].forEach(function (item) {
+      var metric = appendAssetMetric(secondary, item[0], item[1]);
+      metric.querySelector("b").dataset.assetField = item[2];
+    });
+    card.appendChild(secondary);
+
+    var sourceLine = element("span", "asset-source-line");
+    sourceLine.setAttribute("aria-label", "字段来源");
+    var sourceFields = [
+      ["latestPrice", "价格"], ["score", "评分"], ["confidence", "置信"]
+    ];
+    sourceFields.forEach(function (item) {
+      var source = element("small");
+      source.dataset.assetSource = item[0];
+      sourceLine.appendChild(source);
+    });
+    card.appendChild(sourceLine);
     syncAssetCardProjection(card, asset);
     return card;
-  }
-
-  function renderMobileAssetTabs(assets, selectedSymbol) {
-    var root = document.querySelector("[data-mobile-asset-tabs]");
-    if (!root) return;
-    var list = (Array.isArray(assets) ? assets : []).slice(0, MOBILE_ASSET_LIMIT);
-    var normalizedSelected = normalizeSymbol(selectedSymbol);
-    root.hidden = list.length === 0;
-    root.replaceChildren();
-    list.forEach(function (asset, index) {
-      var symbol = normalizeSymbol(asset && (asset.rawSymbol || asset.symbol));
-      var selected = normalizedSelected ? symbol === normalizedSelected : index === 0;
-      var tab = element("button", "mobile-asset-tab" + (selected ? " is-selected" : ""), symbol || "--");
-      tab.type = "button";
-      tab.dataset.mobileAssetTab = symbol;
-      tab.dataset.selected = String(selected);
-      tab.setAttribute("role", "radio");
-      tab.setAttribute("aria-checked", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
-      root.appendChild(tab);
-    });
   }
 
   function renderMobileAssets(assets, selectedSymbol, moduleState) {
@@ -251,7 +248,6 @@
     if (!pager) return null;
     pager.hidden = list.length === 0;
     pager.replaceChildren();
-    renderMobileAssetTabs(list, selectedSymbol);
     var normalizedSelected = normalizeSymbol(selectedSymbol);
     list.forEach(function (asset, index) {
       var symbol = normalizeSymbol(asset && (asset.rawSymbol || asset.symbol));
@@ -298,16 +294,6 @@
     var empty = document.querySelector(isAlert ? "[data-mobile-alert-empty]" : "[data-mobile-event-empty]");
     var details = document.querySelector(isAlert ? "[data-mobile-alert-list]" : "[data-mobile-event-list]");
     var list = (Array.isArray(items) ? items : []).slice(0, 2);
-    if (isAlert) {
-      var riskCopy = document.querySelector("[data-mobile-risk-copy]");
-      var riskState = document.querySelector("[data-mobile-risk-state]");
-      if (riskCopy) riskCopy.textContent = list.length
-        ? text(list[0].message, "当前风险事件待确认")
-        : "当前无升级事件";
-      if (riskState) riskState.textContent = list.length
-        ? text(list[0].level, "待确认")
-        : "稳定";
-    }
     if (empty) {
       empty.hidden = list.length > 0;
       empty.textContent = isAlert ? "暂无高优先级告警" : "暂无高影响关键事件";
@@ -381,47 +367,25 @@
     if (!root) return;
     root.hidden = list.length === 0;
     root.replaceChildren();
-    list.forEach(function (position) {
-      var card = element("article", "position-card");
+    list.forEach(function (position, index) {
+      var card = element("article", "position-card" + (index === 2 ? " position-third" : ""));
       card.dataset.positionId = text(position.positionId, "");
       card.dataset.moduleState = frontendContract.normalizeModuleState(
         position.moduleState,
         "PARTIAL"
       ).toLowerCase();
       var heading = element("div", "position-heading");
-      heading.appendChild(element("span", "position-owner-label", "MY POSITION · OWNER SCOPED"));
-      heading.appendChild(element("span", "position-monitor-badge", "持仓监控 · " + text(
-        position.positionStatusLabel || position.positionStatus,
-        "当前不可查看"
-      )));
+      heading.appendChild(element("h3", "", text(position.symbol, "--")));
+      heading.appendChild(element("span", "", text(position.directionLabel || position.direction, "--")));
       card.appendChild(heading);
 
-      var title = element("div", "position-title-line");
-      var identity = element("span");
-      identity.appendChild(element("strong", "", text(position.symbol, "--")));
-      identity.appendChild(element("small", "", "持仓方向 · " + text(position.directionLabel || position.direction, "--")));
-      title.appendChild(identity);
-      var pnl = element("strong", "position-pnl", position.pnlPct != null
-        ? ((Number(position.pnlPct) > 0 ? "+" : "") + Number(position.pnlPct).toFixed(2) + "%")
-        : "--");
-      var pnlNumber = Number(position.pnlPct);
-      pnl.dataset.tone = Number.isFinite(pnlNumber) ? (pnlNumber > 0 ? "positive" : (pnlNumber < 0 ? "negative" : "neutral")) : "neutral";
-      title.appendChild(pnl);
-      card.appendChild(title);
-
       var core = element("dl", "position-core position-summary");
-      appendDefinition(core, "入场", position.entryPrice, false);
-      appendDefinition(core, "当前", position.currentPrice, false);
-      appendDefinition(core, "风险", position.riskLevelLabel || position.riskLevel, false);
+      appendDefinition(core, "当前风险", position.riskLevelLabel || position.riskLevel, false);
+      appendDefinition(core, "入场逻辑", position.entryLogicStatusLabel || position.entryLogicStatus, false);
+      appendDefinition(core, "方向支持", position.directionSupportStatusLabel || position.directionSupportStatus, false);
+      appendDefinition(core, "反转状态", position.reversalStatusLabel || position.reversalStatus, false);
+      appendDefinition(core, "当前建议", position.suggestedManualActionText || position.suggestedManualAction, true);
       card.appendChild(core);
-
-      var monitor = element("p", "position-monitor-conclusion");
-      monitor.appendChild(element("span", "", "监控结论"));
-      monitor.appendChild(element("strong", "", text(
-        position.monitorConclusion || position.suggestedManualActionText || position.entryLogicStatusLabel,
-        "当前不可查看"
-      )));
-      card.appendChild(monitor);
 
       var more = element("details", "position-details");
       more.appendChild(element("summary", "", "查看完整持仓"));
@@ -529,6 +493,14 @@
     setAssetCardField(card, "marketBias", asset.marketBiasLabel || asset.marketBias, "当前判断不可用");
     setAssetCardField(card, "confidence", asset.confidenceLabel || asset.confidenceLevel, "--");
     setAssetCardField(card, "risk", asset.riskLabel || asset.riskLevel, "--");
+    setAssetCardField(card, "dataQuality", frontendContract.dataQualityLabel(asset.dataQuality), "数据缺失");
+    setAssetCardField(card, "multiTimeframeState", asset.multiTimeframeState, "MISSING");
+    setAssetCardField(card, "confused", asset.confused === true ? "是" : (asset.confused === false ? "否" : null), "MISSING");
+    setAssetCardField(card, "updatedAt", frontendContract.formatBusinessTimeCompact(asset.updatedAt), "--");
+    var fieldSources = asset.fieldSourceStatus || {};
+    setAssetCardSource(card, "latestPrice", fieldSources.latestPrice);
+    setAssetCardSource(card, "score", fieldSources.score);
+    setAssetCardSource(card, "confidence", fieldSources.confidence);
   }
 
   function clearAssetCardProjection(card, stateLabel) {
@@ -542,6 +514,13 @@
     setAssetCardField(card, "marketBias", null, "--");
     setAssetCardField(card, "confidence", null, "--");
     setAssetCardField(card, "risk", null, "--");
+    setAssetCardField(card, "dataQuality", null, "MISSING");
+    setAssetCardField(card, "multiTimeframeState", null, "MISSING");
+    setAssetCardField(card, "confused", null, "MISSING");
+    setAssetCardField(card, "updatedAt", null, "--");
+    setAssetCardSource(card, "latestPrice", "MISSING");
+    setAssetCardSource(card, "score", "MISSING");
+    setAssetCardSource(card, "confidence", "MISSING");
   }
 
   function updateMobileStatusProjection(systemState, header) {
@@ -551,10 +530,6 @@
       var field = node.dataset.mobileStatusField;
       if (field === "aiStatus") {
         node.textContent = text(safeHeader.aiStatusLabel, "待同步");
-        return;
-      }
-      if (field === "updatedAt") {
-        node.textContent = frontendContract.formatBusinessTimeCompact(safeHeader.updatedAt);
         return;
       }
       var card = state[field] || {};
@@ -636,7 +611,8 @@
       "takeProfitRules",
       "positionSuggestion",
       "invalidCondition",
-      "validPeriod",
+      "validFrom",
+      "expiresAt",
       "sourceExecutionPlanId",
       "riskRewardRatio"
     ];
@@ -654,21 +630,6 @@
         node.textContent = worthOpeningText(selectedAsset, selectedCard);
         return;
       }
-      if (field === "direction") {
-        node.textContent = access.visible
-          ? frontendContract.marketBiasHierarchyLabel(safeSuggestion.direction)
-          : "--";
-        return;
-      }
-      if (field === "validPeriod") {
-        var directPeriod = text(safeSuggestion.validPeriod, "");
-        var from = frontendContract.formatBusinessTimeCompact(safeSuggestion.validFrom);
-        var until = frontendContract.formatBusinessTimeCompact(safeSuggestion.expiresAt);
-        node.textContent = access.visible
-          ? (directPeriod || ((from !== "--" || until !== "--") ? from + " 至 " + until : "--"))
-          : "--";
-        return;
-      }
       node.textContent = access.visible && planFields.indexOf(field) >= 0
         ? text(safeSuggestion[field], "--")
         : "--";
@@ -682,15 +643,15 @@
     Object.keys(context).forEach(function (field) {
       setText('[data-execution-context-field="' + field + '"]', context[field], "--");
     });
+    var optionalRiskReward = document.querySelector('[data-execution-optional="riskRewardRatio"]');
+    if (optionalRiskReward) {
+      optionalRiskReward.hidden = !(access.visible && text(safeSuggestion.riskRewardRatio, "") !== "");
+    }
+    var disclosure = document.querySelector(".execution-details");
+    if (disclosure) disclosure.open = false;
     setText("[data-execution-conflict]", safeSuggestion.blockedReason, "--");
     var section = document.getElementById("execution-advice");
-    if (section) {
-      section.dataset.exactPlanVisible = String(access.visible);
-      section.dataset.moduleState = frontendContract.normalizeModuleState(
-        safeSuggestion.moduleState,
-        access.visible ? "READY" : "MISSING"
-      ).toLowerCase();
-    }
+    if (section) section.dataset.exactPlanVisible = String(access.visible);
   }
 
   function updateConsistency(consistency) {
@@ -760,13 +721,19 @@
       panel.dataset.roleStatusMessage = String(tab.statusMessage);
     }
     var heading = element("div", "role-heading");
-    var headingText = element("div", "role-identity");
+    var headingText = element("div");
     headingText.appendChild(element("span", "", tab.role));
     headingText.appendChild(element("h3", "", roleLabel(tab.role, tab.roleLabel)));
     heading.appendChild(headingText);
     heading.appendChild(element("strong", "", text(tab.runStatusLabel, "等待同步")));
     panel.appendChild(heading);
     panel.appendChild(element("p", "role-status", roleSummary(tab)));
+    if (tab.role === "GPT_FINAL" && tab.resultAvailable === true) {
+      var metrics = element("dl", "role-summary-metrics");
+      appendDefinition(metrics, "方向", tab.finalMarketBias, false);
+      appendDefinition(metrics, "置信度", tab.finalConfidence, false);
+      panel.appendChild(metrics);
+    }
     return panel;
   }
 
@@ -774,9 +741,61 @@
     var root = document.querySelector("[data-ai-role-root]");
     if (!root) return;
     root.replaceChildren();
-    frontendContract.normalizeAiTabs(tabs).forEach(function (tab) {
+    var orderedTabs = frontendContract.normalizeAiTabs(tabs);
+    var tabList = element("div", "mobile-ai-role-tabs");
+    tabList.setAttribute("role", "tablist");
+    tabList.setAttribute("aria-label", "AI 三角色摘要");
+    var panels = element("div", "mobile-ai-role-panels");
+    var buttons = [];
+    orderedTabs.forEach(function (tab, index) {
+      var button = element(
+        "button",
+        "mobile-ai-role-tab",
+        tab.role === "GPT_FINAL" ? "GPT Final" : (tab.role === "GEMINI_REVIEW" ? "Gemini Review" : "Grok Challenge")
+      );
+      button.type = "button";
+      button.id = "mobile-home-ai-tab-" + tab.role;
+      button.dataset.homeAiTab = tab.role;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(index === 0));
+      button.setAttribute("aria-controls", "mobile-home-ai-panel-" + tab.role);
+      button.tabIndex = index === 0 ? 0 : -1;
+      tabList.appendChild(button);
+      buttons.push(button);
+
       var panel = createRoleSummaryCard(tab);
-      root.appendChild(panel);
+      panel.id = "mobile-home-ai-panel-" + tab.role;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", button.id);
+      panel.tabIndex = 0;
+      panel.hidden = index !== 0;
+      panels.appendChild(panel);
+    });
+    root.appendChild(tabList);
+    root.appendChild(panels);
+
+    function activate(role, focus) {
+      buttons.forEach(function (button) {
+        var selected = button.dataset.homeAiTab === role;
+        button.setAttribute("aria-selected", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+        if (selected && focus) button.focus();
+      });
+      panels.querySelectorAll("[data-ai-role-summary]").forEach(function (panel) {
+        panel.hidden = panel.dataset.aiRoleSummary !== role;
+      });
+    }
+    buttons.forEach(function (button, index) {
+      button.addEventListener("click", function () {
+        activate(button.dataset.homeAiTab, false);
+      });
+      button.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        event.preventDefault();
+        var offset = event.key === "ArrowRight" ? 1 : -1;
+        var next = buttons[(index + offset + buttons.length) % buttons.length];
+        activate(next.dataset.homeAiTab, true);
+      });
     });
   }
 
@@ -1010,6 +1029,8 @@
     else delete card.dataset.confidenceLabel;
     if (frontendContract.hasText(riskLabel)) card.dataset.riskLabel = String(riskLabel);
     else delete card.dataset.riskLabel;
+    if (asset && frontendContract.hasText(asset.dataQuality)) card.dataset.qualityLabel = String(asset.dataQuality);
+    else delete card.dataset.qualityLabel;
   }
 
   async function selectAsset(symbol, sourceCard) {
@@ -1101,27 +1122,6 @@
       keepAssetCardVisible(next, "smooth");
       selectAsset(next.dataset.symbol, next);
     });
-    var tabs = document.querySelector("[data-mobile-asset-tabs]");
-    if (tabs) {
-      tabs.addEventListener("click", function (event) {
-        var tab = event.target.closest("[data-mobile-asset-tab]");
-        if (!tab) return;
-        var card = assetCards().find(function (item) {
-          return normalizeSymbol(item.dataset.symbol) === normalizeSymbol(tab.dataset.mobileAssetTab);
-        });
-        if (card) selectAsset(card.dataset.symbol, card);
-      });
-      tabs.addEventListener("keydown", function (event) {
-        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-        var allTabs = Array.from(tabs.querySelectorAll("[data-mobile-asset-tab]"));
-        var current = event.target.closest("[data-mobile-asset-tab]");
-        var index = allTabs.indexOf(current);
-        if (index < 0 || !allTabs.length) return;
-        event.preventDefault();
-        var offset = event.key === "ArrowRight" ? 1 : -1;
-        allTabs[(index + offset + allTabs.length) % allTabs.length].click();
-      });
-    }
   }
 
   function bindHomeRetry() {

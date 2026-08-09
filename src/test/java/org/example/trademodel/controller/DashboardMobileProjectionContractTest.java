@@ -102,10 +102,9 @@ class DashboardMobileProjectionContractTest {
     @Test
     void mobileTemplateKeepsFrozenInformationArchitectureAndWatchTools() throws Exception {
         String html = Files.readString(TEMPLATE);
-        String assetCard = slice(html, "<button class=\"asset-card asset-select\"", "</button>");
 
         assertThat(html)
-                .contains("<h1 class=\"page-heading\" id=\"mobile-page-context\" tabindex=\"-1\">首页 · 当前资产")
+                .contains("<h1 class=\"page-heading\" id=\"mobile-page-context\" tabindex=\"-1\">首页</h1>")
                 .contains("<p class=\"product-name\">TRADE MODEL V1</p>")
                 .doesNotContain("id=\"mobile-home-title\"")
                 .doesNotContain("data-header-status-nav")
@@ -117,32 +116,23 @@ class DashboardMobileProjectionContractTest {
                 .contains("搜索当前重点资产")
                 .contains("重点资产监控")
                 .contains("AI 三角色复核")
-                .contains("一致性摘要")
+                .contains("一致性综合摘要")
                 .contains("asset.latestPrice")
                 .contains("asset.compositeScore")
                 .contains("asset.confidenceLabel")
                 .contains("asset.riskLabel")
                 .contains("asset.assetState")
                 .contains("asset.analysisId")
+                .contains("asset.dataQuality")
+                .contains("asset.multiTimeframeState")
+                .contains("asset.confused")
+                .contains("asset.updatedAt")
+                .contains("asset.fieldSourceStatus")
                 .contains("data-home-retry")
                 .doesNotContain("asset.currentConclusion")
                 .doesNotContain("一致性评分")
                 .doesNotContain("资产方向阻断")
                 .doesNotContain("<h2 id=\"mobile-ai-title\">AI 证据复核</h2>");
-        assertThat(assetCard)
-                .contains(
-                        "data-asset-field=\"latestPrice\"",
-                        "data-asset-field=\"compositeScore\"",
-                        "data-asset-field=\"marketBias\"",
-                        "data-asset-field=\"confidence\"",
-                        "data-asset-field=\"risk\"",
-                        "data-asset-field=\"state\"")
-                .doesNotContain(
-                        "dataQuality",
-                        "multiTimeframeState",
-                        "confused",
-                        "updatedAt",
-                        "fieldSourceStatus");
         assertThat(html.indexOf("mobile-status-title")).isLessThan(html.indexOf("mobile-alert-title"));
         assertThat(html.indexOf("mobile-alert-title")).isLessThan(html.indexOf("mobile-watch-title"));
         assertThat(html.indexOf("mobile-watch-title")).isLessThan(html.indexOf("mobile-execution-title"));
@@ -166,19 +156,19 @@ class DashboardMobileProjectionContractTest {
     }
 
     @Test
-    void mobileDecisionFlowShowsTheFullPlanTopThreePositionsAndScopedStateLabels()
+    void mobileDecisionFlowKeepsCoreFactsAboveNativeDisclosuresAndScopesStateLabels()
             throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
         String css = Files.readString(STYLES);
-        String planPrimary = slice(
+        String compactPlan = slice(
                 html,
-                "<dl class=\"definition-list execution-grid execution-primary-grid\"",
+                "<dl class=\"definition-list execution-grid execution-compact-grid\"",
                 "</dl>");
         String fullPlan = slice(
                 html,
-                "<dl class=\"definition-list execution-detail-grid\"",
-                "</dl>");
+                "<details class=\"long-details execution-details\">",
+                "</details>");
         String positionSummary = slice(
                 html,
                 "<dl class=\"position-core position-summary\"",
@@ -193,12 +183,15 @@ class DashboardMobileProjectionContractTest {
                         "<details class=\"long-details status-details\">",
                         "资产状态 · 正在同步",
                         "系统冲突阻断",
+                        "计划冲突阻断",
                         "AI 一致性阻断",
-                        "我的持仓 · Top3")
+                        "Top 3 · 小屏默认 Top 2")
                 .doesNotContain(">冲突阻断</dt>");
-        assertThat(planPrimary)
+        assertThat(compactPlan)
                 .contains(
                         "data-execution-field=\"direction\"",
+                        "data-execution-context-field=\"confidence\"",
+                        "data-execution-context-field=\"risk\"",
                         "data-execution-field=\"entryZone\"")
                 .doesNotContain(
                         "data-execution-field=\"stopLoss\"",
@@ -206,11 +199,13 @@ class DashboardMobileProjectionContractTest {
                         "data-execution-field=\"invalidCondition\"");
         assertThat(fullPlan)
                 .contains(
+                        "查看完整计划",
                         "data-execution-field=\"stopLoss\"",
                         "data-execution-field=\"takeProfitRules\"",
+                        "data-execution-field=\"riskRewardRatio\"",
                         "data-execution-field=\"invalidCondition\"",
-                        "data-execution-field=\"validPeriod\"")
-                .doesNotContain("<details", "<summary");
+                        "data-execution-field=\"sourceExecutionPlanId\"",
+                        "不是交易指令");
         assertThat(positionSummary)
                 .contains("当前风险", "入场逻辑", "方向支持", "反转状态", "当前建议")
                 .doesNotContain("持仓 ID", "入场价", "止损", "止盈", "更新时间");
@@ -218,20 +213,17 @@ class DashboardMobileProjectionContractTest {
                 .contains("查看完整持仓", "持仓 ID", "入场价", "止损", "止盈", "更新时间");
         assertThat(script)
                 .contains(
-                        "field === \"validPeriod\"",
-                        "frontendContract.normalizeAiTabs(tabs).forEach",
+                        "data-execution-context-field",
+                        "optionalRiskReward.hidden",
+                        "if (disclosure) disclosure.open = false",
                         "资产状态 · ")
-                .doesNotContain(
-                        "bindPositionDisclosure",
-                        "mobile-home-ai-tab-",
-                        "position-third");
+                .contains("position-card\" + (index === 2 ? \" position-third\" : \"\")");
         assertThat(css)
                 .contains(
-                        ".execution-section .execution-primary-grid",
-                        ".execution-section .execution-detail-grid",
+                        ".execution-compact-grid",
                         ".status-details",
-                        ".ai-role-summary-card")
-                .doesNotContain(".position-list .position-third");
+                        ".position-third {",
+                        "display: none;");
     }
 
     @Test
@@ -335,6 +327,11 @@ class DashboardMobileProjectionContractTest {
                         "data-asset-field=\"state\"",
                         "data-asset-field=\"latestPrice\"",
                         "data-asset-field=\"compositeScore\"",
+                        "data-asset-field=\"dataQuality\"",
+                        "data-asset-field=\"multiTimeframeState\"",
+                        "data-asset-field=\"confused\"",
+                        "data-asset-field=\"updatedAt\"",
+                        "data-asset-source=\"latestPrice\"",
                         "data-home-retry");
         assertThat(clearContext).contains(
                 "window.__lastDashboardHome = null",
@@ -410,35 +407,15 @@ class DashboardMobileProjectionContractTest {
         String foundation = Files.readString(FRONTEND_CONTRACT);
         String projection = slice(
                 script,
-                "function updateMobileStatusProjection(systemState, header)",
-                "function clearMobileAssetContext(symbol, contextState, stateLabel)");
+                "function syncAssetCardProjection(card, asset)",
+                "function clearAssetCardProjection(card, stateLabel)");
 
         assertThat(foundation).contains(
                 "PARTIAL: \"数据不足\"",
                 "function dataQualityLabel(value)");
         assertThat(projection)
-                .contains(
-                        "var card = state[field] || {}",
-                        "card.valueLabel != null ? card.valueLabel : card.value")
+                .contains("frontendContract.dataQualityLabel(asset.dataQuality)")
                 .doesNotContain("dataQualityScore", ">= 70", "< 70");
-    }
-
-    @Test
-    void formalMarketBiasHierarchyIsCompleteAndFailsClosed() throws Exception {
-        String foundation = Files.readString(FRONTEND_CONTRACT);
-        String script = Files.readString(SCRIPT);
-
-        assertThat(foundation).contains(
-                "STRONG_BULLISH: \"强偏多\"",
-                "BULLISH: \"偏多\"",
-                "WEAK_BULLISH: \"弱偏多\"",
-                "RANGE: \"震荡\"",
-                "WEAK_BEARISH: \"弱偏空\"",
-                "BEARISH: \"偏空\"",
-                "STRONG_BEARISH: \"强偏空\"",
-                "WAIT: \"观望\"",
-                "return MARKET_BIAS_HIERARCHY_LABELS[normalized] || \"--\"");
-        assertThat(script).contains("frontendContract.marketBiasHierarchyLabel");
     }
 
     @Test
