@@ -141,7 +141,8 @@ for required_registry_id in \
   PS-V1-ARCHITECTURE \
   PS-POSITION-MONITORING \
   PS-AI-CONFLICT-RECHECK-REVIEW \
-  PS-HOME-INTERACTION; do
+  PS-HOME-INTERACTION \
+  PS-P2-POSITION-MONITORING-AUTHORIZATION; do
   registry_has_id "$required_registry_id" || block "Required formal product source is not registered: $required_registry_id"
 done
 
@@ -191,7 +192,7 @@ if [[ -n "$simulation" ]]; then
       ;;
     position-monitor)
       task_product_scope="P2 Position / Position Monitoring Risk Prompt"
-      required_sources=(PS-V1-ARCHITECTURE PS-POSITION-MONITORING PS-AI-CONFLICT-RECHECK-REVIEW PS-HOME-INTERACTION PS-FORMAL-BUSINESS-CONTRACT)
+      required_sources=(PS-V1-ARCHITECTURE PS-POSITION-MONITORING PS-AI-CONFLICT-RECHECK-REVIEW PS-HOME-INTERACTION PS-P2-POSITION-MONITORING-AUTHORIZATION PS-FORMAL-BUSINESS-CONTRACT)
       simulation_mapping=(
         "identity: exact owner-scoped UserPosition and original ExecutionPlan remain separate"
         "monitor: original logic, reversal, liquidity, wick filtering, risk, alert, and manual adjustment suggestion"

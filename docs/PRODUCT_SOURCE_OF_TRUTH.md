@@ -47,6 +47,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-AI-CONFLICT-RECHECK-REVIEW|docs/product-sources/AI_CONFLICT_RECHECK_REVIEW_PLAN.md|10c2f96c145371baa75bb46a7e6e6aa2c5f27ae4a43da4d96f008b42800feb3c|AI_STATE_PUSH_REVIEW -->
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
+<!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
 <!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|598c5628f1a179c19c38215a6fcfde67b96c7a55e2fb778c5caaaa4d2a99079a|DELIVERY_AND_SAFETY -->
 
@@ -139,6 +140,23 @@ outrank direction, confidence, risk, or AssetState. This explicit decision
 resolves the prior ambiguity without changing the existing interaction rule:
 card selection changes asset context and never selects a position or performs
 a mutation.
+
+### PS-P2-POSITION-MONITORING-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | P2 Position Monitoring Backend Implementation Authorization |
+| Repository path | `docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md` |
+| Repository SHA-256 | `32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919` |
+| Version/date | Product authorization candidate; effective only after merged-main validation |
+| Authority | Explicit authorization for the first bounded Product P2 backend package |
+| Applicable modules | UserPosition-backed Position Monitor persistence, risk, trust, Home Position projection, and tests |
+| Required concepts | independent entry-logic/conclusion/reversal/risk-reason semantics; per-position risk; verified fresh source gate; mark-price/PnL provenance; fail-closed state handling |
+| Forbidden reinterpretations | no aggregate risk copied to each position; no semantic fallback; no fake zero/missing data; no automatic open/close/reduce/add/reverse/order; no Mobile or Figma change |
+
+This record authorizes only `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION`.
+It remains non-effective until reviewed and merged, and it does not make the
+separate local candidate diff authoritative by existence.
 
 ### PS-FIGMA-BASELINE
 
