@@ -133,7 +133,7 @@ class StaticNoTradeInstructionGuardTest {
         assertThat(row).contains("用户真实持仓 Top 3 摘要");
         assertThat(row).contains("仅显示手动录入持仓");
         assertThat(row).contains("暂无手动持仓");
-        assertThat(row).contains("持仓数据不足时保持空状态");
+        assertThat(row).contains("录入真实持仓后开始监控");
         assertThat(row).contains("系统执行建议（非交易指令）");
         assertThat(row).doesNotContain("<button");
         assertThat(row).doesNotContain("<form");

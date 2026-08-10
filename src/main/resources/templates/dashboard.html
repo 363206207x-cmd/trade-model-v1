@@ -4162,15 +4162,17 @@
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 16px;
+            align-items: stretch;
         }
         .home-position-summary-card {
-            min-height: 136px;
-            height: 136px;
+            min-height: 236px;
+            height: auto;
             padding: 12px 14px;
             border: 1px solid var(--home-line);
             border-radius: 8px;
             background: var(--home-surface);
         }
+        .home-position-summary-card.is-waiting { min-height: 136px; }
         .home-position-summary-head {
             display: grid;
             grid-template-columns: 1fr 78px 88px;
@@ -4194,7 +4196,7 @@
         .home-position-symbol-row strong { font-family: var(--ui-number-font); font-size: 14px; }
         .home-position-semantic-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
             margin: 9px 0 0;
             padding-top: 8px;
@@ -4215,6 +4217,42 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .home-position-facts-grid,
+        .home-position-monitor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin: 8px 0 0;
+            padding-top: 8px;
+            border-top: 1px solid var(--home-line);
+        }
+        .home-position-monitor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .home-position-facts-grid > div,
+        .home-position-monitor-grid > div { min-width: 0; }
+        .home-position-facts-grid dt,
+        .home-position-monitor-grid dt { color: var(--home-muted); font-size: 9px; }
+        .home-position-facts-grid dd,
+        .home-position-monitor-grid dd {
+            margin: 3px 0 0;
+            overflow: hidden;
+            color: var(--home-text);
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1.3;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .home-position-state-band {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--home-line);
+        }
+        .home-position-state-band strong { color: var(--home-text); font-size: 12px; }
+        .home-position-state-band span { color: var(--home-muted); font-size: 10px; }
         .position-risk-badge {
             padding: 0;
             background: transparent;
@@ -4544,7 +4582,7 @@
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <div class="overview-empty-state" role="status">
-                        <strong>暂无手动持仓</strong><span>持仓数据不足时保持空状态</span>
+                        <strong>暂无手动持仓</strong><span>录入真实持仓后开始监控</span>
                     </div>
                 </div>
             </section>
@@ -7070,6 +7108,9 @@
 
     function positionLogicStatusLabel(raw) {
         var labels = {
+            STILL_VALID: "仍成立",
+            WEAKENED: "弱化",
+            INVALIDATED: "失效",
             LOGIC_VALID: "入场逻辑仍成立",
             LOGIC_WEAKENED: "入场逻辑减弱",
             PLAN_INVALIDATED: "原计划已失效",
@@ -7114,6 +7155,9 @@
 
     function reversalStatusLabel(raw) {
         var labels = {
+            NO_REVERSAL: "无明显反转",
+            WEAK_REVERSAL: "弱反转",
+            STRONG_REVERSAL: "强反转",
             NO_REVERSAL_SIGNAL: "暂无反转信号",
             MANUAL_REVIEW_REQUIRED: "需人工复核反转风险",
             RISK_REVIEW: "需复核高风险变化",
@@ -7125,6 +7169,14 @@
 
     function manualActionLabel(raw) {
         var labels = {
+            CONTINUE_HOLD: "继续持有",
+            NO_ADD_POSITION: "暂不加仓",
+            REDUCE_POSITION: "降低仓位",
+            TIGHTEN_STOP: "收紧止损",
+            MOVE_STOP: "移动止损",
+            PARTIAL_TAKE_PROFIT: "分批止盈",
+            WAIT_CONFIRMATION: "等待人工确认",
+            RECORD_CLOSE_REVIEW: "记录平仓并进入复盘",
             HOLD: "人工继续观察",
             MANUAL_REVIEW: "人工复核",
             TIGHTEN_STOP_REVIEW: "复核是否收紧止损",
@@ -7134,6 +7186,130 @@
         };
         var key = String(raw || "").trim().toUpperCase();
         return key ? (labels[key] || "未知状态") : "等待首次监控";
+    }
+
+    function riskTrendLabel(raw) {
+        var labels = {
+            STABLE: "稳定",
+            INCREASED: "上升",
+            SHARPLY_INCREASED: "显著上升"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "当前不可查看") : "当前不可查看";
+    }
+
+    function riskReasonLabel(raw) {
+        var labels = {
+            NO_CLEAR_RISK_FACTOR: "暂无明显风险因素",
+            OPPOSING_EVIDENCE_INCREASED: "反向证据增加",
+            STRUCTURE_CHANGED: "结构变化",
+            EVENT_IMPACT: "事件冲击",
+            DATA_QUALITY_DEGRADED: "数据质量下降"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "当前不可查看") : "当前不可查看";
+    }
+
+    function positionDataStateLabel(raw) {
+        var labels = {
+            NO_POSITION: "暂无手动持仓",
+            OPEN_MONITORING: "监控中",
+            WAITING_MONITOR_DATA: "等待监控数据",
+            RISK_ESCALATED: "风险升级",
+            PLAN_INVALIDATED: "计划失效",
+            CLOSED: "已平仓"
+        };
+        var key = String(raw || "").trim().toUpperCase();
+        return key ? (labels[key] || "当前不可查看") : "当前不可查看";
+    }
+
+    function homePositionMonitorView(position) {
+        var p = position && typeof position === "object" ? position : {};
+        var dataState = String(p.dataState || "").trim().toUpperCase();
+        var riskTrend = String(p.riskTrend || "").trim().toUpperCase();
+        var monitorConclusion = String(p.monitorConclusion || "").trim().toUpperCase();
+        var direction = String(p.direction || "").trim().toUpperCase();
+        var riskLevel = String(p.riskLevel || "").trim().toUpperCase();
+        var entryLogicStatus = String(p.entryLogicStatus || "").trim().toUpperCase();
+        var reversalStatus = String(p.reversalStatus || "").trim().toUpperCase();
+        var riskReason = String(p.riskReason || "").trim().toUpperCase();
+        var suggestedAction = String(p.suggestedAction || "").trim().toUpperCase();
+        var active = dataState !== "NO_POSITION" && dataState !== "CLOSED";
+        var successfulState = dataState === "OPEN_MONITORING"
+            || dataState === "RISK_ESCALATED"
+            || dataState === "PLAN_INVALIDATED";
+        var recognizedTrend = riskTrend === "STABLE"
+            || riskTrend === "INCREASED"
+            || riskTrend === "SHARPLY_INCREASED";
+        var stateMatchesTrend = (dataState !== "OPEN_MONITORING" || riskTrend === "STABLE")
+            && (dataState !== "RISK_ESCALATED"
+                || riskTrend === "INCREASED"
+                || riskTrend === "SHARPLY_INCREASED");
+        var stateMatchesConclusion = dataState !== "PLAN_INVALIDATED"
+            || monitorConclusion === "PLAN_INVALIDATED";
+        var recognizedContract = (direction === "LONG" || direction === "SHORT")
+            && ["LOW", "MEDIUM", "HIGH", "EXTREME"].indexOf(riskLevel) >= 0
+            && [
+                "LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "NEAR_STOP_LOSS",
+                "NEAR_TAKE_PROFIT", "HIGH_RISK_OBSERVATION", "WAIT_USER_CONFIRM_CLOSE"
+            ].indexOf(monitorConclusion) >= 0
+            && ["STILL_VALID", "WEAKENED", "INVALIDATED"].indexOf(entryLogicStatus) >= 0
+            && ["NO_REVERSAL", "WEAK_REVERSAL", "STRONG_REVERSAL"].indexOf(reversalStatus) >= 0
+            && [
+                "NO_CLEAR_RISK_FACTOR", "OPPOSING_EVIDENCE_INCREASED", "STRUCTURE_CHANGED",
+                "EVENT_IMPACT", "DATA_QUALITY_DEGRADED"
+            ].indexOf(riskReason) >= 0
+            && [
+                "CONTINUE_HOLD", "NO_ADD_POSITION", "REDUCE_POSITION", "TIGHTEN_STOP",
+                "MOVE_STOP", "PARTIAL_TAKE_PROFIT", "WAIT_CONFIRMATION", "RECORD_CLOSE_REVIEW"
+            ].indexOf(suggestedAction) >= 0;
+        var numericContract = Number.isFinite(Number(p.entryPrice))
+            && Number(p.entryPrice) > 0
+            && Number.isFinite(Number(p.markPrice))
+            && Number(p.markPrice) > 0
+            && Number.isFinite(Number(p.pnlAmount))
+            && Number.isFinite(Number(p.pnlPercent));
+        var requiredValues = [
+            p.symbol,
+            p.direction,
+            p.entryPrice,
+            p.markPrice,
+            p.pnlAmount,
+            p.pnlPercent,
+            p.riskLevel,
+            p.riskTrend,
+            p.monitorConclusion,
+            p.entryLogicStatus,
+            p.reversalStatus,
+            p.riskReason,
+            p.suggestedAction,
+            p.lastMonitorTime
+        ];
+        var complete = requiredValues.every(function (value) {
+            return value !== null && value !== undefined
+                && (typeof value !== "string" || value.trim() !== "");
+        });
+        var trusted = active
+            && successfulState
+            && p.markPriceFresh === true
+            && recognizedTrend
+            && recognizedContract
+            && numericContract
+            && stateMatchesTrend
+            && stateMatchesConclusion
+            && complete;
+        return {
+            active: active,
+            trusted: trusted,
+            dataState: dataState || "WAITING_MONITOR_DATA",
+            stateLabel: trusted
+                ? positionDataStateLabel(dataState)
+                : (dataState === "WAITING_MONITOR_DATA" ? "等待监控数据" : "当前不可查看"),
+            riskTrend: riskTrend,
+            escalated: trusted
+                && dataState === "RISK_ESCALATED"
+                && (riskTrend === "INCREASED" || riskTrend === "SHARPLY_INCREASED")
+        };
     }
 
     function dataQualityStatusLabel(raw) {
@@ -8328,53 +8504,81 @@
         if (!box) return;
         var list = (positions || []).filter(function (p) {
             var positionId = p && (p.positionId != null ? p.positionId : p.id);
-            return !isLocallyClosedPosition(positionId);
+            return !isLocallyClosedPosition(positionId) && homePositionMonitorView(p).active;
         });
         if (!list.length) {
             box.innerHTML = '<div class="overview-empty-state" role="status">'
-                + '<strong>暂无手动持仓</strong><span>持仓数据不足时保持空状态</span></div>';
+                + '<strong>暂无手动持仓</strong><span>录入真实持仓后开始监控</span></div>';
             return;
         }
-        function value(raw, fallback) {
-            return cleanBlankValue(raw) || fallback || "--";
+        function value(raw) {
+            return cleanBlankValue(raw) || "当前不可查看";
+        }
+        function price(raw) {
+            var formatted = formatPrice(raw);
+            return formatted === "—" ? "当前不可查看" : formatted;
+        }
+        function percentage(raw) {
+            var formatted = formatPct(raw);
+            return formatted === "—" ? "当前不可查看" : formatted;
+        }
+        function amount(raw) {
+            var formatted = formatSignedAmount(raw);
+            return formatted === "—" ? "当前不可查看" : formatted;
         }
         var cards = list.slice(0, 3).map(function (p) {
             var positionId = p.positionId != null ? p.positionId : p.id;
-            var direction = value(p.directionLabel || positionSideText(p.direction), "--");
-            var risk = value(p.riskLevelLabel || p.riskLevel, "--");
+            var monitorView = homePositionMonitorView(p);
+            var direction = value(positionSideText(p.direction));
+            var symbol = value(p.symbol);
+            if (!monitorView.trusted) {
+                return '<article class="home-position-summary-card is-waiting" data-position-id="'
+                    + escapeHtml(normalizePositionId(positionId)) + '" data-position-state="'
+                    + escapeHtml(monitorView.dataState.toLowerCase()) + '" data-monitor-trusted="false"'
+                    + ' aria-label="' + escapeHtml(symbol + " " + direction + "；" + monitorView.stateLabel) + '">'
+                    + '<div class="home-position-summary-head"><span>USER POSITION</span><span>方向 '
+                    + escapeHtml(direction) + '</span><strong>' + escapeHtml(monitorView.stateLabel) + '</strong></div>'
+                    + '<div class="home-position-symbol-row"><strong>' + escapeHtml(symbol) + '</strong></div>'
+                    + '<div class="home-position-state-band" role="status"><strong>'
+                    + escapeHtml(monitorView.stateLabel) + '</strong><span>可信监控结果尚未就绪</span></div>'
+                    + '<dl class="home-position-facts-grid"><div><dt>开仓价</dt><dd>'
+                    + escapeHtml(price(p.entryPrice)) + '</dd></div></dl></article>';
+            }
+            var risk = riskLevelLabel(p.riskLevel);
             var monitorConclusion = monitorConclusionLabel(p.monitorConclusion);
-            var suggestedAction = value(p.suggestedManualActionText, "当前不可查看");
-            var entryLogicStatus = cleanBlankValue(p.entryLogicStatusLabel)
-                || (cleanBlankValue(p.entryLogicStatus) ? positionLogicStatusLabel(p.entryLogicStatus) : "当前不可查看");
-            var monitorMetadata = [
-                "持仓状态 " + value(p.positionStatusLabel || p.positionStatus, "--"),
-                "方向支持 " + value(p.directionSupportStatusLabel || p.directionSupportStatus, "--"),
-                "反转状态 " + value(p.reversalStatusLabel || p.reversalStatus, "--"),
-                "更新时间 " + homeAssetBusinessTime(p.updatedAt)
-            ].join("；");
-            var pnl = p.pnlPct != null ? formatPct(p.pnlPct) : "--";
-            var pnlNumber = Number(p.pnlPct);
+            var suggestedAction = manualActionLabel(p.suggestedAction);
+            var entryLogicStatus = positionLogicStatusLabel(p.entryLogicStatus);
+            var reversalStatus = reversalStatusLabel(p.reversalStatus);
+            var riskReason = riskReasonLabel(p.riskReason);
+            var trend = riskTrendLabel(p.riskTrend);
+            var lastMonitorTime = homeAssetBusinessTime(p.lastMonitorTime);
+            var pnl = percentage(p.pnlPercent);
+            var pnlNumber = Number(p.pnlPercent);
             var pnlTone = Number.isFinite(pnlNumber) ? (pnlNumber > 0 ? "positive" : (pnlNumber < 0 ? "negative" : "neutral")) : "neutral";
             return '<article class="home-position-summary-card" data-position-id="'
-                + escapeHtml(normalizePositionId(positionId)) + '" data-module-state="'
-                + escapeHtml(frontendContract.normalizeModuleState(p.moduleState, "PARTIAL").toLowerCase())
-                + '" aria-label="' + escapeHtml(value(p.symbol, "--") + " " + direction + "；" + monitorMetadata) + '">'
-                + '<div class="home-position-summary-head"><span>MY POSITION</span><span>方向 ' + escapeHtml(direction) + '</span>'
+                + escapeHtml(normalizePositionId(positionId)) + '" data-position-state="'
+                + escapeHtml(monitorView.dataState.toLowerCase()) + '" data-risk-trend="'
+                + escapeHtml(monitorView.riskTrend.toLowerCase()) + '" data-risk-escalated="'
+                + String(monitorView.escalated) + '" data-monitor-trusted="true" aria-label="'
+                + escapeHtml(symbol + " " + direction + "；持仓风险 " + risk + "；监控结论 " + monitorConclusion) + '">'
+                + '<div class="home-position-summary-head"><span>USER POSITION · ' + escapeHtml(monitorView.stateLabel)
+                + '</span><span>方向 ' + escapeHtml(direction) + '</span>'
                 + '<strong class="position-pnl ' + pnlTone + '">' + escapeHtml(pnl) + '</strong></div>'
-                + '<div class="home-position-symbol-row"><strong>' + escapeHtml(value(p.symbol, "--")) + '</strong>'
+                + '<div class="home-position-symbol-row"><strong>' + escapeHtml(symbol) + '</strong>'
                 + '<span class="position-risk-badge">持仓风险 · ' + escapeHtml(risk) + '</span></div>'
                 + '<dl class="home-position-semantic-grid">'
                 + '<div><dt>监控结论</dt><dd>' + escapeHtml(monitorConclusion) + '</dd></div>'
-                + '<div><dt>建议动作</dt><dd>' + escapeHtml(suggestedAction) + '</dd></div>'
-                + '<div><dt>入场逻辑状态</dt><dd>' + escapeHtml(entryLogicStatus) + '</dd></div></dl>'
-                + '<dl class="position-keyline visually-hidden">'
-                + '<div><dt>入场价</dt><dd>' + escapeHtml(value(p.entryPrice, "--")) + '</dd></div>'
-                + '<div><dt>数量</dt><dd>' + escapeHtml(value(p.positionSize, "--")) + '</dd></div>'
-                + '<div><dt>杠杆</dt><dd>' + escapeHtml(value(p.leverage, "--")) + '</dd></div>'
-                + '<div><dt>止损</dt><dd>' + escapeHtml(value(p.userStopLoss, "--")) + '</dd></div>'
-                + '<div><dt>止盈</dt><dd>' + escapeHtml(value(p.userTakeProfit, "--")) + '</dd></div>'
-                + '<div><dt>告警</dt><dd>' + escapeHtml(value(p.warningState, "--")) + '</dd></div></dl>'
-                + '<span class="visually-hidden">' + escapeHtml(monitorMetadata) + '</span></article>';
+                + '<div><dt>建议动作</dt><dd>' + escapeHtml(suggestedAction) + '</dd></div></dl>'
+                + '<dl class="home-position-facts-grid">'
+                + '<div><dt>开仓价</dt><dd>' + escapeHtml(price(p.entryPrice)) + '</dd></div>'
+                + '<div><dt>标记价格</dt><dd>' + escapeHtml(price(p.markPrice)) + '</dd></div>'
+                + '<div><dt>盈亏金额</dt><dd>' + escapeHtml(amount(p.pnlAmount)) + '</dd></div></dl>'
+                + '<dl class="home-position-monitor-grid">'
+                + '<div><dt>入场逻辑状态</dt><dd>' + escapeHtml(entryLogicStatus) + '</dd></div>'
+                + '<div><dt>反转状态</dt><dd>' + escapeHtml(reversalStatus) + '</dd></div>'
+                + '<div><dt>风险趋势</dt><dd>' + escapeHtml(trend) + '</dd></div>'
+                + '<div><dt>风险变化原因</dt><dd>' + escapeHtml(riskReason) + '</dd></div>'
+                + '<div><dt>最近监控时间</dt><dd>' + escapeHtml(lastMonitorTime) + '</dd></div></dl></article>';
         });
         box.innerHTML = '<div class="home-position-summary-list" data-home-position-summary>'
             + cards.join("") + '</div>';

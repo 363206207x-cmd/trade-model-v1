@@ -388,27 +388,41 @@ public class DashboardControllerTest {
     @Test
     void positionMonitorTemplateRendersRealMonitorFields() throws Exception {
         String positionRows = functionBody("renderHomePositionsFromPayload");
+        String trustView = functionBody("homePositionMonitorView");
 
         assertThat(positionRows).contains(
                 "list.slice(0, 3)",
                 "p.symbol",
                 "p.direction",
                 "var monitorConclusion = monitorConclusionLabel(p.monitorConclusion)",
-                "var suggestedAction = value(p.suggestedManualActionText",
-                "p.entryLogicStatusLabel",
+                "var suggestedAction = manualActionLabel(p.suggestedAction)",
                 "positionLogicStatusLabel(p.entryLogicStatus)",
+                "reversalStatusLabel(p.reversalStatus)",
+                "riskReasonLabel(p.riskReason)",
+                "riskTrendLabel(p.riskTrend)",
+                "p.markPrice", "p.pnlAmount", "p.pnlPercent", "p.lastMonitorTime",
                 "<dt>监控结论</dt>",
                 "<dt>建议动作</dt>",
                 "<dt>入场逻辑状态</dt>",
-                "entryLogicStatusLabel",
-                "directionSupportStatusLabel",
-                "reversalStatusLabel",
-                "riskLevelLabel",
-                "suggestedManualActionText");
+                "<dt>反转状态</dt>",
+                "<dt>风险趋势</dt>",
+                "<dt>风险变化原因</dt>",
+                "<dt>最近监控时间</dt>");
         assertThat(positionRows).doesNotContain(
-                "p.monitorConclusion || p.suggestedManualActionText",
-                "p.suggestedManualActionText || p.entryLogicStatusLabel",
+                "p.directionLabel", "p.riskLevelLabel", "p.monitorConclusionLabel",
+                "p.suggestedManualActionText", "p.suggestedManualAction",
+                "p.entryLogicStatusLabel", "p.reversalStatusLabel", "p.riskReasonLabel",
+                "p.currentPrice", "p.floatingPnl", "p.pnlPct",
                 "lastMonitorAt", "nextMonitorAt", "fetch(", "position-action-btn", "bindHomePositionRows");
+        assertThat(trustView).contains(
+                "p.markPriceFresh === true",
+                "dataState === \"OPEN_MONITORING\"",
+                "dataState === \"RISK_ESCALATED\"",
+                "dataState === \"PLAN_INVALIDATED\"",
+                "riskTrend === \"STABLE\"",
+                "riskTrend === \"INCREASED\"",
+                "riskTrend === \"SHARPLY_INCREASED\"",
+                "recognizedContract", "numericContract", "complete");
         assertThat(functionBody("monitorConclusionLabel")).contains(
                 "LOGIC_VALID", "逻辑仍成立",
                 "LOGIC_WEAKENED", "逻辑弱化",
@@ -435,7 +449,9 @@ public class DashboardControllerTest {
         String execution = functionBody("renderHomeExecutionFromPayload");
 
         assertThat(monitorTime).contains("if (!lastMonitorAt)", "暂无下次监控排期");
-        assertThat(positions).doesNotContain("positionMonitorTimeCellHtml", "lastMonitorAt", "nextMonitorAt");
+        assertThat(positions)
+                .contains("p.lastMonitorTime", "最近监控时间")
+                .doesNotContain("positionMonitorTimeCellHtml", "lastMonitorAt", "nextMonitorAt");
         assertThat(execution).doesNotContain(
                 "positionMonitorTimeCellHtml", "lastMonitorAt", "nextMonitorAt");
     }
@@ -461,7 +477,7 @@ public class DashboardControllerTest {
         assertThat(visibleDom).doesNotContain("pendingCount", "degraded",
                 "latestAnalysisFailureCode", "failureReasonCode");
         assertThat(visibleDom).contains(
-                "待复核机会", "AI 一致性摘要", "持仓摘要", "持仓数据不足时保持空状态");
+                "待复核机会", "AI 一致性摘要", "持仓摘要", "录入真实持仓后开始监控");
 
         String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
         assertThat(localRealRenderer).contains("localRealFailureLabel", "latestFailureLabel");
@@ -647,7 +663,7 @@ public class DashboardControllerTest {
     @Test
     void visualFixtureSeparatesAssetExecutionPlanFromUserPositions() throws Exception {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
-        int positionStart = fixture.indexOf("elif scenario in {\"position-monitored\", \"position-waiting\"}");
+        int positionStart = fixture.indexOf("elif scenario in {\n        \"position-monitored\"");
         int positionEnd = fixture.indexOf("elif scenario == \"multi-position\"", positionStart);
 
         assertThat(fixture).contains(
@@ -714,7 +730,9 @@ public class DashboardControllerTest {
                 "function riskLevelLabel", "function aiRunStatusLabel", "function aiConflictLevelLabel",
                 "function planModeLabel", "function positionLogicStatusLabel",
                 "function directionSupportStatusLabel", "function reversalStatusLabel",
-                "function manualActionLabel", "function dataQualityStatusLabel");
+                "function manualActionLabel", "function riskTrendLabel",
+                "function riskReasonLabel", "function positionDataStateLabel",
+                "function dataQualityStatusLabel");
         assertThat(html).contains("未知状态");
     }
 
@@ -733,12 +751,69 @@ public class DashboardControllerTest {
     }
 
     @Test
-    void homePositionSummaryUsesOnlyContractedPnlPercentage() throws Exception {
+    void homePositionSummaryUsesOnlyCanonicalP2PnlFields() throws Exception {
         String homePayloadRows = functionBody("renderHomePositionsFromPayload");
 
-        assertThat(homePayloadRows).contains("p.pnlPct", "formatPct");
+        assertThat(homePayloadRows).contains(
+                "p.pnlPercent", "p.pnlAmount", "formatPct", "formatSignedAmount");
         assertThat(homePayloadRows).doesNotContain(
-                "p.floatingPnl", "formatSignedAmount", "浮动盈亏");
+                "p.pnlPct", "p.floatingPnl", "p.currentPrice", "浮动盈亏");
+    }
+
+    @Test
+    void homePositionEmptyWaitingAndStaleScenariosFailClosed() throws Exception {
+        String renderer = functionBody("renderHomePositionsFromPayload");
+        String trustView = functionBody("homePositionMonitorView");
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(renderer).contains(
+                "暂无手动持仓", "录入真实持仓后开始监控",
+                "if (!monitorView.trusted)", "当前不可查看",
+                "data-monitor-trusted=\"false\"");
+        assertThat(trustView).contains(
+                "等待监控数据",
+                "p.markPriceFresh === true",
+                "dataState !== \"NO_POSITION\"",
+                "dataState !== \"CLOSED\"");
+        assertThat(fixture).contains(
+                "\"position-waiting\"", "\"position-stale\"",
+                "position[\"markPriceFresh\"] = False",
+                "\"dataState\": \"WAITING_MONITOR_DATA\"");
+    }
+
+    @Test
+    void homePositionVerifiedScenarioExposesEveryFrozenCanonicalField() throws Exception {
+        String renderer = functionBody("renderHomePositionsFromPayload");
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(renderer).contains(
+                "p.symbol", "p.direction", "p.entryPrice", "p.markPrice",
+                "p.pnlAmount", "p.pnlPercent", "p.riskLevel", "p.riskTrend",
+                "p.monitorConclusion", "p.entryLogicStatus", "p.reversalStatus",
+                "p.riskReason", "p.suggestedAction", "p.lastMonitorTime");
+        assertThat(fixture).contains(
+                "\"position-monitored\"",
+                "\"markPriceFresh\": True",
+                "\"dataState\": data_state",
+                "\"entryLogicStatus\": \"STILL_VALID\"",
+                "\"reversalStatus\": \"NO_REVERSAL\"",
+                "\"suggestedAction\": \"TIGHTEN_STOP\" if risk_escalated else \"CONTINUE_HOLD\"");
+    }
+
+    @Test
+    void homePositionMultiPositionAndRiskTrendScenariosStayIndependent() throws Exception {
+        String trustView = functionBody("homePositionMonitorView");
+        String renderer = functionBody("renderHomePositionsFromPayload");
+        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+
+        assertThat(renderer).contains("list.slice(0, 3).map(function (p)", "homePositionMonitorView(p)");
+        assertThat(trustView)
+                .contains("dataState === \"RISK_ESCALATED\"", "riskTrend === \"INCREASED\"")
+                .doesNotContain("p.riskLevel === \"HIGH\"", "p.riskLevel === \"EXTREME\"");
+        assertThat(fixture).contains(
+                "\"position-high-stable\"", "\"position-risk-escalated\"", "\"multi-position\"",
+                "risk_level=\"HIGH\", risk_trend=\"STABLE\"",
+                "risk_level=\"MEDIUM\", risk_trend=\"INCREASED\"");
     }
 
     @Test
@@ -2057,6 +2132,8 @@ public class DashboardControllerTest {
         String executionCard = htmlSection(HOME_EXECUTION_CARD_START);
         String realPositionDetector = htmlBlock(HAS_REAL_POSITION_DETAIL_START, UPDATE_MODE_HINT_START);
         String renderHomePositions = functionBody("renderHomePositionsFromPayload");
+        String positionTrustView = functionBody("homePositionMonitorView");
+        String positionFrontendContract = renderHomePositions + positionTrustView;
 
         assertThat(html).contains(CANDIDATE_REVIEW_START);
         assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
@@ -2065,7 +2142,7 @@ public class DashboardControllerTest {
                 "用户真实持仓 Top 3 摘要",
                 "仅显示手动录入持仓",
                 "暂无手动持仓",
-                "持仓数据不足时保持空状态");
+                "录入真实持仓后开始监控");
         assertThat(positionCard).doesNotContain("manualPositionBtn");
         assertThat(executionCard).contains("系统执行建议（非交易指令）");
 
@@ -2081,20 +2158,24 @@ public class DashboardControllerTest {
         assertThat(realPositionDetector).doesNotContain("stopLoss");
         assertThat(realPositionDetector).doesNotContain("takeProfit");
 
-        assertThat(renderHomePositions).contains(
+        assertThat(positionFrontendContract).contains(
                 "positions", "list.slice(0, 3)", "p.symbol", "p.direction",
-                "p.entryPrice", "p.positionSize", "p.leverage",
-                "p.userStopLoss", "p.userTakeProfit", "p.positionStatusLabel",
-                "p.entryLogicStatusLabel", "p.directionSupportStatusLabel",
-                "p.reversalStatusLabel", "p.riskLevelLabel", "p.suggestedManualActionText",
-                "p.warningState", "p.updatedAt");
-        assertThat(renderHomePositions).doesNotContain("fetch(");
-        assertThat(renderHomePositions).doesNotContain("/api/user-positions/manual-open");
-        assertThat(renderHomePositions).doesNotContain("/api/user-positions/");
-        assertThat(renderHomePositions).doesNotContain(
-                "tradeType", "recommendedAction", "executionPlanDisplay", "p.floatingPnl");
-        assertThat(renderHomePositions).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
-        assertThat(renderHomePositions).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
+                "p.entryPrice", "p.markPrice", "p.pnlAmount", "p.pnlPercent",
+                "p.riskLevel", "p.riskTrend", "p.monitorConclusion", "p.entryLogicStatus",
+                "p.reversalStatus", "p.riskReason", "p.suggestedAction", "p.lastMonitorTime",
+                "p.dataState", "p.markPriceFresh");
+        assertThat(positionFrontendContract).doesNotContain("fetch(");
+        assertThat(positionFrontendContract).doesNotContain("/api/user-positions/manual-open");
+        assertThat(positionFrontendContract).doesNotContain("/api/user-positions/");
+        assertThat(positionFrontendContract).doesNotContain(
+                "tradeType", "recommendedAction", "executionPlanDisplay",
+                "p.positionSize", "p.leverage", "p.userStopLoss", "p.userTakeProfit",
+                "p.positionStatusLabel", "p.directionSupportStatusLabel", "p.warningState",
+                "p.currentPrice", "p.floatingPnl", "p.pnlPct",
+                "p.entryLogicStatusLabel", "p.reversalStatusLabel", "p.riskLevelLabel",
+                "p.riskReasonLabel", "p.suggestedManualActionText");
+        assertThat(positionFrontendContract).doesNotContain("orderBtn", "executeBtn", "buyBtn", "sellBtn");
+        assertThat(positionFrontendContract).doesNotContain("autoOpen", "autoClose", "pushRecheckCreatedUserPosition");
     }
 
     @Test
