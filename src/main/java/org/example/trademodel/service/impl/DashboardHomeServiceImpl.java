@@ -448,7 +448,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         header.setAiStatusLabel(headerAiStatusLabel(aiStatus));
         header.setDataSourceText(dataSourceText(positionSyncStatus, externalContext, providerReadiness));
         if (localRealReadinessService != null) {
-            header.setDataSourceText(localRealDataSourceText());
+            header.setDataSourceText(firstNonBlank(
+                    providerReadiness != null ? providerReadiness.getDataSourceText() : null,
+                    "WAITING_SYNC"));
         }
         header.setUpdatedAt(null);
         return header;

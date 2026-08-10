@@ -5,7 +5,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.vo.ProviderReadinessVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +22,15 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     public static final String STATUS_UNKNOWN = "UNKNOWN";
 
     private final Environment environment;
+    private LocalRealDataStatusService localRealDataStatusService;
 
     public ProviderReadinessServiceImpl(Environment environment) {
         this.environment = environment;
+    }
+
+    @Autowired(required = false)
+    void setLocalRealDataStatusService(LocalRealDataStatusService localRealDataStatusService) {
+        this.localRealDataStatusService = localRealDataStatusService;
     }
 
     @Override
@@ -51,6 +60,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     }
 
     private ProviderReadinessVO.ProviderStatusVO marketDataStatus() {
+        if (localRealDataStatusService != null) {
+            return localRealMarketDataStatus();
+        }
         String providerType = upper(firstNonBlank(property("position.provider.type"), "SIMULATED"));
         if ("BINANCE".equals(providerType)) {
             boolean baseUrlConfigured = hasText(firstNonBlank(
@@ -90,6 +102,78 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
                 false,
                 "UNKNOWN_MARKET_PROVIDER_TYPE"
         );
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO localRealMarketDataStatus() {
+        try {
+            LocalRealDataStatusService.ProviderReadinessSnapshot snapshot =
+                    localRealDataStatusService.providerReadinessSnapshot();
+            String provider = upper(firstNonBlank(snapshot.provider(), "UNKNOWN"));
+            String freshness = upper(firstNonBlank(snapshot.freshnessStatus(), "NO_DATA"));
+            String runtimeState = upper(firstNonBlank(snapshot.runtimeState(), "UNKNOWN"));
+            PublicProviderHealthSnapshot providerHealth = snapshot.providerHealth();
+            boolean providerUp = providerHealth != null
+                    && "UP".equals(upper(providerHealth.status()))
+                    && providerHealth.lastSuccessAt() != null
+                    && !providerHealth.circuitOpen();
+            boolean fresh = "FRESH".equals(freshness);
+            boolean connected = snapshot.dashboardReady() && fresh && providerUp;
+
+            String readinessStatus;
+            String reason;
+            if (connected) {
+                readinessStatus = STATUS_CONNECTED;
+                reason = "LOCAL_REAL_PROVIDER_VERIFIED_FRESH";
+            } else if ("FAILED".equals(runtimeState)
+                    || "STALE".equals(freshness)
+                    || "INVALID".equals(freshness)
+                    || providerHealth != null && (providerHealth.circuitOpen()
+                    || "DEGRADED".equals(upper(providerHealth.status()))
+                    || "GEO_RESTRICTED".equals(upper(providerHealth.status())))) {
+                readinessStatus = STATUS_FAIL_CLOSED;
+                reason = localRealFailureReason(runtimeState, freshness, providerHealth);
+            } else {
+                readinessStatus = STATUS_WAITING_SYNC;
+                reason = "LOCAL_REAL_PROVIDER_NOT_READY";
+            }
+            return item(
+                    "MARKET_DATA",
+                    provider + "_PUBLIC_MARKET_DATA",
+                    readinessStatus,
+                    true,
+                    true,
+                    connected,
+                    reason
+            );
+        } catch (RuntimeException ex) {
+            return item(
+                    "MARKET_DATA",
+                    "LOCAL_REAL_MARKET_DATA",
+                    STATUS_FAIL_CLOSED,
+                    true,
+                    true,
+                    false,
+                    "LOCAL_REAL_PROVIDER_STATUS_UNAVAILABLE"
+            );
+        }
+    }
+
+    private String localRealFailureReason(String runtimeState,
+                                          String freshness,
+                                          PublicProviderHealthSnapshot providerHealth) {
+        if ("FAILED".equals(runtimeState)) {
+            return "LOCAL_REAL_RUNTIME_FAILED";
+        }
+        if ("STALE".equals(freshness)) {
+            return "LOCAL_REAL_MARKET_DATA_STALE";
+        }
+        if ("INVALID".equals(freshness)) {
+            return "LOCAL_REAL_MARKET_DATA_INVALID";
+        }
+        if (providerHealth != null && providerHealth.circuitOpen()) {
+            return "LOCAL_REAL_PROVIDER_CIRCUIT_OPEN";
+        }
+        return "LOCAL_REAL_PROVIDER_DEGRADED";
     }
 
     private List<ProviderReadinessVO.ProviderStatusVO> aiProviderStatuses() {
@@ -181,7 +265,19 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         if ("SIMULATED_FALLBACK".equals(market.getName())) {
             return "Simulated fallback / " + market.getStatus();
         }
+        if (market.getName() != null && market.getName().endsWith("_PUBLIC_MARKET_DATA")) {
+            String provider = market.getName().substring(0,
+                    market.getName().length() - "_PUBLIC_MARKET_DATA".length());
+            return providerLabel(provider) + " public data / " + market.getStatus();
+        }
         return firstNonBlank(market.getName(), "UNKNOWN") + " / " + firstNonBlank(market.getStatus(), STATUS_UNKNOWN);
+    }
+
+    private String providerLabel(String provider) {
+        String normalized = trim(provider).toLowerCase(Locale.ROOT);
+        return normalized.isEmpty()
+                ? "Unknown"
+                : Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
     }
 
     private boolean hasAnyText(String... keys) {

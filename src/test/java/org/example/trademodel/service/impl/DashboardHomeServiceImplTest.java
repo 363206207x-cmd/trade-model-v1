@@ -36,6 +36,7 @@ import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
@@ -403,6 +404,28 @@ class DashboardHomeServiceImplTest {
             assertThat(provider.getStatus()).isNotEqualTo("CONNECTED");
             assertThat(provider.getConnected()).isFalse();
         });
+    }
+
+    @Test
+    void localRealHeaderAndDiagnosticsUseTheSameProviderReadinessSnapshot() {
+        ProviderReadinessVO readiness = providerReadiness(
+                "CONNECTED",
+                "WAITING_SYNC",
+                "WAITING_SYNC",
+                "Kraken public data / CONNECTED"
+        );
+        ProviderReadinessVO.ProviderStatusVO market = readiness.getProviders().get(0);
+        market.setName("KRAKEN_PUBLIC_MARKET_DATA");
+        market.setConnected(true);
+        market.setReason("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
+        when(providerReadinessService.getReadiness()).thenReturn(readiness);
+        service.setLocalRealReadinessService(mock(LocalRealReadinessService.class));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+
+        assertThat(home.getHeader().getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
+        assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONNECTED");
+        assertThat(home.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
     }
 
     @Test

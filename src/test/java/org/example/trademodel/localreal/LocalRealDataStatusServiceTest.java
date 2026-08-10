@@ -18,6 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 import java.util.List;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
+import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -105,5 +110,56 @@ class LocalRealDataStatusServiceTest {
                 .containsEntry("realMarketEnvironment", true)
                 .containsEntry("analysisStatus", "FAILED")
                 .containsEntry("latestAnalysisFailureCode", "REAL_MARKET_ENVIRONMENT_REQUIRED");
+    }
+
+    @Test
+    void providerReadinessUsesCurrentBarAgeAndFailsClosedAfterFreshnessWindow() {
+        Instant now = Instant.parse("2026-08-10T14:30:00Z");
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        for (String symbol : LocalRealDataCoordinator.SYMBOLS) {
+            readiness.updateAsset(symbol, LocalRealAssetReadinessState.READY, "KRAKEN",
+                    "REAL_DATA_AVAILABLE");
+        }
+        readiness.transition(LocalRealReadinessState.DASHBOARD_READY, "REAL_DATA_AVAILABLE");
+        when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(6);
+        when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
+        when(routedProvider.krakenPairCacheState()).thenReturn(KrakenPairCacheState.READY);
+        when(routedProvider.health()).thenReturn(Map.of(
+                "kraken", new PublicProviderHealthSnapshot(
+                        "KRAKEN", "UP", now, null, false, null)));
+
+        PersistedOhlcvBarDO fresh = readyBar(now.minusSeconds(5 * 60));
+        PersistedOhlcvBarDO stale = readyBar(now.minusSeconds(12 * 60));
+        PersistedOhlcvBarDO invalid = readyBar(now.minusSeconds(5 * 60));
+        invalid.setSourceStatus("INVALID");
+        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(fresh, stale, invalid);
+        LocalRealDataStatusService service = new LocalRealDataStatusService(
+                readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
+                realMarketEnvironmentService, Clock.fixed(now, ZoneOffset.UTC));
+
+        LocalRealDataStatusService.ProviderReadinessSnapshot freshSnapshot =
+                service.providerReadinessSnapshot();
+        LocalRealDataStatusService.ProviderReadinessSnapshot staleSnapshot =
+                service.providerReadinessSnapshot();
+        LocalRealDataStatusService.ProviderReadinessSnapshot invalidSnapshot =
+                service.providerReadinessSnapshot();
+
+        assertThat(freshSnapshot.dashboardReady()).isTrue();
+        assertThat(freshSnapshot.freshnessStatus()).isEqualTo("FRESH");
+        assertThat(staleSnapshot.dashboardReady()).isFalse();
+        assertThat(staleSnapshot.freshnessStatus()).isEqualTo("STALE");
+        assertThat(staleSnapshot.reasonCode()).isEqualTo("LOCAL_REAL_MARKET_DATA_STALE");
+        assertThat(invalidSnapshot.dashboardReady()).isFalse();
+        assertThat(invalidSnapshot.freshnessStatus()).isEqualTo("INVALID");
+        assertThat(invalidSnapshot.reasonCode()).isEqualTo("LOCAL_REAL_MARKET_DATA_INVALID");
+    }
+
+    private PersistedOhlcvBarDO readyBar(Instant closedAt) {
+        PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
+        bar.setTimeframe("5m");
+        bar.setCloseTimeMs(closedAt.toEpochMilli());
+        bar.setSourceStatus("READY");
+        bar.setFreshnessStatus("FRESH");
+        return bar;
     }
 }
