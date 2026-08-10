@@ -468,3 +468,37 @@ reverse, order, Mobile, Figma, and unrelated expansion remain blocked.
 Human confirmation required: Already explicitly authorized by the Product
 Owner for this candidate; independent review and merged-main validation are
 still required before implementation permission becomes effective.
+
+---
+
+## v4.1-decision-chain-authorization-candidate
+
+Date: 2026-08-11
+Changed by: Codex
+Reason: Explicit Product Owner approval of
+`Fundamental_AI_v4_1_Codex_v2.docx` as a frozen product source and explicit
+authorization to create the independent v4.1 OneShot backend implementation
+permission gate.
+Before: The v4.1 design source was not registered. No exact implementation
+package existed in the Delivery Matrix or machine-readable handoff, so
+implementation and PR creation correctly failed closed.
+After: `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN` is a registered, hashed Product
+Source. AI role authority, Candidate/Final separation, Asset Pool-only
+opportunity sourcing, Opportunity state semantics, audit requirements, manual
+UserPosition boundary, and canonical object ownership are frozen. The Delivery
+Matrix records only
+`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION` as
+`AUTHORIZED_TO_IMPLEMENT`; machine permission remains false before merge and
+may become true only after clean/synced merged-main validation for that exact
+package.
+Does this change phase order: It adds a directly approved version-scoped
+backend package without marking Product P2 or full Product P3 complete. It
+does not authorize their UI or acceptance gaps by implication.
+Does this change done criteria: No. Authorization is not implementation,
+acceptance, deployment, or production readiness.
+Does this weaken safety boundaries: No. No automatic open, close, reduce, add,
+reverse, order, AI rule bypass, Candidate-as-Final exposure, plan-as-position,
+duplicate object family, Mobile, or Figma change is authorized.
+Human confirmation required: Already explicitly supplied for this
+authorization candidate. Independent exact-Head review, merge, and merged-main
+validation remain required before implementation permission becomes effective.

@@ -220,6 +220,45 @@ Mobile, Figma, Three AI, and unrelated product expansion.
 
 **Exit criteria:** list/detail agree on authoritative latest monitor; every change is traceable; no automatic mutation; merged main effective.
 
+## Fundamental AI v4.1 — Authorized Decision Chain Backend Package
+
+**Product design status:** `FROZEN` by the explicitly approved
+`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN` source.
+
+**Implementation authorization:**
+`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION` is the only authorized
+successor after `docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md` is
+reviewed, merged, and validated on clean/synced main. The authorization does
+not mark Product P2 or full Product P3 complete and does not authorize their UI
+or acceptance gaps by implication.
+
+**Input:** Asset Pool, existing AnalysisRun/Evidence/Score/Decision owners,
+rule-base direction, data-quality/confused/risk state, existing ExecutionPlan,
+AI call log, conflict resolver, UserPosition, PositionMonitorLog, and Review.
+
+**Deliverables:** Asset Pool as the only opportunity source; eight-state
+Opportunity state machine with unified transition audit/debounce/cooling;
+ExecutionPlanCandidate; GPT Candidate generation; Gemini Candidate review;
+Grok risk challenge; Conflict Resolver; Rule Validation; separate Final plan;
+complete AI trace; Review extension; required schema/API changes and tests.
+
+**Ownership boundary:** reuse the existing canonical object families described
+in `docs/FUNDAMENTAL_AI_V4_1_OBJECT_OWNERSHIP_MAP.md`. A second Analysis,
+Evidence, Score, Decision, ExecutionPlan, UserPosition, PositionMonitorLog,
+Review, AI trace, conflict-resolver, Asset Pool, or Opportunity-state stack is
+forbidden.
+
+**Safety boundary:** no automatic open, close, reduce, add, reverse, order, or
+plan-to-position conversion. AI cannot mutate state or bypass Rule Validation.
+Mobile, Figma, frontend redesign, and unrelated notification/delivery work are
+outside the package.
+
+**Exit criteria:** implementation and capability audit prove the complete
+chain, Candidate/Final isolation, traceability, fallback, state precedence,
+Asset Pool-only source, manual UserPosition boundary, and safety tests on the
+exact reviewed implementation Head. Authorization alone satisfies none of
+these implementation criteria.
+
 ## P3 — AI Analysis
 
 **Input:** formal V1 architecture and AI conflict plan, real normalized evidence, eight scores, four timeframes, rule base, AI trigger records, existing FE-03 detail path.
