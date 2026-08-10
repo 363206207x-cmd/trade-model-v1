@@ -189,15 +189,30 @@ broad schema change, guessed plan identity, and PR #1156 recovery content.
 
 ## P2 — Position and Position Monitoring
 
+**Authorization status:** `AUTHORIZED_PENDING_MERGED_MAIN`. The bounded
+backend contract package is recorded in
+`docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md`. Authorization becomes
+effective only after independent review, merged-main validation, a clean and
+synced worktree, Product Source Gate `PASS`, and no active conflicting PR. It
+does not make Product P2 complete or automatically adopt an existing candidate
+diff.
+
 **Input:** formal Position Monitoring plan, P1 Home identity behavior, real UserPosition contract, original ExecutionPlan links, market evidence and monitor logs.
 
 **Deliverables:** manual position workflow; plan-versus-actual presentation; open/partial/closed lifecycle; authoritative latest monitoring; logic/reversal/risk/liquidity/wick handling; manual suggestions; alerts; complete logs; close/review entry.
 
 **Dependencies:** P1 accepted; current-user ownership proven; exact string IDs; reliable current-market feed; review identity available.
 
-**Allowed scope:** UserPosition/PositionMonitor product paths explicitly mapped to the plan; owner-scoped read/write only for explicit user actions; tests and UI needed by the package.
+**Authorized first implementation scope:** Position Monitor backend contract
+completion only: schema and persistence for independent monitor semantics,
+per-position risk, monitor-source trust and freshness, mark-price/PnL
+provenance, Dashboard Home Position projection, state handling, and focused
+tests. UserPosition/PositionMonitor reads and explicit user actions remain
+owner scoped.
 
-**Blocked scope:** auto-open, auto-close, auto-reduce, auto-add, auto-reverse, monitor-triggered orders, ExecutionPlan substitution for actual user facts.
+**Blocked scope:** auto-open, auto-close, auto-reduce, auto-add, auto-reverse,
+monitor-triggered orders, ExecutionPlan substitution for actual user facts,
+Mobile, Figma, Three AI, and unrelated product expansion.
 
 **Acceptance evidence:** owner-isolation tests; plan/actual screenshots; monitor state/log trace; no-run-on-read proof; alert/suggestion semantics; accessibility and device-width evidence.
 

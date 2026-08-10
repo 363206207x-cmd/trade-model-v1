@@ -64,6 +64,9 @@ emit_resolved_task_state() {
   printf 'P1B_1_STATUS: %s\n' "${p1b_1_declared_status:-UNDECLARED}"
   printf 'P1B_HOME_CORE_DATA_AUTHORIZATION_STATUS: %s\n' "${home_core_data_authorization_runtime_status:-BLOCKED}"
   printf 'P1B_HOME_CORE_DATA_COMPLETION_STATUS: %s\n' "${home_core_data_implementation_status:-UNDECLARED}"
+  printf 'PRODUCT_P1B_STATUS: %s\n' "${product_p1b_declared_status:-UNDECLARED}"
+  printf 'P2_POSITION_MONITORING_AUTHORIZATION_STATUS: %s\n' "${p2_authorization_runtime_status:-BLOCKED}"
+  printf 'P2_POSITION_MONITORING_IMPLEMENTATION_STATUS: %s\n' "${p2_implementation_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -189,6 +192,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="P1B_AUTHORIZATION_REMEDIATION_REVIEW"
     elif [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
       resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -198,6 +203,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="P1B_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
         resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -242,6 +249,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="P1B_HOME_IMPLEMENTATION"
   elif [[ "$authorized_next_package_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]]; then
     resolved_handoff_stage="P1B_HOME_CORE_DATA_IMPLEMENTATION"
+  elif [[ "$authorized_next_package_phase" == "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" ]]; then
+    resolved_handoff_stage="P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -496,7 +505,90 @@ evaluate_home_core_data_transition() {
   p1b_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
+evaluate_p2_position_monitoring_transition() {
+  local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
+  local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
+  local merged_main_validation_status="$9" repository_edits_allowed="${10}"
+  local implementation_allowed="${11}" implementation_pr_allowed="${12}"
+  local declared_authorization_status="${13}" predecessor_status="${14}"
+
+  effective_task_mode="$current_mode"
+  p1a_transition_allowed="YES"
+  p1a_completion_status="PASS"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
+  p2_authorization_runtime_status="BLOCKED"
+
+  [[ "$current_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]] || return 0
+  [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
+  [[ "$next_phase" == "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" ]] || return 0
+  [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
+
+  if [[ "$predecessor_status" != "COMPLETE" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_P1B_NOT_COMPLETE"
+    return 0
+  fi
+  if [[ "$current_status" != "COMPLETED" ]]; then
+    next_task_authorization_status="BLOCKED_P2_AUTHORIZATION_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$declared_authorization_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_P2_SCOPE_NOT_AUTHORIZED"
+    return 0
+  fi
+  if ! is_true_flag "$repository_edits_allowed" \
+    || ! is_true_flag "$implementation_allowed" \
+    || ! is_true_flag "$implementation_pr_allowed"; then
+    next_task_authorization_status="BLOCKED_P2_IMPLEMENTATION_PERMISSIONS_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$completion_state" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_P2_AUTHORIZATION_MERGED_MAIN"
+    p2_authorization_runtime_status="PENDING_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "$synced_main_status" != "YES" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH"
+    return 0
+  fi
+  if [[ "$source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "$merged_main_validation_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_P2_AUTHORIZATION_MERGED_MAIN_VALIDATION"
+    return 0
+  fi
+
+  effective_task_mode="$next_mode"
+  next_transition_allowed="YES"
+  authorization_status="APPROVED"
+  next_task_authorization_status="ALLOWED"
+  p2_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" ]]; then
+    evaluate_p2_position_monitoring_transition \
+      "$current_package_phase" \
+      "$current_package_status" \
+      "$current_task_mode" \
+      "$authorized_next_package_phase" \
+      "$authorized_next_task_mode" \
+      "$completion_effective_state" \
+      "$clean_synced_main" \
+      "$product_source_gate_status" \
+      "$p0_merged_main_validation_status" \
+      "$authorized_next_repository_edits_allowed" \
+      "$authorized_next_implementation_allowed" \
+      "$authorized_next_implementation_pr_allowed" \
+      "$p2_authorization_declared_status" \
+      "$product_p1b_declared_status"
+    return 0
+  fi
+
   if [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "P1B_HOME_CORE_DATA_COMPLETION" ]]; then
     evaluate_home_core_data_transition \
@@ -796,6 +888,9 @@ load_task_package_contract() {
   p1b_authorization_declared_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
   home_core_data_declared_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_authorization_status)"
   home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_implementation_status)"
+  product_p1b_declared_status="$(yaml_value "$TASK_FILE" product_p1b_status)"
+  p2_authorization_declared_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_authorization_status)"
+  p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_implementation_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -823,7 +918,7 @@ run_handoff_resolution_simulation() {
   main_sync="OK"
   open_prs="current authorization package"
   can_continue="NO"
-  blockers_text="P1B_AUTHORIZATION_PENDING_MERGED_MAIN"
+  blockers_text="AUTHORIZATION_PENDING_MERGED_MAIN"
   requested_package="$provided_requested_package"
   open_pr_evidence_source="GH_QUERY"
   open_pr_none_confirmed="NO"
@@ -840,10 +935,14 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      p1b_1_declared_status="IN_PROGRESS"
+      if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
+        product_p1b_declared_status="IN_PROGRESS"
+      else
+        p1b_1_declared_status="IN_PROGRESS"
+      fi
       requested_package="$authorized_next_package_phase"
       ;;
-    authorization_pending_request_p1b)
+    authorization_pending_request_p1b|authorization_pending_request_p2)
       requested_package="$authorized_next_package_phase"
       ;;
     authorization_merged_unsynced)
@@ -855,7 +954,7 @@ run_handoff_resolution_simulation() {
       open_prs="none"
       blockers_text="MAIN_BEHIND_ORIGIN"
       ;;
-    authorization_merged_validated|p1b_operator|closed_pr_1156|merged_gh_no_pr)
+    authorization_merged_validated|p1b_operator|p2_operator|closed_pr_1156|merged_gh_no_pr)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -914,7 +1013,7 @@ run_handoff_resolution_simulation() {
       open_pr_none_confirmed="$provided_open_pr_confirmation"
       blockers_text="ACTIVE_CONFLICTING_PR"
       ;;
-    p1b_unauthorized)
+    p1b_unauthorized|p2_unauthorized)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -923,8 +1022,13 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      home_core_data_declared_status="BLOCKED_PENDING_REVIEW"
-      blockers_text="P1B_NOT_AUTHORIZED"
+      if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
+        p2_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="P2_NOT_AUTHORIZED"
+      else
+        home_core_data_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="P1B_NOT_AUTHORIZED"
+      fi
       ;;
     conflicting_pr|separate_conflicting_pr_successor)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
@@ -942,7 +1046,7 @@ run_handoff_resolution_simulation() {
       open_prs=$'current authorization package\n#2000 active-conflicting-pr'
       blockers_text="ACTIVE_CONFLICTING_PR_BLOCKS_SUCCESSOR_ONLY"
       ;;
-    p1b_permission_missing)
+    p1b_permission_missing|p2_permission_missing)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -951,7 +1055,7 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       authorized_next_implementation_allowed="false"
-      blockers_text="P1B_PERMISSION_INCOMPLETE"
+      blockers_text="IMPLEMENTATION_PERMISSION_INCOMPLETE"
       ;;
     dirty_worktree)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
@@ -1108,6 +1212,8 @@ fi
 current_phase="$(matrix_field P0-0 2)"
 current_phase_status="$(matrix_field P0-0 4)"
 existing_module_maturity="$(matrix_field P0-0 5)"
+product_p1b_matrix_status="$(matrix_field "Product P1B" 4)"
+product_p2_matrix_status="$(matrix_field "Product P2" 5)"
 current_work_package="$(current_state_value "Current Work Package")"
 next_business_phase="$(current_state_value "Next Business Phase")"
 next_business_phase_allowed_raw="$(current_state_value "Next Business Phase Allowed")"
@@ -1151,6 +1257,9 @@ p1b_1_declared_status="$(yaml_value "$TASK_FILE" p1b_1_status)"
 p1b_authorization_declared_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
 home_core_data_declared_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_authorization_status)"
 home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_implementation_status)"
+product_p1b_declared_status="$(yaml_value "$TASK_FILE" product_p1b_status)"
+p2_authorization_declared_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_authorization_status)"
+p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_implementation_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1195,6 +1304,28 @@ if [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" ]]; then
     || "$home_core_data_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
     || "$home_core_data_implementation_status" != "NOT_STARTED" \
     || "$p1b_scope" != "HOME_CORE_DATA_READ_ONLY" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed"; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+fi
+if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
+  if [[ "$current_package_status" != "COMPLETED" \
+    || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
+    || "$authorized_next_package_phase" != "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" \
+    || "$authorized_next_package_mode" != "IMPLEMENTATION" \
+    || "$product_p1b_declared_status" != "COMPLETE" \
+    || "$product_p1b_matrix_status" != "COMPLETE" \
+    || "$product_p2_matrix_status" != "AUTHORIZED_TO_IMPLEMENT" \
+    || "$p2_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$p2_implementation_status" != "NOT_STARTED" \
+    || "$p1b_1_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$p1b_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$home_core_data_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$home_core_data_implementation_status" != "COMPLETE" \
+    || "$p1b_scope" != "POSITION_MONITORING_BACKEND_CONTRACT_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
@@ -1510,6 +1641,10 @@ printf 'P1B_AUTHORIZATION_DECLARED_STATUS: %s\n' "${p1b_authorization_declared_s
 printf 'P1B_1_STATUS: %s\n' "${p1b_1_declared_status:-UNDECLARED}"
 printf 'P1B_HOME_CORE_DATA_DECLARED_STATUS: %s\n' "${home_core_data_declared_status:-UNDECLARED}"
 printf 'P1B_HOME_CORE_DATA_COMPLETION_STATUS: %s\n' "${home_core_data_implementation_status:-UNDECLARED}"
+printf 'PRODUCT_P1B_DECLARED_STATUS: %s\n' "${product_p1b_declared_status:-UNDECLARED}"
+printf 'PRODUCT_P2_MATRIX_STATUS: %s\n' "${product_p2_matrix_status:-UNDECLARED}"
+printf 'P2_POSITION_MONITORING_DECLARED_STATUS: %s\n' "${p2_authorization_declared_status:-UNDECLARED}"
+printf 'P2_POSITION_MONITORING_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${p2_implementation_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"

@@ -441,3 +441,30 @@ Figma, notification, or trading capability.
 Human confirmation required: The close-without-merge decision was explicitly
 provided. PR #1157 still requires a new exact-Head review before any Ready or
 merge action.
+
+---
+
+## v2.0-p2-position-monitoring-backend-authorization-candidate
+
+Date: 2026-08-10
+Changed by: Codex
+Reason: Explicit Product Owner authorization to begin the bounded Product P2
+Position Monitoring backend contract package after Product P1B completion.
+Before: Product P1B was complete, but Product P2 was `NOT_STARTED`; runtime
+implementation and PR creation permissions were false because no independent
+P2 authorization record existed.
+After: `docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md` records the exact
+backend scope and permanent safety boundary. The machine-readable handoff may
+allow only `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION` after this
+authorization is reviewed, merged, and validated on clean/synced main. The
+authorization candidate contains no business implementation and does not
+automatically adopt the separate local backend candidate diff.
+Does this change phase order: No. It activates the already frozen Product P2
+stage after Product P1B completion.
+Does this change done criteria: No. Authorization is not implementation or
+Product P2 completion.
+Does this weaken safety boundaries: No. Automatic open, close, reduce, add,
+reverse, order, Mobile, Figma, and unrelated expansion remain blocked.
+Human confirmation required: Already explicitly authorized by the Product
+Owner for this candidate; independent review and merged-main validation are
+still required before implementation permission becomes effective.

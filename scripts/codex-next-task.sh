@@ -111,6 +111,7 @@ validate_contract_task() {
   local current_package_phase current_package_mode current_package_status authorized_next_phase authorized_next_mode
   local authorized_next_edits authorized_next_implementation authorized_next_pr blocked_package blocked_status
   local p1b_1_status p1b_authorization_status home_core_data_status home_core_data_implementation_status p1b_scope
+  local product_p1b_status product_p2_status p2_authorization_status p2_implementation_status
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
@@ -133,6 +134,10 @@ validate_contract_task() {
   p1b_authorization_status="$(yaml_value "$TASK_FILE" p1b_authorization_status)"
   home_core_data_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_authorization_status)"
   home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_data_implementation_status)"
+  product_p1b_status="$(yaml_value "$TASK_FILE" product_p1b_status)"
+  product_p2_status="$(matrix_field "Product P2" 5)"
+  p2_authorization_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_authorization_status)"
+  p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_implementation_status)"
   p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
@@ -140,16 +145,18 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "P1B_HOME_CORE_DATA_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED Home Core Data authorization declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED P2 Position Monitoring authorization declaration mismatch" >&2; failed=1; }
   [[ "$current_package_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "P1B_HOME_CORE_DATA_COMPLETION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized Home Core Data package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized P2 backend package mismatch" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" ]] || { echo "TASK_VALIDATION_FAILED bounded P1B permissions are incomplete" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" ]] || { echo "TASK_VALIDATION_FAILED bounded P2 permissions are incomplete" >&2; failed=1; }
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   [[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || { echo "TASK_VALIDATION_FAILED P1B-1 predecessor is not effective" >&2; failed=1; }
-  [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$home_core_data_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "HOME_CORE_DATA_READ_ONLY" ]] || { echo "TASK_VALIDATION_FAILED Home Core Data authorization boundary mismatch" >&2; failed=1; }
-  [[ -f docs/P1B_AUTHORIZATION_SCOPE.md && -f docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md ]] || { echo "TASK_VALIDATION_FAILED P1B authorization artifacts are missing" >&2; failed=1; }
+  [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED Product P1B predecessor boundary mismatch" >&2; failed=1; }
+  [[ "$product_p1b_status" == "COMPLETE" && "$product_p2_status" == "AUTHORIZED_TO_IMPLEMENT" ]] || { echo "TASK_VALIDATION_FAILED Product P2 delivery authorization mismatch" >&2; failed=1; }
+  [[ "$p2_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$p2_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "POSITION_MONITORING_BACKEND_CONTRACT_ONLY" ]] || { echo "TASK_VALIDATION_FAILED P2 Position Monitoring authorization boundary mismatch" >&2; failed=1; }
+  [[ -f docs/P1B_AUTHORIZATION_SCOPE.md && -f docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md && -f docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md ]] || { echo "TASK_VALIDATION_FAILED authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -226,6 +233,8 @@ p1b_authorization_runtime_status="$(state_value "$state_text" P1B_AUTHORIZATION_
 p1b_1_runtime_status="$(state_value "$state_text" P1B_1_STATUS)"
 home_core_data_authorization_runtime_status="$(state_value "$state_text" P1B_HOME_CORE_DATA_AUTHORIZATION_STATUS)"
 home_core_data_completion_status="$(state_value "$state_text" P1B_HOME_CORE_DATA_COMPLETION_STATUS)"
+p2_authorization_runtime_status="$(state_value "$state_text" P2_POSITION_MONITORING_AUTHORIZATION_STATUS)"
+p2_implementation_runtime_status="$(state_value "$state_text" P2_POSITION_MONITORING_IMPLEMENTATION_STATUS)"
 resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
 resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
 resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
@@ -308,6 +317,8 @@ P1B_AUTHORIZATION_RUNTIME_STATUS: $p1b_authorization_runtime_status
 P1B_1_STATUS: $p1b_1_runtime_status
 P1B_HOME_CORE_DATA_AUTHORIZATION_STATUS: $home_core_data_authorization_runtime_status
 P1B_HOME_CORE_DATA_COMPLETION_STATUS: $home_core_data_completion_status
+P2_POSITION_MONITORING_AUTHORIZATION_STATUS: $p2_authorization_runtime_status
+P2_POSITION_MONITORING_IMPLEMENTATION_STATUS: $p2_implementation_runtime_status
 RESOLVED_PACKAGE: $resolved_package
 RESOLVED_MODE: $resolved_mode
 RESOLVED_EDIT_PERMISSION: $resolved_edit_permission

@@ -8,13 +8,30 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: P0 Product Foundation Freeze
-Product Phase Status: CANDIDATE_PENDING_REVIEW_AND_MERGED_MAIN
-Current Work Package: Establish the immutable product-source registry, permanent Product Source Gate, full product baseline, Product First roadmap, and acceptance standard; no business implementation is authorized in this package
-Next Business Phase: P1 Home Alignment Readiness and Gap Audit
-Next Business Phase Allowed: NO; P0 must be independently reviewed and merged to clean/synced main before a read-only P1 audit, and P1 implementation requires a separate bounded authorization
+Product Phase: P2 Position and Position Monitoring Authorization
+Product Phase Status: AUTHORIZED_PENDING_MERGED_MAIN
+Current Work Package: Record the independent bounded P2 Position Monitoring backend authorization and machine-readable implementation handoff; no backend implementation is included
+Next Business Phase: P2 Position Monitoring Backend Implementation
+Next Business Phase Allowed: NO on this candidate branch; YES only after this authorization is independently reviewed, merged, and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## Product P2 Authorization Candidate
+
+Product P1B is `COMPLETE` on merged main. The independent bounded Product P2
+authorization is recorded by
+`docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md`. It permits only
+Position Monitor backend contract completion, schema/API changes required by
+that exact contract, per-position risk, monitor source trust/freshness,
+explicit state semantics, and tests after merged-main effectivity.
+
+The candidate branch does not make implementation permission effective. The
+runtime gate must continue to block P2 implementation before merge and must
+allow only `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION` after clean/synced
+merged-main validation. Auto trading, auto close, auto reverse, Mobile, Figma,
+Three AI, and unrelated expansion remain blocked.
 
 ---
 
