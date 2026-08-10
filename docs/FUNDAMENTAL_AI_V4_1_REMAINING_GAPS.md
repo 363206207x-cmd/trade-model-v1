@@ -4,14 +4,16 @@ Status: `IMPLEMENTATION_COMPLETE_PENDING_AUDIT`
 
 ## Merge-Readiness Evidence Still Required
 
-1. PostgreSQL V11 migration must execute without skip in a disposable or
-   controlled PostgreSQL environment. Local Docker/Testcontainers is
-   unavailable, so only the test path and H2 mirror are proven locally.
-2. The Draft PR CI and independent Backend Capability Audit must review the
+1. The independent Backend Capability Audit must review the
    schema constraints, Asset Pool source closure, AI authority, Candidate/Final
    separation, and legacy compatibility.
-3. Merged-main validation has not run. The candidate is not effective until
+2. Merged-main validation has not run. The candidate is not effective until
    reviewed, merged, and validated on clean/synced main.
+
+PostgreSQL V11 is no longer an open validation gap: Draft PR CI run
+`31437240898` executed the Testcontainers PostgreSQL 16 migration smoke test
+with `0` failures, `0` errors, and `0` skipped. Local execution remains skipped
+only because the local environment has no Docker socket.
 
 ## Runtime Acceptance Not Claimed
 

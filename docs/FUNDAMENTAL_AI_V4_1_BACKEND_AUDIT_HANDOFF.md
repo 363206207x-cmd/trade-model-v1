@@ -38,11 +38,13 @@ PASS and does not authorize merge without the required review.
 - v4.1 principal suites: `57 passed`
 - H2 schema/persistence constraints: `PASS`
 - PostgreSQL V11 local runtime: `SKIPPED_DOCKER_UNAVAILABLE`
+- PostgreSQL V11 Draft PR CI: `PASS` (`PostgreSQL 16`, `1` test, `0` skipped)
+- workflow-contract Draft PR CI: `PASS`
+- quality-gate Draft PR CI: `PASS`
 - automatic trading path scan: only defensive rejection terms found
 - Figma/Mobile changes: `0`
 
 ## Audit Recommendation
 
-Proceed to Backend Capability Audit and CI PostgreSQL migration validation.
-Do not start a successor product package and do not merge until those gates are
-reviewed.
+Proceed to Backend Capability Audit. Do not start a successor product package
+and do not merge until the independent audit is reviewed.

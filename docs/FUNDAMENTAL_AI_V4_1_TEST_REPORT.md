@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Test Report
 
-Status: `LOCAL_VALIDATION_PASS_WITH_POSTGRESQL_ENV_SKIP`
+Status: `LOCAL_VALIDATION_PASS_AND_CI_POSTGRESQL_PASS`
 
 ## Full Maven Validation
 
@@ -61,6 +61,10 @@ invalid Final rejection, and manual-only UserPosition linkage.
 
 Local result: `SKIPPED_DOCKER_UNAVAILABLE` because no Docker socket or
 controlled PostgreSQL server is available. This is not reported as a
-PostgreSQL migration PASS. H2 schema and persistence constraints pass locally;
-the PostgreSQL V11 path must run without skip in CI or a controlled disposable
-PostgreSQL environment before merge approval.
+local PostgreSQL migration PASS. H2 schema and persistence constraints pass
+locally.
+
+Draft PR CI result: `PASS`. GitHub Actions run `31437240898` connected to the
+Docker socket, started PostgreSQL 16 through Testcontainers, and ran
+`PostgreSqlFlywayMigrationSmokeTest` with `1` test, `0` failures, `0` errors,
+and `0` skipped.

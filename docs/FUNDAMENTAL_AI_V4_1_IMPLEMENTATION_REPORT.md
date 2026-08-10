@@ -81,10 +81,10 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 
 ## Delivery State
 
-The implementation candidate is complete locally, but an open PR is not
-effective completion. Only reviewed merged main, clean/synced main validation,
-PostgreSQL V11 evidence, and the independent Backend Capability Audit can make
-the package effective.
+The implementation candidate and Draft PR CI are complete, including
+PostgreSQL V11 Testcontainers evidence, but an open PR is not effective
+completion. Only reviewed merged main, clean/synced main validation, and the
+independent Backend Capability Audit can make the package effective.
 
 `PRODUCT_WORK_RATIO = 95%`
 
