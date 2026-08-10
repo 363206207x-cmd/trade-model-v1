@@ -33,6 +33,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -272,7 +274,10 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         if (position == null || position.getId() == null) return null;
         try {
             List<PositionMonitorLogDTO> rows = monitorLogService.listByPositionIdForSystem(position.getId(), 1);
-            return rows == null || rows.isEmpty() ? null : rows.get(0);
+            if (rows == null || rows.isEmpty()) return null;
+            PositionMonitorLogDTO latest = rows.get(0);
+            LocalDateTime asOf = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+            return latest != null && latest.isTrustedAndFreshAt(asOf) ? latest : null;
         } catch (RuntimeException ignored) {
             return null;
         }

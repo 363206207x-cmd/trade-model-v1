@@ -416,6 +416,7 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     reversal_status VARCHAR(32),
     risk_change_reason VARCHAR(64),
     risk_level VARCHAR(32),
+    risk_trend VARCHAR(32),
     suggested_action VARCHAR(64),
     source_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_VERIFICATION',
     observed_at TIMESTAMP NOT NULL,
@@ -449,6 +450,9 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     CONSTRAINT ck_tm_position_monitor_log_risk_level CHECK (
         risk_level IN ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')
     ),
+    CONSTRAINT ck_tm_position_monitor_log_risk_trend CHECK (
+        risk_trend IN ('STABLE', 'INCREASED', 'SHARPLY_INCREASED')
+    ),
     CONSTRAINT ck_tm_position_monitor_log_suggested_action CHECK (
         suggested_action IN (
             'CONTINUE_HOLD', 'NO_ADD_POSITION', 'REDUCE_POSITION', 'TIGHTEN_STOP',
@@ -471,6 +475,7 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
             AND reversal_status IS NOT NULL
             AND risk_change_reason IS NOT NULL
             AND risk_level IS NOT NULL
+            AND risk_trend IS NOT NULL
             AND suggested_action IS NOT NULL
             AND fresh_until > observed_at
         )
@@ -482,6 +487,7 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
             AND reversal_status IS NULL
             AND risk_change_reason IS NULL
             AND risk_level IS NULL
+            AND risk_trend IS NULL
             AND suggested_action IS NULL
         )
     )

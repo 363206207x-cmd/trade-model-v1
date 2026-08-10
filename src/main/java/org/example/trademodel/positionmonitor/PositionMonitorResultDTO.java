@@ -28,6 +28,7 @@ public class PositionMonitorResultDTO {
     private String reversalStatus;
     private String riskReason;
     private String riskLevel;
+    private String riskTrend;
     private boolean riskBlocked;
     private boolean riskIncreased;
     private boolean nearStopLoss;
@@ -109,6 +110,8 @@ public class PositionMonitorResultDTO {
     public void setRiskReason(String riskReason) { this.riskReason = riskReason; }
     public String getRiskLevel() { return riskLevel; }
     public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+    public String getRiskTrend() { return riskTrend; }
+    public void setRiskTrend(String riskTrend) { this.riskTrend = riskTrend; }
     public boolean isRiskBlocked() { return riskBlocked; }
     public void setRiskBlocked(boolean riskBlocked) { this.riskBlocked = riskBlocked; }
     public boolean isRiskIncreased() { return riskIncreased; }

@@ -179,7 +179,7 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
                             position.getSourceRefId(), log.getAnalysisId(), log.getExecutionPlanId());
             if (monitorSource.verified()) {
                 PositionMonitorLogSourceViewPolicy.markVerified(
-                        log, monitorSource.analysisId(), monitorSource.executionPlanId());
+                        log, monitorSource.monitorAnalysisId(), monitorSource.executionPlanId());
                 if (latestTrustedLog == null || isNewerMonitorLog(log, latestTrustedLog)) {
                     latestTrustedLog = log;
                     latestTrustedSource = monitorSource;

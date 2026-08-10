@@ -58,6 +58,7 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -702,10 +703,17 @@ class V1BusinessStressTest {
             lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), "BTCUSDT"));
+            lenient().when(analysisRunMapper.countEvidenceByAnalysisId(plan.getAnalysisId())).thenReturn(3);
+            lenient().when(analysisRunMapper.countScoresByAnalysisId(plan.getAnalysisId())).thenReturn(8);
             DecisionResultVO currentDecision = new DecisionResultVO();
+            currentDecision.setAnalysisId(plan.getAnalysisId());
             currentDecision.setSymbol("BTCUSDT");
+            currentDecision.setTimeframe("5m");
             currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL_AFTER_OPEN".equals(scenario.name())
                     ? "STRONG_BEARISH" : "RANGE");
+            currentDecision.setMultiTfConvergence("ALIGNED");
+            currentDecision.setDataQualityScore(90);
+            currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
             when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
                     .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(scenario.id(), USER_ID);
@@ -736,6 +744,10 @@ class V1BusinessStressTest {
         run.setAnalysisId(analysisId);
         run.setSymbol(symbol);
         run.setTraceId("trace-" + analysisId);
+        run.setTimeframe("5m");
+        run.setDataQualityScore(90);
+        run.setStatus("SUCCESS");
+        run.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         return run;
     }
 

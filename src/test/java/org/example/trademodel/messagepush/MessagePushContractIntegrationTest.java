@@ -332,9 +332,9 @@ class MessagePushContractIntegrationTest {
                 "INSERT INTO tm_position_monitor_log("
                         + "log_id, position_id, analysis_id, execution_plan_id, current_price, mark_price_source, "
                         + "entry_logic_status, monitor_conclusion, reversal_status, risk_change_reason, "
-                        + "risk_level, suggested_action, source_status, observed_at, fresh_until, reason, "
+                        + "risk_level, risk_trend, suggested_action, source_status, observed_at, fresh_until, reason, "
                         + "risk_snapshot, trace_id, created_at"
-                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 logId,
                 row.getPositionId(),
                 row.getAnalysisId(),
@@ -346,6 +346,7 @@ class MessagePushContractIntegrationTest {
                 row.getReversalStatus(),
                 row.getRiskChangeReason(),
                 row.getRiskLevel(),
+                row.getRiskTrend(),
                 row.getSuggestedAction(),
                 row.getMonitorSourceStatus(),
                 row.getObservedAt(),
@@ -380,6 +381,7 @@ class MessagePushContractIntegrationTest {
             default -> "OPPOSING_EVIDENCE_INCREASED";
         });
         row.setRiskLevel("LOGIC_VALID".equals(logicStatus) ? "LOW" : "HIGH");
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction(switch (logicStatus) {
             case "LOGIC_VALID" -> "CONTINUE_HOLD";
             case "LOGIC_WEAKENED" -> "NO_ADD_POSITION";

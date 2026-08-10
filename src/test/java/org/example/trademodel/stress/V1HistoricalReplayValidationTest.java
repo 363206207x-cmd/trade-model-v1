@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -662,10 +663,17 @@ class V1HistoricalReplayValidationTest {
             lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
+            lenient().when(analysisRunMapper.countEvidenceByAnalysisId(plan.getAnalysisId())).thenReturn(3);
+            lenient().when(analysisRunMapper.countScoresByAnalysisId(plan.getAnalysisId())).thenReturn(8);
             DecisionResultVO currentDecision = new DecisionResultVO();
+            currentDecision.setAnalysisId(plan.getAnalysisId());
             currentDecision.setSymbol(SYMBOL);
+            currentDecision.setTimeframe("5m");
             currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL".equals(point.name())
                     ? "STRONG_BEARISH" : "RANGE");
+            currentDecision.setMultiTfConvergence("ALIGNED");
+            currentDecision.setDataQualityScore(90);
+            currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
             when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(SYMBOL))
                     .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(point.id(), USER_ID);
@@ -688,6 +696,10 @@ class V1HistoricalReplayValidationTest {
         run.setAnalysisId(analysisId);
         run.setSymbol(symbol);
         run.setTraceId("trace-" + analysisId);
+        run.setTimeframe("5m");
+        run.setDataQualityScore(90);
+        run.setStatus("SUCCESS");
+        run.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         return run;
     }
 }

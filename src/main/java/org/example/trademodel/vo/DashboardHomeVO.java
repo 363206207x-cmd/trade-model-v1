@@ -683,6 +683,7 @@ public class DashboardHomeVO {
         private String reversalStatusLabel;
         private String riskLevel;
         private String riskLevelLabel;
+        private String riskTrend;
         private String riskReason;
         private String riskReasonLabel;
         private String suggestedAction;
@@ -876,6 +877,8 @@ public class DashboardHomeVO {
 
         public String getRiskLevelLabel() { return riskLevelLabel; }
         public void setRiskLevelLabel(String riskLevelLabel) { this.riskLevelLabel = riskLevelLabel; }
+        public String getRiskTrend() { return riskTrend; }
+        public void setRiskTrend(String riskTrend) { this.riskTrend = riskTrend; }
         public String getRiskReason() { return riskReason; }
         public void setRiskReason(String riskReason) { this.riskReason = riskReason; }
         public String getRiskReasonLabel() { return riskReasonLabel; }

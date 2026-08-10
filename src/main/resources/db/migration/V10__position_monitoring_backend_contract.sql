@@ -14,6 +14,7 @@ ALTER TABLE tm_position_monitor_log
     ADD COLUMN monitor_conclusion VARCHAR(40),
     ADD COLUMN reversal_status VARCHAR(32),
     ADD COLUMN risk_change_reason VARCHAR(64),
+    ADD COLUMN risk_trend VARCHAR(32),
     ADD COLUMN source_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_VERIFICATION',
     ADD COLUMN observed_at TIMESTAMP WITHOUT TIME ZONE,
     ADD COLUMN fresh_until TIMESTAMP WITHOUT TIME ZONE;
@@ -23,6 +24,7 @@ SET entry_logic_status = NULL,
     monitor_conclusion = NULL,
     reversal_status = NULL,
     risk_change_reason = NULL,
+    risk_trend = NULL,
     risk_level = NULL,
     suggested_action = NULL,
     source_status = 'PENDING_VERIFICATION',
@@ -55,6 +57,9 @@ ALTER TABLE tm_position_monitor_log
     ADD CONSTRAINT ck_tm_position_monitor_log_risk_level CHECK (
         risk_level IN ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')
     ),
+    ADD CONSTRAINT ck_tm_position_monitor_log_risk_trend CHECK (
+        risk_trend IN ('STABLE', 'INCREASED', 'SHARPLY_INCREASED')
+    ),
     ADD CONSTRAINT ck_tm_position_monitor_log_suggested_action CHECK (
         suggested_action IN (
             'CONTINUE_HOLD', 'NO_ADD_POSITION', 'REDUCE_POSITION', 'TIGHTEN_STOP',
@@ -77,6 +82,7 @@ ALTER TABLE tm_position_monitor_log
             AND reversal_status IS NOT NULL
             AND risk_change_reason IS NOT NULL
             AND risk_level IS NOT NULL
+            AND risk_trend IS NOT NULL
             AND suggested_action IS NOT NULL
             AND fresh_until > observed_at
         )
@@ -88,6 +94,7 @@ ALTER TABLE tm_position_monitor_log
             AND reversal_status IS NULL
             AND risk_change_reason IS NULL
             AND risk_level IS NULL
+            AND risk_trend IS NULL
             AND suggested_action IS NULL
         )
     );
@@ -100,3 +107,6 @@ COMMENT ON COLUMN tm_position_monitor_log.logic_status IS
 
 COMMENT ON COLUMN tm_position_monitor_log.source_status IS
     'Monitor-result trust status. Only VERIFIED and unexpired rows may feed Home position results.';
+
+COMMENT ON COLUMN tm_position_monitor_log.risk_trend IS
+    'Risk movement relative to the prior historically trusted position monitor result; independent from risk_level.';

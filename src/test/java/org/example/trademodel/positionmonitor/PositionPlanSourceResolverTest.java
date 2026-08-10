@@ -46,7 +46,7 @@ class PositionPlanSourceResolverTest {
                 "analysis-X",
                 "plan-A");
         PositionMonitorLogDTO log = new PositionMonitorLogDTO();
-        PositionMonitorLogSourceViewPolicy.markVerified(log, source.analysisId(), source.executionPlanId());
+        PositionMonitorLogSourceViewPolicy.markVerified(log, source.monitorAnalysisId(), source.executionPlanId());
 
         assertThat(source.verified()).isTrue();
         assertThat(log.isSourceVerified()).isTrue();
@@ -63,10 +63,12 @@ class PositionPlanSourceResolverTest {
                 PositionMonitorSourceContract.executionPlanReference("plan-A"),
                 "analysis-X",
                 "plan-B");
+        when(executionPlanMapper.selectByPlanId("plan-A")).thenReturn(plan("plan-A", "analysis-X"));
+        when(analysisRunMapper.selectById("analysis-X")).thenReturn(run("analysis-X", "BTCUSDT"));
         PositionPlanSourceResolver.Resolution wrongAnalysis = resolver.resolveTrustedMonitorSource(
                 7L,
                 "BTCUSDT",
-                PositionMonitorSourceContract.analysisReference("analysis-X"),
+                PositionMonitorSourceContract.analysisReference("analysis-Z"),
                 "analysis-Y",
                 "plan-A");
 
@@ -74,7 +76,26 @@ class PositionPlanSourceResolverTest {
         assertThat(wrongPlan.failureReason()).isEqualTo("POSITION_MONITOR_PLAN_MISMATCH");
         assertThat(wrongAnalysis.verified()).isFalse();
         assertThat(wrongAnalysis.failureReason()).isEqualTo("POSITION_MONITOR_ANALYSIS_MISMATCH");
-        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+    }
+
+    @Test
+    void currentMonitorAnalysisCanDifferFromOriginalPlanAnalysis() {
+        when(executionPlanMapper.selectByPlanId("plan-A")).thenReturn(plan("plan-A", "analysis-original"));
+        when(analysisRunMapper.selectById("analysis-original"))
+                .thenReturn(run("analysis-original", "BTCUSDT"));
+        when(analysisRunMapper.selectById("analysis-current"))
+                .thenReturn(run("analysis-current", "BTCUSDT"));
+
+        PositionPlanSourceResolver.Resolution source = resolver.resolveTrustedMonitorSource(
+                7L,
+                "BTCUSDT",
+                PositionMonitorSourceContract.executionPlanReference("plan-A"),
+                "analysis-current",
+                "plan-A");
+
+        assertThat(source.verified()).isTrue();
+        assertThat(source.analysisId()).isEqualTo("analysis-original");
+        assertThat(source.monitorAnalysisId()).isEqualTo("analysis-current");
     }
 
     @Test

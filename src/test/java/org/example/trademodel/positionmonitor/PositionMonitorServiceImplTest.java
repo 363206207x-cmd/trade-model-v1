@@ -114,11 +114,17 @@ class PositionMonitorServiceImplTest {
         lenient().when(positionMonitorLogService.recordMonitorRunForSystem(any())).thenAnswer(invocation ->
                 monitorLog(invocation.getArgument(0)));
         lenient().when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(any())).thenAnswer(invocation -> {
-            DecisionResultVO decision = new DecisionResultVO();
-            decision.setSymbol(invocation.getArgument(0));
-            decision.setMarketBiasHierarchy("RANGE");
-            return decision;
+            String symbol = invocation.getArgument(0);
+            return decision("monitor-" + symbol, symbol, "RANGE");
         });
+        lenient().when(analysisRunMapper.selectById(any())).thenAnswer(invocation -> {
+            String analysisId = invocation.getArgument(0);
+            String symbol = analysisId != null && analysisId.startsWith("monitor-")
+                    ? analysisId.substring("monitor-".length()) : "BTC";
+            return analysisRun(analysisId, symbol);
+        });
+        lenient().when(analysisRunMapper.countEvidenceByAnalysisId(any())).thenReturn(3);
+        lenient().when(analysisRunMapper.countScoresByAnalysisId(any())).thenReturn(8);
     }
 
     @Test
@@ -265,9 +271,7 @@ class PositionMonitorServiceImplTest {
     void strongReversalComesFromCurrentRuleDirectionInsteadOfStopLossState() {
         UserPositionDO position = position(111L, "LONG", "OPEN", "plan-reversal", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-reversal", "ana-111", "VALID", true));
-        DecisionResultVO decision = new DecisionResultVO();
-        decision.setSymbol("BTC");
-        decision.setMarketBiasHierarchy("STRONG_BEARISH");
+        DecisionResultVO decision = decision("ana-111", "BTC", "STRONG_BEARISH");
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(decision);
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(111L, USER_ID);
@@ -301,6 +305,30 @@ class PositionMonitorServiceImplTest {
         assertThat(captor.getValue().getReversalStatus()).isNull();
         assertThat(captor.getValue().getRiskLevel()).isNull();
         assertThat(captor.getValue().getSuggestedAction()).isNull();
+    }
+
+    @Test
+    void staleEvidenceCannotBecomeVerified() {
+        UserPositionDO position = position(113L, "LONG", "OPEN", "plan-stale-evidence", "90", "120");
+        arrange(position, "100", risk("LOW", false),
+                plan("plan-stale-evidence", "ana-stale-evidence", "VALID", true));
+        DecisionResultVO staleDecision = decision("ana-stale-evidence", "BTC", "RANGE");
+        staleDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
+        AnalysisRunDO staleRun = analysisRun("ana-stale-evidence", "BTC");
+        staleRun.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(staleDecision);
+        when(analysisRunMapper.selectById("ana-stale-evidence")).thenReturn(staleRun);
+
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(113L, USER_ID);
+
+        assertThat(result.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertThat(result.getMonitorConclusion()).isNull();
+        assertThat(result.getReasonCodes()).contains("MONITOR_EVIDENCE_STALE");
+        ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
+                ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
+        verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
+        assertThat(captor.getValue().getMonitorSourceStatus()).isEqualTo("PENDING_VERIFICATION");
+        assertThat(captor.getValue().getRiskLevel()).isNull();
     }
 
     @Test
@@ -457,9 +485,9 @@ class PositionMonitorServiceImplTest {
         ArgumentCaptor<RecordPositionMonitorLogCommand> captor =
                 ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
         verify(positionMonitorLogService).recordMonitorRunForUser(eq(USER_ID), captor.capture());
-        assertThat(captor.getValue().getAnalysisId()).isEqualTo("analysis-A");
+        assertThat(captor.getValue().getAnalysisId()).isEqualTo("monitor-BTC");
         assertThat(captor.getValue().getExecutionPlanId()).isEqualTo("plan-A");
-        assertThat(result.getAnalysisId()).isEqualTo("analysis-A");
+        assertThat(result.getAnalysisId()).isEqualTo("monitor-BTC");
         verify(executionPlanMapper, never()).selectLatestByAnalysisId(any());
     }
 
@@ -489,6 +517,8 @@ class PositionMonitorServiceImplTest {
         PositionMonitorResultDTO blocked = service.monitorUserPositionForUser(14L, USER_ID);
         assertThat(blocked.getMonitorConclusion()).isEqualTo("HIGH_RISK_OBSERVATION");
         assertThat(blocked.getRiskLevel()).isEqualTo("EXTREME");
+        assertThat(blocked.getRiskTrend()).isEqualTo("STABLE");
+        assertThat(blocked.getDataState()).isEqualTo("OPEN_MONITORING");
         assertThat(blocked.getSuggestedAction()).isEqualTo("WAIT_CONFIRMATION");
         assertThat(blocked.isRiskBlocked()).isTrue();
 
@@ -502,6 +532,35 @@ class PositionMonitorServiceImplTest {
         arrange(unchanged, "100", risk("MEDIUM", false), plan("plan-risk-same", "ana-16", "VALID", true));
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 16L, 1)).thenReturn(List.of(previousLog("MEDIUM")));
         assertThat(service.monitorUserPositionForUser(16L, USER_ID).isRiskIncreased()).isFalse();
+    }
+
+    @Test
+    void mediumToHighRiskIsEscalatedWhileStaticHighRiskIsNot() {
+        UserPositionDO increased = position(115L, "LONG", "OPEN", "plan-medium-high", "90", "120");
+        increased.setLeverage(new BigDecimal("10"));
+        arrange(increased, "100", risk("HIGH", false),
+                plan("plan-medium-high", "ana-medium-high", "VALID", true));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 115L, 1))
+                .thenReturn(List.of(previousLog("MEDIUM")));
+
+        PositionMonitorResultDTO changed = service.monitorUserPositionForUser(115L, USER_ID);
+
+        assertThat(changed.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(changed.getRiskTrend()).isEqualTo("INCREASED");
+        assertThat(changed.getDataState()).isEqualTo("RISK_ESCALATED");
+
+        UserPositionDO stable = position(116L, "LONG", "OPEN", "plan-static-high", "90", "120");
+        stable.setLeverage(new BigDecimal("10"));
+        arrange(stable, "100", risk("HIGH", false),
+                plan("plan-static-high", "ana-static-high", "VALID", true));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 116L, 1))
+                .thenReturn(List.of(previousLog("HIGH")));
+
+        PositionMonitorResultDTO unchanged = service.monitorUserPositionForUser(116L, USER_ID);
+
+        assertThat(unchanged.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(unchanged.getRiskTrend()).isEqualTo("STABLE");
+        assertThat(unchanged.getDataState()).isEqualTo("OPEN_MONITORING");
     }
 
     @Test
@@ -754,6 +813,9 @@ class PositionMonitorServiceImplTest {
             when(executionPlanMapper.selectByPlanId(plan.getPlanId())).thenReturn(plan);
             when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), position.getAssetSymbol()));
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(
+                    position.getAssetSymbol().toUpperCase()))
+                    .thenReturn(decision(plan.getAnalysisId(), position.getAssetSymbol(), "RANGE"));
         }
     }
 
@@ -794,6 +856,7 @@ class PositionMonitorServiceImplTest {
         dto.setReversalStatus(command.getReversalStatus());
         dto.setRiskChangeReason(command.getRiskChangeReason());
         dto.setRiskLevel(command.getRiskLevel());
+        dto.setRiskTrend(command.getRiskTrend());
         dto.setSuggestedAction(command.getSuggestedAction());
         dto.setMonitorSourceStatus(command.getMonitorSourceStatus());
         dto.setObservedAt(command.getObservedAt());
@@ -807,7 +870,23 @@ class PositionMonitorServiceImplTest {
         run.setAnalysisId(analysisId);
         run.setSymbol(symbol);
         run.setTraceId("trace-" + analysisId);
+        run.setTimeframe("5m");
+        run.setDataQualityScore(90);
+        run.setStatus("SUCCESS");
+        run.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         return run;
+    }
+
+    private static DecisionResultVO decision(String analysisId, String symbol, String bias) {
+        DecisionResultVO decision = new DecisionResultVO();
+        decision.setAnalysisId(analysisId);
+        decision.setSymbol(symbol);
+        decision.setTimeframe("5m");
+        decision.setMarketBiasHierarchy(bias);
+        decision.setMultiTfConvergence("ALIGNED");
+        decision.setDataQualityScore(90);
+        decision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        return decision;
     }
 
     private static MarketQuoteSnapshot quote(String price) {
@@ -864,9 +943,10 @@ class PositionMonitorServiceImplTest {
         PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
         dto.setLogId(1L);
         dto.setRiskLevel(riskLevel);
+        dto.setRiskTrend("STABLE");
         dto.setMonitorSourceStatus("VERIFIED");
-        dto.setObservedAt(LocalDateTime.now(ZoneOffset.UTC).minusSeconds(1));
-        dto.setFreshUntil(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(1));
+        dto.setObservedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(2));
+        dto.setFreshUntil(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
         return dto;
     }
 

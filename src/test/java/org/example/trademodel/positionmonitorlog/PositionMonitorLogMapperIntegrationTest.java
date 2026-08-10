@@ -114,6 +114,7 @@ class PositionMonitorLogMapperIntegrationTest {
         row.setRiskChangeReason("LOGIC_VALID".equals(monitorConclusion)
                 ? "NO_CLEAR_RISK_FACTOR" : "OPPOSING_EVIDENCE_INCREASED");
         row.setRiskLevel(riskLevel);
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction(suggestedAction);
         row.setMonitorSourceStatus("VERIFIED");
         row.setObservedAt(createdAt.minusMinutes(1));

@@ -160,6 +160,19 @@ class PositionMonitorLogServiceImplTest {
     }
 
     @Test
+    void staleMonitorResultCannotBeRecordedAsVerified() {
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
+        RecordPositionMonitorLogCommand command = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        command.setObservedAt(LocalDateTime.now().minusMinutes(10));
+        command.setFreshUntil(LocalDateTime.now().minusMinutes(5));
+
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("verified monitor result must be fresh when recorded");
+        verify(positionMonitorLogMapper, never()).insert(any());
+    }
+
+    @Test
     void invalidSourcePersistsOnlyRawObservationAndExplicitMissingSemantics() {
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
         when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
@@ -307,6 +320,7 @@ class PositionMonitorLogServiceImplTest {
         command.setReversalStatus("NO_REVERSAL");
         command.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         command.setRiskLevel(riskLevel);
+        command.setRiskTrend("STABLE");
         command.setSuggestedAction(suggestedAction);
         command.setMonitorSourceStatus("VERIFIED");
         command.setObservedAt(LocalDateTime.now().minusSeconds(1));
@@ -342,6 +356,7 @@ class PositionMonitorLogServiceImplTest {
         row.setReversalStatus("NO_REVERSAL");
         row.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         row.setRiskLevel("HIGH");
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction(suggestedAction);
         row.setMonitorSourceStatus("PENDING_VERIFICATION");
         row.setObservedAt(createdAt);
@@ -356,6 +371,7 @@ class PositionMonitorLogServiceImplTest {
         command.setReversalStatus(null);
         command.setRiskChangeReason(null);
         command.setRiskLevel(null);
+        command.setRiskTrend(null);
         command.setSuggestedAction(null);
         command.setRiskSnapshot(null);
     }

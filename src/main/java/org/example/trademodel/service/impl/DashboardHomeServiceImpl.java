@@ -991,6 +991,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && recognizedReversalStatus(monitor.getReversalStatus())
                 && recognizedRiskReason(monitor.getRiskChangeReason())
                 && recognizedPositionRisk(monitor.getRiskLevel())
+                && recognizedRiskTrend(monitor.getRiskTrend())
                 && recognizedSuggestedAction(monitor.getSuggestedAction())
                 && recognizedMonitorActionPair(monitor);
     }
@@ -1015,6 +1016,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setReversalStatusLabel(reversalStatusLabel(row.getReversalStatus()));
         row.setRiskLevel(trimToNull(monitor.getRiskLevel()));
         row.setRiskLevelLabel(positionRiskLevelLabel(row.getRiskLevel()));
+        row.setRiskTrend(trimToNull(monitor.getRiskTrend()));
         row.setRiskReason(trimToNull(monitor.getRiskChangeReason()));
         row.setRiskReasonLabel(riskReasonLabel(row.getRiskReason()));
         row.setSuggestedAction(trimToNull(monitor.getSuggestedAction()));
@@ -1046,6 +1048,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setReversalStatusLabel(null);
         row.setRiskLevel(null);
         row.setRiskLevelLabel(null);
+        row.setRiskTrend(null);
         row.setRiskReason(null);
         row.setRiskReasonLabel(null);
         row.setSuggestedAction(null);
@@ -1178,6 +1181,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
+    private boolean recognizedRiskTrend(String riskTrend) {
+        return switch (upper(riskTrend)) {
+            case "STABLE", "INCREASED", "SHARPLY_INCREASED" -> true;
+            default -> false;
+        };
+    }
+
     private boolean recognizedMonitorActionPair(PositionMonitorLogDTO monitor) {
         try {
             PositionMonitorConclusionEnum conclusion = PositionMonitorConclusionEnum.valueOf(
@@ -1240,7 +1250,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if ("PLAN_INVALIDATED".equals(conclusion)) {
             return "PLAN_INVALIDATED";
         }
-        if ("HIGH".equals(upper(row.getRiskLevel())) || "EXTREME".equals(upper(row.getRiskLevel()))) {
+        if ("INCREASED".equals(upper(row.getRiskTrend()))
+                || "SHARPLY_INCREASED".equals(upper(row.getRiskTrend()))) {
             return "RISK_ESCALATED";
         }
         return "OPEN_MONITORING";

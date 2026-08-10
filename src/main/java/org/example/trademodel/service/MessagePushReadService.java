@@ -19,6 +19,7 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskTrendEnum;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -485,10 +486,12 @@ public class MessagePushReadService {
             error = validatePositionLifecycle(position, latest, missing);
         }
         if (error == null) {
-            error = validateMonitor("originalSnapshot", original, now, missing);
+            error = validateMonitor("originalSnapshot", original, now, missing,
+                    MonitorFreshnessMode.HISTORICAL_SNAPSHOT);
         }
         if (error == null && !Objects.equals(original.getLogId(), latest.getLogId())) {
-            error = validateMonitor("currentRecheck", latest, now, missing);
+            error = validateMonitor("currentRecheck", latest, now, missing,
+                    MonitorFreshnessMode.REALTIME_CURRENT);
         }
         if (error == null) {
             error = validateMonitorRelationship(original, latest, missing);
@@ -564,7 +567,8 @@ public class MessagePushReadService {
             String fieldPrefix,
             PositionMonitorLogDO row,
             LocalDateTime now,
-            Set<String> missing) {
+            Set<String> missing,
+            MonitorFreshnessMode freshnessMode) {
         if (!positive(row.getLogId()) || !positive(row.getPositionId())) {
             return "POSITION_MONITOR_IDENTITY_INVALID";
         }
@@ -631,7 +635,11 @@ public class MessagePushReadService {
         String sourceStatus = normalize(row.getMonitorSourceStatus());
         if (!PositionMonitorSourceStatusEnum.VERIFIED.name().equals(sourceStatus)
                 || row.getObservedAt() == null || row.getFreshUntil() == null
-                || now == null || now.isBefore(row.getObservedAt()) || !now.isBefore(row.getFreshUntil())) {
+                || !row.getFreshUntil().isAfter(row.getObservedAt())) {
+            return "POSITION_MONITOR_SOURCE_UNTRUSTED";
+        }
+        if (freshnessMode == MonitorFreshnessMode.REALTIME_CURRENT
+                && (now == null || now.isBefore(row.getObservedAt()) || !now.isBefore(row.getFreshUntil()))) {
             return "POSITION_MONITOR_SOURCE_UNTRUSTED";
         }
 
@@ -640,6 +648,17 @@ public class MessagePushReadService {
             missing.add(fieldPrefix + ".riskLevel");
         } else if (!RISK_LEVELS.contains(riskLevel)) {
             return "POSITION_MONITOR_RISK_LEVEL_INVALID";
+        }
+
+        String riskTrend = normalize(row.getRiskTrend());
+        if (riskTrend == null) {
+            missing.add(fieldPrefix + ".riskTrend");
+        } else {
+            try {
+                PositionRiskTrendEnum.valueOf(riskTrend);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_MONITOR_RISK_TREND_INVALID";
+            }
         }
 
         String action = normalize(row.getSuggestedAction());
@@ -663,6 +682,9 @@ public class MessagePushReadService {
             missing.add(fieldPrefix + ".checkedAt");
         } else if (now != null && row.getCreatedAt().isAfter(now)) {
             return "POSITION_MONITOR_TIMESTAMP_INVALID";
+        } else if (row.getCreatedAt().isBefore(row.getObservedAt())
+                || !row.getCreatedAt().isBefore(row.getFreshUntil())) {
+            return "POSITION_MONITOR_SNAPSHOT_TRUST_INVALID";
         }
         return validateRiskSnapshot(fieldPrefix, row, missing);
     }
@@ -737,6 +759,11 @@ public class MessagePushReadService {
             MessageReadState state,
             List<String> missingFields,
             String reason) {
+    }
+
+    private enum MonitorFreshnessMode {
+        HISTORICAL_SNAPSHOT,
+        REALTIME_CURRENT
     }
 
     private record PositionRiskListItem(

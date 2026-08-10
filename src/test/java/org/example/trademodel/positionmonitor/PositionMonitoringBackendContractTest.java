@@ -7,6 +7,7 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskTrendEnum;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -34,6 +35,8 @@ class PositionMonitoringBackendContractTest {
                 .containsExactly("VERIFIED", "PENDING_VERIFICATION", "INVALID");
         assertThat(names(PositionRiskLevelEnum.values()))
                 .containsExactly("LOW", "MEDIUM", "HIGH", "EXTREME");
+        assertThat(names(PositionRiskTrendEnum.values()))
+                .containsExactly("STABLE", "INCREASED", "SHARPLY_INCREASED");
         assertThat(names(PositionMonitorDataStateEnum.values())).containsExactly(
                 "NO_POSITION", "OPEN_MONITORING", "WAITING_MONITOR_DATA", "RISK_ESCALATED",
                 "PLAN_INVALIDATED", "CLOSED");

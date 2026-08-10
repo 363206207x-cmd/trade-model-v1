@@ -13,6 +13,7 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskTrendEnum;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
@@ -69,6 +70,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         String markPriceSource = monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED
                 ? requireText(command.getMarkPriceSource(), "mark_price_source")
                 : optionalText(command.getMarkPriceSource());
+        LocalDateTime recordedAt = LocalDateTime.now();
         LocalDateTime observedAt = requireTime(command.getObservedAt(), "observed_at");
         LocalDateTime freshUntil = requireTime(command.getFreshUntil(), "fresh_until");
         if (freshUntil.isBefore(observedAt)) {
@@ -78,12 +80,17 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
                 && !freshUntil.isAfter(observedAt)) {
             throw new IllegalArgumentException("verified monitor fresh_until must be after observed_at");
         }
+        if (monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED
+                && (observedAt.isAfter(recordedAt) || !recordedAt.isBefore(freshUntil))) {
+            throw new IllegalArgumentException("verified monitor result must be fresh when recorded");
+        }
 
         PositionEntryLogicStatusEnum entryLogicStatus = null;
         PositionMonitorConclusionEnum monitorConclusion = null;
         PositionReversalStatusEnum reversalStatus = null;
         PositionRiskChangeReasonEnum riskChangeReason = null;
         PositionRiskLevelEnum riskLevel = null;
+        PositionRiskTrendEnum riskTrend = null;
         PositionMonitorSuggestedActionEnum suggestedAction = null;
         if (monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED) {
             entryLogicStatus = parseEnum(
@@ -95,6 +102,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
             riskChangeReason = parseEnum(
                     command.getRiskChangeReason(), PositionRiskChangeReasonEnum.class, "risk_change_reason");
             riskLevel = parseEnum(command.getRiskLevel(), PositionRiskLevelEnum.class, "risk_level");
+            riskTrend = parseEnum(command.getRiskTrend(), PositionRiskTrendEnum.class, "risk_trend");
             suggestedAction = PositionMonitorSuggestedActionEnum.parse(command.getSuggestedAction());
             if (!suggestedAction.isAllowedFor(monitorConclusion)) {
                 throw new IllegalArgumentException("suggested_action is not valid for monitor_conclusion");
@@ -105,6 +113,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
             requireMissing(command.getReversalStatus(), "reversal_status");
             requireMissing(command.getRiskChangeReason(), "risk_change_reason");
             requireMissing(command.getRiskLevel(), "risk_level");
+            requireMissing(command.getRiskTrend(), "risk_trend");
             requireMissing(command.getSuggestedAction(), "suggested_action");
         }
         String executionPlanId = optionalText(command.getExecutionPlanId());
@@ -132,6 +141,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         row.setReversalStatus(reversalStatus == null ? null : reversalStatus.name());
         row.setRiskChangeReason(riskChangeReason == null ? null : riskChangeReason.name());
         row.setRiskLevel(riskLevel == null ? null : riskLevel.name());
+        row.setRiskTrend(riskTrend == null ? null : riskTrend.name());
         row.setSuggestedAction(suggestedAction == null ? null : suggestedAction.name());
         row.setMonitorSourceStatus(monitorSourceStatus.name());
         row.setObservedAt(observedAt);
@@ -142,7 +152,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         row.setDecisionSnapshot(decisionSnapshot);
         row.setRiskSnapshot(riskSnapshot);
         row.setTraceId(traceId);
-        row.setCreatedAt(LocalDateTime.now());
+        row.setCreatedAt(recordedAt);
         int inserted = positionMonitorLogMapper.insert(row);
         if (inserted != 1) {
             throw new IllegalStateException("PositionMonitorLog insert failed");
@@ -223,6 +233,7 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         dto.setReversalStatus(row.getReversalStatus());
         dto.setRiskChangeReason(row.getRiskChangeReason());
         dto.setRiskLevel(row.getRiskLevel());
+        dto.setRiskTrend(row.getRiskTrend());
         dto.setSuggestedAction(row.getSuggestedAction());
         dto.setMonitorSourceStatus(row.getMonitorSourceStatus());
         dto.setObservedAt(row.getObservedAt());

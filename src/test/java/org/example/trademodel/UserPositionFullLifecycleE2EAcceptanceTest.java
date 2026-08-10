@@ -17,6 +17,7 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -91,7 +92,13 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         analysisRun.setAnalysisId(ANALYSIS_ID);
         analysisRun.setSymbol("BTCUSDT");
         analysisRun.setTraceId("trace-" + ANALYSIS_ID);
+        analysisRun.setTimeframe("5m");
+        analysisRun.setDataQualityScore(90);
+        analysisRun.setStatus("SUCCESS");
+        analysisRun.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         when(analysisRunMapper.selectById(ANALYSIS_ID)).thenReturn(analysisRun);
+        when(analysisRunMapper.countEvidenceByAnalysisId(ANALYSIS_ID)).thenReturn(3);
+        when(analysisRunMapper.countScoresByAnalysisId(ANALYSIS_ID)).thenReturn(8);
 
         MarketQuoteClient marketQuoteClient = mock(MarketQuoteClient.class);
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
@@ -101,8 +108,13 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         DecisionResultMapper decisionResultMapper = mock(DecisionResultMapper.class);
         org.example.trademodel.vo.DecisionResultVO currentDecision =
                 new org.example.trademodel.vo.DecisionResultVO();
+        currentDecision.setAnalysisId(ANALYSIS_ID);
         currentDecision.setSymbol("BTCUSDT");
+        currentDecision.setTimeframe("5m");
         currentDecision.setMarketBiasHierarchy("RANGE");
+        currentDecision.setMultiTfConvergence("ALIGNED");
+        currentDecision.setDataQualityScore(90);
+        currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
                 .thenReturn(currentDecision);
         InMemoryPositionMonitorLogService monitorLogService = new InMemoryPositionMonitorLogService();

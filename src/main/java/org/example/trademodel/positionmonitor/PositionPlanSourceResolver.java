@@ -53,11 +53,28 @@ public final class PositionPlanSourceResolver {
                 && !positionSource.id().equals(executionPlanId)) {
             return Resolution.unverified("POSITION_MONITOR_PLAN_MISMATCH");
         }
+        Resolution originalPlan = resolve(positionId, positionSymbol, executionPlanId, null);
+        if (!originalPlan.verified()) {
+            return originalPlan;
+        }
         if (positionSource.type() == SourceType.ANALYSIS
-                && !positionSource.id().equals(analysisId)) {
+                && !positionSource.id().equals(originalPlan.analysisId())) {
             return Resolution.unverified("POSITION_MONITOR_ANALYSIS_MISMATCH");
         }
-        return resolve(positionId, positionSymbol, executionPlanId, analysisId);
+        try {
+            AnalysisRunDO monitorRun = analysisRunMapper.selectById(analysisId);
+            if (monitorRun == null || !analysisId.equals(trimToNull(monitorRun.getAnalysisId()))) {
+                return Resolution.unverified("MONITOR_ANALYSIS_RUN_MISSING");
+            }
+            if (!normalizeSymbol(positionSymbol).equals(normalizeSymbol(monitorRun.getSymbol()))) {
+                return Resolution.unverified("POSITION_MONITOR_SYMBOL_MISMATCH");
+            }
+            return Resolution.verified(originalPlan.executionPlan(), originalPlan.analysisRun(),
+                    originalPlan.analysisId(), originalPlan.executionPlanId(),
+                    originalPlan.sourceTraceId(), analysisId);
+        } catch (RuntimeException ignored) {
+            return Resolution.unverified("MONITOR_ANALYSIS_SOURCE_READ_FAILED");
+        }
     }
 
     private Resolution resolve(Long positionId,
@@ -97,7 +114,7 @@ public final class PositionPlanSourceResolver {
             if (!normalizeSymbol(positionSymbol).equals(normalizeSymbol(run.getSymbol()))) {
                 return Resolution.unverified("POSITION_PLAN_SYMBOL_MISMATCH");
             }
-            return Resolution.verified(plan, run, analysisId, planId, trimToNull(run.getTraceId()));
+            return Resolution.verified(plan, run, analysisId, planId, trimToNull(run.getTraceId()), analysisId);
         } catch (RuntimeException ignored) {
             return Resolution.unverified("PLAN_SOURCE_READ_FAILED");
         }
@@ -125,17 +142,20 @@ public final class PositionPlanSourceResolver {
                              AnalysisRunDO analysisRun,
                              String analysisId,
                              String executionPlanId,
-                             String sourceTraceId) {
+                             String sourceTraceId,
+                             String monitorAnalysisId) {
         private static Resolution verified(ExecutionPlanDO plan,
                                            AnalysisRunDO run,
                                            String analysisId,
                                            String executionPlanId,
-                                           String sourceTraceId) {
-            return new Resolution(true, null, plan, run, analysisId, executionPlanId, sourceTraceId);
+                                           String sourceTraceId,
+                                           String monitorAnalysisId) {
+            return new Resolution(true, null, plan, run, analysisId, executionPlanId,
+                    sourceTraceId, monitorAnalysisId);
         }
 
         private static Resolution unverified(String failureReason) {
-            return new Resolution(false, failureReason, null, null, null, null, null);
+            return new Resolution(false, failureReason, null, null, null, null, null, null);
         }
     }
 }

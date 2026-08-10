@@ -501,6 +501,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setReversalStatus("NO_REVERSAL");
         row.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         row.setRiskLevel("LOW");
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction("CONTINUE_HOLD");
         row.setMonitorSourceStatus("VERIFIED");
         row.setObservedAt(AS_OF_UTC.minusMinutes(1));

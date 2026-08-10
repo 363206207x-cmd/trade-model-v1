@@ -12,6 +12,7 @@ import org.example.trademodel.messagepush.MessageReadState;
 import org.example.trademodel.messagepush.PushDetailDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -641,6 +642,23 @@ class MessagePushReadServiceTest {
     }
 
     @Test
+    @Tag("core-regression")
+    void historicalSnapshotRemainsReadableAfterItsRealtimeFreshnessWindow() {
+        PositionMonitorLogDO historical = validMonitor(337L, 437L);
+        historical.setObservedAt(LocalDateTime.of(2026, 7, 29, 8, 0));
+        historical.setCreatedAt(LocalDateTime.of(2026, 7, 29, 8, 15));
+        historical.setFreshUntil(LocalDateTime.of(2026, 7, 29, 9, 0));
+        stubPositionRiskListAndDetail(historical, historical, ownedPosition(437L, "BTCUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "337");
+
+        assertThat(list.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.state()).isEqualTo(MessageReadState.READY);
+        assertThat(detail.reason()).isNull();
+    }
+
+    @Test
     void historicalAndLatestIdentityMismatchAreConsistentlyError() {
         PositionMonitorLogDO original = validMonitor(331L, 431L);
         PositionMonitorLogDO latest = validMonitor(332L, 999L);
@@ -990,6 +1008,7 @@ class MessagePushReadServiceTest {
         row.setMonitorConclusion("HIGH_RISK_OBSERVATION");
         row.setReversalStatus("NO_REVERSAL");
         row.setRiskChangeReason("OPPOSING_EVIDENCE_INCREASED");
+        row.setRiskTrend("STABLE");
         row.setMonitorSourceStatus("VERIFIED");
         row.setObservedAt(LocalDateTime.of(2026, 7, 29, 11, 0));
         row.setFreshUntil(LocalDateTime.of(2026, 7, 29, 13, 0));

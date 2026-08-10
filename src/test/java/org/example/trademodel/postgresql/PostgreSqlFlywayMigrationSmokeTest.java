@@ -23,6 +23,7 @@ import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.RunBaselineVO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -48,6 +49,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@Tag("core-regression")
 class PostgreSqlFlywayMigrationSmokeTest {
 
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:16-alpine");
@@ -127,6 +129,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertDecisionPlanOffsetTimeColumnsExist(connection);
             assertUserPositionOwnershipV9Contract(connection, legacyPositionId);
             assertPositionMonitorV10Contract(connection, legacyMonitorLogId);
+            assertPositionMonitorV10NewRowDefaults(connection, legacyPositionId);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -373,7 +376,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
     private static void assertPositionMonitorV10Contract(Connection connection, long logId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT logic_status, entry_logic_status, monitor_conclusion, reversal_status,
-                       risk_change_reason, risk_level, suggested_action, source_status,
+                       risk_change_reason, risk_level, risk_trend, suggested_action, source_status,
                        observed_at, fresh_until, mark_price_source
                 FROM tm_position_monitor_log
                 WHERE log_id = ?
@@ -387,6 +390,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertThat(rs.getString("reversal_status")).isNull();
                 assertThat(rs.getString("risk_change_reason")).isNull();
                 assertThat(rs.getString("risk_level")).isNull();
+                assertThat(rs.getString("risk_trend")).isNull();
                 assertThat(rs.getString("suggested_action")).isNull();
                 assertThat(rs.getString("source_status")).isEqualTo("PENDING_VERIFICATION");
                 assertThat(rs.getObject("observed_at", LocalDateTime.class))
@@ -394,6 +398,36 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertThat(rs.getObject("fresh_until", LocalDateTime.class))
                         .isEqualTo(LocalDateTime.of(2026, 7, 27, 8, 5));
                 assertThat(rs.getString("mark_price_source")).isNull();
+            }
+        }
+    }
+
+    private static void assertPositionMonitorV10NewRowDefaults(
+            Connection connection, long positionId) throws Exception {
+        LocalDateTime observedAt = LocalDateTime.of(2026, 7, 27, 9, 0);
+        try (PreparedStatement insert = connection.prepareStatement("""
+                INSERT INTO tm_position_monitor_log(
+                    position_id, analysis_id, current_price, observed_at, fresh_until, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING source_status, entry_logic_status, monitor_conclusion, reversal_status,
+                          risk_change_reason, risk_level, risk_trend, suggested_action
+                """)) {
+            insert.setLong(1, positionId);
+            insert.setString(2, "post-v10-default-monitor");
+            insert.setBigDecimal(3, new BigDecimal("101.25"));
+            insert.setObject(4, observedAt);
+            insert.setObject(5, observedAt);
+            insert.setObject(6, observedAt);
+            try (ResultSet rs = insert.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("source_status")).isEqualTo("PENDING_VERIFICATION");
+                assertThat(rs.getString("entry_logic_status")).isNull();
+                assertThat(rs.getString("monitor_conclusion")).isNull();
+                assertThat(rs.getString("reversal_status")).isNull();
+                assertThat(rs.getString("risk_change_reason")).isNull();
+                assertThat(rs.getString("risk_level")).isNull();
+                assertThat(rs.getString("risk_trend")).isNull();
+                assertThat(rs.getString("suggested_action")).isNull();
             }
         }
     }

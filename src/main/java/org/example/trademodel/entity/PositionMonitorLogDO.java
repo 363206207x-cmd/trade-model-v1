@@ -16,6 +16,7 @@ public class PositionMonitorLogDO {
     private String reversalStatus;
     private String riskChangeReason;
     private String riskLevel;
+    private String riskTrend;
     private String suggestedAction;
     private String monitorSourceStatus;
     private LocalDateTime observedAt;
@@ -95,6 +96,9 @@ public class PositionMonitorLogDO {
     public void setRiskLevel(String riskLevel) {
         this.riskLevel = riskLevel;
     }
+
+    public String getRiskTrend() { return riskTrend; }
+    public void setRiskTrend(String riskTrend) { this.riskTrend = riskTrend; }
 
     public String getSuggestedAction() {
         return suggestedAction;

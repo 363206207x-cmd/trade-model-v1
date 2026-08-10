@@ -43,6 +43,7 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
+import org.junit.jupiter.api.Tag;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
@@ -646,6 +647,7 @@ class DashboardHomeServiceImplTest {
                 .andExpect(jsonPath("$.data.positions[0].pnlAmount").value(10))
                 .andExpect(jsonPath("$.data.positions[0].pnlPercent").value(5.0))
                 .andExpect(jsonPath("$.data.positions[0].riskLevel").value("MEDIUM"))
+                .andExpect(jsonPath("$.data.positions[0].riskTrend").value("STABLE"))
                 .andExpect(jsonPath("$.data.positions[0].monitorConclusion").value("LOGIC_WEAKENED"))
                 .andExpect(jsonPath("$.data.positions[0].entryLogicStatus").value("WEAKENED"))
                 .andExpect(jsonPath("$.data.positions[0].reversalStatus").value("NO_REVERSAL"))
@@ -699,6 +701,30 @@ class DashboardHomeServiceImplTest {
         assertThat(row.getOpenedAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 0));
         assertThat(row.getLastMonitorAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 5));
         assertThat(row.getNextMonitorAt()).isNull();
+    }
+
+    @Test
+    @Tag("core-regression")
+    void homeRiskEscalationDependsOnTrendNotAbsoluteRiskLevel() {
+        UserPositionVO position = activeManualPosition(907L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("105"));
+        completeTrustedMonitor(monitor, "HIGH_RISK_OBSERVATION", "HIGH", "REDUCE_POSITION");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO.PositionVO stable = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertThat(stable.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(stable.getRiskTrend()).isEqualTo("STABLE");
+        assertThat(stable.getDataState()).isEqualTo("OPEN_MONITORING");
+
+        monitor.setRiskTrend("INCREASED");
+        DashboardHomeVO.PositionVO increased = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertThat(increased.getDataState()).isEqualTo("RISK_ESCALATED");
     }
 
     @Test
@@ -2445,6 +2471,7 @@ class DashboardHomeServiceImplTest {
         monitor.setReversalStatus("NO_REVERSAL");
         monitor.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         monitor.setRiskLevel(riskLevel);
+        monitor.setRiskTrend("STABLE");
         monitor.setSuggestedAction(suggestedAction);
         monitor.setMonitorSourceStatus("VERIFIED");
         monitor.setObservedAt(LocalDateTime.of(2026, 7, 1, 11, 59));
