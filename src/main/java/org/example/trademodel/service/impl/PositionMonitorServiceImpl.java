@@ -21,14 +21,22 @@ import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
+import org.example.trademodel.positionmonitor.PositionMonitorDataStateEnum;
 import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
+import org.example.trademodel.positionmonitor.PositionReversalEvaluator;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
+import org.example.trademodel.positionmonitor.SinglePositionRiskCalculator;
+import org.example.trademodel.positionmonitorlog.PositionEntryLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
+import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
-import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionMonitorService;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
@@ -38,6 +46,7 @@ import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
+import org.example.trademodel.vo.DecisionResultVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +54,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -59,7 +70,8 @@ import java.util.UUID;
 public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final UserPositionMapper userPositionMapper;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
-    private final UserPositionRiskAdapter userPositionRiskAdapter;
+    private final SinglePositionRiskCalculator singlePositionRiskCalculator;
+    private final PositionReversalEvaluator positionReversalEvaluator;
     private final PositionPlanSourceResolver positionPlanSourceResolver;
     private final PositionMonitorLogService positionMonitorLogService;
     private final EvidenceItemMapper evidenceItemMapper;
@@ -72,21 +84,21 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
-                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      UserPositionRiskAdapter ignoredAggregateRiskAdapter,
                                       ExecutionPlanMapper executionPlanMapper,
                                       PositionMonitorLogService positionMonitorLogService,
                                       EvidenceItemMapper evidenceItemMapper,
                                       ScoreItemMapper scoreItemMapper,
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper) {
-        this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
+        this(userPositionMapper, marketPriceSnapshotService, ignoredAggregateRiskAdapter, executionPlanMapper,
                 positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
                 objectMapper, null, null);
     }
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
-                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      UserPositionRiskAdapter ignoredAggregateRiskAdapter,
                                       ExecutionPlanMapper executionPlanMapper,
                                       PositionMonitorLogService positionMonitorLogService,
                                       EvidenceItemMapper evidenceItemMapper,
@@ -94,7 +106,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       DecisionResultMapper decisionResultMapper,
                                       ObjectMapper objectMapper,
                                       ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
-        this(userPositionMapper, marketPriceSnapshotService, userPositionRiskAdapter, executionPlanMapper,
+        this(userPositionMapper, marketPriceSnapshotService, ignoredAggregateRiskAdapter, executionPlanMapper,
                 positionMonitorLogService, evidenceItemMapper, scoreItemMapper, decisionResultMapper,
                 objectMapper, null, externalContextEvidenceBuilder);
     }
@@ -102,7 +114,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     @Autowired
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
-                                      UserPositionRiskAdapter userPositionRiskAdapter,
+                                      UserPositionRiskAdapter ignoredAggregateRiskAdapter,
                                       ExecutionPlanMapper executionPlanMapper,
                                       PositionMonitorLogService positionMonitorLogService,
                                       EvidenceItemMapper evidenceItemMapper,
@@ -113,7 +125,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                       ExternalContextEvidenceBuilder externalContextEvidenceBuilder) {
         this.userPositionMapper = userPositionMapper;
         this.marketPriceSnapshotService = marketPriceSnapshotService;
-        this.userPositionRiskAdapter = userPositionRiskAdapter;
+        this.singlePositionRiskCalculator = new SinglePositionRiskCalculator();
+        this.positionReversalEvaluator = new PositionReversalEvaluator();
         this.positionPlanSourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
         this.positionMonitorLogService = positionMonitorLogService;
         this.evidenceItemMapper = evidenceItemMapper;
@@ -157,7 +170,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 PositionMonitorResultDTO result = monitorActivePosition(
                         position, position == null ? null : position.getUserId(), true);
                 results.add(result);
-                if (result.isRiskBlocked() || "HIGH_RISK".equals(result.getLogicStatus())) {
+                if (result.isRiskBlocked() || "EXTREME".equals(result.getRiskLevel())) {
                     blockedCount++;
                 }
             } catch (UserPositionConflictException | UserPositionNotFoundException
@@ -185,25 +198,15 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             throw new IllegalArgumentException("UserPosition side must be LONG or SHORT");
         }
         String assetSymbol = requireText(position.getAssetSymbol(), "asset_symbol");
-        BigDecimal currentPrice = readCurrentPrice(assetSymbol);
+        MarkPriceContext markPrice = readMarkPrice(assetSymbol);
         DerivativesBusinessAssessment derivativesAssessment = readDerivativesAssessment(
-                position, side, currentPrice);
-        UserPositionRiskResult risk = currentRiskOrBlocked(userId);
+                position, side, markPrice.price());
         Set<String> reasons = new LinkedHashSet<>();
         if (derivativesAssessment != null) {
             reasons.addAll(derivativesAssessment.reasonCodes());
         }
-        if (risk.getReasonCodes().contains("RISK_CONTEXT_UNAVAILABLE")) {
-            reasons.add("RISK_CONTEXT_UNAVAILABLE");
-        }
 
         PlanContext planContext = resolvePlanContext(position, reasons);
-        boolean riskBlocked = risk.isRiskBlocked();
-        String riskLevel = riskBlocked ? "HIGH" : PositionMonitorPolicy.normalizeRiskLevel(risk.getRiskLevel());
-        if (derivativesAssessment != null && derivativesAssessment.isHighRisk()) {
-            riskLevel = "HIGH";
-            reasons.add("DERIVATIVES_RISK_REVIEW_REQUIRED");
-        }
         ExternalContextSnapshot externalContext = resolveExternalContext(assetSymbol, planContext.analysisId);
         boolean externalSourceBlocked = ExternalContextPolicy.SOURCE_HEALTH_BLOCKED.equalsIgnoreCase(
                 externalContext.getSourceHealth());
@@ -216,10 +219,18 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         if (externalBlocked && !externalSourceBlocked) {
             reasons.add(ExternalContextPolicy.REASON_WINDOW_BLOCKED);
         }
+        boolean derivativesHighRisk = derivativesAssessment != null && derivativesAssessment.isHighRisk();
+        if (derivativesHighRisk) {
+            reasons.add("DERIVATIVES_RISK_REVIEW_REQUIRED");
+        }
         if (externalHighRisk) {
-            riskLevel = "HIGH";
             reasons.add("EXTERNAL_CONTEXT_REVIEW_REQUIRED");
         }
+        SinglePositionRiskCalculator.Assessment risk = singlePositionRiskCalculator.calculate(
+                position, markPrice.price(), externalHighRisk || derivativesHighRisk, externalBlocked);
+        reasons.addAll(risk.reasonCodes());
+        String riskLevel = risk.level().name();
+        boolean riskBlocked = risk.riskBlocked();
         boolean riskIncreased = riskIncreased(position.getId(), userId, systemScope, riskLevel);
         if (riskBlocked) {
             reasons.add("RISK_BLOCKED");
@@ -239,10 +250,10 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.add("TAKE_PROFIT_MISSING");
         }
 
-        boolean stopLossBreached = PositionMonitorPolicy.stopLossBreached(side, currentPrice, stopLoss);
-        boolean nearStopLoss = PositionMonitorPolicy.nearStopLoss(side, currentPrice, stopLoss);
-        boolean takeProfitReached = PositionMonitorPolicy.takeProfitReached(side, currentPrice, takeProfit);
-        boolean nearTakeProfit = PositionMonitorPolicy.nearTakeProfit(side, currentPrice, takeProfit);
+        boolean stopLossBreached = PositionMonitorPolicy.stopLossBreached(side, markPrice.price(), stopLoss);
+        boolean nearStopLoss = PositionMonitorPolicy.nearStopLoss(side, markPrice.price(), stopLoss);
+        boolean takeProfitReached = PositionMonitorPolicy.takeProfitReached(side, markPrice.price(), takeProfit);
+        boolean nearTakeProfit = PositionMonitorPolicy.nearTakeProfit(side, markPrice.price(), takeProfit);
         if (stopLossBreached) {
             reasons.add("STOP_LOSS_BREACHED");
         }
@@ -262,33 +273,42 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 || planContext.persistedPlanState == PersistedPlanState.INCOMPLETE
                 || planContext.persistedPlanState == PersistedPlanState.REVIEW_ONLY
                 || planContext.persistedPlanState == PersistedPlanState.MISSING;
-        boolean planInvalidated = stopLossBreached || persistedPlanInvalidated;
+        PositionReversalEvaluator.Assessment reversalAssessment = readReversalAssessment(assetSymbol, side);
+        PositionReversalStatusEnum reversalStatus = reversalAssessment.status();
+        if (!reversalAssessment.sourceAvailable()) {
+            reasons.add("REVERSAL_SOURCE_UNAVAILABLE");
+        }
+        boolean strongReversal = reversalStatus == PositionReversalStatusEnum.STRONG_REVERSAL;
+        boolean weakReversal = reversalStatus == PositionReversalStatusEnum.WEAK_REVERSAL;
+        boolean planInvalidated = stopLossBreached || persistedPlanInvalidated || strongReversal;
         boolean logicWeakened = planContext.missing
                 || planNeedsReview
                 || riskIncreased
                 || derivativesAssessment != null && derivativesAssessment.needsRevalidation()
                 || nearStopLoss
+                || weakReversal
                 || missingStopLoss
                 || missingTakeProfit
                 || (externalHighRisk && !externalBlocked);
 
-        String logicStatus;
-        String suggestedAction;
-        if (riskBlocked || externalBlocked
-                || derivativesAssessment != null && derivativesAssessment.isHighRisk()) {
-            logicStatus = "HIGH_RISK";
-            suggestedAction = "RISK_REVIEW";
-        } else if (planInvalidated) {
-            logicStatus = "PLAN_INVALIDATED";
-            suggestedAction = "RECHECK_PLAN";
-        } else if (logicWeakened) {
-            logicStatus = "LOGIC_WEAKENED";
-            suggestedAction = planNeedsReview ? "RECHECK_PLAN" : "MANUAL_REVIEW";
-        } else {
-            logicStatus = "LOGIC_VALID";
-            suggestedAction = nearTakeProfit ? "MANUAL_REVIEW" : "HOLD";
+        PositionEntryLogicStatusEnum entryLogicStatus = planInvalidated
+                ? PositionEntryLogicStatusEnum.INVALIDATED
+                : logicWeakened ? PositionEntryLogicStatusEnum.WEAKENED
+                : PositionEntryLogicStatusEnum.STILL_VALID;
+        PositionMonitorConclusionEnum monitorConclusion = monitorConclusion(
+                stopLossBreached, takeProfitReached, planInvalidated, nearStopLoss,
+                nearTakeProfit, risk.level().name(), entryLogicStatus);
+        PositionMonitorSuggestedActionEnum suggestedAction = suggestedAction(monitorConclusion, risk.level().name());
+        PositionRiskChangeReasonEnum riskReason = riskChangeReason(
+                planContext.missing, externalSourceBlocked, externalHighRisk, derivativesHighRisk, planInvalidated,
+                reversalStatus, logicWeakened, riskIncreased);
+        if (monitorConclusion == PositionMonitorConclusionEnum.LOGIC_VALID) {
             reasons.add("LOGIC_VALID");
         }
+        PositionMonitorSourceStatusEnum sourceStatus = planContext.missing || !reversalAssessment.sourceAvailable()
+                ? PositionMonitorSourceStatusEnum.PENDING_VERIFICATION
+                : PositionMonitorSourceStatusEnum.VERIFIED;
+        boolean trustedMonitorResult = sourceStatus == PositionMonitorSourceStatusEnum.VERIFIED;
 
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(position.getId());
@@ -296,15 +316,22 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 ? PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID
                 : planContext.analysisId);
         command.setExecutionPlanId(planContext.executionPlanId);
-        command.setCurrentPrice(currentPrice);
-        command.setLogicStatus(logicStatus);
-        command.setRiskLevel(riskLevel);
-        command.setSuggestedAction(suggestedAction);
+        command.setCurrentPrice(markPrice.price());
+        command.setMarkPriceSource(markPrice.source());
+        command.setEntryLogicStatus(trustedMonitorResult ? entryLogicStatus.name() : null);
+        command.setMonitorConclusion(trustedMonitorResult ? monitorConclusion.name() : null);
+        command.setReversalStatus(trustedMonitorResult ? reversalStatus.name() : null);
+        command.setRiskChangeReason(trustedMonitorResult ? riskReason.name() : null);
+        command.setRiskLevel(trustedMonitorResult ? riskLevel : null);
+        command.setSuggestedAction(trustedMonitorResult ? suggestedAction.name() : null);
+        command.setMonitorSourceStatus(sourceStatus.name());
+        command.setObservedAt(markPrice.observedAt());
+        command.setFreshUntil(markPrice.freshUntil());
         command.setReason(String.join(",", reasons));
         command.setEvidenceSnapshot(snapshotCount("evidence", planContext.analysisId));
         command.setScoreSnapshot(snapshotCount("score", planContext.analysisId));
         command.setDecisionSnapshot(decisionSnapshot(planContext.analysisId));
-        command.setRiskSnapshot(riskSnapshot(risk, externalContext));
+        command.setRiskSnapshot(trustedMonitorResult ? riskSnapshot(risk, externalContext) : null);
         command.setTraceId("POSITION_MONITOR_" + position.getId());
         PositionMonitorLogDTO log = systemScope
                 ? positionMonitorLogService.recordMonitorRunForSystem(command)
@@ -317,29 +344,40 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setPositionStatus(normalize(position.getStatus()));
         result.setAnalysisId(planContext.analysisId);
         result.setExecutionPlanId(planContext.executionPlanId);
-        result.setCurrentPrice(currentPrice);
         result.setEntryPrice(position.getEntryPrice());
         result.setStopLoss(stopLoss);
         result.setTakeProfit(takeProfit);
-        result.setLogicStatus(logicStatus);
-        result.setEntryLogicStatus(logicStatus);
-        result.setDirectionSupportStatus(directionSupportStatus(logicStatus));
-        result.setReversalStatus(reversalStatus(planInvalidated, stopLossBreached, externalBlocked, riskBlocked));
-        result.setRiskLevel(riskLevel);
-        result.setRiskBlocked(riskBlocked);
-        result.setRiskIncreased(riskIncreased);
-        result.setNearStopLoss(nearStopLoss);
-        result.setNearTakeProfit(nearTakeProfit);
-        result.setStopLossBreached(stopLossBreached);
-        result.setTakeProfitReached(takeProfitReached);
-        result.setSuggestedAction(suggestedAction);
-        result.setSuggestedManualAction(suggestedAction);
-        result.setSuggestedManualActionText(suggestedActionText(suggestedAction));
-        applyPnl(result, side, position.getEntryPrice(), currentPrice, position.getQuantity(), position.getLeverage());
+        if (trustedMonitorResult) {
+            result.setCurrentPrice(markPrice.price());
+            result.setMarkPrice(markPrice.price());
+            result.setMarkPriceSource(markPrice.source());
+            result.setMarkPriceObservedAt(markPrice.observedAt());
+            result.setMarkPriceFresh(true);
+            result.setEntryLogicStatus(entryLogicStatus.name());
+            result.setMonitorConclusion(monitorConclusion.name());
+            result.setDirectionSupportStatus(directionSupportStatus(entryLogicStatus));
+            result.setReversalStatus(reversalStatus.name());
+            result.setRiskReason(riskReason.name());
+            result.setRiskLevel(riskLevel);
+            result.setRiskBlocked(riskBlocked);
+            result.setRiskIncreased(riskIncreased);
+            result.setNearStopLoss(nearStopLoss);
+            result.setNearTakeProfit(nearTakeProfit);
+            result.setStopLossBreached(stopLossBreached);
+            result.setTakeProfitReached(takeProfitReached);
+            result.setSuggestedAction(suggestedAction.name());
+            result.setSuggestedManualAction(suggestedAction.name());
+            result.setSuggestedManualActionText(suggestedActionText(suggestedAction));
+            applyPnl(result, side, position.getEntryPrice(), markPrice.price(), position.getQuantity());
+        } else {
+            result.setMarkPriceFresh(false);
+        }
         result.setReasonCodes(new ArrayList<>(reasons));
         applyExternalContext(result, externalContext);
         result.setMonitorLogId(log.getLogId());
-        result.setMonitoredAt(LocalDateTime.now());
+        result.setMonitoredAt(log.getCreatedAt());
+        result.setLastMonitorTime(log.getCreatedAt());
+        result.setDataState(dataState(sourceStatus, monitorConclusion, riskLevel, riskIncreased).name());
         return result;
     }
 
@@ -376,7 +414,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
     }
 
-    private BigDecimal readCurrentPrice(String assetSymbol) {
+    private MarkPriceContext readMarkPrice(String assetSymbol) {
         ProviderCallResult<MarketPriceSnapshot> result;
         try {
             result = marketPriceSnapshotService.get(assetSymbol, AssetPriority.P0_POSITION,
@@ -391,20 +429,25 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         if (!positive(lastPrice)) {
             throw new PositionMonitorDataUnavailableException("INVALID_MARKET_PRICE");
         }
-        return lastPrice;
-    }
-
-    private UserPositionRiskResult currentRiskOrBlocked(Long userId) {
-        try {
-            UserPositionRiskResult result = userPositionRiskAdapter.currentRiskForUser(userId);
-            return result == null ? UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE") : result;
-        } catch (RuntimeException ex) {
-            return UserPositionRiskResult.failClosed("RISK_CONTEXT_UNAVAILABLE");
+        Instant observedInstant = result.payload().sourceFetchedAt() != null
+                ? result.payload().sourceFetchedAt()
+                : result.metadata().providerDataTime() != null
+                ? result.metadata().providerDataTime() : result.metadata().fetchTime();
+        Instant freshUntilInstant = result.metadata().expiresAt();
+        if (observedInstant == null || freshUntilInstant == null || freshUntilInstant.isBefore(observedInstant)) {
+            throw new PositionMonitorDataUnavailableException("QUOTE_TRUST_METADATA_INCOMPLETE");
         }
+        String source = optionalText(result.payload().sourceProvider());
+        if (source == null) {
+            source = requireText(result.metadata().provider(), "mark_price_source");
+        }
+        return new MarkPriceContext(lastPrice, source,
+                LocalDateTime.ofInstant(observedInstant, ZoneOffset.UTC),
+                LocalDateTime.ofInstant(freshUntilInstant, ZoneOffset.UTC));
     }
 
     private static void applyPnl(PositionMonitorResultDTO result, String side, BigDecimal entryPrice,
-                                 BigDecimal currentPrice, BigDecimal quantity, BigDecimal leverage) {
+                                 BigDecimal currentPrice, BigDecimal quantity) {
         if (!positive(entryPrice) || !positive(currentPrice)) {
             return;
         }
@@ -417,47 +460,138 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                     .multiply(new BigDecimal("100"));
         }
         result.setPnlPct(pct);
+        result.setPnlPercent(pct);
         if (positive(quantity)) {
             BigDecimal unitPnl = "SHORT".equals(side)
                     ? entryPrice.subtract(currentPrice)
                     : currentPrice.subtract(entryPrice);
             result.setPnlAmount(unitPnl.multiply(quantity));
         }
-        if (positive(leverage)) {
-            result.setAccountImpactPct(pct.multiply(leverage));
-        }
     }
 
-    private static String directionSupportStatus(String logicStatus) {
-        return switch (normalize(logicStatus)) {
-            case "LOGIC_VALID" -> "SUPPORTED";
-            case "LOGIC_WEAKENED" -> "WEAKENED";
-            case "PLAN_INVALIDATED" -> "NOT_SUPPORTED";
-            case "HIGH_RISK" -> "RISK_BLOCKED";
-            default -> "WAITING_REVIEW";
+    private static String directionSupportStatus(PositionEntryLogicStatusEnum entryLogicStatus) {
+        return switch (entryLogicStatus) {
+            case STILL_VALID -> "SUPPORTED";
+            case WEAKENED -> "WEAKENED";
+            case INVALIDATED -> "NOT_SUPPORTED";
         };
     }
 
-    private static String reversalStatus(boolean planInvalidated, boolean stopLossBreached,
-                                         boolean externalBlocked, boolean riskBlocked) {
-        if (riskBlocked || externalBlocked) {
-            return "RISK_REVIEW";
+    private PositionReversalEvaluator.Assessment readReversalAssessment(String assetSymbol, String side) {
+        String normalizedSymbol = normalizeSymbol(assetSymbol);
+        if (normalizedSymbol == null) {
+            return positionReversalEvaluator.evaluate(side, null);
         }
-        if (planInvalidated || stopLossBreached) {
-            return "MANUAL_REVIEW_REQUIRED";
+        try {
+            DecisionResultVO latestDecision = decisionResultMapper
+                    .findLatestDecisionResultBySymbolJoined(normalizedSymbol);
+            if (latestDecision == null
+                    || !normalizedSymbol.equals(normalizeSymbol(latestDecision.getSymbol()))) {
+                return positionReversalEvaluator.evaluate(side, null);
+            }
+            return positionReversalEvaluator.evaluate(side, latestDecision.getMarketBiasHierarchy());
+        } catch (RuntimeException ignored) {
+            return positionReversalEvaluator.evaluate(side, null);
         }
-        return "NO_REVERSAL_SIGNAL";
     }
 
-    private static String suggestedActionText(String suggestedAction) {
-        return switch (normalize(suggestedAction)) {
-            case "HOLD" -> "继续人工观察";
-            case "MANUAL_REVIEW" -> "人工复核";
-            case "TIGHTEN_STOP_REVIEW" -> "复核是否收紧止损";
-            case "REDUCE_POSITION_REVIEW" -> "复核是否降低仓位";
-            case "RECHECK_PLAN" -> "复核执行计划";
-            case "RISK_REVIEW" -> "风险复核";
-            default -> "人工复核";
+    private static PositionMonitorConclusionEnum monitorConclusion(
+            boolean stopLossBreached,
+            boolean takeProfitReached,
+            boolean persistedPlanInvalidated,
+            boolean nearStopLoss,
+            boolean nearTakeProfit,
+            String riskLevel,
+            PositionEntryLogicStatusEnum entryLogicStatus) {
+        if (stopLossBreached || persistedPlanInvalidated) {
+            return PositionMonitorConclusionEnum.PLAN_INVALIDATED;
+        }
+        if (takeProfitReached) {
+            return PositionMonitorConclusionEnum.WAIT_USER_CONFIRM_CLOSE;
+        }
+        if (nearStopLoss) {
+            return PositionMonitorConclusionEnum.NEAR_STOP_LOSS;
+        }
+        if (nearTakeProfit) {
+            return PositionMonitorConclusionEnum.NEAR_TAKE_PROFIT;
+        }
+        if ("HIGH".equals(riskLevel) || "EXTREME".equals(riskLevel)) {
+            return PositionMonitorConclusionEnum.HIGH_RISK_OBSERVATION;
+        }
+        if (entryLogicStatus == PositionEntryLogicStatusEnum.WEAKENED) {
+            return PositionMonitorConclusionEnum.LOGIC_WEAKENED;
+        }
+        return PositionMonitorConclusionEnum.LOGIC_VALID;
+    }
+
+    private static PositionMonitorSuggestedActionEnum suggestedAction(
+            PositionMonitorConclusionEnum conclusion, String riskLevel) {
+        return switch (conclusion) {
+            case WAIT_USER_CONFIRM_CLOSE -> PositionMonitorSuggestedActionEnum.RECORD_CLOSE_REVIEW;
+            case PLAN_INVALIDATED -> PositionMonitorSuggestedActionEnum.WAIT_CONFIRMATION;
+            case NEAR_STOP_LOSS -> PositionMonitorSuggestedActionEnum.TIGHTEN_STOP;
+            case NEAR_TAKE_PROFIT -> PositionMonitorSuggestedActionEnum.PARTIAL_TAKE_PROFIT;
+            case HIGH_RISK_OBSERVATION -> "EXTREME".equals(riskLevel)
+                    ? PositionMonitorSuggestedActionEnum.WAIT_CONFIRMATION
+                    : PositionMonitorSuggestedActionEnum.REDUCE_POSITION;
+            case LOGIC_WEAKENED -> PositionMonitorSuggestedActionEnum.NO_ADD_POSITION;
+            case LOGIC_VALID -> PositionMonitorSuggestedActionEnum.CONTINUE_HOLD;
+        };
+    }
+
+    private static PositionRiskChangeReasonEnum riskChangeReason(
+            boolean planSourceMissing,
+            boolean externalSourceBlocked,
+            boolean externalContextHighRisk,
+            boolean derivativesHighRisk,
+            boolean planInvalidated,
+            PositionReversalStatusEnum reversalStatus,
+            boolean logicWeakened,
+            boolean riskIncreased) {
+        if (planSourceMissing || externalSourceBlocked) {
+            return PositionRiskChangeReasonEnum.DATA_QUALITY_DEGRADED;
+        }
+        if (externalContextHighRisk) {
+            return PositionRiskChangeReasonEnum.EVENT_IMPACT;
+        }
+        if (planInvalidated || reversalStatus != null
+                && reversalStatus != PositionReversalStatusEnum.NO_REVERSAL) {
+            return PositionRiskChangeReasonEnum.STRUCTURE_CHANGED;
+        }
+        if (derivativesHighRisk || logicWeakened || riskIncreased) {
+            return PositionRiskChangeReasonEnum.OPPOSING_EVIDENCE_INCREASED;
+        }
+        return PositionRiskChangeReasonEnum.NO_CLEAR_RISK_FACTOR;
+    }
+
+    private static PositionMonitorDataStateEnum dataState(
+            PositionMonitorSourceStatusEnum sourceStatus,
+            PositionMonitorConclusionEnum conclusion,
+            String riskLevel,
+            boolean riskIncreased) {
+        if (sourceStatus != PositionMonitorSourceStatusEnum.VERIFIED) {
+            return PositionMonitorDataStateEnum.WAITING_MONITOR_DATA;
+        }
+        if (conclusion == PositionMonitorConclusionEnum.PLAN_INVALIDATED) {
+            return PositionMonitorDataStateEnum.PLAN_INVALIDATED;
+        }
+        if (riskIncreased || conclusion == PositionMonitorConclusionEnum.HIGH_RISK_OBSERVATION
+                || "HIGH".equals(riskLevel) || "EXTREME".equals(riskLevel)) {
+            return PositionMonitorDataStateEnum.RISK_ESCALATED;
+        }
+        return PositionMonitorDataStateEnum.OPEN_MONITORING;
+    }
+
+    private static String suggestedActionText(PositionMonitorSuggestedActionEnum suggestedAction) {
+        return switch (suggestedAction) {
+            case CONTINUE_HOLD -> "继续持有";
+            case NO_ADD_POSITION -> "暂不加仓";
+            case REDUCE_POSITION -> "降低仓位";
+            case TIGHTEN_STOP -> "收紧止损";
+            case MOVE_STOP -> "移动止损";
+            case PARTIAL_TAKE_PROFIT -> "分批止盈";
+            case WAIT_CONFIRMATION -> "等待人工确认";
+            case RECORD_CLOSE_REVIEW -> "记录平仓并进入复盘";
         };
     }
 
@@ -514,7 +648,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         if (logs == null || logs.isEmpty()) {
             return false;
         }
-        String previous = logs.get(0).getRiskLevel();
+        PositionMonitorLogDTO previousLog = logs.get(0);
+        if (!previousLog.isTrustedAndFreshAt(LocalDateTime.now(ZoneOffset.UTC))) {
+            return false;
+        }
+        String previous = previousLog.getRiskLevel();
         return PositionMonitorPolicy.riskRank(currentRiskLevel) > PositionMonitorPolicy.riskRank(previous);
     }
 
@@ -574,11 +712,15 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setExternalContextSourceHealth(snapshot.getSourceHealth());
     }
 
-    private String riskSnapshot(UserPositionRiskResult risk, ExternalContextSnapshot externalContext) {
+    private String riskSnapshot(SinglePositionRiskCalculator.Assessment risk,
+                                ExternalContextSnapshot externalContext) {
         Map<String, Object> safe = new LinkedHashMap<>();
-        safe.put("riskLevel", PositionMonitorPolicy.normalizeRiskLevel(risk.getRiskLevel()));
-        safe.put("riskBlocked", risk.isRiskBlocked());
-        safe.put("aggregateRiskScore", risk.getAggregateRiskScore());
+        safe.put("scope", "SINGLE_POSITION");
+        safe.put("riskLevel", risk.level().name());
+        safe.put("riskBlocked", risk.riskBlocked());
+        safe.put("positionNotional", risk.positionNotional());
+        safe.put("leveragedAdverseMovePercent", risk.leveragedAdverseMovePercent());
+        safe.put("reasonCodes", risk.reasonCodes());
         if (externalContext != null) {
             Map<String, Object> external = new LinkedHashMap<>();
             external.put("status", externalContext.getStatus());
@@ -627,6 +769,14 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    private static String normalizeSymbol(String value) {
+        String normalized = normalize(value);
+        return normalized == null ? null : normalized
+                .replace("/", "")
+                .replace("-", "")
+                .replace("_", "");
+    }
+
     private static final class PositionMonitorDataUnavailableException extends IllegalStateException {
         private PositionMonitorDataUnavailableException(String message) {
             super(message);
@@ -635,6 +785,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         private PositionMonitorDataUnavailableException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    private record MarkPriceContext(BigDecimal price,
+                                    String source,
+                                    LocalDateTime observedAt,
+                                    LocalDateTime freshUntil) {
     }
 
     private static class PlanContext {

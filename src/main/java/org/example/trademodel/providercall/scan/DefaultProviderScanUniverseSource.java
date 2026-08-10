@@ -223,10 +223,13 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     private ProfileTransitionSignal signal(UserPositionDO position, AssetStateDO state, String pushSignal) {
         PositionMonitorLogDTO log = latestLog(position);
         String reason = upper(log == null ? null : log.getReason());
-        String logic = upper(log == null ? null : log.getLogicStatus());
+        String conclusion = upper(log == null ? null : log.getMonitorConclusion());
         DecisionResultVO decision = state == null ? null : safeDecision(state.getSymbol());
         boolean highRisk = "HIGH".equalsIgnoreCase(log == null ? null : log.getRiskLevel())
-                || "HIGH_RISK".equals(logic) || "PLAN_INVALIDATED".equals(logic)
+                || "EXTREME".equalsIgnoreCase(log == null ? null : log.getRiskLevel())
+                || "HIGH_RISK_OBSERVATION".equals(conclusion)
+                || "PLAN_INVALIDATED".equals(conclusion)
+                || "WAIT_USER_CONFIRM_CLOSE".equals(conclusion)
                 || (state != null && (state.getState() == AssetStateEnum.HIGH_RISK
                 || state.getState() == AssetStateEnum.INVALIDATED));
         return new ProfileTransitionSignal(null, null, null, null,

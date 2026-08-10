@@ -99,6 +99,12 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         EvidenceItemMapper evidenceItemMapper = mock(EvidenceItemMapper.class);
         ScoreItemMapper scoreItemMapper = mock(ScoreItemMapper.class);
         DecisionResultMapper decisionResultMapper = mock(DecisionResultMapper.class);
+        org.example.trademodel.vo.DecisionResultVO currentDecision =
+                new org.example.trademodel.vo.DecisionResultVO();
+        currentDecision.setSymbol("BTCUSDT");
+        currentDecision.setMarketBiasHierarchy("RANGE");
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
+                .thenReturn(currentDecision);
         InMemoryPositionMonitorLogService monitorLogService = new InMemoryPositionMonitorLogService();
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedRisk());
@@ -140,8 +146,9 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         PositionMonitorResultDTO monitorResult = positionMonitorService.monitorUserPositionForUser(opened.getId(), USER_ID);
 
         assertThat(monitorResult.getPositionId()).isEqualTo(opened.getId());
-        assertThat(monitorResult.getLogicStatus()).isEqualTo("LOGIC_VALID");
-        assertThat(monitorResult.getSuggestedAction()).isEqualTo("HOLD");
+        assertThat(monitorResult.getEntryLogicStatus()).isEqualTo("STILL_VALID");
+        assertThat(monitorResult.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(monitorResult.getSuggestedAction()).isEqualTo("CONTINUE_HOLD");
         assertThat(monitorResult.getMonitorLogId()).isNotNull();
         assertThat(monitorResult.isNotTradeInstruction()).isTrue();
         assertThat(monitorResult.isNotAutoTrading()).isTrue();
@@ -154,8 +161,9 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         List<PositionMonitorLogDTO> monitorLogs = monitorLogService
                 .listAllByPositionIdForUserReview(USER_ID, opened.getId());
         assertThat(monitorLogs).hasSize(1);
-        assertThat(monitorLogs.get(0).getLogicStatus()).isEqualTo("LOGIC_VALID");
-        assertThat(monitorLogs.get(0).getSuggestedAction()).isEqualTo("HOLD");
+        assertThat(monitorLogs.get(0).getEntryLogicStatus()).isEqualTo("STILL_VALID");
+        assertThat(monitorLogs.get(0).getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(monitorLogs.get(0).getSuggestedAction()).isEqualTo("CONTINUE_HOLD");
         assertThat(monitorLogs.get(0).getAnalysisId()).isEqualTo(ANALYSIS_ID);
 
         UserPositionVO closed = userPositionService.manualCloseForUser(opened.getId(), USER_ID, closePositionRequest());
@@ -391,9 +399,17 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
             dto.setAnalysisId(command.getAnalysisId());
             dto.setExecutionPlanId(command.getExecutionPlanId());
             dto.setCurrentPrice(command.getCurrentPrice());
+            dto.setMarkPriceSource(command.getMarkPriceSource());
             dto.setLogicStatus(command.getLogicStatus());
+            dto.setEntryLogicStatus(command.getEntryLogicStatus());
+            dto.setMonitorConclusion(command.getMonitorConclusion());
+            dto.setReversalStatus(command.getReversalStatus());
+            dto.setRiskChangeReason(command.getRiskChangeReason());
             dto.setRiskLevel(command.getRiskLevel());
             dto.setSuggestedAction(command.getSuggestedAction());
+            dto.setMonitorSourceStatus(command.getMonitorSourceStatus());
+            dto.setObservedAt(command.getObservedAt());
+            dto.setFreshUntil(command.getFreshUntil());
             dto.setReason(command.getReason());
             dto.setEvidenceSnapshot(command.getEvidenceSnapshot());
             dto.setScoreSnapshot(command.getScoreSnapshot());

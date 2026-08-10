@@ -357,7 +357,7 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
                 .filter(log -> log.getCreatedAt() != null && !log.getCreatedAt().isAfter(position.getClosedAt()))
                 .toList();
         List<PositionMonitorLogDTO> invalidations = beforeClose.stream()
-                .filter(log -> "PLAN_INVALIDATED".equals(log.getLogicStatus()))
+                .filter(log -> "PLAN_INVALIDATED".equals(log.getMonitorConclusion()))
                 .toList();
         summary.setPlanInvalidatedBeforeClose(!invalidations.isEmpty());
         summary.setPlanInvalidationWarningCount(invalidations.size());
@@ -381,7 +381,8 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
             summary.setWarningTimelinessStatus("TIMELY_WARNING");
         }
 
-        boolean highRiskBeforeClose = beforeClose.stream().anyMatch(log -> "HIGH_RISK".equals(log.getLogicStatus()));
+        boolean highRiskBeforeClose = beforeClose.stream()
+                .anyMatch(log -> "HIGH".equals(log.getRiskLevel()) || "EXTREME".equals(log.getRiskLevel()));
         if (summary.isWarnedBeforeClose()
                 && position.getClosedAt().isAfter(summary.getFirstWarningAt())
                 && ("LOSS".equals(summary.getOutcome()) || summary.isPlanInvalidatedBeforeClose() || highRiskBeforeClose)) {
@@ -399,14 +400,17 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
     }
 
     private static boolean isWarningLog(PositionMonitorLogDTO log) {
-        String logicStatus = log.getLogicStatus();
+        String monitorConclusion = log.getMonitorConclusion();
         String suggestedAction = log.getSuggestedAction();
-        return "LOGIC_WEAKENED".equals(logicStatus)
-                || "PLAN_INVALIDATED".equals(logicStatus)
-                || "HIGH_RISK".equals(logicStatus)
-                || "MANUAL_REVIEW".equals(suggestedAction)
-                || "RECHECK_PLAN".equals(suggestedAction)
-                || "RISK_REVIEW".equals(suggestedAction);
+        return "LOGIC_WEAKENED".equals(monitorConclusion)
+                || "PLAN_INVALIDATED".equals(monitorConclusion)
+                || "NEAR_STOP_LOSS".equals(monitorConclusion)
+                || "HIGH_RISK_OBSERVATION".equals(monitorConclusion)
+                || "WAIT_USER_CONFIRM_CLOSE".equals(monitorConclusion)
+                || "REDUCE_POSITION".equals(suggestedAction)
+                || "TIGHTEN_STOP".equals(suggestedAction)
+                || "WAIT_CONFIRMATION".equals(suggestedAction)
+                || "RECORD_CLOSE_REVIEW".equals(suggestedAction);
     }
 
     private static String feedbackAnalysisId(UserPositionDO position,

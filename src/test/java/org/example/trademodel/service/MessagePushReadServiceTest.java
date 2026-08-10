@@ -522,6 +522,59 @@ class MessagePushReadServiceTest {
     }
 
     @Test
+    void independentMonitorSemanticsAreValidatedWithoutLegacyFallback() {
+        PositionMonitorLogDO risk = validMonitor(333L, 433L);
+        stubPositionRiskListAndDetail(risk, risk, ownedPosition(433L, "BTCUSDT"));
+
+        risk.setEntryLogicStatus("UNKNOWN");
+        assertPositionRiskError("POSITION_ENTRY_LOGIC_STATUS_INVALID");
+
+        risk.setEntryLogicStatus("WEAKENED");
+        risk.setReversalStatus("UNKNOWN");
+        assertPositionRiskError("POSITION_REVERSAL_STATUS_INVALID");
+
+        risk.setReversalStatus("NO_REVERSAL");
+        risk.setRiskChangeReason("UNKNOWN");
+        assertPositionRiskError("POSITION_RISK_CHANGE_REASON_INVALID");
+    }
+
+    @Test
+    void monitorConclusionAndSuggestedActionMustFormALegalPair() {
+        PositionMonitorLogDO risk = validMonitor(335L, 435L);
+        risk.setSuggestedAction("CONTINUE_HOLD");
+        stubPositionRiskListAndDetail(risk, risk, ownedPosition(435L, "BTCUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "335");
+
+        assertThat(list.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(list.reason()).isEqualTo("POSITION_MONITOR_STATE_CONFLICT");
+        assertThat(detail.reason()).isEqualTo("POSITION_MONITOR_STATE_CONFLICT");
+    }
+
+    @Test
+    void missingIndependentMonitorSemanticsCannotBecomeReady() {
+        PositionMonitorLogDO risk = validMonitor(334L, 434L);
+        risk.setEntryLogicStatus(null);
+        risk.setReversalStatus(null);
+        risk.setRiskChangeReason(null);
+        risk.setMarkPriceSource(null);
+        stubPositionRiskListAndDetail(risk, risk, ownedPosition(434L, "ETHUSDT"));
+
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "334");
+
+        assertThat(list.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.state()).isEqualTo(MessageReadState.PARTIAL);
+        assertThat(detail.missingFields()).contains(
+                "originalSnapshot.markPriceSource",
+                "originalSnapshot.entryLogicStatus",
+                "originalSnapshot.reversalStatus",
+                "originalSnapshot.riskChangeReason");
+    }
+
+    @Test
     void positionRiskListIdentityMismatchIsError() {
         PositionMonitorLogDO risk = validMonitor(304L, 404L);
         when(opportunityLogMapper.queryPublicApi(
@@ -544,15 +597,15 @@ class MessagePushReadServiceTest {
         PositionMonitorLogDO original = validMonitor(325L, 425L);
         PositionMonitorLogDO latest = validMonitor(326L, 425L);
         latest.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 30));
-        latest.setLogicStatus("UNKNOWN_LOGIC");
+        latest.setMonitorConclusion("UNKNOWN_LOGIC");
         stubPositionRiskListAndDetail(original, latest, ownedPosition(425L, "BTCUSDT"));
 
         MessageListDTO list = service.listForUser(USER_ID, null);
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "325");
 
         assertThat(list.state()).isEqualTo(detail.state()).isEqualTo(MessageReadState.ERROR);
-        assertThat(list.reason()).isEqualTo("POSITION_MONITOR_LOGIC_STATUS_INVALID");
-        assertThat(detail.reason()).isEqualTo("POSITION_MONITOR_LOGIC_STATUS_INVALID");
+        assertThat(list.reason()).isEqualTo("POSITION_MONITOR_CONCLUSION_INVALID");
+        assertThat(detail.reason()).isEqualTo("POSITION_MONITOR_CONCLUSION_INVALID");
     }
 
     @Test
@@ -635,7 +688,7 @@ class MessagePushReadServiceTest {
     @Test
     void nullLogicStatusIsPartialAndRowExistenceCannotBecomeReady() {
         PositionMonitorLogDO monitor = validMonitor(311L, 411L);
-        monitor.setLogicStatus(null);
+        monitor.setMonitorConclusion(null);
         stubPositionRisk(monitor, monitor, ownedPosition(411L, "BTCUSDT"));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "311");
@@ -647,7 +700,7 @@ class MessagePushReadServiceTest {
     @Test
     void unknownLogicStatusIsError() {
         PositionMonitorLogDO monitor = validMonitor(312L, 412L);
-        monitor.setLogicStatus("UNKNOWN_LOGIC");
+        monitor.setMonitorConclusion("UNKNOWN_LOGIC");
         stubPositionRisk(monitor, monitor, ownedPosition(412L, "BTCUSDT"));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "312");
@@ -802,6 +855,16 @@ class MessagePushReadServiceTest {
         }
     }
 
+    private void assertPositionRiskError(String reason) {
+        MessageListDTO list = service.listForUser(USER_ID, null);
+        PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "333");
+
+        assertThat(list.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(detail.state()).isEqualTo(MessageReadState.ERROR);
+        assertThat(list.reason()).isEqualTo(reason);
+        assertThat(detail.reason()).isEqualTo(reason);
+    }
+
     private void stubPositionRiskListAndDetail(
             PositionMonitorLogDO original,
             PositionMonitorLogDO latest,
@@ -923,7 +986,13 @@ class MessagePushReadServiceTest {
         row.setLogId(logId);
         row.setPositionId(positionId);
         row.setAnalysisId("ana-position-" + positionId);
-        row.setLogicStatus("HIGH_RISK");
+        row.setEntryLogicStatus("WEAKENED");
+        row.setMonitorConclusion("HIGH_RISK_OBSERVATION");
+        row.setReversalStatus("NO_REVERSAL");
+        row.setRiskChangeReason("OPPOSING_EVIDENCE_INCREASED");
+        row.setMonitorSourceStatus("VERIFIED");
+        row.setObservedAt(LocalDateTime.of(2026, 7, 29, 11, 0));
+        row.setFreshUntil(LocalDateTime.of(2026, 7, 29, 13, 0));
         row.setCreatedAt(LocalDateTime.of(2026, 7, 29, 11, 0));
         return row;
     }
@@ -932,8 +1001,9 @@ class MessagePushReadServiceTest {
         PositionMonitorLogDO row = positionRisk(logId, positionId);
         row.setExecutionPlanId("plan-position-" + positionId);
         row.setCurrentPrice(new BigDecimal("101.25"));
+        row.setMarkPriceSource("TEST");
         row.setRiskLevel("HIGH");
-        row.setSuggestedAction("RISK_REVIEW");
+        row.setSuggestedAction("REDUCE_POSITION");
         row.setReason("risk increased");
         row.setRiskSnapshot("{\"riskLevel\":\"HIGH\",\"riskBlocked\":true}");
         return row;

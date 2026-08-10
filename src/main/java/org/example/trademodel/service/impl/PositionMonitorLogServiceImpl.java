@@ -4,10 +4,15 @@ import org.example.trademodel.entity.PositionMonitorLogDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.positionmonitor.PositionRiskLevelEnum;
+import org.example.trademodel.positionmonitorlog.PositionEntryLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogSourceViewPolicy;
-import org.example.trademodel.positionmonitorlog.PositionMonitorLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
+import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
@@ -59,9 +64,49 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
 
         String analysisId = requireText(command.getAnalysisId(), "analysis_id");
         BigDecimal currentPrice = requirePositive(command.getCurrentPrice(), "current_price");
-        PositionMonitorLogicStatusEnum logicStatus = PositionMonitorLogicStatusEnum.parse(command.getLogicStatus());
-        PositionMonitorSuggestedActionEnum suggestedAction = PositionMonitorSuggestedActionEnum.parse(command.getSuggestedAction());
-        String riskLevel = requireText(command.getRiskLevel(), "risk_level").toUpperCase(Locale.ROOT);
+        PositionMonitorSourceStatusEnum monitorSourceStatus = parseEnum(
+                command.getMonitorSourceStatus(), PositionMonitorSourceStatusEnum.class, "source_status");
+        String markPriceSource = monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED
+                ? requireText(command.getMarkPriceSource(), "mark_price_source")
+                : optionalText(command.getMarkPriceSource());
+        LocalDateTime observedAt = requireTime(command.getObservedAt(), "observed_at");
+        LocalDateTime freshUntil = requireTime(command.getFreshUntil(), "fresh_until");
+        if (freshUntil.isBefore(observedAt)) {
+            throw new IllegalArgumentException("fresh_until must not be before observed_at");
+        }
+        if (monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED
+                && !freshUntil.isAfter(observedAt)) {
+            throw new IllegalArgumentException("verified monitor fresh_until must be after observed_at");
+        }
+
+        PositionEntryLogicStatusEnum entryLogicStatus = null;
+        PositionMonitorConclusionEnum monitorConclusion = null;
+        PositionReversalStatusEnum reversalStatus = null;
+        PositionRiskChangeReasonEnum riskChangeReason = null;
+        PositionRiskLevelEnum riskLevel = null;
+        PositionMonitorSuggestedActionEnum suggestedAction = null;
+        if (monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED) {
+            entryLogicStatus = parseEnum(
+                    command.getEntryLogicStatus(), PositionEntryLogicStatusEnum.class, "entry_logic_status");
+            monitorConclusion = parseEnum(
+                    command.getMonitorConclusion(), PositionMonitorConclusionEnum.class, "monitor_conclusion");
+            reversalStatus = parseEnum(
+                    command.getReversalStatus(), PositionReversalStatusEnum.class, "reversal_status");
+            riskChangeReason = parseEnum(
+                    command.getRiskChangeReason(), PositionRiskChangeReasonEnum.class, "risk_change_reason");
+            riskLevel = parseEnum(command.getRiskLevel(), PositionRiskLevelEnum.class, "risk_level");
+            suggestedAction = PositionMonitorSuggestedActionEnum.parse(command.getSuggestedAction());
+            if (!suggestedAction.isAllowedFor(monitorConclusion)) {
+                throw new IllegalArgumentException("suggested_action is not valid for monitor_conclusion");
+            }
+        } else {
+            requireMissing(command.getEntryLogicStatus(), "entry_logic_status");
+            requireMissing(command.getMonitorConclusion(), "monitor_conclusion");
+            requireMissing(command.getReversalStatus(), "reversal_status");
+            requireMissing(command.getRiskChangeReason(), "risk_change_reason");
+            requireMissing(command.getRiskLevel(), "risk_level");
+            requireMissing(command.getSuggestedAction(), "suggested_action");
+        }
         String executionPlanId = optionalText(command.getExecutionPlanId());
         String traceId = optionalText(command.getTraceId());
         String reason = optionalText(command.getReason());
@@ -70,21 +115,27 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         String decisionSnapshot = boundedSnapshot(command.getDecisionSnapshot(), "decision_snapshot");
         String riskSnapshot = boundedSnapshot(command.getRiskSnapshot(), "risk_snapshot");
 
-        rejectExecutableWords("suggested_action", suggestedAction.name());
-        rejectExecutableWords("reason", reason);
-        rejectExecutableWords("evidence_snapshot", evidenceSnapshot);
-        rejectExecutableWords("score_snapshot", scoreSnapshot);
-        rejectExecutableWords("decision_snapshot", decisionSnapshot);
-        rejectExecutableWords("risk_snapshot", riskSnapshot);
+        rejectAutomaticExecutionWords("reason", reason);
+        rejectAutomaticExecutionWords("evidence_snapshot", evidenceSnapshot);
+        rejectAutomaticExecutionWords("score_snapshot", scoreSnapshot);
+        rejectAutomaticExecutionWords("decision_snapshot", decisionSnapshot);
+        rejectAutomaticExecutionWords("risk_snapshot", riskSnapshot);
 
         PositionMonitorLogDO row = new PositionMonitorLogDO();
         row.setPositionId(positionId);
         row.setAnalysisId(analysisId);
         row.setExecutionPlanId(executionPlanId);
         row.setCurrentPrice(currentPrice);
-        row.setLogicStatus(logicStatus.name());
-        row.setRiskLevel(riskLevel);
-        row.setSuggestedAction(suggestedAction.name());
+        row.setMarkPriceSource(markPriceSource);
+        row.setEntryLogicStatus(entryLogicStatus == null ? null : entryLogicStatus.name());
+        row.setMonitorConclusion(monitorConclusion == null ? null : monitorConclusion.name());
+        row.setReversalStatus(reversalStatus == null ? null : reversalStatus.name());
+        row.setRiskChangeReason(riskChangeReason == null ? null : riskChangeReason.name());
+        row.setRiskLevel(riskLevel == null ? null : riskLevel.name());
+        row.setSuggestedAction(suggestedAction == null ? null : suggestedAction.name());
+        row.setMonitorSourceStatus(monitorSourceStatus.name());
+        row.setObservedAt(observedAt);
+        row.setFreshUntil(freshUntil);
         row.setReason(reason);
         row.setEvidenceSnapshot(evidenceSnapshot);
         row.setScoreSnapshot(scoreSnapshot);
@@ -165,9 +216,17 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         dto.setAnalysisId(row.getAnalysisId());
         dto.setExecutionPlanId(row.getExecutionPlanId());
         dto.setCurrentPrice(row.getCurrentPrice());
+        dto.setMarkPriceSource(row.getMarkPriceSource());
         dto.setLogicStatus(row.getLogicStatus());
+        dto.setEntryLogicStatus(row.getEntryLogicStatus());
+        dto.setMonitorConclusion(row.getMonitorConclusion());
+        dto.setReversalStatus(row.getReversalStatus());
+        dto.setRiskChangeReason(row.getRiskChangeReason());
         dto.setRiskLevel(row.getRiskLevel());
         dto.setSuggestedAction(row.getSuggestedAction());
+        dto.setMonitorSourceStatus(row.getMonitorSourceStatus());
+        dto.setObservedAt(row.getObservedAt());
+        dto.setFreshUntil(row.getFreshUntil());
         dto.setReason(row.getReason());
         dto.setEvidenceSnapshot(row.getEvidenceSnapshot());
         dto.setScoreSnapshot(row.getScoreSnapshot());
@@ -242,12 +301,34 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         return text;
     }
 
+    private static LocalDateTime requireTime(LocalDateTime value, String fieldName) {
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        return value;
+    }
+
+    private static <E extends Enum<E>> E parseEnum(String value, Class<E> type, String fieldName) {
+        String normalized = requireText(value, fieldName).toUpperCase(Locale.ROOT);
+        try {
+            return Enum.valueOf(type, normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException(fieldName + " is not supported");
+        }
+    }
+
     private static String optionalText(String value) {
         if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static void requireMissing(String value, String fieldName) {
+        if (optionalText(value) != null) {
+            throw new IllegalArgumentException(fieldName + " must be absent when source_status is not VERIFIED");
+        }
     }
 
     private static String boundedSnapshot(String value, String fieldName) {
@@ -269,27 +350,24 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         throw new IllegalArgumentException("UserPosition status must be OPEN or PARTIALLY_CLOSED");
     }
 
-    private static void rejectExecutableWords(String fieldName, String value) {
+    private static void rejectAutomaticExecutionWords(String fieldName, String value) {
         if (value == null) {
             return;
         }
         String normalized = value.replace('_', ' ').replace('-', ' ').toLowerCase(Locale.ROOT);
-        if (containsWord(normalized, "close")
-                || containsWord(normalized, "reduce")
-                || containsWord(normalized, "reverse")
-                || containsWord(normalized, "open")
-                || containsWord(normalized, "buy")
-                || containsWord(normalized, "sell")
+        if (normalized.contains("auto close")
+                || normalized.contains("auto reduce")
+                || normalized.contains("auto reverse")
+                || normalized.contains("auto open")
+                || normalized.contains("auto buy")
+                || normalized.contains("auto sell")
+                || normalized.contains("auto order")
                 || normalized.contains("place order")
-                || containsWord(normalized, "execute")
+                || normalized.contains("execute order")
                 || normalized.contains("orderaction")
                 || normalized.contains("executionaction")
                 || normalized.contains("autotradingaction")) {
             throw new IllegalArgumentException("Forbidden executable monitor log content in " + fieldName);
         }
-    }
-
-    private static boolean containsWord(String value, String word) {
-        return value.matches(".*\\b" + word + "\\b.*");
     }
 }

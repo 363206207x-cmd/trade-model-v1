@@ -13,6 +13,7 @@ Current migration files:
 - `V7__decision_plan_offset_times.sql`: additive offset-aware `valid_from` / `expires_at` authority for execution-plan validity; historical rows remain null and fail closed until re-analysis.
 - `V8__personal_user_session_authentication.sql`: personal `tm_user` identity storage for BCrypt-backed form login and server-side Session authentication; runtime bootstrap requires explicit credentials.
 - `V9__user_position_ownership_foundation.sql`: nullable canonical `tm_user_position.user_id` ownership plus owner-scoped review feedback keys, indexes, and restrictive foreign keys; legacy position rows remain unclaimed and legacy review rows remain shared, with no automatic ownership backfill.
+- `V10__position_monitoring_backend_contract.sql`: independent Position Monitoring semantics, source trust, and freshness contract.
 
 `src/main/resources/schema.sql` remains the H2 local/test bootstrap path. It is intentionally separate from the PostgreSQL Flyway migration path.
 
@@ -33,7 +34,8 @@ PDR-PF4 status: current-state migration and rollback drill requirements are docu
 PDR-LIVE3 status: controlled external PostgreSQL Flyway smoke runner is available through `scripts/controlled-postgresql-flyway-smoke.sh` and `ControlledPostgreSqlFlywaySmokeTest`. It skips when controlled DB env is missing, requires explicit non-production and run confirmations, redacts connection values, and does not claim PASS until a disposable controlled PostgreSQL database is supplied.
 
 CALL-1B originally extended `PostgreSqlFlywayMigrationSmokeTest` through V5;
-the current contract verifies the full V1-V9 chain, including profile
+the current contract verifies the full V1-V10 chain, including Position Monitoring
+semantic/trust migration, profile
 save/load, audit insertion, timestamp handling, rollback atomicity, and
 mapper-compatible reads. A run skipped because Docker/Testcontainers is
 unavailable is still recorded as `SKIPPED_DOCKER_UNAVAILABLE`, not PASS.

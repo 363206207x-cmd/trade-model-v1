@@ -23,6 +23,7 @@ public class DashboardHomeVO {
     private Long selectedPositionId;
     private String positionSelectionStatus;
     private Integer matchingPositionCount;
+    private String positionMonitoringState;
     private ExecutionSuggestionVO executionSuggestion = new ExecutionSuggestionVO();
     private AiDecisionVO aiDecision = new AiDecisionVO();
     private PushInboxVO pushInbox = new PushInboxVO();
@@ -117,6 +118,11 @@ public class DashboardHomeVO {
 
     public void setMatchingPositionCount(Integer matchingPositionCount) {
         this.matchingPositionCount = matchingPositionCount;
+    }
+
+    public String getPositionMonitoringState() { return positionMonitoringState; }
+    public void setPositionMonitoringState(String positionMonitoringState) {
+        this.positionMonitoringState = positionMonitoringState;
     }
 
     public ExecutionSuggestionVO getExecutionSuggestion() {
@@ -650,8 +656,14 @@ public class DashboardHomeVO {
         private String directionLabel;
         private BigDecimal entryPrice;
         private BigDecimal currentPrice;
+        private BigDecimal markPrice;
+        private String markPriceSource;
+        private LocalDateTime markPriceObservedAt;
+        private Boolean markPriceFresh;
         private BigDecimal floatingPnl;
         private BigDecimal pnlPct;
+        private BigDecimal pnlAmount;
+        private BigDecimal pnlPercent;
         private BigDecimal accountImpactPct;
         private BigDecimal leverage;
         private BigDecimal positionSize;
@@ -662,6 +674,7 @@ public class DashboardHomeVO {
         private BigDecimal systemSuggestedStopLoss;
         private BigDecimal systemSuggestedTakeProfit;
         private String monitorConclusion;
+        private String monitorConclusionLabel;
         private String entryLogicStatus;
         private String entryLogicStatusLabel;
         private String directionSupportStatus;
@@ -670,11 +683,15 @@ public class DashboardHomeVO {
         private String reversalStatusLabel;
         private String riskLevel;
         private String riskLevelLabel;
+        private String riskReason;
+        private String riskReasonLabel;
+        private String suggestedAction;
         private String suggestedManualAction;
         private String suggestedManualActionText;
         private LocalDateTime updatedAt;
         private LocalDateTime openedAt;
         private LocalDateTime lastMonitorAt;
+        private LocalDateTime lastMonitorTime;
         private LocalDateTime nextMonitorAt;
         private String sourceRefId;
         private String sourceAnalysisId;
@@ -682,6 +699,7 @@ public class DashboardHomeVO {
         private String sourceTraceId;
         private String moduleState = "MISSING";
         private String warningState = "MISSING";
+        private String dataState = "WAITING_MONITOR_DATA";
 
         @JsonSerialize(using = ToStringSerializer.class)
         public Long getPositionId() {
@@ -727,6 +745,17 @@ public class DashboardHomeVO {
             this.currentPrice = currentPrice;
         }
 
+        public BigDecimal getMarkPrice() { return markPrice; }
+        public void setMarkPrice(BigDecimal markPrice) { this.markPrice = markPrice; }
+        public String getMarkPriceSource() { return markPriceSource; }
+        public void setMarkPriceSource(String markPriceSource) { this.markPriceSource = markPriceSource; }
+        public LocalDateTime getMarkPriceObservedAt() { return markPriceObservedAt; }
+        public void setMarkPriceObservedAt(LocalDateTime markPriceObservedAt) {
+            this.markPriceObservedAt = markPriceObservedAt;
+        }
+        public Boolean getMarkPriceFresh() { return markPriceFresh; }
+        public void setMarkPriceFresh(Boolean markPriceFresh) { this.markPriceFresh = markPriceFresh; }
+
         public BigDecimal getFloatingPnl() {
             return floatingPnl;
         }
@@ -742,6 +771,11 @@ public class DashboardHomeVO {
         public void setPnlPct(BigDecimal pnlPct) {
             this.pnlPct = pnlPct;
         }
+
+        public BigDecimal getPnlAmount() { return pnlAmount; }
+        public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
+        public BigDecimal getPnlPercent() { return pnlPercent; }
+        public void setPnlPercent(BigDecimal pnlPercent) { this.pnlPercent = pnlPercent; }
 
         public BigDecimal getAccountImpactPct() {
             return accountImpactPct;
@@ -794,6 +828,11 @@ public class DashboardHomeVO {
             this.monitorConclusion = monitorConclusion;
         }
 
+        public String getMonitorConclusionLabel() { return monitorConclusionLabel; }
+        public void setMonitorConclusionLabel(String monitorConclusionLabel) {
+            this.monitorConclusionLabel = monitorConclusionLabel;
+        }
+
         public String getEntryLogicStatus() {
             return entryLogicStatus;
         }
@@ -837,6 +876,12 @@ public class DashboardHomeVO {
 
         public String getRiskLevelLabel() { return riskLevelLabel; }
         public void setRiskLevelLabel(String riskLevelLabel) { this.riskLevelLabel = riskLevelLabel; }
+        public String getRiskReason() { return riskReason; }
+        public void setRiskReason(String riskReason) { this.riskReason = riskReason; }
+        public String getRiskReasonLabel() { return riskReasonLabel; }
+        public void setRiskReasonLabel(String riskReasonLabel) { this.riskReasonLabel = riskReasonLabel; }
+        public String getSuggestedAction() { return suggestedAction; }
+        public void setSuggestedAction(String suggestedAction) { this.suggestedAction = suggestedAction; }
 
         public String getSuggestedManualAction() {
             return suggestedManualAction;
@@ -865,6 +910,8 @@ public class DashboardHomeVO {
         public void setOpenedAt(LocalDateTime openedAt) { this.openedAt = openedAt; }
         public LocalDateTime getLastMonitorAt() { return lastMonitorAt; }
         public void setLastMonitorAt(LocalDateTime lastMonitorAt) { this.lastMonitorAt = lastMonitorAt; }
+        public LocalDateTime getLastMonitorTime() { return lastMonitorTime; }
+        public void setLastMonitorTime(LocalDateTime lastMonitorTime) { this.lastMonitorTime = lastMonitorTime; }
         public LocalDateTime getNextMonitorAt() { return nextMonitorAt; }
         public void setNextMonitorAt(LocalDateTime nextMonitorAt) { this.nextMonitorAt = nextMonitorAt; }
         public String getSourceRefId() { return sourceRefId; }
@@ -879,6 +926,8 @@ public class DashboardHomeVO {
         public void setModuleState(String moduleState) { this.moduleState = moduleState; }
         public String getWarningState() { return warningState; }
         public void setWarningState(String warningState) { this.warningState = warningState; }
+        public String getDataState() { return dataState; }
+        public void setDataState(String dataState) { this.dataState = dataState; }
     }
 
     public static class ExecutionSuggestionVO {

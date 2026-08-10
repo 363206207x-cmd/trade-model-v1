@@ -203,7 +203,7 @@ public class ReviewCenterServiceImpl implements ReviewCenterService {
             return null;
         }
         PositionMonitorLogDTO latest = logs.get(logs.size() - 1);
-        return firstNonBlank(latest.getLogicStatus(), latest.getSuggestedAction(), latest.getReason());
+        return trimToNull(latest.getMonitorConclusion());
     }
 
     private static String compactActualExecution(UserPositionDO row) {

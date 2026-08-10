@@ -40,10 +40,14 @@ class ProviderArchitectureGuardTest {
     }
 
     @Test
-    void dashboardUsesReadOnlySnapshotBoundary() throws Exception {
+    void dashboardUsesTrustedMonitorSnapshotWithoutMarketFallback() throws Exception {
         String source = readIfPresent(MAIN.resolve("service/impl/DashboardHomeServiceImpl.java"));
-        assertThat(source).contains("marketPriceSnapshotService.peek(")
-                .doesNotContain("marketPriceSnapshotService.get(", "ProviderSnapshotRefreshService");
+        assertThat(source)
+                .contains("isTrustedAndFreshAt", "applyWaitingMonitor")
+                .doesNotContain(
+                        "marketPriceSnapshotService.peek(",
+                        "marketPriceSnapshotService.get(",
+                        "ProviderSnapshotRefreshService");
     }
 
     @Test

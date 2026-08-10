@@ -80,9 +80,11 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 .migrate();
 
         long legacyPositionId;
+        long legacyMonitorLogId;
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
             legacyPositionId = insertLegacyUserPositionBeforeOwnershipMigration(connection);
+            legacyMonitorLogId = insertLegacyPositionMonitorBeforeContractMigration(connection, legacyPositionId);
         }
 
         Flyway.configure()
@@ -111,6 +113,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_user_position_user_status_opened_at",
                     "uk_tm_user_position_id_user",
+                    "idx_tm_position_monitor_log_trust_freshness",
                     "idx_tm_push_snapshot_analysis_id",
                     "idx_tm_ai_call_log_trace_id",
                     "uk_tm_review_result_analysis_scope",
@@ -123,6 +126,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertDerivativesBusinessRuleDefaultsExist(connection);
             assertDecisionPlanOffsetTimeColumnsExist(connection);
             assertUserPositionOwnershipV9Contract(connection, legacyPositionId);
+            assertPositionMonitorV10Contract(connection, legacyMonitorLogId);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -300,7 +304,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(9);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(10);
             }
         }
     }
@@ -334,6 +338,62 @@ class PostgreSqlFlywayMigrationSmokeTest {
             try (ResultSet keys = statement.getGeneratedKeys()) {
                 assertThat(keys.next()).isTrue();
                 return keys.getLong(1);
+            }
+        }
+    }
+
+    private static long insertLegacyPositionMonitorBeforeContractMigration(
+            Connection connection, long positionId) throws Exception {
+        String sql = """
+                INSERT INTO tm_position_monitor_log(
+                    position_id, analysis_id, execution_plan_id, current_price, logic_status,
+                    risk_level, suggested_action, reason, trace_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 27, 8, 5);
+        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            statement.setLong(1, positionId);
+            statement.setString(2, "legacy-position-monitor");
+            statement.setString(3, "legacy-plan");
+            statement.setBigDecimal(4, new BigDecimal("100"));
+            statement.setString(5, "LOGIC_WEAKENED");
+            statement.setString(6, "LEGACY_UNKNOWN");
+            statement.setString(7, "MANUAL_REVIEW");
+            statement.setString(8, "legacy monitor evidence");
+            statement.setString(9, "legacy-monitor-trace");
+            statement.setObject(10, createdAt);
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+            try (ResultSet keys = statement.getGeneratedKeys()) {
+                assertThat(keys.next()).isTrue();
+                return keys.getLong(1);
+            }
+        }
+    }
+
+    private static void assertPositionMonitorV10Contract(Connection connection, long logId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT logic_status, entry_logic_status, monitor_conclusion, reversal_status,
+                       risk_change_reason, risk_level, suggested_action, source_status,
+                       observed_at, fresh_until, mark_price_source
+                FROM tm_position_monitor_log
+                WHERE log_id = ?
+                """)) {
+            statement.setLong(1, logId);
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("logic_status")).isEqualTo("LOGIC_WEAKENED");
+                assertThat(rs.getString("entry_logic_status")).isNull();
+                assertThat(rs.getString("monitor_conclusion")).isNull();
+                assertThat(rs.getString("reversal_status")).isNull();
+                assertThat(rs.getString("risk_change_reason")).isNull();
+                assertThat(rs.getString("risk_level")).isNull();
+                assertThat(rs.getString("suggested_action")).isNull();
+                assertThat(rs.getString("source_status")).isEqualTo("PENDING_VERIFICATION");
+                assertThat(rs.getObject("observed_at", LocalDateTime.class))
+                        .isEqualTo(LocalDateTime.of(2026, 7, 27, 8, 5));
+                assertThat(rs.getObject("fresh_until", LocalDateTime.class))
+                        .isEqualTo(LocalDateTime.of(2026, 7, 27, 8, 5));
+                assertThat(rs.getString("mark_price_source")).isNull();
             }
         }
     }

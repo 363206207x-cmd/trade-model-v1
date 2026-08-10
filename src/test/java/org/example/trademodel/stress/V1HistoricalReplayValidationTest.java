@@ -44,6 +44,7 @@ import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -121,42 +122,43 @@ class V1HistoricalReplayValidationTest {
         MonitorHarness harness = new MonitorHarness();
 
         PositionMonitorResultDTO valid = harness.monitor(MonitorPoint.normal(201L, "OPEN_LOGIC_VALID", "101", "90", "120"));
-        assertThat(valid.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(valid.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(valid.getEntryLogicStatus()).isEqualTo("STILL_VALID");
         assertThat(valid.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
-        assertThat(valid.getReversalStatus()).isEqualTo("NO_REVERSAL_SIGNAL");
+        assertThat(valid.getReversalStatus()).isEqualTo("NO_REVERSAL");
         assertSafeMonitor(valid);
 
         PositionMonitorResultDTO weakened = harness.monitor(MonitorPoint.normal(202L, "FAKE_BREAKOUT_WEAKENED", "99", "98", "120"));
-        assertThat(weakened.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(weakened.getMonitorConclusion()).isEqualTo("NEAR_STOP_LOSS");
+        assertThat(weakened.getEntryLogicStatus()).isEqualTo("WEAKENED");
         assertThat(weakened.getDirectionSupportStatus()).isEqualTo("WEAKENED");
-        assertThat(weakened.getSuggestedManualAction()).isEqualTo("MANUAL_REVIEW");
+        assertThat(weakened.getSuggestedManualAction()).isEqualTo("TIGHTEN_STOP");
         assertThat(weakened.getReasonCodes()).contains("NEAR_STOP_LOSS");
         assertSafeMonitor(weakened);
 
         PositionMonitorResultDTO reversal = harness.monitor(MonitorPoint.normal(203L, "STRONG_REVERSAL", "89", "90", "120"));
-        assertThat(reversal.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
-        assertThat(reversal.getReversalStatus()).isEqualTo("MANUAL_REVIEW_REQUIRED");
-        assertThat(reversal.getSuggestedManualAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(reversal.getMonitorConclusion()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(reversal.getReversalStatus()).isEqualTo("STRONG_REVERSAL");
+        assertThat(reversal.getSuggestedManualAction()).isEqualTo("WAIT_CONFIRMATION");
         assertSafeMonitor(reversal);
 
         PositionMonitorResultDTO takeProfit = harness.monitor(MonitorPoint.normal(204L, "PAPER_OPEN_TO_TAKE_PROFIT", "118", "90", "120"));
-        assertThat(takeProfit.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(takeProfit.getMonitorConclusion()).isEqualTo("NEAR_TAKE_PROFIT");
         assertThat(takeProfit.isNearTakeProfit()).isTrue();
-        assertThat(takeProfit.getSuggestedManualAction()).isEqualTo("MANUAL_REVIEW");
-        assertThat(takeProfit.getSuggestedManualActionText()).contains("人工");
+        assertThat(takeProfit.getSuggestedManualAction()).isEqualTo("PARTIAL_TAKE_PROFIT");
         assertThat(takeProfit.getPnlPct()).isPositive();
         assertSafeMonitor(takeProfit);
 
         PositionMonitorResultDTO stop = harness.monitor(MonitorPoint.normal(205L, "PAPER_OPEN_TO_STOP_OR_INVALIDATION", "90", "90", "120"));
-        assertThat(stop.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(stop.getMonitorConclusion()).isEqualTo("PLAN_INVALIDATED");
         assertThat(stop.isStopLossBreached()).isTrue();
-        assertThat(stop.getSuggestedManualActionText()).contains("复核");
+        assertThat(stop.getSuggestedManualActionText()).isEqualTo("等待人工确认");
         assertSafeMonitor(stop);
 
         PositionMonitorResultDTO highRisk = harness.monitor(MonitorPoint.highRisk(206L, "FAST_CRASH_HIGH_RISK", "94", "90", "120"));
-        assertThat(highRisk.getLogicStatus()).isEqualTo("HIGH_RISK");
-        assertThat(highRisk.getRiskLevel()).isEqualTo("HIGH");
-        assertThat(highRisk.getSuggestedManualAction()).isEqualTo("RISK_REVIEW");
+        assertThat(highRisk.getMonitorConclusion()).isEqualTo("HIGH_RISK_OBSERVATION");
+        assertThat(highRisk.getRiskLevel()).isEqualTo("EXTREME");
+        assertThat(highRisk.getSuggestedManualAction()).isEqualTo("WAIT_CONFIRMATION");
         assertSafeMonitor(highRisk);
 
         assertThatThrownBy(() -> harness.monitorClosed(207L))
@@ -627,6 +629,7 @@ class V1HistoricalReplayValidationTest {
         private final UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         private final ExecutionPlanMapper planMapper = mock(ExecutionPlanMapper.class);
         private final AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
+        private final DecisionResultMapper decisionResultMapper = mock(DecisionResultMapper.class);
         private final PositionMonitorLogService logService = mock(PositionMonitorLogService.class);
         private final PositionMonitorServiceImpl service;
         private final AtomicLong logIds = new AtomicLong(3000L);
@@ -641,22 +644,30 @@ class V1HistoricalReplayValidationTest {
             service = new PositionMonitorServiceImpl(positionMapper,
                     org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(quoteClient),
                     riskAdapter, planMapper, logService,
-                    mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class), mock(DecisionResultMapper.class),
+                    mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class), decisionResultMapper,
                     new ObjectMapper(), analysisRunMapper, null);
         }
 
         private PositionMonitorResultDTO monitor(MonitorPoint point) {
             String planId = "plan-replay-" + point.name();
-            when(positionMapper.selectByIdAndUserId(point.id(), USER_ID))
-                    .thenReturn(paperPosition(point.id(), "OPEN",
-                            PositionMonitorSourceContract.executionPlanReference(planId),
-                            point.stopLoss(), point.takeProfit()));
+            UserPositionDO position = paperPosition(point.id(), "OPEN",
+                    PositionMonitorSourceContract.executionPlanReference(planId),
+                    point.stopLoss(), point.takeProfit());
+            if ("HIGH".equals(point.risk().getRiskLevel())) {
+                position.setLeverage(new BigDecimal("10"));
+            }
+            when(positionMapper.selectByIdAndUserId(point.id(), USER_ID)).thenReturn(position);
             when(quoteClient.fetch24hTicker(SYMBOL)).thenReturn(Optional.of(quote(point.currentPrice())));
-            when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(point.risk());
             ExecutionPlanDO plan = monitorPlan(planId);
             lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
+            DecisionResultVO currentDecision = new DecisionResultVO();
+            currentDecision.setSymbol(SYMBOL);
+            currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL".equals(point.name())
+                    ? "STRONG_BEARISH" : "RANGE");
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(SYMBOL))
+                    .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(point.id(), USER_ID);
         }
 

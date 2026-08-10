@@ -75,8 +75,8 @@ class UserPositionReviewAdapterTest {
         when(userPositionMapper.selectByIdAndUserId(1L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(plan("plan-1", "ana-1", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 1L)).thenReturn(List.of(
-                log(11L, "LOGIC_VALID", "HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30)),
-                log(12L, "LOGIC_WEAKENED", "MANUAL_REVIEW", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
+                log(11L, "LOGIC_VALID", "CONTINUE_HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30)),
+                log(12L, "LOGIC_WEAKENED", "NO_ADD_POSITION", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
 
         UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 1L);
 
@@ -113,8 +113,8 @@ class UserPositionReviewAdapterTest {
         when(userPositionMapper.selectByIdAndUserId(2L, USER_ID)).thenReturn(position);
         when(executionPlanMapper.selectByPlanId("plan-2")).thenReturn(plan("plan-2", "ana-2", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 2L)).thenReturn(List.of(
-                log(21L, "PLAN_INVALIDATED", "RECHECK_PLAN", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 0)),
-                log(22L, "HIGH_RISK", "RISK_REVIEW", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 30))));
+                log(21L, "PLAN_INVALIDATED", "WAIT_CONFIRMATION", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 0)),
+                log(22L, "HIGH_RISK_OBSERVATION", "REDUCE_POSITION", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 30))));
 
         UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 2L);
 
@@ -223,7 +223,7 @@ class UserPositionReviewAdapterTest {
         UserPositionDO noWarning = closedPosition(17L, "LONG", null, "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(17L, USER_ID)).thenReturn(noWarning);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 17L)).thenReturn(List.of(
-                log(171L, "LOGIC_VALID", "HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30))));
+                log(171L, "LOGIC_VALID", "CONTINUE_HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30))));
         UserPositionReviewSummaryDTO noWarningSummary = adapter.buildSummaryForUser(USER_ID, 17L);
         assertThat(noWarningSummary.isWarnedBeforeClose()).isFalse();
         assertThat(noWarningSummary.getWarningTimelinessStatus()).isEqualTo("NO_WARNING_BEFORE_CLOSE");
@@ -231,7 +231,7 @@ class UserPositionReviewAdapterTest {
         UserPositionDO winAfterWarning = closedPosition(18L, "LONG", null, "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(18L, USER_ID)).thenReturn(winAfterWarning);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 18L)).thenReturn(List.of(
-                log(181L, "LOGIC_WEAKENED", "MANUAL_REVIEW", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
+                log(181L, "LOGIC_WEAKENED", "NO_ADD_POSITION", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
         UserPositionReviewSummaryDTO warningSummary = adapter.buildSummaryForUser(USER_ID, 18L);
         assertThat(warningSummary.isWarnedBeforeClose()).isTrue();
         assertThat(warningSummary.isIgnoredWarning()).isFalse();
@@ -564,7 +564,7 @@ class UserPositionReviewAdapterTest {
     }
 
     private static PositionMonitorLogDTO log(Long logId,
-                                             String logicStatus,
+                                             String monitorConclusion,
                                              String suggestedAction,
                                              String riskLevel,
                                              LocalDateTime createdAt) {
@@ -573,7 +573,16 @@ class UserPositionReviewAdapterTest {
         dto.setPositionId(1L);
         dto.setAnalysisId("ana-log");
         dto.setCurrentPrice(new BigDecimal("101"));
-        dto.setLogicStatus(logicStatus);
+        dto.setEntryLogicStatus(switch (monitorConclusion) {
+            case "LOGIC_VALID" -> "STILL_VALID";
+            case "PLAN_INVALIDATED" -> "INVALIDATED";
+            default -> "WEAKENED";
+        });
+        dto.setMonitorConclusion(monitorConclusion);
+        dto.setReversalStatus("NO_REVERSAL");
+        dto.setRiskChangeReason("LOGIC_VALID".equals(monitorConclusion)
+                ? "NO_CLEAR_RISK_FACTOR"
+                : "OPPOSING_EVIDENCE_INCREASED");
         dto.setSuggestedAction(suggestedAction);
         dto.setRiskLevel(riskLevel);
         dto.setCreatedAt(createdAt);
@@ -594,7 +603,7 @@ class UserPositionReviewAdapterTest {
                                                    String analysisId,
                                                    String executionPlanId,
                                                    LocalDateTime createdAt) {
-        PositionMonitorLogDTO dto = log(logId, "LOGIC_VALID", "HOLD", "LOW", createdAt);
+        PositionMonitorLogDTO dto = log(logId, "LOGIC_VALID", "CONTINUE_HOLD", "LOW", createdAt);
         dto.setPositionId(positionId);
         dto.setAnalysisId(analysisId);
         dto.setExecutionPlanId(executionPlanId);

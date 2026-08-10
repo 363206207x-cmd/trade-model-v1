@@ -13,8 +13,12 @@ import org.example.trademodel.messagepush.MessageReadState;
 import org.example.trademodel.messagepush.PublicOpportunityProjectionPolicy;
 import org.example.trademodel.messagepush.PushDetailDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
-import org.example.trademodel.positionmonitorlog.PositionMonitorLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionEntryLogicStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSourceStatusEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
+import org.example.trademodel.positionmonitorlog.PositionReversalStatusEnum;
+import org.example.trademodel.positionmonitorlog.PositionRiskChangeReasonEnum;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,10 +43,12 @@ public class MessagePushReadService {
     private static final Pattern NUMERIC_ID = Pattern.compile("[1-9][0-9]{0,18}");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> RISK_LOGIC_STATUSES = Set.of(
-            PositionMonitorLogicStatusEnum.LOGIC_WEAKENED.name(),
-            PositionMonitorLogicStatusEnum.PLAN_INVALIDATED.name(),
-            PositionMonitorLogicStatusEnum.HIGH_RISK.name());
-    private static final Set<String> RISK_LEVELS = Set.of("LOW", "MEDIUM", "HIGH");
+            PositionMonitorConclusionEnum.LOGIC_WEAKENED.name(),
+            PositionMonitorConclusionEnum.PLAN_INVALIDATED.name(),
+            PositionMonitorConclusionEnum.NEAR_STOP_LOSS.name(),
+            PositionMonitorConclusionEnum.HIGH_RISK_OBSERVATION.name(),
+            PositionMonitorConclusionEnum.WAIT_USER_CONFIRM_CLOSE.name());
+    private static final Set<String> RISK_LEVELS = Set.of("LOW", "MEDIUM", "HIGH", "EXTREME");
 
     private final OpportunityLogMapper opportunityLogMapper;
     private final PositionMonitorLogMapper positionMonitorLogMapper;
@@ -189,7 +195,7 @@ public class MessagePushReadService {
                 positionId,
                 positionSymbol,
                 position.getSide(),
-                normalize(originalLog.getLogicStatus()),
+                normalize(originalLog.getMonitorConclusion()),
                 originalLog.getCurrentPrice(),
                 null,
                 null,
@@ -211,7 +217,7 @@ public class MessagePushReadService {
         PushDetailDTO.CurrentRecheck current = new PushDetailDTO.CurrentRecheck(
                 id(latest.getLogId()),
                 "POSITION_MONITOR",
-                normalize(latest.getLogicStatus()),
+                normalize(latest.getMonitorConclusion()),
                 latest.getCurrentPrice(),
                 null,
                 null,
@@ -269,7 +275,7 @@ public class MessagePushReadService {
                         new MessageListDTO.SourceIdentity(
                                 "POSITION_RISK", messageId, row.getAnalysisId(), positionId),
                         normalizeMessageId(position.getAssetSymbol()),
-                        normalize(row.getLogicStatus()),
+                        normalize(row.getMonitorConclusion()),
                         row.getCreatedAt()),
                 null);
     }
@@ -516,7 +522,7 @@ public class MessagePushReadService {
         if (normalizeMessageId(position.getAssetSymbol()) == null) {
             missing.add("position.symbol");
         }
-        String originalLogic = normalize(original.getLogicStatus());
+        String originalLogic = normalize(original.getMonitorConclusion());
         if (originalLogic == null) {
             missing.add("originalSnapshot.status");
         } else if (!RISK_LOGIC_STATUSES.contains(originalLogic)) {
@@ -573,16 +579,60 @@ public class MessagePushReadService {
         } else if (!positive(row.getCurrentPrice())) {
             return "POSITION_MONITOR_PRICE_INVALID";
         }
+        if (normalizeMessageId(row.getMarkPriceSource()) == null) {
+            missing.add(fieldPrefix + ".markPriceSource");
+        }
 
-        String logicStatus = normalize(row.getLogicStatus());
-        if (logicStatus == null) {
+        String entryLogicStatus = normalize(row.getEntryLogicStatus());
+        if (entryLogicStatus == null) {
+            missing.add(fieldPrefix + ".entryLogicStatus");
+        } else {
+            try {
+                PositionEntryLogicStatusEnum.valueOf(entryLogicStatus);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_ENTRY_LOGIC_STATUS_INVALID";
+            }
+        }
+
+        String monitorConclusion = normalize(row.getMonitorConclusion());
+        PositionMonitorConclusionEnum monitorConclusionValue = null;
+        if (monitorConclusion == null) {
             missing.add(fieldPrefix + ".status");
         } else {
             try {
-                PositionMonitorLogicStatusEnum.valueOf(logicStatus);
+                monitorConclusionValue = PositionMonitorConclusionEnum.valueOf(monitorConclusion);
             } catch (IllegalArgumentException ex) {
-                return "POSITION_MONITOR_LOGIC_STATUS_INVALID";
+                return "POSITION_MONITOR_CONCLUSION_INVALID";
             }
+        }
+
+        String reversalStatus = normalize(row.getReversalStatus());
+        if (reversalStatus == null) {
+            missing.add(fieldPrefix + ".reversalStatus");
+        } else {
+            try {
+                PositionReversalStatusEnum.valueOf(reversalStatus);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_REVERSAL_STATUS_INVALID";
+            }
+        }
+
+        String riskChangeReason = normalize(row.getRiskChangeReason());
+        if (riskChangeReason == null) {
+            missing.add(fieldPrefix + ".riskChangeReason");
+        } else {
+            try {
+                PositionRiskChangeReasonEnum.valueOf(riskChangeReason);
+            } catch (IllegalArgumentException ex) {
+                return "POSITION_RISK_CHANGE_REASON_INVALID";
+            }
+        }
+
+        String sourceStatus = normalize(row.getMonitorSourceStatus());
+        if (!PositionMonitorSourceStatusEnum.VERIFIED.name().equals(sourceStatus)
+                || row.getObservedAt() == null || row.getFreshUntil() == null
+                || now == null || now.isBefore(row.getObservedAt()) || !now.isBefore(row.getFreshUntil())) {
+            return "POSITION_MONITOR_SOURCE_UNTRUSTED";
         }
 
         String riskLevel = normalize(row.getRiskLevel());
@@ -596,12 +646,13 @@ public class MessagePushReadService {
         if (action == null) {
             missing.add(fieldPrefix + ".suggestedAction");
         } else {
+            PositionMonitorSuggestedActionEnum actionValue;
             try {
-                PositionMonitorSuggestedActionEnum.valueOf(action);
+                actionValue = PositionMonitorSuggestedActionEnum.valueOf(action);
             } catch (IllegalArgumentException ex) {
                 return "POSITION_MONITOR_ACTION_INVALID";
             }
-            if (logicStatus != null && !legalAction(logicStatus, action)) {
+            if (monitorConclusionValue != null && !actionValue.isAllowedFor(monitorConclusionValue)) {
                 return "POSITION_MONITOR_STATE_CONFLICT";
             }
         }
@@ -680,16 +731,6 @@ public class MessagePushReadService {
             missing.add("sourceIdentity.analysisId");
         }
         return null;
-    }
-
-    private static boolean legalAction(String logicStatus, String action) {
-        return switch (logicStatus) {
-            case "LOGIC_VALID" -> "HOLD".equals(action) || "MANUAL_REVIEW".equals(action);
-            case "LOGIC_WEAKENED" -> "MANUAL_REVIEW".equals(action) || "RECHECK_PLAN".equals(action);
-            case "PLAN_INVALIDATED" -> "RECHECK_PLAN".equals(action);
-            case "HIGH_RISK" -> "RISK_REVIEW".equals(action);
-            default -> false;
-        };
     }
 
     private record MonitorValidation(

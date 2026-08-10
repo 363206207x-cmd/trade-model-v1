@@ -495,9 +495,16 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setAnalysisId(analysisId);
         row.setExecutionPlanId(planId);
         row.setCurrentPrice(new BigDecimal("100"));
-        row.setLogicStatus("LOGIC_VALID");
+        row.setMarkPriceSource("CONTROLLED_POSTGRESQL_FIXTURE");
+        row.setEntryLogicStatus("STILL_VALID");
+        row.setMonitorConclusion("LOGIC_VALID");
+        row.setReversalStatus("NO_REVERSAL");
+        row.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         row.setRiskLevel("LOW");
-        row.setSuggestedAction("HOLD");
+        row.setSuggestedAction("CONTINUE_HOLD");
+        row.setMonitorSourceStatus("VERIFIED");
+        row.setObservedAt(AS_OF_UTC.minusMinutes(1));
+        row.setFreshUntil(AS_OF_UTC.plusMinutes(5));
         row.setReason("controlled historical review only");
         row.setTraceId(traceId);
         row.setCreatedAt(AS_OF_UTC);
