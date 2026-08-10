@@ -8,30 +8,36 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: P2 Position and Position Monitoring Authorization
-Product Phase Status: AUTHORIZED_PENDING_MERGED_MAIN
-Current Work Package: Record the independent bounded P2 Position Monitoring backend authorization and machine-readable implementation handoff; no backend implementation is included
-Next Business Phase: P2 Position Monitoring Backend Implementation
-Next Business Phase Allowed: NO on this candidate branch; YES only after this authorization is independently reviewed, merged, and validated on clean/synced main
+Product Phase: P2 Position and Position Monitoring
+Product Phase Status: FUNCTIONAL_UNVALIDATED
+Current Work Package: Close the acceptance status for the merged P2 Position Monitoring backend implementation; this package changes status documentation only
+Next Business Phase: P2 Frontend Real Data Integration and Scenario Validation
+Next Business Phase Allowed: NO on this candidate branch; YES only after this acceptance closure is independently reviewed, merged, and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## Product P2 Authorization Candidate
+## Product P2 Backend Acceptance Closure Candidate
 
-Product P1B is `COMPLETE` on merged main. The independent bounded Product P2
-authorization is recorded by
-`docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md`. It permits only
-Position Monitor backend contract completion, schema/API changes required by
-that exact contract, per-position risk, monitor source trust/freshness,
-explicit state semantics, and tests after merged-main effectivity.
+`P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION` is `COMPLETE` and effective on
+merged main through PR #1169 / merge commit
+`0aa67b5631a5450b215d6ce6a89474c687f68e70`. The merged implementation and
+`docs/P2_POSITION_MONITORING_BACKEND_CAPABILITY_AUDIT.md` establish Schema V10,
+independent entry-logic / conclusion / reversal / risk-reason semantics,
+per-position risk, separate risk trend, verified-and-fresh monitor trust,
+trusted provider consumption, explicit missing-data behavior, Dashboard Home
+projection, and PostgreSQL migration validation.
 
-The candidate branch does not make implementation permission effective. The
-runtime gate must continue to block P2 implementation before merge and must
-allow only `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION` after clean/synced
-merged-main validation. Auto trading, auto close, auto reverse, Mobile, Figma,
-Three AI, and unrelated expansion remain blocked.
+This docs-only candidate records that backend subpackage result in
+`docs/P2_POSITION_MONITORING_BACKEND_ACCEPTANCE_CLOSURE.md`. It does not make
+the whole Product P2 package complete. Product P2 stays at
+`FUNCTIONAL_UNVALIDATED` until frontend real-data integration, real and
+historical monitoring scenarios, UI
+acceptance, target-device validation, and the later required delivery evidence
+are complete. The next package must not start before this acceptance closure is
+reviewed and effective on clean/synced merged main. Auto trading, auto close,
+auto reverse, Mobile, Figma, Three AI, and unrelated expansion remain blocked.
 
 ---
 
