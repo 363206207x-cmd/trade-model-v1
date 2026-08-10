@@ -46,6 +46,9 @@ SCENARIOS = {
     "plan-missing",
     "position-monitored",
     "position-waiting",
+    "position-high-stable",
+    "position-risk-escalated",
+    "position-stale",
     "multi-position",
     "placeholder",
     "home-failure",
@@ -352,17 +355,18 @@ def base_home(selected_symbol: str) -> dict[str, object]:
     }
 
 
-def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001) -> dict[str, object]:
+def monitored_position(
+    symbol: str,
+    with_monitor: bool,
+    position_id: int = 9001,
+    risk_level: str = "MEDIUM",
+    risk_trend: str = "STABLE",
+) -> dict[str, object]:
     position = {
         "positionId": position_id,
         "symbol": symbol,
         "direction": "LONG",
-        "directionLabel": "做多持仓",
         "entryPrice": "63000.00",
-        "currentPrice": "64218.40",
-        "floatingPnl": "1218.40",
-        "pnlPct": "1.93",
-        "accountImpactPct": "0.42",
         "leverage": "2",
         "positionSize": "1",
         "positionStatus": "OPEN",
@@ -377,20 +381,38 @@ def monitored_position(symbol: str, with_monitor: bool, position_id: int = 9001)
         "moduleState": "READY" if with_monitor else "PARTIAL",
     }
     if with_monitor:
+        risk_escalated = risk_trend in {"INCREASED", "SHARPLY_INCREASED"}
+        data_state = "RISK_ESCALATED" if risk_escalated else "OPEN_MONITORING"
         position.update({
-            "monitorConclusion": "LOGIC_VALID",
-            "entryLogicStatus": "LOGIC_VALID",
-            "entryLogicStatusLabel": "入场逻辑仍成立",
-            "directionSupportStatus": "SUPPORTED",
-            "directionSupportStatusLabel": "当前方向仍获支持",
-            "reversalStatus": "NO_REVERSAL_SIGNAL",
-            "reversalStatusLabel": "暂无反转信号",
-            "riskLevel": "MEDIUM",
-            "riskLevelLabel": "中",
-            "suggestedManualAction": "HOLD",
-            "suggestedManualActionText": "人工继续观察",
-            "lastMonitorAt": "2026-07-13T11:58:00",
-            "nextMonitorAt": None,
+            "markPrice": "64218.40",
+            "markPriceFresh": True,
+            "pnlAmount": "1218.40",
+            "pnlPercent": "1.93",
+            "monitorConclusion": "HIGH_RISK_OBSERVATION" if risk_escalated else "LOGIC_VALID",
+            "entryLogicStatus": "STILL_VALID",
+            "reversalStatus": "NO_REVERSAL",
+            "riskLevel": risk_level,
+            "riskTrend": risk_trend,
+            "riskReason": "OPPOSING_EVIDENCE_INCREASED" if risk_escalated else "NO_CLEAR_RISK_FACTOR",
+            "suggestedAction": "TIGHTEN_STOP" if risk_escalated else "CONTINUE_HOLD",
+            "lastMonitorTime": "2026-07-13T11:58:00",
+            "dataState": data_state,
+        })
+    else:
+        position.update({
+            "markPrice": None,
+            "markPriceFresh": False,
+            "pnlAmount": None,
+            "pnlPercent": None,
+            "monitorConclusion": None,
+            "entryLogicStatus": None,
+            "reversalStatus": None,
+            "riskLevel": None,
+            "riskTrend": None,
+            "riskReason": None,
+            "suggestedAction": None,
+            "lastMonitorTime": None,
+            "dataState": "WAITING_MONITOR_DATA",
         })
     return position
 
@@ -703,18 +725,41 @@ def scenario_home(
             "positionMonitor": None,
         }
 
-    elif scenario in {"position-monitored", "position-waiting"}:
-        position = monitored_position(selected_symbol, scenario == "position-monitored")
+    elif scenario in {
+        "position-monitored",
+        "position-waiting",
+        "position-high-stable",
+        "position-risk-escalated",
+        "position-stale",
+    }:
+        if scenario == "position-waiting":
+            position = monitored_position(selected_symbol, False)
+        elif scenario == "position-risk-escalated":
+            position = monitored_position(
+                selected_symbol,
+                True,
+                risk_level="HIGH",
+                risk_trend="INCREASED",
+            )
+        else:
+            risk_level = "HIGH" if scenario == "position-high-stable" else "MEDIUM"
+            position = monitored_position(selected_symbol, True, risk_level=risk_level)
+            if scenario == "position-stale":
+                position["markPriceFresh"] = False
         home["positions"] = [position]
         home["pushInbox"]["hasOpenPosition"] = True
-        home["pushInbox"]["counts"]["positionRisk"] = 1 if scenario == "position-monitored" else 0
+        home["pushInbox"]["counts"]["positionRisk"] = 1 if scenario != "position-waiting" else 0
         home["selectedPositionId"] = None
         home["positionSelectionStatus"] = "POSITION_SELECTION_REQUIRED"
         home["matchingPositionCount"] = 1
 
     elif scenario == "multi-position":
-        position_a = monitored_position(selected_symbol, True, 9101)
-        position_b = monitored_position(selected_symbol, True, 9102)
+        position_a = monitored_position(
+            "BTC/USDT", True, 9101, risk_level="HIGH", risk_trend="STABLE"
+        )
+        position_b = monitored_position(
+            "ETH/USDT", True, 9102, risk_level="MEDIUM", risk_trend="INCREASED"
+        )
         position_a.update({"entryPrice": "61000.00", "sourceExecutionPlanId": "plan-POSITION-A"})
         position_b.update({"entryPrice": "62000.00", "sourceExecutionPlanId": "plan-POSITION-B"})
         home["positions"] = [position_a, position_b]
