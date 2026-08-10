@@ -5,7 +5,7 @@
 - Package: `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION`
 - Candidate branch: `codex/p2-position-monitoring-backend-contract`
 - Authorization baseline: `0e133093` (`#1168` merged)
-- Result: `AUDIT_REMEDIATION_COMPLETE_PENDING_CI_REVIEW`
+- Result: `AUDIT_REMEDIATION_COMPLETE`
 - Mainline completion: `NO` (only merged `main` can complete P2)
 
 ## Source Chain
@@ -141,14 +141,16 @@ and data state. If trust fails, those result fields are `null` and the state is
 | Full Maven suite | `4333 passed, 0 failed, 0 errors, 14 skipped` |
 | JDK 17 CI-equivalent `-Pci verify` | `PASS` |
 | H2 schema and mapper constraint integration | `PASS` |
-| PostgreSQL Testcontainers migration smoke | `TAGGED_FOR_CI`; local Docker unavailable |
+| PR CI quality gate | `735 passed, 0 failed, 0 errors, 0 skipped` (run `31359190007`) |
+| PostgreSQL 16 Testcontainers migration smoke | `PASS`: `1 passed, 0 skipped` in PR CI |
 | Product Source Gate | `PASS` |
-| Workflow contract | `PASS` |
+| Workflow contract | `PASS` (run `31359189984`) |
 | `git diff --check` | `PASS` |
 
-The local PostgreSQL smoke remains an environment skip, not a passing
-PostgreSQL execution. The test is part of the `core-regression` CI profile and
-must execute successfully on the Docker-enabled PR runner before merge.
+The local PostgreSQL smoke was skipped because Docker is unavailable. The
+Docker-enabled GitHub runner executed it against PostgreSQL 16 with no skip,
+proving the V8 legacy setup, V9/V10 Flyway upgrade, historical backfill, new-row
+defaults, and resulting constraints on the PR merge commit.
 
 ## Completion Gates
 
@@ -171,7 +173,7 @@ must execute successfully on the Docker-enabled PR runner before merge.
 
 ## Review Boundary
 
-The remediated candidate is ready for PR CI and Product Owner / code review.
-Merge recommendation remains conditional on a successful Docker-backed
-PostgreSQL V10 migration run. P2 remains incomplete until the reviewed commit
-is merged to `main` and merged-main validation passes.
+The remediated candidate has passed local validation and both required PR
+workflows. Merge recommendation: `APPROVE`, subject to normal Product Owner/code
+review. P2 remains incomplete until the reviewed commit is merged to `main` and
+merged-main validation passes.
