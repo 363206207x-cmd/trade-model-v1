@@ -44,6 +44,8 @@ import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
+import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
+import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
 import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
@@ -260,6 +262,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setAssets(assets);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         home.setPositions(positionRowsResult.topRows());
+        home.setPositionMonitoringState(positionRowsResult.monitoringState());
         home.setSelectedSymbol(normalizedSelected);
         PositionSelectionResult positionSelection = resolveSelectedPosition(positionRowsResult.allRows(), selectedPositionId);
         DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
@@ -923,23 +926,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private PositionRowsResult buildPositions(Long userId, List<UserPositionVO> positions) {
         List<DashboardHomeVO.PositionVO> rows = new ArrayList<>();
         Map<Long, PositionPlanSourceResolver.Resolution> trustedSources = new LinkedHashMap<>();
+        LocalDateTime asOf = LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC);
         for (UserPositionVO position : positions == null ? List.<UserPositionVO>of() : positions) {
             if (!isActiveManualPosition(position)) {
                 continue;
             }
             MonitorReadResult monitorRead = latestPositionMonitorLog(userId, position.getId());
             PositionMonitorLogDTO latestMonitorLog = monitorRead.log();
+            boolean trustedMonitor = trustedMonitor(latestMonitorLog, asOf);
             DashboardHomeVO.PositionVO row = new DashboardHomeVO.PositionVO();
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
             row.setDirection(trimToNull(position.getSide()));
             row.setDirectionLabel(positionDirectionLabel(position.getSide()));
             row.setEntryPrice(position.getEntryPrice());
-            BigDecimal currentPrice = latestMonitorLog != null && positive(latestMonitorLog.getCurrentPrice())
-                    ? latestMonitorLog.getCurrentPrice()
-                    : safeCurrentPrice(position.getAssetSymbol());
-            row.setCurrentPrice(currentPrice);
-            applyPositionPnl(row, position, currentPrice);
             row.setLeverage(position.getLeverage());
             row.setPositionSize(position.getQuantity());
             row.setPositionStatus(trimToNull(position.getStatus()));
@@ -948,24 +948,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setUserTakeProfit(position.getTakeProfit());
             row.setSystemSuggestedStopLoss(null);
             row.setSystemSuggestedTakeProfit(null);
-            row.setMonitorConclusion(latestMonitorLog != null
-                    ? positionLogicStatusLabel(latestMonitorLog.getLogicStatus()) : null);
-            row.setEntryLogicStatus(latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null);
-            row.setEntryLogicStatusLabel(positionLogicStatusLabel(row.getEntryLogicStatus()));
-            row.setDirectionSupportStatus(directionSupportStatus(latestMonitorLog));
-            row.setDirectionSupportStatusLabel(directionSupportStatusLabel(row.getDirectionSupportStatus()));
-            row.setReversalStatus(reversalStatus(latestMonitorLog));
-            row.setReversalStatusLabel(reversalStatusLabel(row.getReversalStatus()));
-            row.setRiskLevel(latestMonitorLog != null ? trimToNull(latestMonitorLog.getRiskLevel()) : null);
-            row.setRiskLevelLabel(positionRiskLevelLabel(row.getRiskLevel()));
-            row.setSuggestedManualAction(latestMonitorLog != null ? trimToNull(latestMonitorLog.getSuggestedAction()) : null);
-            row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedManualAction(), latestMonitorLog));
             row.setUpdatedAt(position.getUpdatedAt());
             row.setOpenedAt(position.getOpenedAt());
-            row.setLastMonitorAt(latestMonitorLog != null ? latestMonitorLog.getCreatedAt() : null);
             row.setNextMonitorAt(null);
             row.setSourceRefId(trimToNull(position.getSourceRefId()));
-            if (latestMonitorLog != null
+            if (trustedMonitor) {
+                applyTrustedMonitor(row, position, latestMonitorLog);
+            } else {
+                applyWaitingMonitor(row, latestMonitorLog);
+            }
+            if (trustedMonitor
                     && positionPlanSourceResolver != null
                     && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
                 PositionPlanSourceResolver.Resolution trustedSource = positionPlanSourceResolver
@@ -979,14 +971,92 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     trustedSources.put(position.getId(), trustedSource);
                 }
             }
-            row.setWarningState(positionWarningState(latestMonitorLog, monitorRead.failed()));
-            row.setModuleState(positionModuleState(row, latestMonitorLog, monitorRead.failed()));
+            row.setWarningState(positionWarningState(row, monitorRead.failed()));
+            row.setModuleState(positionModuleState(row, trustedMonitor, monitorRead.failed()));
             rows.add(row);
         }
         rows.sort(positionPriorityComparator());
         List<DashboardHomeVO.PositionVO> allRows = List.copyOf(rows);
         List<DashboardHomeVO.PositionVO> topRows = allRows.stream().limit(3).toList();
-        return new PositionRowsResult(allRows, topRows, Map.copyOf(trustedSources));
+        return new PositionRowsResult(allRows, topRows, Map.copyOf(trustedSources), positionMonitoringState(allRows));
+    }
+
+    private boolean trustedMonitor(PositionMonitorLogDTO monitor, LocalDateTime asOf) {
+        return monitor != null
+                && monitor.isTrustedAndFreshAt(asOf)
+                && positive(monitor.getCurrentPrice())
+                && hasText(monitor.getMarkPriceSource())
+                && recognizedEntryLogicStatus(monitor.getEntryLogicStatus())
+                && recognizedMonitorConclusion(monitor.getMonitorConclusion())
+                && recognizedReversalStatus(monitor.getReversalStatus())
+                && recognizedRiskReason(monitor.getRiskChangeReason())
+                && recognizedPositionRisk(monitor.getRiskLevel())
+                && recognizedRiskTrend(monitor.getRiskTrend())
+                && recognizedSuggestedAction(monitor.getSuggestedAction())
+                && recognizedMonitorActionPair(monitor);
+    }
+
+    private void applyTrustedMonitor(DashboardHomeVO.PositionVO row,
+                                     UserPositionVO position,
+                                     PositionMonitorLogDTO monitor) {
+        BigDecimal markPrice = monitor.getCurrentPrice();
+        row.setMarkPrice(markPrice);
+        row.setCurrentPrice(markPrice);
+        row.setMarkPriceSource(trimToNull(monitor.getMarkPriceSource()));
+        row.setMarkPriceObservedAt(monitor.getObservedAt());
+        row.setMarkPriceFresh(true);
+        applyPositionPnl(row, position, markPrice);
+        row.setMonitorConclusion(trimToNull(monitor.getMonitorConclusion()));
+        row.setMonitorConclusionLabel(monitorConclusionLabel(row.getMonitorConclusion()));
+        row.setEntryLogicStatus(trimToNull(monitor.getEntryLogicStatus()));
+        row.setEntryLogicStatusLabel(entryLogicStatusLabel(row.getEntryLogicStatus()));
+        row.setDirectionSupportStatus(directionSupportStatus(row.getEntryLogicStatus()));
+        row.setDirectionSupportStatusLabel(directionSupportStatusLabel(row.getDirectionSupportStatus()));
+        row.setReversalStatus(trimToNull(monitor.getReversalStatus()));
+        row.setReversalStatusLabel(reversalStatusLabel(row.getReversalStatus()));
+        row.setRiskLevel(trimToNull(monitor.getRiskLevel()));
+        row.setRiskLevelLabel(positionRiskLevelLabel(row.getRiskLevel()));
+        row.setRiskTrend(trimToNull(monitor.getRiskTrend()));
+        row.setRiskReason(trimToNull(monitor.getRiskChangeReason()));
+        row.setRiskReasonLabel(riskReasonLabel(row.getRiskReason()));
+        row.setSuggestedAction(trimToNull(monitor.getSuggestedAction()));
+        row.setSuggestedManualAction(row.getSuggestedAction());
+        row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedAction()));
+        row.setLastMonitorAt(monitor.getCreatedAt());
+        row.setLastMonitorTime(monitor.getCreatedAt());
+        row.setDataState(positionDataState(row));
+    }
+
+    private void applyWaitingMonitor(DashboardHomeVO.PositionVO row, PositionMonitorLogDTO monitor) {
+        row.setMarkPrice(null);
+        row.setCurrentPrice(null);
+        row.setMarkPriceSource(null);
+        row.setMarkPriceObservedAt(null);
+        row.setMarkPriceFresh(false);
+        row.setFloatingPnl(null);
+        row.setPnlPct(null);
+        row.setPnlAmount(null);
+        row.setPnlPercent(null);
+        row.setAccountImpactPct(null);
+        row.setMonitorConclusion(null);
+        row.setMonitorConclusionLabel(null);
+        row.setEntryLogicStatus(null);
+        row.setEntryLogicStatusLabel(null);
+        row.setDirectionSupportStatus(null);
+        row.setDirectionSupportStatusLabel(null);
+        row.setReversalStatus(null);
+        row.setReversalStatusLabel(null);
+        row.setRiskLevel(null);
+        row.setRiskLevelLabel(null);
+        row.setRiskTrend(null);
+        row.setRiskReason(null);
+        row.setRiskReasonLabel(null);
+        row.setSuggestedAction(null);
+        row.setSuggestedManualAction(null);
+        row.setSuggestedManualActionText(null);
+        row.setLastMonitorAt(null);
+        row.setLastMonitorTime(null);
+        row.setDataState("WAITING_MONITOR_DATA");
     }
 
     private boolean isManualPosition(UserPositionVO position) {
@@ -1038,19 +1108,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private String positionWarningState(PositionMonitorLogDTO monitor, boolean readFailed) {
+    private String positionWarningState(DashboardHomeVO.PositionVO row, boolean readFailed) {
         if (readFailed) return "ERROR";
-        if (monitor == null) return "MISSING";
-        String risk = upper(monitor.getRiskLevel());
-        String logic = upper(monitor.getLogicStatus());
-        if ("HIGH".equals(risk) || "EXTREME".equals(risk) || "HIGH_RISK".equals(logic)) return "HIGH_RISK";
-        if ("PLAN_INVALIDATED".equals(logic)) return "PLAN_INVALIDATED";
-        if ("LOGIC_WEAKENED".equals(logic)) return "WATCH";
+        if (row == null || "WAITING_MONITOR_DATA".equals(row.getDataState())) return "MISSING";
+        String risk = upper(row.getRiskLevel());
+        String conclusion = upper(row.getMonitorConclusion());
+        if ("HIGH".equals(risk) || "EXTREME".equals(risk)) return "HIGH_RISK";
+        if ("PLAN_INVALIDATED".equals(conclusion)
+                || "WAIT_USER_CONFIRM_CLOSE".equals(conclusion)) return "PLAN_INVALIDATED";
+        if ("LOGIC_WEAKENED".equals(conclusion) || "NEAR_STOP_LOSS".equals(conclusion)) return "WATCH";
         return "NONE";
     }
 
     private String positionModuleState(DashboardHomeVO.PositionVO row,
-                                       PositionMonitorLogDTO monitor,
+                                       boolean trustedMonitor,
                                        boolean readFailed) {
         if (readFailed) return "ERROR";
         if (row == null || row.getPositionId() == null || !hasText(row.getSymbol())
@@ -1058,20 +1129,47 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 || !positive(row.getPositionSize()) || !hasText(row.getPositionStatus())) {
             return "ERROR";
         }
-        if (monitor != null && (!recognizedPositionLogic(monitor.getLogicStatus())
-                || !recognizedPositionRisk(monitor.getRiskLevel()))) {
-            return "ERROR";
-        }
-        if (monitor == null || row.getLeverage() == null || row.getUserStopLoss() == null
+        if (!trustedMonitor || row.getLeverage() == null || row.getUserStopLoss() == null
                 || row.getUserTakeProfit() == null || row.getUpdatedAt() == null) {
             return "PARTIAL";
         }
         return "READY";
     }
 
-    private boolean recognizedPositionLogic(String logicStatus) {
-        return switch (upper(logicStatus)) {
-            case "LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "HIGH_RISK" -> true;
+    private boolean recognizedEntryLogicStatus(String status) {
+        return switch (upper(status)) {
+            case "STILL_VALID", "WEAKENED", "INVALIDATED" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedMonitorConclusion(String status) {
+        return switch (upper(status)) {
+            case "LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "NEAR_STOP_LOSS",
+                    "NEAR_TAKE_PROFIT", "HIGH_RISK_OBSERVATION", "WAIT_USER_CONFIRM_CLOSE" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedReversalStatus(String status) {
+        return switch (upper(status)) {
+            case "NO_REVERSAL", "WEAK_REVERSAL", "STRONG_REVERSAL" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedRiskReason(String status) {
+        return switch (upper(status)) {
+            case "NO_CLEAR_RISK_FACTOR", "OPPOSING_EVIDENCE_INCREASED", "STRUCTURE_CHANGED",
+                    "EVENT_IMPACT", "DATA_QUALITY_DEGRADED" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedSuggestedAction(String status) {
+        return switch (upper(status)) {
+            case "CONTINUE_HOLD", "NO_ADD_POSITION", "REDUCE_POSITION", "TIGHTEN_STOP", "MOVE_STOP",
+                    "PARTIAL_TAKE_PROFIT", "WAIT_CONFIRMATION", "RECORD_CLOSE_REVIEW" -> true;
             default -> false;
         };
     }
@@ -1083,17 +1181,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private BigDecimal safeCurrentPrice(String assetSymbol) {
-        String symbol = trimToNull(assetSymbol);
-        if (symbol == null || marketPriceSnapshotService == null) {
-            return null;
-        }
+    private boolean recognizedRiskTrend(String riskTrend) {
+        return switch (upper(riskTrend)) {
+            case "STABLE", "INCREASED", "SHARPLY_INCREASED" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean recognizedMonitorActionPair(PositionMonitorLogDTO monitor) {
         try {
-            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.peek(symbol,
-                    AssetPriority.P0_POSITION, Duration.ofSeconds(15), "dashboard-home-" + UUID.randomUUID());
-            return MarketPriceSnapshotPolicy.isFresh(result) ? result.payload().lastPrice() : null;
-        } catch (RuntimeException ignored) {
-            return null;
+            PositionMonitorConclusionEnum conclusion = PositionMonitorConclusionEnum.valueOf(
+                    upper(monitor.getMonitorConclusion()));
+            PositionMonitorSuggestedActionEnum action = PositionMonitorSuggestedActionEnum.valueOf(
+                    upper(monitor.getSuggestedAction()));
+            return action.isAllowedFor(conclusion);
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            return false;
         }
     }
 
@@ -1108,52 +1211,64 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 : currentPrice.subtract(position.getEntryPrice()).divide(position.getEntryPrice(), 8, RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100"));
         row.setPnlPct(pnlPct);
+        row.setPnlPercent(pnlPct);
         if (positive(position.getQuantity())) {
             BigDecimal unitPnl = "SHORT".equalsIgnoreCase(side)
                     ? position.getEntryPrice().subtract(currentPrice)
                     : currentPrice.subtract(position.getEntryPrice());
-            row.setFloatingPnl(unitPnl.multiply(position.getQuantity()));
-        }
-        if (positive(position.getLeverage())) {
-            row.setAccountImpactPct(pnlPct.multiply(position.getLeverage()));
+            BigDecimal pnlAmount = unitPnl.multiply(position.getQuantity());
+            row.setFloatingPnl(pnlAmount);
+            row.setPnlAmount(pnlAmount);
         }
     }
 
-    private String directionSupportStatus(PositionMonitorLogDTO latestMonitorLog) {
-        String logic = latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null;
-        return switch (logic == null ? "" : logic.toUpperCase(Locale.ROOT)) {
-            case "LOGIC_VALID" -> "SUPPORTED";
-            case "LOGIC_WEAKENED" -> "WEAKENED";
-            case "PLAN_INVALIDATED" -> "NOT_SUPPORTED";
-            case "HIGH_RISK" -> "RISK_BLOCKED";
-            default -> "WAITING_SYNC";
+    private String directionSupportStatus(String entryLogicStatus) {
+        return switch (upper(entryLogicStatus)) {
+            case "STILL_VALID" -> "SUPPORTED";
+            case "WEAKENED" -> "WEAKENED";
+            case "INVALIDATED" -> "NOT_SUPPORTED";
+            default -> null;
         };
     }
 
-    private String reversalStatus(PositionMonitorLogDTO latestMonitorLog) {
-        String logic = latestMonitorLog != null ? trimToNull(latestMonitorLog.getLogicStatus()) : null;
-        if ("PLAN_INVALIDATED".equalsIgnoreCase(logic)) {
-            return "MANUAL_REVIEW_REQUIRED";
-        }
-        if ("HIGH_RISK".equalsIgnoreCase(logic)) {
-            return "RISK_REVIEW";
-        }
-        return latestMonitorLog == null ? "WAITING_MONITOR" : "NO_REVERSAL_SIGNAL";
+    private String suggestedActionText(String suggestedAction) {
+        return switch (upper(suggestedAction)) {
+            case "CONTINUE_HOLD" -> "继续持有";
+            case "NO_ADD_POSITION" -> "暂不加仓";
+            case "REDUCE_POSITION" -> "降低仓位";
+            case "TIGHTEN_STOP" -> "收紧止损";
+            case "MOVE_STOP" -> "移动止损";
+            case "PARTIAL_TAKE_PROFIT" -> "分批止盈";
+            case "WAIT_CONFIRMATION" -> "等待人工确认";
+            case "RECORD_CLOSE_REVIEW" -> "记录平仓并进入复盘";
+            default -> null;
+        };
     }
 
-    private String suggestedActionText(String suggestedAction, PositionMonitorLogDTO latestMonitorLog) {
-        if (latestMonitorLog == null) {
-            return "等待监控";
+    private String positionDataState(DashboardHomeVO.PositionVO row) {
+        String conclusion = upper(row.getMonitorConclusion());
+        if ("PLAN_INVALIDATED".equals(conclusion)) {
+            return "PLAN_INVALIDATED";
         }
-        return switch (suggestedAction == null ? "" : suggestedAction.toUpperCase(Locale.ROOT)) {
-            case "HOLD" -> "人工继续观察";
-            case "MANUAL_REVIEW" -> "人工复核";
-            case "TIGHTEN_STOP_REVIEW" -> "复核是否收紧止损";
-            case "REDUCE_POSITION_REVIEW" -> "复核是否降低仓位";
-            case "RECHECK_PLAN" -> "复核执行计划";
-            case "RISK_REVIEW" -> "风险复核";
-            default -> "人工复核";
-        };
+        if ("INCREASED".equals(upper(row.getRiskTrend()))
+                || "SHARPLY_INCREASED".equals(upper(row.getRiskTrend()))) {
+            return "RISK_ESCALATED";
+        }
+        return "OPEN_MONITORING";
+    }
+
+    private String positionMonitoringState(List<DashboardHomeVO.PositionVO> rows) {
+        if (rows == null || rows.isEmpty()) return "NO_POSITION";
+        if (rows.stream().anyMatch(row -> "PLAN_INVALIDATED".equals(row.getDataState()))) {
+            return "PLAN_INVALIDATED";
+        }
+        if (rows.stream().anyMatch(row -> "RISK_ESCALATED".equals(row.getDataState()))) {
+            return "RISK_ESCALATED";
+        }
+        if (rows.stream().anyMatch(row -> "WAITING_MONITOR_DATA".equals(row.getDataState()))) {
+            return "WAITING_MONITOR_DATA";
+        }
+        return "OPEN_MONITORING";
     }
 
     private ResolvedOriginalPlan resolveOriginalPlan(DashboardHomeVO.PositionVO position,
@@ -2300,14 +2415,25 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private String positionLogicStatusLabel(String status) {
+    private String entryLogicStatusLabel(String status) {
         return switch (upper(status)) {
-            case "LOGIC_VALID" -> "入场逻辑仍成立";
-            case "LOGIC_WEAKENED" -> "入场逻辑减弱";
-            case "PLAN_INVALIDATED" -> "原计划已失效";
-            case "HIGH_RISK" -> "风险升高";
-            case "WAITING_MONITOR" -> "等待首次监控";
-            default -> "未知状态";
+            case "STILL_VALID" -> "仍成立";
+            case "WEAKENED" -> "弱化";
+            case "INVALIDATED" -> "失效";
+            default -> null;
+        };
+    }
+
+    private String monitorConclusionLabel(String status) {
+        return switch (upper(status)) {
+            case "LOGIC_VALID" -> "逻辑仍成立";
+            case "LOGIC_WEAKENED" -> "逻辑弱化";
+            case "PLAN_INVALIDATED" -> "计划失效";
+            case "NEAR_STOP_LOSS" -> "接近止损";
+            case "NEAR_TAKE_PROFIT" -> "接近止盈";
+            case "HIGH_RISK_OBSERVATION" -> "高风险观察";
+            case "WAIT_USER_CONFIRM_CLOSE" -> "等待用户确认平仓";
+            default -> null;
         };
     }
 
@@ -2316,26 +2442,32 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "SUPPORTED" -> "当前方向仍获支持";
             case "WEAKENED" -> "方向支持减弱";
             case "NOT_SUPPORTED" -> "当前方向不再获支持";
-            case "RISK_BLOCKED" -> "方向结论受风险阻断";
-            case "WAITING_SYNC", "WAITING_MONITOR" -> "等待首次监控";
-            default -> "未知状态";
+            default -> null;
         };
     }
 
     private String reversalStatusLabel(String status) {
         return switch (upper(status)) {
-            case "NO_REVERSAL_SIGNAL" -> "暂无反转信号";
-            case "MANUAL_REVIEW_REQUIRED" -> "需人工复核反转风险";
-            case "RISK_REVIEW" -> "需复核高风险变化";
-            case "WAITING_MONITOR" -> "等待首次监控";
-            default -> "未知状态";
+            case "NO_REVERSAL" -> "无明显反转";
+            case "WEAK_REVERSAL" -> "弱反转";
+            case "STRONG_REVERSAL" -> "强反转";
+            default -> null;
         };
     }
 
     private String positionRiskLevelLabel(String status) {
-        if ("WAITING_MONITOR".equals(upper(status))) return "等待首次监控";
-        String label = riskLabel(status);
-        return label != null ? label : "未知状态";
+        return riskLabel(status);
+    }
+
+    private String riskReasonLabel(String status) {
+        return switch (upper(status)) {
+            case "NO_CLEAR_RISK_FACTOR" -> "暂无明显风险因素";
+            case "OPPOSING_EVIDENCE_INCREASED" -> "反向证据增加";
+            case "STRUCTURE_CHANGED" -> "结构变化";
+            case "EVENT_IMPACT" -> "事件冲击";
+            case "DATA_QUALITY_DEGRADED" -> "数据质量下降";
+            default -> null;
+        };
     }
 
     private AiRoleStats aiRoleStats(AiRoleResultsPayload payload) {
@@ -2625,7 +2757,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private record PositionRowsResult(
             List<DashboardHomeVO.PositionVO> allRows,
             List<DashboardHomeVO.PositionVO> topRows,
-            Map<Long, PositionPlanSourceResolver.Resolution> trustedSources) {
+            Map<Long, PositionPlanSourceResolver.Resolution> trustedSources,
+            String monitoringState) {
     }
 
     private enum ExactPlanIdentityState {

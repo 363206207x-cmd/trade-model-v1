@@ -43,6 +43,7 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
+import org.junit.jupiter.api.Tag;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
@@ -287,7 +288,8 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getLeverage()).isNotEqualByComparingTo("20");
         assertThat(homePosition.getCurrentPrice()).isNull();
         assertThat(homePosition.getFloatingPnl()).isNull();
-        assertThat(homePosition.getMonitorConclusion()).isEqualTo("入场逻辑仍成立");
+        assertThat(homePosition.getMonitorConclusion()).isNull();
+        assertThat(homePosition.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
         assertThat(home.getExecutionSuggestion().getPositionMode()).isFalse();
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("RISK_BLOCKED");
         assertThat(home.getExecutionSuggestion().getPositionMonitor()).isNull();
@@ -499,7 +501,7 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(9L);
         monitorLog.setCurrentPrice(new BigDecimal("63500"));
-        monitorLog.setLogicStatus("LOGIC_VALID");
+        completeTrustedMonitor(monitorLog, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 9L, 1)).thenReturn(List.of(monitorLog));
@@ -509,10 +511,151 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositions()).hasSize(1);
         DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
         assertThat(homePosition.getCurrentPrice()).isEqualByComparingTo("63500");
-        assertThat(homePosition.getMonitorConclusion()).isEqualTo("入场逻辑仍成立");
+        assertThat(homePosition.getMarkPrice()).isEqualByComparingTo("63500");
+        assertThat(homePosition.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(homePosition.getMonitorConclusionLabel()).isEqualTo("逻辑仍成立");
         assertThat(homePosition.getFloatingPnl()).isEqualByComparingTo("300.0");
         assertThat(homePosition.getPnlPct()).isEqualByComparingTo("2.41935500");
-        assertThat(homePosition.getAccountImpactPct()).isEqualByComparingTo("4.83871000");
+        assertThat(homePosition.getPnlAmount()).isEqualByComparingTo("300.0");
+        assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("2.41935500");
+        assertThat(homePosition.getAccountImpactPct()).isNull();
+    }
+
+    @Test
+    void pendingMonitorSourceFailsClosedWithoutLeakingMonitorResults() {
+        UserPositionVO position = activeManualPosition(901L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(new BigDecimal("2"));
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("110"));
+        completeTrustedMonitor(monitor, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        monitor.setMonitorSourceStatus("PENDING_VERIFICATION");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO.PositionVO row = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertWaitingMonitorData(row);
+    }
+
+    @Test
+    void invalidMonitorSourceFailsClosedWithoutLeakingMonitorResults() {
+        UserPositionVO position = activeManualPosition(905L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("110"));
+        completeTrustedMonitor(monitor, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        monitor.setMonitorSourceStatus("INVALID");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO.PositionVO row = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertWaitingMonitorData(row);
+    }
+
+    @Test
+    void missingMarkPriceSourceFailsClosedWithoutUsingTheNumericPrice() {
+        UserPositionVO position = activeManualPosition(906L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("110"));
+        completeTrustedMonitor(monitor, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        monitor.setMarkPriceSource(null);
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO.PositionVO row = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertWaitingMonitorData(row);
+    }
+
+    @Test
+    void expiredMonitorSourceFailsClosedWithoutUsingStaleMarkPrice() {
+        UserPositionVO position = activeManualPosition(902L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("111"));
+        completeTrustedMonitor(monitor, "HIGH_RISK_OBSERVATION", "HIGH", "REDUCE_POSITION");
+        monitor.setObservedAt(LocalDateTime.of(2026, 7, 1, 11, 0));
+        monitor.setFreshUntil(LocalDateTime.of(2026, 7, 1, 11, 59));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+
+        assertThat(home.getPositionMonitoringState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertWaitingMonitorData(home.getPositions().get(0));
+    }
+
+    @Test
+    void illegalMonitorConclusionActionPairFailsClosedOnHome() {
+        UserPositionVO position = activeManualPosition(904L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(BigDecimal.ONE);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("105"));
+        completeTrustedMonitor(monitor, "LOGIC_VALID", "LOW", "REDUCE_POSITION");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+
+        assertThat(home.getPositionMonitoringState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertWaitingMonitorData(home.getPositions().get(0));
+    }
+
+    @Test
+    void dashboardHomeJsonKeepsFrozenPositionFieldsIndependent() throws Exception {
+        UserPositionVO position = activeManualPosition(903L, "BTCUSDT", null);
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setQuantity(new BigDecimal("2"));
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("105"));
+        completeTrustedMonitor(monitor, "LOGIC_WEAKENED", "MEDIUM", "NO_ADD_POSITION");
+        monitor.setEntryLogicStatus("WEAKENED");
+        monitor.setRiskChangeReason("OPPOSING_EVIDENCE_INCREASED");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+        AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
+        when(resolver.requireCurrentUserId()).thenReturn(USER_ID);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(service, resolver)).build();
+
+        mockMvc.perform(get("/api/dashboard/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.positions[0].symbol").value("BTC/USDT"))
+                .andExpect(jsonPath("$.data.positions[0].direction").value("LONG"))
+                .andExpect(jsonPath("$.data.positions[0].entryPrice").value(100))
+                .andExpect(jsonPath("$.data.positions[0].markPrice").value(105))
+                .andExpect(jsonPath("$.data.positions[0].markPriceSource").value("TEST"))
+                .andExpect(jsonPath("$.data.positions[0].markPriceFresh").value(true))
+                .andExpect(jsonPath("$.data.positions[0].pnlAmount").value(10))
+                .andExpect(jsonPath("$.data.positions[0].pnlPercent").value(5.0))
+                .andExpect(jsonPath("$.data.positions[0].riskLevel").value("MEDIUM"))
+                .andExpect(jsonPath("$.data.positions[0].riskTrend").value("STABLE"))
+                .andExpect(jsonPath("$.data.positions[0].monitorConclusion").value("LOGIC_WEAKENED"))
+                .andExpect(jsonPath("$.data.positions[0].entryLogicStatus").value("WEAKENED"))
+                .andExpect(jsonPath("$.data.positions[0].reversalStatus").value("NO_REVERSAL"))
+                .andExpect(jsonPath("$.data.positions[0].riskReason")
+                        .value("OPPOSING_EVIDENCE_INCREASED"))
+                .andExpect(jsonPath("$.data.positions[0].suggestedAction").value("NO_ADD_POSITION"))
+                .andExpect(jsonPath("$.data.positions[0].lastMonitorTime").exists())
+                .andExpect(jsonPath("$.data.positions[0].dataState").value("OPEN_MONITORING"));
     }
 
     @Test
@@ -532,9 +675,7 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(19L);
         monitorLog.setCurrentPrice(new BigDecimal("105"));
-        monitorLog.setLogicStatus("LOGIC_VALID");
-        monitorLog.setRiskLevel("LOW");
-        monitorLog.setSuggestedAction("TIGHTEN_STOP_REVIEW");
+        completeTrustedMonitor(monitorLog, "NEAR_STOP_LOSS", "LOW", "TIGHTEN_STOP");
         monitorLog.setCreatedAt(LocalDateTime.of(2026, 7, 13, 10, 5));
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
@@ -544,15 +685,15 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getPositions()).hasSize(1);
         DashboardHomeVO.PositionVO row = home.getPositions().get(0);
-        assertThat(row.getEntryLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(row.getEntryLogicStatus()).isEqualTo("STILL_VALID");
         assertThat(row.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
-        assertThat(row.getReversalStatus()).isEqualTo("NO_REVERSAL_SIGNAL");
+        assertThat(row.getReversalStatus()).isEqualTo("NO_REVERSAL");
         assertThat(row.getRiskLevel()).isEqualTo("LOW");
-        assertThat(row.getSuggestedManualAction()).isEqualTo("TIGHTEN_STOP_REVIEW");
-        assertThat(row.getSuggestedManualActionText()).isEqualTo("复核是否收紧止损");
-        assertThat(row.getEntryLogicStatusLabel()).isEqualTo("入场逻辑仍成立");
+        assertThat(row.getSuggestedManualAction()).isEqualTo("TIGHTEN_STOP");
+        assertThat(row.getSuggestedManualActionText()).isEqualTo("收紧止损");
+        assertThat(row.getEntryLogicStatusLabel()).isEqualTo("仍成立");
         assertThat(row.getDirectionSupportStatusLabel()).isEqualTo("当前方向仍获支持");
-        assertThat(row.getReversalStatusLabel()).isEqualTo("暂无反转信号");
+        assertThat(row.getReversalStatusLabel()).isEqualTo("无明显反转");
         assertThat(row.getUserStopLoss()).isEqualByComparingTo("95");
         assertThat(row.getUserTakeProfit()).isEqualByComparingTo("115");
         assertThat(row.getSystemSuggestedStopLoss()).isNull();
@@ -560,6 +701,30 @@ class DashboardHomeServiceImplTest {
         assertThat(row.getOpenedAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 0));
         assertThat(row.getLastMonitorAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 5));
         assertThat(row.getNextMonitorAt()).isNull();
+    }
+
+    @Test
+    @Tag("core-regression")
+    void homeRiskEscalationDependsOnTrendNotAbsoluteRiskLevel() {
+        UserPositionVO position = activeManualPosition(907L, "BTCUSDT", null);
+        PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
+        monitor.setPositionId(position.getId());
+        monitor.setCurrentPrice(new BigDecimal("105"));
+        completeTrustedMonitor(monitor, "HIGH_RISK_OBSERVATION", "HIGH", "REDUCE_POSITION");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
+                .thenReturn(List.of(monitor));
+
+        DashboardHomeVO.PositionVO stable = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertThat(stable.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(stable.getRiskTrend()).isEqualTo("STABLE");
+        assertThat(stable.getDataState()).isEqualTo("OPEN_MONITORING");
+
+        monitor.setRiskTrend("INCREASED");
+        DashboardHomeVO.PositionVO increased = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+
+        assertThat(increased.getDataState()).isEqualTo("RISK_ESCALATED");
     }
 
     @Test
@@ -575,6 +740,7 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPositions()).isEmpty();
+        assertThat(home.getPositionMonitoringState()).isEqualTo("NO_POSITION");
         assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
     }
@@ -618,7 +784,7 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(10L);
         monitorLog.setCurrentPrice(new BigDecimal("90"));
-        monitorLog.setLogicStatus("LOGIC_VALID");
+        completeTrustedMonitor(monitorLog, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 10L, 1)).thenReturn(List.of(monitorLog));
@@ -628,8 +794,10 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.PositionVO homePosition = home.getPositions().get(0);
         assertThat(homePosition.getFloatingPnl()).isEqualByComparingTo("20");
         assertThat(homePosition.getPnlPct()).isEqualByComparingTo("10.00000000");
-        assertThat(homePosition.getAccountImpactPct()).isEqualByComparingTo("30.00000000");
-        assertThat(homePosition.getSuggestedManualActionText()).isEqualTo("人工复核");
+        assertThat(homePosition.getPnlAmount()).isEqualByComparingTo("20");
+        assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("10.00000000");
+        assertThat(homePosition.getAccountImpactPct()).isNull();
+        assertThat(homePosition.getSuggestedManualActionText()).isEqualTo("继续持有");
     }
 
     @Test
@@ -2279,12 +2447,55 @@ class DashboardHomeServiceImplTest {
                                                    int minute) {
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(positionId);
-        monitor.setLogicStatus(logicStatus);
-        monitor.setRiskLevel(riskLevel);
         monitor.setCurrentPrice(new BigDecimal("105"));
-        monitor.setSuggestedAction("MANUAL_REVIEW");
+        String conclusion = "HIGH_RISK".equals(logicStatus) ? "HIGH_RISK_OBSERVATION" : logicStatus;
+        String action = switch (conclusion) {
+            case "PLAN_INVALIDATED" -> "WAIT_CONFIRMATION";
+            case "HIGH_RISK_OBSERVATION" -> "REDUCE_POSITION";
+            case "LOGIC_WEAKENED" -> "NO_ADD_POSITION";
+            default -> "CONTINUE_HOLD";
+        };
+        completeTrustedMonitor(monitor, conclusion, riskLevel, action);
         monitor.setCreatedAt(LocalDateTime.of(2026, 7, 20, 10, minute));
         return monitor;
+    }
+
+    private static void completeTrustedMonitor(PositionMonitorLogDTO monitor,
+                                               String conclusion,
+                                               String riskLevel,
+                                               String suggestedAction) {
+        monitor.setMarkPriceSource("TEST");
+        monitor.setEntryLogicStatus("PLAN_INVALIDATED".equals(conclusion) ? "INVALIDATED"
+                : "LOGIC_WEAKENED".equals(conclusion) ? "WEAKENED" : "STILL_VALID");
+        monitor.setMonitorConclusion(conclusion);
+        monitor.setReversalStatus("NO_REVERSAL");
+        monitor.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
+        monitor.setRiskLevel(riskLevel);
+        monitor.setRiskTrend("STABLE");
+        monitor.setSuggestedAction(suggestedAction);
+        monitor.setMonitorSourceStatus("VERIFIED");
+        monitor.setObservedAt(LocalDateTime.of(2026, 7, 1, 11, 59));
+        monitor.setFreshUntil(LocalDateTime.of(2026, 7, 1, 12, 30));
+        if (monitor.getCreatedAt() == null) {
+            monitor.setCreatedAt(LocalDateTime.of(2026, 7, 1, 12, 0));
+        }
+    }
+
+    private static void assertWaitingMonitorData(DashboardHomeVO.PositionVO row) {
+        assertThat(row.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertThat(row.getMarkPrice()).isNull();
+        assertThat(row.getCurrentPrice()).isNull();
+        assertThat(row.getMarkPriceSource()).isNull();
+        assertThat(row.getMarkPriceObservedAt()).isNull();
+        assertThat(row.getMarkPriceFresh()).isFalse();
+        assertThat(row.getPnlAmount()).isNull();
+        assertThat(row.getPnlPercent()).isNull();
+        assertThat(row.getRiskLevel()).isNull();
+        assertThat(row.getMonitorConclusion()).isNull();
+        assertThat(row.getSuggestedAction()).isNull();
+        assertThat(row.getEntryLogicStatus()).isNull();
+        assertThat(row.getReversalStatus()).isNull();
+        assertThat(row.getRiskReason()).isNull();
     }
 
     private void wireCapturedMonitorLogs(long positionId, List<PositionMonitorLogDTO> capturedLogs) {
@@ -2300,9 +2511,16 @@ class DashboardHomeServiceImplTest {
             log.setAnalysisId(command.getAnalysisId());
             log.setExecutionPlanId(command.getExecutionPlanId());
             log.setCurrentPrice(command.getCurrentPrice());
-            log.setLogicStatus(command.getLogicStatus());
+            log.setMarkPriceSource(command.getMarkPriceSource());
+            log.setEntryLogicStatus(command.getEntryLogicStatus());
+            log.setMonitorConclusion(command.getMonitorConclusion());
+            log.setReversalStatus(command.getReversalStatus());
+            log.setRiskChangeReason(command.getRiskChangeReason());
             log.setRiskLevel(command.getRiskLevel());
             log.setSuggestedAction(command.getSuggestedAction());
+            log.setMonitorSourceStatus(command.getMonitorSourceStatus());
+            log.setObservedAt(command.getObservedAt());
+            log.setFreshUntil(command.getFreshUntil());
             log.setTraceId(command.getTraceId());
             log.setCreatedAt(LocalDateTime.of(2026, 7, 1, 11, 0));
             capturedLogs.add(log);
@@ -2383,7 +2601,8 @@ class DashboardHomeServiceImplTest {
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
-        monitor.setLogicStatus("LOGIC_VALID");
+        monitor.setCurrentPrice(new BigDecimal("100"));
+        completeTrustedMonitor(monitor, "LOGIC_VALID", "LOW", "CONTINUE_HOLD");
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1)).thenReturn(List.of(monitor));
         return stubResolvedOriginalPlan(sourceDecision, planId, sourceTraceId, currentStateTraceId, false);
     }
@@ -2438,7 +2657,6 @@ class DashboardHomeServiceImplTest {
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(analysisId);
-        monitor.setLogicStatus("LOGIC_VALID");
         return monitor;
     }
 
@@ -2487,7 +2705,7 @@ class DashboardHomeServiceImplTest {
         ExecutionPlanDO plan = validExecutionPlan(planId, analysisId);
         copyExactPlanFields(plan, sourceDecision);
         planMutation.accept(plan);
-        when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+        lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
         when(analysisRunMapper.selectById(analysisId))
                 .thenReturn(sourceRun(analysisId, "BTCUSDT", traceId));
 
@@ -2506,12 +2724,12 @@ class DashboardHomeServiceImplTest {
 
         PositionMonitorResultDTO monitorResult = monitorService.monitorUserPositionForUser(positionId, USER_ID);
 
-        assertThat(monitorResult.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
-        assertThat(monitorResult.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(monitorResult.getMonitorConclusion()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(monitorResult.getSuggestedAction()).isEqualTo("NO_ADD_POSITION");
         assertThat(monitorResult.getReasonCodes()).contains(expectedReasonCode);
         assertThat(capturedLogs).singleElement().satisfies(log -> {
-            assertThat(log.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
-            assertThat(log.getSuggestedAction()).isEqualTo("RECHECK_PLAN");
+            assertThat(log.getMonitorConclusion()).isEqualTo("LOGIC_WEAKENED");
+            assertThat(log.getSuggestedAction()).isEqualTo("NO_ADD_POSITION");
             assertThat(log.getAnalysisId()).isEqualTo(analysisId);
             assertThat(log.getExecutionPlanId()).isEqualTo(planId);
         });
@@ -2663,12 +2881,11 @@ class DashboardHomeServiceImplTest {
         monitor.setPositionId(position.getId());
         monitor.setAnalysisId(sourceDecision.getAnalysisId());
         monitor.setExecutionPlanId(planId);
-        monitor.setLogicStatus("LOGIC_VALID");
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1)).thenReturn(List.of(monitor));
 
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         copyExactPlanFields(plan, sourceDecision);
-        when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+        lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
 
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(sourceDecision.getAnalysisId());

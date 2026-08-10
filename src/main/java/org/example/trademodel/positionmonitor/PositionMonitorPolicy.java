@@ -73,6 +73,9 @@ public final class PositionMonitorPolicy {
 
     public static int riskRank(String riskLevel) {
         String normalized = normalize(riskLevel);
+        if ("EXTREME".equals(normalized)) {
+            return 4;
+        }
         if ("HIGH".equals(normalized)) {
             return 3;
         }
@@ -87,10 +90,11 @@ public final class PositionMonitorPolicy {
 
     public static String normalizeRiskLevel(String riskLevel) {
         String normalized = normalize(riskLevel);
-        if ("LOW".equals(normalized) || "MEDIUM".equals(normalized) || "HIGH".equals(normalized)) {
+        if ("LOW".equals(normalized) || "MEDIUM".equals(normalized)
+                || "HIGH".equals(normalized) || "EXTREME".equals(normalized)) {
             return normalized;
         }
-        return "HIGH";
+        return null;
     }
 
     private static BigDecimal ratio(BigDecimal numerator, BigDecimal denominator) {

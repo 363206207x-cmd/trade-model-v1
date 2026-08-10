@@ -47,6 +47,7 @@ import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.example.trademodel.vo.UserPositionVO;
 import org.junit.jupiter.api.Tag;
@@ -57,6 +58,7 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -130,42 +132,44 @@ class V1BusinessStressTest {
         MonitorHarness harness = new MonitorHarness();
 
         PositionMonitorResultDTO valid = harness.monitor(MonitorScenario.valid(101L, "ENTRY_LOGIC_STILL_VALID", "100", "90", "120"));
-        assertThat(valid.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(valid.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(valid.getEntryLogicStatus()).isEqualTo("STILL_VALID");
         assertThat(valid.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
-        assertThat(valid.getReversalStatus()).isEqualTo("NO_REVERSAL_SIGNAL");
-        assertThat(valid.getSuggestedManualActionText()).contains("人工");
+        assertThat(valid.getReversalStatus()).isEqualTo("NO_REVERSAL");
+        assertThat(valid.getSuggestedManualAction()).isEqualTo("CONTINUE_HOLD");
         assertThat(valid.getPnlAmount()).isEqualByComparingTo("0");
         assertSafeMonitor(valid);
 
         PositionMonitorResultDTO weakened = harness.monitor(MonitorScenario.valid(102L, "ENTRY_LOGIC_WEAKENS_AFTER_OPEN", "100", "99", "120"));
-        assertThat(weakened.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
-        assertThat(weakened.getEntryLogicStatus()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(weakened.getMonitorConclusion()).isEqualTo("NEAR_STOP_LOSS");
+        assertThat(weakened.getEntryLogicStatus()).isEqualTo("WEAKENED");
         assertThat(weakened.getDirectionSupportStatus()).isEqualTo("WEAKENED");
-        assertThat(weakened.getSuggestedManualAction()).isEqualTo("MANUAL_REVIEW");
+        assertThat(weakened.getSuggestedManualAction()).isEqualTo("TIGHTEN_STOP");
         assertThat(weakened.getReasonCodes()).contains("NEAR_STOP_LOSS");
 
         PositionMonitorResultDTO reversal = harness.monitor(MonitorScenario.valid(103L, "STRONG_REVERSAL_AFTER_OPEN", "89", "90", "120"));
-        assertThat(reversal.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
-        assertThat(reversal.getReversalStatus()).isEqualTo("MANUAL_REVIEW_REQUIRED");
-        assertThat(reversal.getSuggestedManualAction()).isEqualTo("RECHECK_PLAN");
+        assertThat(reversal.getMonitorConclusion()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(reversal.getReversalStatus()).isEqualTo("STRONG_REVERSAL");
+        assertThat(reversal.getSuggestedManualAction()).isEqualTo("WAIT_CONFIRMATION");
         assertThat(reversal.isStopLossBreached()).isTrue();
 
         PositionMonitorResultDTO takeProfit = harness.monitor(MonitorScenario.valid(104L, "HIT_TAKE_PROFIT_ZONE", "118", "90", "120"));
         assertThat(takeProfit.isTakeProfitReached()).isFalse();
         assertThat(takeProfit.isNearTakeProfit()).isTrue();
-        assertThat(takeProfit.getSuggestedManualAction()).isEqualTo("MANUAL_REVIEW");
+        assertThat(takeProfit.getMonitorConclusion()).isEqualTo("NEAR_TAKE_PROFIT");
+        assertThat(takeProfit.getSuggestedManualAction()).isEqualTo("PARTIAL_TAKE_PROFIT");
         assertThat(takeProfit.getReasonCodes()).contains("NEAR_TAKE_PROFIT");
 
         PositionMonitorResultDTO stopZone = harness.monitor(MonitorScenario.valid(105L, "HIT_STOP_ZONE", "90", "90", "120"));
         assertThat(stopZone.isStopLossBreached()).isTrue();
-        assertThat(stopZone.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
-        assertThat(stopZone.getSuggestedManualActionText()).contains("复核");
+        assertThat(stopZone.getMonitorConclusion()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(stopZone.getSuggestedManualActionText()).isEqualTo("等待人工确认");
 
         PositionMonitorResultDTO highRisk = harness.monitor(MonitorScenario.highRisk(106L, "HIGH_RISK_OR_CONFLICT_BLOCKED", "100", "90", "120"));
-        assertThat(highRisk.getLogicStatus()).isEqualTo("HIGH_RISK");
+        assertThat(highRisk.getMonitorConclusion()).isEqualTo("HIGH_RISK_OBSERVATION");
         assertThat(highRisk.getRiskLevel()).isEqualTo("HIGH");
-        assertThat(highRisk.getSuggestedManualAction()).isEqualTo("RISK_REVIEW");
-        assertThat(highRisk.getDirectionSupportStatus()).isEqualTo("RISK_BLOCKED");
+        assertThat(highRisk.getSuggestedManualAction()).isEqualTo("REDUCE_POSITION");
+        assertThat(highRisk.getDirectionSupportStatus()).isEqualTo("SUPPORTED");
 
         assertThatThrownBy(() -> harness.monitorClosedPosition(107L))
                 .isInstanceOf(UserPositionConflictException.class)
@@ -176,8 +180,9 @@ class V1BusinessStressTest {
         assertThat(afterClose.getFailureCount()).isZero();
 
         assertThat(harness.recordedLogs()).hasSize(6);
-        assertThat(harness.recordedLogs()).extracting(PositionMonitorLogDTO::getLogicStatus)
-                .contains("LOGIC_VALID", "LOGIC_WEAKENED", "PLAN_INVALIDATED", "HIGH_RISK");
+        assertThat(harness.recordedLogs()).extracting(PositionMonitorLogDTO::getMonitorConclusion)
+                .contains("LOGIC_VALID", "NEAR_STOP_LOSS", "PLAN_INVALIDATED",
+                        "NEAR_TAKE_PROFIT", "HIGH_RISK_OBSERVATION");
         verify(harness.userPositionMapper(), never())
                 .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), anyString(), any());
     }
@@ -672,6 +677,7 @@ class V1BusinessStressTest {
         private final UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         private final ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
         private final AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
+        private final DecisionResultMapper decisionResultMapper = mock(DecisionResultMapper.class);
         private final InMemoryMonitorLogService monitorLogService = new InMemoryMonitorLogService();
         private final PositionMonitorServiceImpl service;
 
@@ -680,7 +686,7 @@ class V1BusinessStressTest {
                     org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
                     riskAdapter, executionPlanMapper,
                     monitorLogService, mock(EvidenceItemMapper.class), mock(ScoreItemMapper.class),
-                    mock(DecisionResultMapper.class), new ObjectMapper(), analysisRunMapper, null);
+                    decisionResultMapper, new ObjectMapper(), analysisRunMapper, null);
         }
 
         private PositionMonitorResultDTO monitor(MonitorScenario scenario) {
@@ -688,13 +694,28 @@ class V1BusinessStressTest {
             UserPositionDO position = position(scenario.id(), "OPEN",
                     PositionMonitorSourceContract.executionPlanReference(planId),
                     "BTCUSDT", scenario.stopLoss(), scenario.takeProfit());
+            if ("HIGH".equals(scenario.risk().getRiskLevel())) {
+                position.setLeverage(new BigDecimal("10"));
+            }
             when(userPositionMapper.selectByIdAndUserId(scenario.id(), USER_ID)).thenReturn(position);
             when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("BTCUSDT", scenario.currentPrice())));
-            when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(scenario.risk());
             ExecutionPlanDO plan = monitorPlan(planId);
             lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
             lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
                     .thenReturn(analysisRun(plan.getAnalysisId(), "BTCUSDT"));
+            lenient().when(analysisRunMapper.countEvidenceByAnalysisId(plan.getAnalysisId())).thenReturn(3);
+            lenient().when(analysisRunMapper.countScoresByAnalysisId(plan.getAnalysisId())).thenReturn(8);
+            DecisionResultVO currentDecision = new DecisionResultVO();
+            currentDecision.setAnalysisId(plan.getAnalysisId());
+            currentDecision.setSymbol("BTCUSDT");
+            currentDecision.setTimeframe("5m");
+            currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL_AFTER_OPEN".equals(scenario.name())
+                    ? "STRONG_BEARISH" : "RANGE");
+            currentDecision.setMultiTfConvergence("ALIGNED");
+            currentDecision.setDataQualityScore(90);
+            currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
+                    .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(scenario.id(), USER_ID);
         }
 
@@ -723,6 +744,10 @@ class V1BusinessStressTest {
         run.setAnalysisId(analysisId);
         run.setSymbol(symbol);
         run.setTraceId("trace-" + analysisId);
+        run.setTimeframe("5m");
+        run.setDataQualityScore(90);
+        run.setStatus("SUCCESS");
+        run.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         return run;
     }
 
@@ -751,9 +776,16 @@ class V1BusinessStressTest {
             dto.setAnalysisId(command.getAnalysisId());
             dto.setExecutionPlanId(command.getExecutionPlanId());
             dto.setCurrentPrice(command.getCurrentPrice());
-            dto.setLogicStatus(command.getLogicStatus());
+            dto.setMarkPriceSource(command.getMarkPriceSource());
+            dto.setEntryLogicStatus(command.getEntryLogicStatus());
+            dto.setMonitorConclusion(command.getMonitorConclusion());
+            dto.setReversalStatus(command.getReversalStatus());
+            dto.setRiskChangeReason(command.getRiskChangeReason());
             dto.setRiskLevel(command.getRiskLevel());
             dto.setSuggestedAction(command.getSuggestedAction());
+            dto.setMonitorSourceStatus(command.getMonitorSourceStatus());
+            dto.setObservedAt(command.getObservedAt());
+            dto.setFreshUntil(command.getFreshUntil());
             dto.setReason(command.getReason());
             dto.setTraceId(command.getTraceId());
             dto.setNotTradeInstruction(true);

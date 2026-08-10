@@ -14,14 +14,21 @@ public class PositionMonitorResultDTO {
     private String analysisId;
     private String executionPlanId;
     private BigDecimal currentPrice;
+    private BigDecimal markPrice;
+    private String markPriceSource;
+    private LocalDateTime markPriceObservedAt;
+    private boolean markPriceFresh;
     private BigDecimal entryPrice;
     private BigDecimal stopLoss;
     private BigDecimal takeProfit;
     private String logicStatus;
     private String entryLogicStatus;
+    private String monitorConclusion;
     private String directionSupportStatus;
     private String reversalStatus;
+    private String riskReason;
     private String riskLevel;
+    private String riskTrend;
     private boolean riskBlocked;
     private boolean riskIncreased;
     private boolean nearStopLoss;
@@ -32,6 +39,7 @@ public class PositionMonitorResultDTO {
     private String suggestedManualAction;
     private String suggestedManualActionText;
     private BigDecimal pnlPct;
+    private BigDecimal pnlPercent;
     private BigDecimal pnlAmount;
     private BigDecimal accountImpactPct;
     private List<String> reasonCodes = new ArrayList<>();
@@ -47,6 +55,8 @@ public class PositionMonitorResultDTO {
     private String externalContextSourceHealth;
     private Long monitorLogId;
     private LocalDateTime monitoredAt;
+    private LocalDateTime lastMonitorTime;
+    private String dataState;
     private boolean reviewOnly = true;
     private boolean manualReviewOnly = true;
     private boolean notTradeInstruction = true;
@@ -72,6 +82,14 @@ public class PositionMonitorResultDTO {
     public void setExecutionPlanId(String executionPlanId) { this.executionPlanId = executionPlanId; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
     public void setCurrentPrice(BigDecimal currentPrice) { this.currentPrice = currentPrice; }
+    public BigDecimal getMarkPrice() { return markPrice; }
+    public void setMarkPrice(BigDecimal markPrice) { this.markPrice = markPrice; }
+    public String getMarkPriceSource() { return markPriceSource; }
+    public void setMarkPriceSource(String markPriceSource) { this.markPriceSource = markPriceSource; }
+    public LocalDateTime getMarkPriceObservedAt() { return markPriceObservedAt; }
+    public void setMarkPriceObservedAt(LocalDateTime markPriceObservedAt) { this.markPriceObservedAt = markPriceObservedAt; }
+    public boolean isMarkPriceFresh() { return markPriceFresh; }
+    public void setMarkPriceFresh(boolean markPriceFresh) { this.markPriceFresh = markPriceFresh; }
     public BigDecimal getEntryPrice() { return entryPrice; }
     public void setEntryPrice(BigDecimal entryPrice) { this.entryPrice = entryPrice; }
     public BigDecimal getStopLoss() { return stopLoss; }
@@ -82,12 +100,18 @@ public class PositionMonitorResultDTO {
     public void setLogicStatus(String logicStatus) { this.logicStatus = logicStatus; }
     public String getEntryLogicStatus() { return entryLogicStatus; }
     public void setEntryLogicStatus(String entryLogicStatus) { this.entryLogicStatus = entryLogicStatus; }
+    public String getMonitorConclusion() { return monitorConclusion; }
+    public void setMonitorConclusion(String monitorConclusion) { this.monitorConclusion = monitorConclusion; }
     public String getDirectionSupportStatus() { return directionSupportStatus; }
     public void setDirectionSupportStatus(String directionSupportStatus) { this.directionSupportStatus = directionSupportStatus; }
     public String getReversalStatus() { return reversalStatus; }
     public void setReversalStatus(String reversalStatus) { this.reversalStatus = reversalStatus; }
+    public String getRiskReason() { return riskReason; }
+    public void setRiskReason(String riskReason) { this.riskReason = riskReason; }
     public String getRiskLevel() { return riskLevel; }
     public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+    public String getRiskTrend() { return riskTrend; }
+    public void setRiskTrend(String riskTrend) { this.riskTrend = riskTrend; }
     public boolean isRiskBlocked() { return riskBlocked; }
     public void setRiskBlocked(boolean riskBlocked) { this.riskBlocked = riskBlocked; }
     public boolean isRiskIncreased() { return riskIncreased; }
@@ -108,6 +132,8 @@ public class PositionMonitorResultDTO {
     public void setSuggestedManualActionText(String suggestedManualActionText) { this.suggestedManualActionText = suggestedManualActionText; }
     public BigDecimal getPnlPct() { return pnlPct; }
     public void setPnlPct(BigDecimal pnlPct) { this.pnlPct = pnlPct; }
+    public BigDecimal getPnlPercent() { return pnlPercent; }
+    public void setPnlPercent(BigDecimal pnlPercent) { this.pnlPercent = pnlPercent; }
     public BigDecimal getPnlAmount() { return pnlAmount; }
     public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
     public BigDecimal getAccountImpactPct() { return accountImpactPct; }
@@ -138,6 +164,10 @@ public class PositionMonitorResultDTO {
     public void setMonitorLogId(Long monitorLogId) { this.monitorLogId = monitorLogId; }
     public LocalDateTime getMonitoredAt() { return monitoredAt; }
     public void setMonitoredAt(LocalDateTime monitoredAt) { this.monitoredAt = monitoredAt; }
+    public LocalDateTime getLastMonitorTime() { return lastMonitorTime; }
+    public void setLastMonitorTime(LocalDateTime lastMonitorTime) { this.lastMonitorTime = lastMonitorTime; }
+    public String getDataState() { return dataState; }
+    public void setDataState(String dataState) { this.dataState = dataState; }
     public boolean isReviewOnly() { return reviewOnly; }
     public boolean isManualReviewOnly() { return manualReviewOnly; }
     public boolean isNotTradeInstruction() { return notTradeInstruction; }

@@ -15,6 +15,7 @@ import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogStatus;
+import org.example.trademodel.service.MessagePushReadService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -61,6 +65,8 @@ class MessagePushContractIntegrationTest {
     private OpportunityLogMapper opportunityLogMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private MessagePushReadService messagePushReadService;
 
     private Long userAId;
     private Long userBId;
@@ -69,6 +75,8 @@ class MessagePushContractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        messagePushReadService.setClock(Clock.fixed(
+                Instant.parse("2026-07-29T10:30:00Z"), ZoneOffset.UTC));
         userAId = insertUser(USER_A);
         userBId = insertUser(USER_B);
         positionA = insertPosition(userAId, "BTCUSDT", 1);
@@ -108,7 +116,7 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.data.sourceIdentity.sourceId").value(LARGE_MESSAGE_ID))
                 .andExpect(jsonPath("$.data.sourceIdentity.positionId")
                         .value(String.valueOf(positionA.getId())))
-                .andExpect(jsonPath("$.data.originalSnapshot.status").value("HIGH_RISK"))
+                .andExpect(jsonPath("$.data.originalSnapshot.status").value("HIGH_RISK_OBSERVATION"))
                 .andExpect(jsonPath("$.data.currentRecheck.status").value("LOGIC_VALID"));
 
         mockMvc.perform(get("/api/messages/{messageId}/push-detail", userBLog.getLogId())
@@ -322,17 +330,27 @@ class MessagePushContractIntegrationTest {
         PositionMonitorLogDO row = monitorLog(position, logicStatus, reason);
         jdbcTemplate.update(
                 "INSERT INTO tm_position_monitor_log("
-                        + "log_id, position_id, analysis_id, execution_plan_id, current_price, logic_status, "
-                        + "risk_level, suggested_action, reason, risk_snapshot, trace_id, created_at"
-                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + "log_id, position_id, analysis_id, execution_plan_id, current_price, mark_price_source, "
+                        + "entry_logic_status, monitor_conclusion, reversal_status, risk_change_reason, "
+                        + "risk_level, risk_trend, suggested_action, source_status, observed_at, fresh_until, reason, "
+                        + "risk_snapshot, trace_id, created_at"
+                        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 logId,
                 row.getPositionId(),
                 row.getAnalysisId(),
                 row.getExecutionPlanId(),
                 row.getCurrentPrice(),
-                row.getLogicStatus(),
+                row.getMarkPriceSource(),
+                row.getEntryLogicStatus(),
+                row.getMonitorConclusion(),
+                row.getReversalStatus(),
+                row.getRiskChangeReason(),
                 row.getRiskLevel(),
+                row.getRiskTrend(),
                 row.getSuggestedAction(),
+                row.getMonitorSourceStatus(),
+                row.getObservedAt(),
+                row.getFreshUntil(),
                 row.getReason(),
                 row.getRiskSnapshot(),
                 row.getTraceId(),
@@ -347,21 +365,40 @@ class MessagePushContractIntegrationTest {
         row.setAnalysisId("ana-position-" + position.getId());
         row.setExecutionPlanId("plan-position-" + position.getId());
         row.setCurrentPrice(new BigDecimal("95"));
-        row.setLogicStatus(logicStatus);
-        row.setRiskLevel("LOGIC_VALID".equals(logicStatus) ? "LOW" : "HIGH");
-        row.setSuggestedAction(switch (logicStatus) {
-            case "LOGIC_VALID" -> "HOLD";
-            case "LOGIC_WEAKENED" -> "MANUAL_REVIEW";
-            case "PLAN_INVALIDATED" -> "RECHECK_PLAN";
-            default -> "RISK_REVIEW";
+        row.setMarkPriceSource("TEST_MARK_PRICE");
+        row.setEntryLogicStatus(switch (logicStatus) {
+            case "LOGIC_VALID" -> "STILL_VALID";
+            case "PLAN_INVALIDATED" -> "INVALIDATED";
+            default -> "WEAKENED";
         });
+        row.setMonitorConclusion("HIGH_RISK".equals(logicStatus)
+                ? "HIGH_RISK_OBSERVATION" : logicStatus);
+        row.setReversalStatus("PLAN_INVALIDATED".equals(logicStatus)
+                ? "STRONG_REVERSAL" : "NO_REVERSAL");
+        row.setRiskChangeReason(switch (logicStatus) {
+            case "LOGIC_VALID" -> "NO_CLEAR_RISK_FACTOR";
+            case "PLAN_INVALIDATED" -> "STRUCTURE_CHANGED";
+            default -> "OPPOSING_EVIDENCE_INCREASED";
+        });
+        row.setRiskLevel("LOGIC_VALID".equals(logicStatus) ? "LOW" : "HIGH");
+        row.setRiskTrend("STABLE");
+        row.setSuggestedAction(switch (logicStatus) {
+            case "LOGIC_VALID" -> "CONTINUE_HOLD";
+            case "LOGIC_WEAKENED" -> "NO_ADD_POSITION";
+            case "PLAN_INVALIDATED" -> "WAIT_CONFIRMATION";
+            default -> "REDUCE_POSITION";
+        });
+        row.setMonitorSourceStatus("VERIFIED");
         row.setReason(reason);
         row.setRiskSnapshot("LOGIC_VALID".equals(logicStatus)
                 ? "{\"riskLevel\":\"LOW\",\"riskBlocked\":false}"
                 : "{\"riskLevel\":\"HIGH\",\"riskBlocked\":true}");
         row.setTraceId("trace-position-" + position.getId());
-        row.setCreatedAt(LocalDateTime.of(2026, 7, 29, 9,
-                "LOGIC_VALID".equals(logicStatus) ? 5 : 0));
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 29, 9,
+                "LOGIC_VALID".equals(logicStatus) ? 5 : 0);
+        row.setObservedAt(createdAt.minusMinutes(1));
+        row.setFreshUntil(createdAt.plusHours(3));
+        row.setCreatedAt(createdAt);
         return row;
     }
 

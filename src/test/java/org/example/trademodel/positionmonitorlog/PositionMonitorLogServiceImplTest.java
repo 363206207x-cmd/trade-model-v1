@@ -58,7 +58,7 @@ class PositionMonitorLogServiceImplTest {
         });
 
         PositionMonitorLogDTO dto = service.recordMonitorRunForUser(
-                USER_ID, command("LOGIC_VALID", "LOW", "HOLD"));
+                USER_ID, command("LOGIC_VALID", "LOW", "CONTINUE_HOLD"));
 
         ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
         verify(positionMonitorLogMapper).insert(captor.capture());
@@ -67,9 +67,16 @@ class PositionMonitorLogServiceImplTest {
         assertThat(row.getAnalysisId()).isEqualTo("ana-p0-4");
         assertThat(row.getExecutionPlanId()).isEqualTo("plan-p0-4");
         assertThat(row.getCurrentPrice()).isEqualByComparingTo("111.25000000");
-        assertThat(row.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(row.getLogicStatus()).isNull();
+        assertThat(row.getEntryLogicStatus()).isEqualTo("STILL_VALID");
+        assertThat(row.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(row.getReversalStatus()).isEqualTo("NO_REVERSAL");
+        assertThat(row.getRiskChangeReason()).isEqualTo("NO_CLEAR_RISK_FACTOR");
         assertThat(row.getRiskLevel()).isEqualTo("LOW");
-        assertThat(row.getSuggestedAction()).isEqualTo("HOLD");
+        assertThat(row.getSuggestedAction()).isEqualTo("CONTINUE_HOLD");
+        assertThat(row.getMonitorSourceStatus()).isEqualTo("VERIFIED");
+        assertThat(row.getObservedAt()).isNotNull();
+        assertThat(row.getFreshUntil()).isAfter(row.getObservedAt());
         assertThat(row.getEvidenceSnapshot()).contains("evidence");
         assertThat(row.getScoreSnapshot()).contains("score");
         assertThat(row.getDecisionSnapshot()).contains("decision");
@@ -92,16 +99,16 @@ class PositionMonitorLogServiceImplTest {
         });
 
         PositionMonitorLogDTO weakened = service.recordMonitorRunForUser(
-                USER_ID, command("LOGIC_WEAKENED", "MEDIUM", "MANUAL_REVIEW"));
+                USER_ID, command("LOGIC_WEAKENED", "MEDIUM", "NO_ADD_POSITION"));
         PositionMonitorLogDTO invalidated = service.recordMonitorRunForUser(
-                USER_ID, command("PLAN_INVALIDATED", "HIGH", "RECHECK_PLAN"));
+                USER_ID, command("PLAN_INVALIDATED", "HIGH", "WAIT_CONFIRMATION"));
         PositionMonitorLogDTO highRisk = service.recordMonitorRunForUser(
-                USER_ID, command("HIGH_RISK", "HIGH", "RISK_REVIEW"));
+                USER_ID, command("HIGH_RISK_OBSERVATION", "EXTREME", "REDUCE_POSITION"));
 
-        assertThat(weakened.getLogicStatus()).isEqualTo("LOGIC_WEAKENED");
-        assertThat(invalidated.getLogicStatus()).isEqualTo("PLAN_INVALIDATED");
-        assertThat(highRisk.getLogicStatus()).isEqualTo("HIGH_RISK");
-        assertThat(highRisk.getSuggestedAction()).isEqualTo("RISK_REVIEW");
+        assertThat(weakened.getMonitorConclusion()).isEqualTo("LOGIC_WEAKENED");
+        assertThat(invalidated.getMonitorConclusion()).isEqualTo("PLAN_INVALIDATED");
+        assertThat(highRisk.getMonitorConclusion()).isEqualTo("HIGH_RISK_OBSERVATION");
+        assertThat(highRisk.getSuggestedAction()).isEqualTo("REDUCE_POSITION");
         assertSafetyFields(weakened);
         assertSafetyFields(invalidated);
         assertSafetyFields(highRisk);
@@ -115,9 +122,11 @@ class PositionMonitorLogServiceImplTest {
             row.setLogId(203L);
             return 1;
         });
-        RecordPositionMonitorLogCommand command = command("LOGIC_WEAKENED", "LOW", "MANUAL_REVIEW");
+        RecordPositionMonitorLogCommand command = command("LOGIC_WEAKENED", "LOW", "NO_ADD_POSITION");
         command.setAnalysisId(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         command.setExecutionPlanId(null);
+        command.setMonitorSourceStatus("PENDING_VERIFICATION");
+        clearMonitorResult(command);
 
         PositionMonitorLogDTO result = service.recordMonitorRunForUser(USER_ID, command);
 
@@ -126,6 +135,10 @@ class PositionMonitorLogServiceImplTest {
         assertThat(captor.getValue().getAnalysisId())
                 .isEqualTo(PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID);
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
+        assertThat(captor.getValue().getMonitorConclusion()).isNull();
+        assertThat(captor.getValue().getReversalStatus()).isNull();
+        assertThat(captor.getValue().getRiskLevel()).isNull();
+        assertThat(captor.getValue().getSuggestedAction()).isNull();
         assertThat(result.getAnalysisId()).isNull();
         assertThat(result.getExecutionPlanId()).isNull();
         assertThat(result.isSourceVerified()).isFalse();
@@ -135,8 +148,60 @@ class PositionMonitorLogServiceImplTest {
     }
 
     @Test
+    void untrustedSourceRejectsInventedSemanticResults() {
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
+        RecordPositionMonitorLogCommand command = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        command.setMonitorSourceStatus("INVALID");
+
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("entry_logic_status must be absent");
+        verify(positionMonitorLogMapper, never()).insert(any());
+    }
+
+    @Test
+    void staleMonitorResultCannotBeRecordedAsVerified() {
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
+        RecordPositionMonitorLogCommand command = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        command.setObservedAt(LocalDateTime.now().minusMinutes(10));
+        command.setFreshUntil(LocalDateTime.now().minusMinutes(5));
+
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("verified monitor result must be fresh when recorded");
+        verify(positionMonitorLogMapper, never()).insert(any());
+    }
+
+    @Test
+    void invalidSourcePersistsOnlyRawObservationAndExplicitMissingSemantics() {
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
+        when(positionMonitorLogMapper.insert(any())).thenAnswer(invocation -> {
+            PositionMonitorLogDO row = invocation.getArgument(0);
+            row.setLogId(205L);
+            return 1;
+        });
+        RecordPositionMonitorLogCommand command = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        command.setMonitorSourceStatus("INVALID");
+        command.setMarkPriceSource(null);
+        clearMonitorResult(command);
+
+        PositionMonitorLogDTO result = service.recordMonitorRunForUser(USER_ID, command);
+
+        ArgumentCaptor<PositionMonitorLogDO> captor = ArgumentCaptor.forClass(PositionMonitorLogDO.class);
+        verify(positionMonitorLogMapper).insert(captor.capture());
+        assertThat(captor.getValue().getCurrentPrice()).isEqualByComparingTo("111.25");
+        assertThat(captor.getValue().getMonitorSourceStatus()).isEqualTo("INVALID");
+        assertThat(captor.getValue().getMarkPriceSource()).isNull();
+        assertThat(captor.getValue().getEntryLogicStatus()).isNull();
+        assertThat(captor.getValue().getMonitorConclusion()).isNull();
+        assertThat(captor.getValue().getRiskLevel()).isNull();
+        assertThat(captor.getValue().getSuggestedAction()).isNull();
+        assertThat(result.isTrustedAndFreshAt(LocalDateTime.now())).isFalse();
+    }
+
+    @Test
     void legacyNonSentinelMonitorRowIsNotAutomaticallyVerified() {
-        PositionMonitorLogDO row = logRow(204L, 7L, "analysis-verified", "LOGIC_VALID", "HOLD",
+        PositionMonitorLogDO row = logRow(204L, 7L, "analysis-verified", "LOGIC_VALID", "CONTINUE_HOLD",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         row.setExecutionPlanId("plan-verified");
         when(positionMonitorLogMapper.selectById(204L)).thenReturn(row);
@@ -154,12 +219,12 @@ class PositionMonitorLogServiceImplTest {
     void closedOrMissingUserPositionRejectsNewMonitorRunLog() {
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "CLOSED"));
         assertThatThrownBy(() -> service.recordMonitorRunForUser(
-                USER_ID, command("LOGIC_VALID", "LOW", "HOLD")))
+                USER_ID, command("LOGIC_VALID", "LOW", "CONTINUE_HOLD")))
                 .isInstanceOf(UserPositionConflictException.class)
                 .hasMessageContaining("CLOSED UserPosition");
 
         when(userPositionMapper.selectByIdAndUserId(8L, USER_ID)).thenReturn(null);
-        RecordPositionMonitorLogCommand missing = command("LOGIC_VALID", "LOW", "HOLD");
+        RecordPositionMonitorLogCommand missing = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
         missing.setPositionId(8L);
         assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, missing))
                 .isInstanceOf(UserPositionNotFoundException.class)
@@ -172,23 +237,28 @@ class PositionMonitorLogServiceImplTest {
     void invalidPriceLogicStatusSuggestedActionAndExecutableWordsFailClosed() {
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
 
-        RecordPositionMonitorLogCommand badPrice = command("LOGIC_VALID", "LOW", "HOLD");
+        RecordPositionMonitorLogCommand badPrice = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
         badPrice.setCurrentPrice(BigDecimal.ZERO);
         assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, badPrice))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("current_price");
 
-        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command("BOGUS", "LOW", "HOLD")))
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, command("BOGUS", "LOW", "CONTINUE_HOLD")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("logic_status");
+                .hasMessageContaining("monitor_conclusion");
 
         assertThatThrownBy(() -> service.recordMonitorRunForUser(
-                USER_ID, command("LOGIC_VALID", "LOW", "CLOSE")))
+                USER_ID, command("LOGIC_VALID", "LOW", "AUTO_CLOSE")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("suggested_action");
 
-        RecordPositionMonitorLogCommand forbiddenReason = command("LOGIC_VALID", "LOW", "HOLD");
-        forbiddenReason.setReason("please close this position");
+        assertThatThrownBy(() -> service.recordMonitorRunForUser(
+                USER_ID, command("LOGIC_VALID", "LOW", "REDUCE_POSITION")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not valid for monitor_conclusion");
+
+        RecordPositionMonitorLogCommand forbiddenReason = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        forbiddenReason.setReason("please auto close this position");
         assertThatThrownBy(() -> service.recordMonitorRunForUser(USER_ID, forbiddenReason))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Forbidden executable monitor log content");
@@ -198,7 +268,7 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void listQueriesUseFailClosedLimitAndReturnSafetyDtos() {
-        PositionMonitorLogDO row = logRow(11L, 7L, "ana-p0-4", "HIGH_RISK", "RISK_REVIEW",
+        PositionMonitorLogDO row = logRow(11L, 7L, "ana-p0-4", "HIGH_RISK_OBSERVATION", "REDUCE_POSITION",
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         when(positionMonitorLogMapper.listByPositionId(7L, 20)).thenReturn(List.of(row));
         when(positionMonitorLogMapper.listByAnalysisId("ana-p0-4", 2)).thenReturn(List.of(row));
@@ -220,9 +290,9 @@ class PositionMonitorLogServiceImplTest {
 
     @Test
     void reviewTimelineQueryReturnsAllLogsInMapperOrderWithSafetyDtos() {
-        PositionMonitorLogDO first = logRow(1L, 7L, "ana-p0-6", "LOGIC_WEAKENED", "MANUAL_REVIEW",
+        PositionMonitorLogDO first = logRow(1L, 7L, "ana-p0-6", "LOGIC_WEAKENED", "NO_ADD_POSITION",
                 LocalDateTime.of(2026, 6, 22, 8, 30));
-        PositionMonitorLogDO second = logRow(2L, 7L, "ana-p0-6", "PLAN_INVALIDATED", "RECHECK_PLAN",
+        PositionMonitorLogDO second = logRow(2L, 7L, "ana-p0-6", "PLAN_INVALIDATED", "WAIT_CONFIRMATION",
                 LocalDateTime.of(2026, 6, 22, 9, 30));
         when(positionMonitorLogMapper.listAllByPositionIdForReview(7L)).thenReturn(List.of(first, second));
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "CLOSED"));
@@ -240,9 +310,21 @@ class PositionMonitorLogServiceImplTest {
         command.setAnalysisId(" ana-p0-4 ");
         command.setExecutionPlanId(" plan-p0-4 ");
         command.setCurrentPrice(new BigDecimal("111.25"));
-        command.setLogicStatus(logicStatus);
+        command.setMarkPriceSource("TEST");
+        command.setEntryLogicStatus(switch (logicStatus) {
+            case "LOGIC_VALID" -> "STILL_VALID";
+            case "PLAN_INVALIDATED" -> "INVALIDATED";
+            default -> "WEAKENED";
+        });
+        command.setMonitorConclusion(logicStatus);
+        command.setReversalStatus("NO_REVERSAL");
+        command.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         command.setRiskLevel(riskLevel);
+        command.setRiskTrend("STABLE");
         command.setSuggestedAction(suggestedAction);
+        command.setMonitorSourceStatus("VERIFIED");
+        command.setObservedAt(LocalDateTime.now().minusSeconds(1));
+        command.setFreshUntil(LocalDateTime.now().plusMinutes(1));
         command.setReason("manual review note");
         command.setEvidenceSnapshot("{\"evidence\":\"stable\"}");
         command.setScoreSnapshot("{\"score\":70}");
@@ -268,11 +350,30 @@ class PositionMonitorLogServiceImplTest {
         row.setPositionId(positionId);
         row.setAnalysisId(analysisId);
         row.setCurrentPrice(new BigDecimal("111.25"));
-        row.setLogicStatus(logicStatus);
+        row.setMarkPriceSource("TEST");
+        row.setEntryLogicStatus("PLAN_INVALIDATED".equals(logicStatus) ? "INVALIDATED" : "WEAKENED");
+        row.setMonitorConclusion(logicStatus);
+        row.setReversalStatus("NO_REVERSAL");
+        row.setRiskChangeReason("NO_CLEAR_RISK_FACTOR");
         row.setRiskLevel("HIGH");
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction(suggestedAction);
+        row.setMonitorSourceStatus("PENDING_VERIFICATION");
+        row.setObservedAt(createdAt);
+        row.setFreshUntil(createdAt.plusMinutes(1));
         row.setCreatedAt(createdAt);
         return row;
+    }
+
+    private static void clearMonitorResult(RecordPositionMonitorLogCommand command) {
+        command.setEntryLogicStatus(null);
+        command.setMonitorConclusion(null);
+        command.setReversalStatus(null);
+        command.setRiskChangeReason(null);
+        command.setRiskLevel(null);
+        command.setRiskTrend(null);
+        command.setSuggestedAction(null);
+        command.setRiskSnapshot(null);
     }
 
     private static void assertSafetyFields(PositionMonitorLogDTO dto) {

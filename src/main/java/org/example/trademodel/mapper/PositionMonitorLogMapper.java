@@ -13,27 +13,40 @@ import java.util.List;
 public interface PositionMonitorLogMapper {
 
     String BASE_SELECT = "SELECT log_id AS logId, position_id AS positionId, analysis_id AS analysisId, "
-            + "execution_plan_id AS executionPlanId, current_price AS currentPrice, logic_status AS logicStatus, "
-            + "risk_level AS riskLevel, suggested_action AS suggestedAction, reason, "
+            + "execution_plan_id AS executionPlanId, current_price AS currentPrice, "
+            + "mark_price_source AS markPriceSource, logic_status AS logicStatus, "
+            + "entry_logic_status AS entryLogicStatus, monitor_conclusion AS monitorConclusion, "
+            + "reversal_status AS reversalStatus, risk_change_reason AS riskChangeReason, "
+            + "risk_level AS riskLevel, risk_trend AS riskTrend, suggested_action AS suggestedAction, "
+            + "source_status AS monitorSourceStatus, observed_at AS observedAt, fresh_until AS freshUntil, reason, "
             + "evidence_snapshot AS evidenceSnapshot, score_snapshot AS scoreSnapshot, "
             + "decision_snapshot AS decisionSnapshot, risk_snapshot AS riskSnapshot, trace_id AS traceId, "
             + "created_at AS createdAt FROM tm_position_monitor_log ";
 
     String OWNER_SCOPED_SELECT = "SELECT l.log_id AS logId, l.position_id AS positionId, "
             + "l.analysis_id AS analysisId, l.execution_plan_id AS executionPlanId, "
-            + "l.current_price AS currentPrice, l.logic_status AS logicStatus, l.risk_level AS riskLevel, "
-            + "l.suggested_action AS suggestedAction, l.reason, l.evidence_snapshot AS evidenceSnapshot, "
+            + "l.current_price AS currentPrice, l.mark_price_source AS markPriceSource, "
+            + "l.logic_status AS logicStatus, l.entry_logic_status AS entryLogicStatus, "
+            + "l.monitor_conclusion AS monitorConclusion, l.reversal_status AS reversalStatus, "
+            + "l.risk_change_reason AS riskChangeReason, l.risk_level AS riskLevel, l.risk_trend AS riskTrend, "
+            + "l.suggested_action AS suggestedAction, l.source_status AS monitorSourceStatus, "
+            + "l.observed_at AS observedAt, l.fresh_until AS freshUntil, "
+            + "l.reason, l.evidence_snapshot AS evidenceSnapshot, "
             + "l.score_snapshot AS scoreSnapshot, l.decision_snapshot AS decisionSnapshot, "
             + "l.risk_snapshot AS riskSnapshot, l.trace_id AS traceId, l.created_at AS createdAt "
             + "FROM tm_position_monitor_log l "
             + "INNER JOIN tm_user_position p ON p.id = l.position_id AND p.user_id = #{userId} ";
 
     @Insert("INSERT INTO tm_position_monitor_log("
-            + "position_id, analysis_id, execution_plan_id, current_price, logic_status, risk_level, suggested_action, "
-            + "reason, evidence_snapshot, score_snapshot, decision_snapshot, risk_snapshot, trace_id, created_at"
+            + "position_id, analysis_id, execution_plan_id, current_price, mark_price_source, "
+            + "entry_logic_status, monitor_conclusion, reversal_status, risk_change_reason, risk_level, risk_trend, "
+            + "suggested_action, source_status, observed_at, fresh_until, reason, "
+            + "evidence_snapshot, score_snapshot, decision_snapshot, risk_snapshot, trace_id, created_at"
             + ") VALUES ("
-            + "#{positionId}, #{analysisId}, #{executionPlanId}, #{currentPrice}, #{logicStatus}, #{riskLevel}, #{suggestedAction}, "
-            + "#{reason}, #{evidenceSnapshot}, #{scoreSnapshot}, #{decisionSnapshot}, #{riskSnapshot}, #{traceId}, #{createdAt}"
+            + "#{positionId}, #{analysisId}, #{executionPlanId}, #{currentPrice}, #{markPriceSource}, "
+            + "#{entryLogicStatus}, #{monitorConclusion}, #{reversalStatus}, #{riskChangeReason}, #{riskLevel}, #{riskTrend}, "
+            + "#{suggestedAction}, #{monitorSourceStatus}, #{observedAt}, #{freshUntil}, #{reason}, "
+            + "#{evidenceSnapshot}, #{scoreSnapshot}, #{decisionSnapshot}, #{riskSnapshot}, #{traceId}, #{createdAt}"
             + ")")
     @Options(useGeneratedKeys = true, keyProperty = "logId", keyColumn = "log_id")
     int insert(PositionMonitorLogDO row);
@@ -56,7 +69,8 @@ public interface PositionMonitorLogMapper {
                                                  @Param("userId") Long userId);
 
     @Select(OWNER_SCOPED_SELECT
-            + "WHERE l.logic_status IN ('LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK') "
+            + "WHERE l.monitor_conclusion IN ('LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'NEAR_STOP_LOSS', "
+            + "'HIGH_RISK_OBSERVATION', 'WAIT_USER_CONFIRM_CLOSE') "
             + "ORDER BY l.created_at DESC, l.log_id DESC LIMIT #{limit}")
     List<PositionMonitorLogDO> listRiskByUserId(@Param("userId") Long userId,
                                                 @Param("limit") int limit);

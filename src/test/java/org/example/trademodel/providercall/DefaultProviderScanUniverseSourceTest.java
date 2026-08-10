@@ -11,6 +11,7 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.providercall.profile.ScanProfileTransitionService;
 import org.example.trademodel.providercall.profile.ProfileTransitionResult;
+import org.example.trademodel.providercall.profile.ProfileTransitionSignal;
 import org.example.trademodel.providercall.profile.ProviderCallProfilePreferenceService;
 import org.example.trademodel.providercall.scan.DefaultProviderScanUniverseSource;
 import org.example.trademodel.providercall.scan.ProviderRefreshStateRegistry;
@@ -20,13 +21,18 @@ import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
 import org.example.trademodel.providercall.universe.DiscoveryUniverseSource;
 import org.example.trademodel.providercall.universe.WatchlistAssetSource;
 import org.example.trademodel.service.PositionMonitorLogService;
+import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.UserConfigService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,6 +46,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 class DefaultProviderScanUniverseSourceTest {
     private UserPositionMapper positionMapper;
@@ -51,6 +58,7 @@ class DefaultProviderScanUniverseSourceTest {
     private ProviderCallProperties properties;
     private UserConfigService userConfigService;
     private ScanProfileTransitionService transitions;
+    private PositionMonitorLogService monitorLogService;
     private DefaultProviderScanUniverseSource source;
 
     @BeforeEach void setUp() {
@@ -67,13 +75,15 @@ class DefaultProviderScanUniverseSourceTest {
         when(discoverySource.currentDiscoveryUniverse()).thenReturn(instruments("SOLUSDT", "BNBUSDT"));
         userConfigService = mock(UserConfigService.class);
         transitions = mock(ScanProfileTransitionService.class);
+        monitorLogService = mock(PositionMonitorLogService.class);
         when(userConfigService.getUserConfig("admin")).thenReturn(new UserConfigDO());
         source = new DefaultProviderScanUniverseSource(properties, positionMapper, stateMapper,
-                mock(DecisionResultMapper.class), pushSnapshotMapper, mock(PositionMonitorLogService.class), userConfigService,
+                mock(DecisionResultMapper.class), pushSnapshotMapper, monitorLogService, userConfigService,
                 transitions, new ProviderRefreshStateRegistry(), watchlistSource,
                 discoverySource, new AutoCandidateRegistry(), ProviderCallTestFixtures.binanceRegistry(
                         "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "ADAUSDT", "LINKUSDT"),
-                profilePreferenceService);
+                profilePreferenceService,
+                Clock.fixed(Instant.parse("2026-07-10T12:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test void realScanUniverseUsesReplaceableManualWatchlist() {
@@ -209,6 +219,34 @@ class DefaultProviderScanUniverseSourceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("scanCycleTraceId is required");
         verify(transitions, never()).evaluate(anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    @Tag("core-regression")
+    void providerTransitionIgnoresStaleMonitorLog() {
+        properties.setProfileEscalationEnabled(true);
+        UserPositionDO position = position("BTCUSDT", "OPEN");
+        position.setId(77L);
+        when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
+        when(stateMapper.listCandidateOrWaitingTrigger(anyInt())).thenReturn(List.of());
+        PositionMonitorLogDTO stale = new PositionMonitorLogDTO();
+        stale.setPositionId(77L);
+        stale.setMonitorSourceStatus("VERIFIED");
+        stale.setObservedAt(LocalDateTime.of(2026, 7, 10, 10, 0));
+        stale.setFreshUntil(LocalDateTime.of(2026, 7, 10, 11, 0));
+        stale.setRiskLevel("EXTREME");
+        stale.setMonitorConclusion("PLAN_INVALIDATED");
+        stale.setReason("REVERSAL");
+        when(monitorLogService.listByPositionIdForSystem(77L, 1)).thenReturn(List.of(stale));
+        when(transitions.evaluate(eq("BTCUSDT"), any(), any(), anyString()))
+                .thenReturn(transition("BTCUSDT", RuntimeScanProfile.LOW, "NO_ESCALATION", "stale"));
+
+        source.evaluateUniverseForExecution("scan-cycle-stale-monitor");
+
+        ArgumentCaptor<ProfileTransitionSignal> signal = ArgumentCaptor.forClass(ProfileTransitionSignal.class);
+        verify(transitions).evaluate(eq("BTCUSDT"), any(), signal.capture(), anyString());
+        assertThat(signal.getValue().highImpactEvent()).isFalse();
+        assertThat(signal.getValue().strongReversal()).isFalse();
     }
 
     private void emptySources() {

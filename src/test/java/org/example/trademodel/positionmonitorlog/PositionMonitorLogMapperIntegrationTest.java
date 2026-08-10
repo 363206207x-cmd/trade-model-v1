@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -31,9 +32,10 @@ class PositionMonitorLogMapperIntegrationTest {
         UserPositionDO position = userPosition("OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
         userPositionMapper.insert(position);
 
-        PositionMonitorLogDO older = log(position.getId(), "ana-p0-4", "LOGIC_VALID", "LOW", "HOLD",
+        PositionMonitorLogDO older = log(position.getId(), "ana-p0-4", "LOGIC_VALID", "LOW", "CONTINUE_HOLD",
                 LocalDateTime.of(2026, 6, 22, 8, 10));
-        PositionMonitorLogDO newer = log(position.getId(), "ana-p0-4", "HIGH_RISK", "HIGH", "RISK_REVIEW",
+        PositionMonitorLogDO newer = log(position.getId(), "ana-p0-4", "HIGH_RISK_OBSERVATION", "HIGH",
+                "REDUCE_POSITION",
                 LocalDateTime.of(2026, 6, 22, 8, 20));
 
         positionMonitorLogMapper.insert(older);
@@ -45,9 +47,15 @@ class PositionMonitorLogMapperIntegrationTest {
         assertThat(persisted.getAnalysisId()).isEqualTo("ana-p0-4");
         assertThat(persisted.getExecutionPlanId()).isEqualTo("plan-p0-4");
         assertThat(persisted.getCurrentPrice()).isEqualByComparingTo("111.25000000");
-        assertThat(persisted.getLogicStatus()).isEqualTo("LOGIC_VALID");
+        assertThat(persisted.getLogicStatus()).isNull();
+        assertThat(persisted.getEntryLogicStatus()).isEqualTo("STILL_VALID");
+        assertThat(persisted.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
+        assertThat(persisted.getReversalStatus()).isEqualTo("NO_REVERSAL");
+        assertThat(persisted.getRiskChangeReason()).isEqualTo("NO_CLEAR_RISK_FACTOR");
         assertThat(persisted.getRiskLevel()).isEqualTo("LOW");
-        assertThat(persisted.getSuggestedAction()).isEqualTo("HOLD");
+        assertThat(persisted.getSuggestedAction()).isEqualTo("CONTINUE_HOLD");
+        assertThat(persisted.getMonitorSourceStatus()).isEqualTo("VERIFIED");
+        assertThat(persisted.getMarkPriceSource()).isEqualTo("TEST_MARK_PRICE");
         assertThat(persisted.getEvidenceSnapshot()).contains("evidence");
         assertThat(persisted.getScoreSnapshot()).contains("score");
         assertThat(persisted.getDecisionSnapshot()).contains("decision");
@@ -63,16 +71,54 @@ class PositionMonitorLogMapperIntegrationTest {
                 .containsExactly(newer.getLogId(), older.getLogId());
     }
 
-    private static PositionMonitorLogDO log(Long positionId, String analysisId, String logicStatus,
+    @Test
+    void untrustedRowsPersistRawObservationOnlyAndDatabaseRejectsInventedSemantics() {
+        UserPositionDO position = userPosition("OPEN", LocalDateTime.of(2026, 6, 22, 9, 0));
+        userPositionMapper.insert(position);
+        LocalDateTime observedAt = LocalDateTime.of(2026, 6, 22, 9, 10);
+        PositionMonitorLogDO pending = new PositionMonitorLogDO();
+        pending.setPositionId(position.getId());
+        pending.setAnalysisId("UNVERIFIED_POSITION_SOURCE");
+        pending.setCurrentPrice(new BigDecimal("112.25"));
+        pending.setMonitorSourceStatus("PENDING_VERIFICATION");
+        pending.setObservedAt(observedAt);
+        pending.setFreshUntil(observedAt);
+        pending.setCreatedAt(observedAt);
+
+        assertThat(positionMonitorLogMapper.insert(pending)).isEqualTo(1);
+        PositionMonitorLogDO persisted = positionMonitorLogMapper.selectById(pending.getLogId());
+        assertThat(persisted.getCurrentPrice()).isEqualByComparingTo("112.25");
+        assertThat(persisted.getMonitorConclusion()).isNull();
+        assertThat(persisted.getReversalStatus()).isNull();
+        assertThat(persisted.getRiskLevel()).isNull();
+        assertThat(persisted.getSuggestedAction()).isNull();
+
+        PositionMonitorLogDO invalid = log(position.getId(), "ana-invalid", "LOGIC_VALID", "LOW",
+                "CONTINUE_HOLD", observedAt.plusMinutes(1));
+        invalid.setMonitorSourceStatus("INVALID");
+        assertThatThrownBy(() -> positionMonitorLogMapper.insert(invalid))
+                .hasMessageContaining("CK_TM_POSITION_MONITOR_LOG_TRUSTED_PAYLOAD");
+    }
+
+    private static PositionMonitorLogDO log(Long positionId, String analysisId, String monitorConclusion,
                                             String riskLevel, String suggestedAction, LocalDateTime createdAt) {
         PositionMonitorLogDO row = new PositionMonitorLogDO();
         row.setPositionId(positionId);
         row.setAnalysisId(analysisId);
         row.setExecutionPlanId("plan-p0-4");
         row.setCurrentPrice(new BigDecimal("111.25"));
-        row.setLogicStatus(logicStatus);
+        row.setMarkPriceSource("TEST_MARK_PRICE");
+        row.setEntryLogicStatus("LOGIC_VALID".equals(monitorConclusion) ? "STILL_VALID" : "WEAKENED");
+        row.setMonitorConclusion(monitorConclusion);
+        row.setReversalStatus("NO_REVERSAL");
+        row.setRiskChangeReason("LOGIC_VALID".equals(monitorConclusion)
+                ? "NO_CLEAR_RISK_FACTOR" : "OPPOSING_EVIDENCE_INCREASED");
         row.setRiskLevel(riskLevel);
+        row.setRiskTrend("STABLE");
         row.setSuggestedAction(suggestedAction);
+        row.setMonitorSourceStatus("VERIFIED");
+        row.setObservedAt(createdAt.minusMinutes(1));
+        row.setFreshUntil(createdAt.plusMinutes(5));
         row.setReason("manual review note");
         row.setEvidenceSnapshot("{\"evidence\":\"stable\"}");
         row.setScoreSnapshot("{\"score\":70}");

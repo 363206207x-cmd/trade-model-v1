@@ -15,9 +15,18 @@ public class PositionMonitorLogDTO {
     private String sourceStatus;
     private String sourceStatusLabel;
     private BigDecimal currentPrice;
+    private String markPriceSource;
     private String logicStatus;
+    private String entryLogicStatus;
+    private String monitorConclusion;
+    private String reversalStatus;
+    private String riskChangeReason;
     private String riskLevel;
+    private String riskTrend;
     private String suggestedAction;
+    private String monitorSourceStatus;
+    private LocalDateTime observedAt;
+    private LocalDateTime freshUntil;
     private String reason;
     private String evidenceSnapshot;
     private String scoreSnapshot;
@@ -52,12 +61,35 @@ public class PositionMonitorLogDTO {
     public void setSourceStatusLabel(String sourceStatusLabel) { this.sourceStatusLabel = sourceStatusLabel; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
     public void setCurrentPrice(BigDecimal currentPrice) { this.currentPrice = currentPrice; }
+    public String getMarkPriceSource() { return markPriceSource; }
+    public void setMarkPriceSource(String markPriceSource) { this.markPriceSource = markPriceSource; }
     public String getLogicStatus() { return logicStatus; }
     public void setLogicStatus(String logicStatus) { this.logicStatus = logicStatus; }
+    public String getEntryLogicStatus() { return entryLogicStatus; }
+    public void setEntryLogicStatus(String entryLogicStatus) { this.entryLogicStatus = entryLogicStatus; }
+    public String getMonitorConclusion() { return monitorConclusion; }
+    public void setMonitorConclusion(String monitorConclusion) { this.monitorConclusion = monitorConclusion; }
+    public String getReversalStatus() { return reversalStatus; }
+    public void setReversalStatus(String reversalStatus) { this.reversalStatus = reversalStatus; }
+    public String getRiskChangeReason() { return riskChangeReason; }
+    public void setRiskChangeReason(String riskChangeReason) { this.riskChangeReason = riskChangeReason; }
     public String getRiskLevel() { return riskLevel; }
     public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
+    public String getRiskTrend() { return riskTrend; }
+    public void setRiskTrend(String riskTrend) { this.riskTrend = riskTrend; }
     public String getSuggestedAction() { return suggestedAction; }
     public void setSuggestedAction(String suggestedAction) { this.suggestedAction = suggestedAction; }
+    public String getMonitorSourceStatus() { return monitorSourceStatus; }
+    public void setMonitorSourceStatus(String monitorSourceStatus) { this.monitorSourceStatus = monitorSourceStatus; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime observedAt) { this.observedAt = observedAt; }
+    public LocalDateTime getFreshUntil() { return freshUntil; }
+    public void setFreshUntil(LocalDateTime freshUntil) { this.freshUntil = freshUntil; }
+    public boolean isTrustedAndFreshAt(LocalDateTime asOf) {
+        return PositionMonitorSourceStatusEnum.VERIFIED.name().equals(monitorSourceStatus)
+                && asOf != null && observedAt != null && freshUntil != null
+                && !asOf.isBefore(observedAt) && asOf.isBefore(freshUntil);
+    }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
     public String getEvidenceSnapshot() { return evidenceSnapshot; }

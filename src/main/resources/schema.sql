@@ -409,9 +409,18 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     analysis_id VARCHAR(64) NOT NULL,
     execution_plan_id VARCHAR(64),
     current_price DECIMAL(20, 8) NOT NULL,
-    logic_status VARCHAR(32) NOT NULL,
-    risk_level VARCHAR(32) NOT NULL,
-    suggested_action VARCHAR(32) NOT NULL,
+    mark_price_source VARCHAR(64),
+    logic_status VARCHAR(32),
+    entry_logic_status VARCHAR(32),
+    monitor_conclusion VARCHAR(40),
+    reversal_status VARCHAR(32),
+    risk_change_reason VARCHAR(64),
+    risk_level VARCHAR(32),
+    risk_trend VARCHAR(32),
+    suggested_action VARCHAR(64),
+    source_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_VERIFICATION',
+    observed_at TIMESTAMP NOT NULL,
+    fresh_until TIMESTAMP NOT NULL,
     reason VARCHAR(1024),
     evidence_snapshot TEXT,
     score_snapshot TEXT,
@@ -420,11 +429,67 @@ CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     trace_id VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_position_monitor_log_price CHECK (current_price > 0),
-    CONSTRAINT ck_tm_position_monitor_log_logic_status CHECK (
-        logic_status IN ('LOGIC_VALID', 'LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'HIGH_RISK')
+    CONSTRAINT ck_tm_position_monitor_log_entry_logic CHECK (
+        entry_logic_status IN ('STILL_VALID', 'WEAKENED', 'INVALIDATED')
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_conclusion CHECK (
+        monitor_conclusion IN (
+            'LOGIC_VALID', 'LOGIC_WEAKENED', 'PLAN_INVALIDATED', 'NEAR_STOP_LOSS',
+            'NEAR_TAKE_PROFIT', 'HIGH_RISK_OBSERVATION', 'WAIT_USER_CONFIRM_CLOSE'
+        )
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_reversal CHECK (
+        reversal_status IN ('NO_REVERSAL', 'WEAK_REVERSAL', 'STRONG_REVERSAL')
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_risk_reason CHECK (
+        risk_change_reason IN (
+            'NO_CLEAR_RISK_FACTOR', 'OPPOSING_EVIDENCE_INCREASED', 'STRUCTURE_CHANGED',
+            'EVENT_IMPACT', 'DATA_QUALITY_DEGRADED'
+        )
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_risk_level CHECK (
+        risk_level IN ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_risk_trend CHECK (
+        risk_trend IN ('STABLE', 'INCREASED', 'SHARPLY_INCREASED')
     ),
     CONSTRAINT ck_tm_position_monitor_log_suggested_action CHECK (
-        suggested_action IN ('HOLD', 'MANUAL_REVIEW', 'RECHECK_PLAN', 'RISK_REVIEW')
+        suggested_action IN (
+            'CONTINUE_HOLD', 'NO_ADD_POSITION', 'REDUCE_POSITION', 'TIGHTEN_STOP',
+            'MOVE_STOP', 'PARTIAL_TAKE_PROFIT', 'WAIT_CONFIRMATION', 'RECORD_CLOSE_REVIEW'
+        )
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_source_status CHECK (
+        source_status IN ('VERIFIED', 'PENDING_VERIFICATION', 'INVALID')
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_freshness CHECK (
+        fresh_until >= observed_at
+    ),
+    CONSTRAINT ck_tm_position_monitor_log_trusted_payload CHECK (
+        (
+            source_status = 'VERIFIED'
+            AND mark_price_source IS NOT NULL
+            AND TRIM(mark_price_source) <> ''
+            AND entry_logic_status IS NOT NULL
+            AND monitor_conclusion IS NOT NULL
+            AND reversal_status IS NOT NULL
+            AND risk_change_reason IS NOT NULL
+            AND risk_level IS NOT NULL
+            AND risk_trend IS NOT NULL
+            AND suggested_action IS NOT NULL
+            AND fresh_until > observed_at
+        )
+        OR
+        (
+            source_status IN ('PENDING_VERIFICATION', 'INVALID')
+            AND entry_logic_status IS NULL
+            AND monitor_conclusion IS NULL
+            AND reversal_status IS NULL
+            AND risk_change_reason IS NULL
+            AND risk_level IS NULL
+            AND risk_trend IS NULL
+            AND suggested_action IS NULL
+        )
     )
 );
 
@@ -432,6 +497,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_position_created
     ON tm_position_monitor_log(position_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_analysis_created
     ON tm_position_monitor_log(analysis_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_trust_freshness
+    ON tm_position_monitor_log(position_id, source_status, fresh_until DESC);
 
 -- Push 快照 / 二次校验（与 tm_analysis_run.analysis_id 类型一致：VARCHAR(64)）
 -- 下列 CLOB JSON 列由 /api/review/aggregate 原样透出至复盘页文本展示，应用层不对其做解析或折叠 UI。

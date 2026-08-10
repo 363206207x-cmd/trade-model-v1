@@ -115,7 +115,7 @@ class ReviewCenterServiceImplTest {
         assertThat(position.getSymbol()).isEqualTo("BTCUSDT");
         assertThat(position.getPnl()).isEqualByComparingTo("20");
         assertThat(position.getExecutionDeviation()).isEqualTo("ALIGNED");
-        assertThat(position.getMonitorConclusion()).isEqualTo("PLAN_VALID");
+        assertThat(position.getMonitorConclusion()).isEqualTo("LOGIC_VALID");
         assertThat(position.getOriginalExecutionPlan().getPlanId()).isEqualTo("plan-7");
 
         assertThat(vo.getOpportunityReviews()).hasSize(1);
@@ -242,8 +242,8 @@ class ReviewCenterServiceImplTest {
 
     private static PositionMonitorLogDTO monitorLog() {
         PositionMonitorLogDTO dto = new PositionMonitorLogDTO();
-        dto.setLogicStatus("PLAN_VALID");
-        dto.setSuggestedAction("MANUAL_REVIEW");
+        dto.setMonitorConclusion("LOGIC_VALID");
+        dto.setSuggestedAction("CONTINUE_HOLD");
         return dto;
     }
 

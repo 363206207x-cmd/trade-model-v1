@@ -33,6 +33,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -223,10 +225,13 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     private ProfileTransitionSignal signal(UserPositionDO position, AssetStateDO state, String pushSignal) {
         PositionMonitorLogDTO log = latestLog(position);
         String reason = upper(log == null ? null : log.getReason());
-        String logic = upper(log == null ? null : log.getLogicStatus());
+        String conclusion = upper(log == null ? null : log.getMonitorConclusion());
         DecisionResultVO decision = state == null ? null : safeDecision(state.getSymbol());
         boolean highRisk = "HIGH".equalsIgnoreCase(log == null ? null : log.getRiskLevel())
-                || "HIGH_RISK".equals(logic) || "PLAN_INVALIDATED".equals(logic)
+                || "EXTREME".equalsIgnoreCase(log == null ? null : log.getRiskLevel())
+                || "HIGH_RISK_OBSERVATION".equals(conclusion)
+                || "PLAN_INVALIDATED".equals(conclusion)
+                || "WAIT_USER_CONFIRM_CLOSE".equals(conclusion)
                 || (state != null && (state.getState() == AssetStateEnum.HIGH_RISK
                 || state.getState() == AssetStateEnum.INVALIDATED));
         return new ProfileTransitionSignal(null, null, null, null,
@@ -269,7 +274,10 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         if (position == null || position.getId() == null) return null;
         try {
             List<PositionMonitorLogDTO> rows = monitorLogService.listByPositionIdForSystem(position.getId(), 1);
-            return rows == null || rows.isEmpty() ? null : rows.get(0);
+            if (rows == null || rows.isEmpty()) return null;
+            PositionMonitorLogDTO latest = rows.get(0);
+            LocalDateTime asOf = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+            return latest != null && latest.isTrustedAndFreshAt(asOf) ? latest : null;
         } catch (RuntimeException ignored) {
             return null;
         }
