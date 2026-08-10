@@ -48,6 +48,8 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|09159a26bc0679e08be5b44f5f7ee8ef534fb0d7469cd8d242369ceef6590c02|V4_1_DECISION_CHAIN -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md|ceeebb1f62d0154b9196314799b20a94bc90867f90bc50cf490b41fc6b53e0fe|V4_1_DECISION_CHAIN_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
 <!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|598c5628f1a179c19c38215a6fcfde67b96c7a55e2fb778c5caaaa4d2a99079a|DELIVERY_AND_SAFETY -->
 
@@ -158,6 +160,40 @@ This record authorizes only `P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION`.
 It remains non-effective until reviewed and merged, and it does not make the
 separate local candidate diff authoritative by existence.
 
+### PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
+
+| Attribute | Registration |
+|---|---|
+| Document name | Fundamental AI v4.1 Decision Chain |
+| Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
+| Original source | `/Users/xuchao/Desktop/Fundamental_AI_v4_1_Codex_v2.docx` |
+| Original SHA-256 | `0aea7af215045df2b49430bdbde601910825de5248f53b37de977c11927da2e7` |
+| Repository SHA-256 | `09159a26bc0679e08be5b44f5f7ee8ef534fb0d7469cd8d242369ceef6590c02` |
+| Version/date | v4.1 Product Owner source; registered `2026-08-11` |
+| Authority | Explicit Product Owner product-design freeze for the v4.1 decision chain |
+| Applicable modules | Asset Pool, Opportunity, state machine, Analysis/Evidence/Score/Decision, Three AI, Candidate/Final plan, conflict resolution, AI trace, Review |
+| Required concepts | Asset Pool only source; eight opportunity states; rule-led AI chain; Candidate/Final separation; rule validation; complete trace; manual UserPosition boundary |
+| Forbidden reinterpretations | no automatic trading; no AI voting or state mutation; no Candidate as Final; no plan as position; no duplicate canonical object family |
+
+### PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | Fundamental AI v4.1 Decision Chain Implementation Authorization |
+| Repository path | `docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md` |
+| Repository SHA-256 | `ceeebb1f62d0154b9196314799b20a94bc90867f90bc50cf490b41fc6b53e0fe` |
+| Version/date | Authorization candidate; effective only after merged-main validation |
+| Authority | Exact implementation permission for one bounded v4.1 backend package |
+| Applicable modules | The exact `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION` package only |
+| Required concepts | frozen AI permissions; canonical object ownership; exact package match; pre-merge block; post-merge permission |
+| Forbidden reinterpretations | no broader package, Mobile, Figma, automatic trading, duplicate object stack, or implementation inside this authorization change |
+
+This source and authorization are a directly approved version-scoped backend
+package. They do not mark Product P2 or full Product P3 acceptance complete,
+do not authorize a P3 UI package, and do not change the Product Completion
+Matrix. Their sole implementation successor is
+`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`.
+
 ### PS-FIGMA-BASELINE
 
 Repository record: `docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`, SHA-256 `fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851`.
@@ -173,7 +209,7 @@ Figma shows design intent; it cannot invent data, APIs, state transitions, or co
 ## 4. Frozen Product Semantics
 
 1. The rule layer produces base direction, confidence/risk context, and plan mode before AI review.
-2. GPT Final explains and synthesizes; Gemini Review finds conflicts and downgrade needs; Grok Challenge supplies counter-evidence and event/microstructure challenge. They are not parallel voters.
+2. For v4.1, GPT Final generates only an ExecutionPlanCandidate; Gemini Review reviews that Candidate; Grok Challenge supplies counter-evidence and risk challenge; Conflict Resolver records adjustments; Rule Validation alone confirms the FinalExecutionPlan. They are not parallel voters.
 3. AI is checkpoint-triggered, not required every cycle. AI failure falls back to the rule chain and cannot stop manual-position price safety monitoring.
 4. `AssetState` and `UserPositionState` are separate domains.
 5. `triggered` means conditions matched, not that the user opened a position.
@@ -187,6 +223,10 @@ Figma shows design intent; it cannot invent data, APIs, state transitions, or co
 13. Home displays the verified ExecutionPlan summary and three AI summaries; detailed evidence, eight scores, timeframes, source trace, and conflict reasons belong in Analysis Detail.
 14. Message Center product sources are only `OPPORTUNITY` and `POSITION_RISK`. Telegram is a future delivery outlet, not a message type or Message Center.
 15. A module is complete only when product, design, semantics, real data, interaction, failure handling, and a real scenario all pass.
+16. Asset Pool is the only v4.1 opportunity source; Home focus assets are projections from it, not a fixed opportunity universe.
+17. Opportunity state and execution permission are separate; `triggered` never creates UserPosition.
+18. ExecutionPlanCandidate and FinalExecutionPlan are separate identities and storage contracts; an unvalidated Candidate is never a Final plan.
+19. AITrace and ConflictResolverResult extend the existing AI call-log and conflict-resolver owners rather than creating parallel object families.
 
 ## 5. Permanent Safety and Privacy Boundaries
 
