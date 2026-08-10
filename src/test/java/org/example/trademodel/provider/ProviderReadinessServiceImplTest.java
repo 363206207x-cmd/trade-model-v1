@@ -1,15 +1,21 @@
 package org.example.trademodel.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.net.http.HttpClient;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.service.readiness.ProviderReadinessServiceImpl;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 class ProviderReadinessServiceImplTest {
@@ -86,6 +92,83 @@ class ProviderReadinessServiceImplTest {
     }
 
     @Test
+    void localRealRuntimeUsesFreshProviderHealthAsSingleReadinessSource() {
+        LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
+        when(localRealStatus.providerReadinessSnapshot()).thenReturn(localRealStatus(
+                true, "DASHBOARD_READY", "FRESH", "UP", false));
+        ProviderReadinessServiceImpl service = service(new MockEnvironment()
+                .withProperty("position.provider.type", "SIMULATED"));
+        ReflectionTestUtils.setField(service, "localRealDataStatusService", localRealStatus);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("CONNECTED");
+        assertThat(readiness.getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            assertThat(provider.getName()).isEqualTo("KRAKEN_PUBLIC_MARKET_DATA");
+            assertThat(provider.getConnected()).isTrue();
+            assertThat(provider.getReason()).isEqualTo("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
+        });
+    }
+
+    @Test
+    void localRealStaleMarketDataFailsClosedEvenWhenProviderWasUp() {
+        LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
+        when(localRealStatus.providerReadinessSnapshot()).thenReturn(localRealStatus(
+                true, "DASHBOARD_READY", "STALE", "UP", false));
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        ReflectionTestUtils.setField(service, "localRealDataStatusService", localRealStatus);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("FAIL_CLOSED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("KRAKEN_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("LOCAL_REAL_MARKET_DATA_STALE");
+            }
+        });
+    }
+
+    @Test
+    void localRealInvalidMarketDataFailsClosedEvenWhenProviderWasUp() {
+        LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
+        when(localRealStatus.providerReadinessSnapshot()).thenReturn(localRealStatus(
+                true, "DASHBOARD_READY", "INVALID", "UP", false));
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        ReflectionTestUtils.setField(service, "localRealDataStatusService", localRealStatus);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("FAIL_CLOSED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("KRAKEN_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("LOCAL_REAL_MARKET_DATA_INVALID");
+            }
+        });
+    }
+
+    @Test
+    void localRealStatusReadFailureFailsClosedWithoutStaticFallback() {
+        LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
+        when(localRealStatus.providerReadinessSnapshot()).thenThrow(new IllegalStateException("status unavailable"));
+        ProviderReadinessServiceImpl service = service(new MockEnvironment()
+                .withProperty("position.provider.type", "SIMULATED"));
+        ReflectionTestUtils.setField(service, "localRealDataStatusService", localRealStatus);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("FAIL_CLOSED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("LOCAL_REAL_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("LOCAL_REAL_PROVIDER_STATUS_UNAVAILABLE");
+            }
+        });
+    }
+
+    @Test
     void readinessServiceHasNoLiveProviderClientOrderExecutionTelegramOrPushDependency() {
         List<String> forbiddenTypeNames = List.of(
                 HttpClient.class.getSimpleName(),
@@ -110,6 +193,20 @@ class ProviderReadinessServiceImplTest {
 
     private ProviderReadinessServiceImpl service(MockEnvironment environment) {
         return new ProviderReadinessServiceImpl(environment);
+    }
+
+    private LocalRealDataStatusService.ProviderReadinessSnapshot localRealStatus(
+            boolean dashboardReady,
+            String state,
+            String freshness,
+            String providerStatus,
+            boolean circuitOpen) {
+        Instant now = Instant.parse("2026-08-10T00:00:00Z");
+        PublicProviderHealthSnapshot health = new PublicProviderHealthSnapshot(
+                "KRAKEN", providerStatus, now, null, circuitOpen, null);
+        return new LocalRealDataStatusService.ProviderReadinessSnapshot(
+                "KRAKEN", state, dashboardReady, freshness, health,
+                dashboardReady ? "REAL_DATA_AVAILABLE" : "LOCAL_REAL_PROVIDER_NOT_READY", 6, 6);
     }
 
     private void assertNoConnected(ProviderReadinessVO readiness) {
