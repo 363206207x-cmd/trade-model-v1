@@ -28,6 +28,10 @@ public interface AssetStateService {
     void persistAuthoritativeState(String symbol, AssetStateEnum state, int confusedScore,
                                    int confusedLowStreak, String traceId);
 
+    OpportunityTransitionResult transition(String symbol, AssetStateEnum requestedState, int confusedScore,
+                                           int confusedLowStreak, String analysisId, String traceId,
+                                           String reason, OpportunityTriggerSource triggerSource);
+
     /**
      * 全库维度「最近一次 Hot Reset」行（按 hot_reset_time 最大），供 systemStatus 展示；无则 null。
      */

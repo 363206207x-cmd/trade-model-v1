@@ -33,6 +33,12 @@ public class AnalysisRunCommand {
                 triggerReference, requestId, null, null, null);
     }
 
+    public static AnalysisRunCommand assetPoolScan(String symbol, String timeframe, String requestId,
+                                                   String triggerReference) {
+        return new AnalysisRunCommand(symbol, timeframe, AnalysisRunTriggerType.ASSET_POOL_SCAN,
+                triggerReference, requestId, null, null, null);
+    }
+
     public static AnalysisRunCommand hotResetRebuild(String symbol, String timeframe, String eventId,
                                                      String requestId, String parentAnalysisId, String parentTraceId) {
         return new AnalysisRunCommand(symbol, timeframe, AnalysisRunTriggerType.HOT_RESET_REBUILD,

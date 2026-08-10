@@ -75,11 +75,17 @@ public record AiRoleResultsPayload(
             boolean notUserPositionCreation,
             boolean notPositionMutation,
             boolean notStateMachineOverride,
+            boolean notFinalExecutionPlanCreation,
             boolean ruleDirectionPreserved) {
 
         public static SafetyBoundary defaults() {
             return new SafetyBoundary(true, true, true, true, true,
-                    true, true, true, true, true);
+                    true, true, true, true, true, true);
+        }
+
+        public static SafetyBoundary decisionChainV41() {
+            return new SafetyBoundary(false, true, true, true, true,
+                    true, true, true, true, true, true);
         }
     }
 }

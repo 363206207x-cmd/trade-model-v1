@@ -32,6 +32,18 @@ public class AssetStateDO {
 
     private String postResetState;
 
+    private String opportunityId;
+
+    private LocalDateTime stateEnteredAt;
+
+    private LocalDateTime coolingUntil;
+
+    private String lastTransitionReason;
+
+    private String lastTriggerSource;
+
+    private String lastAnalysisId;
+
     private LocalDateTime lastUpdateTime = LocalDateTime.now();
 
     private String traceId;
@@ -123,6 +135,19 @@ public class AssetStateDO {
     public void setPostResetState(String postResetState) {
         this.postResetState = postResetState;
     }
+
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+    public LocalDateTime getStateEnteredAt() { return stateEnteredAt; }
+    public void setStateEnteredAt(LocalDateTime stateEnteredAt) { this.stateEnteredAt = stateEnteredAt; }
+    public LocalDateTime getCoolingUntil() { return coolingUntil; }
+    public void setCoolingUntil(LocalDateTime coolingUntil) { this.coolingUntil = coolingUntil; }
+    public String getLastTransitionReason() { return lastTransitionReason; }
+    public void setLastTransitionReason(String lastTransitionReason) { this.lastTransitionReason = lastTransitionReason; }
+    public String getLastTriggerSource() { return lastTriggerSource; }
+    public void setLastTriggerSource(String lastTriggerSource) { this.lastTriggerSource = lastTriggerSource; }
+    public String getLastAnalysisId() { return lastAnalysisId; }
+    public void setLastAnalysisId(String lastAnalysisId) { this.lastAnalysisId = lastAnalysisId; }
 
     public LocalDateTime getLastUpdateTime() {
         return lastUpdateTime;

@@ -87,6 +87,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 target.jdbcUrl(), target.username(), target.password())) {
             legacyPositionId = insertLegacyUserPositionBeforeOwnershipMigration(connection);
             legacyMonitorLogId = insertLegacyPositionMonitorBeforeContractMigration(connection, legacyPositionId);
+            insertLegacyAssetStateBeforeDecisionChainMigration(connection);
         }
 
         Flyway.configure()
@@ -97,7 +98,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
 
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(28);
+            assertThat(countTradeModelTables(connection)).isEqualTo(32);
             assertTablesExist(connection, List.of(
                     "tm_analysis_run",
                     "tm_decision_result",
@@ -110,7 +111,11 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "tm_push_recheck_log",
                     "tm_ai_call_log",
                     "tm_user",
-                    "tm_asset_state"));
+                    "tm_asset_state",
+                    "tm_asset_pool_item",
+                    "tm_opportunity_state_transition",
+                    "tm_execution_plan_candidate",
+                    "tm_conflict_resolver_result"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_user_position_user_status_opened_at",
@@ -118,6 +123,11 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "idx_tm_position_monitor_log_trust_freshness",
                     "idx_tm_push_snapshot_analysis_id",
                     "idx_tm_ai_call_log_trace_id",
+                    "idx_tm_ai_call_log_candidate",
+                    "idx_tm_asset_pool_active_order",
+                    "idx_tm_opportunity_transition_opportunity_time",
+                    "uk_tm_plan_candidate_analysis",
+                    "uk_tm_conflict_resolver_candidate",
                     "uk_tm_review_result_analysis_scope",
                     "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
@@ -130,6 +140,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertUserPositionOwnershipV9Contract(connection, legacyPositionId);
             assertPositionMonitorV10Contract(connection, legacyMonitorLogId);
             assertPositionMonitorV10NewRowDefaults(connection, legacyPositionId);
+            assertDecisionChainV11Contract(connection);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -307,8 +318,135 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(10);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(11);
             }
+        }
+    }
+
+    private static void insertLegacyAssetStateBeforeDecisionChainMigration(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO tm_asset_state(
+                  symbol, state, confused_score, confused_low_streak, last_update_time, trace_id
+                ) VALUES ('LEGACYV11USDT', 'legacy_state', 5, 0, ?, 'legacy-v11-trace')
+                """)) {
+            statement.setObject(1, LocalDateTime.of(2026, 7, 27, 8, 10));
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    private static void assertDecisionChainV11Contract(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) FROM tm_asset_pool_item
+                WHERE owner_type = 'SYSTEM' AND owner_id = 0 AND active = TRUE
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isEqualTo(6);
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT state, opportunity_id, state_entered_at, last_transition_reason, last_trigger_source
+                FROM tm_asset_state WHERE symbol = 'LEGACYV11USDT'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("state")).isEqualTo("OBSERVING");
+                assertThat(rs.getString("opportunity_id")).isEqualTo("opp-legacyv11usdt");
+                assertThat(rs.getObject("state_entered_at")).isNotNull();
+                assertThat(rs.getString("last_transition_reason")).isEqualTo("LEGACY_STATE_ADOPTED");
+                assertThat(rs.getString("last_trigger_source")).isEqualTo("LEGACY_ANALYSIS");
+            }
+        }
+
+        try (Statement statement = connection.createStatement()) {
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_analysis_run(
+                      analysis_id, symbol, timeframe, analysis_time, trace_id, status, created_at, updated_at
+                    ) VALUES ('analysis-v11-chain', 'V11CHAINUSDT', '5m', CURRENT_TIMESTAMP,
+                      'trace-v11-chain', 'SUCCESS', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """)).isEqualTo(1);
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_asset_state(
+                      symbol, state, confused_score, opportunity_id, state_entered_at,
+                      last_update_time, trace_id
+                    ) VALUES ('V11CHAINUSDT', 'CANDIDATE', 10, 'opp-v11-chain', CURRENT_TIMESTAMP,
+                      CURRENT_TIMESTAMP, 'trace-v11-chain')
+                    """)).isEqualTo(1);
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_execution_plan_candidate(
+                      candidate_id, opportunity_id, analysis_id, trace_id,
+                      rule_direction, rule_confidence, rule_risk, candidate_direction,
+                      plan_mode, confidence_level, risk_level, worth_opening,
+                      recommended_action, entry_zone, stop_loss, take_profit_rules,
+                      leverage_suggestion, position_suggestion, invalid_condition, validity,
+                      summary, candidate_source, candidate_status, payload_json,
+                      not_final_plan, not_state_machine_mutation, not_user_position_creation, created_at
+                    ) VALUES ('candidate-v11-chain', 'opp-v11-chain', 'analysis-v11-chain', 'trace-v11-chain',
+                      'BULLISH', 'HIGH', 'MEDIUM', 'BULLISH', 'CONFIRM', 'HIGH', 'MEDIUM', TRUE,
+                      'MANUAL_REVIEW', '100-101', '95', '110 then 120', '1x', 'small',
+                      'close below 95', '2026-08-12T00:00Z', 'candidate only', 'GPT_FINAL', 'VALIDATED',
+                      '{}', TRUE, TRUE, TRUE, CURRENT_TIMESTAMP)
+                    """)).isEqualTo(1);
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_conflict_resolver_result(
+                      resolver_result_id, candidate_id, analysis_id, trace_id,
+                      rule_direction, rule_confidence, rule_risk,
+                      gemini_review_json, grok_challenge_json, conflict_level, conflict_score,
+                      plan_mode_before, plan_mode_after, confidence_before, confidence_after,
+                      risk_before, risk_after, confused_decision, rule_direction_preserved, created_at
+                    ) VALUES ('resolver-v11-chain', 'candidate-v11-chain', 'analysis-v11-chain', 'trace-v11-chain',
+                      'BULLISH', 'HIGH', 'MEDIUM', '{}', '{}', 'NONE', 0,
+                      'CONFIRM', 'CONFIRM', 'HIGH', 'HIGH', 'MEDIUM', 'MEDIUM', FALSE, TRUE,
+                      CURRENT_TIMESTAMP)
+                    """)).isEqualTo(1);
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_execution_plan(
+                      plan_id, analysis_id, plan_mode, execution_plan_status,
+                      source_gate_status, source_gate_complete, candidate_id, opportunity_id,
+                      resolver_result_id, trace_id, chain_status, rule_validation_status,
+                      finalized_at, final_plan, create_time
+                    ) VALUES ('final-plan-v11-chain', 'analysis-v11-chain', 'CONFIRM', 'VALID',
+                      'VALID', TRUE, 'candidate-v11-chain', 'opp-v11-chain', 'resolver-v11-chain',
+                      'trace-v11-chain', 'FINAL_VALIDATED', 'PASS', CURRENT_TIMESTAMP, TRUE, CURRENT_TIMESTAMP)
+                    """)).isEqualTo(1);
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT candidate_id, resolver_result_id, final_plan, rule_validation_status
+                FROM tm_execution_plan WHERE plan_id = 'final-plan-v11-chain'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("candidate_id")).isEqualTo("candidate-v11-chain");
+                assertThat(rs.getString("resolver_result_id")).isEqualTo("resolver-v11-chain");
+                assertThat(rs.getBoolean("final_plan")).isTrue();
+                assertThat(rs.getString("rule_validation_status")).isEqualTo("PASS");
+            }
+        }
+
+        try (Statement statement = connection.createStatement()) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_execution_plan(
+                      plan_id, analysis_id, chain_status, rule_validation_status, final_plan, create_time
+                    ) VALUES ('invalid-final-v11-chain', 'analysis-v11-chain',
+                      'FINAL_VALIDATED', 'PASS', TRUE, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_user_position(
+                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      source_type, final_plan_id
+                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                      CURRENT_TIMESTAMP, 'MANUAL', 'final-plan-v11-chain')
+                    """)).isEqualTo(1);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_user_position(
+                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      source_type, final_plan_id
+                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                      CURRENT_TIMESTAMP, 'AUTO', 'final-plan-v11-chain')
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
         }
     }
 

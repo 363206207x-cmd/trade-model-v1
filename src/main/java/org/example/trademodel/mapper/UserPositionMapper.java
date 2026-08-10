@@ -17,11 +17,11 @@ public interface UserPositionMapper {
 
     @Insert("INSERT INTO tm_user_position(" +
             "user_id, asset_symbol, side, status, entry_price, quantity, leverage, stop_loss, take_profit, opened_at, " +
-            "closed_at, close_price, close_reason, source_type, source_ref_id, manual_review_required, " +
+            "closed_at, close_price, close_reason, source_type, source_ref_id, final_plan_id, manual_review_required, " +
             "not_trade_instruction, not_auto_trading, not_order_execution, not_position_sync, created_at, updated_at" +
             ") VALUES (" +
             "#{userId}, #{assetSymbol}, #{side}, #{status}, #{entryPrice}, #{quantity}, #{leverage}, #{stopLoss}, #{takeProfit}, " +
-            "#{openedAt}, #{closedAt}, #{closePrice}, #{closeReason}, #{sourceType}, #{sourceRefId}, " +
+            "#{openedAt}, #{closedAt}, #{closePrice}, #{closeReason}, #{sourceType}, #{sourceRefId}, #{finalPlanId}, " +
             "#{manualReviewRequired}, #{notTradeInstruction}, #{notAutoTrading}, #{notOrderExecution}, " +
             "#{notPositionSync}, #{createdAt}, #{updatedAt}" +
             ")")

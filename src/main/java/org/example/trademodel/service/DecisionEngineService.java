@@ -155,6 +155,25 @@ public class DecisionEngineService {
                                          EventImpactInputVO externalContextInput,
                                          DerivativesBusinessAssessment derivativesAssessment,
                                          Integer eightScoreComposite) {
+        return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, derivativesAssessment, eightScoreComposite, true);
+    }
+
+    public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
+                                                         Integer dataQualityScore, Integer trendStructureScore,
+                                                         EventImpactInputVO externalContextInput,
+                                                         DerivativesBusinessAssessment derivativesAssessment,
+                                                         Integer eightScoreComposite) {
+        return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, derivativesAssessment, eightScoreComposite, false);
+    }
+
+    private DecisionBundleVO makeDecisionInternal(String symbol, String timeframe, String analysisId,
+                                                  Integer dataQualityScore, Integer trendStructureScore,
+                                                  EventImpactInputVO externalContextInput,
+                                                  DerivativesBusinessAssessment derivativesAssessment,
+                                                  Integer eightScoreComposite,
+                                                  boolean runLegacyAiReview) {
         String decisionId = AnalysisPersistenceIds.decisionId();
         logger.info("[AI决策] === 开始为 {} {} analysisId={} 生成决策 ===", symbol, timeframe, analysisId);
 
@@ -262,11 +281,14 @@ public class DecisionEngineService {
             }
             ctx.setConsecutiveLowConfusedCount(0);
 
-            AiOrchestratorResult aiReview = runAiReview(symbol, timeframe, analysisId, decisionId,
+            AiOrchestratorResult aiReview = runLegacyAiReview
+                    ? runAiReview(symbol, timeframe, analysisId, decisionId,
                     ruleMarketBias, confidenceLevel, riskTier, effectiveWorthOpening,
                     dataQualityScore, trendStructureScore, multiTfConvergence,
                     externalContextInput, baseScore, convergenceScore, finalScore,
-                    isBullish5m, isBullish4h, externalContextBlocked);
+                    isBullish5m, isBullish4h, externalContextBlocked)
+                    : ruleOnlyFallback(analysisId, analysisId + "-decision-chain-v4-1",
+                    "SUPERSEDED_BY_DECISION_CHAIN_V4_1");
             ctx.setGptConsistentWithRule(aiReview.isGptConsistentWithRule());
             ctx.setGeminiConsistentWithRule(aiReview.isGeminiConsistentWithRule());
             ctx.setGrokConsistentWithRule(aiReview.isGrokConsistentWithRule());

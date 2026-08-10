@@ -9,6 +9,9 @@ public class ReviewStateVO {
 
     private String reviewId;
     private String analysisId;
+    private String finalPlanId;
+    private String candidateId;
+    private String traceId;
     private String errorType;
     private String actualOutcome;
     private String adjustmentSuggestion;
@@ -30,6 +33,13 @@ public class ReviewStateVO {
     public void setAnalysisId(String analysisId) {
         this.analysisId = analysisId;
     }
+
+    public String getFinalPlanId() { return finalPlanId; }
+    public void setFinalPlanId(String finalPlanId) { this.finalPlanId = finalPlanId; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
 
     public String getErrorType() {
         return errorType;

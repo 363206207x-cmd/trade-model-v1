@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,6 +55,15 @@ public class ExecutionPlanVO {
     private List<String> derivativesReasonCodes = new ArrayList<>();
     private Instant derivativesProviderDataTime;
     private String derivativesTraceId;
+    private String candidateId;
+    private String opportunityId;
+    private String resolverResultId;
+    private String traceId;
+    private String chainStatus = "LEGACY";
+    private String ruleValidationStatus = "LEGACY";
+    private String ruleVetoReason;
+    private LocalDateTime finalizedAt;
+    private Boolean finalPlan = false;
 
     public String getPlanId() { return planId; }
     public void setPlanId(String planId) { this.planId = planId; }
@@ -137,4 +147,22 @@ public class ExecutionPlanVO {
     public void setDerivativesProviderDataTime(Instant derivativesProviderDataTime) { this.derivativesProviderDataTime = derivativesProviderDataTime; }
     public String getDerivativesTraceId() { return derivativesTraceId; }
     public void setDerivativesTraceId(String derivativesTraceId) { this.derivativesTraceId = derivativesTraceId; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+    public String getResolverResultId() { return resolverResultId; }
+    public void setResolverResultId(String resolverResultId) { this.resolverResultId = resolverResultId; }
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+    public String getChainStatus() { return chainStatus; }
+    public void setChainStatus(String chainStatus) { this.chainStatus = chainStatus; }
+    public String getRuleValidationStatus() { return ruleValidationStatus; }
+    public void setRuleValidationStatus(String ruleValidationStatus) { this.ruleValidationStatus = ruleValidationStatus; }
+    public String getRuleVetoReason() { return ruleVetoReason; }
+    public void setRuleVetoReason(String ruleVetoReason) { this.ruleVetoReason = ruleVetoReason; }
+    public LocalDateTime getFinalizedAt() { return finalizedAt; }
+    public void setFinalizedAt(LocalDateTime finalizedAt) { this.finalizedAt = finalizedAt; }
+    public Boolean getFinalPlan() { return finalPlan; }
+    public void setFinalPlan(Boolean finalPlan) { this.finalPlan = finalPlan; }
 }

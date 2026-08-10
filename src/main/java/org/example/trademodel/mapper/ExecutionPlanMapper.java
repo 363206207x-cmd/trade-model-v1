@@ -10,8 +10,8 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface ExecutionPlanMapper {
 
-    @Insert("INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, execution_plan_status, source_gate_status, source_gate_complete, source_missing_reasons, source_blocker_reasons, source_completeness_summary, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, account_risk_json, invalid_condition, manual_review_required, not_trade_instruction, not_executable, not_auto_trading, not_order_execution, not_user_position_creation, needs_revalidation, revalidation_reason, create_time) " +
-            "VALUES(#{planId}, #{analysisId}, #{planMode}, #{executionPlanStatus}, #{sourceGateStatus}, #{sourceGateComplete}, #{sourceMissingReasons}, #{sourceBlockerReasons}, #{sourceCompletenessSummary}, #{recommendedAction}, #{entryZone}, #{stopLoss}, #{takeProfitRules}, #{leverageSuggestion}, #{positionSuggestion}, #{accountRiskJson}, #{invalidCondition}, #{manualReviewRequired}, #{notTradeInstruction}, #{notExecutable}, #{notAutoTrading}, #{notOrderExecution}, #{notUserPositionCreation}, #{needsRevalidation}, #{revalidationReason}, #{createTime})")
+    @Insert("INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, execution_plan_status, source_gate_status, source_gate_complete, source_missing_reasons, source_blocker_reasons, source_completeness_summary, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, account_risk_json, invalid_condition, manual_review_required, not_trade_instruction, not_executable, not_auto_trading, not_order_execution, not_user_position_creation, candidate_id, opportunity_id, resolver_result_id, trace_id, chain_status, rule_validation_status, rule_veto_reason, finalized_at, final_plan, needs_revalidation, revalidation_reason, create_time) " +
+            "VALUES(#{planId}, #{analysisId}, #{planMode}, #{executionPlanStatus}, #{sourceGateStatus}, #{sourceGateComplete}, #{sourceMissingReasons}, #{sourceBlockerReasons}, #{sourceCompletenessSummary}, #{recommendedAction}, #{entryZone}, #{stopLoss}, #{takeProfitRules}, #{leverageSuggestion}, #{positionSuggestion}, #{accountRiskJson}, #{invalidCondition}, #{manualReviewRequired}, #{notTradeInstruction}, #{notExecutable}, #{notAutoTrading}, #{notOrderExecution}, #{notUserPositionCreation}, #{candidateId}, #{opportunityId}, #{resolverResultId}, #{traceId}, #{chainStatus}, #{ruleValidationStatus}, #{ruleVetoReason}, #{finalizedAt}, #{finalPlan}, #{needsRevalidation}, #{revalidationReason}, #{createTime})")
     int insert(ExecutionPlanDO plan);
 
     @Select("SELECT * FROM tm_execution_plan WHERE analysis_id = #{analysisId} ORDER BY create_time DESC LIMIT 1")
@@ -28,6 +28,15 @@ public interface ExecutionPlanMapper {
 
     @Select("SELECT * FROM tm_execution_plan WHERE plan_id = #{planId} ORDER BY create_time DESC LIMIT 1")
     ExecutionPlanDO selectByPlanId(@Param("planId") String planId);
+
+    @Select("SELECT ep.* FROM tm_execution_plan ep "
+            + "INNER JOIN tm_decision_result d ON d.analysis_id = ep.analysis_id "
+            + "WHERE ep.plan_id = #{planId} AND ep.final_plan = TRUE "
+            + "AND ep.rule_validation_status = 'PASS' AND ep.candidate_id IS NOT NULL "
+            + "AND UPPER(TRIM(d.symbol)) = #{normalizedSymbol} "
+            + "ORDER BY ep.create_time DESC LIMIT 1")
+    ExecutionPlanDO selectValidatedFinalByPlanIdAndSymbol(@Param("planId") String planId,
+                                                          @Param("normalizedSymbol") String normalizedSymbol);
 
     @Update("UPDATE tm_execution_plan SET needs_revalidation = TRUE, revalidation_reason = #{reason}, "
             + "hot_reset_event_id = #{eventId}, revalidation_required_at = #{requiredAt} "

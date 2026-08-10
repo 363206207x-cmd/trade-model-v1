@@ -14,6 +14,7 @@ public interface ReviewResultMapper {
 
     String COLUMNS = "id, analysis_id AS analysisId, user_id AS userId, "
             + "user_position_id AS userPositionId, review_scope_key AS reviewScopeKey, "
+            + "final_plan_id AS finalPlanId, candidate_id AS candidateId, trace_id AS traceId, "
             + "error_type AS errorType, actual_outcome AS actualOutcome, "
             + "adjustment_suggestion AS adjustmentSuggestion, create_time AS createTime, update_time AS updateTime";
 
@@ -40,9 +41,9 @@ public interface ReviewResultMapper {
             + "ORDER BY update_time DESC, create_time DESC, id DESC LIMIT #{limit}")
     List<ReviewResultDO> listRecentByUserId(@Param("userId") Long userId, @Param("limit") int limit);
 
-    @Insert("INSERT INTO tm_review_result(id, analysis_id, user_id, user_position_id, review_scope_key, "
+    @Insert("INSERT INTO tm_review_result(id, analysis_id, user_id, user_position_id, final_plan_id, candidate_id, trace_id, review_scope_key, "
             + "error_type, actual_outcome, adjustment_suggestion, create_time, update_time) "
-            + "VALUES(#{id}, #{analysisId}, #{userId}, #{userPositionId}, #{reviewScopeKey}, "
+            + "VALUES(#{id}, #{analysisId}, #{userId}, #{userPositionId}, #{finalPlanId}, #{candidateId}, #{traceId}, #{reviewScopeKey}, "
             + "#{errorType}, #{actualOutcome}, #{adjustmentSuggestion}, #{createTime}, #{updateTime})")
     int insert(ReviewResultDO row);
 

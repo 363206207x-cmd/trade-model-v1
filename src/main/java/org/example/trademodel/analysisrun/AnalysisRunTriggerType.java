@@ -4,6 +4,7 @@ import java.util.Locale;
 
 public enum AnalysisRunTriggerType {
     SCHEDULED,
+    ASSET_POOL_SCAN,
     MANUAL_API,
     HOT_RESET_REBUILD,
     MARKET_DATA_COMPATIBILITY;
@@ -18,6 +19,9 @@ public enum AnalysisRunTriggerType {
         }
         if (t.startsWith("SCHEDULE")) {
             return SCHEDULED;
+        }
+        if (t.startsWith("ASSET_POOL")) {
+            return ASSET_POOL_SCAN;
         }
         if (t.startsWith("MARKET_DATA") || t.startsWith("REAL_MARKET")) {
             return MARKET_DATA_COMPATIBILITY;

@@ -19,6 +19,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     private final ObjectMapper objectMapper;
     private final AiPromptBuilder promptBuilder;
     private final AiProviderResponseParser responseParser;
+    private final AiDecisionChainPromptBuilder decisionChainPromptBuilder;
+    private final AiDecisionChainResponseParser decisionChainResponseParser;
     private volatile boolean contractVerified;
 
     protected AbstractSafeAiProviderClient(AiOrchestratorProperties properties,
@@ -29,6 +31,8 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         this.objectMapper = objectMapper;
         this.promptBuilder = new AiPromptBuilder(objectMapper, properties);
         this.responseParser = new AiProviderResponseParser(objectMapper);
+        this.decisionChainPromptBuilder = new AiDecisionChainPromptBuilder(objectMapper, properties);
+        this.decisionChainResponseParser = new AiDecisionChainResponseParser(objectMapper);
     }
 
     @Override
@@ -134,6 +138,59 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         }
     }
 
+    @Override
+    public AiDecisionChainResult executeDecisionChain(AiDecisionChainRequest request, long timeoutOverrideMs) {
+        long started = System.nanoTime();
+        if (request == null || request.getRole() == null) {
+            return AiDecisionChainResult.failed(provider(), null, AiProviderCallStatus.FAILED,
+                    "DECISION_CHAIN_REQUEST_INVALID");
+        }
+        AiDecisionChainPromptBuilder.PromptPayload prompt = decisionChainPromptBuilder.build(request);
+        if (prompt.truncated()) {
+            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.FAILED,
+                    "PROMPT_INPUT_TOO_LARGE");
+        }
+        try {
+            String model = providerProperties().getEffectiveModel();
+            AiHttpRequest httpRequest = buildDecisionChainHttpRequest(
+                    prompt.dataJson(), request.getRole(), timeoutOverrideMs, model);
+            AiHttpResponse response = transport.post(httpRequest);
+            long latencyMs = elapsedMs(started);
+            if (response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+                AiProviderReviewResult failure = httpFailure(response, latencyMs);
+                return chainFailure(request.getRole(), failure);
+            }
+            ProviderPayload payload = extractPayload(response);
+            String raw = payload.rawContent() == null ? payload.content() : payload.rawContent();
+            AiDecisionChainResult result = decisionChainResponseParser.parse(provider(), request.getRole(), raw);
+            result.setProviderRequestId(payload.providerRequestId());
+            result.setLatencyMs(latencyMs);
+            result.setInputTokens(payload.inputTokens());
+            result.setOutputTokens(payload.outputTokens());
+            result.setTotalTokens(totalTokens(payload.inputTokens(), payload.outputTokens(), payload.totalTokens()));
+            result.setCalculatedCostUsd(calculateCost(payload.inputTokens(), payload.outputTokens()));
+            result.setSelectedModel(model);
+            return result;
+        } catch (HttpTimeoutException exception) {
+            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
+                    "PROVIDER_TIMEOUT");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
+                    "PROVIDER_INTERRUPTED");
+        } catch (Exception exception) {
+            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.FAILED,
+                    "PROVIDER_FAILURE");
+        }
+    }
+
+    protected AiHttpRequest buildDecisionChainHttpRequest(String promptJson,
+                                                          AiDecisionChainRole role,
+                                                          long timeoutOverrideMs,
+                                                          String selectedModel) throws Exception {
+        return buildHttpRequest(promptJson, timeoutOverrideMs, selectedModel);
+    }
+
     protected abstract AiHttpRequest buildHttpRequest(String promptJson, long timeoutOverrideMs,
                                                       String selectedModel) throws Exception;
 
@@ -230,7 +287,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return result;
     }
 
-    private BigDecimal calculateCost(Long inputTokens, Long outputTokens) {
+    protected BigDecimal calculateCost(Long inputTokens, Long outputTokens) {
         BigDecimal input = costPart(inputTokens, providerProperties().getInputCostPerMillionUsd());
         BigDecimal output = costPart(outputTokens, providerProperties().getOutputCostPerMillionUsd());
         return input.add(output).setScale(8, RoundingMode.HALF_UP);
@@ -245,7 +302,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                 .divide(BigDecimal.valueOf(1_000_000L), 12, RoundingMode.HALF_UP);
     }
 
-    private static Long totalTokens(Long input, Long output, Long total) {
+    protected static Long totalTokens(Long input, Long output, Long total) {
         if (total != null) {
             return total;
         }
@@ -255,7 +312,7 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return (input == null ? 0L : input) + (output == null ? 0L : output);
     }
 
-    private static long elapsedMs(long started) {
+    protected static long elapsedMs(long started) {
         return Math.max(0, (System.nanoTime() - started) / 1_000_000L);
     }
 
@@ -280,9 +337,28 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
                 || normalized.contains("payment_required");
     }
 
+    private AiDecisionChainResult chainFailure(AiDecisionChainRole role, AiProviderReviewResult failure) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(provider(), role,
+                failure == null ? AiProviderCallStatus.FAILED : failure.getCallStatus(),
+                failure == null ? "PROVIDER_FAILURE" : failure.getErrorCode());
+        if (failure != null) {
+            result.setLatencyMs(failure.getLatencyMs());
+            result.setSelectedModel(failure.getSelectedModel());
+        }
+        return result;
+    }
+
     protected record ProviderPayload(String content, String providerRequestId,
                                      Long inputTokens, Long outputTokens, Long totalTokens,
                                      GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
-                                     GeminiInteractionDiagnostic geminiInteractionDiagnostic) {
+                                     GeminiInteractionDiagnostic geminiInteractionDiagnostic,
+                                     String rawContent) {
+        protected ProviderPayload(String content, String providerRequestId,
+                                  Long inputTokens, Long outputTokens, Long totalTokens,
+                                  GeminiResponseShapeDiagnostic geminiResponseShapeDiagnostic,
+                                  GeminiInteractionDiagnostic geminiInteractionDiagnostic) {
+            this(content, providerRequestId, inputTokens, outputTokens, totalTokens,
+                    geminiResponseShapeDiagnostic, geminiInteractionDiagnostic, content);
+        }
     }
 }

@@ -23,12 +23,14 @@ public interface AiCallLogMapper {
             + "fallback_reason AS fallbackReason, rate_limited AS rateLimited, budget_blocked AS budgetBlocked, "
             + "timeout_flag AS timeoutFlag, error_code AS errorCode, error_message AS errorMessage, "
             + "request_hash AS requestHash, request_summary AS requestSummary, response_summary AS responseSummary, "
-            + "rule_version AS ruleVersion, review_only AS reviewOnly, manual_review_only AS manualReviewOnly, "
+            + "rule_version AS ruleVersion, contract_type AS contractType, candidate_id AS candidateId, "
+            + "output_payload AS outputPayload, review_only AS reviewOnly, manual_review_only AS manualReviewOnly, "
             + "not_trade_instruction AS notTradeInstruction, not_executable AS notExecutable, "
             + "not_auto_trading AS notAutoTrading, not_order_execution AS notOrderExecution, "
             + "not_user_position_creation AS notUserPositionCreation, not_position_mutation AS notPositionMutation, "
             + "not_state_machine_override AS notStateMachineOverride, "
             + "not_execution_plan_creation AS notExecutionPlanCreation, "
+            + "not_final_execution_plan_creation AS notFinalExecutionPlanCreation, "
             + "rule_direction_preserved AS ruleDirectionPreserved, created_at AS createdAt, updated_at AS updatedAt";
 
     String CHARGEABLE_COST = """
@@ -50,19 +52,21 @@ public interface AiCallLogMapper {
               provider_request_id, started_at, completed_at, latency_ms, input_tokens, output_tokens, total_tokens,
               reserved_cost_usd, calculated_cost_usd, cost_currency, cost_calculation_method,
               fallback_flag, fallback_reason, rate_limited, budget_blocked, timeout_flag, error_code, error_message,
-              request_hash, request_summary, response_summary, rule_version,
+              request_hash, request_summary, response_summary, rule_version, contract_type, candidate_id, output_payload,
               review_only, manual_review_only, not_trade_instruction, not_executable, not_auto_trading,
               not_order_execution, not_user_position_creation, not_position_mutation,
-              not_state_machine_override, not_execution_plan_creation, rule_direction_preserved, created_at, updated_at
+              not_state_machine_override, not_execution_plan_creation, not_final_execution_plan_creation,
+              rule_direction_preserved, created_at, updated_at
             ) VALUES (
               #{callId}, #{analysisId}, #{traceId}, #{requestId}, #{providerName}, #{modelName}, #{aiRole}, #{callStatus},
               #{providerRequestId}, #{startedAt}, #{completedAt}, #{latencyMs}, #{inputTokens}, #{outputTokens}, #{totalTokens},
               #{reservedCostUsd}, #{calculatedCostUsd}, #{costCurrency}, #{costCalculationMethod},
               #{fallbackFlag}, #{fallbackReason}, #{rateLimited}, #{budgetBlocked}, #{timeoutFlag}, #{errorCode}, #{errorMessage},
-              #{requestHash}, #{requestSummary}, #{responseSummary}, #{ruleVersion},
+              #{requestHash}, #{requestSummary}, #{responseSummary}, #{ruleVersion}, #{contractType}, #{candidateId}, #{outputPayload},
               #{reviewOnly}, #{manualReviewOnly}, #{notTradeInstruction}, #{notExecutable}, #{notAutoTrading},
               #{notOrderExecution}, #{notUserPositionCreation}, #{notPositionMutation},
-              #{notStateMachineOverride}, #{notExecutionPlanCreation}, #{ruleDirectionPreserved}, #{createdAt}, #{updatedAt}
+              #{notStateMachineOverride}, #{notExecutionPlanCreation}, #{notFinalExecutionPlanCreation},
+              #{ruleDirectionPreserved}, #{createdAt}, #{updatedAt}
             )
             """)
     int insert(AiCallLogDO log);
@@ -85,6 +89,7 @@ public interface AiCallLogMapper {
               error_code = #{errorCode},
               error_message = #{errorMessage},
               response_summary = #{responseSummary},
+              output_payload = #{outputPayload},
               updated_at = #{updatedAt}
             WHERE call_id = #{callId}
             """)

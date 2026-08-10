@@ -11,6 +11,9 @@ public class ReviewResultDO {
     private String analysisId;
     private Long userId;
     private Long userPositionId;
+    private String finalPlanId;
+    private String candidateId;
+    private String traceId;
     private String reviewScopeKey;
     private String errorType;
     private String actualOutcome;
@@ -49,6 +52,13 @@ public class ReviewResultDO {
     public void setUserPositionId(Long userPositionId) {
         this.userPositionId = userPositionId;
     }
+
+    public String getFinalPlanId() { return finalPlanId; }
+    public void setFinalPlanId(String finalPlanId) { this.finalPlanId = finalPlanId; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
 
     public String getReviewScopeKey() {
         return reviewScopeKey;

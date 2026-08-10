@@ -15,6 +15,7 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.AnalysisSchedulerService;
+import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
@@ -22,6 +23,7 @@ import org.example.trademodel.service.HotResetCommand;
 import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
+import org.example.trademodel.service.OpportunityTriggerSource;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +64,7 @@ public class HotResetServiceImpl implements HotResetService {
     private final UserPositionRiskAdapter userPositionRiskAdapter;
     private final ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider;
     private final RuleConfigContractService ruleConfigContractService;
+    private final AssetStateService assetStateService;
     private Clock clock = Clock.systemUTC();
 
     public HotResetServiceImpl(AssetStateMapper assetStateMapper,
@@ -73,7 +76,21 @@ public class HotResetServiceImpl implements HotResetService {
                                UserPositionRiskAdapter userPositionRiskAdapter,
                                ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider) {
         this(assetStateMapper, hotResetEventMapper, decisionResultMapper, executionPlanMapper, pushSnapshotMapper,
-                confusedStateService, userPositionRiskAdapter, analysisSchedulerServiceProvider, null);
+                confusedStateService, userPositionRiskAdapter, analysisSchedulerServiceProvider, null, null);
+    }
+
+    public HotResetServiceImpl(AssetStateMapper assetStateMapper,
+                               HotResetEventMapper hotResetEventMapper,
+                               DecisionResultMapper decisionResultMapper,
+                               ExecutionPlanMapper executionPlanMapper,
+                               PushSnapshotMapper pushSnapshotMapper,
+                               ConfusedStateService confusedStateService,
+                               UserPositionRiskAdapter userPositionRiskAdapter,
+                               ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider,
+                               RuleConfigContractService ruleConfigContractService) {
+        this(assetStateMapper, hotResetEventMapper, decisionResultMapper, executionPlanMapper, pushSnapshotMapper,
+                confusedStateService, userPositionRiskAdapter, analysisSchedulerServiceProvider,
+                ruleConfigContractService, null);
     }
 
     @Autowired
@@ -85,7 +102,8 @@ public class HotResetServiceImpl implements HotResetService {
                                ConfusedStateService confusedStateService,
                                UserPositionRiskAdapter userPositionRiskAdapter,
                                ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider,
-                               RuleConfigContractService ruleConfigContractService) {
+                               RuleConfigContractService ruleConfigContractService,
+                               AssetStateService assetStateService) {
         this.assetStateMapper = assetStateMapper;
         this.hotResetEventMapper = hotResetEventMapper;
         this.decisionResultMapper = decisionResultMapper;
@@ -95,6 +113,7 @@ public class HotResetServiceImpl implements HotResetService {
         this.userPositionRiskAdapter = userPositionRiskAdapter;
         this.analysisSchedulerServiceProvider = analysisSchedulerServiceProvider;
         this.ruleConfigContractService = ruleConfigContractService;
+        this.assetStateService = assetStateService;
     }
 
     @Autowired(required = false)
@@ -260,14 +279,12 @@ public class HotResetServiceImpl implements HotResetService {
     private void persistAssetState(String normalizedSymbol, AssetStateEnum postState, int confusedScore,
                                    int confusedLowStreak, HotResetCommand command, LocalDateTime occurredAt,
                                    LocalDateTime nowUtc, AssetStateEnum preState) {
-        AssetStateDO core = new AssetStateDO();
-        core.setSymbol(normalizedSymbol);
-        core.setState(postState);
-        core.setConfusedScore(confusedScore);
-        core.setConfusedLowStreak(Math.max(0, confusedLowStreak));
-        core.setLastUpdateTime(nowUtc);
-        core.setTraceId(command.getTraceId());
-        assetStateMapper.mergeUpsertCore(core);
+        if (assetStateService == null) {
+            throw new IllegalStateException("Canonical opportunity transition service is required");
+        }
+        assetStateService.transition(normalizedSymbol, postState, confusedScore,
+                Math.max(0, confusedLowStreak), command.getAnalysisId(), command.getTraceId(),
+                "HOT_RESET:" + command.getEventType().name(), OpportunityTriggerSource.HOT_RESET);
 
         AssetStateDO hot = new AssetStateDO();
         hot.setSymbol(normalizedSymbol);

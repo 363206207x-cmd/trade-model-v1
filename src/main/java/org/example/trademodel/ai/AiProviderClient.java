@@ -9,4 +9,9 @@ public interface AiProviderClient {
         return review(request);
     }
     AiProviderProperties providerProperties();
+
+    default AiDecisionChainResult executeDecisionChain(AiDecisionChainRequest request, long timeoutOverrideMs) {
+        return AiDecisionChainResult.failed(provider(), request == null ? null : request.getRole(),
+                AiProviderCallStatus.FAILED, "DECISION_CHAIN_NOT_SUPPORTED");
+    }
 }

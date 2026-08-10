@@ -35,6 +35,9 @@ public class AiCallLogDO {
     private String requestSummary;
     private String responseSummary;
     private String ruleVersion;
+    private String contractType = "AI_ROLE_RESULTS_SCHEMA_V1";
+    private String candidateId;
+    private String outputPayload;
     private Boolean reviewOnly = true;
     private Boolean manualReviewOnly = true;
     private Boolean notTradeInstruction = true;
@@ -45,6 +48,7 @@ public class AiCallLogDO {
     private Boolean notPositionMutation = true;
     private Boolean notStateMachineOverride = true;
     private Boolean notExecutionPlanCreation = true;
+    private Boolean notFinalExecutionPlanCreation = true;
     private Boolean ruleDirectionPreserved = true;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -154,6 +158,13 @@ public class AiCallLogDO {
         this.ruleVersion = ruleVersion;
     }
 
+    public String getContractType() { return contractType; }
+    public void setContractType(String contractType) { this.contractType = contractType; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public String getOutputPayload() { return outputPayload; }
+    public void setOutputPayload(String outputPayload) { this.outputPayload = outputPayload; }
+
     public Boolean getReviewOnly() { return reviewOnly; }
     public void setReviewOnly(Boolean reviewOnly) { this.reviewOnly = reviewOnly; }
     public Boolean getManualReviewOnly() { return manualReviewOnly; }
@@ -174,6 +185,8 @@ public class AiCallLogDO {
     public void setNotStateMachineOverride(Boolean notStateMachineOverride) { this.notStateMachineOverride = notStateMachineOverride; }
     public Boolean getNotExecutionPlanCreation() { return notExecutionPlanCreation; }
     public void setNotExecutionPlanCreation(Boolean notExecutionPlanCreation) { this.notExecutionPlanCreation = notExecutionPlanCreation; }
+    public Boolean getNotFinalExecutionPlanCreation() { return notFinalExecutionPlanCreation; }
+    public void setNotFinalExecutionPlanCreation(Boolean value) { this.notFinalExecutionPlanCreation = value; }
     public Boolean getRuleDirectionPreserved() { return ruleDirectionPreserved; }
     public void setRuleDirectionPreserved(Boolean ruleDirectionPreserved) { this.ruleDirectionPreserved = ruleDirectionPreserved; }
     public LocalDateTime getCreatedAt() { return createdAt; }

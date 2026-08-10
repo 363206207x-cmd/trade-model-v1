@@ -10,6 +10,8 @@ import org.example.trademodel.analysisrun.AnalysisRunIds;
 import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
+import org.example.trademodel.decisionchain.DecisionChainBuildInput;
+import org.example.trademodel.decisionchain.DecisionChainBuildResult;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
@@ -76,6 +78,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private final RealMarketEnvironmentService realMarketEnvironmentService;
     private final AssetStateService assetStateService;
     private final RuleConfigService ruleConfigService;
+    private DecisionChainService decisionChainService;
 
     private final AnalysisRunMapper analysisRunMapper;
     private final EvidenceItemMapper evidenceItemMapper;
@@ -168,7 +171,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 missedOpportunityService, opportunityLogService, null, null, null, null);
     }
 
-    @Autowired
     public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
                                         PlanService planService,
                                         DecisionEngineService decisionEngineService,
@@ -214,6 +216,39 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.runtimeKlineContextAssemblyService = runtimeKlineContextAssemblyService;
         this.marketStructureBoundaryExtractor = marketStructureBoundaryExtractor;
         this.sourceTraceBoundaryProducer = sourceTraceBoundaryProducer;
+    }
+
+    @Autowired
+    public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
+                                        PlanService planService,
+                                        DecisionEngineService decisionEngineService,
+                                        RealMarketEnvironmentService realMarketEnvironmentService,
+                                        AssetStateService assetStateService,
+                                        RuleConfigService ruleConfigService,
+                                        AnalysisRunMapper analysisRunMapper,
+                                        EvidenceItemMapper evidenceItemMapper,
+                                        ScoreItemMapper scoreItemMapper,
+                                        DecisionResultMapper decisionResultMapper,
+                                        ExecutionPlanMapper executionPlanMapper,
+                                        AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                                        MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
+                                        PushSnapshotService pushSnapshotService,
+                                        MonitorAlertWriteService monitorAlertWriteService,
+                                        HotResetService hotResetService,
+                                        MissedOpportunityService missedOpportunityService,
+                                        OpportunityLogService opportunityLogService,
+                                        PersistedOhlcvQueryService persistedOhlcvQueryService,
+                                        RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService,
+                                        MarketStructureBoundaryExtractor marketStructureBoundaryExtractor,
+                                        SourceTraceBoundaryProducer sourceTraceBoundaryProducer,
+                                        DecisionChainService decisionChainService) {
+        this(evidenceService, scoreService, planService, decisionEngineService, realMarketEnvironmentService,
+                assetStateService, ruleConfigService, analysisRunMapper, evidenceItemMapper, scoreItemMapper,
+                decisionResultMapper, executionPlanMapper, accountRiskSnapshotMapper,
+                marketEnvironmentSnapshotMapper, pushSnapshotService, monitorAlertWriteService, hotResetService,
+                missedOpportunityService, opportunityLogService, persistedOhlcvQueryService,
+                runtimeKlineContextAssemblyService, marketStructureBoundaryExtractor, sourceTraceBoundaryProducer);
+        this.decisionChainService = decisionChainService;
     }
 
     @Autowired(required = false)
@@ -316,7 +351,17 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             Integer trendStructureScore = extractTrendStructureScore(scores);
             Integer eightScoreComposite = calculateEightScoreComposite(scores);
 
-            DecisionBundleVO decision = decisionEngineService.makeDecision(
+            DecisionBundleVO decision = decisionChainService != null
+                    ? decisionEngineService.makeDecisionForDecisionChain(
+                    symbol,
+                    timeframe,
+                    analysisId,
+                    dataQualityScore,
+                    trendStructureScore,
+                    scoreInput.getEventImpactInput(),
+                    derivativesAssessment,
+                    eightScoreComposite)
+                    : decisionEngineService.makeDecision(
                     symbol,
                     timeframe,
                     analysisId,
@@ -346,6 +391,22 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                         decision.isMultiTimeframeAligned()));
             }
 
+            DecisionChainBuildResult decisionChain = null;
+            if (decisionChainService != null) {
+                decisionChain = decisionChainService.build(new DecisionChainBuildInput(
+                        analysisId,
+                        effectiveContext.getTraceId(),
+                        symbol,
+                        timeframe,
+                        dataQualityScore,
+                        decision,
+                        plan,
+                        evidences,
+                        scores,
+                        effectiveContext.getTriggerType()));
+                plan = decisionChain.finalPlan();
+            }
+
             AssetAnalysisVO analysis = new AssetAnalysisVO();
             analysis.setAnalysisId(analysisId);
             analysis.setSymbol(symbol);
@@ -360,7 +421,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setDerivativesAssessment(derivativesAssessment);
 
             System.out.println("=== 准备执行落库 saveToDatabase === analysisId=" + analysisId);
-            saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan, marketEnvSourceType);
+            saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan,
+                    marketEnvSourceType, decisionChain);
             System.out.println("=== 落库执行完成 === analysisId=" + analysisId);
 
             return analysis;
@@ -662,9 +724,17 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
     }
 
+    private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis,
+                                List<EvidenceItemVO> evidences, List<ScoreItemVO> scores,
+                                DecisionBundleVO decision, ExecutionPlanVO plan,
+                                String marketEnvSourceType) {
+        saveToDatabase(context, analysis, evidences, scores, decision, plan, marketEnvSourceType, null);
+    }
+
     private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
                                 List<ScoreItemVO> scores, DecisionBundleVO decision, ExecutionPlanVO plan,
-                                String marketEnvSourceType) {
+                                String marketEnvSourceType,
+                                DecisionChainBuildResult decisionChain) {
         System.out.println("落库开始 - analysisId = " + analysis.getAnalysisId());
         String decisionInvalidCondition = null;
         HotResetCommand hotResetCommand = null;
@@ -798,7 +868,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 hotResetCommand = buildStructuredHotResetCommand(analysis, decision, marketEnvSourceType, run.getTraceId());
                 hotWouldReset = hotResetCommand != null && hotResetService.shouldTriggerHotReset(hotResetCommand);
 
-                if (decision.getAssetState() != null) {
+                if (decisionChain == null && decision.getAssetState() != null) {
                     assetStateService.persistAuthoritativeState(
                             analysis.getSymbol(),
                             decision.getAssetState(),
@@ -813,6 +883,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             Long accountRiskSnapshotId = pushSnapshotService.ensureAccountRiskSnapshot(run, analysis, decision, plan);
 
             pushSnapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, accountRiskSnapshotId);
+
+            if (decisionChain != null) {
+                decisionChainService.persist(decisionChain);
+            }
 
             // 5. ExecutionPlan
             if (plan != null) {
@@ -843,6 +917,15 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setNotAutoTrading(booleanOrTrue(plan.getNotAutoTrading()));
                 pdo.setNotOrderExecution(booleanOrTrue(plan.getNotOrderExecution()));
                 pdo.setNotUserPositionCreation(booleanOrTrue(plan.getNotUserPositionCreation()));
+                pdo.setCandidateId(plan.getCandidateId());
+                pdo.setOpportunityId(plan.getOpportunityId());
+                pdo.setResolverResultId(plan.getResolverResultId());
+                pdo.setTraceId(plan.getTraceId());
+                pdo.setChainStatus(plan.getChainStatus());
+                pdo.setRuleValidationStatus(plan.getRuleValidationStatus());
+                pdo.setRuleVetoReason(plan.getRuleVetoReason());
+                pdo.setFinalizedAt(plan.getFinalizedAt());
+                pdo.setFinalPlan(Boolean.TRUE.equals(plan.getFinalPlan()));
                 pdo.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
                 pdo.setRevalidationReason(plan.getRevalidationReason());
                 pdo.setCreateTime(utcLocalNow());
@@ -850,7 +933,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 persistedPlan = pdo;
             }
 
-            if (!hotWouldReset && persistedDecision != null && persistedPlan != null) {
+            if (!hotWouldReset && persistedDecision != null && persistedPlan != null
+                    && (decisionChain == null || Boolean.TRUE.equals(persistedPlan.getFinalPlan()))) {
                 opportunityLogService.recordFromAuthoritativeAnalysis(
                         run,
                         persistedDecision,

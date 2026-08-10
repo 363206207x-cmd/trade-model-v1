@@ -19,6 +19,7 @@ public class UserPositionDTO {
     private String closeReason;
     private String sourceType;
     private String sourceRefId;
+    private String finalPlanId;
     private boolean manualReviewRequired;
     private boolean notTradeInstruction;
     private boolean notAutoTrading;
@@ -145,6 +146,14 @@ public class UserPositionDTO {
 
     public void setSourceRefId(String sourceRefId) {
         this.sourceRefId = sourceRefId;
+    }
+
+    public String getFinalPlanId() {
+        return finalPlanId;
+    }
+
+    public void setFinalPlanId(String finalPlanId) {
+        this.finalPlanId = finalPlanId;
     }
 
     public boolean isManualReviewRequired() {

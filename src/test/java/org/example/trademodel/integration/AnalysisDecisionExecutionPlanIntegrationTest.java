@@ -2,6 +2,9 @@ package org.example.trademodel.integration;
 
 import org.example.trademodel.TradeModelApplication;
 import org.example.trademodel.ai.AiOrchestratorResult;
+import org.example.trademodel.ai.AiDecisionChainRequest;
+import org.example.trademodel.ai.AiDecisionChainResult;
+import org.example.trademodel.ai.AiDecisionChainRole;
 import org.example.trademodel.ai.AiProviderCallStatus;
 import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiProviderRequest;
@@ -34,6 +37,7 @@ import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.OpportunityLogMapper;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
+import org.example.trademodel.service.DecisionChainAiOrchestratorService;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.RealMarketDataFetcherService;
 import org.example.trademodel.service.PersistedOhlcvIngestionService;
@@ -115,6 +119,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     private RealMarketEnvironmentService realMarketEnvironmentService;
     @MockBean
     private AiDecisionOrchestratorService aiDecisionOrchestratorService;
+    @MockBean
+    private DecisionChainAiOrchestratorService decisionChainAiOrchestratorService;
 
     @BeforeEach
     void cleanDashboardRuntimeTables() {
@@ -149,6 +155,13 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                     : emptyRoleResult(request);
         });
         when(aiDecisionOrchestratorService.providerReadiness()).thenReturn(List.of());
+        when(decisionChainAiOrchestratorService.invoke(any())).thenAnswer(invocation -> {
+            AiDecisionChainRequest request = invocation.getArgument(0);
+            return List.of("SOLUSDT", "BNBUSDT", "ADAUSDT").contains(request.getSymbol())
+                    ? decisionChainRoleResult(request)
+                    : AiDecisionChainResult.failed(provider(request.getRole()), request.getRole(),
+                    AiProviderCallStatus.NOT_CONFIGURED, "TEST_PROVIDER_NOT_CONFIGURED");
+        });
     }
 
     @AfterEach
@@ -185,9 +198,10 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
         assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
 
-        clearInvocations(aiDecisionOrchestratorService);
+        clearInvocations(aiDecisionOrchestratorService, decisionChainAiOrchestratorService);
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
         verifyNoInteractions(aiDecisionOrchestratorService);
+        verifyNoInteractions(decisionChainAiOrchestratorService);
 
         assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v1");
         DashboardHomeVO.AiTabVO gpt = aiTab(home, "GPT_FINAL");
@@ -195,7 +209,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
         assertThat(gpt.getFinalMarketBias()).isEqualTo("WAIT");
         assertThat(gpt.getDecisionSummary()).isEqualTo("AI 复核结果已返回，等待人工复核");
-        assertThat(gpt.getCoreSupportingEvidence()).containsExactly("AI 证据已记录，需人工复核");
+        assertThat(gpt.getCoreSupportingEvidence()).isEmpty();
         assertThat(gemini.getReviewConclusion()).isEqualTo("AI 复核结果已返回，等待人工复核");
         assertThat(gemini.getDetectedContradictions()).containsExactly("AI 发现证据冲突");
         assertThat(grok.getChallengeThesis()).isEqualTo("AI 复核结果已返回，等待人工复核");
@@ -209,7 +223,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void ruleLayerRemainsAuthoritative() {
-        AnalysisRunResult result = runAiContractAnalysis("DOGEUSDT", "req-ai-authority");
+        AnalysisRunResult result = runAiContractAnalysis("ADAUSDT", "req-ai-authority");
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
         AiRoleResultsPayload payload = aiRoleResultsCodec.parse(persisted.getAiRoleResults()).payload();
 
@@ -493,6 +507,36 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         result.setAnalysisId(request.getAnalysisId());
         result.setTraceId(request.getTraceId());
         return result;
+    }
+
+    private AiDecisionChainResult decisionChainRoleResult(AiDecisionChainRequest request) {
+        AiDecisionChainResult result = new AiDecisionChainResult();
+        result.setProvider(provider(request.getRole()));
+        result.setRole(request.getRole());
+        result.setCallStatus(AiProviderCallStatus.SUCCESS);
+        result.setPayloadJson(switch (request.getRole()) {
+            case GPT_FINAL -> "{\"summary\":\"GPT persisted summary\"}";
+            case GEMINI_REVIEW -> "{\"verdict\":\"DOWNGRADE\",\"conflictLevel\":\"MINOR\","
+                    + "\"confidenceAdjustment\":\"DOWNGRADE_ONE\",\"riskAdjustment\":\"RAISE_ONE\","
+                    + "\"planModeAdjustment\":\"DOWNGRADE_ONE\","
+                    + "\"reasons\":[\"GEMINI_CONTRADICTION_ONLY\"],"
+                    + "\"summary\":\"Gemini persisted review\"}";
+            case GROK_CHALLENGE -> "{\"opposingView\":\"counter view\",\"riskLevel\":\"HIGH\","
+                    + "\"challengeLevel\":\"MAJOR\",\"majorCounterEvidence\":true,"
+                    + "\"planModeImpact\":\"DOWNGRADE_ONE\","
+                    + "\"reasons\":[\"GROK_COUNTER_ONLY\"],"
+                    + "\"summary\":\"Grok persisted challenge\"}";
+        });
+        result.setSelectedModel("test-role-model");
+        return result;
+    }
+
+    private AiProviderName provider(AiDecisionChainRole role) {
+        return switch (role) {
+            case GPT_FINAL -> AiProviderName.OPENAI;
+            case GEMINI_REVIEW -> AiProviderName.GEMINI;
+            case GROK_CHALLENGE -> AiProviderName.XAI;
+        };
     }
 
     private AiProviderReviewResult role(AiProviderName provider,

@@ -16,11 +16,24 @@ public interface AssetStateMapper {
      * H2：按 symbol 合并写入核心权威字段（state / confused / trace），不触碰 hot_reset_*，
      * 避免每次分析把「最近一次 Hot Reset」覆盖掉。
      */
-    @Insert("MERGE INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, last_update_time, trace_id) KEY (symbol) VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, #{lastUpdateTime}, #{traceId})")
-    @Insert(value = "INSERT INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, last_update_time, trace_id) "
-            + "VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, #{lastUpdateTime}, #{traceId}) "
+    @Insert("MERGE INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, opportunity_id, "
+            + "state_entered_at, cooling_until, last_transition_reason, last_trigger_source, last_analysis_id, "
+            + "last_update_time, trace_id) KEY (symbol) VALUES (#{symbol}, #{state}, #{confusedScore}, "
+            + "#{confusedLowStreak}, COALESCE(#{opportunityId}, CONCAT('opp-', LOWER(REPLACE(REPLACE(REPLACE(#{symbol}, '/', ''), '-', ''), '_', '')))), "
+            + "COALESCE(#{stateEnteredAt}, #{lastUpdateTime}, CURRENT_TIMESTAMP), #{coolingUntil}, "
+            + "#{lastTransitionReason}, #{lastTriggerSource}, #{lastAnalysisId}, #{lastUpdateTime}, #{traceId})")
+    @Insert(value = "INSERT INTO tm_asset_state (symbol, state, confused_score, confused_low_streak, opportunity_id, "
+            + "state_entered_at, cooling_until, last_transition_reason, last_trigger_source, last_analysis_id, "
+            + "last_update_time, trace_id) "
+            + "VALUES (#{symbol}, #{state}, #{confusedScore}, #{confusedLowStreak}, "
+            + "COALESCE(#{opportunityId}, CONCAT('opp-', LOWER(REPLACE(REPLACE(REPLACE(#{symbol}, '/', ''), '-', ''), '_', '')))), "
+            + "COALESCE(#{stateEnteredAt}, #{lastUpdateTime}, CURRENT_TIMESTAMP), #{coolingUntil}, #{lastTransitionReason}, #{lastTriggerSource}, "
+            + "#{lastAnalysisId}, #{lastUpdateTime}, #{traceId}) "
             + "ON CONFLICT (symbol) DO UPDATE SET state = EXCLUDED.state, confused_score = EXCLUDED.confused_score, "
             + "confused_low_streak = EXCLUDED.confused_low_streak, last_update_time = EXCLUDED.last_update_time, "
+            + "state_entered_at = EXCLUDED.state_entered_at, cooling_until = EXCLUDED.cooling_until, "
+            + "last_transition_reason = EXCLUDED.last_transition_reason, "
+            + "last_trigger_source = EXCLUDED.last_trigger_source, last_analysis_id = EXCLUDED.last_analysis_id, "
             + "trace_id = EXCLUDED.trace_id",
             databaseId = "postgresql")
     int mergeUpsertCore(AssetStateDO row);

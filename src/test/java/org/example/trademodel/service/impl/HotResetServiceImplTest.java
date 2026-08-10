@@ -15,6 +15,7 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.AnalysisSchedulerService;
+import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
@@ -45,6 +46,7 @@ import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -71,6 +73,7 @@ class HotResetServiceImplTest {
     @Mock private ObjectProvider<AnalysisSchedulerService> schedulerProvider;
     @Mock private AnalysisSchedulerService scheduler;
     @Mock private RuleConfigContractService ruleConfigContractService;
+    @Mock private AssetStateService assetStateService;
 
     private HotResetServiceImpl service;
 
@@ -78,7 +81,7 @@ class HotResetServiceImplTest {
     void setUp() {
         service = new HotResetServiceImpl(assetStateMapper, hotResetEventMapper, decisionResultMapper,
                 executionPlanMapper, pushSnapshotMapper, confusedStateService, userPositionRiskAdapter,
-                schedulerProvider, ruleConfigContractService);
+                schedulerProvider, ruleConfigContractService, assetStateService);
         service.setClock(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
         lenient().when(schedulerProvider.getIfAvailable()).thenReturn(scheduler);
         lenient().when(ruleConfigContractService.requireHotResetThresholds()).thenReturn(thresholds());
@@ -412,11 +415,11 @@ class HotResetServiceImplTest {
         assertThat(event.getValue().getEventTime())
                 .isBetween(LocalDateTime.parse("2026-07-14T11:30:00"), FIXED_UTC)
                 .isEqualTo(FIXED_UTC);
-        ArgumentCaptor<AssetStateDO> core = ArgumentCaptor.forClass(AssetStateDO.class);
         ArgumentCaptor<AssetStateDO> hot = ArgumentCaptor.forClass(AssetStateDO.class);
-        verify(assetStateMapper).mergeUpsertCore(core.capture());
+        verify(assetStateService).transition(
+                eq("BTCUSDT"), any(), anyInt(), anyInt(),
+                eq("ana-test"), anyString(), anyString(), eq(org.example.trademodel.service.OpportunityTriggerSource.HOT_RESET));
         verify(assetStateMapper).updateHotResetColumns(hot.capture());
-        assertThat(core.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
         assertThat(hot.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
         assertThat(hot.getValue().getHotResetTime()).isEqualTo(FIXED_UTC);
         verify(decisionResultMapper).markHotResetInvalidatedBySymbol(

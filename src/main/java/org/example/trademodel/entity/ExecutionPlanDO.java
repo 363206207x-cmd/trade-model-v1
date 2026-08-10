@@ -25,6 +25,15 @@ public class ExecutionPlanDO {
     private Boolean notAutoTrading;
     private Boolean notOrderExecution;
     private Boolean notUserPositionCreation;
+    private String candidateId;
+    private String opportunityId;
+    private String resolverResultId;
+    private String traceId;
+    private String chainStatus = "LEGACY";
+    private String ruleValidationStatus = "LEGACY";
+    private String ruleVetoReason;
+    private LocalDateTime finalizedAt;
+    private Boolean finalPlan = false;
     private Boolean needsRevalidation = false;
     private String revalidationReason;
     private String hotResetEventId;
@@ -77,6 +86,24 @@ public class ExecutionPlanDO {
     public void setNotOrderExecution(Boolean notOrderExecution) { this.notOrderExecution = notOrderExecution; }
     public Boolean getNotUserPositionCreation() { return notUserPositionCreation; }
     public void setNotUserPositionCreation(Boolean notUserPositionCreation) { this.notUserPositionCreation = notUserPositionCreation; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+    public String getResolverResultId() { return resolverResultId; }
+    public void setResolverResultId(String resolverResultId) { this.resolverResultId = resolverResultId; }
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+    public String getChainStatus() { return chainStatus; }
+    public void setChainStatus(String chainStatus) { this.chainStatus = chainStatus; }
+    public String getRuleValidationStatus() { return ruleValidationStatus; }
+    public void setRuleValidationStatus(String ruleValidationStatus) { this.ruleValidationStatus = ruleValidationStatus; }
+    public String getRuleVetoReason() { return ruleVetoReason; }
+    public void setRuleVetoReason(String ruleVetoReason) { this.ruleVetoReason = ruleVetoReason; }
+    public LocalDateTime getFinalizedAt() { return finalizedAt; }
+    public void setFinalizedAt(LocalDateTime finalizedAt) { this.finalizedAt = finalizedAt; }
+    public Boolean getFinalPlan() { return finalPlan; }
+    public void setFinalPlan(Boolean finalPlan) { this.finalPlan = finalPlan; }
     public Boolean getNeedsRevalidation() { return needsRevalidation; }
     public void setNeedsRevalidation(Boolean needsRevalidation) { this.needsRevalidation = needsRevalidation; }
     public String getRevalidationReason() { return revalidationReason; }

@@ -2,16 +2,19 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.enums.UserPositionSideEnum;
 import org.example.trademodel.enums.UserPositionSourceTypeEnum;
 import org.example.trademodel.enums.UserPositionStatusEnum;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,9 +32,17 @@ public class UserPositionServiceImpl implements UserPositionService {
             "userid", "ownerid", "accountid", "principalid", "tenantid");
 
     private final UserPositionMapper userPositionMapper;
+    private final ExecutionPlanMapper executionPlanMapper;
 
     public UserPositionServiceImpl(UserPositionMapper userPositionMapper) {
+        this(userPositionMapper, null);
+    }
+
+    @Autowired
+    public UserPositionServiceImpl(UserPositionMapper userPositionMapper,
+                                   ExecutionPlanMapper executionPlanMapper) {
         this.userPositionMapper = userPositionMapper;
+        this.executionPlanMapper = executionPlanMapper;
     }
 
     @Override
@@ -49,6 +60,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         BigDecimal leverage = requirePositive(request.getLeverage(), "leverage");
         BigDecimal stopLoss = optionalPositive(request.getStopLoss(), "stop_loss");
         BigDecimal takeProfit = optionalPositive(request.getTakeProfit(), "take_profit");
+        String finalPlanId = validateFinalPlanReference(request.getFinalPlanId(), assetSymbol);
         LocalDateTime now = LocalDateTime.now();
 
         UserPositionDO row = new UserPositionDO();
@@ -67,6 +79,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         row.setCloseReason(null);
         row.setSourceType(sourceType.name());
         row.setSourceRefId(trimToNull(request.getSourceRefId()));
+        row.setFinalPlanId(finalPlanId);
         applySafetyFlags(row);
         row.setCreatedAt(now);
         row.setUpdatedAt(now);
@@ -177,6 +190,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         vo.setCloseReason(row.getCloseReason());
         vo.setSourceType(SOURCE_MANUAL);
         vo.setSourceRefId(row.getSourceRefId());
+        vo.setFinalPlanId(row.getFinalPlanId());
         vo.setManualReviewRequired(true);
         vo.setNotTradeInstruction(true);
         vo.setNotAutoTrading(true);
@@ -231,6 +245,23 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("userId is required");
         }
+    }
+
+    private String validateFinalPlanReference(String requestedPlanId, String assetSymbol) {
+        String finalPlanId = trimToNull(requestedPlanId);
+        if (finalPlanId == null) {
+            return null;
+        }
+        if (executionPlanMapper == null) {
+            throw new IllegalStateException("FinalExecutionPlan validation is unavailable");
+        }
+        ExecutionPlanDO plan = executionPlanMapper.selectValidatedFinalByPlanIdAndSymbol(
+                finalPlanId, assetSymbol);
+        if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())
+                || !"PASS".equals(plan.getRuleValidationStatus())) {
+            throw new IllegalArgumentException("final_plan_id must reference a rule-validated FinalExecutionPlan for the same asset");
+        }
+        return finalPlanId;
     }
 
     private static String trimToNull(String value) {

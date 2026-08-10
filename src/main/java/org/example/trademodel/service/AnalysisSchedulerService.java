@@ -9,6 +9,7 @@ import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,19 +29,28 @@ public class AnalysisSchedulerService {
     private final AnalysisRunProperties properties;
     private final Clock clock;
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private final AssetPoolService assetPoolService;
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties) {
-        this(analysisRunOrchestrator, properties, Clock.systemUTC());
+        this(analysisRunOrchestrator, properties, Clock.systemUTC(), null);
+    }
+
+    public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
+                                    AnalysisRunProperties properties,
+                                    Clock analysisRunClock) {
+        this(analysisRunOrchestrator, properties, analysisRunClock, null);
     }
 
     @Autowired
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties,
-                                    Clock analysisRunClock) {
+                                    Clock analysisRunClock,
+                                    AssetPoolService assetPoolService) {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.properties = properties;
         this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
+        this.assetPoolService = assetPoolService;
     }
 
     @Autowired(required = false)
@@ -92,7 +102,7 @@ public class AnalysisSchedulerService {
         }
         String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         List<AnalysisRunResult> results = new ArrayList<>();
-        for (String symbol : properties.getScheduler().getSymbols()) {
+        for (String symbol : scanSymbols()) {
             if (!marketDataReady(symbol)) {
                 continue;
             }
@@ -126,7 +136,8 @@ public class AnalysisSchedulerService {
     public Map<String, Object> status() {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("enabled", properties.getScheduler().isEnabled());
-        status.put("symbols", properties.getScheduler().getSymbols());
+        status.put("symbols", scanSymbols());
+        status.put("assetPoolOnly", true);
         status.put("timeframes", properties.getScheduler().getTimeframes());
         status.put("leaseSeconds", properties.getIdempotency().getLeaseSeconds());
         status.put("maxRecoveryAttempts", properties.getIdempotency().getMaxRecoveryAttempts());
@@ -157,11 +168,12 @@ public class AnalysisSchedulerService {
 
     private boolean schedulerConfigValid() {
         try {
-            if (properties.getScheduler().getSymbols() == null || properties.getScheduler().getSymbols().isEmpty()
+            List<String> symbols = scanSymbols();
+            if (symbols.isEmpty()
                     || properties.getScheduler().getTimeframes() == null || properties.getScheduler().getTimeframes().isEmpty()) {
                 return false;
             }
-            for (String symbol : properties.getScheduler().getSymbols()) {
+            for (String symbol : symbols) {
                 validateSymbol(symbol);
             }
             for (String timeframe : properties.getScheduler().getTimeframes()) {
@@ -171,6 +183,15 @@ public class AnalysisSchedulerService {
         } catch (AnalysisRunInputException ex) {
             return false;
         }
+    }
+
+    private List<String> scanSymbols() {
+        if (assetPoolService == null) {
+            // Compatibility for direct unit construction; Spring runtime always injects AssetPoolService.
+            return properties.getScheduler().getSymbols();
+        }
+        List<String> symbols = assetPoolService.listScanSymbols();
+        return symbols == null ? List.of() : symbols;
     }
 
     private static void validateInput(String symbol, String timeframe) {

@@ -3,10 +3,12 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.constant.ReviewErrorType;
 import org.example.trademodel.dto.req.WriteReviewResultReq;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.RuleVersionLogDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
@@ -16,6 +18,7 @@ import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.ReviewStateVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,15 +36,26 @@ public class ReviewServiceImpl implements ReviewService {
     private final AnalysisRunMapper analysisRunMapper;
     private final RuleVersionLogMapper ruleVersionLogMapper;
     private final UserPositionMapper userPositionMapper;
+    private final ExecutionPlanMapper executionPlanMapper;
 
     public ReviewServiceImpl(ReviewResultMapper reviewResultMapper,
                                AnalysisRunMapper analysisRunMapper,
                                RuleVersionLogMapper ruleVersionLogMapper,
                                UserPositionMapper userPositionMapper) {
+        this(reviewResultMapper, analysisRunMapper, ruleVersionLogMapper, userPositionMapper, null);
+    }
+
+    @Autowired
+    public ReviewServiceImpl(ReviewResultMapper reviewResultMapper,
+                             AnalysisRunMapper analysisRunMapper,
+                             RuleVersionLogMapper ruleVersionLogMapper,
+                             UserPositionMapper userPositionMapper,
+                             ExecutionPlanMapper executionPlanMapper) {
         this.reviewResultMapper = reviewResultMapper;
         this.analysisRunMapper = analysisRunMapper;
         this.ruleVersionLogMapper = ruleVersionLogMapper;
         this.userPositionMapper = userPositionMapper;
+        this.executionPlanMapper = executionPlanMapper;
     }
 
     @Override
@@ -54,6 +68,7 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewResultDO existing = reviewResultMapper.selectByAnalysisId(analysisId);
         if (existing == null) {
             ReviewResultDO row = newRow(analysisId, null, null, SHARED_SCOPE, content, now);
+            applyDecisionChainTrace(row, analysisId, null);
             reviewResultMapper.insert(row);
         }
         if (existing != null) {
@@ -88,8 +103,10 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewResultDO existing = reviewResultMapper.selectByUserPositionScope(
                 analysisId, userId, userPositionId, reviewScopeKey);
         if (existing == null) {
-            reviewResultMapper.insert(newRow(
-                    analysisId, userId, userPositionId, reviewScopeKey, content, now));
+            ReviewResultDO row = newRow(
+                    analysisId, userId, userPositionId, reviewScopeKey, content, now);
+            applyDecisionChainTrace(row, analysisId, ownedPosition);
+            reviewResultMapper.insert(row);
         }
         if (existing != null) {
             applyContent(existing, content, now);
@@ -114,6 +131,9 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewStateVO vo = new ReviewStateVO();
         vo.setReviewId(row.getId());
         vo.setAnalysisId(row.getAnalysisId());
+        vo.setFinalPlanId(row.getFinalPlanId());
+        vo.setCandidateId(row.getCandidateId());
+        vo.setTraceId(row.getTraceId());
         vo.setErrorType(row.getErrorType());
         vo.setActualOutcome(row.getActualOutcome());
         vo.setAdjustmentSuggestion(row.getAdjustmentSuggestion());
@@ -172,6 +192,28 @@ public class ReviewServiceImpl implements ReviewService {
 
     private static String userPositionScopeKey(Long userId, Long userPositionId) {
         return "USER:" + userId + ":POSITION:" + userPositionId;
+    }
+
+    private void applyDecisionChainTrace(ReviewResultDO row,
+                                         String analysisId,
+                                         UserPositionDO position) {
+        if (executionPlanMapper == null) {
+            return;
+        }
+        ExecutionPlanDO plan = position != null && position.getFinalPlanId() != null
+                ? executionPlanMapper.selectByPlanId(position.getFinalPlanId())
+                : executionPlanMapper.selectLatestByAnalysisId(analysisId);
+        if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())
+                || !"PASS".equals(plan.getRuleValidationStatus())) {
+            return;
+        }
+        if (analysisId != null && plan.getAnalysisId() != null
+                && !analysisId.equals(plan.getAnalysisId())) {
+            throw new UserPositionConflictException("POSITION_FINAL_PLAN_ANALYSIS_MISMATCH");
+        }
+        row.setFinalPlanId(plan.getPlanId());
+        row.setCandidateId(plan.getCandidateId());
+        row.setTraceId(plan.getTraceId());
     }
 
     private static void requirePositive(Long value, String fieldName) {
