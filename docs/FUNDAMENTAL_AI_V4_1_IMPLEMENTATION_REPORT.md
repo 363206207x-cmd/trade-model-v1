@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Decision Chain Implementation Report
 
-Status: `IMPLEMENTATION_COMPLETE_PENDING_BACKEND_CAPABILITY_AUDIT`
+Status: `AUDIT_REMEDIATION_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
 
 Package: `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`
 
@@ -28,7 +28,10 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 - all runtime writes use `AssetStateService.transition`;
 - every actual/suppressed priority transition records from/to/reason/source,
   time, Opportunity, Analysis, and Trace;
-- ordinary debounce is 30 seconds and cooling is 15 minutes;
+- ordinary debounce is 30 seconds per symbol and timeframe, and cooling is 15
+  minutes;
+- Invalidated and Confused recover through Cooling; active Cooling blocks
+  direct Candidate/Waiting/Triggered promotion until expiry;
 - precedence is Hot Reset > Confused > Invalidated > ordinary;
 - Opportunity state and execution permission remain separate.
 
@@ -43,10 +46,13 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 - AI audit stores full canonical input hash, bounded sanitized input summary,
   accepted output or bounded invalid output, model, tokens, cost, latency, and
   fallback state.
+- missing-provider, timeout, exception, and log-failure paths retain terminal
+  trace evidence while the rule fallback continues.
 
 ### Candidate, Conflict, And Final
 
 - Candidate and Final are separate Java/persistence objects and identities;
+- conflict level uses the frozen Level 1-4 enum and persistence constraint;
 - Gemini/Grok can only downgrade confidence/plan mode or raise risk;
 - plan blocking does not automatically mutate Opportunity to Confused;
 - Rule Validation checks source/data/state/rule direction, Candidate authority,
@@ -58,8 +64,9 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 
 - existing UserPosition and PositionMonitor remain the canonical owners;
 - a plan never creates a position;
-- a manually supplied `finalPlanId` is optional and validated against a Final
-  of the same asset;
+- every new position declares `MANUAL_POSITION` or `SYSTEM_PLAN_POSITION`;
+- a system-plan position requires a same-symbol, validated Final, while an
+  explicit manual position carries no Final plan;
 - Review reuses the existing owner and carries Final/Candidate/Trace provenance.
 
 ### Home / Dashboard
@@ -81,10 +88,10 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 
 ## Delivery State
 
-The implementation candidate and Draft PR CI are complete, including
-PostgreSQL V11 Testcontainers evidence, but an open PR is not effective
-completion. Only reviewed merged main, clean/synced main validation, and the
-independent Backend Capability Audit can make the package effective.
+The four audit blockers are remediated and PostgreSQL V11 passes against a
+disposable PostgreSQL 16.14 database. An open PR is not effective completion.
+Only an independent re-audit, reviewed merged main, and clean/synced main
+validation can make the package effective.
 
 `PRODUCT_WORK_RATIO = 95%`
 

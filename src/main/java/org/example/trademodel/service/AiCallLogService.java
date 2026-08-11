@@ -5,6 +5,7 @@ import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
+import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.entity.AiCallLogDO;
 
 import java.math.BigDecimal;
@@ -23,6 +24,14 @@ public interface AiCallLogService {
 
     default void completeDecisionChainCall(AiCallLogDO log, AiDecisionChainResult result) {
         throw new UnsupportedOperationException("Decision-chain AI logging is not implemented");
+    }
+
+    default AiCallLogDO recordDecisionChainResult(AiDecisionChainRequest request,
+                                                  AiProviderName provider,
+                                                  String modelName,
+                                                  AiDecisionChainResult result,
+                                                  BigDecimal reservedCostUsd) {
+        throw new UnsupportedOperationException("Decision-chain terminal AI logging is not implemented");
     }
 
     AiCallLogDO recordSkipped(AiProviderRequest request, AiProviderClient client,

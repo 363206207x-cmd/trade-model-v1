@@ -87,7 +87,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
 
         AssetStateEnum requestedState = defaultState(decision.getAssetState(), decision.getIsWorthOpening());
         OpportunityTransitionResult opportunity = assetStateService.transition(
-                input.symbol(), requestedState,
+                input.symbol(), input.timeframe(), requestedState,
                 integer(decision.getConfusedScore()), integer(decision.getConfusedLowStreak()),
                 input.analysisId(), input.traceId(),
                 "ANALYSIS_DECISION_PROMOTION",
@@ -118,7 +118,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         if (Boolean.TRUE.equals(conflict.getConfusedDecision())
                 && opportunity.state() != AssetStateEnum.CONFUSED) {
             opportunity = assetStateService.transition(
-                    input.symbol(), AssetStateEnum.CONFUSED,
+                    input.symbol(), input.timeframe(), AssetStateEnum.CONFUSED,
                     Math.max(integer(decision.getConfusedScore()), ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD),
                     integer(decision.getConfusedLowStreak()),
                     input.analysisId(), input.traceId(),

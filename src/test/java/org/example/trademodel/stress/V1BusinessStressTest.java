@@ -198,7 +198,7 @@ class V1BusinessStressTest {
                 USER_ID, openPaperPositionRequest("plan-paper-loop"));
 
         assertThat(opened.getStatus()).isEqualTo("OPEN");
-        assertThat(opened.getSourceType()).isEqualTo("MANUAL");
+        assertThat(opened.getSourceType()).isEqualTo("MANUAL_POSITION");
         assertThat(opened.getSourceRefId()).isEqualTo("plan-paper-loop");
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
@@ -234,7 +234,7 @@ class V1BusinessStressTest {
         when(fetcher.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
                 .thenReturn(scenario.klines5m());
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflictResult());
-        when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(eq(scenario.symbol()), anyString(), any(DecisionContext.class)))
                 .thenReturn(scenario.confusedResult());
         when(assetStateService.buildSnapshotAtDecision(anyString(), anyString(), any(), any(), anyInt(), anyInt(), any(Boolean.class), any(Boolean.class)))
                 .thenAnswer(invocation -> "{\"previousState\":\"" + ((AssetStateEnum) invocation.getArgument(2)).name()
@@ -479,7 +479,7 @@ class V1BusinessStressTest {
         position.setLeverage(new BigDecimal("2"));
         position.setStopLoss(new BigDecimal(stopLoss));
         position.setTakeProfit(new BigDecimal(takeProfit));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
         position.setSourceRefId(sourceRefId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -600,7 +600,7 @@ class V1BusinessStressTest {
         private static OpportunityScenario noTrade(String name, String symbol, String direction, String reason) {
             return new OpportunityScenario(name, symbol, direction, false, false, AssetStateEnum.OBSERVING, 88, 45,
                     bullishKlines(), bearishKlines(),
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE, direction, "MEDIUM", "REVIEW", 40),
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, direction, "MEDIUM", "REVIEW", 40),
                     new ConfusedResult(45, "OBSERVING", "OBSERVING", false, false, 0, false, reason, "no-trade"),
                     null, reason);
         }
@@ -616,7 +616,7 @@ class V1BusinessStressTest {
         private static OpportunityScenario conflicted(String name, String symbol) {
             return new OpportunityScenario(name, symbol, "BULLISH", false, false, AssetStateEnum.CONFUSED, 88, 70,
                     bullishKlines(), bullishKlines(),
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BULLISH", "LOW", "HIGH",
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BULLISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),
                     new ConfusedResult(85, "OBSERVING", "CONFUSED", true, false, 0, true,
                             "extreme conflict", "block"),

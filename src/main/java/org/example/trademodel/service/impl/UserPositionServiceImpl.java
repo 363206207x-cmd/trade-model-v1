@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserPositionServiceImpl implements UserPositionService {
-    private static final String SOURCE_MANUAL = UserPositionSourceTypeEnum.MANUAL.name();
     private static final String STATUS_OPEN = UserPositionStatusEnum.OPEN.name();
     private static final Set<String> FORBIDDEN_OWNER_FIELDS = Set.of(
             "userid", "ownerid", "accountid", "principalid", "tenantid");
@@ -54,13 +53,13 @@ public class UserPositionServiceImpl implements UserPositionService {
         rejectForbiddenInputFields(request.getExtraFields());
         String assetSymbol = normalizeAssetSymbol(request.getAssetSymbol());
         UserPositionSideEnum side = UserPositionSideEnum.parse(request.getSide());
-        UserPositionSourceTypeEnum sourceType = UserPositionSourceTypeEnum.requireManual(request.getSourceType());
+        UserPositionSourceTypeEnum sourceType = UserPositionSourceTypeEnum.parseExplicit(request.getSourceType());
         BigDecimal entryPrice = requirePositive(request.getEntryPrice(), "entry_price");
         BigDecimal quantity = requirePositive(request.getQuantity(), "quantity");
         BigDecimal leverage = requirePositive(request.getLeverage(), "leverage");
         BigDecimal stopLoss = optionalPositive(request.getStopLoss(), "stop_loss");
         BigDecimal takeProfit = optionalPositive(request.getTakeProfit(), "take_profit");
-        String finalPlanId = validateFinalPlanReference(request.getFinalPlanId(), assetSymbol);
+        String finalPlanId = validateFinalPlanReference(sourceType, request.getFinalPlanId(), assetSymbol);
         LocalDateTime now = LocalDateTime.now();
 
         UserPositionDO row = new UserPositionDO();
@@ -188,7 +187,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         vo.setClosedAt(row.getClosedAt());
         vo.setClosePrice(row.getClosePrice());
         vo.setCloseReason(row.getCloseReason());
-        vo.setSourceType(SOURCE_MANUAL);
+        vo.setSourceType(UserPositionSourceTypeEnum.parseExplicit(row.getSourceType()).name());
         vo.setSourceRefId(row.getSourceRefId());
         vo.setFinalPlanId(row.getFinalPlanId());
         vo.setManualReviewRequired(true);
@@ -247,10 +246,19 @@ public class UserPositionServiceImpl implements UserPositionService {
         }
     }
 
-    private String validateFinalPlanReference(String requestedPlanId, String assetSymbol) {
+    private String validateFinalPlanReference(UserPositionSourceTypeEnum sourceType,
+                                              String requestedPlanId,
+                                              String assetSymbol) {
         String finalPlanId = trimToNull(requestedPlanId);
-        if (finalPlanId == null) {
+        if (!sourceType.finalPlanRequired()) {
+            if (finalPlanId != null) {
+                throw new IllegalArgumentException(
+                        "MANUAL_POSITION must not carry final_plan_id; use SYSTEM_PLAN_POSITION");
+            }
             return null;
+        }
+        if (finalPlanId == null) {
+            throw new IllegalArgumentException("SYSTEM_PLAN_POSITION requires final_plan_id");
         }
         if (executionPlanMapper == null) {
             throw new IllegalStateException("FinalExecutionPlan validation is unavailable");

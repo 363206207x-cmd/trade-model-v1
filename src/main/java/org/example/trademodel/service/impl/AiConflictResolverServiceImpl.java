@@ -57,13 +57,13 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             return result(context, AiConflictLevelEnum.LEVEL_1_CONSISTENT, context.getRuleConfidenceLevel(),
                     "UNCHANGED", "CONFIRM", aiConflictScore, objectionCount, 0);
         } else if (aiConflictScore <= 45) {
-            return result(context, AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE, downgradeConfidence(context, 1),
+            return result(context, AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, downgradeConfidence(context, 1),
                     "SLIGHTLY_RAISED", "REDUCED", aiConflictScore, objectionCount, aiConflictScore);
         } else if (aiConflictScore <= 70) {
-            return result(context, AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE, downgradeConfidence(context, 2),
+            return result(context, AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT, downgradeConfidence(context, 2),
                     "RAISED", "PREPARE_ONLY", aiConflictScore, objectionCount, aiConflictScore);
         } else {
-            return result(context, AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, downgradeConfidence(context, 2),
+            return result(context, AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, downgradeConfidence(context, 2),
                     "HIGH", "CONFUSED", aiConflictScore, objectionCount, aiConflictScore);
         }
     }
@@ -96,7 +96,8 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
                 case "RISK_WARNING" -> 10;
                 default -> 0;
             };
-            int conflictContribution = conflictContribution(upperText(gemini, "conflictLevel", "NONE"));
+            int conflictContribution = conflictContribution(upperText(
+                    gemini, "conflictLevel", AiConflictLevelEnum.LEVEL_1_CONSISTENT.name()));
             score += verdictContribution + conflictContribution;
             aiConflictScore += verdictContribution + conflictContribution;
             requestedConfidenceDowngrade = adjustmentLevels(
@@ -112,7 +113,8 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         }
 
         if (available(grok, "challengeLevel")) {
-            String challenge = upperText(grok, "challengeLevel", "NONE");
+            String challenge = upperText(
+                    grok, "challengeLevel", AiConflictLevelEnum.LEVEL_1_CONSISTENT.name());
             int challengeContribution = conflictContribution(challenge);
             score += challengeContribution;
             aiConflictScore += challengeContribution;
@@ -153,7 +155,10 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             score = Math.max(score, 90);
             reasons.add(ruleVeto);
         }
-        String conflictLevel = score <= 15 ? "NONE" : score <= 40 ? "MINOR" : score <= 70 ? "MAJOR" : "EXTREME";
+        AiConflictLevelEnum conflictLevel = conflictLevel(score);
+        if (conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT) {
+            confused = true;
+        }
         int scoreDowngrades = score <= 15 ? 0 : score <= 40 ? 1 : score <= 70 ? 2 : 4;
         int confidenceDowngrades = Math.max(scoreDowngrades, requestedConfidenceDowngrade);
         int riskRaises = Math.max(scoreDowngrades, requestedRiskRaise);
@@ -171,7 +176,7 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         result.setRuleRisk(candidate.getRuleRisk());
         result.setGeminiReviewJson(nonBlankJson(geminiReviewJson));
         result.setGrokChallengeJson(nonBlankJson(grokChallengeJson));
-        result.setConflictLevel(conflictLevel);
+        result.setConflictLevel(conflictLevel.name());
         result.setConflictScore(score);
         result.setPlanModeBefore(candidate.getPlanMode());
         result.setPlanModeAfter(planModeAfter);
@@ -287,11 +292,18 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
 
     private static int conflictContribution(String level) {
         return switch (normalize(level)) {
-            case "EXTREME" -> 45;
-            case "MAJOR" -> 30;
-            case "MINOR" -> 12;
+            case "LEVEL_4_EXTREME_CONFLICT" -> 45;
+            case "LEVEL_3_SIGNIFICANT_DISAGREEMENT" -> 30;
+            case "LEVEL_2_MINOR_DISAGREEMENT" -> 12;
             default -> 0;
         };
+    }
+
+    private static AiConflictLevelEnum conflictLevel(int score) {
+        if (score <= 15) return AiConflictLevelEnum.LEVEL_1_CONSISTENT;
+        if (score <= 40) return AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT;
+        if (score <= 70) return AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT;
+        return AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT;
     }
 
     private static int adjustmentLevels(String adjustment, String prefix) {

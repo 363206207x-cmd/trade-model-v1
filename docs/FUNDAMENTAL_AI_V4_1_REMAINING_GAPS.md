@@ -1,19 +1,31 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `IMPLEMENTATION_COMPLETE_PENDING_AUDIT`
+Status: `REMEDIATION_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
 
 ## Merge-Readiness Evidence Still Required
 
-1. The independent Backend Capability Audit must review the
-   schema constraints, Asset Pool source closure, AI authority, Candidate/Final
-   separation, and legacy compatibility.
+1. The independent Backend Capability Audit must re-audit the four remediated
+   findings and issue a new `APPROVE` or `REQUEST_CHANGES` decision.
 2. Merged-main validation has not run. The candidate is not effective until
    reviewed, merged, and validated on clean/synced main.
+3. PR CI must run against the remediated head; local validation cannot replace
+   the required PR Merge Gate checks.
 
-PostgreSQL V11 is no longer an open validation gap: Draft PR CI run
-`31437240898` executed the Testcontainers PostgreSQL 16 migration smoke test
-with `0` failures, `0` errors, and `0` skipped. Local execution remains skipped
-only because the local environment has no Docker socket.
+PostgreSQL V11 is not an open local validation gap. The complete controlled
+migration test passed against disposable PostgreSQL `16.14`, including the
+historical V8 -> V11 path and the new timeframe, Conflict Level, and
+UserPosition source constraints.
+
+## Existing Non-Blocking Audit Debt
+
+The remediation intentionally did not expand into the independent audit's
+non-blocking findings:
+
+- existing legacy Review rows are not backfilled with new provenance;
+- market-catalog degradation remains silent;
+- the machine-readable authorization projection still needs reconciliation at
+  Merge Gate even though the authorization merge is present in this branch's
+  base and the Product Source/Workflow gates pass.
 
 ## Runtime Acceptance Not Claimed
 
@@ -31,5 +43,5 @@ only because the local environment has no Docker socket.
 - Trading execution: absent.
 - Automatic open/close/reverse/order: absent.
 
-No known local compile, unit, integration, H2 persistence, product-source gate,
-or workflow-contract failure remains.
+No known local compile, unit, integration, H2 persistence, PostgreSQL V11,
+product-source gate, or workflow-contract failure remains.

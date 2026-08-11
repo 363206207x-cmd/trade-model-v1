@@ -66,7 +66,7 @@ class AiDecisionChainContractTest {
         AiDecisionChainResult gemini = parser.parse(AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW, """
                 {
                   "verdict":"DOWNGRADE",
-                  "conflictLevel":"MINOR",
+                  "conflictLevel":"LEVEL_2_MINOR_DISAGREEMENT",
                   "confidenceAdjustment":"DOWNGRADE_ONE",
                   "riskAdjustment":"RAISE_ONE",
                   "planModeAdjustment":"DOWNGRADE_ONE",
@@ -79,7 +79,7 @@ class AiDecisionChainContractTest {
                 {
                   "opposingView":"risk",
                   "riskLevel":"HIGH",
-                  "challengeLevel":"MAJOR",
+                  "challengeLevel":"LEVEL_3_SIGNIFICANT_DISAGREEMENT",
                   "majorCounterEvidence":true,
                   "planModeImpact":"DOWNGRADE_TWO",
                   "reasons":["event risk"],
@@ -117,7 +117,7 @@ class AiDecisionChainContractTest {
         AiDecisionChainResult wrongType = parser.parse(AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW, """
                 {
                   "verdict":"APPROVE",
-                  "conflictLevel":"NONE",
+                  "conflictLevel":"LEVEL_1_CONSISTENT",
                   "confidenceAdjustment":"UNCHANGED",
                   "riskAdjustment":"UNCHANGED",
                   "planModeAdjustment":"UNCHANGED",
@@ -141,7 +141,7 @@ class AiDecisionChainContractTest {
                 AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW, """
                 {
                   "verdict":"APPROVE",
-                  "conflictLevel":"NONE",
+                  "conflictLevel":"LEVEL_1_CONSISTENT",
                   "confidenceAdjustment":"UNCHANGED",
                   "riskAdjustment":"UNCHANGED",
                   "planModeAdjustment":"UNCHANGED",
@@ -154,7 +154,7 @@ class AiDecisionChainContractTest {
                 AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW, """
                 {
                   "verdict":"APPROVE",
-                  "conflictLevel":"NONE",
+                  "conflictLevel":"LEVEL_1_CONSISTENT",
                   "confidenceAdjustment":"UNCHANGED",
                   "riskAdjustment":"UNCHANGED",
                   "planModeAdjustment":"UNCHANGED",
@@ -168,6 +168,25 @@ class AiDecisionChainContractTest {
                 .hasSize(AiDecisionChainResponseParser.MAX_RESPONSE_CHARS);
         assertThat(tooManyReasons.getFallbackReason()).isEqualTo("INVALID_FIELD_SIZE_REASONS");
         assertThat(oversizedText.getFallbackReason()).isEqualTo("INVALID_FIELD_SIZE_SUMMARY");
+    }
+
+    @Test
+    void legacyConflictLevelNamesFailClosed() {
+        AiDecisionChainResult legacy = parser.parse(
+                AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW, """
+                {
+                  "verdict":"APPROVE",
+                  "conflictLevel":"MINOR",
+                  "confidenceAdjustment":"UNCHANGED",
+                  "riskAdjustment":"UNCHANGED",
+                  "planModeAdjustment":"UNCHANGED",
+                  "reasons":[],
+                  "summary":"legacy conflict level"
+                }
+                """);
+
+        assertThat(legacy.successful()).isFalse();
+        assertThat(legacy.getFallbackReason()).isEqualTo("INVALID_FIELD_VALUE_CONFLICTLEVEL");
     }
 
     @Test

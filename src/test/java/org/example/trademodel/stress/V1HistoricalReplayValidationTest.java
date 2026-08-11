@@ -188,7 +188,7 @@ class V1HistoricalReplayValidationTest {
         when(localAdapter.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
                 .thenReturn(klines(scenario.fiveMinute()));
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflict());
-        when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(eq(scenario.symbol()), anyString(), any(DecisionContext.class)))
                 .thenReturn(scenario.confused());
         when(assetStateService.buildSnapshotAtDecision(anyString(), anyString(), any(), any(), anyInt(), anyInt(), any(Boolean.class), any(Boolean.class)))
                 .thenAnswer(invocation -> "{\"source\":\"" + FIXTURE_SOURCE + "\",\"nextState\":\""
@@ -488,7 +488,7 @@ class V1HistoricalReplayValidationTest {
         position.setLeverage(decimal("2"));
         position.setStopLoss(decimal(stopLoss));
         position.setTakeProfit(decimal(takeProfit));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
         position.setSourceRefId(planId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -569,7 +569,7 @@ class V1HistoricalReplayValidationTest {
                                               AssetStateEnum state, String reason) {
             return new ReplayScenario(name, symbol, direction, false, false, state, 88, 42,
                     oneMinute, fiveMinute,
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE, direction,
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, direction,
                             "MEDIUM", "REVIEW", 40),
                     new ConfusedResult(45, "OBSERVING", state.name(), false, false, 0, false,
                             reason, "no-trade"), null);
@@ -579,7 +579,7 @@ class V1HistoricalReplayValidationTest {
                                                List<ReplayCandle> oneMinute, List<ReplayCandle> fiveMinute) {
             return new ReplayScenario(name, symbol, "BEARISH", false, false, AssetStateEnum.CONFUSED, 70, 65,
                     oneMinute, fiveMinute,
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BEARISH", "LOW", "HIGH",
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BEARISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),
                     new ConfusedResult(88, "OBSERVING", "CONFUSED", true, false, 0, true,
                             "fast crash and rebound conflict", "manual review block"), null);

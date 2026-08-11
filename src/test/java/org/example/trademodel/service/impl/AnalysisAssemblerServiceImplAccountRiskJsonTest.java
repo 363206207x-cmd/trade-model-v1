@@ -243,6 +243,7 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
 
         verify(assetStateService).persistAuthoritativeState(
                 eq("BTCUSDT"),
+                eq("1h"),
                 eq(AssetStateEnum.HIGH_RISK),
                 eq(0),
                 eq(0),

@@ -142,13 +142,13 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
     public AiDecisionChainResult executeDecisionChain(AiDecisionChainRequest request, long timeoutOverrideMs) {
         long started = System.nanoTime();
         if (request == null || request.getRole() == null) {
-            return AiDecisionChainResult.failed(provider(), null, AiProviderCallStatus.FAILED,
-                    "DECISION_CHAIN_REQUEST_INVALID");
+            return chainFailure(null, AiProviderCallStatus.FAILED,
+                    "DECISION_CHAIN_REQUEST_INVALID", started);
         }
         AiDecisionChainPromptBuilder.PromptPayload prompt = decisionChainPromptBuilder.build(request);
         if (prompt.truncated()) {
-            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.FAILED,
-                    "PROMPT_INPUT_TOO_LARGE");
+            return chainFailure(request.getRole(), AiProviderCallStatus.FAILED,
+                    "PROMPT_INPUT_TOO_LARGE", started);
         }
         try {
             String model = providerProperties().getEffectiveModel();
@@ -172,16 +172,27 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
             result.setSelectedModel(model);
             return result;
         } catch (HttpTimeoutException exception) {
-            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
-                    "PROVIDER_TIMEOUT");
+            return chainFailure(request.getRole(), AiProviderCallStatus.TIMEOUT,
+                    "PROVIDER_TIMEOUT", started);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
-                    "PROVIDER_INTERRUPTED");
+            return chainFailure(request.getRole(), AiProviderCallStatus.TIMEOUT,
+                    "PROVIDER_INTERRUPTED", started);
         } catch (Exception exception) {
-            return AiDecisionChainResult.failed(provider(), request.getRole(), AiProviderCallStatus.FAILED,
-                    "PROVIDER_FAILURE");
+            return chainFailure(request.getRole(), AiProviderCallStatus.FAILED,
+                    "PROVIDER_FAILURE", started);
         }
+    }
+
+    private AiDecisionChainResult chainFailure(AiDecisionChainRole role,
+                                               AiProviderCallStatus status,
+                                               String reason,
+                                               long startedNanos) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(provider(), role, status, reason);
+        result.setLatencyMs(elapsedMs(startedNanos));
+        result.setSelectedModel(providerProperties() == null
+                ? null : providerProperties().getEffectiveModel());
+        return result;
     }
 
     protected AiHttpRequest buildDecisionChainHttpRequest(String promptJson,

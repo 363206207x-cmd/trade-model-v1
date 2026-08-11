@@ -345,13 +345,15 @@ class PostgreSqlFlywayMigrationSmokeTest {
             }
         }
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT state, opportunity_id, state_entered_at, last_transition_reason, last_trigger_source
+                SELECT state, timeframe, opportunity_id, state_entered_at,
+                       last_transition_reason, last_trigger_source
                 FROM tm_asset_state WHERE symbol = 'LEGACYV11USDT'
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getString("state")).isEqualTo("OBSERVING");
-                assertThat(rs.getString("opportunity_id")).isEqualTo("opp-legacyv11usdt");
+                assertThat(rs.getString("timeframe")).isEqualTo("global");
+                assertThat(rs.getString("opportunity_id")).isEqualTo("opp-legacyv11usdt-global");
                 assertThat(rs.getObject("state_entered_at")).isNotNull();
                 assertThat(rs.getString("last_transition_reason")).isEqualTo("LEGACY_STATE_ADOPTED");
                 assertThat(rs.getString("last_trigger_source")).isEqualTo("LEGACY_ANALYSIS");
@@ -395,7 +397,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       plan_mode_before, plan_mode_after, confidence_before, confidence_after,
                       risk_before, risk_after, confused_decision, rule_direction_preserved, created_at
                     ) VALUES ('resolver-v11-chain', 'candidate-v11-chain', 'analysis-v11-chain', 'trace-v11-chain',
-                      'BULLISH', 'HIGH', 'MEDIUM', '{}', '{}', 'NONE', 0,
+                      'BULLISH', 'HIGH', 'MEDIUM', '{}', '{}', 'LEVEL_1_CONSISTENT', 0,
                       'CONFIRM', 'CONFIRM', 'HIGH', 'HIGH', 'MEDIUM', 'MEDIUM', FALSE, TRUE,
                       CURRENT_TIMESTAMP)
                     """)).isEqualTo(1);
@@ -437,8 +439,24 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                       source_type, final_plan_id
                     ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
-                      CURRENT_TIMESTAMP, 'MANUAL', 'final-plan-v11-chain')
+                      CURRENT_TIMESTAMP, 'SYSTEM_PLAN_POSITION', 'final-plan-v11-chain')
                     """)).isEqualTo(1);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_user_position(
+                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      source_type, final_plan_id
+                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                      CURRENT_TIMESTAMP, 'SYSTEM_PLAN_POSITION', NULL)
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_user_position(
+                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      source_type, final_plan_id
+                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                      CURRENT_TIMESTAMP, 'MANUAL_POSITION', 'final-plan-v11-chain')
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO tm_user_position(
                       asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
@@ -625,7 +643,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertThat(rs.getObject("user_id")).isNull();
                 assertThat(rs.getString("asset_symbol")).isEqualTo("LEGACYUSDT");
                 assertThat(rs.getString("status")).isEqualTo("OPEN");
-                assertThat(rs.getString("source_type")).isEqualTo("MANUAL");
+                assertThat(rs.getString("source_type")).isEqualTo("MANUAL_POSITION");
             }
         }
     }
@@ -791,7 +809,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 statement.setBigDecimal(5, new BigDecimal("0.25"));
                 statement.setBigDecimal(6, new BigDecimal("2"));
                 statement.setTimestamp(7, Timestamp.valueOf(now));
-                statement.setString(8, "MANUAL");
+                statement.setString(8, "MANUAL_POSITION");
                 statement.setBoolean(9, true);
                 statement.setBoolean(10, true);
                 statement.setBoolean(11, true);

@@ -20,6 +20,15 @@ public class ConfusedStateServiceImpl implements ConfusedStateService {
 
     @Override
     public ConfusedResult calculateConfused(String symbol, DecisionContext context) {
+        return calculateConfusedInternal(symbol, null, context);
+    }
+
+    @Override
+    public ConfusedResult calculateConfused(String symbol, String timeframe, DecisionContext context) {
+        return calculateConfusedInternal(symbol, normalizeTimeframe(timeframe), context);
+    }
+
+    private ConfusedResult calculateConfusedInternal(String symbol, String timeframe, DecisionContext context) {
         DecisionContext safeContext = context != null ? context : new DecisionContext();
         int driverConflict = safeContext.getDriverConflictScore() != null ? safeContext.getDriverConflictScore() : 30;
         int executionInstability = safeContext.getExecutionInstabilityScore() != null ? safeContext.getExecutionInstabilityScore() : 25;
@@ -35,7 +44,7 @@ public class ConfusedStateServiceImpl implements ConfusedStateService {
                 0.15 * aiConflict
         );
 
-        PersistedState persisted = readPersistedState(symbol, safeContext);
+        PersistedState persisted = readPersistedState(symbol, timeframe, safeContext);
         if (persisted.readFailed) {
             int failClosedScore = Math.max(confusedScore, ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD);
             return new ConfusedResult(
@@ -115,7 +124,7 @@ public class ConfusedStateServiceImpl implements ConfusedStateService {
                 + " | 执行不稳定:" + context.getExecutionInstabilityScore();
     }
 
-    private PersistedState readPersistedState(String symbol, DecisionContext context) {
+    private PersistedState readPersistedState(String symbol, String timeframe, DecisionContext context) {
         AssetStateEnum previousState = AssetStateEnum.OBSERVING;
         int lowStreak = context.getConsecutiveLowConfusedCount() != null
                 ? Math.max(0, context.getConsecutiveLowConfusedCount())
@@ -124,7 +133,9 @@ public class ConfusedStateServiceImpl implements ConfusedStateService {
             return new PersistedState(previousState, lowStreak, false);
         }
         try {
-            AssetStateDO row = assetStateMapper.selectBySymbol(symbol.trim());
+            AssetStateDO row = timeframe == null
+                    ? assetStateMapper.selectBySymbol(symbol.trim())
+                    : assetStateMapper.selectBySymbolAndTimeframe(symbol.trim(), timeframe);
             if (row == null) {
                 return new PersistedState(previousState, lowStreak, false);
             }
@@ -134,6 +145,10 @@ public class ConfusedStateServiceImpl implements ConfusedStateService {
         } catch (Exception e) {
             return new PersistedState(AssetStateEnum.CONFUSED, 0, true);
         }
+    }
+
+    private static String normalizeTimeframe(String timeframe) {
+        return timeframe == null || timeframe.isBlank() ? "global" : timeframe.trim().toLowerCase();
     }
 
     private static final class PersistedState {

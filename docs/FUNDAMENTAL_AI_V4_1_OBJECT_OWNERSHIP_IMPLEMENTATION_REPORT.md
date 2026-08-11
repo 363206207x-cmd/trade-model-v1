@@ -21,7 +21,7 @@ Authority:
 | FinalExecutionPlan | existing `ExecutionPlanDO`, mapper, and plan services | extended `tm_execution_plan` | Existing ExecutionPlan is the Final owner; Final requires Candidate, Opportunity, Resolver, Trace, and Rule Validation PASS |
 | AITrace | existing `AiCallLogDO`, service, and mapper | extended `tm_ai_call_log` | Reused and extended with role contract, Candidate link, bounded output, complete input hash, and Final-authority prohibition |
 | ConflictResolverResult | existing `AiConflictResolverService` | new `tm_conflict_resolver_result` | Extended the existing resolver with the frozen structured result; no second resolver service family |
-| UserPosition | existing `UserPositionDO`, mapper, service, and controller | extended `tm_user_position` with optional `final_plan_id` | Reused; creation remains authenticated and manual, and a supplied Final reference must be validated |
+| UserPosition | existing `UserPositionDO`, mapper, service, and controller | extended `tm_user_position` with explicit `MANUAL_POSITION` / `SYSTEM_PLAN_POSITION` source and validated `final_plan_id` association | Reused; creation remains an authenticated user action, system-plan positions require a validated Final, and explicit manual positions carry no Final plan |
 | PositionMonitorLog | existing PositionMonitor ownership | existing `tm_position_monitor_log` | Reused unchanged; P2 Position Monitoring was not rewritten |
 | Review | existing `ReviewResultDO`, mapper, and services | extended `tm_review_result` | Reused with Final/Candidate/Trace linkage; no second review subsystem |
 

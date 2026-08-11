@@ -138,7 +138,7 @@ class DecisionChainServiceImplTest {
     void gptFailureFallsBackToRuleCandidateAndNeverFabricatesAiReview() {
         when(assetPoolService.isOpportunitySource("BTCUSDT")).thenReturn(true);
         when(assetStateService.transition(
-                anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
+                anyString(), anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
                 .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
         when(aiOrchestratorService.invoke(any())).thenAnswer(invocation -> {
             AiDecisionChainRequest request = invocation.getArgument(0);
@@ -166,9 +166,9 @@ class DecisionChainServiceImplTest {
     void confusedConflictUsesCanonicalStateTransitionAndBlocksFinalPlan() {
         when(assetPoolService.isOpportunitySource("BTCUSDT")).thenReturn(true);
         when(assetStateService.transition(
-                anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
+                anyString(), anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
                 .thenAnswer(invocation -> {
-                    AssetStateEnum requested = invocation.getArgument(1);
+                    AssetStateEnum requested = invocation.getArgument(2);
                     return requested == AssetStateEnum.CONFUSED
                             ? opportunity(AssetStateEnum.CONFUSED, "BLOCKED")
                             : opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED");
@@ -188,7 +188,7 @@ class DecisionChainServiceImplTest {
         assertThat(result.finalPlan().getRuleValidationStatus()).isEqualTo("BLOCKED");
         ArgumentCaptor<AssetStateEnum> states = ArgumentCaptor.forClass(AssetStateEnum.class);
         verify(assetStateService, org.mockito.Mockito.times(2)).transition(
-                anyString(), states.capture(), anyInt(), anyInt(), any(), any(), anyString(), any());
+                anyString(), anyString(), states.capture(), anyInt(), anyInt(), any(), any(), anyString(), any());
         assertThat(states.getAllValues()).containsExactly(AssetStateEnum.CANDIDATE, AssetStateEnum.CONFUSED);
     }
 
@@ -216,7 +216,7 @@ class DecisionChainServiceImplTest {
     private void stubHappyPath() {
         when(assetPoolService.isOpportunitySource("BTCUSDT")).thenReturn(true);
         when(assetStateService.transition(
-                anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
+                anyString(), anyString(), any(), anyInt(), anyInt(), any(), any(), anyString(), any()))
                 .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
         when(aiOrchestratorService.invoke(any())).thenAnswer(invocation -> success(
                 ((AiDecisionChainRequest) invocation.getArgument(0)).getRole()));
@@ -274,7 +274,9 @@ class DecisionChainServiceImplTest {
         result.setRuleRisk("MEDIUM");
         result.setGeminiReviewJson("{}");
         result.setGrokChallengeJson("{}");
-        result.setConflictLevel(confused ? "EXTREME" : "NONE");
+        result.setConflictLevel(confused
+                ? "LEVEL_4_EXTREME_CONFLICT"
+                : "LEVEL_1_CONSISTENT");
         result.setConflictScore(confused ? 90 : 0);
         result.setPlanModeBefore("CONFIRM");
         result.setPlanModeAfter(confused ? "BLOCKED" : "CONFIRM");
@@ -303,11 +305,11 @@ class DecisionChainServiceImplTest {
                      "validity":"2026-08-12T00:00Z","summary":"Candidate only"}
                     """;
             case GEMINI_REVIEW -> """
-                    {"verdict":"APPROVE","conflictLevel":"NONE","confidenceAdjustment":"UNCHANGED",
+                    {"verdict":"APPROVE","conflictLevel":"LEVEL_1_CONSISTENT","confidenceAdjustment":"UNCHANGED",
                      "riskAdjustment":"UNCHANGED","planModeAdjustment":"UNCHANGED","reasons":[],"summary":"approved"}
                     """;
             case GROK_CHALLENGE -> """
-                    {"opposingView":"none","riskLevel":"MEDIUM","challengeLevel":"NONE",
+                    {"opposingView":"none","riskLevel":"MEDIUM","challengeLevel":"LEVEL_1_CONSISTENT",
                      "majorCounterEvidence":false,"planModeImpact":"UNCHANGED","reasons":[],"summary":"no challenge"}
                     """;
         });

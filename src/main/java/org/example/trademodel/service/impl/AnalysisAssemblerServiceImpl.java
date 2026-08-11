@@ -871,6 +871,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 if (decisionChain == null && decision.getAssetState() != null) {
                     assetStateService.persistAuthoritativeState(
                             analysis.getSymbol(),
+                            analysis.getTimeframe(),
                             decision.getAssetState(),
                             confused,
                             decision.getConfusedLowStreak() != null ? decision.getConfusedLowStreak() : 0,

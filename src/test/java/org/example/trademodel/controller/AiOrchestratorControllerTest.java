@@ -119,6 +119,10 @@ class AiOrchestratorControllerTest {
                 .andExpect(jsonPath("$[0].reviewOnly").value(true))
                 .andExpect(jsonPath("$[0].notExecutable").value(true))
                 .andExpect(jsonPath("$[0].requestSummary").value("{\"ruleMarketBias\":\"BULLISH\"}"))
+                .andExpect(jsonPath("$[0].contractType").value("DECISION_CHAIN_V4_1"))
+                .andExpect(jsonPath("$[0].candidateId").value("candidate-1"))
+                .andExpect(jsonPath("$[0].outputPayload").value("{\"summary\":\"candidate\"}"))
+                .andExpect(jsonPath("$[0].errorMessage").value("provider timeout"))
                 .andExpect(content().string(not(containsString("api-key"))));
     }
 
@@ -181,6 +185,10 @@ class AiOrchestratorControllerTest {
             log.setCallStatus("SUCCESS");
             log.setRequestSummary("{\"ruleMarketBias\":\"BULLISH\"}");
             log.setResponseSummary("{\"stance\":\"SUPPORT\"}");
+            log.setContractType("DECISION_CHAIN_V4_1");
+            log.setCandidateId("candidate-1");
+            log.setOutputPayload("{\"summary\":\"candidate\"}");
+            log.setErrorMessage("provider timeout");
             log.setReviewOnly(true);
             log.setNotExecutable(true);
             return List.of(log);

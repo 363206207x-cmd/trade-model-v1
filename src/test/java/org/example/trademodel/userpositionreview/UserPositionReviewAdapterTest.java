@@ -514,7 +514,7 @@ class UserPositionReviewAdapterTest {
         row.setLeverage(new BigDecimal("3"));
         row.setOpenedAt(LocalDateTime.of(2026, 6, 22, 8, 0));
         row.setClosedAt(LocalDateTime.of(2026, 6, 22, 10, 0));
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_POSITION");
         row.setSourceRefId(sourceRefId == null || PositionMonitorSourceContract.parse(sourceRefId) != null
                 ? sourceRefId
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));

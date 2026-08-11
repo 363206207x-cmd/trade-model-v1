@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.example.trademodel.entity.UserPositionDO;
@@ -38,7 +39,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class DecisionServiceImpl implements DecisionService {
     private static final int MAX_DASHBOARD_SUMMARY_LIMIT = 24;
-    private static final String MANUAL_SOURCE_TYPE = "MANUAL";
+    private static final Set<String> USER_POSITION_SOURCE_TYPES =
+            Set.of("MANUAL", "MANUAL_POSITION", "SYSTEM_PLAN_POSITION");
     private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_PARTIALLY_CLOSED = "PARTIALLY_CLOSED";
 
@@ -310,7 +312,7 @@ public class DecisionServiceImpl implements DecisionService {
             return false;
         }
         String sourceType = position.getSourceType();
-        if (sourceType == null || !MANUAL_SOURCE_TYPE.equalsIgnoreCase(sourceType.trim())) {
+        if (sourceType == null || !USER_POSITION_SOURCE_TYPES.contains(sourceType.trim().toUpperCase())) {
             return false;
         }
         String status = position.getStatus();

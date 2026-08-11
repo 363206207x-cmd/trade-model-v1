@@ -14,6 +14,7 @@ import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.service.AiCallLogService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -68,7 +69,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
-    void missingAuthorizedRoleFailsClosedBeforeLoggingOrCallingAnotherProvider() {
+    void missingAuthorizedRoleFailsClosedAndPersistsFallbackTrace() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
@@ -78,10 +79,62 @@ class DecisionChainAiOrchestratorServiceImplTest {
         AiDecisionChainResult result = service.invoke(request(AiDecisionChainRole.GEMINI_REVIEW));
 
         assertThat(result.successful()).isFalse();
-        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.NOT_CONFIGURED);
+        assertThat(result.getCallStatus()).isEqualTo(AiProviderCallStatus.FAILED);
         assertThat(result.getFallbackReason()).isEqualTo("DECISION_CHAIN_PROVIDER_MISSING");
         verify(gpt, never()).executeDecisionChain(any(), anyLong());
         verify(callLogService, never()).startDecisionChainCall(any(), any(), any());
+        verify(callLogService).recordDecisionChainResult(
+                any(), eq(AiProviderName.GEMINI), eq("NOT_CONFIGURED"), eq(result), eq(BigDecimal.ZERO));
+    }
+
+    @Test
+    void timeoutAndProviderExceptionBothCompleteAuditableFallbackTraces() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenReturn(new AiCallLogDO(), new AiCallLogDO());
+        when(gpt.executeDecisionChain(any(), anyLong()))
+                .thenReturn(AiDecisionChainResult.failed(AiProviderName.OPENAI,
+                        AiDecisionChainRole.GPT_FINAL, AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT"))
+                .thenThrow(new IllegalStateException("provider down"));
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, new AiOrchestratorProperties());
+
+        AiDecisionChainResult timeout = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
+        AiDecisionChainResult exception = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
+
+        assertThat(timeout.getCallStatus()).isEqualTo(AiProviderCallStatus.TIMEOUT);
+        assertThat(timeout.isFallback()).isTrue();
+        assertThat(timeout.getLatencyMs()).isNotNull();
+        assertThat(exception.getCallStatus()).isEqualTo(AiProviderCallStatus.FAILED);
+        assertThat(exception.getFallbackReason()).isEqualTo("DECISION_CHAIN_PROVIDER_EXCEPTION");
+        ArgumentCaptor<AiDecisionChainResult> traces = ArgumentCaptor.forClass(AiDecisionChainResult.class);
+        verify(callLogService, org.mockito.Mockito.times(2))
+                .completeDecisionChainCall(any(), traces.capture());
+        assertThat(traces.getAllValues()).extracting(AiDecisionChainResult::getCallStatus)
+                .containsExactly(AiProviderCallStatus.TIMEOUT, AiProviderCallStatus.FAILED);
+    }
+
+    @Test
+    void callLogStartFailureStillAttemptsTerminalFallbackTrace() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenThrow(new IllegalStateException("start failed"));
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, new AiOrchestratorProperties());
+
+        AiDecisionChainResult result = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
+
+        assertThat(result.getFallbackReason()).isEqualTo("AI_CALL_LOG_START_FAILED");
+        verify(callLogService).recordDecisionChainResult(
+                any(), eq(AiProviderName.OPENAI), eq("UNAVAILABLE"), eq(result), eq(BigDecimal.ZERO));
     }
 
     private static AiProviderClient client(AiProviderName provider, AiProviderRole role) {

@@ -118,7 +118,7 @@ class DecisionEngineServiceTest {
                         "CONFIRM",
                         20
                 ));
-        lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        lenient().when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
         lenient().when(userPositionRiskAdapter.currentRiskForSystem())
                 .thenReturn(UserPositionRiskResult.noOpenPosition(0));
@@ -358,7 +358,7 @@ class DecisionEngineServiceTest {
                 .thenReturn(bearishKlines());
         when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
-                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT,
                         "BEARISH",
                         "LOW",
                         "HIGH",
@@ -368,7 +368,7 @@ class DecisionEngineServiceTest {
                         false,
                         90
                 ));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
                         false, false, 0, false, "none", "base"));
 
@@ -386,7 +386,7 @@ class DecisionEngineServiceTest {
     void makeDecision_aiDisagreementDoesNotDirectlyChangeAssetState() {
         when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
-                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT,
                         "BULLISH",
                         "LOW",
                         "HIGH",
@@ -396,7 +396,7 @@ class DecisionEngineServiceTest {
                         false,
                         95
                 ));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
                         false, false, 0, false, "none", "base"));
 
@@ -408,7 +408,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_confusedScore70EntersConfused() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(70, "OBSERVING", "CONFUSED",
                         true, false, 0, false, "threshold", "enter"));
 
@@ -421,7 +421,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_confusedScore85BlocksDirectionalPushAndWorthOpening() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
                         true, false, 0, true, "threshold", "block"));
 
@@ -435,7 +435,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_secondLowCycleExitsToCoolingNotTriggered() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(54, "CONFUSED", "COOLING",
                         false, true, 0, false, "low", "exit"));
 
@@ -495,7 +495,7 @@ class DecisionEngineServiceTest {
     void makeDecision_blockingExternalContextPreservesStricterConfusedState() {
         EventImpactInputVO external = externalInput(true, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
                 List.of(ExternalContextPolicy.REASON_WINDOW_BLOCKED));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
                         true, false, 0, true, "threshold", "block"));
 

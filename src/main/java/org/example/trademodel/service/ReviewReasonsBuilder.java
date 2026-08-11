@@ -34,8 +34,8 @@ public final class ReviewReasonsBuilder {
         if (multiTfConvergence != null && "WEAK".equalsIgnoreCase(multiTfConvergence.trim())) {
             codes.add("MULTI_TF_CONVERGENCE_WEAK");
         }
-        boolean conflictElevated = conflictLevel == AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE
-                || conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE;
+        boolean conflictElevated = conflictLevel == AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT
+                || conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT;
         if (conflictElevated) {
             codes.add("AI_CONFLICT_LEVEL_ELEVATED");
         }

@@ -28,9 +28,23 @@ public interface AssetStateService {
     void persistAuthoritativeState(String symbol, AssetStateEnum state, int confusedScore,
                                    int confusedLowStreak, String traceId);
 
-    OpportunityTransitionResult transition(String symbol, AssetStateEnum requestedState, int confusedScore,
-                                           int confusedLowStreak, String analysisId, String traceId,
-                                           String reason, OpportunityTriggerSource triggerSource);
+    default void persistAuthoritativeState(String symbol, String timeframe, AssetStateEnum state,
+                                           int confusedScore, int confusedLowStreak, String traceId) {
+        transition(symbol, timeframe, state, confusedScore, confusedLowStreak, null, traceId,
+                "LEGACY_AUTHORITATIVE_STATE", OpportunityTriggerSource.LEGACY_ANALYSIS);
+    }
+
+    default OpportunityTransitionResult transition(String symbol, AssetStateEnum requestedState, int confusedScore,
+                                                    int confusedLowStreak, String analysisId, String traceId,
+                                                    String reason, OpportunityTriggerSource triggerSource) {
+        return transition(symbol, "GLOBAL", requestedState, confusedScore, confusedLowStreak,
+                analysisId, traceId, reason, triggerSource);
+    }
+
+    OpportunityTransitionResult transition(String symbol, String timeframe, AssetStateEnum requestedState,
+                                           int confusedScore, int confusedLowStreak, String analysisId,
+                                           String traceId, String reason,
+                                           OpportunityTriggerSource triggerSource);
 
     /**
      * 全库维度「最近一次 Hot Reset」行（按 hot_reset_time 最大），供 systemStatus 展示；无则 null。

@@ -57,6 +57,9 @@ class AssetStateMapperIntegrationTest {
                                     Integer confusedLowStreak, LocalDateTime updateTime, String traceId) {
         AssetStateDO row = new AssetStateDO();
         row.setSymbol(symbol);
+        row.setTimeframe("global");
+        row.setOpportunityId("opp-" + symbol.toLowerCase() + "-global");
+        row.setStateEnteredAt(updateTime);
         row.setState(state);
         row.setConfusedScore(confusedScore);
         row.setConfusedLowStreak(confusedLowStreak);

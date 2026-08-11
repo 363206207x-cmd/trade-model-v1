@@ -148,11 +148,13 @@ public class HotResetServiceImpl implements HotResetService {
         }
 
         String normalizedSymbol = normalizeSymbol(command.getSymbol());
+        String normalizedTimeframe = normalizeTimeframe(command.getTimeframe());
         LocalDateTime occurredAt = command.getOccurredAt() != null ? command.getOccurredAt() : nowUtc;
         result.setOccurredAt(occurredAt);
         String eventId = "hre-" + UUID.randomUUID().toString().substring(0, 12);
 
-        AssetStateDO currentState = assetStateMapper.selectBySymbol(normalizedSymbol);
+        AssetStateDO currentState = assetStateMapper.selectBySymbolAndTimeframe(
+                normalizedSymbol, normalizedTimeframe);
         AssetStateEnum preState = currentState != null && currentState.getState() != null
                 ? currentState.getState()
                 : AssetStateEnum.OBSERVING;
@@ -161,7 +163,8 @@ public class HotResetServiceImpl implements HotResetService {
                 : 0;
 
         DecisionContext confusedContext = buildConfusedContext(command);
-        ConfusedResult confusedResult = confusedStateService.calculateConfused(normalizedSymbol, confusedContext);
+        ConfusedResult confusedResult = confusedStateService.calculateConfused(
+                normalizedSymbol, normalizedTimeframe, confusedContext);
         UserPositionRiskResult riskResult = currentRiskFailClosed();
         AssetStateEnum postState = HotResetPolicy.resolvePostState(command, confusedResult, riskResult.isRiskBlocked());
         if (HotResetPolicy.isUnsafePreState(postState)) {
@@ -282,12 +285,14 @@ public class HotResetServiceImpl implements HotResetService {
         if (assetStateService == null) {
             throw new IllegalStateException("Canonical opportunity transition service is required");
         }
-        assetStateService.transition(normalizedSymbol, postState, confusedScore,
+        String normalizedTimeframe = normalizeTimeframe(command.getTimeframe());
+        assetStateService.transition(normalizedSymbol, normalizedTimeframe, postState, confusedScore,
                 Math.max(0, confusedLowStreak), command.getAnalysisId(), command.getTraceId(),
                 "HOT_RESET:" + command.getEventType().name(), OpportunityTriggerSource.HOT_RESET);
 
         AssetStateDO hot = new AssetStateDO();
         hot.setSymbol(normalizedSymbol);
+        hot.setTimeframe(normalizedTimeframe);
         hot.setHotResetFlag(true);
         hot.setHotResetTriggerType(command.getEventType().name());
         hot.setHotResetTriggerValue(command.getEventKey());
@@ -517,6 +522,11 @@ public class HotResetServiceImpl implements HotResetService {
 
     private String normalizeSymbol(String symbol) {
         return symbol == null ? null : symbol.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeTimeframe(String timeframe) {
+        return timeframe == null || timeframe.isBlank()
+                ? "global" : timeframe.trim().toLowerCase(Locale.ROOT);
     }
 
     private int zero(Integer value) {

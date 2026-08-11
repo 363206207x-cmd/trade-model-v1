@@ -94,6 +94,7 @@ public class AssetStateServiceImpl implements AssetStateService {
     @Transactional
     public synchronized OpportunityTransitionResult transition(
             String symbol,
+            String timeframe,
             AssetStateEnum requestedState,
             int confusedScore,
             int confusedLowStreak,
@@ -102,15 +103,16 @@ public class AssetStateServiceImpl implements AssetStateService {
             String reason,
             OpportunityTriggerSource triggerSource) {
         String normalizedSymbol = normalizeSymbol(symbol);
+        String normalizedTimeframe = normalizeTimeframe(timeframe);
         AssetStateEnum requested = requestedState == null ? AssetStateEnum.OBSERVING : requestedState;
         OpportunityTriggerSource source = triggerSource == null
                 ? OpportunityTriggerSource.ANALYSIS : triggerSource;
         LocalDateTime now = LocalDateTime.now();
-        AssetStateDO current = assetStateMapper.selectBySymbol(normalizedSymbol);
+        AssetStateDO current = assetStateMapper.selectBySymbolAndTimeframe(normalizedSymbol, normalizedTimeframe);
         AssetStateEnum previous = current == null || current.getState() == null
                 ? AssetStateEnum.OBSERVING : current.getState();
         String opportunityId = current != null && hasText(current.getOpportunityId())
-                ? current.getOpportunityId() : opportunityId(normalizedSymbol);
+                ? current.getOpportunityId() : opportunityId(normalizedSymbol, normalizedTimeframe);
 
         AssetStateEnum target = applyPrecedence(previous, requested, current, source, now);
         boolean debounced = shouldDebounce(current, previous, target, source, now);
@@ -127,14 +129,14 @@ public class AssetStateServiceImpl implements AssetStateService {
 
         AssetStateDO row = new AssetStateDO();
         row.setSymbol(normalizedSymbol);
+        row.setTimeframe(normalizedTimeframe);
         row.setState(target);
         row.setConfusedScore(Math.max(0, confusedScore));
         row.setConfusedLowStreak(Math.max(0, confusedLowStreak));
         row.setOpportunityId(opportunityId);
         row.setStateEnteredAt(changed || current.getStateEnteredAt() == null
                 ? now : current.getStateEnteredAt());
-        row.setCoolingUntil(target == AssetStateEnum.COOLING
-                ? now.plus(DEFAULT_COOLING) : null);
+        row.setCoolingUntil(coolingUntil(current, previous, target, now));
         row.setLastTransitionReason(effectiveReason);
         row.setLastTriggerSource(source.name());
         row.setLastAnalysisId(trimToNull(analysisId));
@@ -147,6 +149,7 @@ public class AssetStateServiceImpl implements AssetStateService {
             audit.setTransitionId("opp-transition-" + UUID.randomUUID());
             audit.setOpportunityId(opportunityId);
             audit.setSymbol(normalizedSymbol);
+            audit.setTimeframe(normalizedTimeframe);
             audit.setAnalysisId(trimToNull(analysisId));
             audit.setTraceId(row.getTraceId());
             audit.setFromState(current == null ? null : previous.name());
@@ -194,6 +197,7 @@ public class AssetStateServiceImpl implements AssetStateService {
                 OpportunityTriggerSource.HOT_RESET);
         AssetStateDO hot = new AssetStateDO();
         hot.setSymbol(sym);
+        hot.setTimeframe("global");
         hot.setHotResetFlag(true);
         hot.setHotResetTriggerType(triggerType);
         hot.setHotResetTriggerValue(triggerValue);
@@ -251,20 +255,37 @@ public class AssetStateServiceImpl implements AssetStateService {
         if (requested == AssetStateEnum.CONFUSED) {
             return requested;
         }
-        if (current == AssetStateEnum.CONFUSED) {
+        if (current == AssetStateEnum.CONFUSED && requested != AssetStateEnum.COOLING) {
             return current;
         }
         if (requested == AssetStateEnum.INVALIDATED) {
             return requested;
         }
-        if (current == AssetStateEnum.INVALIDATED) {
+        if (current == AssetStateEnum.INVALIDATED && requested != AssetStateEnum.COOLING) {
             return current;
         }
         if (current == AssetStateEnum.COOLING && row != null && row.getCoolingUntil() != null
-                && now.isBefore(row.getCoolingUntil())) {
+                && now.isBefore(row.getCoolingUntil()) && isCoolingPromotion(requested)) {
             return current;
         }
         return requested;
+    }
+
+    private static boolean isCoolingPromotion(AssetStateEnum requested) {
+        return requested == AssetStateEnum.CANDIDATE
+                || requested == AssetStateEnum.WAITING_TRIGGER
+                || requested == AssetStateEnum.TRIGGERED;
+    }
+
+    private static LocalDateTime coolingUntil(AssetStateDO current,
+                                              AssetStateEnum previous,
+                                              AssetStateEnum target,
+                                              LocalDateTime now) {
+        if (target != AssetStateEnum.COOLING) return null;
+        if (previous == AssetStateEnum.COOLING && current != null && current.getCoolingUntil() != null) {
+            return current.getCoolingUntil();
+        }
+        return now.plus(DEFAULT_COOLING);
     }
 
     private static boolean shouldDebounce(AssetStateDO current,
@@ -275,8 +296,15 @@ public class AssetStateServiceImpl implements AssetStateService {
         if (current == null || previous == target || source.priority() >= OpportunityTriggerSource.INVALIDATION.priority()) {
             return false;
         }
-        LocalDateTime updated = current.getLastUpdateTime();
-        return updated != null && Duration.between(updated, now).compareTo(ORDINARY_DEBOUNCE) < 0;
+        if (target == AssetStateEnum.COOLING
+                && (previous == AssetStateEnum.INVALIDATED || previous == AssetStateEnum.CONFUSED)) {
+            return false;
+        }
+        LocalDateTime lastTransition = current.getStateEnteredAt() != null
+                ? current.getStateEnteredAt()
+                : current.getLastUpdateTime();
+        return lastTransition != null
+                && Duration.between(lastTransition, now).compareTo(ORDINARY_DEBOUNCE) < 0;
     }
 
     private static int effectivePriority(AssetStateEnum requested, OpportunityTriggerSource source) {
@@ -297,9 +325,14 @@ public class AssetStateServiceImpl implements AssetStateService {
         return symbol.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static String opportunityId(String symbol) {
+    private static String opportunityId(String symbol, String timeframe) {
         String compact = symbol.replaceAll("[^A-Z0-9]", "").toLowerCase(Locale.ROOT);
-        return "opp-" + compact;
+        String compactTimeframe = timeframe.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+        return "opp-" + compact + "-" + compactTimeframe;
+    }
+
+    private static String normalizeTimeframe(String timeframe) {
+        return hasText(timeframe) ? timeframe.trim().toLowerCase(Locale.ROOT) : "global";
     }
 
     private static String requireTraceId(String traceId) {

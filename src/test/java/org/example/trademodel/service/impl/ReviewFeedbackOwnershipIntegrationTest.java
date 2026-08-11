@@ -156,7 +156,7 @@ class ReviewFeedbackOwnershipIntegrationTest {
             row.setClosePrice(new BigDecimal("110"));
             row.setCloseReason("manual fixture close");
         }
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_POSITION");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

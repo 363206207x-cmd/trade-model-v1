@@ -301,7 +301,7 @@ public class DecisionEngineService {
 
             AiConflictResult conflict = aiConflictResolverService.resolve(ctx);
             ctx.setAiConflictScore(conflict.getConfusedContribution());
-            ConfusedResult confused = confusedStateService.calculateConfused(symbol, ctx);
+            ConfusedResult confused = confusedStateService.calculateConfused(symbol, timeframe, ctx);
 
             AssetStateEnum previousState = parseAssetState(confused.getPreviousState(), AssetStateEnum.OBSERVING);
             AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),

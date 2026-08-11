@@ -133,9 +133,13 @@ public class AiOrchestratorController {
         map.put("budgetBlocked", log.getBudgetBlocked());
         map.put("timeoutFlag", log.getTimeoutFlag());
         map.put("errorCode", log.getErrorCode());
+        map.put("errorMessage", log.getErrorMessage());
         map.put("requestHash", log.getRequestHash());
         map.put("requestSummary", log.getRequestSummary());
         map.put("responseSummary", log.getResponseSummary());
+        map.put("contractType", log.getContractType());
+        map.put("candidateId", log.getCandidateId());
+        map.put("outputPayload", log.getOutputPayload());
         return map;
     }
 

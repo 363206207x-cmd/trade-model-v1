@@ -8,6 +8,7 @@ import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
+import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.mapper.AiCallLogMapper;
 import org.example.trademodel.service.AiCallLogService;
@@ -60,40 +61,10 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     public AiCallLogDO startDecisionChainCall(AiDecisionChainRequest request,
                                               AiProviderClient client,
                                               BigDecimal reservedCostUsd) {
-        LocalDateTime now = LocalDateTime.now();
-        AiCallLogDO log = new AiCallLogDO();
-        log.setCallId("ai-call-" + UUID.randomUUID());
-        log.setAnalysisId(safe(request.getAnalysisId(), 64));
-        log.setTraceId(safe(request.getTraceId(), 128));
-        log.setRequestId("ai-req-" + UUID.randomUUID());
-        log.setProviderName(client.provider().name());
-        log.setModelName(safe(client.providerProperties().getEffectiveModel(), 128));
-        log.setAiRole(request.getRole().name());
+        AiCallLogDO log = newDecisionChainLog(request, client.provider(),
+                client.providerProperties() == null ? null : client.providerProperties().getEffectiveModel(),
+                reservedCostUsd);
         log.setCallStatus("STARTED");
-        log.setStartedAt(now);
-        log.setReservedCostUsd(reservedCostUsd == null ? BigDecimal.ZERO : reservedCostUsd);
-        log.setCalculatedCostUsd(BigDecimal.ZERO);
-        log.setContractType("DECISION_CHAIN_V4_1");
-        log.setCandidateId(safe(request.getCandidateId(), 64));
-        String canonicalInput = canonicalDecisionChainRequest(request);
-        log.setRequestSummary(truncate(canonicalInput, DECISION_CHAIN_SUMMARY_CHARS));
-        log.setRequestHash(hash(canonicalInput));
-        log.setRuleVersion("FUNDAMENTAL_AI_V4_1");
-        boolean reviewOnly = request.getRole() != AiDecisionChainRole.GPT_FINAL;
-        log.setReviewOnly(reviewOnly);
-        log.setNotExecutionPlanCreation(reviewOnly);
-        log.setNotFinalExecutionPlanCreation(true);
-        log.setManualReviewOnly(true);
-        log.setNotTradeInstruction(true);
-        log.setNotExecutable(true);
-        log.setNotAutoTrading(true);
-        log.setNotOrderExecution(true);
-        log.setNotUserPositionCreation(true);
-        log.setNotPositionMutation(true);
-        log.setNotStateMachineOverride(true);
-        log.setRuleDirectionPreserved(true);
-        log.setCreatedAt(now);
-        log.setUpdatedAt(now);
         mapper.insert(log);
         return log;
     }
@@ -102,7 +73,31 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeDecisionChainCall(AiCallLogDO log, AiDecisionChainResult result) {
         if (log == null || result == null) return;
+        fillDecisionChainCompletion(log, result);
+        mapper.updateCompletion(log);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AiCallLogDO recordDecisionChainResult(AiDecisionChainRequest request,
+                                                 AiProviderName provider,
+                                                 String modelName,
+                                                 AiDecisionChainResult result,
+                                                 BigDecimal reservedCostUsd) {
+        if (request == null || request.getRole() == null || result == null) {
+            throw new IllegalArgumentException("decision-chain request, role and result are required");
+        }
+        AiCallLogDO log = newDecisionChainLog(request, provider, modelName, reservedCostUsd);
+        fillDecisionChainCompletion(log, result);
+        mapper.insert(log);
+        return log;
+    }
+
+    private void fillDecisionChainCompletion(AiCallLogDO log, AiDecisionChainResult result) {
         LocalDateTime now = LocalDateTime.now();
+        if (result.getSelectedModel() != null && !result.getSelectedModel().isBlank()) {
+            log.setModelName(safe(result.getSelectedModel(), 128));
+        }
         log.setCallStatus(result.getCallStatus() == null ? "FAILED" : result.getCallStatus().name());
         log.setProviderRequestId(safe(result.getProviderRequestId(), 128));
         log.setCompletedAt(now);
@@ -121,7 +116,6 @@ public class AiCallLogServiceImpl implements AiCallLogService {
                 ? result.getPayloadJson() : result.getAuditOutput();
         log.setOutputPayload(safe(auditOutput, DECISION_CHAIN_OUTPUT_CHARS));
         log.setUpdatedAt(now);
-        mapper.updateCompletion(log);
     }
 
     @Override
@@ -173,6 +167,46 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setRequestSummary(requestSummary(request));
         log.setRequestHash(hash(log.getRequestSummary()));
         log.setRuleVersion("P2-2");
+        log.setCreatedAt(now);
+        log.setUpdatedAt(now);
+        return log;
+    }
+
+    private AiCallLogDO newDecisionChainLog(AiDecisionChainRequest request,
+                                            AiProviderName provider,
+                                            String modelName,
+                                            BigDecimal reservedCostUsd) {
+        LocalDateTime now = LocalDateTime.now();
+        AiCallLogDO log = new AiCallLogDO();
+        log.setCallId("ai-call-" + UUID.randomUUID());
+        log.setAnalysisId(safe(request.getAnalysisId(), 64));
+        log.setTraceId(safe(request.getTraceId(), 128));
+        log.setRequestId("ai-req-" + UUID.randomUUID());
+        log.setProviderName(provider == null ? "UNKNOWN" : provider.name());
+        log.setModelName(safe(modelName == null || modelName.isBlank() ? "UNAVAILABLE" : modelName, 128));
+        log.setAiRole(request.getRole().name());
+        log.setStartedAt(now);
+        log.setReservedCostUsd(reservedCostUsd == null ? BigDecimal.ZERO : reservedCostUsd);
+        log.setCalculatedCostUsd(BigDecimal.ZERO);
+        log.setContractType("DECISION_CHAIN_V4_1");
+        log.setCandidateId(safe(request.getCandidateId(), 64));
+        String canonicalInput = canonicalDecisionChainRequest(request);
+        log.setRequestSummary(truncate(canonicalInput, DECISION_CHAIN_SUMMARY_CHARS));
+        log.setRequestHash(hash(canonicalInput));
+        log.setRuleVersion("FUNDAMENTAL_AI_V4_1");
+        boolean reviewOnly = request.getRole() != AiDecisionChainRole.GPT_FINAL;
+        log.setReviewOnly(reviewOnly);
+        log.setNotExecutionPlanCreation(reviewOnly);
+        log.setNotFinalExecutionPlanCreation(true);
+        log.setManualReviewOnly(true);
+        log.setNotTradeInstruction(true);
+        log.setNotExecutable(true);
+        log.setNotAutoTrading(true);
+        log.setNotOrderExecution(true);
+        log.setNotUserPositionCreation(true);
+        log.setNotPositionMutation(true);
+        log.setNotStateMachineOverride(true);
+        log.setRuleDirectionPreserved(true);
         log.setCreatedAt(now);
         log.setUpdatedAt(now);
         return log;

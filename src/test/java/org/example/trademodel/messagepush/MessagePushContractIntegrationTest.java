@@ -303,7 +303,7 @@ class MessagePushContractIntegrationTest {
         row.setStopLoss(new BigDecimal("90"));
         row.setTakeProfit(new BigDecimal("120"));
         row.setOpenedAt(openedAt);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_POSITION");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

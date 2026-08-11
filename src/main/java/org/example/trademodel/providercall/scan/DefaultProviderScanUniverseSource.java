@@ -338,7 +338,9 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     }
 
     private static boolean validManualPosition(UserPositionDO row) {
-        return row != null && "MANUAL".equalsIgnoreCase(row.getSourceType())
+        return row != null && ("MANUAL".equalsIgnoreCase(row.getSourceType())
+                || "MANUAL_POSITION".equalsIgnoreCase(row.getSourceType())
+                || "SYSTEM_PLAN_POSITION".equalsIgnoreCase(row.getSourceType()))
                 && ("OPEN".equalsIgnoreCase(row.getStatus())
                 || "PARTIALLY_CLOSED".equalsIgnoreCase(row.getStatus()));
     }

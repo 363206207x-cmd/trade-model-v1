@@ -208,7 +208,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("62000"));
         position.setQuantity(new BigDecimal("0.2"));
         position.setLeverage(new BigDecimal("2"));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
         position.setUpdatedAt(LocalDateTime.of(2026, 6, 27, 2, 0));
         allowResolvedOriginalPlan(position, btc, "plan-btc-source", "trace-" + btc.getAnalysisId());
 
@@ -456,7 +456,7 @@ class DashboardHomeServiceImplTest {
         manualPosition.setId(13L);
         manualPosition.setAssetSymbol("BTCUSDT");
         manualPosition.setStatus("OPEN");
-        manualPosition.setSourceType("MANUAL");
+        manualPosition.setSourceType("MANUAL_POSITION");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(manualPosition));
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 13L, 1)).thenReturn(List.of());
@@ -519,7 +519,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("62000"));
         position.setQuantity(new BigDecimal("0.2"));
         position.setLeverage(new BigDecimal("2"));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(9L);
@@ -693,7 +693,7 @@ class DashboardHomeServiceImplTest {
         position.setStopLoss(new BigDecimal("95"));
         position.setTakeProfit(new BigDecimal("115"));
         position.setOpenedAt(LocalDateTime.of(2026, 7, 13, 10, 0));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(19L);
@@ -756,7 +756,7 @@ class DashboardHomeServiceImplTest {
         closedPosition.setId(21L);
         closedPosition.setAssetSymbol("BTCUSDT");
         closedPosition.setStatus("CLOSED");
-        closedPosition.setSourceType("MANUAL");
+        closedPosition.setSourceType("MANUAL_POSITION");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(closedPosition));
 
@@ -802,7 +802,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(new BigDecimal("2"));
         position.setLeverage(new BigDecimal("3"));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(10L);
@@ -2431,7 +2431,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(BigDecimal.ONE);
         position.setLeverage(BigDecimal.ONE);
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
         position.setSourceRefId(sourceRefId);
         return position;
     }
@@ -2562,7 +2562,7 @@ class DashboardHomeServiceImplTest {
         position.setLeverage(BigDecimal.ONE);
         position.setStopLoss(new BigDecimal("90"));
         position.setTakeProfit(new BigDecimal("120"));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_POSITION");
         position.setSourceRefId(sourceRefId);
         return position;
     }

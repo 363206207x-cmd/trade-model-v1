@@ -84,7 +84,7 @@ class AiRoleResultsCodecTest {
     private AiRoleResultsPayload.SynthesisPayload synthesis() {
         return new AiRoleResultsPayload.SynthesisPayload(
                 "BULLISH", "MEDIUM", "HIGH", false,
-                "LEVEL_3_SIGNIFICANT_DIVERGENCE", 62,
+                "LEVEL_3_SIGNIFICANT_DISAGREEMENT", 62,
                 "MEDIUM", "RAISED", "PREPARE_ONLY", false,
                 "GEMINI_ONLY");
     }

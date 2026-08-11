@@ -13,6 +13,8 @@ public class AssetStateDO {
 
     private String symbol;
 
+    private String timeframe;
+
     /** 存库为枚举名，与 {@link AssetStateEnum} 一致 */
     private AssetStateEnum state;
 
@@ -63,6 +65,9 @@ public class AssetStateDO {
     public void setSymbol(String symbol) {
         this.symbol = symbol;
     }
+
+    public String getTimeframe() { return timeframe; }
+    public void setTimeframe(String timeframe) { this.timeframe = timeframe; }
 
     public AssetStateEnum getState() {
         return state;

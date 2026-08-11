@@ -1111,7 +1111,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private boolean isManualPosition(UserPositionVO position) {
-        return position != null && "MANUAL".equalsIgnoreCase(trimToNull(position.getSourceType()));
+        if (position == null) return false;
+        String sourceType = trimToNull(position.getSourceType());
+        return "MANUAL".equalsIgnoreCase(sourceType)
+                || "MANUAL_POSITION".equalsIgnoreCase(sourceType)
+                || "SYSTEM_PLAN_POSITION".equalsIgnoreCase(sourceType);
     }
 
     private boolean isActiveManualPosition(UserPositionVO position) {
@@ -2601,9 +2605,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private String aiConflictLevelLabel(String level) {
         return switch (upper(level)) {
             case "LEVEL_1_CONSISTENT" -> "无显著分歧";
-            case "LEVEL_2_LIGHT_DIVERGENCE", "LEVEL_2_REVIEW" -> "轻微分歧";
-            case "LEVEL_3_SIGNIFICANT_DIVERGENCE", "LEVEL_3_DIVERGENCE" -> "显著分歧";
-            case "LEVEL_4_EXTREME_DIVERGENCE" -> "极端分歧";
+            case "LEVEL_2_MINOR_DISAGREEMENT", "LEVEL_2_LIGHT_DIVERGENCE", "LEVEL_2_REVIEW" -> "轻微分歧";
+            case "LEVEL_3_SIGNIFICANT_DISAGREEMENT", "LEVEL_3_SIGNIFICANT_DIVERGENCE", "LEVEL_3_DIVERGENCE" -> "显著分歧";
+            case "LEVEL_4_EXTREME_CONFLICT", "LEVEL_4_EXTREME_DIVERGENCE" -> "极端分歧";
             default -> "未知状态";
         };
     }

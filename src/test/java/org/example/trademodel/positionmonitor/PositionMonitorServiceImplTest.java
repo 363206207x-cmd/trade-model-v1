@@ -836,7 +836,7 @@ class PositionMonitorServiceImplTest {
         row.setLeverage(new BigDecimal("2"));
         row.setStopLoss(stopLoss == null ? null : new BigDecimal(stopLoss));
         row.setTakeProfit(takeProfit == null ? null : new BigDecimal(takeProfit));
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_POSITION");
         row.setSourceRefId(sourceRefId == null
                 ? null
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));

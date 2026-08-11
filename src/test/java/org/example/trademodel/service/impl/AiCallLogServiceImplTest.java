@@ -192,6 +192,33 @@ class AiCallLogServiceImplTest {
         assertThat(captor.getValue().getOutputPayload()).hasSize(20_000);
     }
 
+    @Test
+    void terminalFailureTraceIsInsertedWithErrorFallbackAndLatency() {
+        AiCallLogServiceImpl service = new AiCallLogServiceImpl(mapper, new ObjectMapper());
+        AiDecisionChainRequest request = decisionChainRequest("evidence");
+        AiDecisionChainResult failure = AiDecisionChainResult.failed(
+                AiProviderName.OPENAI, AiDecisionChainRole.GPT_FINAL,
+                AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT");
+        failure.setLatencyMs(250L);
+
+        service.recordDecisionChainResult(request, AiProviderName.OPENAI,
+                "gpt-test", failure, BigDecimal.ZERO);
+
+        ArgumentCaptor<AiCallLogDO> captor = ArgumentCaptor.forClass(AiCallLogDO.class);
+        verify(mapper).insert(captor.capture());
+        AiCallLogDO trace = captor.getValue();
+        assertThat(trace.getTraceId()).isEqualTo("trace-chain-1");
+        assertThat(trace.getAnalysisId()).isEqualTo("analysis-chain-1");
+        assertThat(trace.getAiRole()).isEqualTo("GPT_FINAL");
+        assertThat(trace.getModelName()).isEqualTo("gpt-test");
+        assertThat(trace.getCallStatus()).isEqualTo("TIMEOUT");
+        assertThat(trace.getErrorMessage()).isEqualTo("PROVIDER_TIMEOUT");
+        assertThat(trace.getFallbackFlag()).isTrue();
+        assertThat(trace.getFallbackReason()).isEqualTo("PROVIDER_TIMEOUT");
+        assertThat(trace.getLatencyMs()).isEqualTo(250L);
+        assertThat(trace.getCompletedAt()).isNotNull();
+    }
+
     private static AiProviderRequest request() {
         AiProviderRequest request = new AiProviderRequest();
         request.setAnalysisId("analysis-1");

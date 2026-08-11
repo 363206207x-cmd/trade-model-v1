@@ -40,7 +40,7 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT);
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("MEDIUM");
         assertThat(result.getPlanMode()).isEqualTo("REDUCED");
@@ -62,7 +62,7 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT);
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("LOW");
         assertThat(result.getRiskAdjustment()).isEqualTo("RAISED");
@@ -84,7 +84,7 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT);
         assertThat(result.getBaseMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getRiskAdjustment()).isEqualTo("HIGH");
@@ -190,7 +190,7 @@ class AiConflictResolverServiceImplTest {
                 90, 10, "READY");
 
         assertThat(result.getConflictScore()).isZero();
-        assertThat(result.getConflictLevel()).isEqualTo("NONE");
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_1_CONSISTENT");
         assertThat(result.getPlanModeAfter()).isEqualTo("CONFIRM");
         assertThat(result.getConfidenceAfter()).isEqualTo("HIGH");
         assertThat(result.getRiskAfter()).isEqualTo("LOW");
@@ -204,17 +204,18 @@ class AiConflictResolverServiceImplTest {
         ConflictResolverResultDO result = service.resolveDecisionChain(
                 candidate(),
                 """
-                {"verdict":"DOWNGRADE","conflictLevel":"MINOR","confidenceAdjustment":"DOWNGRADE_ONE",
+                {"verdict":"DOWNGRADE","conflictLevel":"LEVEL_2_MINOR_DISAGREEMENT","confidenceAdjustment":"DOWNGRADE_ONE",
                  "riskAdjustment":"RAISE_ONE","planModeAdjustment":"DOWNGRADE_ONE","reasons":["weak"],"summary":"review"}
                 """,
                 """
-                {"opposingView":"event","riskLevel":"HIGH","challengeLevel":"MAJOR",
+                {"opposingView":"event","riskLevel":"HIGH","challengeLevel":"LEVEL_3_SIGNIFICANT_DISAGREEMENT",
                  "majorCounterEvidence":true,"planModeImpact":"DOWNGRADE_TWO","reasons":["event"],"summary":"challenge"}
                 """,
                 90, 10, "READY");
 
         assertThat(result.getRuleDirection()).isEqualTo("BULLISH");
         assertThat(result.getRuleDirectionPreserved()).isTrue();
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
         assertThat(result.getConfidenceAfter()).isEqualTo("LOW");
         assertThat(result.getRiskAfter()).isEqualTo("EXTREME");
         assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
@@ -236,7 +237,8 @@ class AiConflictResolverServiceImplTest {
         assertThat(result.getRuleDirection()).isEqualTo("BULLISH");
         assertThat(result.getRuleVetoReason()).isEqualTo("CANDIDATE_DIRECTION_DIFFERS_FROM_RULE");
         assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
-        assertThat(result.getConfusedDecision()).isFalse();
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
+        assertThat(result.getConfusedDecision()).isTrue();
     }
 
     @Test
@@ -244,7 +246,7 @@ class AiConflictResolverServiceImplTest {
         ConflictResolverResultDO result = service.resolveDecisionChain(
                 candidate(),
                 """
-                {"verdict":"RISK_WARNING","conflictLevel":"NONE","confidenceAdjustment":"UNCHANGED",
+                {"verdict":"RISK_WARNING","conflictLevel":"LEVEL_1_CONSISTENT","confidenceAdjustment":"UNCHANGED",
                  "riskAdjustment":"UNCHANGED","planModeAdjustment":"BLOCKED","reasons":["wait"],"summary":"review"}
                 """,
                 "{\"fallback\":true}",
@@ -252,6 +254,33 @@ class AiConflictResolverServiceImplTest {
 
         assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
         assertThat(result.getConfusedDecision()).isFalse();
+    }
+
+    @Test
+    void decisionChainUsesFrozenFourLevelSemanticsAndPlanModeMapping() {
+        ConflictResolverResultDO levelTwo = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"RISK_WARNING","conflictLevel":"LEVEL_2_MINOR_DISAGREEMENT",
+                 "confidenceAdjustment":"UNCHANGED","riskAdjustment":"UNCHANGED",
+                 "planModeAdjustment":"UNCHANGED","reasons":[],"summary":"minor"}
+                """,
+                "{\"fallback\":true}", 90, 10, "READY");
+        ConflictResolverResultDO levelThree = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"DOWNGRADE","conflictLevel":"LEVEL_3_SIGNIFICANT_DISAGREEMENT",
+                 "confidenceAdjustment":"UNCHANGED","riskAdjustment":"UNCHANGED",
+                 "planModeAdjustment":"UNCHANGED","reasons":[],"summary":"significant"}
+                """,
+                "{\"fallback\":true}", 90, 10, "READY");
+
+        assertThat(levelTwo.getConflictLevel()).isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
+        assertThat(levelTwo.getPlanModeAfter()).isEqualTo("PREPARE");
+        assertThat(levelTwo.getConfusedDecision()).isFalse();
+        assertThat(levelThree.getConflictLevel()).isEqualTo("LEVEL_3_SIGNIFICANT_DISAGREEMENT");
+        assertThat(levelThree.getPlanModeAfter()).isEqualTo("REDUCE");
+        assertThat(levelThree.getConfusedDecision()).isFalse();
     }
 
     private static DecisionContext baseContext() {

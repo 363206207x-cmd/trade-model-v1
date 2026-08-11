@@ -10,9 +10,9 @@ import java.util.List;
 
 @Mapper
 public interface OpportunityStateTransitionMapper {
-    @Insert("INSERT INTO tm_opportunity_state_transition(transition_id, opportunity_id, symbol, analysis_id, "
+    @Insert("INSERT INTO tm_opportunity_state_transition(transition_id, opportunity_id, symbol, timeframe, analysis_id, "
             + "trace_id, from_state, to_state, reason, trigger_source, transition_priority, suppressed, occurred_at) "
-            + "VALUES(#{transitionId}, #{opportunityId}, #{symbol}, #{analysisId}, #{traceId}, #{fromState}, "
+            + "VALUES(#{transitionId}, #{opportunityId}, #{symbol}, #{timeframe}, #{analysisId}, #{traceId}, #{fromState}, "
             + "#{toState}, #{reason}, #{triggerSource}, #{transitionPriority}, #{suppressed}, #{occurredAt})")
     int insert(OpportunityStateTransitionDO row);
 

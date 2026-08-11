@@ -258,7 +258,7 @@ class DefaultProviderScanUniverseSourceTest {
         UserPositionDO row = new UserPositionDO();
         row.setAssetSymbol(symbol);
         row.setStatus(status);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_POSITION");
         return row;
     }
     private static AssetStateDO state(String symbol, AssetStateEnum status) {

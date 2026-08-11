@@ -6,6 +6,7 @@ public class OpportunityStateTransitionDO {
     private String transitionId;
     private String opportunityId;
     private String symbol;
+    private String timeframe;
     private String analysisId;
     private String traceId;
     private String fromState;
@@ -22,6 +23,8 @@ public class OpportunityStateTransitionDO {
     public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
+    public String getTimeframe() { return timeframe; }
+    public void setTimeframe(String timeframe) { this.timeframe = timeframe; }
     public String getAnalysisId() { return analysisId; }
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
     public String getTraceId() { return traceId; }

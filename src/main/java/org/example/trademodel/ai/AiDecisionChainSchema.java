@@ -56,7 +56,8 @@ public final class AiDecisionChainSchema {
             return Set.of("APPROVE", "DOWNGRADE", "REJECT", "RISK_WARNING");
         }
         if ("conflictLevel".equals(field) || "challengeLevel".equals(field)) {
-            return Set.of("NONE", "MINOR", "MAJOR", "EXTREME");
+            return Set.of("LEVEL_1_CONSISTENT", "LEVEL_2_MINOR_DISAGREEMENT",
+                    "LEVEL_3_SIGNIFICANT_DISAGREEMENT", "LEVEL_4_EXTREME_CONFLICT");
         }
         if ("confidenceAdjustment".equals(field)) {
             return Set.of("UNCHANGED", "DOWNGRADE_ONE", "DOWNGRADE_TWO");

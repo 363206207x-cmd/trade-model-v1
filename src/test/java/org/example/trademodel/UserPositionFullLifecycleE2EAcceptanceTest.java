@@ -147,7 +147,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(opened.getId()).isNotNull();
         assertThat(opened.getAssetSymbol()).isEqualTo("BTCUSDT");
         assertThat(opened.getStatus()).isEqualTo("OPEN");
-        assertThat(opened.getSourceType()).isEqualTo("MANUAL");
+        assertThat(opened.getSourceType()).isEqualTo("MANUAL_POSITION");
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotAutoTrading()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();

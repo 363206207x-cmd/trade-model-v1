@@ -599,9 +599,15 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
         AssetStateDO state = new AssetStateDO();
         state.setSymbol(SYMBOL);
+        state.setTimeframe("1h");
         state.setState(org.example.trademodel.enums.AssetStateEnum.CANDIDATE);
         state.setConfusedScore(8);
         state.setConfusedLowStreak(0);
+        state.setOpportunityId("opp-btcusdt-1h");
+        state.setStateEnteredAt(now);
+        state.setLastTransitionReason("CONTROLLED_INTEGRATION_FIXTURE");
+        state.setLastTriggerSource("MANUAL_API");
+        state.setLastAnalysisId(ANALYSIS_ID);
         state.setLastUpdateTime(now);
         state.setTraceId("trace-int-1");
         assetStateMapper.mergeUpsertCore(state);

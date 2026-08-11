@@ -36,6 +36,7 @@ VALUES
 ON CONFLICT (owner_type, owner_id, symbol) DO NOTHING;
 
 ALTER TABLE tm_asset_state
+    ADD COLUMN timeframe VARCHAR(16) NOT NULL DEFAULT 'global',
     ADD COLUMN opportunity_id VARCHAR(64),
     ADD COLUMN state_entered_at TIMESTAMP WITHOUT TIME ZONE,
     ADD COLUMN cooling_until TIMESTAMP WITHOUT TIME ZONE,
@@ -57,16 +58,19 @@ SET state = CASE
 END;
 
 UPDATE tm_asset_state
-SET opportunity_id = CONCAT('opp-', LOWER(REGEXP_REPLACE(symbol, '[^A-Za-z0-9]', '', 'g'))),
+SET opportunity_id = CONCAT('opp-', LOWER(REGEXP_REPLACE(symbol, '[^A-Za-z0-9]', '', 'g')), '-',
+                            LOWER(REGEXP_REPLACE(timeframe, '[^A-Za-z0-9]', '', 'g'))),
     state_entered_at = COALESCE(last_update_time, CURRENT_TIMESTAMP),
     last_transition_reason = COALESCE(last_transition_reason, 'LEGACY_STATE_ADOPTED'),
     last_trigger_source = COALESCE(last_trigger_source, 'LEGACY_ANALYSIS')
 WHERE opportunity_id IS NULL;
 
 ALTER TABLE tm_asset_state
+    DROP CONSTRAINT IF EXISTS tm_asset_state_symbol_key,
     ALTER COLUMN opportunity_id SET NOT NULL,
     ALTER COLUMN state_entered_at SET NOT NULL,
     ALTER COLUMN state SET NOT NULL,
+    ADD CONSTRAINT uk_tm_asset_state_symbol_timeframe UNIQUE (symbol, timeframe),
     ADD CONSTRAINT uk_tm_asset_state_opportunity UNIQUE (opportunity_id),
     ADD CONSTRAINT ck_tm_asset_state_state CHECK (
         state IN ('OBSERVING', 'CANDIDATE', 'WAITING_TRIGGER', 'TRIGGERED',
@@ -77,6 +81,7 @@ CREATE TABLE tm_opportunity_state_transition (
     transition_id VARCHAR(64) PRIMARY KEY,
     opportunity_id VARCHAR(64) NOT NULL,
     symbol VARCHAR(32) NOT NULL,
+    timeframe VARCHAR(16) NOT NULL,
     analysis_id VARCHAR(64),
     trace_id VARCHAR(128) NOT NULL,
     from_state VARCHAR(32),
@@ -182,6 +187,12 @@ CREATE TABLE tm_conflict_resolver_result (
     rule_direction_preserved BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_conflict_score CHECK (conflict_score BETWEEN 0 AND 100),
+    CONSTRAINT ck_tm_conflict_level CHECK (conflict_level IN (
+        'LEVEL_1_CONSISTENT',
+        'LEVEL_2_MINOR_DISAGREEMENT',
+        'LEVEL_3_SIGNIFICANT_DISAGREEMENT',
+        'LEVEL_4_EXTREME_CONFLICT'
+    )),
     CONSTRAINT ck_tm_conflict_direction CHECK (rule_direction_preserved = TRUE)
 );
 
@@ -256,6 +267,20 @@ ALTER TABLE tm_user_position
     ADD COLUMN final_plan_id VARCHAR(64),
     ADD CONSTRAINT fk_tm_user_position_final_plan
         FOREIGN KEY (final_plan_id) REFERENCES tm_execution_plan(plan_id);
+
+ALTER TABLE tm_user_position
+    DROP CONSTRAINT IF EXISTS ck_tm_user_position_source_type;
+
+UPDATE tm_user_position
+SET source_type = 'MANUAL_POSITION'
+WHERE source_type = 'MANUAL';
+
+ALTER TABLE tm_user_position
+    ALTER COLUMN source_type SET DEFAULT 'MANUAL_POSITION',
+    ADD CONSTRAINT ck_tm_user_position_source_type CHECK (
+        (source_type = 'MANUAL_POSITION' AND final_plan_id IS NULL)
+        OR (source_type = 'SYSTEM_PLAN_POSITION' AND final_plan_id IS NOT NULL)
+    );
 
 CREATE INDEX idx_tm_user_position_final_plan
     ON tm_user_position(final_plan_id);

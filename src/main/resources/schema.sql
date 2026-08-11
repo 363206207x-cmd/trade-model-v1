@@ -401,7 +401,7 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     closed_at TIMESTAMP,
     close_price DECIMAL(20, 8),
     close_reason VARCHAR(512),
-    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
+    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL_POSITION',
     source_ref_id VARCHAR(128),
     final_plan_id VARCHAR(64),
     manual_review_required BOOLEAN NOT NULL DEFAULT TRUE,
@@ -413,7 +413,10 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_user_position_side CHECK (side IN ('LONG', 'SHORT')),
     CONSTRAINT ck_tm_user_position_status CHECK (status IN ('OPEN', 'PARTIALLY_CLOSED', 'CLOSED')),
-    CONSTRAINT ck_tm_user_position_source_type CHECK (source_type = 'MANUAL'),
+    CONSTRAINT ck_tm_user_position_source_type CHECK (
+        (source_type = 'MANUAL_POSITION' AND final_plan_id IS NULL)
+        OR (source_type = 'SYSTEM_PLAN_POSITION' AND final_plan_id IS NOT NULL)
+    ),
     CONSTRAINT ck_tm_user_position_entry_price CHECK (entry_price > 0),
     CONSTRAINT ck_tm_user_position_quantity CHECK (quantity > 0),
     CONSTRAINT ck_tm_user_position_leverage CHECK (leverage > 0),
@@ -859,7 +862,8 @@ KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'ADAUSDT', 'ADA', 60, 'DE
 
 CREATE TABLE IF NOT EXISTS tm_asset_state (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    symbol VARCHAR(32) NOT NULL UNIQUE,
+    symbol VARCHAR(32) NOT NULL,
+    timeframe VARCHAR(16) NOT NULL DEFAULT 'global',
     state VARCHAR(32) NOT NULL,
     confused_score INT,
     confused_low_streak INT NOT NULL DEFAULT 0,
@@ -877,6 +881,7 @@ CREATE TABLE IF NOT EXISTS tm_asset_state (
     last_analysis_id VARCHAR(64),
     last_update_time TIMESTAMP NOT NULL,
     trace_id VARCHAR(128),
+    CONSTRAINT uk_tm_asset_state_symbol_timeframe UNIQUE (symbol, timeframe),
     CONSTRAINT uk_tm_asset_state_opportunity UNIQUE (opportunity_id),
     CONSTRAINT ck_tm_asset_state_state CHECK (
         state IN ('OBSERVING', 'CANDIDATE', 'WAITING_TRIGGER', 'TRIGGERED',
@@ -888,6 +893,7 @@ CREATE TABLE IF NOT EXISTS tm_opportunity_state_transition (
     transition_id VARCHAR(64) PRIMARY KEY,
     opportunity_id VARCHAR(64) NOT NULL,
     symbol VARCHAR(32) NOT NULL,
+    timeframe VARCHAR(16) NOT NULL,
     analysis_id VARCHAR(64),
     trace_id VARCHAR(128) NOT NULL,
     from_state VARCHAR(32),
@@ -993,6 +999,12 @@ CREATE TABLE IF NOT EXISTS tm_conflict_resolver_result (
     rule_direction_preserved BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_conflict_score CHECK (conflict_score BETWEEN 0 AND 100),
+    CONSTRAINT ck_tm_conflict_level CHECK (conflict_level IN (
+        'LEVEL_1_CONSISTENT',
+        'LEVEL_2_MINOR_DISAGREEMENT',
+        'LEVEL_3_SIGNIFICANT_DISAGREEMENT',
+        'LEVEL_4_EXTREME_CONFLICT'
+    )),
     CONSTRAINT ck_tm_conflict_direction CHECK (rule_direction_preserved = TRUE)
 );
 

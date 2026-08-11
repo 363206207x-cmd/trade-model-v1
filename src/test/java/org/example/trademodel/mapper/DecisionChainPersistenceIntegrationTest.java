@@ -60,7 +60,7 @@ class DecisionChainPersistenceIntegrationTest {
                   plan_mode_before, plan_mode_after, confidence_before, confidence_after,
                   risk_before, risk_after, confused_decision, rule_direction_preserved, created_at
                 ) VALUES (?, ?, ?, ?, 'BULLISH', 'HIGH', 'MEDIUM',
-                  '{}', '{}', 'NONE', 0, 'CONFIRM', 'CONFIRM', 'HIGH', 'HIGH',
+                  '{}', '{}', 'LEVEL_1_CONSISTENT', 0, 'CONFIRM', 'CONFIRM', 'HIGH', 'HIGH',
                   'MEDIUM', 'MEDIUM', FALSE, TRUE, ?)
                 """,
                 "resolver-chain-db", "candidate-chain-db", "analysis-chain-db", "trace-chain-db", timestamp());
@@ -123,7 +123,7 @@ class DecisionChainPersistenceIntegrationTest {
                 INSERT INTO tm_user_position(
                   asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                   source_type, final_plan_id
-                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'MANUAL', ?)
+                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'SYSTEM_PLAN_POSITION', ?)
                 """, timestamp(), "final-plan-chain-db");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM tm_user_position WHERE final_plan_id='final-plan-chain-db'",
@@ -133,7 +133,7 @@ class DecisionChainPersistenceIntegrationTest {
                 INSERT INTO tm_user_position(
                   asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                   source_type, final_plan_id
-                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'AUTO', ?)
+                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'MANUAL_POSITION', ?)
                 """, timestamp(), "final-plan-chain-db"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
