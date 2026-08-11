@@ -9,6 +9,8 @@ import java.util.List;
 public interface AssetPoolService {
     List<AssetPoolAssetDTO> listForUser(Long userId);
 
+    List<AssetPoolAssetDTO> listSystemDefaults();
+
     List<String> listFocusSymbols(Long userId, int limit);
 
     List<String> listScanSymbols();

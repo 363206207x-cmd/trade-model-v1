@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -113,6 +114,118 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         assertThat(row.getEntryZone()).isEqualTo("sol-zone");
         assertThat(row.getInvalidCondition()).isEqualTo("decision-fallback-invalid");
         assertThat(row.getExecutionPlanSummary()).isEqualTo("2h | decision-fallback-invalid");
+    }
+
+    @Test
+    void opportunityRankingReadReturnsLatestDecisionRealScoreAndOnlyValidatedFinalPlan() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
+                        + "VALUES (?,?,?, TIMESTAMP '2025-01-01 00:00:00', ?)",
+                "analysis-rank-btc-old", "BTCUSDT", "5m", 70);
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
+                        + "VALUES (?,?,?, TIMESTAMP '2026-01-01 00:00:00', ?)",
+                "analysis-rank-btc", "BTCUSDT", "5m", 94);
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
+                        + "VALUES (?,?,?, TIMESTAMP '2026-01-01 00:00:00', ?)",
+                "analysis-rank-link", "LINKUSDT", "1h", 88);
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
+                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2025-01-01 00:00:00')",
+                "decision-rank-btc-old", "analysis-rank-btc-old", "BTCUSDT", "LOW", "HIGH",
+                "LEVEL_3_SIGNIFICANT_DISAGREEMENT");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
+                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
+                "decision-rank-btc", "analysis-rank-btc", "BTCUSDT", "HIGH", "LOW",
+                "LEVEL_1_CONSISTENT");
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
+                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
+                "decision-rank-link", "analysis-rank-link", "LINKUSDT", "MEDIUM", "MEDIUM",
+                "LEVEL_2_MINOR_DISAGREEMENT");
+        insertValidatedFinalPlan("analysis-rank-btc", "BTCUSDT", "5m",
+                "plan-rank-btc", "CONFIRM", "FINAL_VALIDATED");
+        insertValidatedFinalPlan("analysis-rank-link", "LINKUSDT", "1h",
+                "plan-rank-link", "PREPARE", "RULE_FALLBACK_VALIDATED");
+        jdbcTemplate.update(
+                "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, chain_status, "
+                        + "rule_validation_status, final_plan, create_time) "
+                        + "VALUES (?,?,?,?,?,?, TIMESTAMP '2026-02-01 00:00:00')",
+                "plan-rank-btc-newer-blocked", "analysis-rank-btc", "BLOCKED",
+                "RULE_VALIDATION_BLOCKED", "BLOCKED", false);
+        jdbcTemplate.update(
+                "INSERT INTO tm_score_item(score_id, analysis_id, score_type, score_value) VALUES (?,?,?,?)",
+                "score-rank-btc-1", "analysis-rank-btc", "TREND", 80D);
+        jdbcTemplate.update(
+                "INSERT INTO tm_score_item(score_id, analysis_id, score_type, score_value) VALUES (?,?,?,?)",
+                "score-rank-btc-2", "analysis-rank-btc", "STRUCTURE", 100D);
+        jdbcTemplate.update(
+                "INSERT INTO tm_score_item(score_id, analysis_id, score_type, score_value) VALUES (?,?,?,?)",
+                "score-rank-link", "analysis-rank-link", "TREND", 75D);
+
+        List<DecisionResultVO> rows = decisionResultMapper
+                .findLatestDecisionResultsForSymbolsJoined(List.of("BTCUSDT", "LINKUSDT"));
+
+        assertThat(rows).hasSize(2);
+        DecisionResultVO btc = rows.stream()
+                .filter(row -> "BTCUSDT".equals(row.getSymbol()))
+                .findFirst().orElseThrow();
+        assertThat(btc.getAnalysisId()).isEqualTo("analysis-rank-btc");
+        assertThat(btc.getPlanMode()).isEqualTo("CONFIRM");
+        assertThat(btc.getDataQualityScore()).isEqualTo(94);
+        assertThat(btc.getOpportunityScore()).isEqualTo(90D);
+        assertThat(rows).extracting(DecisionResultVO::getSymbol)
+                .containsExactlyInAnyOrder("BTCUSDT", "LINKUSDT");
+    }
+
+    private void insertValidatedFinalPlan(String analysisId,
+                                          String symbol,
+                                          String timeframe,
+                                          String planId,
+                                          String planMode,
+                                          String chainStatus) {
+        String opportunityId = "opportunity-" + planId;
+        String candidateId = "candidate-" + planId;
+        String resolverId = "resolver-" + planId;
+        String traceId = "trace-" + planId;
+        Timestamp createdAt = Timestamp.valueOf("2026-01-01 00:00:00");
+        jdbcTemplate.update("""
+                INSERT INTO tm_asset_state(
+                  symbol, timeframe, state, opportunity_id, state_entered_at,
+                  last_analysis_id, last_update_time, trace_id
+                ) VALUES (?, ?, 'CANDIDATE', ?, ?, ?, ?, ?)
+                """, symbol, timeframe, opportunityId, createdAt, analysisId, createdAt, traceId);
+        jdbcTemplate.update("""
+                INSERT INTO tm_execution_plan_candidate(
+                  candidate_id, opportunity_id, analysis_id, trace_id,
+                  rule_direction, rule_confidence, rule_risk, candidate_direction,
+                  plan_mode, confidence_level, risk_level, worth_opening,
+                  candidate_source, candidate_status, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, 'BULLISH', 'HIGH', 'LOW', 'BULLISH',
+                  ?, 'HIGH', 'LOW', TRUE, ?, 'VALIDATED', '{}', ?)
+                """, candidateId, opportunityId, analysisId, traceId, planMode,
+                "RULE_FALLBACK_VALIDATED".equals(chainStatus) ? "RULE_FALLBACK" : "GPT_FINAL",
+                createdAt);
+        jdbcTemplate.update("""
+                INSERT INTO tm_conflict_resolver_result(
+                  resolver_result_id, candidate_id, analysis_id, trace_id,
+                  rule_direction, rule_confidence, rule_risk,
+                  gemini_review_json, grok_challenge_json, conflict_level, conflict_score,
+                  plan_mode_before, plan_mode_after, confidence_before, confidence_after,
+                  risk_before, risk_after, confused_decision, rule_direction_preserved, created_at
+                ) VALUES (?, ?, ?, ?, 'BULLISH', 'HIGH', 'LOW', '{}', '{}',
+                  'LEVEL_1_CONSISTENT', 0, ?, ?, 'HIGH', 'HIGH', 'LOW', 'LOW', FALSE, TRUE, ?)
+                """, resolverId, candidateId, analysisId, traceId, planMode, planMode, createdAt);
+        jdbcTemplate.update("""
+                INSERT INTO tm_execution_plan(
+                  plan_id, analysis_id, plan_mode, candidate_id, opportunity_id,
+                  resolver_result_id, trace_id, chain_status, rule_validation_status,
+                  finalized_at, final_plan, create_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PASS', ?, TRUE, ?)
+                """, planId, analysisId, planMode, candidateId, opportunityId, resolverId,
+                traceId, chainStatus, createdAt, createdAt);
     }
 
     @Test

@@ -90,6 +90,58 @@ public interface DecisionResultMapper {
             """)
     DecisionResultVO findLatestDecisionResultBySymbolJoined(@Param("normalizedSymbol") String normalizedSymbol);
 
+    @Select({
+            "<script>",
+            "SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,",
+            "ar.timeframe AS timeframe,",
+            "d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,",
+            "d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,",
+            "d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,",
+            "d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,",
+            "d.is_adopted AS isAdopted, d.valid_period AS validPeriod,",
+            "d.valid_from AS validFrom, d.expires_at AS expiresAt,",
+            "COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,",
+            "d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson,",
+            "d.review_reasons AS reviewReasons, d.ai_conflict_level AS aiConflictLevel,",
+            "d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,",
+            "d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot,",
+            "d.create_time AS createTime, p.recommended_action AS recommendedAction,",
+            "p.plan_mode AS planMode, p.entry_zone AS entryZone, p.stop_loss AS stopLoss,",
+            "p.take_profit_rules AS takeProfitRules, p.leverage_suggestion AS leverageSuggestion,",
+            "p.position_suggestion AS positionSuggestion, ar.data_quality_score AS dataQualityScore,",
+            "scores.opportunity_score AS opportunityScore",
+            "FROM (",
+            "  SELECT src.*, ROW_NUMBER() OVER (",
+            "    PARTITION BY UPPER(TRIM(src.symbol))",
+            "    ORDER BY src.create_time DESC, src.decision_id DESC",
+            "  ) AS symbol_rank",
+            "  FROM tm_decision_result src",
+            "  WHERE UPPER(TRIM(src.symbol)) IN",
+            "  <foreach collection='symbols' item='symbol' open='(' separator=',' close=')'>",
+            "    #{symbol}",
+            "  </foreach>",
+            ") d",
+            "LEFT JOIN (",
+            "  SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss,",
+            "         take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition,",
+            "         ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn",
+            "  FROM tm_execution_plan",
+            "  WHERE final_plan = TRUE",
+            "    AND rule_validation_status = 'PASS'",
+            "    AND chain_status IN ('FINAL_VALIDATED', 'RULE_FALLBACK_VALIDATED')",
+            ") p ON d.analysis_id = p.analysis_id AND p.rn = 1",
+            "LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id",
+            "LEFT JOIN (",
+            "  SELECT analysis_id, AVG(score_value) AS opportunity_score",
+            "  FROM tm_score_item GROUP BY analysis_id",
+            ") scores ON scores.analysis_id = d.analysis_id",
+            "WHERE d.symbol_rank = 1",
+            "ORDER BY d.create_time DESC, d.decision_id DESC",
+            "</script>"
+    })
+    List<DecisionResultVO> findLatestDecisionResultsForSymbolsJoined(
+            @Param("symbols") List<String> symbols);
+
     @Select("""
             SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
             ar.timeframe AS timeframe,

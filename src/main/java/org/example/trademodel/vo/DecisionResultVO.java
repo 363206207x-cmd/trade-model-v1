@@ -41,6 +41,7 @@ public class DecisionResultVO {
     private String leverageSuggestion;
     private String positionSuggestion;
     private Integer dataQualityScore;
+    private Double opportunityScore;
     private LocalDateTime createTime;
     private BigDecimal latestPrice;
     private BigDecimal priceChangePct;
@@ -346,6 +347,14 @@ public class DecisionResultVO {
 
     public void setDataQualityScore(Integer dataQualityScore) {
         this.dataQualityScore = dataQualityScore;
+    }
+
+    public Double getOpportunityScore() {
+        return opportunityScore;
+    }
+
+    public void setOpportunityScore(Double opportunityScore) {
+        this.opportunityScore = opportunityScore;
     }
 
     public LocalDateTime getCreateTime() {

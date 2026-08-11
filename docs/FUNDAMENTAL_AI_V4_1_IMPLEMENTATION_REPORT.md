@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Decision Chain Implementation Report
 
-Status: `AUDIT_REMEDIATION_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
+Status: `DYNAMIC_ASSET_RANKING_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
 
 Package: `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`
 
@@ -71,7 +71,17 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 
 ### Home / Dashboard
 
-- Home focus assets come from Asset Pool;
+- Home focus assets are dynamically ranked from every effective user Asset Pool
+  asset with an exact Opportunity and Analysis source;
+- ranking considers Rule-validated Final Plan Mode, Opportunity Score,
+  confidence, Conflict Level, Data Quality, and risk, then projects at most six
+  current assets;
+- a newer Candidate, legacy, or Rule-blocked plan cannot override the Plan Mode
+  used by ranking;
+- Home no longer truncates Asset Pool order or fills empty slots with fixed
+  BTC/ETH/SOL-style defaults;
+- each projected asset carries Asset, Opportunity, Analysis, ranking input, and
+  ranking-reason provenance;
 - existing Home structures consume Final chain data and Three-AI role payload;
 - no new trading module, Figma behavior, or Mobile behavior was introduced.
 
@@ -88,10 +98,11 @@ Baseline: `fb2722c7daa3acaa528131928222fcbbdc079081`
 
 ## Delivery State
 
-The four audit blockers are remediated and PostgreSQL V11 passes against a
-disposable PostgreSQL 16.14 database. An open PR is not effective completion.
-Only an independent re-audit, reviewed merged main, and clean/synced main
-validation can make the package effective.
+The four prior audit blockers and dynamic Home ranking gap are remediated.
+PostgreSQL V11 and the new ranking read queries pass against a disposable
+PostgreSQL 16.14 database. An open PR is not effective completion. Only an
+independent re-audit, reviewed merged main, and clean/synced main validation can
+make the package effective.
 
 `PRODUCT_WORK_RATIO = 95%`
 

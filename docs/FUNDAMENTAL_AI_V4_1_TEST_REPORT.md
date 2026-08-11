@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Test Report
 
-Status: `AUDIT_REMEDIATION_LOCAL_VALIDATION_PASS`
+Status: `DYNAMIC_ASSET_RANKING_LOCAL_VALIDATION_PASS`
 
 ## Full Maven Validation
 
@@ -8,16 +8,16 @@ Command: `./mvnw test -q`
 
 Result:
 
-- suites: `398`
-- tests: `4394`
-- passed: `4380`
+- suites: `399`
+- tests: `4404`
+- passed: `4390`
 - failures: `0`
 - errors: `0`
 - skipped: `14`
 
 ## v4.1 Focused Coverage
 
-The principal new/extended contract suites contain `66` passing tests and no
+The principal new/extended contract suites contain `72` passing tests and no
 failure or skip:
 
 - AI response/authority/input safety and failure traces: `13`
@@ -25,7 +25,8 @@ failure or skip:
 - role-specific AI orchestration: `4`
 - Rule Validation: `5`
 - decision-chain orchestration: `5`
-- persistent Asset Pool: `4`
+- persistent Asset Pool: `5`
+- Opportunity priority ranking: `5`
 - market catalog search: `2`
 - conflict resolver: `15`
 - Opportunity state machine: `14`
@@ -54,6 +55,16 @@ legacy behavior.
 | AI success/failure/timeout trace completeness | `PASS` |
 | canonical Conflict Level 1-4 and Plan Mode mapping | `PASS` |
 | no automatic trading capability | `PASS` |
+| ten Asset Pool assets remain fully manageable | `PASS` |
+| Top 6 changes when ranked opportunity inputs change | `PASS` |
+| Home projection never exceeds six assets | `PASS` |
+| removed defaults are not reintroduced | `PASS` |
+| exact Asset Pool + Opportunity + Analysis source is required | `PASS` |
+| only a Rule-validated Final Plan can supply ranking Plan Mode | `PASS` |
+| newer Rule-blocked plan cannot override validated Final Plan Mode | `PASS` |
+| Opportunity Score, confidence, risk, Plan Mode, AI result, and Data Quality affect ordering | `PASS` |
+| Home service consumes ranking order without Asset Pool first-N fallback | `PASS` |
+| Home API serializes ranking identity and provenance | `PASS` |
 
 ## PostgreSQL V11 Migration
 
@@ -68,12 +79,13 @@ Local controlled result: `PASS` against disposable PostgreSQL `16.14`.
 - V11 historical AssetState timeframe normalization: `PASS`;
 - canonical Conflict Level database constraint: `PASS`;
 - UserPosition source/Final association constraints: `PASS`;
+- dynamic ranking Decision/Score/validated-Final-Plan query: `PASS`;
+- dynamic ranking Opportunity-state query: `PASS`;
 - tests: `1`, failures: `0`, errors: `0`, skipped: `0`.
 
-The test was executed through its controlled PostgreSQL target because the
-local Testcontainers client could not negotiate directly with the installed
-Docker Desktop API. This is an environment adapter detail; the complete test
-body ran against a real disposable PostgreSQL 16 database.
+The test was executed through its explicit controlled PostgreSQL target. The
+complete test body ran against a real disposable PostgreSQL 16 database, and
+the container was removed after validation.
 
 ## Contract Gates
 

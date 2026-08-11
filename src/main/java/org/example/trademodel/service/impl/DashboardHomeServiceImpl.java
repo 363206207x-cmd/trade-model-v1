@@ -39,6 +39,7 @@ import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
+import org.example.trademodel.service.OpportunityPriorityRankingService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
@@ -55,6 +56,7 @@ import org.example.trademodel.service.support.ExternalContextSnapshot;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
+import org.example.trademodel.vo.HomeTopAssetProjection;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
@@ -87,9 +89,6 @@ import java.util.regex.Pattern;
 public class DashboardHomeServiceImpl implements DashboardHomeService {
     private static final int DEFAULT_LIMIT = 6;
     private static final int MAX_LIMIT = 12;
-    private static final List<String> LEGACY_CONSTRUCTOR_DEFAULT_SYMBOLS = List.of(
-            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"
-    );
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
     private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
@@ -118,6 +117,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
     private AssetPoolService assetPoolService;
+    private OpportunityPriorityRankingService opportunityPriorityRankingService;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -187,6 +187,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         this.assetPoolService = assetPoolService;
     }
 
+    @Autowired
+    void setOpportunityPriorityRankingService(
+            OpportunityPriorityRankingService opportunityPriorityRankingService) {
+        this.opportunityPriorityRankingService = opportunityPriorityRankingService;
+    }
+
     @Autowired(required = false)
     void setOriginalPlanSources(DecisionResultMapper decisionResultMapper,
                                 ExecutionPlanMapper executionPlanMapper,
@@ -224,32 +230,41 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<UserPositionVO> positions = positionRead.rows();
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
-        List<String> focusSymbols = focusSymbols(userId, effectiveLimit);
+        boolean rankingEnabled = opportunityPriorityRankingService != null;
+        RankingReadResult rankingRead = rankingEnabled
+                ? safeHomeRanking(userId, effectiveLimit)
+                : new RankingReadResult(List.of(), false);
+        List<String> focusSymbols = rankingEnabled
+                ? rankingRead.rows().stream().map(HomeTopAssetProjection::symbol).toList()
+                : focusSymbols(userId, effectiveLimit);
 
         String normalizedRequest = normalizeSymbol(selectedSymbol);
-        if (assetPoolService != null && normalizedRequest != null && !focusSymbols.contains(normalizedRequest)) {
+        if ((rankingEnabled || assetPoolService != null)
+                && normalizedRequest != null && !focusSymbols.contains(normalizedRequest)) {
             normalizedRequest = null;
         }
         String normalizedSelected = normalizedRequest;
         if (normalizedSelected == null) {
+            normalizedSelected = focusSymbols.stream().findFirst().orElse(null);
+        }
+        if (normalizedSelected == null && !rankingEnabled) {
             normalizedSelected = firstDecisionSymbol(decisions);
         }
-        if (normalizedSelected == null) {
-            normalizedSelected = focusSymbols.stream().findFirst()
-                    .orElseGet(() -> assetPoolService == null
-                            ? LEGACY_CONSTRUCTOR_DEFAULT_SYMBOLS.get(0) : null);
-        }
 
-        DecisionResultVO selectedDecision = findDecision(decisions, normalizedSelected);
+        HomeTopAssetProjection selectedProjection = findRankingProjection(rankingRead.rows(), normalizedSelected);
+        DecisionResultVO selectedDecision = rankingEnabled
+                ? selectedProjection == null ? null : selectedProjection.sourceDecision()
+                : findDecision(decisions, normalizedSelected);
         boolean selectedDecisionReadFailed = false;
-        if (selectedDecision == null) {
+        if (!rankingEnabled && selectedDecision == null) {
             DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
             selectedDecision = lookup.decision();
             selectedDecisionReadFailed = lookup.failed();
         }
-        List<DashboardHomeVO.AssetVO> assets =
-                buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
-        if (normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
+        List<DashboardHomeVO.AssetVO> assets = rankingEnabled
+                ? buildRankedAssets(rankingRead.rows(), effectiveLimit)
+                : buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
+        if (!rankingEnabled && normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
             String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
             if (firstRenderableSymbol != null) {
                 normalizedSelected = firstRenderableSymbol;
@@ -293,7 +308,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
         DashboardHomeVO.ModuleStatesVO moduleStates = buildModuleStates(
                 selectedAsset, executionSuggestion, positionRowsResult, aiDecision,
-                decisionRead.failed() || selectedDecisionReadFailed, positionRead.failed());
+                decisionRead.failed() || selectedDecisionReadFailed || rankingRead.failed(), positionRead.failed());
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
         home.getHeader().setUpdatedAt(selectedAsset != null ? selectedAsset.getUpdatedAt() : null);
@@ -630,7 +645,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                       List<String> focusSymbols,
                                                       int limit) {
         if (assetPoolService == null) {
-            return buildLegacyConstructorAssets(decisions, selectedDecision, selectedSymbol, limit);
+            return buildLegacyConstructorAssets(decisions, selectedDecision, limit);
         }
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         String normalizedSelected = normalizeSymbol(selectedSymbol);
@@ -656,9 +671,39 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return assets;
     }
 
+    private List<DashboardHomeVO.AssetVO> buildRankedAssets(
+            List<HomeTopAssetProjection> projections,
+            int limit) {
+        List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
+        for (HomeTopAssetProjection projection : projections == null
+                ? List.<HomeTopAssetProjection>of() : projections) {
+            if (assets.size() >= limit) {
+                break;
+            }
+            if (projection == null || projection.sourceDecision() == null) {
+                continue;
+            }
+            DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            asset.setAssetId(projection.assetId());
+            asset.setAnalysisId(projection.analysisId());
+            asset.setOpportunityId(projection.opportunityId());
+            asset.setOpportunityState(projection.opportunityState());
+            asset.setOpportunityScore(projection.opportunityScore());
+            asset.setPlanMode(projection.planMode());
+            asset.setAiDecisionResult(projection.aiDecisionResult());
+            asset.setDataQualityScore(projection.dataQuality());
+            asset.setRankingReason(projection.rankingReason());
+            if (projection.opportunityScore() != null) {
+                asset.setCompositeScore(projection.opportunityScore());
+                setFieldSource(asset, "score", "DERIVED");
+            }
+            assets.add(asset);
+        }
+        return assets;
+    }
+
     private List<DashboardHomeVO.AssetVO> buildLegacyConstructorAssets(List<DecisionResultVO> decisions,
                                                                         DecisionResultVO selectedDecision,
-                                                                        String selectedSymbol,
                                                                         int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         LinkedHashSet<String> used = new LinkedHashSet<>();
@@ -678,43 +723,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             used.add(selectedDecisionSymbol);
             assets.add(assetFromDecision(assets.size() + 1, selectedDecision));
         }
-        String normalizedSelected = normalizeSymbol(selectedSymbol);
-        LinkedHashSet<String> fallbackSymbols = new LinkedHashSet<>();
-        if (normalizedSelected != null && !used.contains(normalizedSelected)) {
-            fallbackSymbols.add(normalizedSelected);
-        }
-        fallbackSymbols.addAll(LEGACY_CONSTRUCTOR_DEFAULT_SYMBOLS);
-        List<DashboardHomeVO.AssetVO> emptyFallbacks = new ArrayList<>();
-        for (String symbol : fallbackSymbols) {
-            boolean selectedFallback = symbol.equals(normalizedSelected);
-            if (assets.size() >= limit && !selectedFallback) break;
-            if (used.contains(symbol)) continue;
-            DashboardHomeVO.AssetVO fallback = assetPlaceholder(0, symbol);
-            if ("DEFAULT_SLOT".equals(fallback.getSlotType())) {
-                emptyFallbacks.add(fallback);
-                continue;
-            }
-            if (selectedFallback && assets.size() >= limit) {
-                DashboardHomeVO.AssetVO removed = assets.remove(assets.size() - 1);
-                used.remove(removed.getRawSymbol());
-            }
-            if (assets.size() < limit) {
-                fallback.setSlot(assets.size() + 1);
-                used.add(symbol);
-                assets.add(fallback);
-            }
-        }
-        for (DashboardHomeVO.AssetVO fallback : emptyFallbacks) {
-            if (assets.size() >= limit) break;
-            if (!used.add(fallback.getRawSymbol())) continue;
-            fallback.setSlot(assets.size() + 1);
-            assets.add(fallback);
-        }
         return assets;
     }
 
     private List<String> focusSymbols(Long userId, int limit) {
-        if (assetPoolService == null) return LEGACY_CONSTRUCTOR_DEFAULT_SYMBOLS;
+        if (assetPoolService == null) return List.of();
         try {
             List<String> symbols = userId == null
                     ? assetPoolService.listScanSymbols()
@@ -728,6 +741,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } catch (RuntimeException ignored) {
             return List.of();
         }
+    }
+
+    private HomeTopAssetProjection findRankingProjection(
+            List<HomeTopAssetProjection> projections,
+            String symbol) {
+        String normalized = normalizeSymbol(symbol);
+        if (normalized == null || projections == null) {
+            return null;
+        }
+        return projections.stream()
+                .filter(Objects::nonNull)
+                .filter(projection -> normalized.equals(normalizeSymbol(projection.symbol())))
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean hasRenderableAsset(List<DashboardHomeVO.AssetVO> assets, String symbol) {
@@ -2015,6 +2042,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private RankingReadResult safeHomeRanking(Long userId, int limit) {
+        try {
+            List<HomeTopAssetProjection> ranked = opportunityPriorityRankingService.rankForHome(userId, limit);
+            return new RankingReadResult(ranked == null ? List.of() : List.copyOf(ranked), false);
+        } catch (RuntimeException ignored) {
+            return new RankingReadResult(List.of(), true);
+        }
+    }
+
     private DecisionLookupResult safeDecisionLookup(Long userId, String symbol) {
         try {
             if (!hasText(symbol)) {
@@ -2195,7 +2231,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String suffix = partiallyAvailable.isEmpty()
                 ? "" : " · 数据部分可用 " + String.join(",", partiallyAvailable);
         int poolSize = assetPoolService == null
-                ? LEGACY_CONSTRUCTOR_DEFAULT_SYMBOLS.size()
+                ? localRealReadinessService.assets().size()
                 : assetPoolService.listScanSymbols().size();
         return "真实行情资产 " + ready + "/" + poolSize + " · Kraken" + suffix;
     }
@@ -2798,6 +2834,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private record DecisionReadResult(List<DecisionResultVO> rows, boolean failed) {
+    }
+
+    private record RankingReadResult(List<HomeTopAssetProjection> rows, boolean failed) {
     }
 
     private record DecisionLookupResult(DecisionResultVO decision, boolean failed) {

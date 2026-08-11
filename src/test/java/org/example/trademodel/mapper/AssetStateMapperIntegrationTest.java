@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,6 +52,27 @@ class AssetStateMapperIntegrationTest {
         assertThat(persisted.getHotResetTriggerValue()).isEqualTo("7%");
         assertThat(persisted.getPreResetState()).isEqualTo("TRIGGERED");
         assertThat(persisted.getPostResetState()).isEqualTo("HIGH_RISK");
+    }
+
+    @Test
+    void listBySymbolsReturnsOnlyRequestedOpportunitySourcesAcrossTimeframes() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 11, 12, 0);
+        AssetStateDO btc = row("BTCUSDT", AssetStateEnum.CANDIDATE, 0, 0, now, "trace-btc");
+        btc.setTimeframe("5m");
+        btc.setLastAnalysisId("analysis-btc");
+        AssetStateDO link = row("LINKUSDT", AssetStateEnum.WAITING_TRIGGER, 0, 0, now, "trace-link");
+        link.setTimeframe("1h");
+        link.setLastAnalysisId("analysis-link");
+        AssetStateDO sol = row("SOLUSDT", AssetStateEnum.OBSERVING, 0, 0, now, "trace-sol");
+        assetStateMapper.mergeUpsertCore(btc);
+        assetStateMapper.mergeUpsertCore(link);
+        assetStateMapper.mergeUpsertCore(sol);
+
+        List<AssetStateDO> rows = assetStateMapper.listBySymbols(List.of("BTCUSDT", "LINKUSDT"));
+
+        assertThat(rows).extracting(AssetStateDO::getSymbol)
+                .containsExactlyInAnyOrder("BTCUSDT", "LINKUSDT");
+        assertThat(rows).noneMatch(row -> "SOLUSDT".equals(row.getSymbol()));
     }
 
     private static AssetStateDO row(String symbol, AssetStateEnum state, Integer confusedScore,

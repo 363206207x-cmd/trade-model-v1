@@ -471,7 +471,15 @@ public class DashboardHomeVO {
         private String slotType;
         private String symbol;
         private String rawSymbol;
+        private Long assetId;
         private String analysisId;
+        private String opportunityId;
+        private String opportunityState;
+        private Integer opportunityScore;
+        private String planMode;
+        private String aiDecisionResult;
+        private Integer dataQualityScore;
+        private String rankingReason;
         private String marketBias;
         private String marketBiasLabel;
         private Integer compositeScore;
@@ -529,6 +537,15 @@ public class DashboardHomeVO {
             this.rawSymbol = rawSymbol;
         }
 
+        @JsonSerialize(using = ToStringSerializer.class)
+        public Long getAssetId() {
+            return assetId;
+        }
+
+        public void setAssetId(Long assetId) {
+            this.assetId = assetId;
+        }
+
         public String getAnalysisId() {
             return analysisId;
         }
@@ -536,6 +553,21 @@ public class DashboardHomeVO {
         public void setAnalysisId(String analysisId) {
             this.analysisId = analysisId;
         }
+
+        public String getOpportunityId() { return opportunityId; }
+        public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+        public String getOpportunityState() { return opportunityState; }
+        public void setOpportunityState(String opportunityState) { this.opportunityState = opportunityState; }
+        public Integer getOpportunityScore() { return opportunityScore; }
+        public void setOpportunityScore(Integer opportunityScore) { this.opportunityScore = opportunityScore; }
+        public String getPlanMode() { return planMode; }
+        public void setPlanMode(String planMode) { this.planMode = planMode; }
+        public String getAiDecisionResult() { return aiDecisionResult; }
+        public void setAiDecisionResult(String aiDecisionResult) { this.aiDecisionResult = aiDecisionResult; }
+        public Integer getDataQualityScore() { return dataQualityScore; }
+        public void setDataQualityScore(Integer dataQualityScore) { this.dataQualityScore = dataQualityScore; }
+        public String getRankingReason() { return rankingReason; }
+        public void setRankingReason(String rankingReason) { this.rankingReason = rankingReason; }
 
         public String getMarketBias() {
             return marketBias;

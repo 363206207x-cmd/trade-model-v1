@@ -56,6 +56,14 @@ public class PersistentAssetPoolService implements AssetPoolService {
     }
 
     @Override
+    public List<AssetPoolAssetDTO> listSystemDefaults() {
+        return safe(mapper.listSystemDefaults()).stream()
+                .sorted((left, right) -> Integer.compare(sortOrder(left), sortOrder(right)))
+                .map(PersistentAssetPoolService::toDto)
+                .toList();
+    }
+
+    @Override
     public List<String> listFocusSymbols(Long userId, int limit) {
         return listForUser(userId).stream()
                 .filter(AssetPoolAssetDTO::focusEnabled)
@@ -156,6 +164,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
 
     private static AssetPoolAssetDTO toDto(AssetPoolItemDO row) {
         return new AssetPoolAssetDTO(
+                row.getId(),
                 normalizeSymbol(row.getSymbol()),
                 row.getDisplayName(),
                 row.getMarketType(),

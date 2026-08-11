@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `REMEDIATION_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
+Status: `DYNAMIC_ASSET_RANKING_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
 
 ## Merge-Readiness Evidence Still Required
 
@@ -10,11 +10,15 @@ Status: `REMEDIATION_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
    reviewed, merged, and validated on clean/synced main.
 3. PR CI must run against the remediated head; local validation cannot replace
    the required PR Merge Gate checks.
+4. Dynamic Top 6 behavior has deterministic unit, H2 integration, API contract,
+   Spring-context, and PostgreSQL query evidence, but has not yet been observed
+   with continuously changing production Opportunity data.
 
 PostgreSQL V11 is not an open local validation gap. The complete controlled
 migration test passed against disposable PostgreSQL `16.14`, including the
 historical V8 -> V11 path and the new timeframe, Conflict Level, and
-UserPosition source constraints.
+UserPosition source constraints. The dynamic ranking read queries also executed
+successfully in the same V11 smoke test.
 
 ## Existing Non-Blocking Audit Debt
 
@@ -26,6 +30,10 @@ non-blocking findings:
 - the machine-readable authorization projection still needs reconciliation at
   Merge Gate even though the authorization merge is present in this branch's
   base and the Product Source/Workflow gates pass.
+- the legacy composite V7 evidence runner does not isolate its historical V7
+  fixtures from V11 schema state; its combined run fails outside the ranking
+  test. The targeted V11 migration/ranking test passes and is the applicable
+  database evidence for this increment.
 
 ## Runtime Acceptance Not Claimed
 

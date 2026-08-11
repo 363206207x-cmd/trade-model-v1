@@ -132,6 +132,29 @@ class PersistentAssetPoolServiceTest {
         });
     }
 
+    @Test
+    void assetPoolManagesMoreThanSixAssetsWithoutDisplaySlotTruncation() {
+        when(mapper.listSystemDefaults()).thenReturn(List.of(
+                row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT"),
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 20, "DEFAULT"),
+                row("SYSTEM", 0L, "SOLUSDT", true, true, 30, "DEFAULT"),
+                row("SYSTEM", 0L, "AAVEUSDT", true, true, 40, "DEFAULT"),
+                row("SYSTEM", 0L, "LINKUSDT", true, true, 50, "DEFAULT"),
+                row("SYSTEM", 0L, "TAOUSDT", true, true, 60, "DEFAULT")));
+        when(mapper.listUserOverrides(21L)).thenReturn(List.of(
+                row("USER", 21L, "SUIUSDT", true, true, 70, "USER_ADDED"),
+                row("USER", 21L, "ARBUSDT", true, true, 80, "USER_ADDED"),
+                row("USER", 21L, "OPUSDT", true, true, 90, "USER_ADDED"),
+                row("USER", 21L, "NEARUSDT", true, true, 100, "USER_ADDED")));
+
+        List<AssetPoolAssetDTO> assets = service.listForUser(21L);
+
+        assertThat(assets).hasSize(10);
+        assertThat(assets).extracting(AssetPoolAssetDTO::symbol)
+                .containsExactly("BTCUSDT", "ETHUSDT", "SOLUSDT", "AAVEUSDT", "LINKUSDT",
+                        "TAOUSDT", "SUIUSDT", "ARBUSDT", "OPUSDT", "NEARUSDT");
+    }
+
     private static AssetPoolItemDO row(String ownerType,
                                        Long ownerId,
                                        String symbol,
@@ -140,6 +163,7 @@ class PersistentAssetPoolServiceTest {
                                        int sortOrder,
                                        String sourceType) {
         AssetPoolItemDO row = new AssetPoolItemDO();
+        row.setId((long) sortOrder);
         row.setOwnerType(ownerType);
         row.setOwnerId(ownerId);
         row.setSymbol(symbol);

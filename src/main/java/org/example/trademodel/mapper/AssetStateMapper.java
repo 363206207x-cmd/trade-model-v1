@@ -44,6 +44,17 @@ public interface AssetStateMapper {
     AssetStateDO selectBySymbolAndTimeframe(@Param("symbol") String symbol,
                                             @Param("timeframe") String timeframe);
 
+    @Select({
+            "<script>",
+            "SELECT * FROM tm_asset_state WHERE UPPER(TRIM(symbol)) IN",
+            "<foreach collection='symbols' item='symbol' open='(' separator=',' close=')'>",
+            "#{symbol}",
+            "</foreach>",
+            "ORDER BY last_update_time DESC, id DESC",
+            "</script>"
+    })
+    List<AssetStateDO> listBySymbols(@Param("symbols") List<String> symbols);
+
     @Select("SELECT * FROM tm_asset_state WHERE state IN ('CANDIDATE', 'WAITING_TRIGGER') "
             + "ORDER BY last_update_time DESC, id DESC LIMIT #{limit}")
     List<AssetStateDO> listCandidateOrWaitingTrigger(@Param("limit") int limit);

@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Schema And API Changelog
 
-Status: `AUDIT_REMEDIATION_COMPLETE_PENDING_REAUDIT`
+Status: `DYNAMIC_ASSET_RANKING_COMPLETE_PENDING_REAUDIT`
 
 ## Schema V11
 
@@ -67,14 +67,28 @@ Base path: `/api/asset-pool`
 - ExecutionPlan output adds Candidate, Opportunity, Resolver, Trace, chain,
   Rule Validation, veto, Final timestamp, and Final marker fields.
 - Review output adds Final, Candidate, and Trace provenance.
-- Dashboard Home focus assets are projected from Asset Pool, and current
-  decision-chain role output is serialized into the existing Three-AI payload.
+- Asset Pool rows expose their persisted `assetId`; pool size remains unbounded
+  by the six Home slots.
+- `GET /api/dashboard/home` focus assets are the current Opportunity-ranked Top
+  6 projection, not the first six Asset Pool rows. Each projected asset exposes
+  `assetId`, `analysisId`, `opportunityId`, `opportunityState`,
+  `opportunityScore`, `planMode`, `aiDecisionResult`, `dataQualityScore`, and
+  `rankingReason`.
+- ranking reads `planMode` only from a Rule Validation PASS Final Plan; a
+  Candidate, legacy, or blocked plan cannot be projected as the Final mode.
+- current decision-chain role output is serialized into the existing Three-AI
+  payload for the selected ranked asset.
+
+No new endpoint was added for ranking. The existing Dashboard Home endpoint is
+the projection boundary.
 
 ## Explicit Non-Changes
 
 - No order API.
 - No automatic open, close, reduce, add, reverse, or position conversion API.
 - No PositionMonitor API or schema rewrite.
+- No new migration or schema change for dynamic ranking; it is a read model over
+  V11 Asset Pool, Analysis, Score, Decision, Plan, and Opportunity data.
 - No Figma or Mobile change.
 
 `SCHEMA_CHANGED = YES`

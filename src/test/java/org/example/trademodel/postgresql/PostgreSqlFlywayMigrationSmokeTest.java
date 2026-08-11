@@ -9,6 +9,8 @@ import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.MonitorAlertMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
@@ -146,7 +148,31 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertFlywayHistorySucceeded(connection);
             assertUserPositionIdentityGeneratedKey(connection);
         }
+        assertOpportunityRankingReadQueries(target);
         assertMonitorAlertUtcNaiveAcrossSessionTimezones(target);
+    }
+
+    private static void assertOpportunityRankingReadQueries(DatabaseTarget target) {
+        PGSimpleDataSource dataSource = new PGSimpleDataSource();
+        dataSource.setUrl(target.jdbcUrl());
+        dataSource.setUser(target.username());
+        dataSource.setPassword(target.password());
+        Environment environment = new Environment(
+                "controlled-postgresql-ranking", new JdbcTransactionFactory(), dataSource);
+        Configuration configuration = new Configuration(environment);
+        configuration.setDatabaseId("postgresql");
+        configuration.setMapUnderscoreToCamelCase(true);
+        configuration.addMapper(DecisionResultMapper.class);
+        configuration.addMapper(AssetStateMapper.class);
+        SqlSessionFactory sessions = new SqlSessionFactoryBuilder().build(configuration);
+
+        try (SqlSession session = sessions.openSession(false)) {
+            assertThat(session.getMapper(DecisionResultMapper.class)
+                    .findLatestDecisionResultsForSymbolsJoined(List.of("BTCUSDT"))).isEmpty();
+            assertThat(session.getMapper(AssetStateMapper.class)
+                    .listBySymbols(List.of("BTCUSDT"))).isEmpty();
+            session.rollback();
+        }
     }
 
     private static void assertMonitorAlertUtcNaiveAcrossSessionTimezones(

@@ -38,14 +38,18 @@ PASS and does not authorize merge without the required review.
 10. Conflict Level is canonical Level 1-4 across schema, Resolver, projections,
     and tests.
 11. V11 succeeds against PostgreSQL and preserves historical data.
+12. Home Top 6 is dynamically ranked from the complete effective Asset Pool,
+    every projection has exact Opportunity/Analysis provenance, and no fixed
+    symbol fallback remains. Ranking Plan Mode must come only from a
+    Rule-validated Final Plan.
 
 ## Current Evidence
 
-- full Maven: `4394 tests, 4380 passed, 0 failed, 0 errors, 14 skipped`
-- v4.1 principal suites: `66 passed`
+- full Maven: `4404 tests, 4390 passed, 0 failed, 0 errors, 14 skipped`
+- v4.1 principal suites: `72 passed`
 - H2 schema/persistence constraints: `PASS`
 - PostgreSQL V11 local controlled runtime: `PASS` (`PostgreSQL 16.14`, `1`
-  test, `0` skipped)
+  test, `0` skipped), including dynamic ranking read queries
 - Product Source Gate: `PASS`
 - Workflow Contract: `PASS`
 - automatic trading path scan: only defensive rejection terms found

@@ -106,6 +106,44 @@ class DashboardHomeControllerTest {
     }
 
     @Test
+    void homeSerializesOpportunityRankingProjectionContract() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSelectedSymbol("LINKUSDT");
+
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setAssetId(9_007_199_254_740_993L);
+        asset.setSymbol("LINK/USDT");
+        asset.setRawSymbol("LINKUSDT");
+        asset.setAnalysisId("analysis-link-ranked");
+        asset.setOpportunityId("opportunity-link-ranked");
+        asset.setOpportunityState("CANDIDATE");
+        asset.setOpportunityScore(94);
+        asset.setPlanMode("CONFIRM");
+        asset.setAiDecisionResult("LEVEL_1_CONSISTENT");
+        asset.setDataQualityScore(91);
+        asset.setRankingReason("OPPORTUNITY_SCORE=94|CONFIDENCE=HIGH|RISK_LEVEL=LOW"
+                + "|PLAN_MODE=CONFIRM|AI_DECISION=LEVEL_1_CONSISTENT|DATA_QUALITY=91");
+        home.setAssets(List.of(asset));
+
+        when(dashboardHomeService.getHomeForUser(7L, null, 6, null)).thenReturn(home);
+
+        mockMvc.perform(get("/api/dashboard/home").param("limit", "6"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assets[0].assetId").value("9007199254740993"))
+                .andExpect(jsonPath("$.data.assets[0].symbol").value("LINK/USDT"))
+                .andExpect(jsonPath("$.data.assets[0].analysisId").value("analysis-link-ranked"))
+                .andExpect(jsonPath("$.data.assets[0].opportunityId").value("opportunity-link-ranked"))
+                .andExpect(jsonPath("$.data.assets[0].opportunityState").value("CANDIDATE"))
+                .andExpect(jsonPath("$.data.assets[0].opportunityScore").value(94))
+                .andExpect(jsonPath("$.data.assets[0].planMode").value("CONFIRM"))
+                .andExpect(jsonPath("$.data.assets[0].aiDecisionResult").value("LEVEL_1_CONSISTENT"))
+                .andExpect(jsonPath("$.data.assets[0].dataQualityScore").value(91))
+                .andExpect(jsonPath("$.data.assets[0].rankingReason")
+                        .value("OPPORTUNITY_SCORE=94|CONFIDENCE=HIGH|RISK_LEVEL=LOW"
+                                + "|PLAN_MODE=CONFIRM|AI_DECISION=LEVEL_1_CONSISTENT|DATA_QUALITY=91"));
+    }
+
+    @Test
     void homeControllerPassesSelectedPositionId() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");

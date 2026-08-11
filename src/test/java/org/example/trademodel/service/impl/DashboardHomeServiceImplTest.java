@@ -50,6 +50,7 @@ import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
+import org.example.trademodel.service.OpportunityPriorityRankingService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
@@ -61,7 +62,9 @@ import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
+import org.example.trademodel.vo.HomeTopAssetProjection;
 import org.example.trademodel.vo.UserPositionVO;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -171,6 +174,36 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void homeAssetsConsumeOpportunityRankingProjectionWithoutPoolOrderFallback() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        DecisionResultVO link = decision("LINKUSDT", "BULLISH", "HIGH", "LOW", 91, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        link.setPlanMode("CONFIRM");
+        DecisionResultVO aave = decision("AAVEUSDT", "WEAK_BULLISH", "MEDIUM", "MEDIUM", 84, 21,
+                "LEVEL_2_MINOR_DISAGREEMENT", true, "{\"state\":\"WAITING_TRIGGER\"}");
+        aave.setPlanMode("PREPARE");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(101L, link, 94, "opportunity-link", "CANDIDATE"),
+                projection(102L, aave, 88, "opportunity-aave", "WAITING_TRIGGER")));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6, null);
+
+        assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("LINKUSDT", "AAVEUSDT");
+        assertThat(home.getAssets().get(0).getAssetId()).isEqualTo(101L);
+        assertThat(home.getAssets().get(0).getOpportunityId()).isEqualTo("opportunity-link");
+        assertThat(home.getAssets().get(0).getAnalysisId()).isEqualTo("analysis-LINKUSDT");
+        assertThat(home.getAssets().get(0).getOpportunityScore()).isEqualTo(94);
+        assertThat(home.getAssets().get(0).getRankingReason()).contains("OPPORTUNITY_SCORE=94");
+        verify(assetPoolService, never()).listFocusSymbols(any(), anyInt());
+        verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
+    }
+
+    @Test
     void homeAggregatesStableReadOnlySemanticsWithoutCrossFallbacks() {
         LightSystemStatusVO system = new LightSystemStatusVO();
         system.setStatus("OK");
@@ -253,7 +286,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
         assertThat(home.getSystemState().getAiConflict().getScore()).isEqualTo(25);
 
-        assertThat(home.getAssets()).hasSize(6);
+        assertThat(home.getAssets()).hasSize(4);
         DashboardHomeVO.AssetVO btcAsset = asset(home, "BTC/USDT");
         assertThat(btcAsset.getMarketBias()).isEqualTo("BULLISH");
         assertThat(btcAsset.getConfidenceLevel()).isEqualTo("HIGH");
@@ -1355,7 +1388,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void realFallbackAssetsAreCollectedBeforeDefaultSlotsAreUsedToFillTheLimit() {
+    void marketDataAloneCannotCreateHomeOpportunityAssetsOrDefaultSlots() {
         PersistedOhlcvBarDO bnb = new PersistedOhlcvBarDO();
         bnb.setSymbol("BNBUSDT");
         bnb.setTimeframe("5m");
@@ -1370,28 +1403,13 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
 
-        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
-        assertThat(home.getAssets())
-                .extracting(DashboardHomeVO.AssetVO::getRawSymbol)
-                .containsExactly("BNBUSDT", "BTCUSDT", "ETHUSDT");
-        assertThat(asset(home, "BNB/USDT").getSlotType()).isEqualTo("MARKET_DATA");
-        assertThat(asset(home, "BNB/USDT").getAnalysisId()).isNull();
-        assertThat(home.getAssets().subList(1, 3))
-                .extracting(DashboardHomeVO.AssetVO::getSlotType)
-                .containsOnly("DEFAULT_SLOT");
-        assertThat(home.getAssets().subList(1, 3))
-                .extracting(DashboardHomeVO.AssetVO::getAnalysisId)
-                .containsOnlyNulls();
-        verify(externalContextEvidenceBuilder).buildSnapshot(
-                eq("dashboard-home"),
-                eq("BNBUSDT"),
-                eq("1h"),
-                any(LocalDateTime.class),
-                eq("CRYPTO"));
+        assertThat(home.getSelectedSymbol()).isNull();
+        assertThat(home.getAssets()).isEmpty();
+        verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
     }
 
     @Test
-    void implicitRealFallbackRebuildsDecisionContextForResolvedSymbol() {
+    void unrankedDecisionAndMarketDataCannotBecomeImplicitHomeOpportunity() {
         PersistedOhlcvBarDO bnbBar = new PersistedOhlcvBarDO();
         bnbBar.setSymbol("BNBUSDT");
         bnbBar.setTimeframe("5m");
@@ -1409,7 +1427,6 @@ class DashboardHomeServiceImplTest {
         bnbDecision.setValidPeriod(ACTIVE_VALID_PERIOD);
         bnbDecision.setInvalidCondition("跌破 600");
         setActivePlanValidity(bnbDecision);
-        allowMatchingSnapshot(bnbDecision);
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of());
         lenient().when(decisionService.getLatestDecisionResultBySymbolForUser(USER_ID, "BNBUSDT"))
@@ -1420,11 +1437,10 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
 
-        assertThat(home.getSelectedSymbol()).isEqualTo("BNBUSDT");
-        assertThat(home.getAssets().get(0).getSlotType()).isEqualTo("DECISION");
-        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-BNBUSDT");
-        assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
-        assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo("610-615");
+        assertThat(home.getSelectedSymbol()).isNull();
+        assertThat(home.getAssets()).isEmpty();
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isNull();
+        verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
     }
 
     @Test
@@ -1443,7 +1459,7 @@ class DashboardHomeServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", null));
         PersistedOhlcvBarDO marketBar = persistedBar("BTCUSDT", "64123.45", "FRESH", marketUpdatedAt);
-        when(persistedOhlcvBarMapper.selectLatestClosedWindow(eq("BTCUSDT"), anyString(), eq(1)))
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow(eq("BTCUSDT"), anyString(), eq(1)))
                 .thenReturn(List.of(marketBar));
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(decision));
@@ -1522,19 +1538,15 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void freshMarketDataWithoutDecisionCannotBecomeGoodOrReady() {
-        PersistedOhlcvBarDO marketBar = persistedBar(
-                "BTCUSDT", "64123.45", "FRESH", LocalDateTime.of(2026, 7, 21, 9, 30));
-        when(persistedOhlcvBarMapper.selectLatestClosedWindow(eq("BTCUSDT"), anyString(), eq(1)))
-                .thenReturn(List.of(marketBar));
+    void marketDataSourceCannotCreateHomeAssetWithoutOpportunity() {
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of());
 
-        DashboardHomeVO.AssetVO asset = asset(
-                service.getHomeForUser(USER_ID, "BTCUSDT", 1), "BTC/USDT");
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
 
-        assertThat(asset.getDataQuality()).isEqualTo("PARTIAL");
-        assertThat(asset.getModuleState()).isEqualTo("PARTIAL");
+        assertThat(home.getAssets()).isEmpty();
+        assertThat(home.getStates().getAssets()).isNotEqualTo("READY");
+        verify(persistedOhlcvBarMapper, never()).selectLatestClosedWindow(anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -3054,6 +3066,32 @@ class DashboardHomeServiceImplTest {
         decision.setIsWorthOpening(worthOpening);
         decision.setAssetStateSnapshot(assetStateSnapshot);
         return decision;
+    }
+
+    private HomeTopAssetProjection projection(Long assetId,
+                                               DecisionResultVO decision,
+                                               Integer opportunityScore,
+                                               String opportunityId,
+                                               String opportunityState) {
+        return new HomeTopAssetProjection(
+                assetId,
+                decision.getSymbol(),
+                opportunityScore,
+                decision.getConfidenceLevel(),
+                decision.getRiskLevel(),
+                decision.getPlanMode(),
+                decision.getAiConflictLevel(),
+                decision.getDataQualityScore(),
+                "OPPORTUNITY_SCORE=" + opportunityScore
+                        + "|CONFIDENCE=" + decision.getConfidenceLevel()
+                        + "|RISK_LEVEL=" + decision.getRiskLevel()
+                        + "|PLAN_MODE=" + decision.getPlanMode()
+                        + "|AI_DECISION=" + decision.getAiConflictLevel()
+                        + "|DATA_QUALITY=" + decision.getDataQualityScore(),
+                decision.getAnalysisId(),
+                opportunityId,
+                opportunityState,
+                decision);
     }
 
     private AnalysisRunDO analysisRun(String analysisId, String symbol) {
