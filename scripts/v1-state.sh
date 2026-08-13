@@ -70,6 +70,7 @@ emit_resolved_task_state() {
   printf 'V4_1_DECISION_CHAIN_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
   printf 'V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_DECISION_CHAIN_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
+  printf 'V4_1_FRONTEND_RUNTIME_ALIGNMENT_STATUS: %s\n' "${v4_1_frontend_runtime_alignment_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -986,6 +987,7 @@ load_task_package_contract() {
   v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_design_status)"
   v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_authorization_status)"
   v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_implementation_status)"
+  v4_1_frontend_runtime_alignment_status="$(yaml_value "$TASK_FILE" v4_1_frontend_runtime_alignment_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -1364,6 +1366,7 @@ p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_imple
 v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_design_status)"
 v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_authorization_status)"
 v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_implementation_status)"
+v4_1_frontend_runtime_alignment_status="$(yaml_value "$TASK_FILE" v4_1_frontend_runtime_alignment_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1770,6 +1773,7 @@ printf 'PRODUCT_V4_1_MATRIX_AUTHORIZATION: %s\n' "${product_v4_1_matrix_authoriz
 printf 'V4_1_DECISION_CHAIN_DECLARED_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
 printf 'V4_1_DECISION_CHAIN_DECLARED_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_declared_status:-UNDECLARED}"
 printf 'V4_1_DECISION_CHAIN_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
+printf 'V4_1_FRONTEND_RUNTIME_ALIGNMENT_STATUS: %s\n' "${v4_1_frontend_runtime_alignment_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"

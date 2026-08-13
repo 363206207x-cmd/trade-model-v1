@@ -1036,6 +1036,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setOpenedAt(position.getOpenedAt());
             row.setNextMonitorAt(null);
             row.setSourceRefId(trimToNull(position.getSourceRefId()));
+            row.setSourceType(trimToNull(position.getSourceType()));
+            row.setFinalPlanId(trimToNull(position.getFinalPlanId()));
             if (trustedMonitor) {
                 applyTrustedMonitor(row, position, latestMonitorLog);
             } else {
@@ -1536,12 +1538,34 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setWorthOpening(finalPlanWorthOpening(executionPlan.getFinalPlanMode()));
         suggestion.setOpportunityType(trimToNull(executionPlan.getOpportunityType()));
         suggestion.setRecommendedAction(trimToNull(executionPlan.getRecommendedAction()));
+        suggestion.setEntryLogic(trimPlanValue(executionPlan.getEntryLogic()));
         suggestion.setEntryZone(trimPlanValue(executionPlan.getEntryZone()));
         suggestion.setTriggerCondition(trimPlanValue(executionPlan.getTriggerCondition()));
+        suggestion.setStopLogic(trimPlanValue(executionPlan.getStopLogic()));
+        suggestion.setStopZone(trimPlanValue(executionPlan.getStopLoss()));
         suggestion.setStopLoss(trimPlanValue(executionPlan.getStopLoss()));
+        suggestion.setTargetLogic(trimPlanValue(executionPlan.getTargetLogic()));
+        suggestion.setTargetZones(trimPlanValue(executionPlan.getTakeProfitRules()));
         suggestion.setTakeProfitRules(trimPlanValue(executionPlan.getTakeProfitRules()));
+        suggestion.setAddCondition(trimPlanValue(executionPlan.getAddPositionCondition()));
+        suggestion.setReduceCondition(trimPlanValue(executionPlan.getReducePositionCondition()));
+        suggestion.setAbandonCondition(trimPlanValue(executionPlan.getAbandonCondition()));
         suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageLimit()));
         suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionLimit()));
+        suggestion.setExpectedRiskReward(executionPlan.getExpectedRiskReward());
+        suggestion.setAnalysisTimeframes(trimToNull(executionPlan.getAnalysisTimeframesJson()));
+        suggestion.setTriggerTimeframe(trimToNull(executionPlan.getTriggerTimeframe()));
+        suggestion.setHoldingHorizon(trimToNull(executionPlan.getHoldingHorizon()));
+        suggestion.setValidationStatus(trimToNull(executionPlan.getRuleValidationStatus()));
+        suggestion.setValidationReasons(trimToNull(executionPlan.getValidationReasons()));
+        suggestion.setDowngradeReason(trimToNull(executionPlan.getDowngradeReason()));
+        suggestion.setRuleVetoReason(trimToNull(executionPlan.getRuleVetoReason()));
+        suggestion.setSourceStatus(trimToNull(executionPlan.getSourceStatus()));
+        suggestion.setChainStatus(trimToNull(executionPlan.getChainStatus()));
+        suggestion.setCandidateId(trimToNull(executionPlan.getCandidateId()));
+        suggestion.setResolverResultId(trimToNull(executionPlan.getResolverResultId()));
+        suggestion.setValidationResultId(trimToNull(executionPlan.getValidationResultId()));
+        suggestion.setFinalPlan(Boolean.TRUE.equals(executionPlan.getFinalPlan()));
         suggestion.setExecutionFeasibilityStatus(trimToNull(executionPlan.getExecutionFeasibilityStatus()));
         suggestion.setExecutionFeasibilityReason(trimToNull(executionPlan.getExecutionFeasibilityReason()));
         suggestion.setValidPeriod(planValidityDisplay(planValidity));
@@ -1900,6 +1924,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         tab.setRoleState(role.roleState());
         tab.setDataState(role.dataState());
         tab.setGeneratedAt(role.generatedAt());
+        tab.setProvider(role.provider());
+        tab.setSourceRole(role.sourceRole());
+        tab.setReasonCodes(role.reasonCodes());
+        tab.setFallback(role.fallback());
+        tab.setFallbackReason(role.fallbackReason());
         tab.setCoreJudgment(role.coreJudgment());
         tab.setSupportingEvidence(role.supportingEvidence());
         tab.setSupportingEvidenceState(role.supportingEvidenceState());

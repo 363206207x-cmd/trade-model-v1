@@ -135,9 +135,8 @@ class StaticNoTradeInstructionGuardTest {
         assertThat(row).contains("暂无手动持仓");
         assertThat(row).contains("录入真实持仓后开始监控");
         assertThat(row).contains("系统执行建议（非交易指令）");
-        assertThat(row).doesNotContain("<button");
+        assertThat(row).contains("manualPositionBtn", "录入持仓");
         assertThat(row).doesNotContain("<form");
-        assertThat(row).doesNotContain("manualPositionBtn");
         assertThat(row).doesNotContain("openPositionBtn");
         assertThat(row).doesNotContain("closePositionBtn");
         assertThat(row).doesNotContain("orderBtn");

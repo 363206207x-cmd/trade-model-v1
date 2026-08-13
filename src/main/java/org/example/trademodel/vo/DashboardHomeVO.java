@@ -738,6 +738,8 @@ public class DashboardHomeVO {
         private LocalDateTime lastMonitorTime;
         private LocalDateTime nextMonitorAt;
         private String sourceRefId;
+        private String sourceType;
+        private String finalPlanId;
         private String sourceAnalysisId;
         private String sourceExecutionPlanId;
         private String sourceTraceId;
@@ -962,6 +964,10 @@ public class DashboardHomeVO {
         public void setNextMonitorAt(LocalDateTime nextMonitorAt) { this.nextMonitorAt = nextMonitorAt; }
         public String getSourceRefId() { return sourceRefId; }
         public void setSourceRefId(String sourceRefId) { this.sourceRefId = sourceRefId; }
+        public String getSourceType() { return sourceType; }
+        public void setSourceType(String sourceType) { this.sourceType = sourceType; }
+        public String getFinalPlanId() { return finalPlanId; }
+        public void setFinalPlanId(String finalPlanId) { this.finalPlanId = finalPlanId; }
         public String getSourceAnalysisId() { return sourceAnalysisId; }
         public void setSourceAnalysisId(String sourceAnalysisId) { this.sourceAnalysisId = sourceAnalysisId; }
         public String getSourceExecutionPlanId() { return sourceExecutionPlanId; }
@@ -994,12 +1000,34 @@ public class DashboardHomeVO {
         private Boolean worthOpening;
         private String opportunityType;
         private String recommendedAction;
+        private String entryLogic;
         private String entryZone;
         private String triggerCondition;
+        private String stopLogic;
+        private String stopZone;
         private String stopLoss;
+        private String targetLogic;
+        private String targetZones;
         private String takeProfitRules;
+        private String addCondition;
+        private String reduceCondition;
+        private String abandonCondition;
         private String leverageSuggestion;
         private String positionSuggestion;
+        private BigDecimal expectedRiskReward;
+        private String analysisTimeframes;
+        private String triggerTimeframe;
+        private String holdingHorizon;
+        private String validationStatus;
+        private String validationReasons;
+        private String downgradeReason;
+        private String ruleVetoReason;
+        private String sourceStatus;
+        private String chainStatus;
+        private String candidateId;
+        private String resolverResultId;
+        private String validationResultId;
+        private Boolean finalPlan;
         private String executionFeasibilityStatus;
         private String executionFeasibilityReason;
         private String validPeriod;
@@ -1052,6 +1080,8 @@ public class DashboardHomeVO {
         public void setOpportunityType(String value) { this.opportunityType = value; }
         public String getRecommendedAction() { return recommendedAction; }
         public void setRecommendedAction(String value) { this.recommendedAction = value; }
+        public String getEntryLogic() { return entryLogic; }
+        public void setEntryLogic(String value) { this.entryLogic = value; }
 
         public String getEntryZone() {
             return entryZone;
@@ -1063,6 +1093,10 @@ public class DashboardHomeVO {
 
         public String getTriggerCondition() { return triggerCondition; }
         public void setTriggerCondition(String value) { this.triggerCondition = value; }
+        public String getStopLogic() { return stopLogic; }
+        public void setStopLogic(String value) { this.stopLogic = value; }
+        public String getStopZone() { return stopZone; }
+        public void setStopZone(String value) { this.stopZone = value; }
 
         public String getStopLoss() {
             return stopLoss;
@@ -1072,6 +1106,11 @@ public class DashboardHomeVO {
             this.stopLoss = stopLoss;
         }
 
+        public String getTargetLogic() { return targetLogic; }
+        public void setTargetLogic(String value) { this.targetLogic = value; }
+        public String getTargetZones() { return targetZones; }
+        public void setTargetZones(String value) { this.targetZones = value; }
+
         public String getTakeProfitRules() {
             return takeProfitRules;
         }
@@ -1079,6 +1118,13 @@ public class DashboardHomeVO {
         public void setTakeProfitRules(String takeProfitRules) {
             this.takeProfitRules = takeProfitRules;
         }
+
+        public String getAddCondition() { return addCondition; }
+        public void setAddCondition(String value) { this.addCondition = value; }
+        public String getReduceCondition() { return reduceCondition; }
+        public void setReduceCondition(String value) { this.reduceCondition = value; }
+        public String getAbandonCondition() { return abandonCondition; }
+        public void setAbandonCondition(String value) { this.abandonCondition = value; }
 
         public String getLeverageSuggestion() {
             return leverageSuggestion;
@@ -1095,6 +1141,35 @@ public class DashboardHomeVO {
         public void setPositionSuggestion(String positionSuggestion) {
             this.positionSuggestion = positionSuggestion;
         }
+
+        public BigDecimal getExpectedRiskReward() { return expectedRiskReward; }
+        public void setExpectedRiskReward(BigDecimal value) { this.expectedRiskReward = value; }
+        public String getAnalysisTimeframes() { return analysisTimeframes; }
+        public void setAnalysisTimeframes(String value) { this.analysisTimeframes = value; }
+        public String getTriggerTimeframe() { return triggerTimeframe; }
+        public void setTriggerTimeframe(String value) { this.triggerTimeframe = value; }
+        public String getHoldingHorizon() { return holdingHorizon; }
+        public void setHoldingHorizon(String value) { this.holdingHorizon = value; }
+        public String getValidationStatus() { return validationStatus; }
+        public void setValidationStatus(String value) { this.validationStatus = value; }
+        public String getValidationReasons() { return validationReasons; }
+        public void setValidationReasons(String value) { this.validationReasons = value; }
+        public String getDowngradeReason() { return downgradeReason; }
+        public void setDowngradeReason(String value) { this.downgradeReason = value; }
+        public String getRuleVetoReason() { return ruleVetoReason; }
+        public void setRuleVetoReason(String value) { this.ruleVetoReason = value; }
+        public String getSourceStatus() { return sourceStatus; }
+        public void setSourceStatus(String value) { this.sourceStatus = value; }
+        public String getChainStatus() { return chainStatus; }
+        public void setChainStatus(String value) { this.chainStatus = value; }
+        public String getCandidateId() { return candidateId; }
+        public void setCandidateId(String value) { this.candidateId = value; }
+        public String getResolverResultId() { return resolverResultId; }
+        public void setResolverResultId(String value) { this.resolverResultId = value; }
+        public String getValidationResultId() { return validationResultId; }
+        public void setValidationResultId(String value) { this.validationResultId = value; }
+        public Boolean getFinalPlan() { return finalPlan; }
+        public void setFinalPlan(Boolean value) { this.finalPlan = value; }
 
         public String getExecutionFeasibilityStatus() { return executionFeasibilityStatus; }
         public void setExecutionFeasibilityStatus(String value) { this.executionFeasibilityStatus = value; }
@@ -1189,6 +1264,11 @@ public class DashboardHomeVO {
         private String roleState;
         private String dataState;
         private String generatedAt;
+        private String provider;
+        private String sourceRole;
+        private List<String> reasonCodes = new ArrayList<>();
+        private Boolean fallback;
+        private String fallbackReason;
         private String runStatus;
         private String runStatusLabel;
         private Boolean resultAvailable = false;
@@ -1317,6 +1397,18 @@ public class DashboardHomeVO {
         public void setDataState(String value) { this.dataState = value; }
         public String getGeneratedAt() { return generatedAt; }
         public void setGeneratedAt(String value) { this.generatedAt = value; }
+        public String getProvider() { return provider; }
+        public void setProvider(String value) { this.provider = value; }
+        public String getSourceRole() { return sourceRole; }
+        public void setSourceRole(String value) { this.sourceRole = value; }
+        public List<String> getReasonCodes() { return List.copyOf(reasonCodes); }
+        public void setReasonCodes(List<String> value) {
+            this.reasonCodes = value == null ? new ArrayList<>() : new ArrayList<>(value);
+        }
+        public Boolean getFallback() { return fallback; }
+        public void setFallback(Boolean value) { this.fallback = value; }
+        public String getFallbackReason() { return fallbackReason; }
+        public void setFallbackReason(String value) { this.fallbackReason = value; }
 
         public String getRunStatus() { return runStatus; }
         public void setRunStatus(String runStatus) { this.runStatus = runStatus; }

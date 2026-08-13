@@ -323,6 +323,8 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 6, 27, 2, 0));
         assertThat(homePosition.getLeverage()).isEqualByComparingTo("2");
         assertThat(homePosition.getLeverage()).isNotEqualByComparingTo("20");
+        assertThat(homePosition.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
+        assertThat(homePosition.getFinalPlanId()).isNull();
         assertThat(homePosition.getCurrentPrice()).isNull();
         assertThat(homePosition.getFloatingPnl()).isNull();
         assertThat(homePosition.getMonitorConclusion()).isNull();
@@ -891,6 +893,89 @@ class DashboardHomeServiceImplTest {
                 .getExecutionSuggestion();
 
         assertAssetExecutionPlan(suggestion, decision, "plan-" + decision.getAnalysisId());
+    }
+
+    @Test
+    void validatedFinalPlanExposesEveryFrozenHomeFieldWithoutCandidateSubstitution() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setFinalMarketBias("BULLISH");
+        plan.setFinalPlanMode("CONFIRMATION");
+        plan.setOpportunityType("BREAKOUT_CONFIRMATION");
+        plan.setRecommendedAction("WAIT_MANUAL_CONFIRMATION");
+        plan.setEntryLogic("verified entry logic");
+        plan.setTriggerCondition("verified trigger");
+        plan.setStopLogic("verified stop logic");
+        plan.setTargetLogic("verified target logic");
+        plan.setAddPositionCondition("verified add condition");
+        plan.setReducePositionCondition("verified reduce condition");
+        plan.setAbandonCondition("verified abandon condition");
+        plan.setLeverageLimit("3x");
+        plan.setPositionLimit("8%");
+        plan.setExpectedRiskReward(new BigDecimal("2.5"));
+        plan.setAnalysisTimeframesJson("[\"4h\",\"1h\",\"15m\",\"5m\"]");
+        plan.setTriggerTimeframe("15m");
+        plan.setHoldingHorizon("1-3 days");
+        plan.setValidationReasons("ALL_RULES_PASS");
+        plan.setDowngradeReason("NO_DOWNGRADE");
+        plan.setRuleVetoReason(null);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(suggestion.getStatus()).isEqualTo("USABLE_REVIEW_PLAN");
+        assertThat(suggestion.getFinalPlan()).isTrue();
+        assertThat(suggestion.getFinalMarketBias()).isEqualTo("BULLISH");
+        assertThat(suggestion.getFinalPlanMode()).isEqualTo("CONFIRMATION");
+        assertThat(suggestion.getDirection()).isEqualTo("BULLISH");
+        assertThat(suggestion.getWorthOpening()).isTrue();
+        assertThat(suggestion.getOpportunityType()).isEqualTo("BREAKOUT_CONFIRMATION");
+        assertThat(suggestion.getRecommendedAction()).isEqualTo("WAIT_MANUAL_CONFIRMATION");
+        assertThat(suggestion.getEntryLogic()).isEqualTo("verified entry logic");
+        assertThat(suggestion.getEntryZone()).isEqualTo(decision.getEntryZone());
+        assertThat(suggestion.getTriggerCondition()).isEqualTo("verified trigger");
+        assertThat(suggestion.getStopLogic()).isEqualTo("verified stop logic");
+        assertThat(suggestion.getStopZone()).isEqualTo(decision.getStopLoss());
+        assertThat(suggestion.getTargetLogic()).isEqualTo("verified target logic");
+        assertThat(suggestion.getTargetZones()).isEqualTo(decision.getTakeProfitRules());
+        assertThat(suggestion.getAddCondition()).isEqualTo("verified add condition");
+        assertThat(suggestion.getReduceCondition()).isEqualTo("verified reduce condition");
+        assertThat(suggestion.getAbandonCondition()).isEqualTo("verified abandon condition");
+        assertThat(suggestion.getInvalidCondition()).isEqualTo(decision.getInvalidCondition());
+        assertThat(suggestion.getLeverageSuggestion()).isEqualTo("3x");
+        assertThat(suggestion.getPositionSuggestion()).isEqualTo("8%");
+        assertThat(suggestion.getExpectedRiskReward()).isEqualByComparingTo("2.5");
+        assertThat(suggestion.getAnalysisTimeframes()).isEqualTo("[\"4h\",\"1h\",\"15m\",\"5m\"]");
+        assertThat(suggestion.getTriggerTimeframe()).isEqualTo("15m");
+        assertThat(suggestion.getHoldingHorizon()).isEqualTo("1-3 days");
+        assertThat(suggestion.getValidationStatus()).isEqualTo("PASS");
+        assertThat(suggestion.getValidationReasons()).isEqualTo("ALL_RULES_PASS");
+        assertThat(suggestion.getDowngradeReason()).isEqualTo("NO_DOWNGRADE");
+        assertThat(suggestion.getSourceStatus()).isEqualTo("VALID");
+        assertThat(suggestion.getChainStatus()).isEqualTo("FINAL_VALIDATED");
+        assertThat(suggestion.getCandidateId()).isEqualTo(plan.getCandidateId());
+        assertThat(suggestion.getResolverResultId()).isEqualTo(plan.getResolverResultId());
+        assertThat(suggestion.getValidationResultId()).isEqualTo(plan.getValidationResultId());
+        assertThat(suggestion.getNotTradeInstruction()).isTrue();
+    }
+
+    @Test
+    void systemPlanPositionKeepsExplicitFinalPlanSourceInHomeProjection() {
+        UserPositionVO position = activeManualPosition(302L, "BTCUSDT", null);
+        position.setSourceType("SYSTEM_PLAN_POSITION");
+        position.setFinalPlanId("final-plan-302");
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+
+        assertThat(home.getPositions()).hasSize(1);
+        assertThat(home.getPositions().get(0).getSourceType()).isEqualTo("SYSTEM_PLAN_POSITION");
+        assertThat(home.getPositions().get(0).getFinalPlanId()).isEqualTo("final-plan-302");
+        assertThat(home.getPositions().get(0).getDataState()).isEqualTo("WAITING_MONITOR_DATA");
     }
 
     @Test

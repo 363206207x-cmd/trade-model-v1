@@ -172,15 +172,19 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("复盘中心");
         assertThat(desktopPosition)
                 .contains("Top 3", "仅显示手动录入持仓")
-                .doesNotContain("manualPositionBtn")
-                .doesNotContain("reviewCenterLink")
-                .doesNotContain("position-action-btn");
+                .contains("manualPositionBtn")
+                .doesNotContain("reviewCenterLink");
+        assertThat(desktop)
+                .contains("class=\"position-action-btn\"")
+                .contains("记录平仓")
+                .contains("SYSTEM_PLAN_POSITION")
+                .contains("MANUAL_INDEPENDENT");
         assertThat(desktop)
                 .contains(
                         "资产状态 · 正在同步",
                         "系统冲突阻断",
-                        "计划冲突阻断",
-                        "AI 一致性阻断");
+                        "等待 Final Plan",
+                        "Candidate 不会在此展示");
         assertThat(mobileAi)
                 .contains("data-ai-role-summary")
                 .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")
@@ -320,7 +324,7 @@ class Fe04ShellHomeDashboardContractTest {
     }
 
     @Test
-    void aiAnalysisRequiresExplicitRoleAvailabilityBeforeRenderingConclusions()
+    void aiAnalysisPreservesStructuredRoleSemanticsWhileUnavailableRolesFailClosed()
             throws Exception {
         String mobile = Files.readString(MOBILE);
         String script = Files.readString(MOBILE_SCRIPT);
@@ -329,12 +333,13 @@ class Fe04ShellHomeDashboardContractTest {
 
         assertThat(contract)
                 .contains(
-                        "if (!supplied || supplied.resultAvailable !== true)",
+                        "normalized.resultAvailable = supplied.resultAvailable === true",
                         "roleLabel: definition.label",
-                        "resultAvailable: false",
-                        "runStatusLabel: displayText(supplied && supplied.runStatusLabel, \"待同步\")",
-                        "supplied && supplied.statusMessage",
-                        "normalized.resultAvailable = true");
+                        "roleState: \"UNAVAILABLE\"",
+                        "dataState: \"SOURCE_UNAVAILABLE\"",
+                        "normalized.roleState = normalizeRoleState(normalized.roleState)",
+                        "STRUCTURED_AI_COLLECTIONS.forEach(function (collection)",
+                        "normalized[collection.key] = Array.isArray(normalized[collection.key])");
         assertThat(mobile)
                 .contains(
                         "data-result-available=${tab.resultAvailable == true}",
@@ -354,19 +359,25 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("Number(tab.resultAvailable)");
         assertThat(desktop)
                 .contains(
+                        "function renderHomeAiRoleTab(role, tab)",
+                        "frontendContract.normalizeRoleState(role.roleState)",
+                        "renderGptFinalHomeRole(role)",
+                        "renderGeminiReviewHomeRole(role)",
+                        "renderGrokChallengeHomeRole(role)",
                         "function desktopAiRoleSummary(tab)",
                         "if (tab.resultAvailable !== true)",
                         "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true",
                         "data-desktop-ai-role-output hidden",
                         "roleOutput.hidden = !resultAvailable",
-                        "if (role.resultAvailable !== true) roleHtml = renderUnavailableAiRole(role)",
+                        "var hasStructuredContract = tab === \"GPT_FINAL\"",
+                        "(roleState === \"UNAVAILABLE\" || roleState === \"ERROR\") && !hasStructuredContract",
                         "function renderUnavailableAiRole(role)",
                         "roleMetadata(role)")
                 .doesNotContain("Boolean(tab.resultAvailable)");
     }
 
     @Test
-    void desktopAiConsistencyStaysInsideThreeRoleRegionAndUsesConsistencyFieldsOnly()
+    void desktopAiConsistencyStaysAdjacentToSingleWorkspaceAndUsesConsistencyFieldsOnly()
             throws Exception {
         String desktop = Files.readString(DESKTOP);
         String aiPanel = slice(
@@ -384,12 +395,17 @@ class Fe04ShellHomeDashboardContractTest {
 
         assertThat(aiPanel)
                 .contains(
-                        "id=\"homeConsistencyContent\"",
-                        "AI 一致性摘要",
-                        "冲突等级",
+                        "homeAiSummaryCards",
+                        "role=\"tablist\"",
                         "GPT_FINAL",
                         "GEMINI_REVIEW",
                         "GROK_CHALLENGE")
+                .doesNotContain("id=\"homeConsistencyContent\"");
+        assertThat(desktop)
+                .contains(
+                        "id=\"homeConsistencyContent\"",
+                        "AI 一致性摘要",
+                        "home-consistency-summary")
                 .doesNotContain(
                         "homeConsistencyPanel",
                         "consistency-ring",

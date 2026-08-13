@@ -8,41 +8,35 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Decision Chain Authorization
-Product Phase Status: PRODUCT_DESIGN_FROZEN_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register and merge the bounded Fundamental AI v4.1 Decision Chain implementation authorization; no business implementation is included
-Next Business Phase: FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after authorization is independently reviewed, merged, and validated on clean/synced main
+Product Phase: Fundamental AI v4.1 Frontend Runtime Alignment
+Product Phase Status: IMPLEMENTED_PENDING_MERGE
+Current Work Package: FUNDAMENTAL_AI_V4_1_FRONTEND_RUNTIME_ALIGNMENT candidate on top of merged-main backend PR #1177
+Next Business Phase: Independent Frontend Contract And Runtime Capability Audit
+Next Business Phase Allowed: NO until this exact frontend candidate is independently audited, merged, and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## Fundamental AI v4.1 Decision Chain Authorization Candidate
+## Fundamental AI v4.1 Frontend Runtime Alignment Candidate
 
-The Product Owner has frozen the v4.1 decision-chain source represented by
-`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` and explicitly
-authorized one successor package:
-`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`.
+The v4.1 backend decision chain is effective on merged main through PR #1177
+at `edc3615c03c9b71763c32574f1d811c1d9a8954d`. The Product Owner separately
+authorized the exact package `FUNDAMENTAL_AI_V4_1_FRONTEND_RUNTIME_ALIGNMENT`
+to align the existing Desktop Home and existing Analysis Detail with that
+merged contract.
 
-This candidate records only product source, AI authority, canonical object
-ownership, delivery authorization, and fail-closed machine state. It contains
-no application code, API, schema, migration, business test, Figma, or Mobile
-change. Before merged-main effectivity, implementation and successor PR
-creation remain false. After exact-source review, merge, clean/synced main
-validation, Product Source Gate PASS, and no active conflicting PR, only the
-exact named successor may resolve those permissions to true.
+The current candidate consumes existing owners and endpoints for Asset Pool,
+authoritative dynamic Top6 ranking, FinalExecutionPlan, structured GPT / Gemini
+/ Grok results, resolver and rule-validation audit data, UserPosition, and
+Position Monitoring. It adds no schema, parallel API, duplicate Home, duplicate
+analysis page, automatic-trading action, Figma change, or Mobile change.
 
-The v4.1 package reuses existing AnalysisRun, EvidenceItem, ScoreItem,
-DecisionBundle, ExecutionPlan, UserPosition, PositionMonitorLog, Review,
-AiCallLog, AssetState/OpportunityLog, and AI conflict-resolver ownership. It
-does not authorize duplicate object families. It preserves manual
-UserPosition, rule-layer Final confirmation, Candidate/Final separation, and
-the permanent no-automatic-trading boundary.
-
-Product P2 remains `FUNCTIONAL_UNVALIDATED`, and full Product P3 remains
-`NOT_STARTED`. This version-scoped backend authorization does not claim either
-phase complete and does not authorize Mobile, Figma, or a P3 UI package.
+Package state is `IMPLEMENTED_PENDING_MERGE`. It is not `COMPLETE`,
+`EFFECTIVE`, or `FUNCTIONALLY_ACCEPTED`. Deterministic fixtures may prove UI
+contracts and browser behavior, but do not prove live-provider opportunity
+accuracy. The only next action is an independent frontend contract and runtime
+capability audit of the exact candidate Head.
 
 ---
 

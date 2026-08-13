@@ -103,6 +103,40 @@
     WAIT: "观望"
   });
 
+  var PLAN_MODE_LABELS = Object.freeze({
+    CONFIRMATION: "确认型",
+    PREPARATION: "预备型",
+    REDUCED: "缩减型",
+    OBSERVATION: "观察",
+    BLOCKED: "阻断"
+  });
+
+  var COLLECTION_STATE_LABELS = Object.freeze({
+    FOUND: "已找到可验证内容",
+    NONE_FOUND: "已完成检查，未发现",
+    INSUFFICIENT_DATA: "数据不足，无法完成检查",
+    SOURCE_UNAVAILABLE: "来源不可用",
+    STALE: "数据已过期",
+    NO_VERIFIABLE_FAILURE_PATH: "未找到可验证失败路径"
+  });
+
+  var ROLE_STATES = Object.freeze([
+    "READY", "PARTIAL", "FALLBACK", "UNAVAILABLE", "ERROR"
+  ]);
+
+  var STRUCTURED_AI_COLLECTIONS = Object.freeze([
+    Object.freeze({ key: "supportingEvidence", state: "supportingEvidenceState" }),
+    Object.freeze({ key: "opposingEvidence", state: "opposingEvidenceState" }),
+    Object.freeze({ key: "evidenceGaps", state: "evidenceGapsState" }),
+    Object.freeze({ key: "logicConflicts", state: "logicConflictsState" }),
+    Object.freeze({ key: "underestimatedRisks", state: "underestimatedRisksState" }),
+    Object.freeze({ key: "failurePaths", state: "failurePathState" }),
+    Object.freeze({ key: "opposingScenarios", state: "opposingScenariosState" }),
+    Object.freeze({ key: "externalEventRisks", state: "externalEventRisksState" }),
+    Object.freeze({ key: "microstructureRisks", state: "microstructureRisksState" }),
+    Object.freeze({ key: "watchIndicators", state: "watchIndicatorsState" })
+  ]);
+
   function hasText(value) {
     return value !== null
       && value !== undefined
@@ -139,6 +173,21 @@
   function marketBiasHierarchyLabel(value) {
     var normalized = String(value || "").trim().toUpperCase();
     return MARKET_BIAS_HIERARCHY_LABELS[normalized] || "--";
+  }
+
+  function planModeLabel(value) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return PLAN_MODE_LABELS[normalized] || "当前不可查看";
+  }
+
+  function collectionStateLabel(value) {
+    var normalized = String(value || "SOURCE_UNAVAILABLE").trim().toUpperCase();
+    return COLLECTION_STATE_LABELS[normalized] || COLLECTION_STATE_LABELS.SOURCE_UNAVAILABLE;
+  }
+
+  function normalizeRoleState(value) {
+    var normalized = String(value || "UNAVAILABLE").trim().toUpperCase();
+    return ROLE_STATES.indexOf(normalized) >= 0 ? normalized : "UNAVAILABLE";
   }
 
   function parseApiEnvelope(envelope) {
@@ -183,16 +232,15 @@
 
     return AI_ROLES.map(function (definition) {
       var supplied = byRole[definition.role];
-      if (!supplied || supplied.resultAvailable !== true) {
-        return {
+      if (!supplied) {
+        supplied = {
           role: definition.role,
           roleLabel: definition.label,
           resultAvailable: false,
-          runStatusLabel: displayText(supplied && supplied.runStatusLabel, "待同步"),
-          statusMessage: displayText(
-            supplied && supplied.statusMessage,
-            supplied ? "当前角色观点不可用" : "当前角色观点待同步"
-          )
+          roleState: "UNAVAILABLE",
+          dataState: "SOURCE_UNAVAILABLE",
+          runStatusLabel: "待同步",
+          statusMessage: "当前角色观点待同步"
         };
       }
       var normalized = {};
@@ -201,7 +249,21 @@
       });
       normalized.role = definition.role;
       normalized.roleLabel = displayText(normalized.roleLabel, definition.label);
-      normalized.resultAvailable = true;
+      normalized.roleState = normalizeRoleState(normalized.roleState);
+      normalized.dataState = String(normalized.dataState || "SOURCE_UNAVAILABLE").toUpperCase();
+      normalized.resultAvailable = supplied.resultAvailable === true;
+      normalized.runStatusLabel = displayText(normalized.runStatusLabel, "待同步");
+      normalized.statusMessage = displayText(
+        normalized.statusMessage,
+        normalized.resultAvailable ? "" : "当前角色观点不可用"
+      );
+      STRUCTURED_AI_COLLECTIONS.forEach(function (collection) {
+        normalized[collection.key] = Array.isArray(normalized[collection.key])
+          ? normalized[collection.key] : [];
+        normalized[collection.state] = String(
+          normalized[collection.state] || "SOURCE_UNAVAILABLE"
+        ).toUpperCase();
+      });
       return normalized;
     });
   }
@@ -264,6 +326,19 @@
         visible: false,
         statusLabel: displayText(plan.statusLabel, "当前暂无可验证的执行建议"),
         reason: displayText(plan.blockedReason, "执行建议不可用")
+      };
+    }
+
+    var finalContractValid = plan.finalPlan === true
+      && String(plan.validationStatus || "").toUpperCase() === "PASS"
+      && String(plan.chainStatus || "").toUpperCase() === "FINAL_VALIDATED"
+      && String(plan.sourceStatus || "").toUpperCase() === "VALID"
+      && plan.notTradeInstruction === true;
+    if (!finalContractValid) {
+      return {
+        visible: false,
+        statusLabel: "当前 Final Plan 不可验证",
+        reason: "Rule Validation、来源或非交易指令合同未通过"
       };
     }
 
@@ -343,6 +418,9 @@
     FIELD_SOURCE_VIEWS: FIELD_SOURCE_VIEWS,
     DATA_QUALITY_LABELS: DATA_QUALITY_LABELS,
     MARKET_BIAS_HIERARCHY_LABELS: MARKET_BIAS_HIERARCHY_LABELS,
+    PLAN_MODE_LABELS: PLAN_MODE_LABELS,
+    COLLECTION_STATE_LABELS: COLLECTION_STATE_LABELS,
+    ROLE_STATES: ROLE_STATES,
     hasText: hasText,
     displayText: displayText,
     displayNumber: displayNumber,
@@ -350,6 +428,9 @@
     fieldSourceView: fieldSourceView,
     dataQualityLabel: dataQualityLabel,
     marketBiasHierarchyLabel: marketBiasHierarchyLabel,
+    planModeLabel: planModeLabel,
+    collectionStateLabel: collectionStateLabel,
+    normalizeRoleState: normalizeRoleState,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,

@@ -88,7 +88,7 @@
       <section class="evidence-scoring" aria-labelledby="evidence-scoring-title">
         <div class="section-heading">
           <h2 id="evidence-scoring-title">证据与评分</h2>
-          <p>只展示当前分析实际返回的 Top 3；缺失时保持关闭。</p>
+          <p>展示当前 analysisId 的真实 Evidence 与八项评分；缺失维度保持空值。</p>
         </div>
 
         <div class="evidence-score-grid">
@@ -96,7 +96,7 @@
             <div class="module-heading">
               <div>
                 <h3 id="key-evidence-title">关键证据</h3>
-                <p>最多 3 条；不创建“查看全部”假入口。</p>
+                <p>支持与反对证据均保留来源、观测时间和新鲜度。</p>
               </div>
               <span class="coverage-badge" data-evidence-coverage>不可用</span>
             </div>
@@ -118,7 +118,7 @@
               </article>
             </div>
             <p class="coverage-note" data-evidence-note>
-              完整证据、支持/反对关系、强度与置信度尚未提供。
+              仅展示当前 analysisId 实际持久化证据，不从其他分析补齐。
             </p>
           </section>
 
@@ -126,7 +126,7 @@
             <div class="module-heading">
               <div>
                 <h3 id="key-score-title">关键评分</h3>
-                <p>仅渲染实际返回评分，不补齐八项。</p>
+                <p>八项评分逐项绑定；缺失不是 0。</p>
               </div>
               <span class="coverage-badge" data-score-coverage>不可用</span>
             </div>
@@ -145,7 +145,7 @@
                 <div><dt>宏观环境分</dt><dd data-score-type="宏观环境分">—</dd></div>
                 <div><dt>综合可信度分</dt><dd data-score-type="综合可信度分">—</dd></div>
               </dl>
-              <small data-score-note>评分不可用；不合成、不平均、不排序。</small>
+              <small data-score-note>评分不可用；不合成、不平均、不用默认值补齐。</small>
             </div>
           </section>
         </div>
@@ -207,42 +207,60 @@
                  role="tabpanel" data-role-panel="GPT_FINAL"
                  aria-labelledby="analysis-role-tab-GPT_FINAL">
           <h3>GPT_FINAL / 最终裁决官</h3>
-          <dl>
-            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
-            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的详细分析</dd></div>
-            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
-          </dl>
-          <p>当前分析溯源待同步；不从其他 analysis 或当前首页补全。</p>
+          <div data-role-content><p>当前分析溯源待同步；不从其他 analysis 或当前首页补全。</p></div>
         </article>
 
         <article class="role-panel" id="analysis-role-panel-GEMINI_REVIEW"
                  role="tabpanel" data-role-panel="GEMINI_REVIEW"
                  aria-labelledby="analysis-role-tab-GEMINI_REVIEW" hidden>
           <h3>GEMINI_REVIEW / 冲突复核官</h3>
-          <dl>
-            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
-            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的冲突复核</dd></div>
-            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
-          </dl>
-          <p>当前分析溯源待同步；不生成独立交易方向。</p>
+          <div data-role-content><p>当前分析溯源待同步；不生成独立交易方向。</p></div>
         </article>
 
         <article class="role-panel" id="analysis-role-panel-GROK_CHALLENGE"
                  role="tabpanel" data-role-panel="GROK_CHALLENGE"
                  aria-labelledby="analysis-role-tab-GROK_CHALLENGE" hidden>
           <h3>GROK_CHALLENGE / 反方挑战官</h3>
-          <dl>
-            <div><dt>当前状态</dt><dd data-role-state>待同步</dd></div>
-            <div><dt>当前结论摘要</dt><dd>该角色暂无可验证的反方挑战</dd></div>
-            <div><dt>决策冲突状态</dt><dd data-role-conflict>待同步</dd></div>
-          </dl>
-          <p>当前分析溯源待同步；不补写外部事件或技术证据。</p>
+          <div data-role-content><p>当前分析溯源待同步；不补写外部事件或技术证据。</p></div>
         </article>
+      </section>
+
+      <section class="module-card audit-chain-module" aria-labelledby="audit-chain-title">
+        <div class="module-heading">
+          <div>
+            <h2 id="audit-chain-title">决策责任链</h2>
+            <p>Candidate、Resolver、Rule Validation 与 Final 使用独立所有权。</p>
+          </div>
+          <span class="coverage-badge" data-audit-status>待同步</span>
+        </div>
+        <ol class="audit-stage-list" data-audit-stage-list></ol>
+        <div class="audit-detail-grid">
+          <section aria-label="Conflict Resolver before after">
+            <h3>Conflict Resolver</h3>
+            <dl data-resolver-detail></dl>
+          </section>
+          <section aria-label="Rule Validation">
+            <h3>Rule Validation</h3>
+            <dl data-rule-validation-detail></dl>
+          </section>
+        </div>
+      </section>
+
+      <section class="module-card final-source-module" aria-labelledby="final-source-title">
+        <div class="module-heading">
+          <div>
+            <h2 id="final-source-title">Final Plan 来源链</h2>
+            <p>只展示通过规则校验的 Final；Candidate 不作为执行计划输出。</p>
+          </div>
+          <span class="coverage-badge" data-final-source-status>待同步</span>
+        </div>
+        <dl class="final-source-grid" data-final-source-grid></dl>
+        <p class="coverage-note" data-final-source-note>notTradeInstruction 必须为 true。</p>
       </section>
 
       <aside class="partial-notice" data-partial-notice hidden role="status">
         <strong>部分数据可用</strong>
-        <span>页面仅展示当前 API 已返回的摘要，未提供内容保持待同步。</span>
+        <span>页面只展示当前 analysisId 已返回且可验证的数据，未提供内容保持关闭。</span>
       </aside>
       <div class="bottom-safe-area" aria-hidden="true"></div>
     </div>

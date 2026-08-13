@@ -716,6 +716,137 @@ a:focus-visible {
   line-height: 1.125rem;
 }
 
+.role-metadata,
+.role-contract-grid,
+.role-collection-item dl,
+.audit-detail-grid dl,
+.final-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.role-metadata > div,
+.role-contract-grid > div,
+.role-collection-item dl > div,
+.audit-detail-grid dl > div,
+.final-source-grid > div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--surface-card);
+}
+
+.role-metadata dt,
+.role-contract-grid dt,
+.role-collection-item dt,
+.audit-detail-grid dt,
+.final-source-grid dt {
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.role-metadata dd,
+.role-contract-grid dd,
+.role-collection-item dd,
+.audit-detail-grid dd,
+.final-source-grid dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.role-collection {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.role-collection > p {
+  margin-top: 8px;
+}
+
+.role-collection-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.role-collection-item {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-card);
+}
+
+.role-collection-item > strong {
+  font-size: 0.75rem;
+}
+
+.audit-chain-module,
+.final-source-module {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.audit-stage-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-stage {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 3px 8px;
+  min-width: 0;
+  padding: 9px;
+  border-radius: 8px;
+  background: var(--surface-default);
+}
+
+.audit-stage > span {
+  grid-row: 1 / span 2;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.audit-stage > strong,
+.audit-stage > small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.audit-stage > strong { font-size: 0.75rem; }
+.audit-stage > small { color: var(--text-tertiary); font-size: 0.625rem; line-height: 0.9375rem; }
+
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.audit-detail-grid > section {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-default);
+}
+
+.audit-detail-grid h3 { margin: 0; font-size: 0.875rem; }
+
 .partial-notice {
   display: flex;
   min-width: 0;
@@ -812,6 +943,8 @@ a:focus-visible {
 
   .asset-context,
   .evidence-scoring,
+  .audit-chain-module,
+  .final-source-module,
   .partial-notice,
   .bottom-safe-area {
     grid-column: 1 / -1;
@@ -832,6 +965,18 @@ a:focus-visible {
 
   .evidence-score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .role-metadata,
+  .role-contract-grid,
+  .role-collection-item dl,
+  .audit-detail-grid,
+  .audit-detail-grid dl,
+  .final-source-grid,
+  .audit-stage-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

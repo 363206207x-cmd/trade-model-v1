@@ -76,6 +76,11 @@ p2_position_monitoring_implementation_status: "COMPLETE"
 v4_1_decision_chain_design_status: "FROZEN"
 v4_1_decision_chain_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_decision_chain_implementation_status: "NOT_STARTED"
+# Compatibility fields above preserve the historical authorization handoff.
+# The active package below is independently machine-readable and must not be
+# interpreted as merged-main effectivity before its Draft PR is reviewed.
+v4_1_backend_effective_main: "edc3615c03c9b71763c32574f1d811c1d9a8954d"
+v4_1_frontend_runtime_alignment_status: "IMPLEMENTED_PENDING_MERGE"
 authorized_next_package: "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
 scope: "V4_1_DECISION_CHAIN_BACKEND_ONLY"
 implementation_allowed: false
