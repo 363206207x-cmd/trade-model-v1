@@ -158,7 +158,7 @@ class ProviderScanReadOnlyExecutionIntegrationTest {
         UserPositionMapper positionMapper = mock(UserPositionMapper.class);
         UserPositionDO position = new UserPositionDO();
         position.setAssetSymbol("BTCUSDT");
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setStatus("OPEN");
         when(positionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
         AssetStateMapper stateMapper = mock(AssetStateMapper.class);

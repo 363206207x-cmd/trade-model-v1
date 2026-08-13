@@ -2,7 +2,9 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
@@ -41,12 +43,14 @@ class UserPositionServiceImplTest {
 
     @Mock
     private UserPositionMapper userPositionMapper;
+    @Mock
+    private ExecutionPlanMapper executionPlanMapper;
 
     private UserPositionServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new UserPositionServiceImpl(userPositionMapper);
+        service = new UserPositionServiceImpl(userPositionMapper, executionPlanMapper);
         lenient().when(userPositionMapper.insert(any())).thenReturn(1);
     }
 
@@ -66,7 +70,8 @@ class UserPositionServiceImplTest {
         assertThat(row.getEntryPrice()).isEqualByComparingTo("100.50");
         assertThat(row.getQuantity()).isEqualByComparingTo("0.25");
         assertThat(row.getLeverage()).isEqualByComparingTo("2");
-        assertThat(row.getSourceType()).isEqualTo("MANUAL");
+        assertThat(row.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
+        assertThat(row.getFinalPlanId()).isNull();
         assertThat(row.getManualReviewRequired()).isTrue();
         assertThat(row.getNotTradeInstruction()).isTrue();
         assertThat(row.getNotAutoTrading()).isTrue();
@@ -74,7 +79,7 @@ class UserPositionServiceImplTest {
         assertThat(row.getNotPositionSync()).isTrue();
 
         assertThat(vo.getStatus()).isEqualTo("OPEN");
-        assertThat(vo.getSourceType()).isEqualTo("MANUAL");
+        assertThat(vo.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(vo.isManualReviewRequired()).isTrue();
         assertThat(vo.isNotTradeInstruction()).isTrue();
         assertThat(vo.isNotAutoTrading()).isTrue();
@@ -124,6 +129,59 @@ class UserPositionServiceImplTest {
         assertAutoSourceRejected("REAL_POSITION_SYNC_AUTO");
 
         verify(userPositionMapper, never()).insert(any());
+    }
+
+    @Test
+    void systemPlanPositionRequiresAndRetainsValidatedFinalPlanAssociation() {
+        CreateUserPositionReq request = validOpenRequest();
+        request.setSourceType("SYSTEM_PLAN_POSITION");
+        request.setFinalPlanId("final-plan-1");
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId("final-plan-1");
+        plan.setFinalPlan(true);
+        plan.setRuleValidationStatus("PASS");
+        when(executionPlanMapper.selectValidatedFinalByPlanIdAndSymbol("final-plan-1", "BTCUSDT"))
+                .thenReturn(plan);
+
+        UserPositionVO result = service.manualOpenForUser(USER_ID, request);
+
+        ArgumentCaptor<UserPositionDO> captor = ArgumentCaptor.forClass(UserPositionDO.class);
+        verify(userPositionMapper).insert(captor.capture());
+        assertThat(captor.getValue().getSourceType()).isEqualTo("SYSTEM_PLAN_POSITION");
+        assertThat(captor.getValue().getFinalPlanId()).isEqualTo("final-plan-1");
+        assertThat(result.getSourceType()).isEqualTo("SYSTEM_PLAN_POSITION");
+        assertThat(result.getFinalPlanId()).isEqualTo("final-plan-1");
+    }
+
+    @Test
+    void sourceAndFinalPlanSemanticsFailClosedWhenAmbiguous() {
+        CreateUserPositionReq missingSource = validOpenRequest();
+        missingSource.setSourceType(null);
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, missingSource))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("source_type is required");
+
+        CreateUserPositionReq planWithoutId = validOpenRequest();
+        planWithoutId.setSourceType("SYSTEM_PLAN_POSITION");
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, planWithoutId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires final_plan_id");
+
+        CreateUserPositionReq manualWithPlan = validOpenRequest();
+        manualWithPlan.setFinalPlanId("final-plan-1");
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, manualWithPlan))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("use SYSTEM_PLAN_POSITION");
+    }
+
+    @Test
+    void explicitLegacyManualAliasNormalizesToManualIndependent() {
+        CreateUserPositionReq request = validOpenRequest();
+        request.setSourceType("MANUAL");
+
+        UserPositionVO result = service.manualOpenForUser(USER_ID, request);
+
+        assertThat(result.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
     }
 
     @Test
@@ -329,7 +387,7 @@ class UserPositionServiceImplTest {
         request.setSourceType(sourceType);
         assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("source_type must be MANUAL");
+                .hasMessageContaining("source_type must be MANUAL_INDEPENDENT or SYSTEM_PLAN_POSITION");
     }
 
     private static CreateUserPositionReq validOpenRequest() {
@@ -341,6 +399,7 @@ class UserPositionServiceImplTest {
         request.setLeverage(new BigDecimal("2"));
         request.setStopLoss(new BigDecimal("95.00"));
         request.setTakeProfit(new BigDecimal("120.00"));
+        request.setSourceType("MANUAL_INDEPENDENT");
         request.setSourceRefId("manual-note-1");
         return request;
     }
@@ -363,7 +422,7 @@ class UserPositionServiceImplTest {
         row.setQuantity(new BigDecimal("0.25"));
         row.setLeverage(new BigDecimal("2"));
         row.setOpenedAt(LocalDateTime.of(2026, 6, 22, 8, 30));
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

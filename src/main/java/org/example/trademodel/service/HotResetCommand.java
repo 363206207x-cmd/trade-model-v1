@@ -10,6 +10,10 @@ public class HotResetCommand {
     private String eventKey;
     private String analysisId;
     private String traceId;
+    private String ownerType;
+    private Long ownerId;
+    private Long assetId;
+    private String ruleVersion;
     private String symbol;
     private String timeframe;
     private HotResetEventTypeEnum eventType;
@@ -36,6 +40,14 @@ public class HotResetCommand {
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
     public String getTraceId() { return traceId; }
     public void setTraceId(String traceId) { this.traceId = traceId; }
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public Long getAssetId() { return assetId; }
+    public void setAssetId(Long assetId) { this.assetId = assetId; }
+    public String getRuleVersion() { return ruleVersion; }
+    public void setRuleVersion(String ruleVersion) { this.ruleVersion = ruleVersion; }
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
     public String getTimeframe() { return timeframe; }

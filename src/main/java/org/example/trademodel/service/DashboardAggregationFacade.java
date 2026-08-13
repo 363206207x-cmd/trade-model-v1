@@ -82,8 +82,11 @@ public class DashboardAggregationFacade implements DashboardReadService {
     }
 
     @Override
-    public Map<String, Object> traceSummary(String analysisId, String traceId, String requestId) {
-        AnalysisTraceSnapshot snapshot = lookupTrace(analysisId, traceId, requestId);
+    public Map<String, Object> traceSummary(Long userId, String analysisId, String traceId, String requestId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        AnalysisTraceSnapshot snapshot = lookupTrace(userId, analysisId, traceId, requestId);
         if (snapshot == null) {
             Map<String, Object> missing = baseSafety("DASHBOARD_READ_ONLY_TRACE_NOT_FOUND");
             missing.put("traceStatus", "NOT_FOUND");
@@ -104,15 +107,15 @@ public class DashboardAggregationFacade implements DashboardReadService {
         return summary;
     }
 
-    private AnalysisTraceSnapshot lookupTrace(String analysisId, String traceId, String requestId) {
+    private AnalysisTraceSnapshot lookupTrace(Long userId, String analysisId, String traceId, String requestId) {
         if (hasText(analysisId)) {
-            return analysisTraceService.byAnalysisId(analysisId.trim());
+            return analysisTraceService.byAnalysisIdForUser(analysisId.trim(), userId);
         }
         if (hasText(traceId)) {
-            return analysisTraceService.byTraceId(traceId.trim());
+            return analysisTraceService.byTraceIdForUser(traceId.trim(), userId);
         }
         if (hasText(requestId)) {
-            return analysisTraceService.byRequestId(requestId.trim());
+            return analysisTraceService.byRequestIdForUser(requestId.trim(), userId);
         }
         return null;
     }

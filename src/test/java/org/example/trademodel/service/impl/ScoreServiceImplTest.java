@@ -32,6 +32,35 @@ class ScoreServiceImplTest {
     private ScoreItemMapper scoreItemMapper;
 
     @Test
+    void buildScoreList_returnsTheFrozenEightScoresWithStableUniqueIds() {
+        ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
+
+        List<ScoreItemVO> result = service.buildScoreList(
+                new AssetAnalysisVO(), new MarketEnvironmentVO());
+
+        assertThat(result)
+                .extracting(ScoreItemVO::getScoreType)
+                .containsExactlyInAnyOrder(
+                        "趋势结构分",
+                        "综合可信度分",
+                        "资金推动分",
+                        "杠杆风险分",
+                        "流动性质量分",
+                        "情绪温度分",
+                        "宏观环境分",
+                        "事件冲击分");
+        assertThat(result)
+                .extracting(ScoreItemVO::getScoreId)
+                .doesNotContainNull()
+                .allSatisfy(scoreId -> assertThat(scoreId).isNotBlank());
+        assertThat(result.stream().map(ScoreItemVO::getScoreId).collect(java.util.stream.Collectors.toSet()))
+                .hasSize(8);
+        assertThat(result)
+                .extracting(ScoreItemVO::getWeight)
+                .doesNotContainNull();
+    }
+
+    @Test
     void buildScoreList_returnsTrendStructureScoreAboveBaselineForBullishSummary() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         MarketEnvironmentVO env = new MarketEnvironmentVO();

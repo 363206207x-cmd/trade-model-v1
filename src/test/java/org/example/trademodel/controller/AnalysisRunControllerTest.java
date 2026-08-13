@@ -9,6 +9,7 @@ import org.example.trademodel.analysistrace.AnalysisTraceService;
 import org.example.trademodel.analysistrace.AnalysisTraceSnapshot;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.AnalysisSchedulerService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AnalysisRunControllerTest {
     @Test
@@ -60,15 +63,34 @@ class AnalysisRunControllerTest {
         assertThat(scheduler.getBody().getData()).containsEntry("notAutoTrading", true);
     }
 
+    @Test
+    void manualRunUsesAuthenticatedUserOwnership() {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator(false);
+        AnalysisRunController controller = controller(orchestrator, new StubTraceService());
+        AnalysisRunController.AnalysisRunRequest request = new AnalysisRunController.AnalysisRunRequest();
+        request.setSymbol("ETHUSDT");
+        request.setTimeframe("5m");
+
+        ResponseEntity<ApiResponse<AnalysisRunResult>> response = controller.run(request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(orchestrator.command.getOwnerType()).isEqualTo("USER");
+        assertThat(orchestrator.command.getOwnerId()).isEqualTo(41L);
+        assertThat(orchestrator.command.isPreview()).isFalse();
+    }
+
     private static AnalysisRunController controller(CapturingOrchestrator orchestrator, AnalysisTraceService traceService) {
         AnalysisRunProperties properties = new AnalysisRunProperties();
         AnalysisSchedulerService scheduler = new AnalysisSchedulerService(orchestrator, properties);
-        return new AnalysisRunController(orchestrator, traceService, scheduler);
+        AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
+        when(resolver.requireCurrentUserId()).thenReturn(41L);
+        return new AnalysisRunController(orchestrator, traceService, scheduler, resolver);
     }
 
     private static final class CapturingOrchestrator implements AnalysisRunOrchestrator {
         private final boolean throwInputError;
         private boolean called;
+        private AnalysisRunCommand command;
 
         private CapturingOrchestrator(boolean throwInputError) {
             this.throwInputError = throwInputError;
@@ -77,6 +99,7 @@ class AnalysisRunControllerTest {
         @Override
         public AnalysisRunResult run(AnalysisRunCommand command) {
             called = true;
+            this.command = command;
             if (throwInputError) {
                 throw new AnalysisRunInputException("TIMEFRAME_UNSUPPORTED", "unsupported timeframe: " + command.getTimeframe());
             }
@@ -104,6 +127,21 @@ class AnalysisRunControllerTest {
 
         @Override
         public AnalysisTraceSnapshot byRequestId(String requestId) {
+            return snapshot("ana-controller", "trace-controller", requestId);
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byAnalysisIdForUser(String analysisId, Long userId) {
+            return snapshot(analysisId, "trace-controller", "req-controller");
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byTraceIdForUser(String traceId, Long userId) {
+            return snapshot("ana-controller", traceId, "req-controller");
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byRequestIdForUser(String requestId, Long userId) {
             return snapshot("ana-controller", "trace-controller", requestId);
         }
 

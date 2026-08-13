@@ -48,7 +48,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|09159a26bc0679e08be5b44f5f7ee8ef534fb0d7469cd8d242369ceef6590c02|V4_1_DECISION_CHAIN -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|35d4a4e01652a33d35067577c87eadbd495f86cf0afadd0c40a8c78d9026db3d|V4_1_DECISION_CHAIN -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md|ceeebb1f62d0154b9196314799b20a94bc90867f90bc50cf490b41fc6b53e0fe|V4_1_DECISION_CHAIN_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
 <!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|598c5628f1a179c19c38215a6fcfde67b96c7a55e2fb778c5caaaa4d2a99079a|DELIVERY_AND_SAFETY -->
@@ -164,16 +164,16 @@ separate local candidate diff authoritative by existence.
 
 | Attribute | Registration |
 |---|---|
-| Document name | Fundamental AI v4.1 Decision Chain |
+| Document name | Fundamental AI v4.1 Unified Final Contract |
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
-| Original source | `/Users/xuchao/Desktop/Fundamental_AI_v4_1_Codex_v2.docx` |
-| Original SHA-256 | `0aea7af215045df2b49430bdbde601910825de5248f53b37de977c11927da2e7` |
-| Repository SHA-256 | `09159a26bc0679e08be5b44f5f7ee8ef534fb0d7469cd8d242369ceef6590c02` |
-| Version/date | v4.1 Product Owner source; registered `2026-08-11` |
-| Authority | Explicit Product Owner product-design freeze for the v4.1 decision chain |
-| Applicable modules | Asset Pool, Opportunity, state machine, Analysis/Evidence/Score/Decision, Three AI, Candidate/Final plan, conflict resolution, AI trace, Review |
-| Required concepts | Asset Pool only source; eight opportunity states; rule-led AI chain; Candidate/Final separation; rule validation; complete trace; manual UserPosition boundary |
-| Forbidden reinterpretations | no automatic trading; no AI voting or state mutation; no Candidate as Final; no plan as position; no duplicate canonical object family |
+| Original source | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx` |
+| Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900` |
+| Repository SHA-256 | `35d4a4e01652a33d35067577c87eadbd495f86cf0afadd0c40a8c78d9026db3d` |
+| Version/date | v4.1 final freeze; registered `2026-08-12` |
+| Authority | Explicit Product Owner final product freeze for chapters 1-20 and Appendices A-D; supersedes the earlier v4.1 source representation |
+| Applicable modules | Asset Pool, dynamic Home Top6, Opportunity/state machine, Analysis/Evidence/Score/Decision, Market Bias, Plan Mode, Three AI, Candidate/Resolver/Validation/Final, Push Recheck, Position Monitoring, Review, API/audit/test contracts |
+| Required concepts | Asset Pool sole continuous source; search preview isolation; eight biases/eight opportunity states/five modes; structured role and collection states; Candidate/Final separation; separate resolver and validation ownership; full audit query; manual UserPosition boundary |
+| Forbidden reinterpretations | no fake data; no automatic trading; no AI voting/state mutation/rule bypass; no Candidate as Final; no plan as position; no trace-owner impersonation; no duplicate canonical object family |
 
 ### PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION
 

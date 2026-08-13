@@ -39,7 +39,7 @@ class ProviderMarketTypeIdentityTest {
     private static final CanonicalInstrumentId PERPETUAL = ProviderCallTestFixtures.perpetual("BTCUSDT");
 
     @Test
-    void perpetualScanUsesPerpetualPriceMapping() {
+    void perpetualScanUsesPerpetualPriceMappingAndFailsClosedOnMissingProviderResult() {
         ProviderSnapshotQueryService query = mock(ProviderSnapshotQueryService.class);
         ProviderSnapshotRefreshService refresh = mock(ProviderSnapshotRefreshService.class);
         MarketQuoteClient quoteClient = mock(MarketQuoteClient.class);
@@ -51,9 +51,9 @@ class ProviderMarketTypeIdentityTest {
                 Duration.ofSeconds(5), "perpetual-price");
 
         assertThat(result.metadata().canonicalInstrumentId()).isEqualTo(PERPETUAL);
-        assertThat(result.metadata().errorCode()).isEqualTo("PERPETUAL_PRICE_PROVIDER_NOT_CONFIGURED");
+        assertThat(result.metadata().errorCode()).isEqualTo("PROVIDER_RESULT_MISSING");
         assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
-        verifyNoInteractions(query, refresh, quoteClient);
+        verifyNoInteractions(query, quoteClient);
     }
 
     @Test
@@ -104,7 +104,7 @@ class ProviderMarketTypeIdentityTest {
     void spotReferenceMustBeExplicitlyLabelled() {
         String trace = "market-identity-trace";
         MarketPriceSnapshot spotPrice = new MarketPriceSnapshot("BTCUSDT", new BigDecimal("65000"),
-                null, null, null, null, null, null, "BINANCE", NOW,
+                null, null, null, null, null, null, null, null, "BINANCE", NOW,
                 metadata(SPOT, ProviderDatasetType.PRICE, "GLOBAL", trace));
         List<OhlcvSnapshotReference> perpetualBars = List.of("5m", "15m", "1h", "4h").stream()
                 .map(timeframe -> new OhlcvSnapshotReference("BTCUSDT", timeframe, 1L, 100,

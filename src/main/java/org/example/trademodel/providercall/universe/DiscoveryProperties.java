@@ -5,9 +5,6 @@ import org.example.trademodel.providercall.instrument.MarketType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Component
 @ConfigurationProperties(prefix = "trade-model.discovery")
 public class DiscoveryProperties {
@@ -16,7 +13,6 @@ public class DiscoveryProperties {
     private String venue = "BINANCE";
     private MarketType marketType = MarketType.PERPETUAL;
     private ContractType contractType = ContractType.LINEAR;
-    private List<String> symbols = new ArrayList<>();
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -28,8 +24,4 @@ public class DiscoveryProperties {
     public void setMarketType(MarketType marketType) { this.marketType = marketType; }
     public ContractType getContractType() { return contractType; }
     public void setContractType(ContractType contractType) { this.contractType = contractType; }
-    public List<String> getSymbols() { return List.copyOf(symbols); }
-    public void setSymbols(List<String> symbols) {
-        this.symbols = symbols == null ? new ArrayList<>() : new ArrayList<>(symbols);
-    }
 }

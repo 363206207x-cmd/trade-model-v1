@@ -24,6 +24,8 @@ public class CreateUserPositionReq {
     private String sourceType;
     @JsonAlias("source_ref_id")
     private String sourceRefId;
+    @JsonAlias("final_plan_id")
+    private String finalPlanId;
 
     @JsonIgnore
     private final Map<String, Object> extraFields = new LinkedHashMap<>();
@@ -103,6 +105,14 @@ public class CreateUserPositionReq {
 
     public void setSourceRefId(String sourceRefId) {
         this.sourceRefId = sourceRefId;
+    }
+
+    public String getFinalPlanId() {
+        return finalPlanId;
+    }
+
+    public void setFinalPlanId(String finalPlanId) {
+        this.finalPlanId = finalPlanId;
     }
 
     public Map<String, Object> getExtraFields() {

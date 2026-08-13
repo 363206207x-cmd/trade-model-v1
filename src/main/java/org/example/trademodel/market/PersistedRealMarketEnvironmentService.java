@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -80,6 +83,12 @@ public class PersistedRealMarketEnvironmentService {
             return PersistedRealMarketEnvironmentAssessment.failed("REAL_MARKET_PROVENANCE_INCOMPLETE", contexts);
         }
         String sourceType = provider.toUpperCase(Locale.ROOT) + "_PERSISTED_OHLCV";
+        environment.setSourceProvider(provider);
+        environment.setSourceReference(provider + ":" + symbol + ":1h:" + latestClosedBarTimeMs);
+        environment.setSourceTraceId(sourceTraceRefs.isEmpty() ? null : sourceTraceRefs.get(0));
+        environment.setObservedAt(latestClosedBarTimeMs == null ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(latestClosedBarTimeMs), ZoneOffset.UTC));
+        environment.setFreshness(PersistedOhlcvReadinessStatus.FRESH.name());
         return new PersistedRealMarketEnvironmentAssessment(true, null, provider, sourceType, environment,
                 Map.copyOf(contexts), closedBarCount, latestClosedBarTimeMs, List.copyOf(sourceTraceRefs));
     }

@@ -109,6 +109,40 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         return request;
     }
 
+    @Override
+    protected AiHttpRequest buildDecisionChainHttpRequest(String promptJson,
+                                                          AiDecisionChainRole role,
+                                                          long timeoutOverrideMs,
+                                                          String selectedModel) throws Exception {
+        Map<String, Object> generationConfig = new LinkedHashMap<>();
+        generationConfig.put("max_output_tokens", Math.max(INTERACTIONS_MAX_OUTPUT_TOKENS, maxOutputTokens()));
+        generationConfig.put("temperature", 0);
+        generationConfig.put("seed", 42);
+        generationConfig.put("thinking_level", "minimal");
+        generationConfig.put("thinking_summaries", "none");
+
+        Map<String, Object> responseFormat = new LinkedHashMap<>();
+        responseFormat.put("type", "text");
+        responseFormat.put("mime_type", "application/json");
+        responseFormat.put("schema", AiDecisionChainSchema.responseJsonSchema(role));
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", canonicalModelName(selectedModel));
+        body.put("store", false);
+        body.put("stream", false);
+        body.put("system_instruction", AiDecisionChainPromptBuilder.systemInstruction(role));
+        body.put("input", promptJson);
+        body.put("generation_config", generationConfig);
+        body.put("response_format", responseFormat);
+
+        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(),
+                "/v1/interactions"), json(body), timeoutOverrideMs);
+        Map<String, String> headers = jsonHeaders();
+        headers.put("x-goog-api-key", providerProperties().getApiKey());
+        request.setHeaders(headers);
+        return request;
+    }
+
     AiHttpRequest buildControlledSmokeHttpRequest(AiProviderRequest request, long timeoutOverrideMs,
                                                    String selectedModel) throws Exception {
         AiPromptBuilder.PromptPayload prompt = new AiPromptBuilder(objectMapper, properties)
@@ -191,7 +225,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                 longValue(usage, "total_output_tokens"),
                 longValue(usage, "total_tokens"),
                 responseShapeDiagnostic,
-                diagnostic);
+                diagnostic,
+                extractedContent);
     }
 
     @Override

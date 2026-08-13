@@ -1,6 +1,9 @@
 package org.example.trademodel.service.impl;
 
 import org.example.trademodel.enums.AiConflictLevelEnum;
+import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.entity.ConflictResolverResultDO;
+import org.example.trademodel.entity.ExecutionPlanCandidateDO;
 import org.example.trademodel.service.AiConflictResult;
 import org.example.trademodel.service.DecisionContext;
 import org.junit.jupiter.api.Test;
@@ -12,7 +15,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AiConflictResolverServiceImplTest {
 
-    private final AiConflictResolverServiceImpl service = new AiConflictResolverServiceImpl();
+    private final AiConflictResolverServiceImpl service = new AiConflictResolverServiceImpl(
+            FundamentalAiV41Properties.contractFixture());
 
     @Test
     void alignedConflictPreservesDirectionAndConfidence() {
@@ -25,7 +29,7 @@ class AiConflictResolverServiceImplTest {
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("HIGH");
         assertThat(result.getRiskAdjustment()).isEqualTo("UNCHANGED");
-        assertThat(result.getPlanMode()).isEqualTo("CONFIRM");
+        assertThat(result.getPlanMode()).isEqualTo("CONFIRMATION");
         assertThat(result.getAiObjectionCount()).isZero();
     }
 
@@ -38,7 +42,7 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT);
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("MEDIUM");
         assertThat(result.getPlanMode()).isEqualTo("REDUCED");
@@ -60,11 +64,11 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT);
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("LOW");
         assertThat(result.getRiskAdjustment()).isEqualTo("RAISED");
-        assertThat(result.getPlanMode()).isEqualTo("PREPARE_ONLY");
+        assertThat(result.getPlanMode()).isEqualTo("OBSERVATION");
         assertThat(result.isNotStateMachineOverride()).isTrue();
     }
 
@@ -82,11 +86,11 @@ class AiConflictResolverServiceImplTest {
 
         AiConflictResult result = service.resolve(context);
 
-        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE);
+        assertThat(result.getLevel()).isEqualTo(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT);
         assertThat(result.getBaseMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getRiskAdjustment()).isEqualTo("HIGH");
-        assertThat(result.getPlanMode()).isEqualTo("CONFUSED");
+        assertThat(result.getPlanMode()).isEqualTo("BLOCKED");
         assertThat(result.getConfusedContribution()).isGreaterThanOrEqualTo(70);
     }
 
@@ -179,6 +183,115 @@ class AiConflictResolverServiceImplTest {
                         "autoTradingAction", "providerPayload", "executablePayload");
     }
 
+    @Test
+    void unavailableAiRolesStayOnExplicitRuleFallbackWithoutFabricatedConflict() {
+        ConflictResolverResultDO result = service.resolveDecisionChain(
+                candidate(),
+                "{\"fallback\":true,\"role\":\"GEMINI_REVIEW\",\"fallbackReason\":\"TIMEOUT\"}",
+                "{\"fallback\":true,\"role\":\"GROK_CHALLENGE\",\"fallbackReason\":\"NOT_CONFIGURED\"}",
+                90, 10, "READY");
+
+        assertThat(result.getConflictScore()).isZero();
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_1_CONSISTENT");
+        assertThat(result.getPlanModeAfter()).isEqualTo("CONFIRMATION");
+        assertThat(result.getConfidenceAfter()).isEqualTo("HIGH");
+        assertThat(result.getRiskAfter()).isEqualTo("LOW");
+        assertThat(result.getDowngradeReason())
+                .contains("GEMINI_UNAVAILABLE_RULE_FALLBACK", "GROK_UNAVAILABLE_RULE_FALLBACK");
+        assertThat(result.getConfusedDecision()).isFalse();
+        assertThat(result.getRulePlanMode()).isEqualTo("CONFIRMATION");
+        assertThat(result.getRuleCanExecute()).isTrue();
+        assertThat(result.getDataQualityScore()).isEqualTo(90);
+        assertThat(result.getConfusedScore()).isEqualTo(10);
+        assertThat(result.getAccountRiskState()).isEqualTo("READY");
+    }
+
+    @Test
+    void reviewAndChallengeCanOnlyDowngradeConfidenceRiskAndPlanMode() {
+        ConflictResolverResultDO result = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"DOWNGRADE","conflictLevel":"LEVEL_2_MINOR_DISAGREEMENT","confidenceAdjustment":"DOWNGRADE_ONE",
+                 "riskAdjustment":"RAISE_ONE","planModeAdjustment":"DOWNGRADE_ONE","reasons":["weak"],"summary":"review"}
+                """,
+                """
+                {"opposingView":"event","riskLevel":"HIGH","challengeLevel":"LEVEL_3_SIGNIFICANT_DISAGREEMENT",
+                 "majorCounterEvidence":true,"planModeImpact":"DOWNGRADE_TWO","reasons":["event"],"summary":"challenge"}
+                """,
+                90, 10, "READY");
+
+        assertThat(result.getRuleDirection()).isEqualTo("BULLISH");
+        assertThat(result.getRuleDirectionPreserved()).isTrue();
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
+        assertThat(result.getConfidenceAfter()).isEqualTo("LOW");
+        assertThat(result.getRiskAfter()).isEqualTo("EXTREME");
+        assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
+        assertThat(result.getDowngradeReason())
+                .contains("GEMINI_DOWNGRADE", "GROK_MAJOR_COUNTER_EVIDENCE");
+    }
+
+    @Test
+    void candidateDirectionMismatchProducesRuleVetoAndCannotChangeRuleDirection() {
+        ExecutionPlanCandidateDO candidate = candidate();
+        candidate.setCandidateDirection("BEARISH");
+
+        ConflictResolverResultDO result = service.resolveDecisionChain(
+                candidate,
+                "{\"fallback\":true}",
+                "{\"fallback\":true}",
+                90, 10, "READY");
+
+        assertThat(result.getRuleDirection()).isEqualTo("BULLISH");
+        assertThat(result.getRuleVetoReason()).isEqualTo("CANDIDATE_DIRECTION_CROSSES_RULE_FAMILY");
+        assertThat(result.getBiasAfter()).isEqualTo("BULLISH");
+        assertThat(result.getRuleDirectionPreserved()).isTrue();
+        assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
+        assertThat(result.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
+        assertThat(result.getConfusedDecision()).isTrue();
+    }
+
+    @Test
+    void blockedPlanDoesNotChangeOpportunityToConfusedWithoutConfusedEvidence() {
+        ConflictResolverResultDO result = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"RISK_WARNING","conflictLevel":"LEVEL_1_CONSISTENT","confidenceAdjustment":"UNCHANGED",
+                 "riskAdjustment":"UNCHANGED","planModeAdjustment":"BLOCKED","reasons":["wait"],"summary":"review"}
+                """,
+                "{\"fallback\":true}",
+                90, 10, "READY");
+
+        assertThat(result.getPlanModeAfter()).isEqualTo("OBSERVATION");
+        assertThat(result.getConfusedDecision()).isFalse();
+    }
+
+    @Test
+    void decisionChainUsesFrozenFourLevelSemanticsAndPlanModeMapping() {
+        ConflictResolverResultDO levelTwo = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"RISK_WARNING","conflictLevel":"LEVEL_2_MINOR_DISAGREEMENT",
+                 "confidenceAdjustment":"UNCHANGED","riskAdjustment":"UNCHANGED",
+                 "planModeAdjustment":"UNCHANGED","reasons":[],"summary":"minor"}
+                """,
+                "{\"fallback\":true}", 90, 10, "READY");
+        ConflictResolverResultDO levelThree = service.resolveDecisionChain(
+                candidate(),
+                """
+                {"verdict":"DOWNGRADE","conflictLevel":"LEVEL_3_SIGNIFICANT_DISAGREEMENT",
+                 "confidenceAdjustment":"UNCHANGED","riskAdjustment":"UNCHANGED",
+                 "planModeAdjustment":"UNCHANGED","reasons":[],"summary":"significant"}
+                """,
+                "{\"fallback\":true}", 90, 10, "READY");
+
+        assertThat(levelTwo.getConflictLevel()).isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
+        assertThat(levelTwo.getPlanModeAfter()).isEqualTo("PREPARATION");
+        assertThat(levelTwo.getConfusedDecision()).isFalse();
+        assertThat(levelThree.getConflictLevel()).isEqualTo("LEVEL_3_SIGNIFICANT_DISAGREEMENT");
+        assertThat(levelThree.getPlanModeAfter()).isEqualTo("OBSERVATION");
+        assertThat(levelThree.getConfusedDecision()).isFalse();
+    }
+
     private static DecisionContext baseContext() {
         DecisionContext context = new DecisionContext();
         context.setRuleMarketBias("BULLISH");
@@ -194,5 +307,22 @@ class AiConflictResolverServiceImplTest {
         context.setRiskTier("LOW");
         context.setWorthOpening(true);
         return context;
+    }
+
+    private static ExecutionPlanCandidateDO candidate() {
+        ExecutionPlanCandidateDO candidate = new ExecutionPlanCandidateDO();
+        candidate.setCandidateId("candidate-1");
+        candidate.setAnalysisId("analysis-1");
+        candidate.setTraceId("trace-1");
+        candidate.setRuleDirection("BULLISH");
+        candidate.setRuleConfidence("HIGH");
+        candidate.setRuleRisk("LOW");
+        candidate.setCandidateDirection("BULLISH");
+        candidate.setRulePlanMode("CONFIRMATION");
+        candidate.setRuleCanExecute(true);
+        candidate.setPlanMode("CONFIRMATION");
+        candidate.setConfidenceLevel("HIGH");
+        candidate.setRiskLevel("LOW");
+        return candidate;
     }
 }

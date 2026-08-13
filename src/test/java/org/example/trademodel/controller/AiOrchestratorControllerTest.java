@@ -9,6 +9,7 @@ import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiProviderRole;
 import org.example.trademodel.entity.AiCallLogDO;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.AiCallLogService;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,9 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -106,20 +110,32 @@ class AiOrchestratorControllerTest {
 
     @Test
     void callLogsReturnsReadOnlySanitizedLogView() throws Exception {
+        AuthenticatedUserIdResolver userIdResolver = mock(AuthenticatedUserIdResolver.class);
+        when(userIdResolver.requireCurrentUserId()).thenReturn(7L);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new AiOrchestratorController(
                 new FakeOrchestrator(),
                 new FakeLogService(),
                 properties(),
-                List.of()
+                List.of(),
+                userIdResolver
         )).build();
 
         mvc.perform(get("/api/ai/call-logs").param("analysisId", "analysis-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].analysisId").value("analysis-1"))
-                .andExpect(jsonPath("$[0].reviewOnly").value(true))
+                .andExpect(jsonPath("$[0].reviewOnly").value(false))
                 .andExpect(jsonPath("$[0].notExecutable").value(true))
+                .andExpect(jsonPath("$[0].notExecutionPlanCreation").value(false))
+                .andExpect(jsonPath("$[0].notFinalExecutionPlanCreation").value(true))
                 .andExpect(jsonPath("$[0].requestSummary").value("{\"ruleMarketBias\":\"BULLISH\"}"))
+                .andExpect(jsonPath("$[0].contractType").value("DECISION_CHAIN_V4_1"))
+                .andExpect(jsonPath("$[0].candidateId").value("candidate-1"))
+                .andExpect(jsonPath("$[0].outputPayload").value("{\"summary\":\"candidate\"}"))
+                .andExpect(jsonPath("$[0].errorMessage").value("provider timeout"))
+                .andExpect(jsonPath("$[0].ruleVersion").value("FUNDAMENTAL_AI_V4_1"))
+                .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(content().string(not(containsString("api-key"))));
+        verify(userIdResolver).requireCurrentUserId();
     }
 
     private static AiOrchestratorProperties properties() {
@@ -172,17 +188,37 @@ class AiOrchestratorControllerTest {
         @Override public void completeCall(AiCallLogDO log, AiProviderReviewResult result) { }
         @Override public AiCallLogDO recordSkipped(AiProviderRequest request, AiProviderClient client, AiProviderReviewResult result, BigDecimal reservedCostUsd) { return null; }
         @Override public List<AiCallLogDO> query(String analysisId, String traceId, String providerName, String callStatus, LocalDateTime from, LocalDateTime to, int limit) {
+            return fixture();
+        }
+        @Override public List<AiCallLogDO> queryOwned(Long userId, String analysisId, String traceId,
+                                                       String candidateId, String role, String providerName,
+                                                       String callStatus, LocalDateTime from, LocalDateTime to,
+                                                       int limit) {
+            if (!Long.valueOf(7L).equals(userId)) {
+                throw new AssertionError("authenticated owner was not propagated");
+            }
+            return fixture();
+        }
+        private static List<AiCallLogDO> fixture() {
             AiCallLogDO log = new AiCallLogDO();
             log.setCallId("call-1");
             log.setAnalysisId("analysis-1");
             log.setTraceId("trace-1");
             log.setProviderName("OPENAI");
-            log.setAiRole("GPT_RULE_REVIEW");
+            log.setAiRole("GPT_FINAL");
             log.setCallStatus("SUCCESS");
             log.setRequestSummary("{\"ruleMarketBias\":\"BULLISH\"}");
             log.setResponseSummary("{\"stance\":\"SUPPORT\"}");
-            log.setReviewOnly(true);
+            log.setContractType("DECISION_CHAIN_V4_1");
+            log.setCandidateId("candidate-1");
+            log.setOutputPayload("{\"summary\":\"candidate\"}");
+            log.setErrorMessage("provider timeout");
+            log.setReviewOnly(false);
             log.setNotExecutable(true);
+            log.setNotExecutionPlanCreation(false);
+            log.setNotFinalExecutionPlanCreation(true);
+            log.setRuleVersion("FUNDAMENTAL_AI_V4_1");
+            log.setCreatedAt(LocalDateTime.of(2026, 8, 12, 5, 0));
             return List.of(log);
         }
         @Override public int countProviderAttemptsSince(String providerName, LocalDateTime since) { return 0; }

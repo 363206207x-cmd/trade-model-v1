@@ -138,7 +138,7 @@ class PositionMonitorLogMapperIntegrationTest {
         row.setQuantity(new BigDecimal("0.25"));
         row.setLeverage(new BigDecimal("2"));
         row.setOpenedAt(openedAt);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

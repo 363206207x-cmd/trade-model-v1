@@ -5,6 +5,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvIngestionBatch;
 import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class PersistedOhlcvIngestionSchedulerTest {
@@ -74,6 +76,30 @@ class PersistedOhlcvIngestionSchedulerTest {
             release.countDown();
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void schedulerRotatesAcrossAssetPoolInsteadOfUsingConfiguredFixedSymbols() {
+        List<String> poolSymbols = List.of(
+                "AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT",
+                "FUSDT", "GUSDT", "HUSDT", "IUSDT", "JUSDT");
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        when(assetPoolService.listScanSymbols()).thenReturn(poolSymbols);
+        when(provider.fetchClosedBars(anyString(), anyString(), anyInt(), anyString()))
+                .thenReturn(new PublicOhlcvProviderResult(OhlcvSourceState.ERROR,
+                        "EXPECTED_PROVIDER_FAILURE", null));
+        PersistedOhlcvIngestionScheduler scheduler = new PersistedOhlcvIngestionScheduler(
+                provider, ingestionService, true, true, "BTCUSDT", "5m,15m,1h,4h", 100, 6);
+        scheduler.setAssetPoolService(assetPoolService);
+
+        scheduler.ingestScheduled();
+        scheduler.ingestScheduled();
+
+        org.mockito.ArgumentCaptor<String> symbols = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(provider, org.mockito.Mockito.times(48))
+                .fetchClosedBars(symbols.capture(), anyString(), anyInt(), anyString());
+        assertThat(symbols.getAllValues()).containsAll(poolSymbols);
+        assertThat(symbols.getAllValues()).doesNotContain("BTCUSDT");
     }
 
     private PersistedOhlcvIngestionScheduler scheduler(boolean global, boolean enabled) {

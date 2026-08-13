@@ -68,6 +68,10 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
         run.setCreatedAt(now);
         run.setUpdatedAt(now);
         run.setVersionNo(1);
+        run.setOwnerType(request.getOwnerType());
+        run.setOwnerId(request.getOwnerId());
+        run.setAssetId(request.getAssetId());
+        run.setPreview(request.isPreview());
         try {
             analysisRunMapper.insertStarted(run);
             return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.CLAIMED_NEW, run,

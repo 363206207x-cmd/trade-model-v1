@@ -216,7 +216,7 @@ class DerivativesBusinessIntegrationServiceTest {
         DecisionBundleVO decision = decision("BULLISH");
         service.applyDecisionAdjustments(decision, result);
         assertThat(result.confirmEligible()).isFalse();
-        assertThat(result.planMode()).isEqualTo("PREPARE_ONLY");
+        assertThat(result.planMode()).isEqualTo("OBSERVATION");
         assertThat(decision.getIsWorthOpening()).isFalse();
     }
 

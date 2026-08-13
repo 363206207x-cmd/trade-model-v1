@@ -325,6 +325,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
@@ -339,6 +340,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.ohlcv.public-provider.enabled", "true");
         environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "true");
 
@@ -479,6 +481,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.providers.coinglass.enabled", "false");
         environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "false");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
         return environment;
     }

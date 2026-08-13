@@ -29,6 +29,10 @@ public class AnalysisRunDO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer versionNo;
+    private String ownerType;
+    private Long ownerId;
+    private Long assetId;
+    private Boolean preview = false;
 
     public String getAnalysisId() { return analysisId; }
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
@@ -82,4 +86,12 @@ public class AnalysisRunDO {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public Integer getVersionNo() { return versionNo; }
     public void setVersionNo(Integer versionNo) { this.versionNo = versionNo; }
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public Long getAssetId() { return assetId; }
+    public void setAssetId(Long assetId) { this.assetId = assetId; }
+    public Boolean getPreview() { return preview; }
+    public void setPreview(Boolean preview) { this.preview = preview; }
 }

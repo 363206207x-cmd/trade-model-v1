@@ -1,12 +1,18 @@
 package org.example.trademodel.common;
-import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.example.trademodel.requestcontext.RequestIdSupport;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 public class ApiResponse<T> {
     private int code;
     private String msg;
     private T data;
     private String requestId;
-    private LocalDateTime serverTime;
+    private OffsetDateTime serverTime;
 
     public static <T> ApiResponse<T> success(T data) {
         return success("success", data);
@@ -18,8 +24,7 @@ public class ApiResponse<T> {
         resp.code = 200;
         resp.msg = msg;
         resp.data = data;
-        resp.requestId = "req-" + System.currentTimeMillis();
-        resp.serverTime = LocalDateTime.now();
+        stamp(resp);
         return resp;
     }
 
@@ -27,8 +32,7 @@ public class ApiResponse<T> {
         ApiResponse<T> resp = new ApiResponse<>();
         resp.code = 500;
         resp.msg = msg;
-        resp.requestId = "req-" + System.currentTimeMillis();
-        resp.serverTime = LocalDateTime.now();
+        stamp(resp);
         return resp;
     }
 
@@ -38,8 +42,7 @@ public class ApiResponse<T> {
         resp.code = 404;
         resp.msg = msg;
         resp.data = null;
-        resp.requestId = "req-" + System.currentTimeMillis();
-        resp.serverTime = LocalDateTime.now();
+        stamp(resp);
         return resp;
     }
 
@@ -65,9 +68,13 @@ public class ApiResponse<T> {
         resp.code = code;
         resp.msg = msg;
         resp.data = null;
-        resp.requestId = "req-" + System.currentTimeMillis();
-        resp.serverTime = LocalDateTime.now();
+        stamp(resp);
         return resp;
+    }
+
+    private static void stamp(ApiResponse<?> response) {
+        response.requestId = RequestIdSupport.currentOrNew();
+        response.serverTime = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     public int getCode() { return code; }
@@ -76,8 +83,11 @@ public class ApiResponse<T> {
     public void setMsg(String msg) { this.msg = msg; }
     public T getData() { return data; }
     public void setData(T data) { this.data = data; }
+    @JsonProperty("request_id")
     public String getRequestId() { return requestId; }
     public void setRequestId(String requestId) { this.requestId = requestId; }
-    public LocalDateTime getServerTime() { return serverTime; }
-    public void setServerTime(LocalDateTime serverTime) { this.serverTime = serverTime; }
+    @JsonProperty("server_time")
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    public OffsetDateTime getServerTime() { return serverTime; }
+    public void setServerTime(OffsetDateTime serverTime) { this.serverTime = serverTime; }
 }

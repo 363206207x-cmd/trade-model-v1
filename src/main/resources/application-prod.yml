@@ -80,6 +80,7 @@ trade-model:
       symbols: ${TRADE_MODEL_OHLCV_INGESTION_SYMBOLS:}
       timeframes: ${TRADE_MODEL_OHLCV_INGESTION_TIMEFRAMES:5m,15m,1h,4h}
       bar-limit: ${TRADE_MODEL_OHLCV_INGESTION_BAR_LIMIT:100}
+      max-symbols: ${TRADE_MODEL_OHLCV_INGESTION_MAX_SYMBOLS:6}
     watchlist:
       enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:false}
   analysis:

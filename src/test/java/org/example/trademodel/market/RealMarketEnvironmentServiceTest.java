@@ -60,6 +60,11 @@ class RealMarketEnvironmentServiceTest {
         Optional<MarketEnvironmentVO> env = svc.tryBuildFromRealQuote("BTC", "1h");
         assertTrue(env.isPresent());
         assertEquals(BigDecimal.ONE, env.get().getPriceChangePercent24h());
+        assertEquals("binance", env.get().getSourceProvider());
+        assertEquals("test-key", env.get().getSourceReference());
+        assertEquals("test-trace", env.get().getSourceTraceId());
+        assertNotNull(env.get().getObservedAt());
+        assertEquals("FRESH", env.get().getFreshness());
     }
 
     @Test
@@ -233,6 +238,11 @@ class RealMarketEnvironmentServiceTest {
         assertNull(env.get().getDerivativesCrowdingState());
         assertEquals("CROWDED_LONG",
                 RealMarketEnvironmentService.computeDerivativesCrowdingState(env.get()));
+        assertEquals("TEST", env.get().getDerivativesSourceProvider());
+        assertEquals("test-derivatives", env.get().getDerivativesSourceReference());
+        assertEquals("test-trace", env.get().getDerivativesSourceTraceId());
+        assertNotNull(env.get().getDerivativesObservedAt());
+        assertEquals("FRESH", env.get().getDerivativesFreshness());
     }
 
     @Test

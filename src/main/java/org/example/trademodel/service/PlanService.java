@@ -13,6 +13,14 @@ public interface PlanService {
 
     ExecutionPlanVO buildExecutionPlanFromEnvironment(MarketEnvironmentVO env);
 
+    /**
+     * Builds the rule-owned source and execution-feasibility assessment that is
+     * evaluated before GPT. It must not populate Candidate or Final plan fields.
+     */
+    ExecutionPlanVO buildRuleExecutionAssessment(
+            DecisionBundleVO decision,
+            SourceTraceBoundaryProducerResult boundaryResult);
+
     ExecutionPlanVO generateExecutionPlan(
             DecisionBundleVO decision,
             List<ScoreItemVO> scoreList,

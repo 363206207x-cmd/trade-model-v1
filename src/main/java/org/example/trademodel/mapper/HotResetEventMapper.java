@@ -17,6 +17,7 @@ import java.util.List;
 public interface HotResetEventMapper {
 
     @Insert("INSERT INTO tm_hot_reset_event(event_id, event_key, analysis_id, rebuild_analysis_id, trace_id, "
+            + "owner_type, owner_id, asset_id, rule_version, "
             + "symbol, timeframe, trigger_type, trigger_value, source_type, source_reference, severity_score, "
             + "decision_id, decision_state, decision_invalidated_count, plan_revalidation_count, push_invalidated_count, "
             + "confused_score_snapshot, confused_score_before, confused_score_after, multi_timeframe_aligned_snapshot, "
@@ -24,6 +25,8 @@ public interface HotResetEventMapper {
             + "execution_status, execution_error_code, execution_error_message, trigger_reason_code, trigger_reason_text, "
             + "event_version, event_time, pre_state, post_state, completed_at, create_time) "
             + "VALUES(#{eventId}, #{eventKey}, #{analysisId}, #{rebuildAnalysisId}, #{traceId}, "
+            + "COALESCE(#{ownerType}, 'SYSTEM'), COALESCE(#{ownerId}, 0), #{assetId}, "
+            + "COALESCE(#{ruleVersion}, 'LEGACY_UNAVAILABLE'), "
             + "#{symbol}, #{timeframe}, #{triggerType}, #{triggerValue}, #{sourceType}, #{sourceReference}, #{severityScore}, "
             + "#{decisionId}, #{decisionState}, #{decisionInvalidatedCount}, #{planRevalidationCount}, #{pushInvalidatedCount}, "
             + "#{confusedScoreSnapshot}, #{confusedScoreBefore}, #{confusedScoreAfter}, #{multiTimeframeAlignedSnapshot}, "

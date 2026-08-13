@@ -48,7 +48,10 @@ public final class MarketPriceSnapshotTestSupport {
             ProviderSnapshotMetadata metadata = metadata(symbol, fetchedAt, UnifiedSourceStatus.READY,
                     SnapshotFreshnessStatus.FRESH, null);
             MarketPriceSnapshot payload = new MarketPriceSnapshot(quote.getSymbolNormalized(), quote.getLastPrice(),
-                    null, null, null, quote.getHighPrice(), quote.getLowPrice(), quote.getPriceChangePercent24h(),
+                    quote.getBidPrice(), quote.getBidQuantity(), quote.getAskPrice(), quote.getAskQuantity(),
+                    positive(quote.getBidPrice()) && positive(quote.getAskPrice())
+                            ? quote.getAskPrice().subtract(quote.getBidPrice()) : null,
+                    quote.getHighPrice(), quote.getLowPrice(), quote.getPriceChangePercent24h(),
                     quote.getProvider(), fetchedAt, metadata);
             return new ProviderCallResult<>(payload, metadata, budget());
         };
@@ -92,5 +95,9 @@ public final class MarketPriceSnapshotTestSupport {
     private static ProviderBudgetState budget() {
         return new ProviderBudgetState("TEST", 100, 80, .8, .2, 1, 79, null,
                 ProviderCircuitState.CLOSED, null);
+    }
+
+    private static boolean positive(java.math.BigDecimal value) {
+        return value != null && value.signum() > 0;
     }
 }

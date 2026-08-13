@@ -9,6 +9,7 @@ public class AiCallLogDO {
     private String analysisId;
     private String traceId;
     private String requestId;
+    private String opportunityId;
     private String providerName;
     private String modelName;
     private String aiRole;
@@ -35,6 +36,11 @@ public class AiCallLogDO {
     private String requestSummary;
     private String responseSummary;
     private String ruleVersion;
+    private String contractType = "AI_ROLE_RESULTS_SCHEMA_V1";
+    private String candidateId;
+    private Boolean cacheHit = false;
+    private LocalDateTime observedAt;
+    private String outputPayload;
     private Boolean reviewOnly = true;
     private Boolean manualReviewOnly = true;
     private Boolean notTradeInstruction = true;
@@ -45,6 +51,7 @@ public class AiCallLogDO {
     private Boolean notPositionMutation = true;
     private Boolean notStateMachineOverride = true;
     private Boolean notExecutionPlanCreation = true;
+    private Boolean notFinalExecutionPlanCreation = true;
     private Boolean ruleDirectionPreserved = true;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -69,6 +76,8 @@ public class AiCallLogDO {
     public void setTraceId(String traceId) { this.traceId = traceId; }
     public String getRequestId() { return requestId; }
     public void setRequestId(String requestId) { this.requestId = requestId; }
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
 
     public String getProviderName() {
         return providerName;
@@ -154,6 +163,17 @@ public class AiCallLogDO {
         this.ruleVersion = ruleVersion;
     }
 
+    public String getContractType() { return contractType; }
+    public void setContractType(String contractType) { this.contractType = contractType; }
+    public String getCandidateId() { return candidateId; }
+    public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
+    public Boolean getCacheHit() { return cacheHit; }
+    public void setCacheHit(Boolean cacheHit) { this.cacheHit = cacheHit; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime observedAt) { this.observedAt = observedAt; }
+    public String getOutputPayload() { return outputPayload; }
+    public void setOutputPayload(String outputPayload) { this.outputPayload = outputPayload; }
+
     public Boolean getReviewOnly() { return reviewOnly; }
     public void setReviewOnly(Boolean reviewOnly) { this.reviewOnly = reviewOnly; }
     public Boolean getManualReviewOnly() { return manualReviewOnly; }
@@ -174,6 +194,8 @@ public class AiCallLogDO {
     public void setNotStateMachineOverride(Boolean notStateMachineOverride) { this.notStateMachineOverride = notStateMachineOverride; }
     public Boolean getNotExecutionPlanCreation() { return notExecutionPlanCreation; }
     public void setNotExecutionPlanCreation(Boolean notExecutionPlanCreation) { this.notExecutionPlanCreation = notExecutionPlanCreation; }
+    public Boolean getNotFinalExecutionPlanCreation() { return notFinalExecutionPlanCreation; }
+    public void setNotFinalExecutionPlanCreation(Boolean value) { this.notFinalExecutionPlanCreation = value; }
     public Boolean getRuleDirectionPreserved() { return ruleDirectionPreserved; }
     public void setRuleDirectionPreserved(Boolean ruleDirectionPreserved) { this.ruleDirectionPreserved = ruleDirectionPreserved; }
     public LocalDateTime getCreatedAt() { return createdAt; }
@@ -189,8 +211,6 @@ public class AiCallLogDO {
     }
     public Integer getDurationMs() { return latencyMs == null ? null : latencyMs.intValue(); }
     public void setDurationMs(Integer durationMs) { this.latencyMs = durationMs == null ? null : durationMs.longValue(); }
-    public Integer getCacheHit() { return 0; }
-    public void setCacheHit(Integer cacheHit) { }
     public Integer getIsDeleted() { return 0; }
     public void setIsDeleted(Integer isDeleted) { }
     public Integer getVersionNo() { return 1; }

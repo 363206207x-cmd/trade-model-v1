@@ -4,6 +4,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvIngestionHealth;
 import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class PersistedOhlcvIngestionScheduler {
@@ -28,10 +30,11 @@ public class PersistedOhlcvIngestionScheduler {
     private final PersistedOhlcvIngestionService ingestionService;
     private final boolean globalSchedulersEnabled;
     private final boolean schedulerEnabled;
-    private final List<String> symbols;
     private final List<String> timeframes;
     private final int barLimit;
     private final int maxSymbols;
+    private AssetPoolService assetPoolService;
+    private final AtomicInteger nextSymbolOffset = new AtomicInteger();
     private final Set<String> activeKeys = ConcurrentHashMap.newKeySet();
     private final Map<String, OhlcvIngestionHealth> health = new ConcurrentHashMap<>();
 
@@ -49,10 +52,14 @@ public class PersistedOhlcvIngestionScheduler {
         this.ingestionService = ingestionService;
         this.globalSchedulersEnabled = globalSchedulersEnabled;
         this.schedulerEnabled = schedulerEnabled;
-        this.symbols = csv(symbols, true);
         this.timeframes = csv(timeframes, false);
         this.barLimit = Math.min(Math.max(barLimit, 1), 500);
         this.maxSymbols = Math.min(Math.max(maxSymbols, 1), 20);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAssetPoolService(AssetPoolService assetPoolService) {
+        this.assetPoolService = assetPoolService;
     }
 
     @Scheduled(
@@ -62,12 +69,12 @@ public class PersistedOhlcvIngestionScheduler {
         if (!globalSchedulersEnabled || !schedulerEnabled) {
             return;
         }
-        if (symbols.isEmpty() || symbols.size() > maxSymbols || !PRODUCT_TIMEFRAMES.equals(Set.copyOf(timeframes))) {
-            log.error("OHLCV ingestion schedule rejected: allowlist must contain 1-{} symbols and exactly product timeframes",
-                    maxSymbols);
+        List<String> scheduledSymbols = scheduledSymbols();
+        if (scheduledSymbols.isEmpty() || !PRODUCT_TIMEFRAMES.equals(Set.copyOf(timeframes))) {
+            log.error("OHLCV ingestion schedule rejected: Asset Pool must be non-empty and timeframes must match product contract");
             return;
         }
-        for (String symbol : symbols) {
+        for (String symbol : scheduledSymbols) {
             for (String timeframe : timeframes) {
                 ingestOne(symbol, timeframe);
             }
@@ -112,6 +119,24 @@ public class PersistedOhlcvIngestionScheduler {
         String key = (symbol == null ? "" : symbol.trim().toUpperCase(Locale.ROOT)) + "|" + timeframe;
         return health.getOrDefault(key, new OhlcvIngestionHealth(symbol, timeframe,
                 OhlcvSourceState.WAITING_SYNC, null, null, null, OhlcvSourceState.WAITING_SYNC));
+    }
+
+    private List<String> scheduledSymbols() {
+        List<String> poolSymbols = assetPoolService == null ? List.of() : assetPoolService.listScanSymbols();
+        List<String> normalized = (poolSymbols == null ? List.<String>of() : poolSymbols).stream()
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        if (normalized.size() <= maxSymbols) {
+            return normalized;
+        }
+        int start = Math.floorMod(nextSymbolOffset.getAndAdd(maxSymbols), normalized.size());
+        java.util.ArrayList<String> batch = new java.util.ArrayList<>(maxSymbols);
+        for (int index = 0; index < maxSymbols; index++) {
+            batch.add(normalized.get((start + index) % normalized.size()));
+        }
+        return List.copyOf(batch);
     }
 
     private void updateFailure(

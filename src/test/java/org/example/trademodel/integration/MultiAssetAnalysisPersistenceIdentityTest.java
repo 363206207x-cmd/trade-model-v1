@@ -123,6 +123,9 @@ class MultiAssetAnalysisPersistenceIdentityTest {
         run.setCreatedAt(analysisTime);
         run.setUpdatedAt(analysisTime.plusSeconds(1));
         run.setVersionNo(1);
+        run.setOwnerType("SYSTEM");
+        run.setOwnerId(0L);
+        run.setPreview(false);
         return run;
     }
 

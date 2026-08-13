@@ -53,6 +53,26 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
     }
 
     @Override
+    protected AiHttpRequest buildDecisionChainHttpRequest(String promptJson,
+                                                          AiDecisionChainRole role,
+                                                          long timeoutOverrideMs,
+                                                          String selectedModel) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", selectedModel);
+        body.put("instructions", AiDecisionChainPromptBuilder.systemInstruction(role));
+        body.put("input", promptJson);
+        body.put("max_output_tokens", maxOutputTokens());
+        body.put("reasoning", Map.of("effort", "low"));
+        body.put("store", false);
+        AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
+                json(body), timeoutOverrideMs);
+        Map<String, String> headers = jsonHeaders();
+        headers.put("Authorization", "Bearer " + providerProperties().getApiKey());
+        request.setHeaders(headers);
+        return request;
+    }
+
+    @Override
     protected ProviderPayload extractPayload(AiHttpResponse response) throws Exception {
         JsonNode root = readTree(response.getBody());
         String content = text(root, "output_text");

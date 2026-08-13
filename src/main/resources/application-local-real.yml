@@ -44,7 +44,8 @@ trade-model:
       enabled: true
       initial-delay-ms: 60000
       fixed-delay-ms: 60000
-      symbols: BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT
+      # Compatibility binding only. Runtime symbols come from the persistent Asset Pool.
+      symbols:
       timeframes: 5m,15m,1h,4h
       bar-limit: 101
       max-symbols: 6
@@ -54,7 +55,8 @@ trade-model:
       enabled: true
       initial-delay-ms: 300000
       fixed-delay-ms: 300000
-      symbols: BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT
+      # Compatibility binding only. Runtime symbols come from the persistent Asset Pool.
+      symbols:
       timeframes: 5m
       required-market-timeframes: 5m,15m,1h,4h
       required-closed-bars: 100

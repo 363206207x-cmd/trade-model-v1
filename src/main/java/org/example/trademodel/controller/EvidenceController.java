@@ -1,7 +1,5 @@
 package org.example.trademodel.controller;
 
-import java.util.List;
-
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -24,8 +22,8 @@ public class EvidenceController {
     }
 
     @PostMapping("/build")
-    public ApiResponse<List<EvidenceItemVO>> buildEvidence(@RequestBody AssetAnalysisVO request) {
-        List<EvidenceItemVO> result = evidenceService.buildEvidence(request, request.getMarketEnvironment());
-        return ApiResponse.success(result);
+    public ApiResponse<java.util.List<EvidenceItemVO>> buildEvidence(@RequestBody AssetAnalysisVO request) {
+        return ApiResponse.conflict(
+                "DIRECT_EVIDENCE_BUILD_DISABLED_USE_ANALYSIS_RUN_DECISION_CHAIN");
     }
 }

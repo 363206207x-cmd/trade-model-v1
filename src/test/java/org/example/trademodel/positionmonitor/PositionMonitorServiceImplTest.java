@@ -28,6 +28,7 @@ import org.example.trademodel.service.support.ExternalContextImportRequest;
 import org.example.trademodel.service.support.ExternalContextImportResult;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExternalContextSnapshot;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -815,7 +816,8 @@ class PositionMonitorServiceImplTest {
                     .thenReturn(analysisRun(plan.getAnalysisId(), position.getAssetSymbol()));
             when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(
                     position.getAssetSymbol().toUpperCase()))
-                    .thenReturn(decision(plan.getAnalysisId(), position.getAssetSymbol(), "RANGE"));
+                    .thenReturn(decision(plan.getAnalysisId(), position.getAssetSymbol(),
+                            "SHORT".equals(position.getSide()) ? "BEARISH" : "BULLISH"));
         }
     }
 
@@ -836,7 +838,7 @@ class PositionMonitorServiceImplTest {
         row.setLeverage(new BigDecimal("2"));
         row.setStopLoss(stopLoss == null ? null : new BigDecimal(stopLoss));
         row.setTakeProfit(takeProfit == null ? null : new BigDecimal(takeProfit));
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId(sourceRefId == null
                 ? null
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));
@@ -907,13 +909,11 @@ class PositionMonitorServiceImplTest {
     }
 
     private static ExecutionPlanDO plan(String planId, String analysisId, String status, boolean sourceGateComplete) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId(analysisId);
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                planId, analysisId, LocalDateTime.of(2026, 7, 1, 12, 0));
         plan.setExecutionPlanStatus(status);
         plan.setSourceGateStatus(sourceGateComplete ? "VALID" : "INCOMPLETE");
         plan.setSourceGateComplete(sourceGateComplete);
-        plan.setEntryZone("100-101");
         plan.setStopLoss("90");
         plan.setTakeProfitRules("120");
         return plan;

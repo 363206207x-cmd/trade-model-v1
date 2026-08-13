@@ -10,6 +10,7 @@ public class DecisionResultVO {
     private String analysisId;
     private String symbol;
     private String timeframe;
+    private LocalDateTime analysisTime;
     private String marketBiasHierarchy;
     private String tradeType;
     private String confidenceLevel;
@@ -35,12 +36,14 @@ public class DecisionResultVO {
     private String executionPlanSummary;
     private String recommendedAction;
     private String planMode;
+    private String finalMarketBias;
     private String entryZone;
     private String stopLoss;
     private String takeProfitRules;
     private String leverageSuggestion;
     private String positionSuggestion;
     private Integer dataQualityScore;
+    private Double opportunityScore;
     private LocalDateTime createTime;
     private BigDecimal latestPrice;
     private BigDecimal priceChangePct;
@@ -98,6 +101,14 @@ public class DecisionResultVO {
 
     public void setTimeframe(String timeframe) {
         this.timeframe = timeframe;
+    }
+
+    public LocalDateTime getAnalysisTime() {
+        return analysisTime;
+    }
+
+    public void setAnalysisTime(LocalDateTime analysisTime) {
+        this.analysisTime = analysisTime;
     }
 
     public String getMarketBiasHierarchy() {
@@ -300,6 +311,14 @@ public class DecisionResultVO {
         this.planMode = planMode;
     }
 
+    public String getFinalMarketBias() {
+        return finalMarketBias;
+    }
+
+    public void setFinalMarketBias(String finalMarketBias) {
+        this.finalMarketBias = finalMarketBias;
+    }
+
     public String getEntryZone() {
         return entryZone;
     }
@@ -346,6 +365,14 @@ public class DecisionResultVO {
 
     public void setDataQualityScore(Integer dataQualityScore) {
         this.dataQualityScore = dataQualityScore;
+    }
+
+    public Double getOpportunityScore() {
+        return opportunityScore;
+    }
+
+    public void setOpportunityScore(Double opportunityScore) {
+        this.opportunityScore = opportunityScore;
     }
 
     public LocalDateTime getCreateTime() {

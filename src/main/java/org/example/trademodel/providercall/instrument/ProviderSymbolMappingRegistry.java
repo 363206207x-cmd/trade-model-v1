@@ -43,13 +43,17 @@ public class ProviderSymbolMappingRegistry {
     public ProviderSymbolMapping resolve(String provider, String providerSymbol, MarketType marketType) {
         ProviderSymbolMapping mapping = byProviderSymbol.get(new ProviderLookupKey(provider,
                 normalizeSymbol(providerSymbol), marketType));
-        if (mapping == null) throw new IllegalArgumentException("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
+        if (mapping == null) {
+            mapping = dynamicBinanceUsdt(provider, providerSymbol, marketType);
+        }
         return mapping;
     }
 
     public ProviderSymbolMapping resolve(String provider, CanonicalInstrumentId canonicalInstrumentId) {
         ProviderSymbolMapping mapping = byCanonical.get(new CanonicalLookupKey(provider, canonicalInstrumentId));
-        if (mapping == null) throw new IllegalArgumentException("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
+        if (mapping == null) {
+            mapping = dynamicBinanceUsdt(provider, canonicalInstrumentId);
+        }
         return mapping;
     }
 
@@ -65,6 +69,9 @@ public class ProviderSymbolMappingRegistry {
                 .filter(id -> (id.baseAsset() + id.quoteAsset()).equals(compact))
                 .distinct()
                 .toList();
+        if (matches.isEmpty()) {
+            return dynamicBinanceUsdt("BINANCE", configuredSymbol, marketType).canonicalInstrumentId();
+        }
         if (matches.size() != 1) throw new IllegalArgumentException("CONFIGURED_INSTRUMENT_MAPPING_NOT_UNIQUE");
         return matches.get(0);
     }
@@ -77,6 +84,32 @@ public class ProviderSymbolMappingRegistry {
         if (value == null || value.isBlank()) throw new IllegalArgumentException("providerSymbol is required");
         return value.trim().toUpperCase(Locale.ROOT)
                 .replace("/", "").replace("-", "").replace("_", "");
+    }
+
+    private static ProviderSymbolMapping dynamicBinanceUsdt(String provider,
+                                                             String providerSymbol,
+                                                             MarketType marketType) {
+        String compact = normalizeSymbol(providerSymbol);
+        if (!"BINANCE".equalsIgnoreCase(provider) || marketType == null
+                || !compact.endsWith("USDT") || compact.length() <= 6) {
+            throw new IllegalArgumentException("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
+        }
+        String base = compact.substring(0, compact.length() - 4);
+        ContractType contractType = marketType == MarketType.SPOT
+                ? ContractType.NONE : ContractType.LINEAR;
+        return new ProviderSymbolMapping("BINANCE",
+                new CanonicalInstrumentId(base, "USDT", marketType, "BINANCE", contractType),
+                compact, true, "BINANCE_DYNAMIC_USDT_V1");
+    }
+
+    private static ProviderSymbolMapping dynamicBinanceUsdt(String provider,
+                                                             CanonicalInstrumentId instrument) {
+        if (instrument == null || !"BINANCE".equalsIgnoreCase(instrument.venue())
+                || !"USDT".equals(instrument.quoteAsset())) {
+            throw new IllegalArgumentException("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
+        }
+        return dynamicBinanceUsdt(provider, instrument.baseAsset() + instrument.quoteAsset(),
+                instrument.marketType());
     }
 
     private record ProviderLookupKey(String provider, String symbol, MarketType marketType) {

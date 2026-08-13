@@ -42,6 +42,7 @@ import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -188,7 +189,7 @@ class V1HistoricalReplayValidationTest {
         when(localAdapter.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
                 .thenReturn(klines(scenario.fiveMinute()));
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflict());
-        when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(eq(scenario.symbol()), anyString(), any(DecisionContext.class)))
                 .thenReturn(scenario.confused());
         when(assetStateService.buildSnapshotAtDecision(anyString(), anyString(), any(), any(), anyInt(), anyInt(), any(Boolean.class), any(Boolean.class)))
                 .thenAnswer(invocation -> "{\"source\":\"" + FIXTURE_SOURCE + "\",\"nextState\":\""
@@ -488,7 +489,7 @@ class V1HistoricalReplayValidationTest {
         position.setLeverage(decimal("2"));
         position.setStopLoss(decimal(stopLoss));
         position.setTakeProfit(decimal(takeProfit));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setSourceRefId(planId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -497,21 +498,12 @@ class V1HistoricalReplayValidationTest {
     }
 
     private static ExecutionPlanDO monitorPlan(String planId) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId("analysis-" + planId);
-        plan.setExecutionPlanStatus("VALID");
-        plan.setSourceGateStatus("VALID");
-        plan.setSourceGateComplete(true);
+        String analysisId = "analysis-" + planId;
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                planId, analysisId, LocalDateTime.now(ZoneOffset.UTC));
         plan.setEntryZone("95-105");
         plan.setStopLoss("90");
         plan.setTakeProfitRules("120");
-        plan.setManualReviewRequired(true);
-        plan.setNotTradeInstruction(true);
-        plan.setNotExecutable(true);
-        plan.setNotAutoTrading(true);
-        plan.setNotOrderExecution(true);
-        plan.setNotUserPositionCreation(true);
         return plan;
     }
 
@@ -569,7 +561,7 @@ class V1HistoricalReplayValidationTest {
                                               AssetStateEnum state, String reason) {
             return new ReplayScenario(name, symbol, direction, false, false, state, 88, 42,
                     oneMinute, fiveMinute,
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE, direction,
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, direction,
                             "MEDIUM", "REVIEW", 40),
                     new ConfusedResult(45, "OBSERVING", state.name(), false, false, 0, false,
                             reason, "no-trade"), null);
@@ -579,7 +571,7 @@ class V1HistoricalReplayValidationTest {
                                                List<ReplayCandle> oneMinute, List<ReplayCandle> fiveMinute) {
             return new ReplayScenario(name, symbol, "BEARISH", false, false, AssetStateEnum.CONFUSED, 70, 65,
                     oneMinute, fiveMinute,
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BEARISH", "LOW", "HIGH",
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BEARISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),
                     new ConfusedResult(88, "OBSERVING", "CONFUSED", true, false, 0, true,
                             "fast crash and rebound conflict", "manual review block"), null);
@@ -670,7 +662,7 @@ class V1HistoricalReplayValidationTest {
             currentDecision.setSymbol(SYMBOL);
             currentDecision.setTimeframe("5m");
             currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL".equals(point.name())
-                    ? "STRONG_BEARISH" : "RANGE");
+                    ? "STRONG_BEARISH" : "BULLISH");
             currentDecision.setMultiTfConvergence("ALIGNED");
             currentDecision.setDataQualityScore(90);
             currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));

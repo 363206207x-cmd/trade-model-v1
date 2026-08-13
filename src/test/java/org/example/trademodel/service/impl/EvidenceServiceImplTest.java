@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -61,7 +62,7 @@ class EvidenceServiceImplTest {
     void buildEvidence_generatesOnlyAllowedEvidenceTypeAndDirection() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
 
-        List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), new MarketEnvironmentVO());
+        List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), marketEnvironment());
 
         assertThat(result).isNotEmpty();
         assertThat(result)
@@ -73,6 +74,17 @@ class EvidenceServiceImplTest {
         assertThat(result)
                 .extracting(EvidenceItemVO::getSource)
                 .allMatch(EvidenceTypeConstants::isAllowedSource);
+        assertThat(result).allSatisfy(item -> {
+            assertThat(item.getCurrentValue()).isNotBlank();
+            assertThat(item.getChangeFromBaseline()).isNotBlank();
+            assertThat(item.getStrength()).isNotNull();
+            assertThat(item.getConfidence()).isNotNull();
+            assertThat(item.getSourceProvider()).isNotBlank();
+            assertThat(item.getSourceReference()).isNotBlank();
+            assertThat(item.getSourceTraceId()).isNotBlank();
+            assertThat(item.getObservedAt()).isNotNull();
+            assertThat(item.getFreshness()).isEqualTo("FRESH");
+        });
     }
 
     @Test
@@ -86,7 +98,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_priceStructureBullish_whenPctAboveEpsilon() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setPriceChangePercent24h(new BigDecimal("1.5"));
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -104,7 +116,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_priceStructureBearish_whenPctBelowNegativeEpsilon() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setPriceChangePercent24h(new BigDecimal("-2.25"));
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -118,7 +130,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_priceStructureNeutral_whenPctInsideEpsilon() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setPriceChangePercent24h(new BigDecimal("0.03"));
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -130,23 +142,18 @@ class EvidenceServiceImplTest {
     }
 
     @Test
-    void buildEvidence_priceStructureFallback_whenPctMissing() {
+    void buildEvidence_failsClosedWithoutPriceChangeFact() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), null);
 
-        EvidenceItemVO ps = result.get(0);
-        assertThat(ps.getEvidenceType()).isEqualTo("价格结构");
-        assertThat(ps.getDirection()).isEqualTo("NEUTRAL");
-        assertThat(ps.getSource()).isEqualTo("SYSTEM_GENERATED");
-        assertThat(ps.getDescription()).contains("缺少 24h 涨跌幅标量");
-        assertThat(ps.getDescription()).doesNotContain("默认证据");
+        assertThat(result).isEmpty();
     }
 
     @Test
     void buildEvidence_appendsVolatilityRiskEvidence_whenSecondDimensionPresent() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setRangePct24h(4.25);
         env.setVolatilityRegime("中等波动");
 
@@ -165,7 +172,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noVolatilityEvidence_whenRangePctMissing() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setVolatilityRegime("中等波动");
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -176,7 +183,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noVolatilityEvidence_whenVolatilityRegimeMissing() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setRangePct24h(3.0);
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -187,7 +194,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noVolatilityEvidence_whenVolatilityRegimeBlank() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setRangePct24h(3.0);
         env.setVolatilityRegime("   ");
 
@@ -199,7 +206,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_appendsFundingEvidence_whenPerpFundingAppliedWithRate() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         BigDecimal rate = new BigDecimal("0.0001");
         env.setPerpFundingApplied(true);
         env.setLastFundingRate(rate);
@@ -217,7 +224,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noFundingEvidence_whenPerpFundingAppliedButRateMissing() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setPerpFundingApplied(true);
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -228,10 +235,11 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_appendsOpenInterestRiskEvidence_whenOiAppliedWithValue() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         BigDecimal oi = new BigDecimal("75797.837");
         env.setOiApplied(true);
         env.setLastOpenInterest(oi);
+        env.setOpenInterestDelta(new BigDecimal("125.5"));
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
 
@@ -246,7 +254,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noOpenInterestEvidence_whenOiAppliedButValueMissing() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setOiApplied(true);
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -257,7 +265,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noOpenInterestEvidence_whenOiNotApplied() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setOiApplied(false);
         env.setLastOpenInterest(new BigDecimal("1000"));
 
@@ -269,7 +277,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_appendsLeverageEvidence_whenLeverageSuggestionLow() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setLeverageSuggestion("low_leverage");
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -285,7 +293,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_appendsLeverageEvidence_whenLeverageSuggestionModerate() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setLeverageSuggestion("moderate_leverage");
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -299,19 +307,18 @@ class EvidenceServiceImplTest {
     }
 
     @Test
-    void buildEvidence_noLeverageEvidence_whenMarketEnvironmentNull() {
+    void buildEvidence_returnsNoEvidenceWhenMarketEnvironmentNull() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), null);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getEvidenceType()).isEqualTo("价格结构");
+        assertThat(result).isEmpty();
     }
 
     @Test
     void buildEvidence_noLeverageEvidence_whenLeverageSuggestionBlank() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setLeverageSuggestion("   ");
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -322,7 +329,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_noLeverageEvidence_whenLeverageSuggestionUnknownToken() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setLeverageSuggestion("high_leverage");
 
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), env);
@@ -333,7 +340,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_volatilityAndFundingUnchanged_whenLeveragePresent() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper);
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
+        MarketEnvironmentVO env = marketEnvironment();
         env.setRangePct24h(4.25);
         env.setVolatilityRegime("中等波动");
         env.setLeverageSuggestion("low_leverage");
@@ -358,11 +365,14 @@ class EvidenceServiceImplTest {
         event.setTriggerType("HOT_RESET");
         event.setTriggerReasonCode("CONFUSED_HIGH_MTF_MISALIGNED");
         event.setEventVersion(2);
+        event.setEventId("hot-reset-1");
         event.setTraceId("trace-hot-1");
+        event.setEventTime(LocalDateTime.of(2026, 8, 12, 1, 0));
+        event.setSeverityScore(95);
         when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-1")).thenReturn(event);
         when(hotResetEventMapper.countByAnalysisId("ana-hot-1")).thenReturn(1);
 
-        List<EvidenceItemVO> result = service.buildEvidence(analysis, new MarketEnvironmentVO());
+        List<EvidenceItemVO> result = service.buildEvidence(analysis, marketEnvironment());
 
         assertThat(result).hasSize(2);
         EvidenceItemVO ev = result.get(1);
@@ -388,7 +398,7 @@ class EvidenceServiceImplTest {
         when(hotResetEventMapper.selectLatestByAnalysisId("ana-hot-none")).thenReturn(null);
         when(hotResetEventMapper.countByAnalysisId("ana-hot-none")).thenReturn(0);
 
-        List<EvidenceItemVO> result = service.buildEvidence(analysis, new MarketEnvironmentVO());
+        List<EvidenceItemVO> result = service.buildEvidence(analysis, marketEnvironment());
 
         assertThat(result).hasSize(1);
         assertThat(result).extracting(EvidenceItemVO::getEvidenceType).doesNotContain("事件");
@@ -400,7 +410,7 @@ class EvidenceServiceImplTest {
     @Test
     void buildEvidence_appendsMacroEvidence_whenMarketEnvHasVolatilityAndRange() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper, hotResetEventMapper);
-        MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
+        MarketEnvironmentVO marketEnv = marketEnvironment();
         marketEnv.setVolatilityRegime("中等波动");
         marketEnv.setRangePct24h(3.25);
 
@@ -410,14 +420,14 @@ class EvidenceServiceImplTest {
         EvidenceItemVO macro = result.get(1);
         assertThat(macro.getEvidenceType()).isEqualTo("宏观");
         assertThat(macro.getDirection()).isEqualTo("NEUTRAL");
-        assertThat(macro.getSource()).isEqualTo("SYSTEM_GENERATED");
+        assertThat(macro.getSource()).isEqualTo("MARKET_HEURISTIC");
         assertThat(macro.getDescription()).isEqualTo("当前环境呈现中等波动，24h振幅约3.25%。");
     }
 
     @Test
     void buildEvidence_appendsMacroEvidenceWithCrowding_whenMarketEnvHasCrowdingState() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper, hotResetEventMapper);
-        MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
+        MarketEnvironmentVO marketEnv = marketEnvironment();
         marketEnv.setVolatilityRegime("高波动");
         marketEnv.setRangePct24h(7.5);
         marketEnv.setDerivativesCrowdingState("CROWDED_LONG");
@@ -428,7 +438,7 @@ class EvidenceServiceImplTest {
         EvidenceItemVO macro = result.get(1);
         assertThat(macro.getEvidenceType()).isEqualTo("宏观");
         assertThat(macro.getDirection()).isEqualTo("NEUTRAL");
-        assertThat(macro.getSource()).isEqualTo("SYSTEM_GENERATED");
+        assertThat(macro.getSource()).isEqualTo("MARKET_HEURISTIC");
         assertThat(macro.getDescription()).isEqualTo("当前环境呈现高波动，24h振幅约7.50%；衍生品拥挤状态：CROWDED_LONG。");
     }
 
@@ -437,14 +447,14 @@ class EvidenceServiceImplTest {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper, hotResetEventMapper);
         List<EvidenceItemVO> result = service.buildEvidence(new AssetAnalysisVO(), null);
 
-        assertThat(result).hasSize(1);
+        assertThat(result).isEmpty();
         assertThat(result).extracting(EvidenceItemVO::getEvidenceType).doesNotContain("宏观");
     }
 
     @Test
     void buildEvidence_noMacroEvidence_whenMarketEnvMissingRequiredWhitelistFields() {
         EvidenceServiceImpl service = new EvidenceServiceImpl(evidenceItemMapper, hotResetEventMapper);
-        MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
+        MarketEnvironmentVO marketEnv = marketEnvironment();
         marketEnv.setVolatilityRegime(" ");
         marketEnv.setRangePct24h(null);
 
@@ -452,5 +462,21 @@ class EvidenceServiceImplTest {
 
         assertThat(result).hasSize(1);
         assertThat(result).extracting(EvidenceItemVO::getEvidenceType).doesNotContain("宏观");
+    }
+
+    private static MarketEnvironmentVO marketEnvironment() {
+        MarketEnvironmentVO environment = new MarketEnvironmentVO();
+        environment.setPriceChangePercent24h(new BigDecimal("1.0"));
+        environment.setSourceProvider("TEST_MARKET_PROVIDER");
+        environment.setSourceReference("test://market/BTCUSDT/24h");
+        environment.setSourceTraceId("trace-market-1");
+        environment.setObservedAt(LocalDateTime.of(2026, 8, 12, 0, 0));
+        environment.setFreshness("FRESH");
+        environment.setDerivativesSourceProvider("TEST_DERIVATIVES_PROVIDER");
+        environment.setDerivativesSourceReference("test://derivatives/BTCUSDT");
+        environment.setDerivativesSourceTraceId("trace-derivatives-1");
+        environment.setDerivativesObservedAt(LocalDateTime.of(2026, 8, 12, 0, 0));
+        environment.setDerivativesFreshness("FRESH");
+        return environment;
     }
 }

@@ -45,6 +45,7 @@ import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.impl.UserPositionServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -198,7 +199,7 @@ class V1BusinessStressTest {
                 USER_ID, openPaperPositionRequest("plan-paper-loop"));
 
         assertThat(opened.getStatus()).isEqualTo("OPEN");
-        assertThat(opened.getSourceType()).isEqualTo("MANUAL");
+        assertThat(opened.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(opened.getSourceRefId()).isEqualTo("plan-paper-loop");
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
@@ -234,7 +235,7 @@ class V1BusinessStressTest {
         when(fetcher.readClosedBars(eq(scenario.symbol()), matches("15m|1h|4h"), anyInt(), anyString()))
                 .thenReturn(scenario.klines5m());
         when(conflictResolver.resolve(any(DecisionContext.class))).thenReturn(scenario.conflictResult());
-        when(confusedStateService.calculateConfused(eq(scenario.symbol()), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(eq(scenario.symbol()), anyString(), any(DecisionContext.class)))
                 .thenReturn(scenario.confusedResult());
         when(assetStateService.buildSnapshotAtDecision(anyString(), anyString(), any(), any(), anyInt(), anyInt(), any(Boolean.class), any(Boolean.class)))
                 .thenAnswer(invocation -> "{\"previousState\":\"" + ((AssetStateEnum) invocation.getArgument(2)).name()
@@ -479,7 +480,7 @@ class V1BusinessStressTest {
         position.setLeverage(new BigDecimal("2"));
         position.setStopLoss(new BigDecimal(stopLoss));
         position.setTakeProfit(new BigDecimal(takeProfit));
-        position.setSourceType("MANUAL");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setSourceRefId(sourceRefId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -488,21 +489,12 @@ class V1BusinessStressTest {
     }
 
     private static ExecutionPlanDO monitorPlan(String planId) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId("analysis-" + planId);
-        plan.setExecutionPlanStatus("VALID");
-        plan.setSourceGateStatus("VALID");
-        plan.setSourceGateComplete(true);
+        String analysisId = "analysis-" + planId;
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                planId, analysisId, LocalDateTime.now(ZoneOffset.UTC));
         plan.setEntryZone("95-105");
         plan.setStopLoss("90");
         plan.setTakeProfitRules("120");
-        plan.setManualReviewRequired(true);
-        plan.setNotTradeInstruction(true);
-        plan.setNotExecutable(true);
-        plan.setNotAutoTrading(true);
-        plan.setNotOrderExecution(true);
-        plan.setNotUserPositionCreation(true);
         return plan;
     }
 
@@ -600,7 +592,7 @@ class V1BusinessStressTest {
         private static OpportunityScenario noTrade(String name, String symbol, String direction, String reason) {
             return new OpportunityScenario(name, symbol, direction, false, false, AssetStateEnum.OBSERVING, 88, 45,
                     bullishKlines(), bearishKlines(),
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_LIGHT_DIVERGENCE, direction, "MEDIUM", "REVIEW", 40),
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, direction, "MEDIUM", "REVIEW", 40),
                     new ConfusedResult(45, "OBSERVING", "OBSERVING", false, false, 0, false, reason, "no-trade"),
                     null, reason);
         }
@@ -616,7 +608,7 @@ class V1BusinessStressTest {
         private static OpportunityScenario conflicted(String name, String symbol) {
             return new OpportunityScenario(name, symbol, "BULLISH", false, false, AssetStateEnum.CONFUSED, 88, 70,
                     bullishKlines(), bullishKlines(),
-                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE, "BULLISH", "LOW", "HIGH",
+                    new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BULLISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),
                     new ConfusedResult(85, "OBSERVING", "CONFUSED", true, false, 0, true,
                             "extreme conflict", "block"),
@@ -710,7 +702,7 @@ class V1BusinessStressTest {
             currentDecision.setSymbol("BTCUSDT");
             currentDecision.setTimeframe("5m");
             currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL_AFTER_OPEN".equals(scenario.name())
-                    ? "STRONG_BEARISH" : "RANGE");
+                    ? "STRONG_BEARISH" : "BULLISH");
             currentDecision.setMultiTfConvergence("ALIGNED");
             currentDecision.setDataQualityScore(90);
             currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));

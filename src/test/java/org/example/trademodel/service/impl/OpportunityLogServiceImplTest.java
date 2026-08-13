@@ -756,7 +756,7 @@ class OpportunityLogServiceImplTest {
     private static UserPositionDO userPosition(Long id, String sourceRefId, LocalDateTime openedAt) {
         UserPositionDO row = new UserPositionDO();
         row.setId(id);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId(sourceRefId);
         row.setStatus("CLOSED");
         row.setOpenedAt(openedAt);

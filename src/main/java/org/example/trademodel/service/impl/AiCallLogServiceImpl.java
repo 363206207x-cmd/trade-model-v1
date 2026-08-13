@@ -1,13 +1,20 @@
 package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.example.trademodel.ai.AiProviderClient;
 import org.example.trademodel.ai.AiProviderRequest;
 import org.example.trademodel.ai.AiProviderReviewResult;
+import org.example.trademodel.ai.AiDecisionChainRequest;
+import org.example.trademodel.ai.AiDecisionChainResult;
+import org.example.trademodel.ai.AiDecisionChainRole;
+import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.mapper.AiCallLogMapper;
 import org.example.trademodel.service.AiCallLogService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +28,9 @@ import java.util.UUID;
 
 @Service
 public class AiCallLogServiceImpl implements AiCallLogService {
+    private static final int DECISION_CHAIN_SUMMARY_CHARS = 8_000;
+    private static final int DECISION_CHAIN_OUTPUT_CHARS = 65_536;
+
     private final AiCallLogMapper mapper;
     private final ObjectMapper objectMapper;
 
@@ -47,6 +57,71 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AiCallLogDO startDecisionChainCall(AiDecisionChainRequest request,
+                                              AiProviderClient client,
+                                              BigDecimal reservedCostUsd) {
+        AiCallLogDO log = newDecisionChainLog(request, client.provider(),
+                client.providerProperties() == null ? null : client.providerProperties().getEffectiveModel(),
+                reservedCostUsd);
+        log.setCallStatus("STARTED");
+        mapper.insert(log);
+        return log;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void completeDecisionChainCall(AiCallLogDO log, AiDecisionChainResult result) {
+        if (log == null || result == null) return;
+        fillDecisionChainCompletion(log, result);
+        mapper.updateCompletion(log);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AiCallLogDO recordDecisionChainResult(AiDecisionChainRequest request,
+                                                 AiProviderName provider,
+                                                 String modelName,
+                                                 AiDecisionChainResult result,
+                                                 BigDecimal reservedCostUsd) {
+        if (request == null || request.getRole() == null || result == null) {
+            throw new IllegalArgumentException("decision-chain request, role and result are required");
+        }
+        AiCallLogDO log = newDecisionChainLog(request, provider, modelName, reservedCostUsd);
+        fillDecisionChainCompletion(log, result);
+        mapper.insert(log);
+        return log;
+    }
+
+    private void fillDecisionChainCompletion(AiCallLogDO log, AiDecisionChainResult result) {
+        LocalDateTime now = LocalDateTime.now();
+        if (result.getSelectedModel() != null && !result.getSelectedModel().isBlank()) {
+            log.setModelName(safe(result.getSelectedModel(), 128));
+        }
+        log.setCallStatus(result.getCallStatus() == null ? "FAILED" : result.getCallStatus().name());
+        log.setProviderRequestId(safe(result.getProviderRequestId(), 128));
+        log.setCompletedAt(now);
+        log.setLatencyMs(result.getLatencyMs());
+        log.setInputTokens(result.getInputTokens());
+        log.setOutputTokens(result.getOutputTokens());
+        log.setTotalTokens(result.getTotalTokens());
+        log.setCalculatedCostUsd(result.getCalculatedCostUsd());
+        log.setFallbackFlag(result.isFallback());
+        log.setFallbackReason(safe(result.getFallbackReason(), 512));
+        log.setTimeoutFlag(result.getCallStatus() == org.example.trademodel.ai.AiProviderCallStatus.TIMEOUT);
+        log.setErrorCode(safe(result.getErrorCode(), 128));
+        log.setErrorMessage(safe(result.getFallbackReason(), 512));
+        log.setCacheHit(result.isCacheHit());
+        log.setObservedAt(result.getGeneratedAt() == null
+                ? now : result.getGeneratedAt().toLocalDateTime());
+        log.setResponseSummary(decisionChainResponseSummary(result));
+        String auditOutput = result.getAuditOutput() == null
+                ? result.getPayloadJson() : result.getAuditOutput();
+        log.setOutputPayload(safe(auditOutput, DECISION_CHAIN_OUTPUT_CHARS));
+        log.setUpdatedAt(now);
+    }
+
+    @Override
     public AiCallLogDO recordSkipped(AiProviderRequest request, AiProviderClient client,
                                      AiProviderReviewResult result, BigDecimal reservedCostUsd) {
         AiCallLogDO log = baseLog(request, client, reservedCostUsd);
@@ -58,8 +133,21 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     @Override
     public List<AiCallLogDO> query(String analysisId, String traceId, String providerName, String callStatus,
                                    LocalDateTime from, LocalDateTime to, int limit) {
-        return mapper.query(analysisId, traceId, providerName, callStatus,
+        return mapper.query(analysisId, traceId, null, null, providerName, callStatus,
                 from, to, Math.max(1, Math.min(500, limit)));
+    }
+
+    @Override
+    public List<AiCallLogDO> queryOwned(Long userId, String analysisId, String traceId,
+                                        String candidateId, String role, String providerName,
+                                        String callStatus, LocalDateTime from, LocalDateTime to,
+                                        int limit) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        return mapper.queryOwned(userId, safe(analysisId, 64), safe(traceId, 128),
+                safe(candidateId, 64), safe(role, 64), safe(providerName, 32),
+                safe(callStatus, 32), from, to, Math.max(1, Math.min(500, limit)));
     }
 
     @Override
@@ -95,6 +183,51 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setRequestSummary(requestSummary(request));
         log.setRequestHash(hash(log.getRequestSummary()));
         log.setRuleVersion("P2-2");
+        log.setCreatedAt(now);
+        log.setUpdatedAt(now);
+        return log;
+    }
+
+    private AiCallLogDO newDecisionChainLog(AiDecisionChainRequest request,
+                                            AiProviderName provider,
+                                            String modelName,
+                                            BigDecimal reservedCostUsd) {
+        LocalDateTime now = LocalDateTime.now();
+        AiCallLogDO log = new AiCallLogDO();
+        log.setCallId("ai-call-" + UUID.randomUUID());
+        log.setAnalysisId(safe(request.getAnalysisId(), 64));
+        log.setTraceId(safe(request.getTraceId(), 128));
+        log.setRequestId(safe(request.getRequestId(), 128) == null
+                ? "ai-req-" + UUID.randomUUID() : safe(request.getRequestId(), 128));
+        log.setOpportunityId(safe(request.getOpportunityId(), 64));
+        log.setProviderName(provider == null ? "UNKNOWN" : provider.name());
+        log.setModelName(safe(modelName == null || modelName.isBlank() ? "UNAVAILABLE" : modelName, 128));
+        log.setAiRole(request.getRole().name());
+        log.setStartedAt(now);
+        log.setReservedCostUsd(reservedCostUsd == null ? BigDecimal.ZERO : reservedCostUsd);
+        log.setCalculatedCostUsd(BigDecimal.ZERO);
+        log.setContractType("DECISION_CHAIN_V4_1");
+        log.setCandidateId(safe(request.getCandidateId(), 64));
+        log.setCacheHit(false);
+        log.setObservedAt(now);
+        String canonicalInput = canonicalDecisionChainRequest(request);
+        log.setRequestSummary(truncate(canonicalInput, DECISION_CHAIN_SUMMARY_CHARS));
+        log.setRequestHash(hash(canonicalInput));
+        log.setRuleVersion(safe(request.getRuleVersion(), 32) == null
+                ? "FUNDAMENTAL_AI_V4_1" : safe(request.getRuleVersion(), 32));
+        boolean reviewOnly = request.getRole() != AiDecisionChainRole.GPT_FINAL;
+        log.setReviewOnly(reviewOnly);
+        log.setNotExecutionPlanCreation(reviewOnly);
+        log.setNotFinalExecutionPlanCreation(true);
+        log.setManualReviewOnly(true);
+        log.setNotTradeInstruction(true);
+        log.setNotExecutable(true);
+        log.setNotAutoTrading(true);
+        log.setNotOrderExecution(true);
+        log.setNotUserPositionCreation(true);
+        log.setNotPositionMutation(true);
+        log.setNotStateMachineOverride(true);
+        log.setRuleDirectionPreserved(true);
         log.setCreatedAt(now);
         log.setUpdatedAt(now);
         return log;
@@ -158,6 +291,38 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         return json(summary, 1200);
     }
 
+    private String canonicalDecisionChainRequest(AiDecisionChainRequest request) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("analysisId", request.getAnalysisId());
+        summary.put("traceId", request.getTraceId());
+        summary.put("candidateId", request.getCandidateId());
+        summary.put("opportunityId", request.getOpportunityId());
+        summary.put("requestId", request.getRequestId());
+        summary.put("ruleVersion", request.getRuleVersion());
+        summary.put("role", request.getRole() == null ? null : request.getRole().name());
+        summary.put("symbol", request.getSymbol());
+        summary.put("timeframe", request.getTimeframe());
+        summary.put("input", request.getInput());
+        try {
+            String value = objectMapper.writer()
+                    .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                    .writeValueAsString(summary);
+            return sanitize(value);
+        } catch (Exception exception) {
+            return "{}";
+        }
+    }
+
+    private String decisionChainResponseSummary(AiDecisionChainResult result) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("role", result.getRole() == null ? null : result.getRole().name());
+        summary.put("status", result.getCallStatus() == null ? null : result.getCallStatus().name());
+        summary.put("fallback", result.isFallback());
+        summary.put("fallbackReason", result.getFallbackReason());
+        summary.put("selectedModel", result.getSelectedModel());
+        return json(summary, 1200);
+    }
+
     private String json(Object value, int max) {
         try {
             return safe(objectMapper.writeValueAsString(value), max);
@@ -167,14 +332,24 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     }
 
     private static String safe(String value, int max) {
-        if (value == null) {
-            return null;
-        }
-        String sanitized = value.replaceAll("(?i)Bearer\\s+[A-Za-z0-9._\\-]{8,}", "Bearer ***")
+        return truncate(sanitize(value), max);
+    }
+
+    private static String sanitize(String value) {
+        if (value == null) return null;
+        return value.replaceAll(
+                        "(?i)(\\\"(?:api[_-]?key|api[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|password|passphrase|client[_-]?secret|private[_-]?key|cookie|credentials?)\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")",
+                        "$1***$2")
+                .replaceAll("(?i)((?:api[_-]?key|api[_-]?secret|access[_-]?token|refresh[_-]?token|authorization|password|client[_-]?secret)=)[^&\\s]+", "$1***")
+                .replaceAll("(?i)Bearer\\s+[A-Za-z0-9._\\-]{8,}", "Bearer ***")
                 .replaceAll("sk-[A-Za-z0-9]+", "sk-***")
                 .replaceAll("AIza[A-Za-z0-9_\\-]+", "AIza***")
                 .replaceAll("xai-[A-Za-z0-9]+", "xai-***");
-        return sanitized.length() <= max ? sanitized : sanitized.substring(0, max);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     private static String hash(String value) {

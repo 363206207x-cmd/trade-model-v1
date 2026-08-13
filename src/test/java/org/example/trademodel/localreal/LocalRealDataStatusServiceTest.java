@@ -11,6 +11,7 @@ import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -34,6 +35,10 @@ class LocalRealDataStatusServiceTest {
     @Mock DecisionResultMapper decisionResultMapper;
     @Mock RoutedPublicOhlcvProvider routedProvider;
     @Mock PersistedRealMarketEnvironmentService realMarketEnvironmentService;
+    @Mock AssetPoolService assetPoolService;
+
+    private static final List<String> POOL_SYMBOLS = List.of(
+            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
 
     @Test
     void localRealStatusDoesNotExposeSecretsAndShowsAiDisabled() throws Exception {
@@ -44,10 +49,13 @@ class LocalRealDataStatusServiceTest {
         when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
         when(routedProvider.health()).thenReturn(Map.of());
         when(routedProvider.krakenPairCacheState()).thenReturn(KrakenPairCacheState.READY);
-        when(routedProvider.requestPair("BTCUSDT")).thenReturn("XBTUSD");
+        when(routedProvider.requestPair(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
+                "BTCUSDT".equals(invocation.getArgument(0)) ? "XBTUSD" : invocation.getArgument(0));
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService);
+        service.setAssetPoolService(assetPoolService);
+        when(assetPoolService.listScanSymbols()).thenReturn(List.of("BTCUSDT"));
 
         Map<String, Object> status = service.status();
         String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(status).toLowerCase();
@@ -58,12 +66,12 @@ class LocalRealDataStatusServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> market = (Map<String, Object>) status.get("marketData");
         assertThat(market).containsEntry("provider", "KRAKEN").containsEntry("readyAssetCount", 0L);
-        assertThat((java.util.List<?>) market.get("assets")).hasSize(6);
+        assertThat((java.util.List<?>) market.get("assets")).hasSize(1);
         @SuppressWarnings("unchecked")
         Map<String, Object> providers = (Map<String, Object>) status.get("providers");
         assertThat(providers).containsEntry("primary", "KRAKEN")
                 .containsEntry("krakenPairCacheState", "READY");
-        assertThat((java.util.List<?>) status.get("assets")).hasSize(6);
+        assertThat((java.util.List<?>) status.get("assets")).hasSize(1);
         @SuppressWarnings("unchecked")
         java.util.List<Map<String, Object>> assets = (java.util.List<Map<String, Object>>) status.get("assets");
         assertThat(assets.get(0)).containsEntry("symbol", "BTCUSDT")
@@ -101,6 +109,8 @@ class LocalRealDataStatusServiceTest {
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService);
+        service.setAssetPoolService(assetPoolService);
+        when(assetPoolService.listScanSymbols()).thenReturn(List.of("BTCUSDT"));
 
         Map<String, Object> status = service.status();
 
@@ -116,7 +126,7 @@ class LocalRealDataStatusServiceTest {
     void providerReadinessUsesCurrentBarAgeAndFailsClosedAfterFreshnessWindow() {
         Instant now = Instant.parse("2026-08-10T14:30:00Z");
         LocalRealReadinessService readiness = new LocalRealReadinessService();
-        for (String symbol : LocalRealDataCoordinator.SYMBOLS) {
+        for (String symbol : POOL_SYMBOLS) {
             readiness.updateAsset(symbol, LocalRealAssetReadinessState.READY, "KRAKEN",
                     "REAL_DATA_AVAILABLE");
         }
@@ -136,6 +146,8 @@ class LocalRealDataStatusServiceTest {
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService, Clock.fixed(now, ZoneOffset.UTC));
+        service.setAssetPoolService(assetPoolService);
+        when(assetPoolService.listScanSymbols()).thenReturn(POOL_SYMBOLS);
 
         LocalRealDataStatusService.ProviderReadinessSnapshot freshSnapshot =
                 service.providerReadinessSnapshot();

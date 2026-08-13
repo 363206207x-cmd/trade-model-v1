@@ -15,12 +15,14 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.AnalysisSchedulerService;
+import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStateService;
 import org.example.trademodel.service.DecisionContext;
 import org.example.trademodel.service.HotResetCommand;
 import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
+import org.example.trademodel.service.OpportunityStateIdentity;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +47,7 @@ import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -71,6 +74,7 @@ class HotResetServiceImplTest {
     @Mock private ObjectProvider<AnalysisSchedulerService> schedulerProvider;
     @Mock private AnalysisSchedulerService scheduler;
     @Mock private RuleConfigContractService ruleConfigContractService;
+    @Mock private AssetStateService assetStateService;
 
     private HotResetServiceImpl service;
 
@@ -78,7 +82,7 @@ class HotResetServiceImplTest {
     void setUp() {
         service = new HotResetServiceImpl(assetStateMapper, hotResetEventMapper, decisionResultMapper,
                 executionPlanMapper, pushSnapshotMapper, confusedStateService, userPositionRiskAdapter,
-                schedulerProvider, ruleConfigContractService);
+                schedulerProvider, ruleConfigContractService, assetStateService);
         service.setClock(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
         lenient().when(schedulerProvider.getIfAvailable()).thenReturn(scheduler);
         lenient().when(ruleConfigContractService.requireHotResetThresholds()).thenReturn(thresholds());
@@ -133,8 +137,8 @@ class HotResetServiceImplTest {
         command.setSeverityScore(90);
         command.setSourceType("SYSTEMIC_SOURCE");
         command.setSourceReference("shock-feed");
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 20, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CANDIDATE, 20, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(90, "CANDIDATE", "CONFUSED", true, false, 0, true, "shock", "enter"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.failClosed("AGGREGATE_HIGH_RISK"));
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(1);
@@ -172,8 +176,8 @@ class HotResetServiceImplTest {
     void executionPlanDecisionAndPendingPushAreInvalidatedWithHotResetEventId() {
         HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
         command.setPriceMoveRatio(new BigDecimal("0.10"));
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         when(decisionResultMapper.markHotResetInvalidatedBySymbol(anyString(), anyString(), anyString(), any())).thenReturn(2);
@@ -212,8 +216,8 @@ class HotResetServiceImplTest {
     void rebuildIsTriggeredAfterCommitAndRollbackDoesNotTrigger() {
         TransactionSynchronizationManager.initSynchronization();
         HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
 
@@ -229,8 +233,8 @@ class HotResetServiceImplTest {
     @Test
     void rebuildSuccessAndFailureUpdateEventOutcomeWithoutRestoringOldPlan() {
         HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
@@ -412,11 +416,12 @@ class HotResetServiceImplTest {
         assertThat(event.getValue().getEventTime())
                 .isBetween(LocalDateTime.parse("2026-07-14T11:30:00"), FIXED_UTC)
                 .isEqualTo(FIXED_UTC);
-        ArgumentCaptor<AssetStateDO> core = ArgumentCaptor.forClass(AssetStateDO.class);
         ArgumentCaptor<AssetStateDO> hot = ArgumentCaptor.forClass(AssetStateDO.class);
-        verify(assetStateMapper).mergeUpsertCore(core.capture());
+        verify(assetStateService).transition(
+                eq(OpportunityStateIdentity.system("BTCUSDT", "1m")), any(), anyInt(), anyInt(),
+                eq("ana-test"), anyString(), eq("rules-hot-reset-test"), anyString(),
+                eq(org.example.trademodel.service.OpportunityTriggerSource.HOT_RESET));
         verify(assetStateMapper).updateHotResetColumns(hot.capture());
-        assertThat(core.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
         assertThat(hot.getValue().getLastUpdateTime()).isEqualTo(FIXED_UTC);
         assertThat(hot.getValue().getHotResetTime()).isEqualTo(FIXED_UTC);
         verify(decisionResultMapper).markHotResetInvalidatedBySymbol(
@@ -428,10 +433,50 @@ class HotResetServiceImplTest {
         assertThat(rebuild.getValue().getCompletedAt()).isEqualTo(FIXED_UTC);
     }
 
+    @Test
+    void userAssetPoolHotResetPreservesOwnerAssetAndRuleVersionThroughRebuild() {
+        HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
+        command.setOwnerType("USER");
+        command.setOwnerId(41L);
+        command.setAssetId(7L);
+        command.setRuleVersion("rules-user-41");
+        OpportunityStateIdentity identity = new OpportunityStateIdentity(
+                "USER", 41L, 7L, "BTCUSDT", "1m");
+        when(assetStateMapper.selectByIdentity("USER", 41L, "BTCUSDT", "1m"))
+                .thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(eq(identity), any(DecisionContext.class)))
+                .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING",
+                        false, false, 0, false, "price", "base"));
+        when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
+        when(scheduler.runHotResetRebuild(
+                eq("USER"), eq(41L), eq(7L), eq("BTCUSDT"), eq("1m"), anyString(),
+                eq("ana-test"), eq("trace-test")))
+                .thenReturn(executed("ana-user-rebuild", false, false));
+
+        HotResetResult result = service.evaluateAndExecute(command);
+
+        assertThat(result.getRebuildAnalysisId()).isEqualTo("ana-user-rebuild");
+        verify(assetStateService).transition(
+                eq(identity), any(), anyInt(), anyInt(), eq("ana-test"), eq("trace-test"),
+                eq("rules-user-41"), anyString(),
+                eq(org.example.trademodel.service.OpportunityTriggerSource.HOT_RESET));
+        ArgumentCaptor<AssetStateDO> state = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).updateHotResetColumns(state.capture());
+        assertThat(state.getValue().getOwnerType()).isEqualTo("USER");
+        assertThat(state.getValue().getOwnerId()).isEqualTo(41L);
+        assertThat(state.getValue().getAssetId()).isEqualTo(7L);
+        ArgumentCaptor<HotResetEventDO> event = ArgumentCaptor.forClass(HotResetEventDO.class);
+        verify(hotResetEventMapper).insert(event.capture());
+        assertThat(event.getValue().getOwnerType()).isEqualTo("USER");
+        assertThat(event.getValue().getOwnerId()).isEqualTo(41L);
+        assertThat(event.getValue().getAssetId()).isEqualTo(7L);
+        assertThat(event.getValue().getRuleVersion()).isEqualTo("rules-user-41");
+    }
+
     private void assertUnsafePreStateInvalidates(AssetStateEnum preState) {
         HotResetCommand command = command(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(preState, 10, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(preState, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, preState.name(), "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
@@ -444,8 +489,8 @@ class HotResetServiceImplTest {
     }
 
     private void assertPostStateFor(HotResetCommand command, AssetStateEnum expected, ConfusedResult confusedResult) {
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 54, 1));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class))).thenReturn(confusedResult);
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CONFUSED, 54, 1));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class))).thenReturn(confusedResult);
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
         whenRebuildReturns(executed("ana-rebuild", false, false));
 
@@ -459,6 +504,9 @@ class HotResetServiceImplTest {
         command.setEventKey("event-key-" + eventType.name());
         command.setAnalysisId("ana-test");
         command.setTraceId("trace-test");
+        command.setOwnerType("SYSTEM");
+        command.setOwnerId(0L);
+        command.setRuleVersion("rules-hot-reset-test");
         command.setSymbol("BTCUSDT");
         command.setTimeframe("1m");
         command.setEventType(eventType);
@@ -491,8 +539,8 @@ class HotResetServiceImplTest {
     }
 
     private void mockTriggeredPath() {
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1m")).thenReturn(row(AssetStateEnum.CANDIDATE, 10, 0));
+        when(confusedStateService.calculateConfused(anyString(), eq("1m"), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(80, "CANDIDATE", "OBSERVING", false, false, 0, false, "price", "base"));
         when(userPositionRiskAdapter.currentRiskForSystem()).thenReturn(UserPositionRiskResult.noOpenPosition(0));
     }

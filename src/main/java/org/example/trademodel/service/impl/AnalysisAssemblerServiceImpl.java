@@ -10,6 +10,8 @@ import org.example.trademodel.analysisrun.AnalysisRunIds;
 import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
+import org.example.trademodel.decisionchain.DecisionChainBuildInput;
+import org.example.trademodel.decisionchain.DecisionChainBuildResult;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
@@ -34,6 +36,7 @@ import org.example.trademodel.mapper.*;
 import org.example.trademodel.service.*;
 import org.example.trademodel.service.planboundary.MarketStructureBoundaryExtractor;
 import org.example.trademodel.service.planboundary.SourceTraceBoundaryProducer;
+import org.example.trademodel.service.support.ExecutionFeasibilityAssessmentService;
 import org.example.trademodel.vo.*;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.providercall.AssetPriority;
@@ -76,6 +79,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private final RealMarketEnvironmentService realMarketEnvironmentService;
     private final AssetStateService assetStateService;
     private final RuleConfigService ruleConfigService;
+    private DecisionChainService decisionChainService;
+    private ExecutionFeasibilityAssessmentService executionFeasibilityAssessmentService;
 
     private final AnalysisRunMapper analysisRunMapper;
     private final EvidenceItemMapper evidenceItemMapper;
@@ -168,7 +173,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 missedOpportunityService, opportunityLogService, null, null, null, null);
     }
 
-    @Autowired
     public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
                                         PlanService planService,
                                         DecisionEngineService decisionEngineService,
@@ -216,6 +220,39 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         this.sourceTraceBoundaryProducer = sourceTraceBoundaryProducer;
     }
 
+    @Autowired
+    public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
+                                        PlanService planService,
+                                        DecisionEngineService decisionEngineService,
+                                        RealMarketEnvironmentService realMarketEnvironmentService,
+                                        AssetStateService assetStateService,
+                                        RuleConfigService ruleConfigService,
+                                        AnalysisRunMapper analysisRunMapper,
+                                        EvidenceItemMapper evidenceItemMapper,
+                                        ScoreItemMapper scoreItemMapper,
+                                        DecisionResultMapper decisionResultMapper,
+                                        ExecutionPlanMapper executionPlanMapper,
+                                        AccountRiskSnapshotMapper accountRiskSnapshotMapper,
+                                        MarketEnvironmentSnapshotMapper marketEnvironmentSnapshotMapper,
+                                        PushSnapshotService pushSnapshotService,
+                                        MonitorAlertWriteService monitorAlertWriteService,
+                                        HotResetService hotResetService,
+                                        MissedOpportunityService missedOpportunityService,
+                                        OpportunityLogService opportunityLogService,
+                                        PersistedOhlcvQueryService persistedOhlcvQueryService,
+                                        RuntimeKlineContextAssemblyService runtimeKlineContextAssemblyService,
+                                        MarketStructureBoundaryExtractor marketStructureBoundaryExtractor,
+                                        SourceTraceBoundaryProducer sourceTraceBoundaryProducer,
+                                        DecisionChainService decisionChainService) {
+        this(evidenceService, scoreService, planService, decisionEngineService, realMarketEnvironmentService,
+                assetStateService, ruleConfigService, analysisRunMapper, evidenceItemMapper, scoreItemMapper,
+                decisionResultMapper, executionPlanMapper, accountRiskSnapshotMapper,
+                marketEnvironmentSnapshotMapper, pushSnapshotService, monitorAlertWriteService, hotResetService,
+                missedOpportunityService, opportunityLogService, persistedOhlcvQueryService,
+                runtimeKlineContextAssemblyService, marketStructureBoundaryExtractor, sourceTraceBoundaryProducer);
+        this.decisionChainService = decisionChainService;
+    }
+
     @Autowired(required = false)
     void setDerivativesBusinessIntegration(DerivativesSnapshotReadPort derivativesSnapshotReadPort,
                                            DerivativesBusinessIntegrationService derivativesBusinessIntegrationService,
@@ -229,6 +266,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     void setPersistedRealMarketEnvironmentService(
             PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService) {
         this.persistedRealMarketEnvironmentService = persistedRealMarketEnvironmentService;
+    }
+
+    @Autowired(required = false)
+    void setExecutionFeasibilityAssessmentService(
+            ExecutionFeasibilityAssessmentService executionFeasibilityAssessmentService) {
+        this.executionFeasibilityAssessmentService = executionFeasibilityAssessmentService;
     }
 
     @Value("${trade-model.analysis.require-real-market-environment:false}")
@@ -252,6 +295,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private AssetAnalysisVO assembleInternal(AnalysisExecutionContext context) {
         long assembleStart = System.currentTimeMillis();
         AnalysisExecutionContext effectiveContext = normalizeExecutionContext(context);
+        DecisionChainService requiredDecisionChainService = requireDecisionChainService();
         String analysisId = effectiveContext.getAnalysisId();
         String symbol = effectiveContext.getSymbol();
         String timeframe = effectiveContext.getTimeframe();
@@ -261,7 +305,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
         try {
             MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
-            marketEnv.setSummary("Real K-line data from Binance");
+            marketEnv.setSummary(null);
             String marketEnvSourceType = MARKET_ENV_SOURCE_FALLBACK;
             MarketEnvironmentVO quoteEnv = realMarketEnvironmentService == null ? null
                     : realMarketEnvironmentService.tryBuildFromRealQuote(symbol, timeframe).orElse(null);
@@ -316,7 +360,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             Integer trendStructureScore = extractTrendStructureScore(scores);
             Integer eightScoreComposite = calculateEightScoreComposite(scores);
 
-            DecisionBundleVO decision = decisionEngineService.makeDecision(
+            DecisionBundleVO decision = decisionEngineService.makeDecisionForDecisionChain(
                     symbol,
                     timeframe,
                     analysisId,
@@ -324,26 +368,73 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     trendStructureScore,
                     scoreInput.getEventImpactInput(),
                     derivativesAssessment,
-                    eightScoreComposite);
+                    eightScoreComposite,
+                    new OpportunityStateIdentity(
+                            effectiveContext.getOwnerType(),
+                            effectiveContext.getOwnerId(),
+                            effectiveContext.getAssetId(),
+                            symbol,
+                            timeframe));
             if (derivativesAssessment != null) {
                 derivativesBusinessIntegrationService.applyDecisionAdjustments(decision, derivativesAssessment);
             }
 
-            ExecutionPlanVO plan = generateExecutionPlanFailClosed(
+            ExecutionPlanVO plan = buildRuleExecutionAssessment(
                     decision,
-                    scores,
                     marketEnv,
-                    scoreInput,
                     effectiveContext);
+            plan.setAnalysisTimeframesJson(serializeRequired(
+                    decision.getMultiTimeframeDetails(), "MULTI_TIMEFRAME_SERIALIZATION_FAILED"));
             if (derivativesInput != null && derivativesAssessment != null) {
                 derivativesAssessment = evaluateDerivatives(withPlanBoundary(
-                        derivativesInput, hasCompletePlanBoundary(plan)));
+                        derivativesInput, Boolean.TRUE.equals(plan.getSourceGateComplete())));
                 derivativesBusinessIntegrationService.applyOpportunityState(decision, derivativesAssessment);
-                derivativesBusinessIntegrationService.applyPlanAdjustments(plan, derivativesAssessment);
+                derivativesBusinessIntegrationService.applyRuleAssessmentMetadata(plan, derivativesAssessment);
                 decision.setAssetStateSnapshot(assetStateService.buildSnapshotAtDecision(
                         symbol, analysisId, decision.getAssetState(),
                         decision.getConfusedScore() == null ? 0 : decision.getConfusedScore(),
                         decision.isMultiTimeframeAligned()));
+            }
+
+            UserPositionRiskResult accountRiskResult = currentAccountRisk(effectiveContext);
+            TmAccountRiskSnapshotDO accountRiskSnapshot = pushSnapshotService.prepareDecisionAccountRiskSnapshot(
+                    effectiveContext, decision.getRiskLevel(), accountRiskResult, !effectiveContext.isPreview());
+            DecisionChainBuildResult decisionChain = requiredDecisionChainService.build(new DecisionChainBuildInput(
+                    analysisId,
+                    effectiveContext.getTraceId(),
+                    symbol,
+                    timeframe,
+                    dataQualityScore,
+                    decision,
+                    plan,
+                    evidences,
+                    scores,
+                    effectiveContext.getTriggerType(),
+                    effectiveContext.getOwnerType(),
+                    effectiveContext.getOwnerId(),
+                    effectiveContext.getAssetId(),
+                    effectiveContext.getRuleVersion(),
+                    effectiveContext.isPreview(),
+                    effectiveContext.getRequestId(),
+                    accountRiskSnapshot));
+            if (decisionChain == null) {
+                throw new IllegalStateException("V4_1_DECISION_CHAIN_RESULT_REQUIRED");
+            }
+            if (decisionChain.candidate() != null) {
+                pushSnapshotService.assessCandidate(
+                        accountRiskSnapshot,
+                        decisionChain.candidate(),
+                        decisionChain.conflict() == null ? decision.getRiskLevel()
+                                : decisionChain.conflict().getRiskAfter(),
+                        !effectiveContext.isPreview());
+            }
+            plan = decisionChain.finalPlan();
+            if (plan != null) {
+                plan.setAccountRiskSnapshotId(accountRiskSnapshot == null ? null : accountRiskSnapshot.getId());
+                plan.setAccountRiskJson(pushSnapshotService.accountRiskJson(accountRiskSnapshot));
+                if (accountRiskSnapshot != null) {
+                    plan.setRiskLimit(accountRiskSnapshot.getMaxAllowedExposure());
+                }
             }
 
             AssetAnalysisVO analysis = new AssetAnalysisVO();
@@ -360,7 +451,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             analysis.setDerivativesAssessment(derivativesAssessment);
 
             System.out.println("=== 准备执行落库 saveToDatabase === analysisId=" + analysisId);
-            saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan, marketEnvSourceType);
+            saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan,
+                    marketEnvSourceType, decisionChain);
             System.out.println("=== 落库执行完成 === analysisId=" + analysisId);
 
             return analysis;
@@ -379,6 +471,13 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private DerivativesBusinessAssessment evaluateDerivatives(DerivativesBusinessInput input) {
         if (input == null || derivativesBusinessIntegrationService == null) return null;
         return derivativesBusinessIntegrationService.evaluate(input);
+    }
+
+    private DecisionChainService requireDecisionChainService() {
+        if (decisionChainService == null) {
+            throw new IllegalStateException("V4_1_DECISION_CHAIN_REQUIRED");
+        }
+        return decisionChainService;
     }
 
     private DerivativesBusinessInput buildDerivativesBusinessInput(
@@ -449,33 +548,21 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 input.currentState(), input.snapshot(), input.traceId(), input.analysisId(), input.ruleVersion());
     }
 
-    private static boolean hasCompletePlanBoundary(ExecutionPlanVO plan) {
-        return plan != null
-                && Boolean.TRUE.equals(plan.getSourceGateComplete())
-                && concretePlanValue(plan.getEntryZone())
-                && concretePlanValue(plan.getStopLoss())
-                && concretePlanValue(plan.getTakeProfitRules());
-    }
-
-    private static boolean concretePlanValue(String value) {
-        return value != null && !value.isBlank() && !"暂无".equals(value.trim());
-    }
-
-    private ExecutionPlanVO generateExecutionPlanFailClosed(
+    private ExecutionPlanVO buildRuleExecutionAssessment(
             DecisionBundleVO decision,
-            List<ScoreItemVO> scores,
             MarketEnvironmentVO marketEnv,
-            AssetAnalysisVO analysisContext,
             AnalysisExecutionContext executionContext
     ) {
         SourceTraceBoundaryProducerResult boundaryResult = buildBoundaryProducerResult(
                 decision,
                 marketEnv,
                 executionContext);
-        if (boundaryResult != null) {
-            return planService.generateExecutionPlan(decision, scores, marketEnv, analysisContext, boundaryResult);
+        ExecutionPlanVO plan = planService.buildRuleExecutionAssessment(decision, boundaryResult);
+        if (executionFeasibilityAssessmentService != null) {
+            executionFeasibilityAssessmentService.assessAndApply(
+                    plan, executionContext, boundaryResult, boundaryDirection(decision));
         }
-        return planService.generateExecutionPlan(decision, scores, marketEnv, analysisContext);
+        return plan;
     }
 
     private SourceTraceBoundaryProducerResult buildBoundaryProducerResult(
@@ -625,7 +712,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 requireText(context.getLeaseOwner(), "LEASE_OWNER_REQUIRED"),
                 context.getClaimVersion() != null ? context.getClaimVersion() : 1,
                 context.getAttemptCount() != null ? context.getAttemptCount() : 1,
-                context.isRunAlreadyClaimed());
+                context.isRunAlreadyClaimed(),
+                context.getOwnerType(), context.getOwnerId(), context.getAssetId(), context.isPreview());
     }
 
     private static String normalizeAnalysisSymbol(String raw) {
@@ -662,9 +750,20 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         throw new IllegalStateException("DIRECT_ASSEMBLER_ENTRY_DISABLED");
     }
 
+    private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis,
+                                List<EvidenceItemVO> evidences, List<ScoreItemVO> scores,
+                                DecisionBundleVO decision, ExecutionPlanVO plan,
+                                String marketEnvSourceType) {
+        throw new IllegalStateException("V4_1_DECISION_CHAIN_RESULT_REQUIRED");
+    }
+
     private void saveToDatabase(AnalysisExecutionContext context, AssetAnalysisVO analysis, List<EvidenceItemVO> evidences,
                                 List<ScoreItemVO> scores, DecisionBundleVO decision, ExecutionPlanVO plan,
-                                String marketEnvSourceType) {
+                                String marketEnvSourceType,
+                                DecisionChainBuildResult decisionChain) {
+        if (decisionChain == null) {
+            throw new IllegalStateException("V4_1_DECISION_CHAIN_RESULT_REQUIRED");
+        }
         System.out.println("落库开始 - analysisId = " + analysis.getAnalysisId());
         String decisionInvalidCondition = null;
         HotResetCommand hotResetCommand = null;
@@ -699,6 +798,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             run.setCreatedAt(persistStartedAt);
             run.setUpdatedAt(persistStartedAt);
             run.setVersionNo(context.getClaimVersion() != null ? context.getClaimVersion() : 1);
+            run.setOwnerType(context.getOwnerType());
+            run.setOwnerId(context.getOwnerId());
+            run.setAssetId(context.getAssetId());
+            run.setPreview(context.isPreview());
             if (!context.isRunAlreadyClaimed()) {
                 analysisRunMapper.insert(run);
             }
@@ -715,6 +818,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     edo.setStrength(e.getStrength());
                     edo.setConfidence(e.getConfidence());
                     edo.setSource(EvidenceTypeConstants.normalizeEvidenceSource(e.getSource()));
+                    edo.setCurrentValue(e.getCurrentValue());
+                    edo.setChangeFromBaseline(e.getChangeFromBaseline());
+                    edo.setObservedAt(e.getObservedAt());
+                    edo.setFreshness(e.getFreshness());
                     edo.setSourceProvider(e.getSourceProvider());
                     edo.setSourceReference(e.getSourceReference());
                     edo.setSourceTraceId(e.getSourceTraceId());
@@ -733,6 +840,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             if (scores != null) {
                 for (ScoreItemVO s : scores) {
                     ScoreItemDO sdo = new ScoreItemDO();
+                    sdo.setScoreId(s.getScoreId());
                     sdo.setAnalysisId(analysis.getAnalysisId());
                     sdo.setScoreType(s.getScoreType());
                     sdo.setScoreValue(s.getScoreValue());
@@ -788,31 +896,47 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 ddo.setAiConflictLevel(decision.getAiConflictLevel());
                 ddo.setAiConflictScore(decision.getAiConflictScore());
                 ddo.setAiPlanMode(decision.getAiPlanMode());
+                ddo.setRuleMarketBias(decision.getRuleMarketBias());
+                ddo.setFinalMarketBias(decision.getFinalMarketBias());
+                ddo.setRuleConfidence(decision.getRuleConfidence());
+                ddo.setRuleRisk(decision.getRuleRisk());
+                ddo.setRulePlanMode(decision.getRulePlanMode());
+                ddo.setRuleCanExecute(decision.getRuleCanExecute());
+                ddo.setCandidatePlanMode(decision.getCandidatePlanMode());
+                ddo.setFinalPlanMode(decision.getFinalPlanMode());
+                ddo.setBiasAdjustmentReason(decision.getBiasAdjustmentReason());
+                ddo.setPlanModeAdjustmentReason(decision.getPlanModeAdjustmentReason());
                 ddo.setConfusedScore(decision.getConfusedScore());
                 ddo.setAssetStateSnapshot(decision.getAssetStateSnapshot());
                 ddo.setCreateTime(decisionCreateTime);
                 decisionResultMapper.insert(ddo);
                 persistedDecision = ddo;
 
-                int confused = decision.getConfusedScore() != null ? decision.getConfusedScore() : 0;
-                hotResetCommand = buildStructuredHotResetCommand(analysis, decision, marketEnvSourceType, run.getTraceId());
-                hotWouldReset = hotResetCommand != null && hotResetService.shouldTriggerHotReset(hotResetCommand);
-
-                if (decision.getAssetState() != null) {
-                    assetStateService.persistAuthoritativeState(
-                            analysis.getSymbol(),
-                            decision.getAssetState(),
-                            confused,
-                            decision.getConfusedLowStreak() != null ? decision.getConfusedLowStreak() : 0,
-                            run.getTraceId());
+                if (!context.isPreview()) {
+                    hotResetCommand = buildStructuredHotResetCommand(analysis, decision, marketEnvSourceType, run.getTraceId());
+                    if (hotResetCommand != null) {
+                        hotResetCommand.setOwnerType(run.getOwnerType());
+                        hotResetCommand.setOwnerId(run.getOwnerId());
+                        hotResetCommand.setAssetId(run.getAssetId());
+                        hotResetCommand.setRuleVersion(run.getRuleVersion());
+                    }
+                    hotWouldReset = hotResetCommand != null && hotResetService.shouldTriggerHotReset(hotResetCommand);
                 }
+
             }
 
             persistMarketEnvironmentSnapshot(analysis, marketEnvSourceType);
 
-            Long accountRiskSnapshotId = pushSnapshotService.ensureAccountRiskSnapshot(run, analysis, decision, plan);
+            Long accountRiskSnapshotId = plan == null ? null : plan.getAccountRiskSnapshotId();
+            if (plan != null) {
+                plan.setAccountRiskSnapshotId(accountRiskSnapshotId);
+            }
 
-            pushSnapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, accountRiskSnapshotId);
+            if (!context.isPreview()) {
+                pushSnapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, accountRiskSnapshotId);
+            }
+
+            requireDecisionChainService().persist(decisionChain);
 
             // 5. ExecutionPlan
             if (plan != null) {
@@ -832,17 +956,83 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setTakeProfitRules(plan.getTakeProfitRules());
                 pdo.setLeverageSuggestion(plan.getLeverageSuggestion());
                 pdo.setPositionSuggestion(plan.getPositionSuggestion());
-                pdo.setAccountRiskJson(buildExecutionAccountRiskJson(analysis.getAnalysisId()));
+                pdo.setAccountRiskJson(plan.getAccountRiskJson() != null
+                        ? plan.getAccountRiskJson() : buildExecutionAccountRiskJson(analysis.getAnalysisId()));
+                pdo.setExecutionFeasibilityStatus(plan.getExecutionFeasibilityStatus());
+                pdo.setSlippageStatus(plan.getSlippageStatus());
+                pdo.setDepthStatus(plan.getDepthStatus());
+                pdo.setEntryDriftStatus(plan.getEntryDriftStatus());
+                pdo.setTriggerStatus(plan.getTriggerStatus());
+                pdo.setExecutionFeasibilityReason(plan.getExecutionFeasibilityReason());
+                pdo.setExecutionFeasibilityObservedAt(plan.getExecutionFeasibilityObservedAt());
+                pdo.setExecutionFeasibilityFreshUntil(plan.getExecutionFeasibilityFreshUntil());
+                pdo.setExecutionFeasibilitySourceRefsJson(plan.getExecutionFeasibilitySourceRefsJson());
                 String planInvalidCondition = plan.getInvalidCondition();
                 pdo.setInvalidCondition(planInvalidCondition != null && !planInvalidCondition.trim().isEmpty()
                         ? planInvalidCondition
                         : null);
+                pdo.setInvalidationSource(plan.getInvalidationSource());
+                pdo.setInvalidationReason(plan.getInvalidationReason());
                 pdo.setManualReviewRequired(booleanOrTrue(plan.getManualReviewRequired()));
                 pdo.setNotTradeInstruction(booleanOrTrue(plan.getNotTradeInstruction()));
                 pdo.setNotExecutable(booleanOrTrue(plan.getNotExecutable()));
                 pdo.setNotAutoTrading(booleanOrTrue(plan.getNotAutoTrading()));
                 pdo.setNotOrderExecution(booleanOrTrue(plan.getNotOrderExecution()));
                 pdo.setNotUserPositionCreation(booleanOrTrue(plan.getNotUserPositionCreation()));
+                pdo.setCandidateId(plan.getCandidateId());
+                pdo.setOpportunityId(plan.getOpportunityId());
+                pdo.setResolverResultId(plan.getResolverResultId());
+                pdo.setTraceId(plan.getTraceId());
+                pdo.setChainStatus(plan.getChainStatus());
+                pdo.setRuleValidationStatus(plan.getRuleValidationStatus());
+                pdo.setRuleVetoReason(plan.getRuleVetoReason());
+                pdo.setFinalizedAt(plan.getFinalizedAt());
+                pdo.setFinalPlan(Boolean.TRUE.equals(plan.getFinalPlan()));
+                pdo.setAssetId(plan.getAssetId());
+                pdo.setRuleVersion(plan.getRuleVersion());
+                pdo.setRuleMarketBias(plan.getRuleMarketBias());
+                pdo.setFinalMarketBias(plan.getFinalMarketBias());
+                pdo.setCandidatePlanMode(plan.getCandidatePlanMode());
+                pdo.setFinalPlanMode(plan.getFinalPlanMode());
+                pdo.setBiasAdjustmentReason(plan.getBiasAdjustmentReason());
+                pdo.setPlanModeAdjustmentReason(plan.getPlanModeAdjustmentReason());
+                pdo.setAdjustmentReason(plan.getAdjustmentReason());
+                pdo.setDowngradeReason(plan.getDowngradeReason());
+                pdo.setOpportunityType(plan.getOpportunityType());
+                pdo.setEntryLogic(plan.getEntryLogic());
+                pdo.setEntrySource(plan.getEntrySource());
+                pdo.setEntryReason(plan.getEntryReason());
+                pdo.setTriggerCondition(plan.getTriggerCondition());
+                pdo.setStopLogic(plan.getStopLogic());
+                pdo.setStopSource(plan.getStopSource());
+                pdo.setStopReason(plan.getStopReason());
+                pdo.setTargetLogic(plan.getTargetLogic());
+                pdo.setTargetSource(plan.getTargetSource());
+                pdo.setTargetReason(plan.getTargetReason());
+                pdo.setAddPositionCondition(plan.getAddPositionCondition());
+                pdo.setReducePositionCondition(plan.getReducePositionCondition());
+                pdo.setAbandonCondition(plan.getAbandonCondition());
+                pdo.setRiskExplanation(plan.getRiskExplanation());
+                pdo.setLeverageLimit(plan.getLeverageLimit());
+                pdo.setPositionLimit(plan.getPositionLimit());
+                pdo.setRiskLimit(plan.getRiskLimit());
+                pdo.setExpectedRiskReward(plan.getExpectedRiskReward());
+                pdo.setExpectedRiskRewardSource(plan.getExpectedRiskRewardSource());
+                pdo.setExpectedRiskRewardReason(plan.getExpectedRiskRewardReason());
+                pdo.setAccountRiskSnapshotId(plan.getAccountRiskSnapshotId());
+                pdo.setAnalysisTimeframesJson(plan.getAnalysisTimeframesJson());
+                pdo.setTriggerTimeframe(plan.getTriggerTimeframe());
+                pdo.setValidFrom(plan.getValidFrom());
+                pdo.setValidUntil(plan.getValidUntil());
+                pdo.setHoldingHorizon(plan.getHoldingHorizon());
+                pdo.setRevalidationRule(plan.getRevalidationRule());
+                pdo.setDataQuality(plan.getDataQuality());
+                pdo.setSourceRefsJson(plan.getSourceRefsJson());
+                pdo.setEvidenceRefsJson(plan.getEvidenceRefsJson());
+                pdo.setScoreRefsJson(plan.getScoreRefsJson());
+                pdo.setValidationResultId(plan.getValidationResultId());
+                pdo.setValidationReasons(joinReasons(plan.getValidationReasons()));
+                pdo.setSourceStatus(plan.getSourceStatus());
                 pdo.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
                 pdo.setRevalidationReason(plan.getRevalidationReason());
                 pdo.setCreateTime(utcLocalNow());
@@ -850,7 +1040,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 persistedPlan = pdo;
             }
 
-            if (!hotWouldReset && persistedDecision != null && persistedPlan != null) {
+            if (!context.isPreview() && !hotWouldReset && persistedDecision != null && persistedPlan != null
+                    && Boolean.TRUE.equals(persistedPlan.getFinalPlan())) {
                 opportunityLogService.recordFromAuthoritativeAnalysis(
                         run,
                         persistedDecision,
@@ -859,11 +1050,13 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                         run.getTraceId());
             }
 
-            if (hotWouldReset && hotResetCommand != null) {
+            if (!context.isPreview() && hotWouldReset && hotResetCommand != null) {
                 hotResetService.evaluateAndExecute(hotResetCommand);
             }
 
-            monitorAlertWriteService.emitAfterAnalysisPersist(run, analysis, decision);
+            if (!context.isPreview()) {
+                monitorAlertWriteService.emitAfterAnalysisPersist(run, analysis, decision);
+            }
 
             if (context.isRunAlreadyClaimed()) {
                 int updated = analysisRunMapper.markSuccess(
@@ -1119,9 +1312,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
      * 同源窄模板（以前缀 {@link #DQ_OI_EXPLANATORY_DESC_PREFIX}、后缀 {@link #DQ_OI_EXPLANATORY_DESC_SUFFIX} 识别）。
      * 以上条目均<strong>不计入</strong>将 DQ 从 55 抬向 85 的 evidence 计数，避免「解释增强 = 输入档跳升」。
      * <p><b>条数三档：</b>{@code effectiveEv==0 && sc==0 → 35}；{@code effectiveEv &lt; 2 → 55}；否则 {@code 85}（{@code sc} 为评分条数）。
-     * <p><b>sourceType 封顶：</b>若 {@code marketEnvSourceType == PLACEHOLDER_FALLBACK}，结果<strong>最高不超过 55</strong>；
+     * <p><b>sourceType 真实性门禁：</b>若 {@code marketEnvSourceType == PLACEHOLDER_FALLBACK}，结果固定为 {@code 0}，
+     * 占位来源不能提供可用于决策或 AI 调用的数据质量分；
      * 若为 {@code BINANCE_24H_HEURISTIC}、{@code BINANCE_SPOT_PERP_MIN_HEURISTIC}、{@code BINANCE_USDM_OI_MIN_HEURISTIC}、{@code BINANCE_SPOT_PERP_OI_MIN_HEURISTIC} 等，保持条数档结果不变。
-     * <p><b>语义边界：</b>assemble 链上的<strong>稀疏档位 + 单信号封顶</strong>；仍<strong>不是</strong>{@code PROJECT_SPEC.md}
+     * <p><b>语义边界：</b>assemble 链上的<strong>稀疏档位 + 来源真实性门禁</strong>；仍<strong>不是</strong>{@code PROJECT_SPEC.md}
      * 中「数据源扣分矩阵」或规格级 70/85 熔断的完整实现，决策主路径亦未据此接线。勿将本整数误读为 tm_data_source_health 类矩阵得分。
      */
     static int estimateDataQualityScore(List<EvidenceItemVO> evidences, List<ScoreItemVO> scores,
@@ -1136,9 +1330,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         } else {
             base = 85;
         }
-        if (MARKET_ENV_SOURCE_FALLBACK.equals(marketEnvSourceType)) {
-            return Math.min(base, 55);
-        }
+        if (MARKET_ENV_SOURCE_FALLBACK.equals(marketEnvSourceType)) return 0;
         return base;
     }
 
@@ -1453,11 +1645,26 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
     }
 
+    private UserPositionRiskResult currentAccountRisk(AnalysisExecutionContext context) {
+        if (userPositionRiskAdapter == null || context == null) return null;
+        try {
+            return "USER".equalsIgnoreCase(context.getOwnerType())
+                    ? userPositionRiskAdapter.currentRiskForUser(context.getOwnerId())
+                    : userPositionRiskAdapter.currentRiskForSystem();
+        } catch (RuntimeException failure) {
+            log.warn("[account-risk] fail closed analysisId={} reason={}",
+                    context.getAnalysisId(), failure.getClass().getSimpleName());
+            return null;
+        }
+    }
+
     private void insertScoreItemWithRetry(ScoreItemDO scoreItemDO) {
         // 仅处理 score_id 主键冲突，快速重试以恢复样本生成链路。
         final int maxAttempts = 3;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            scoreItemDO.setScoreId(AnalysisPersistenceIds.scoreId());
+            if (scoreItemDO.getScoreId() == null || scoreItemDO.getScoreId().isBlank() || attempt > 1) {
+                scoreItemDO.setScoreId(AnalysisPersistenceIds.scoreId());
+            }
             try {
                 scoreItemMapper.insert(scoreItemDO);
                 return;
@@ -1569,5 +1776,13 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
     private LocalDateTime utcLocalNow() {
         return LocalDateTime.ofInstant(assemblerClock.instant(), ZoneOffset.UTC);
+    }
+
+    private static String serializeRequired(Object value, String failureCode) {
+        try {
+            return EXPLAIN_JSON.writeValueAsString(value);
+        } catch (Exception serializationFailure) {
+            throw new IllegalStateException(failureCode, serializationFailure);
+        }
     }
 }

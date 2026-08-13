@@ -2,10 +2,12 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.req.WriteReviewResultReq;
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.RuleVersionLogDO;
 import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
@@ -40,6 +42,9 @@ class ReviewServiceImplTest {
 
     @Mock
     private UserPositionMapper userPositionMapper;
+
+    @Mock
+    private ExecutionPlanMapper executionPlanMapper;
 
     @Test
     void saveOrUpdate_insertBranch_writesRuleVersionLog_whenRuleVersionMissingAndErrorTypeBlank() {
@@ -233,9 +238,84 @@ class ReviewServiceImplTest {
         verify(ruleVersionLogMapper, never()).insert(any());
     }
 
+    @Test
+    void updateBackfillsTheValidatedDecisionChainOwnershipWithoutAiTraceSubstitution() {
+        ReviewServiceImpl service = service();
+        WriteReviewResultReq req = new WriteReviewResultReq();
+        req.setAnalysisId("analysis-review-chain");
+        req.setReviewType("blocked_by_risk_valid");
+        req.setOutcome("DIRECTION_LATER_CONFIRMED");
+        req.setExecutionDeviation("NOT_EXECUTED");
+        req.setAiAssessment("GEMINI_DOWNGRADE_WAS_USEFUL");
+        req.setRuleAssessment("RISK_BLOCK_WAS_CONSERVATIVE");
+        req.setRuleFeedback("RECALIBRATE_RISK_THRESHOLD");
+        req.setMetricsJson(readyMetricsJson());
+
+        ReviewResultDO existing = reviewRow(
+                "review-chain", "analysis-review-chain", null, null, null);
+        when(reviewResultMapper.selectByAnalysisId("analysis-review-chain"))
+                .thenReturn(existing)
+                .thenReturn(existing);
+
+        ExecutionPlanDO finalPlan = new ExecutionPlanDO();
+        finalPlan.setPlanId("final-plan-1");
+        finalPlan.setAnalysisId("analysis-review-chain");
+        finalPlan.setCandidateId("candidate-1");
+        finalPlan.setTraceId("trace-gpt-1");
+        finalPlan.setOpportunityId("opportunity-1");
+        finalPlan.setResolverResultId("resolver-1");
+        finalPlan.setValidationResultId("validation-1");
+        finalPlan.setFinalPlan(true);
+        finalPlan.setRuleValidationStatus("PASS");
+        when(executionPlanMapper.selectLatestByAnalysisId("analysis-review-chain"))
+                .thenReturn(finalPlan);
+
+        service.saveOrUpdate(req);
+
+        ArgumentCaptor<ReviewResultDO> captor = ArgumentCaptor.forClass(ReviewResultDO.class);
+        verify(reviewResultMapper).updateContentByAnalysisId(captor.capture());
+        assertThat(captor.getValue()).satisfies(row -> {
+            assertThat(row.getReviewType()).isEqualTo("BLOCKED_BY_RISK_VALID");
+            assertThat(row.getFinalPlanId()).isEqualTo("final-plan-1");
+            assertThat(row.getCandidateId()).isEqualTo("candidate-1");
+            assertThat(row.getTraceId()).isEqualTo("trace-gpt-1");
+            assertThat(row.getOpportunityId()).isEqualTo("opportunity-1");
+            assertThat(row.getResolverResultId()).isEqualTo("resolver-1");
+            assertThat(row.getValidationResultId()).isEqualTo("validation-1");
+            assertThat(row.getAiAssessment()).isEqualTo("GEMINI_DOWNGRADE_WAS_USEFUL");
+            assertThat(row.getRuleAssessment()).isEqualTo("RISK_BLOCK_WAS_CONSERVATIVE");
+            assertThat(row.getMetricsJson()).contains("evidenceTraceabilityRate");
+        });
+    }
+
     private ReviewServiceImpl service() {
         return new ReviewServiceImpl(
-                reviewResultMapper, analysisRunMapper, ruleVersionLogMapper, userPositionMapper);
+                reviewResultMapper, analysisRunMapper, ruleVersionLogMapper,
+                userPositionMapper, executionPlanMapper);
+    }
+
+    private static String readyMetricsJson() {
+        return """
+                {
+                  "schemaVersion":"FUNDAMENTAL_AI_V4_1_REVIEW_METRICS",
+                  "dataState":"READY",
+                  "evidenceTraceabilityRate":1.0,
+                  "structuredOutputCompletenessRate":{
+                    "byRole":{"GPT_FINAL":1.0,"GEMINI_REVIEW":1.0,"GROK_CHALLENGE":1.0},
+                    "byPlanMode":{"CONFIRMATION":1.0,"REDUCED":1.0,"PREPARATION":1.0,"OBSERVATION":1.0}
+                  },
+                  "unsupportedConclusionRate":0.0,
+                  "fabricatedFillRate":0.0,
+                  "confidenceCalibration":0.95,
+                  "falsePositiveCount":0,
+                  "falseNegativeCount":0,
+                  "missedValidOpportunityCount":0,
+                  "planModeEffectiveness":{"CONFIRMATION":0.9,"REDUCED":0.8,"PREPARATION":0.7,"OBSERVATION":0.6},
+                  "effectiveDowngradeRate":0.8,
+                  "failurePathHitRate":0.5,
+                  "opportunityOmissionQuality":{"MISSED_VALID":0,"PUSHED_NOT_FILLED_VALID":0,"BLOCKED_BY_RISK_VALID":0}
+                }
+                """;
     }
 
     private static ReviewResultDO reviewRow(String id,

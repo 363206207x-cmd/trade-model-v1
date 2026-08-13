@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.DashboardReadService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +16,12 @@ import java.util.Map;
 @RequestMapping("/api/dashboard")
 public class DashboardOverviewController {
     private final DashboardReadService dashboardReadService;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
-    public DashboardOverviewController(DashboardReadService dashboardReadService) {
+    public DashboardOverviewController(DashboardReadService dashboardReadService,
+                                       AuthenticatedUserIdResolver userIdResolver) {
         this.dashboardReadService = dashboardReadService;
+        this.userIdResolver = userIdResolver;
     }
 
     @GetMapping("/overview")
@@ -43,7 +47,8 @@ public class DashboardOverviewController {
         if (blank(analysisId) && blank(traceId) && blank(requestId)) {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest("analysisId, traceId, or requestId is required"));
         }
-        Map<String, Object> summary = dashboardReadService.traceSummary(analysisId, traceId, requestId);
+        Map<String, Object> summary = dashboardReadService.traceSummary(
+                userIdResolver.requireCurrentUserId(), analysisId, traceId, requestId);
         if ("NOT_FOUND".equals(summary.get("traceStatus"))) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis trace not found"));
         }

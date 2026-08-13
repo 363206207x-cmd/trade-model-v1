@@ -454,9 +454,14 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
     private static AssetStateDO assetState(String traceId, LocalDateTime time) {
         AssetStateDO row = new AssetStateDO();
         row.setSymbol("BTCUSDT");
+        row.setTimeframe("1h");
         row.setState(AssetStateEnum.CANDIDATE);
         row.setConfusedScore(0);
         row.setConfusedLowStreak(0);
+        row.setOpportunityId("opp-btcusdt-1h");
+        row.setStateEnteredAt(time);
+        row.setLastTransitionReason("CONTROLLED_POSTGRESQL_FIXTURE");
+        row.setLastTriggerSource("MANUAL_API");
         row.setLastUpdateTime(time);
         row.setTraceId(traceId);
         return row;
@@ -473,7 +478,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setStopLoss(new BigDecimal("99"));
         row.setTakeProfit(new BigDecimal("103"));
         row.setOpenedAt(AS_OF_UTC.minusHours(2));
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(planId));
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);

@@ -13,6 +13,8 @@ public class AssetStateDO {
 
     private String symbol;
 
+    private String timeframe;
+
     /** 存库为枚举名，与 {@link AssetStateEnum} 一致 */
     private AssetStateEnum state;
 
@@ -32,9 +34,32 @@ public class AssetStateDO {
 
     private String postResetState;
 
+    private String opportunityId;
+
+    private LocalDateTime stateEnteredAt;
+
+    private LocalDateTime coolingUntil;
+
+    private String lastTransitionReason;
+
+    private String lastTriggerSource;
+
+    private String lastAnalysisId;
+
     private LocalDateTime lastUpdateTime = LocalDateTime.now();
 
     private String traceId;
+    private String ownerType = "SYSTEM";
+    private Long ownerId = 0L;
+    private Long assetId;
+    private Long poolItemId;
+    private Integer opportunityScore;
+    private String confidence;
+    private String risk;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String ruleVersion;
+    private String extJson;
 
     public Long getId() {
         return id;
@@ -51,6 +76,9 @@ public class AssetStateDO {
     public void setSymbol(String symbol) {
         this.symbol = symbol;
     }
+
+    public String getTimeframe() { return timeframe; }
+    public void setTimeframe(String timeframe) { this.timeframe = timeframe; }
 
     public AssetStateEnum getState() {
         return state;
@@ -124,6 +152,19 @@ public class AssetStateDO {
         this.postResetState = postResetState;
     }
 
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+    public LocalDateTime getStateEnteredAt() { return stateEnteredAt; }
+    public void setStateEnteredAt(LocalDateTime stateEnteredAt) { this.stateEnteredAt = stateEnteredAt; }
+    public LocalDateTime getCoolingUntil() { return coolingUntil; }
+    public void setCoolingUntil(LocalDateTime coolingUntil) { this.coolingUntil = coolingUntil; }
+    public String getLastTransitionReason() { return lastTransitionReason; }
+    public void setLastTransitionReason(String lastTransitionReason) { this.lastTransitionReason = lastTransitionReason; }
+    public String getLastTriggerSource() { return lastTriggerSource; }
+    public void setLastTriggerSource(String lastTriggerSource) { this.lastTriggerSource = lastTriggerSource; }
+    public String getLastAnalysisId() { return lastAnalysisId; }
+    public void setLastAnalysisId(String lastAnalysisId) { this.lastAnalysisId = lastAnalysisId; }
+
     public LocalDateTime getLastUpdateTime() {
         return lastUpdateTime;
     }
@@ -139,4 +180,26 @@ public class AssetStateDO {
     public void setTraceId(String traceId) {
         this.traceId = traceId;
     }
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public Long getAssetId() { return assetId; }
+    public void setAssetId(Long assetId) { this.assetId = assetId; }
+    public Long getPoolItemId() { return poolItemId; }
+    public void setPoolItemId(Long poolItemId) { this.poolItemId = poolItemId; }
+    public Integer getOpportunityScore() { return opportunityScore; }
+    public void setOpportunityScore(Integer opportunityScore) { this.opportunityScore = opportunityScore; }
+    public String getConfidence() { return confidence; }
+    public void setConfidence(String confidence) { this.confidence = confidence; }
+    public String getRisk() { return risk; }
+    public void setRisk(String risk) { this.risk = risk; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getRuleVersion() { return ruleVersion; }
+    public void setRuleVersion(String ruleVersion) { this.ruleVersion = ruleVersion; }
+    public String getExtJson() { return extJson; }
+    public void setExtJson(String extJson) { this.extJson = extJson; }
 }

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.analysisrun.AnalysisExecutionContext;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
+import org.example.trademodel.decisionchain.DecisionChainBuildResult;
+import org.example.trademodel.decisionchain.RuleValidationResult;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.enums.AssetStateEnum;
@@ -16,6 +18,7 @@ import org.example.trademodel.mapper.MarketEnvironmentSnapshotMapper;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.DecisionEngineService;
+import org.example.trademodel.service.DecisionChainService;
 import org.example.trademodel.service.EvidenceService;
 import org.example.trademodel.service.HotResetService;
 import org.example.trademodel.service.MissedOpportunityService;
@@ -46,9 +49,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +70,8 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
     private PlanService planService;
     @Mock
     private DecisionEngineService decisionEngineService;
+    @Mock
+    private DecisionChainService decisionChainService;
     @Mock
     private AssetStateService assetStateService;
     @Mock
@@ -118,15 +125,18 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 hotResetService,
                 missedOpportunityService,
                 opportunityLogService);
+        ReflectionTestUtils.setField(service, "decisionChainService", decisionChainService);
     }
 
     @Test
     void saveToDatabase_writesNonNullAccountRiskJson_withSevenKeys_whenSnapshotWrittenBeforeExecution() throws Exception {
         String analysisId = "ana-risk-json-1";
         Long snapshotId = 101L;
-        when(pushSnapshotService.ensureAccountRiskSnapshot(any(), any(), any(), any())).thenReturn(snapshotId);
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId))
                 .thenReturn(mockSnapshot());
+        ExecutionPlanVO plan = mockPlan();
+        plan.setAccountRiskSnapshotId(snapshotId);
+        DecisionChainBuildResult chain = decisionChain(plan);
 
         ReflectionTestUtils.invokeMethod(
                 service,
@@ -136,8 +146,9 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 mockDecision(true, "price breaks decision support"),
-                mockPlan(),
-                "BINANCE_24H_HEURISTIC");
+                plan,
+                "BINANCE_24H_HEURISTIC",
+                chain);
 
         ArgumentCaptor<ExecutionPlanDO> planCaptor = ArgumentCaptor.forClass(ExecutionPlanDO.class);
         verify(executionPlanMapper).insert(planCaptor.capture());
@@ -158,9 +169,10 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 "snapshotVersion");
         assertThat(names).hasSize(7);
 
-        InOrder inOrder = inOrder(pushSnapshotService, accountRiskSnapshotMapper, executionPlanMapper, pushSnapshotService);
-        inOrder.verify(pushSnapshotService).ensureAccountRiskSnapshot(any(), any(), any(), any());
+        InOrder inOrder = inOrder(pushSnapshotService, decisionChainService,
+                accountRiskSnapshotMapper, executionPlanMapper);
         inOrder.verify(pushSnapshotService).insertAuthoritativeSnapshot(any(), any(), any(), any(), eq(snapshotId));
+        inOrder.verify(decisionChainService).persist(chain);
         inOrder.verify(accountRiskSnapshotMapper).selectLatestByAnalysisId(analysisId);
         inOrder.verify(executionPlanMapper).insert(any(ExecutionPlanDO.class));
     }
@@ -168,8 +180,9 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
     @Test
     void saveToDatabase_keepsExecutionInsert_whenNoSnapshot() {
         String analysisId = "ana-risk-json-2";
-        when(pushSnapshotService.ensureAccountRiskSnapshot(any(), any(), any(), any())).thenReturn(null);
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId)).thenReturn(null);
+        ExecutionPlanVO plan = mockPlan();
+        DecisionChainBuildResult chain = decisionChain(plan);
 
         ReflectionTestUtils.invokeMethod(
                 service,
@@ -179,23 +192,26 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 mockDecision(false, null),
-                mockPlan(),
-                "BINANCE_24H_HEURISTIC");
+                plan,
+                "BINANCE_24H_HEURISTIC",
+                chain);
 
         ArgumentCaptor<ExecutionPlanDO> planCaptor = ArgumentCaptor.forClass(ExecutionPlanDO.class);
         verify(executionPlanMapper).insert(planCaptor.capture());
         assertThat(planCaptor.getValue().getAccountRiskJson()).isNull();
         assertThat(planCaptor.getValue().getInvalidCondition()).isNull();
-        verify(pushSnapshotService).ensureAccountRiskSnapshot(any(), any(), any(), any());
         verify(pushSnapshotService).insertAuthoritativeSnapshot(any(), any(), any(), any(), eq(null));
+        verify(decisionChainService).persist(chain);
         verify(monitorAlertWriteService).emitAfterAnalysisPersist(any(), any(), any());
     }
 
     @Test
     void saveToDatabase_whenNotWorthOpeningAndPlanPresent_stillWritesExecutionRiskJson() throws Exception {
         String analysisId = "ana-risk-json-3";
-        when(pushSnapshotService.ensureAccountRiskSnapshot(any(), any(), any(), any())).thenReturn(202L);
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId)).thenReturn(mockDecisionNotWorthOpeningSnapshot());
+        ExecutionPlanVO plan = mockPlan();
+        plan.setAccountRiskSnapshotId(202L);
+        DecisionChainBuildResult chain = decisionChain(plan);
 
         ReflectionTestUtils.invokeMethod(
                 service,
@@ -205,8 +221,9 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 mockDecision(false, "decision says invalid after trend reversal"),
-                mockPlan(),
-                "BINANCE_24H_HEURISTIC");
+                plan,
+                "BINANCE_24H_HEURISTIC",
+                chain);
 
         ArgumentCaptor<ExecutionPlanDO> planCaptor = ArgumentCaptor.forClass(ExecutionPlanDO.class);
         verify(executionPlanMapper).insert(planCaptor.capture());
@@ -217,12 +234,12 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         assertThat(jsonNode.path("riskReasonCode").asText()).isEqualTo("DECISION_NOT_WORTH_OPENING");
 
         verify(pushSnapshotService).insertAuthoritativeSnapshot(any(), any(), any(), any(), eq(202L));
+        verify(decisionChainService).persist(chain);
     }
 
     @Test
     void saveToDatabase_persistsExternalBlockedHighRiskAssetStateInsteadOfCandidate() {
         String analysisId = "ana-risk-json-external-blocked";
-        when(pushSnapshotService.ensureAccountRiskSnapshot(any(), any(), any(), any())).thenReturn(null);
         when(accountRiskSnapshotMapper.selectLatestByAnalysisId(analysisId)).thenReturn(null);
         DecisionBundleVO decision = mockDecision(false, "external context blocked");
         decision.setAssetState(AssetStateEnum.HIGH_RISK);
@@ -230,6 +247,8 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         decision.setConfusedScore(0);
         decision.setConfusedLowStreak(0);
 
+        ExecutionPlanVO plan = mockPlan();
+        DecisionChainBuildResult chain = decisionChain(plan);
         ReflectionTestUtils.invokeMethod(
                 service,
                 "saveToDatabase",
@@ -238,15 +257,13 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 decision,
-                mockPlan(),
-                "BINANCE_24H_HEURISTIC");
+                plan,
+                "BINANCE_24H_HEURISTIC",
+                chain);
 
-        verify(assetStateService).persistAuthoritativeState(
-                eq("BTCUSDT"),
-                eq(AssetStateEnum.HIGH_RISK),
-                eq(0),
-                eq(0),
-                any());
+        verify(decisionChainService).persist(chain);
+        verify(assetStateService, never()).persistAuthoritativeState(
+                any(), any(), any(), anyInt(), anyInt(), any());
     }
 
     private static AnalysisExecutionContext context(String analysisId) {
@@ -293,6 +310,15 @@ class AnalysisAssemblerServiceImplAccountRiskJsonTest {
         vo.setLeverageSuggestion("2x");
         vo.setPositionSuggestion("10%");
         return vo;
+    }
+
+    private static DecisionChainBuildResult decisionChain(ExecutionPlanVO plan) {
+        return new DecisionChainBuildResult(
+                null,
+                null,
+                null,
+                RuleValidationResult.pass(),
+                plan);
     }
 
     private static DecisionBundleVO mockDecision(boolean worthOpening, String invalidCondition) {

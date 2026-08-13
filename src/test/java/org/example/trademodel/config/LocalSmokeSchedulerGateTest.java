@@ -148,6 +148,7 @@ class LocalSmokeSchedulerGateTest {
                     properties.getScheduler().setEnabled(true);
                     return properties;
                 })
+                .withPropertyValues("trade-model.schedulers.position-sync.enabled=true")
                 .run(context -> {
                     reset(mocks.pushSnapshotMapper, mocks.positionSyncService, mocks.analysisSchedulerService);
 

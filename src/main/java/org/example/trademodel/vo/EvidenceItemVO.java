@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public class EvidenceItemVO {
     private String evidenceId;
+    private String analysisId;
     private String evidenceType;
     private String description;
     private String direction;
@@ -20,8 +21,13 @@ public class EvidenceItemVO {
     private Integer impactScore;
     private String severity;
     private String timestamp;
+    private String currentValue;
+    private String changeFromBaseline;
+    private LocalDateTime observedAt;
+    private String freshness;
 
-    public void setAnalysisId(String analysisId) { this.evidenceId = analysisId; }
+    public String getAnalysisId() { return analysisId; }
+    public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
     public void setStrengthLevel(String level) { this.strength = 80.0; }
     public void setConfidenceScore(int score) { this.confidence = (double) score; }
     public void setTitle(String title) { this.description = title; }
@@ -60,4 +66,12 @@ public class EvidenceItemVO {
     public void setSeverity(String severity) { this.severity = severity; }
     public String getTimestamp() { return timestamp; }
     public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    public String getCurrentValue() { return currentValue; }
+    public void setCurrentValue(String value) { this.currentValue = value; }
+    public String getChangeFromBaseline() { return changeFromBaseline; }
+    public void setChangeFromBaseline(String value) { this.changeFromBaseline = value; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime value) { this.observedAt = value; }
+    public String getFreshness() { return freshness; }
+    public void setFreshness(String value) { this.freshness = value; }
 }

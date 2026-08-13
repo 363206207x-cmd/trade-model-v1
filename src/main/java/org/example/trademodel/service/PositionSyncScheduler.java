@@ -13,7 +13,7 @@ public class PositionSyncScheduler {
 
     public PositionSyncScheduler(PositionSyncService positionSyncService,
                                  @Value("${trade-model.schedulers.enabled:true}") boolean schedulersEnabled,
-                                 @Value("${trade-model.schedulers.position-sync.enabled:true}") boolean positionSyncSchedulerEnabled) {
+                                 @Value("${trade-model.schedulers.position-sync.enabled:false}") boolean positionSyncSchedulerEnabled) {
         this.positionSyncService = positionSyncService;
         this.schedulersEnabled = schedulersEnabled;
         this.positionSyncSchedulerEnabled = positionSyncSchedulerEnabled;

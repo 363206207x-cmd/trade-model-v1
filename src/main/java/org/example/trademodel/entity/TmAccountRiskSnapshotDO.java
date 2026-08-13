@@ -11,12 +11,27 @@ public class TmAccountRiskSnapshotDO {
     private Long id;
     private String analysisId;
     private String symbol;
+    private String ownerType;
+    private Long ownerId;
+    private String accountRiskStatus;
     private String riskLevelSnapshot;
     private Boolean riskAllowed;
     private String riskReasonCode;
     private String riskReasonText;
     private BigDecimal positionExposure;
     private BigDecimal maxAllowedExposure;
+    private BigDecimal candidateLeverage;
+    private BigDecimal maxAllowedLeverage;
+    private BigDecimal grossNotional;
+    private BigDecimal leverageRisk;
+    private BigDecimal positionSizeRisk;
+    private BigDecimal concentrationRisk;
+    private BigDecimal correlationRisk;
+    private BigDecimal drawdownOrVarRisk;
+    private BigDecimal aggregateRiskScore;
+    private String sourceStatus;
+    private LocalDateTime observedAt;
+    private LocalDateTime freshUntil;
     private String snapshotSource;
     private Integer snapshotVersion;
     private String sourceNote;
@@ -46,6 +61,13 @@ public class TmAccountRiskSnapshotDO {
     public void setSymbol(String symbol) {
         this.symbol = symbol;
     }
+
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public String getAccountRiskStatus() { return accountRiskStatus; }
+    public void setAccountRiskStatus(String accountRiskStatus) { this.accountRiskStatus = accountRiskStatus; }
 
     public String getRiskLevelSnapshot() {
         return riskLevelSnapshot;
@@ -102,6 +124,32 @@ public class TmAccountRiskSnapshotDO {
     public void setMaxAllowedExposure(BigDecimal maxAllowedExposure) {
         this.maxAllowedExposure = maxAllowedExposure;
     }
+
+    public BigDecimal getCandidateLeverage() { return candidateLeverage; }
+    public void setCandidateLeverage(BigDecimal candidateLeverage) { this.candidateLeverage = candidateLeverage; }
+    public BigDecimal getMaxAllowedLeverage() { return maxAllowedLeverage; }
+    public void setMaxAllowedLeverage(BigDecimal maxAllowedLeverage) { this.maxAllowedLeverage = maxAllowedLeverage; }
+
+    public BigDecimal getGrossNotional() { return grossNotional; }
+    public void setGrossNotional(BigDecimal grossNotional) { this.grossNotional = grossNotional; }
+    public BigDecimal getLeverageRisk() { return leverageRisk; }
+    public void setLeverageRisk(BigDecimal leverageRisk) { this.leverageRisk = leverageRisk; }
+    public BigDecimal getPositionSizeRisk() { return positionSizeRisk; }
+    public void setPositionSizeRisk(BigDecimal positionSizeRisk) { this.positionSizeRisk = positionSizeRisk; }
+    public BigDecimal getConcentrationRisk() { return concentrationRisk; }
+    public void setConcentrationRisk(BigDecimal concentrationRisk) { this.concentrationRisk = concentrationRisk; }
+    public BigDecimal getCorrelationRisk() { return correlationRisk; }
+    public void setCorrelationRisk(BigDecimal correlationRisk) { this.correlationRisk = correlationRisk; }
+    public BigDecimal getDrawdownOrVarRisk() { return drawdownOrVarRisk; }
+    public void setDrawdownOrVarRisk(BigDecimal drawdownOrVarRisk) { this.drawdownOrVarRisk = drawdownOrVarRisk; }
+    public BigDecimal getAggregateRiskScore() { return aggregateRiskScore; }
+    public void setAggregateRiskScore(BigDecimal aggregateRiskScore) { this.aggregateRiskScore = aggregateRiskScore; }
+    public String getSourceStatus() { return sourceStatus; }
+    public void setSourceStatus(String sourceStatus) { this.sourceStatus = sourceStatus; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime observedAt) { this.observedAt = observedAt; }
+    public LocalDateTime getFreshUntil() { return freshUntil; }
+    public void setFreshUntil(LocalDateTime freshUntil) { this.freshUntil = freshUntil; }
 
     public String getSnapshotSource() {
         return snapshotSource;

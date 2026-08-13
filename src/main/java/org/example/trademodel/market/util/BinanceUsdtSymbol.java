@@ -13,7 +13,7 @@ public final class BinanceUsdtSymbol {
      */
     public static String toUsdtPair(String assetSymbol) {
         if (assetSymbol == null || assetSymbol.isBlank()) {
-            return "BTCUSDT";
+            throw new IllegalArgumentException("assetSymbol is required");
         }
         String s = assetSymbol.trim().toUpperCase();
         if (s.endsWith("USDT")) {

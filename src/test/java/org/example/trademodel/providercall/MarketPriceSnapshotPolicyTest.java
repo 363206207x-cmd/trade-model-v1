@@ -26,7 +26,8 @@ class MarketPriceSnapshotPolicyTest {
                 freshness, "trace", "key", false, freshness == SnapshotFreshnessStatus.STALE_READABLE, error,
                 error == null ? List.of() : List.of(error));
         MarketPriceSnapshot payload = price == null ? null : new MarketPriceSnapshot("BTCUSDT",
-                new BigDecimal(price), null, null, null, null, null, null, "TEST", now, metadata);
+                new BigDecimal(price), null, null, null, null, null, null, null, null,
+                "TEST", now, metadata);
         return new ProviderCallResult<>(payload, metadata, null);
     }
 }

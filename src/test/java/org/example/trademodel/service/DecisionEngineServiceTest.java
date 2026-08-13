@@ -7,6 +7,7 @@ import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiProviderRole;
 import org.example.trademodel.ai.AiReviewStance;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.entity.AnalysisRunDO;
@@ -118,7 +119,7 @@ class DecisionEngineServiceTest {
                         "CONFIRM",
                         20
                 ));
-        lenient().when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        lenient().when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, false, false, "none"));
         lenient().when(userPositionRiskAdapter.currentRiskForSystem())
                 .thenReturn(UserPositionRiskResult.noOpenPosition(0));
@@ -192,6 +193,7 @@ class DecisionEngineServiceTest {
                 ExecutionPlanVO plan = new ExecutionPlanVO();
                 plan.setEntryZone("100-102");
                 plan.setStopLoss("98");
+                plan.setFinalPlan(true);
                 snapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, 10L);
             }
         } finally {
@@ -322,7 +324,7 @@ class DecisionEngineServiceTest {
     }
 
     @Test
-    void makeDecision_fourHourAndOneHourConflictBlocksWorthOpening() {
+    void makeDecision_threeAlignedTimeframesMeetTheFrozenConvergenceThreshold() {
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "1h".equals(invocation.getArgument(1))
                         ? bearishKlines()
@@ -331,8 +333,8 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-mtf-conflict", 85, 65);
 
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
-        assertThat(decision.getMultiTfConvergence()).isEqualTo("WEAK");
-        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getMultiTfConvergence()).isEqualTo("STRONG");
+        assertThat(decision.getIsWorthOpening()).isTrue();
     }
 
     @Test
@@ -353,12 +355,27 @@ class DecisionEngineServiceTest {
     }
 
     @Test
+    void decisionChainUsesConfiguredCandidatePromotionThresholdWithoutLegacyFallback() {
+        FundamentalAiV41Properties properties = FundamentalAiV41Properties.contractFixture();
+        properties.getOpportunityState().setCandidatePromotionScore(98);
+        properties.validate();
+        service.setFundamentalAiV41Properties(properties);
+
+        DecisionBundleVO decision = service.makeDecisionForDecisionChain(
+                "BTCUSDT", "5m", "analysis-v41-candidate-threshold",
+                85, 65, null, null, 50);
+
+        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+    }
+
+    @Test
     void makeDecision_marketBiasHierarchyAlwaysUsesRuleLayerBaseDirection() {
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenReturn(bearishKlines());
         when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
-                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT,
                         "BEARISH",
                         "LOW",
                         "HIGH",
@@ -368,7 +385,7 @@ class DecisionEngineServiceTest {
                         false,
                         90
                 ));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
                         false, false, 0, false, "none", "base"));
 
@@ -386,7 +403,7 @@ class DecisionEngineServiceTest {
     void makeDecision_aiDisagreementDoesNotDirectlyChangeAssetState() {
         when(aiConflictResolverService.resolve(any(DecisionContext.class)))
                 .thenReturn(new AiConflictResult(
-                        AiConflictLevelEnum.LEVEL_4_EXTREME_DIVERGENCE,
+                        AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT,
                         "BULLISH",
                         "LOW",
                         "HIGH",
@@ -396,7 +413,7 @@ class DecisionEngineServiceTest {
                         false,
                         95
                 ));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(20, "OBSERVING", "OBSERVING",
                         false, false, 0, false, "none", "base"));
 
@@ -408,7 +425,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_confusedScore70EntersConfused() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(70, "OBSERVING", "CONFUSED",
                         true, false, 0, false, "threshold", "enter"));
 
@@ -421,7 +438,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_confusedScore85BlocksDirectionalPushAndWorthOpening() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
                         true, false, 0, true, "threshold", "block"));
 
@@ -435,7 +452,7 @@ class DecisionEngineServiceTest {
 
     @Test
     void makeDecision_secondLowCycleExitsToCoolingNotTriggered() {
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(54, "CONFUSED", "COOLING",
                         false, true, 0, false, "low", "exit"));
 
@@ -495,7 +512,7 @@ class DecisionEngineServiceTest {
     void makeDecision_blockingExternalContextPreservesStricterConfusedState() {
         EventImpactInputVO external = externalInput(true, "HIGH", ExternalContextPolicy.SOURCE_HEALTH_OK,
                 List.of(ExternalContextPolicy.REASON_WINDOW_BLOCKED));
-        when(confusedStateService.calculateConfused(anyString(), any(DecisionContext.class)))
+        when(confusedStateService.calculateConfused(anyString(), anyString(), any(DecisionContext.class)))
                 .thenReturn(new ConfusedResult(85, "OBSERVING", "CONFUSED",
                         true, false, 0, true, "threshold", "block"));
 

@@ -192,28 +192,22 @@ public class DashboardControllerTest {
         assertThat(html).contains("renderGptFinalHomeRole");
         assertThat(html).contains("renderGeminiReviewHomeRole");
         assertThat(html).contains("renderGrokChallengeHomeRole");
-        assertThat(html).contains("最终倾向");
-        assertThat(html).contains("最终结论");
-        assertThat(html).contains("发现的冲突");
-        assertThat(html).contains("证据不足点");
-        assertThat(html).contains("反方论点");
-        assertThat(html).contains("突发新闻 / 事件风险");
-        assertThat(html).contains("暂无该角色证据");
+        assertThat(html).contains("核心判断", "支持证据", "反对证据", "Candidate形成摘要");
+        assertThat(html).contains("证据缺口", "逻辑冲突", "风险低估", "降级建议");
+        assertThat(html).contains("失败路径", "反向情景", "外部事件风险", "观察指标");
+        assertThat(html).doesNotContain("完整证据关联尚未提供", "暂无该角色证据");
     }
 
     @Test
     void gptFinalEmptyDataStillShowsFinalDecisionSemanticFields() throws Exception {
         String panel = functionBody("renderGptFinalHomeRole");
 
-        assertThat(panel).contains("最终倾向");
+        assertThat(panel).contains("Market Bias", "Opportunity State", "Plan Mode");
         assertThat(panel).contains("置信度");
-        assertThat(panel).contains("风险等级");
-        assertThat(panel).contains("AI 计划模式");
+        assertThat(panel).contains("风险");
         assertThat(panel).contains("是否值得开仓");
-        assertThat(panel).contains("最终结论");
-        assertThat(panel).contains("核心支持证据");
-        assertThat(panel).contains("核心反证");
-        assertThat(panel).contains("降级 / 阻断原因");
+        assertThat(panel).contains("核心判断", "支持证据", "反对证据");
+        assertThat(panel).contains("4h", "1h", "15m", "5m", "方向调整", "Candidate形成摘要");
         assertThat(panel).doesNotContain("return aiRoleEmptyState");
     }
 
@@ -221,14 +215,8 @@ public class DashboardControllerTest {
     void geminiReviewEmptyDataStillShowsReviewSemanticFields() throws Exception {
         String panel = functionBody("renderGeminiReviewHomeRole");
 
-        assertThat(panel).contains("复核结论");
-        assertThat(panel).contains("复核意见");
-        assertThat(panel).contains("发现的冲突");
-        assertThat(panel).contains("证据不足点");
-        assertThat(panel).contains("逻辑漏洞");
-        assertThat(panel).contains("是否建议降级");
-        assertThat(panel).contains("是否需要人工复核");
-        assertThat(panel).contains("复核摘要");
+        assertThat(panel).contains("复核结论", "方向影响", "置信度调整", "风险调整", "计划模式调整");
+        assertThat(panel).contains("证据缺口", "逻辑冲突", "风险低估", "降级建议", "恢复条件");
         assertThat(panel).doesNotContain("return aiRoleEmptyState");
     }
 
@@ -236,21 +224,16 @@ public class DashboardControllerTest {
     void grokChallengeEmptyDataStillShowsChallengeSemanticFields() throws Exception {
         String panel = functionBody("renderGrokChallengeHomeRole");
 
-        assertThat(panel).contains("反方论点");
-        assertThat(panel).contains("突发新闻 / 事件风险");
-        assertThat(panel).contains("情绪反转风险");
-        assertThat(panel).contains("微观结构陷阱");
-        assertThat(panel).contains("反向证据");
-        assertThat(panel).contains("反方挑战结论");
-        assertThat(panel).contains("风险提示摘要");
+        assertThat(panel).contains("挑战摘要", "当前方向挑战", "重大反证", "风险调整", "计划模式影响");
+        assertThat(panel).contains("失败路径", "反向情景", "外部事件风险", "微观结构风险", "观察指标");
         assertThat(panel).doesNotContain("return aiRoleEmptyState");
     }
 
     @Test
     void rolePanelsDoNotUseSameFieldList() throws Exception {
-        Set<String> gptLabels = Set.of("最终倾向", "风险等级", "AI 计划模式", "是否值得开仓", "最终结论", "核心支持证据", "核心反证");
-        Set<String> geminiLabels = Set.of("复核结论", "复核意见", "发现的冲突", "证据不足点", "逻辑漏洞", "是否建议降级", "是否需要人工复核");
-        Set<String> grokLabels = Set.of("反方论点", "突发新闻 / 事件风险", "情绪反转风险", "微观结构陷阱", "流动性 / 插针 / 挤仓风险", "反向证据");
+        Set<String> gptLabels = Set.of("Market Bias", "Opportunity State", "Plan Mode", "核心判断", "支持证据", "反对证据");
+        Set<String> geminiLabels = Set.of("复核结论", "证据缺口", "逻辑冲突", "风险低估", "降级建议", "恢复条件");
+        Set<String> grokLabels = Set.of("失败路径", "反向情景", "外部事件风险", "微观结构风险", "观察指标", "挑战摘要");
 
         assertThat(functionBody("renderGptFinalHomeRole")).contains(gptLabels.toArray(String[]::new));
         assertThat(functionBody("renderGeminiReviewHomeRole")).contains(geminiLabels.toArray(String[]::new));
@@ -265,9 +248,9 @@ public class DashboardControllerTest {
 
         assertThat(router.indexOf("role.resultAvailable !== true"))
                 .isLessThan(router.indexOf("renderGptFinalHomeRole"));
-        assertThat(unavailable).contains("运行状态", "状态说明");
+        assertThat(unavailable).contains("roleMetadata(role)", "调用状态", "状态说明");
         assertThat(unavailable).doesNotContain(
-                "最终倾向", "AI 计划模式", "是否值得开仓", "AI 复核结果已返回");
+                "Market Bias", "Plan Mode", "是否值得开仓", "AI 复核结果已返回");
     }
 
     @Test
@@ -277,18 +260,18 @@ public class DashboardControllerTest {
 
     @Test
     void consistencyCardShowsSemanticLabels() throws Exception {
-        String card = consistencyCardSection();
+        String card = functionBody("renderHomeConsistencyCard");
 
         assertThat(card).contains(
-                "一致性等级",
                 "冲突等级",
-                "AI 一致性阻断",
-                "一句话摘要");
+                "最终方向",
+                "最终计划模式",
+                "主要原因",
+                "恢复条件");
         assertThat(card).doesNotContain(
                 "一致性评分",
-                "最终倾向",
-                "AI 计划模式",
-                "降级原因");
+                "投票",
+                "aiApplicable");
     }
 
     @Test
@@ -312,66 +295,42 @@ public class DashboardControllerTest {
 
     @Test
     void consistencyCardExplainsWaitingState() throws Exception {
-        String html = Files.readString(DASHBOARD_TEMPLATE);
+        String renderer = functionBody("renderHomeConsistencyCard");
 
-        assertThat(html).contains("等待同步");
-        assertThat(html).contains("等待 AI 三角色结果同步后生成一致性结论");
+        assertThat(renderer).contains("暂无一致性数据");
+        assertThat(renderer).doesNotContain("等待 AI 三角色结果同步后生成一致性结论");
     }
 
     @Test
-    void consistencyCardChecksAiApplicabilityBeforeAssetDirectionalBlock() throws Exception {
-        String statusFunction = functionBody("consistencyStatusText");
+    void consistencyCardUsesOnlyFrozenConsistencyContract() throws Exception {
         String payloadRenderer = functionBody("renderHomeAiDecisionFromPayload");
 
-        assertThat(statusFunction.indexOf("aiApplicable === false"))
-                .isLessThan(statusFunction.indexOf("confused === true"));
-        assertThat(payloadRenderer).contains("aiApplicable", "var c = ai.consistency || {}");
+        assertThat(payloadRenderer).contains("var c = ai.consistency || {}", "dataState", "conflictLevel",
+                "finalMarketBias", "finalPlanMode", "mainReason", "recoveryCondition");
         assertThat(functionBody("renderHomeConsistencyCard"))
-                .contains(
-                        "冲突等级", "aiApplicable ? options.conflictLevel : \"不适用\"",
-                        "AI 一致性阻断", "不适用")
-                .doesNotContain("AI 计划模式", "资产方向阻断", "finalPlanMode");
+                .contains("冲突等级", "最终方向", "最终计划模式", "主要原因", "恢复条件")
+                .doesNotContain("资产方向阻断", "aiApplicable", "consistencyScore");
     }
 
     @Test
-    void aiNotApplicableUsesExplicitNonApplicableConsistencyValues() throws Exception {
+    void unavailableConsistencyUsesExplicitDataStateWithoutLegacyAliases() throws Exception {
         String payloadRenderer = functionBody("renderHomeAiDecisionFromPayload");
 
-        assertThat(payloadRenderer).contains(
-                "var aiApplicable",
-                "conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : \"不适用\"");
+        assertThat(payloadRenderer).contains("SOURCE_UNAVAILABLE", "暂无一致性数据");
         assertThat(payloadRenderer).doesNotContain(
-                "planMode", "finalPlanMode", "finalTendency", "finalBias");
+                "aiApplicable", "consistencyScore", "consistencyLevel", "consistencySummary");
     }
 
     @Test
-    void allAbstainOfflineFixtureUsesNotApplicableDomContract() throws Exception {
-        String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
+    void partialRolesDoNotUseAbstainSummaryFallback() throws Exception {
         String router = functionBody("renderHomeAiRoleTab");
         String card = functionBody("renderHomeConsistencyCard");
 
-        assertThat(fixture).contains(
-                "\"ai-all-abstain\"",
-                "(\"GPT_FINAL\", \"最终裁决官\")",
-                "(\"GEMINI_REVIEW\", \"冲突复核官\")",
-                "(\"GROK_CHALLENGE\", \"反方挑战官\")",
-                "\"runStatus\": \"SUCCESS\"",
-                "\"stance\": \"ABSTAIN\"",
-                "\"reviewConclusion\": \"证据不足，暂不判断\"",
-                "\"aiApplicable\": False",
-                "\"consistencyLevel\": \"不适用\"",
-                "\"consistencyScore\": None",
-                "AI 成功返回，但所有角色均因证据不足而弃权");
-        assertThat(router).contains(
-                "String(role.stance || \"\").toUpperCase() === \"ABSTAIN\"",
-                "renderAbstainedAiRole(role)");
-        assertThat(functionBody("renderAbstainedAiRole"))
-                .contains("运行状态", "复核成功", "角色结论", "证据不足，暂不判断");
-        assertThat(card).contains(
-                "aiApplicable ? options.conflictLevel : \"不适用\"",
-                "aiApplicable && options.confused ? \"是\" : \"否\"");
+        assertThat(router).contains("role.resultAvailable !== true", "renderUnavailableAiRole");
+        assertThat(router).doesNotContain("renderAbstainedAiRole", "role.stance");
+        assertThat(card).contains("dataState", "暂无一致性数据");
         assertThat(card).doesNotContain(
-                "score", "planMode", "finalPlanMode", "finalTendency");
+                "score", "aiApplicable", "consistencyLevel", "consistencySummary");
     }
 
     @Test
@@ -862,7 +821,7 @@ public class DashboardControllerTest {
                 "updateAssetDetailLink(null)",
                 "当前资产不可查看",
                 "执行计划已清除",
-                "无法生成一致性摘要");
+                "dataState: \"SOURCE_UNAVAILABLE\"");
         assertThat(unavailable).contains(
                 "runtimeState = missing ? \"MISSING\" : \"ERROR\"",
                 "assets.dataset.homeState = missing ? \"missing\" : \"error\"",

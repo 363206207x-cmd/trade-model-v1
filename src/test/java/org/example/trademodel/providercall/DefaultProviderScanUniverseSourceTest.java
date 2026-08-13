@@ -17,6 +17,7 @@ import org.example.trademodel.providercall.scan.DefaultProviderScanUniverseSourc
 import org.example.trademodel.providercall.scan.ProviderRefreshStateRegistry;
 import org.example.trademodel.providercall.scan.ScanUniverseInput;
 import org.example.trademodel.providercall.candidate.AutoCandidateRegistry;
+import org.example.trademodel.providercall.candidate.CandidateLogicIdentity;
 import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
 import org.example.trademodel.providercall.universe.DiscoveryUniverseSource;
 import org.example.trademodel.providercall.universe.WatchlistAssetSource;
@@ -59,6 +60,7 @@ class DefaultProviderScanUniverseSourceTest {
     private UserConfigService userConfigService;
     private ScanProfileTransitionService transitions;
     private PositionMonitorLogService monitorLogService;
+    private AutoCandidateRegistry autoCandidateRegistry;
     private DefaultProviderScanUniverseSource source;
 
     @BeforeEach void setUp() {
@@ -76,11 +78,12 @@ class DefaultProviderScanUniverseSourceTest {
         userConfigService = mock(UserConfigService.class);
         transitions = mock(ScanProfileTransitionService.class);
         monitorLogService = mock(PositionMonitorLogService.class);
+        autoCandidateRegistry = new AutoCandidateRegistry();
         when(userConfigService.getUserConfig("admin")).thenReturn(new UserConfigDO());
         source = new DefaultProviderScanUniverseSource(properties, positionMapper, stateMapper,
                 mock(DecisionResultMapper.class), pushSnapshotMapper, monitorLogService, userConfigService,
                 transitions, new ProviderRefreshStateRegistry(), watchlistSource,
-                discoverySource, new AutoCandidateRegistry(), ProviderCallTestFixtures.binanceRegistry(
+                discoverySource, autoCandidateRegistry, ProviderCallTestFixtures.binanceRegistry(
                         "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "ADAUSDT", "LINKUSDT"),
                 profilePreferenceService,
                 Clock.fixed(Instant.parse("2026-07-10T12:00:00Z"), ZoneOffset.UTC));
@@ -113,6 +116,26 @@ class DefaultProviderScanUniverseSourceTest {
         when(watchlistSource.currentWatchlist()).thenReturn(instruments("SOLUSDT", "BNBUSDT"));
         assertThat(source.currentUniverse().candidateAssets()).containsExactlyElementsOf(
                 instruments("SOLUSDT", "BNBUSDT"));
+    }
+
+    @Test void autoCandidateOutsideAssetPoolCannotEnterProviderCandidateUniverse() {
+        emptySources();
+        when(watchlistSource.currentWatchlist()).thenReturn(instruments("BTCUSDT"));
+        CanonicalInstrumentId ada = ProviderCallTestFixtures.perpetual("ADAUSDT");
+        autoCandidateRegistry.put(new AutoCandidateRegistry.AutoCandidateSnapshot(
+                ada,
+                new CandidateLogicIdentity(ada, "strategy-v1", "rule-v1", "LONG", "CANDIDATE", "BREAKOUT"),
+                "promoted-evidence",
+                "latest-evidence",
+                Instant.parse("2026-07-10T11:00:00Z"),
+                Instant.parse("2026-07-10T11:30:00Z"),
+                Instant.parse("2026-07-10T13:00:00Z"),
+                UserScanProfile.AUTO,
+                RuntimeScanProfile.HIGH,
+                List.of("PROMOTED"),
+                "frequency-v1"));
+
+        assertThat(source.currentUniverse().candidateAssets()).doesNotContain(ada);
     }
 
     @Test void realScanUniverseRemainsBounded() {
@@ -258,7 +281,7 @@ class DefaultProviderScanUniverseSourceTest {
         UserPositionDO row = new UserPositionDO();
         row.setAssetSymbol(symbol);
         row.setStatus(status);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         return row;
     }
     private static AssetStateDO state(String symbol, AssetStateEnum status) {

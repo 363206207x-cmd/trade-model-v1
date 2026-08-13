@@ -40,7 +40,7 @@ class UserPositionMapperIntegrationTest {
         assertThat(persisted.getSide()).isEqualTo("LONG");
         assertThat(persisted.getStatus()).isEqualTo("OPEN");
         assertThat(persisted.getEntryPrice()).isEqualByComparingTo("100.50000000");
-        assertThat(persisted.getSourceType()).isEqualTo("MANUAL");
+        assertThat(persisted.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(persisted.getManualReviewRequired()).isTrue();
         assertThat(persisted.getNotTradeInstruction()).isTrue();
         assertThat(persisted.getNotAutoTrading()).isTrue();
@@ -187,7 +187,7 @@ class UserPositionMapperIntegrationTest {
             row.setClosePrice(new BigDecimal("105.25"));
             row.setCloseReason("closed fixture");
         }
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId("manual-test");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);

@@ -22,6 +22,10 @@ public class AnalysisExecutionContext {
     private final Integer claimVersion;
     private final Integer attemptCount;
     private final boolean runAlreadyClaimed;
+    private final String ownerType;
+    private final Long ownerId;
+    private final Long assetId;
+    private final boolean preview;
 
     public AnalysisExecutionContext(String analysisId, String traceId, String requestId, String idempotencyKey,
                                     String symbol, String timeframe, LocalDateTime analysisTime,
@@ -31,6 +35,22 @@ public class AnalysisExecutionContext {
                                     String inputSnapshotJson, String inputSnapshotHash,
                                     String leaseOwner, Integer claimVersion, Integer attemptCount,
                                     boolean runAlreadyClaimed) {
+        this(analysisId, traceId, requestId, idempotencyKey, symbol, timeframe, analysisTime,
+                canonicalAnalysisTimeBucket, ruleVersion, triggerType, triggerReference,
+                parentAnalysisId, parentTraceId, inputSnapshotJson, inputSnapshotHash,
+                leaseOwner, claimVersion, attemptCount, runAlreadyClaimed,
+                "SYSTEM", 0L, null, false);
+    }
+
+    public AnalysisExecutionContext(String analysisId, String traceId, String requestId, String idempotencyKey,
+                                    String symbol, String timeframe, LocalDateTime analysisTime,
+                                    LocalDateTime canonicalAnalysisTimeBucket, String ruleVersion,
+                                    AnalysisRunTriggerType triggerType, String triggerReference,
+                                    String parentAnalysisId, String parentTraceId,
+                                    String inputSnapshotJson, String inputSnapshotHash,
+                                    String leaseOwner, Integer claimVersion, Integer attemptCount,
+                                    boolean runAlreadyClaimed, String ownerType, Long ownerId,
+                                    Long assetId, boolean preview) {
         this.analysisId = analysisId;
         this.traceId = traceId;
         this.requestId = requestId;
@@ -50,6 +70,10 @@ public class AnalysisExecutionContext {
         this.claimVersion = claimVersion;
         this.attemptCount = attemptCount;
         this.runAlreadyClaimed = runAlreadyClaimed;
+        this.ownerType = ownerType;
+        this.ownerId = ownerId;
+        this.assetId = assetId;
+        this.preview = preview;
     }
 
     public String getAnalysisId() { return analysisId; }
@@ -71,4 +95,8 @@ public class AnalysisExecutionContext {
     public Integer getClaimVersion() { return claimVersion; }
     public Integer getAttemptCount() { return attemptCount; }
     public boolean isRunAlreadyClaimed() { return runAlreadyClaimed; }
+    public String getOwnerType() { return ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public Long getAssetId() { return assetId; }
+    public boolean isPreview() { return preview; }
 }

@@ -3,6 +3,7 @@ package org.example.trademodel.mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.mapping.DatabaseIdProvider;
 import org.example.trademodel.config.MyBatisDatabaseIdProviderConfig;
+import org.example.trademodel.entity.AssetPoolItemDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.UserConfigDO;
 import org.junit.jupiter.api.Test;
@@ -33,12 +34,26 @@ class PostgreSqlUpsertVariantGuardTest {
         Insert generic = genericInsert(AssetStateMapper.class.getMethod("mergeUpsertCore", AssetStateDO.class));
         Insert postgres = postgresInsert(AssetStateMapper.class.getMethod("mergeUpsertCore", AssetStateDO.class));
 
-        assertThat(sql(generic)).contains("MERGE INTO tm_asset_state").contains("KEY (symbol)");
+        assertThat(sql(generic)).contains("MERGE INTO tm_asset_state")
+                .contains("KEY (owner_type, owner_id, symbol, timeframe)");
         assertThat(sql(postgres))
-                .contains("ON CONFLICT (symbol) DO UPDATE")
+                .contains("ON CONFLICT (owner_type, owner_id, symbol, timeframe) DO UPDATE")
                 .doesNotContain("MERGE INTO")
                 .doesNotContain("ON DUPLICATE KEY UPDATE")
                 .doesNotContain("hot_reset_");
+    }
+
+    @Test
+    void assetPoolMapperKeepsGenericH2SqlAndAddsPostgreSqlOnConflictVariant() throws Exception {
+        Insert generic = genericInsert(AssetPoolItemMapper.class.getMethod("upsert", AssetPoolItemDO.class));
+        Insert postgres = postgresInsert(AssetPoolItemMapper.class.getMethod("upsert", AssetPoolItemDO.class));
+
+        assertThat(sql(generic)).contains("MERGE INTO tm_asset_pool_item")
+                .contains("KEY(owner_type, owner_id, symbol)");
+        assertThat(sql(postgres))
+                .contains("ON CONFLICT(owner_type, owner_id, symbol) DO UPDATE")
+                .doesNotContain("MERGE INTO")
+                .doesNotContain("ON DUPLICATE KEY UPDATE");
     }
 
     @Test

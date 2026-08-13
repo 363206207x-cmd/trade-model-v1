@@ -404,7 +404,7 @@ class DecisionServiceImplTest {
         row.setEntryPrice(new BigDecimal("100.50"));
         row.setQuantity(new BigDecimal("0.25"));
         row.setOpenedAt(openedAt);
-        row.setSourceType("MANUAL");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId("manual-test");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);

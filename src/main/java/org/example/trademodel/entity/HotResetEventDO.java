@@ -12,6 +12,10 @@ public class HotResetEventDO {
     private String analysisId;
     private String rebuildAnalysisId;
     private String traceId;
+    private String ownerType;
+    private Long ownerId;
+    private Long assetId;
+    private String ruleVersion;
     private String symbol;
     private String timeframe;
     private String triggerType;
@@ -83,6 +87,38 @@ public class HotResetEventDO {
 
     public void setTraceId(String traceId) {
         this.traceId = traceId;
+    }
+
+    public String getOwnerType() {
+        return ownerType;
+    }
+
+    public void setOwnerType(String ownerType) {
+        this.ownerType = ownerType;
+    }
+
+    public Long getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(Long ownerId) {
+        this.ownerId = ownerId;
+    }
+
+    public Long getAssetId() {
+        return assetId;
+    }
+
+    public void setAssetId(Long assetId) {
+        this.assetId = assetId;
+    }
+
+    public String getRuleVersion() {
+        return ruleVersion;
+    }
+
+    public void setRuleVersion(String ruleVersion) {
+        this.ruleVersion = ruleVersion;
     }
 
     public String getSymbol() {

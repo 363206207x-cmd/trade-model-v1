@@ -2,9 +2,13 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.HotResetEventDO;
+import org.example.trademodel.entity.OpportunityStateTransitionDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.HotResetEventMapper;
+import org.example.trademodel.mapper.OpportunityStateTransitionMapper;
+import org.example.trademodel.service.OpportunityTransitionResult;
+import org.example.trademodel.service.OpportunityTriggerSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -13,9 +17,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,6 +37,8 @@ class AssetStateServiceImplTest {
     private AssetStateMapper assetStateMapper;
     @Mock
     private HotResetEventMapper hotResetEventMapper;
+    @Mock
+    private OpportunityStateTransitionMapper transitionMapper;
 
     private AssetStateServiceImpl service;
 
@@ -51,7 +61,7 @@ class AssetStateServiceImplTest {
 
     @Test
     void recordHotResetEvent_missingStateRow_seedsAndWritesEvent() {
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "global")).thenReturn(null);
 
         service.recordHotResetEvent("a-2", "tr-2", " BTCUSDT ", "CONFUSED", "41",
                 "d-2", AssetStateEnum.CONFUSED, 41, false,
@@ -64,15 +74,16 @@ class AssetStateServiceImplTest {
     }
 
     @Test
-    void recordHotResetEvent_blankAnalysisId_updatesStateButSkipsEventInsert() {
-        when(assetStateMapper.selectBySymbol("ETHUSDT")).thenReturn(new AssetStateDO());
-
-        service.recordHotResetEvent("   ", "tr-3", "ETHUSDT", "CONFUSED", "40",
+    void recordHotResetEvent_blankAnalysisIdFailsClosedBeforeAnyStateWrite() {
+        assertThatThrownBy(() -> service.recordHotResetEvent("   ", "tr-3", "ETHUSDT", "CONFUSED", "40",
                 "d-3", AssetStateEnum.CONFUSED, 40, false,
                 "HOT_RESET_MIN_RULE", "reason", 1, LocalDateTime.now(),
-                AssetStateEnum.CONFUSED, AssetStateEnum.OBSERVING);
+                AssetStateEnum.CONFUSED, AssetStateEnum.OBSERVING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("analysisId is required");
 
-        verify(assetStateMapper).updateHotResetColumns(any(AssetStateDO.class));
+        verify(assetStateMapper, never()).mergeUpsertCore(any());
+        verify(assetStateMapper, never()).updateHotResetColumns(any());
         verify(hotResetEventMapper, never()).insert(any());
     }
 
@@ -102,5 +113,258 @@ class AssetStateServiceImplTest {
         assertThat(json).contains("\"nextState\":\"COOLING\"");
         assertThat(json).contains("\"confusedLowStreak\":0");
         assertThat(json).contains("\"directionalPushBlocked\":false");
+    }
+
+    @Test
+    void canonicalStateServiceIsTheOnlyProductionCallerOfAuthoritativeStateUpsert() throws Exception {
+        Path productionRoot = Path.of("src/main/java");
+        try (var files = Files.walk(productionRoot)) {
+            assertThat(files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> {
+                        try {
+                            return Files.readString(path).contains(".mergeUpsertCore(");
+                        } catch (java.io.IOException exception) {
+                            throw new java.io.UncheckedIOException(exception);
+                        }
+                    })
+                    .map(path -> productionRoot.relativize(path).toString())
+                    .toList())
+                    .containsExactly("org/example/trademodel/service/impl/AssetStateServiceImpl.java");
+        }
+    }
+
+    @Test
+    void transitionUsesOneCanonicalWriteAndRecordsAuditableReason() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "global")).thenReturn(null);
+
+        OpportunityTransitionResult result = service.transition(
+                "btcusdt", AssetStateEnum.CANDIDATE, 12, 0,
+                "analysis-1", "trace-1", "SCORE_PROMOTED", OpportunityTriggerSource.ASSET_POOL_SCAN);
+
+        ArgumentCaptor<AssetStateDO> state = ArgumentCaptor.forClass(AssetStateDO.class);
+        ArgumentCaptor<OpportunityStateTransitionDO> audit =
+                ArgumentCaptor.forClass(OpportunityStateTransitionDO.class);
+        verify(assetStateMapper).mergeUpsertCore(state.capture());
+        verify(transitionMapper).insert(audit.capture());
+        assertThat(result.opportunityId()).isEqualTo("opp-btcusdt-global");
+        assertThat(result.previousState()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(result.state()).isEqualTo(AssetStateEnum.CANDIDATE);
+        assertThat(result.executionPermission()).isEqualTo("ADVISORY_ALLOWED");
+        assertThat(state.getValue().getOpportunityId()).isEqualTo(result.opportunityId());
+        assertThat(state.getValue().getTimeframe()).isEqualTo("global");
+        assertThat(audit.getValue().getFromState()).isNull();
+        assertThat(audit.getValue().getToState()).isEqualTo("CANDIDATE");
+        assertThat(audit.getValue().getReason()).isEqualTo("SCORE_PROMOTED");
+        assertThat(audit.getValue().getTriggerSource()).isEqualTo("ASSET_POOL_SCAN");
+        assertThat(audit.getValue().getTraceId()).isEqualTo("trace-1");
+        assertThat(audit.getValue().getTimeframe()).isEqualTo("global");
+    }
+
+    @Test
+    void ordinaryTransitionInsideDebounceWindowIsSuppressedAndAudited() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.OBSERVING);
+        current.setStateEnteredAt(LocalDateTime.now());
+        current.setLastUpdateTime(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("ETHUSDT", "global")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "ETHUSDT", AssetStateEnum.CANDIDATE, 10, 0,
+                "analysis-2", "trace-2", "ORDINARY_PROMOTION", OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.state()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.reason()).startsWith("DEBOUNCED:");
+        ArgumentCaptor<OpportunityStateTransitionDO> audit =
+                ArgumentCaptor.forClass(OpportunityStateTransitionDO.class);
+        verify(transitionMapper).insert(audit.capture());
+        assertThat(audit.getValue().getSuppressed()).isTrue();
+    }
+
+    @Test
+    void confusedAndInvalidatedPrecedenceBlockLowerPriorityTransitions() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO confused = currentState(AssetStateEnum.CONFUSED);
+        confused.setLastUpdateTime(LocalDateTime.now().minusMinutes(5));
+        when(assetStateMapper.selectBySymbolAndTimeframe("SOLUSDT", "global")).thenReturn(confused);
+
+        OpportunityTransitionResult confusedResult = service.transition(
+                "SOLUSDT", AssetStateEnum.INVALIDATED, 80, 0,
+                "analysis-3", "trace-3", "INVALIDATION", OpportunityTriggerSource.INVALIDATION);
+        assertThat(confusedResult.state()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(confusedResult.executionPermission()).isEqualTo("BLOCKED");
+
+        AssetStateDO invalidated = currentState(AssetStateEnum.INVALIDATED);
+        invalidated.setLastUpdateTime(LocalDateTime.now().minusMinutes(5));
+        when(assetStateMapper.selectBySymbolAndTimeframe("XRPUSDT", "global")).thenReturn(invalidated);
+        OpportunityTransitionResult invalidatedResult = service.transition(
+                "XRPUSDT", AssetStateEnum.CANDIDATE, 5, 0,
+                "analysis-4", "trace-4", "LOW_PRIORITY", OpportunityTriggerSource.ANALYSIS);
+        assertThat(invalidatedResult.state()).isEqualTo(AssetStateEnum.INVALIDATED);
+        assertThat(invalidatedResult.executionPermission()).isEqualTo("NOT_ELIGIBLE");
+    }
+
+    @Test
+    void hotResetHasHighestPriorityAndCanExitConfused() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.CONFUSED);
+        current.setLastUpdateTime(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("BNBUSDT", "global")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "BNBUSDT", AssetStateEnum.OBSERVING, 0, 0,
+                "analysis-5", "trace-5", "HOT_RESET_REBUILD", OpportunityTriggerSource.HOT_RESET);
+
+        assertThat(result.state()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(result.changed()).isTrue();
+        ArgumentCaptor<OpportunityStateTransitionDO> audit =
+                ArgumentCaptor.forClass(OpportunityStateTransitionDO.class);
+        verify(transitionMapper).insert(audit.capture());
+        assertThat(audit.getValue().getTransitionPriority()).isEqualTo(400);
+    }
+
+    @Test
+    void activeCoolingWindowSuppressesOrdinaryPromotion() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.COOLING);
+        current.setCoolingUntil(LocalDateTime.now().plusMinutes(10));
+        current.setLastUpdateTime(LocalDateTime.now().minusMinutes(5));
+        when(assetStateMapper.selectBySymbolAndTimeframe("ADAUSDT", "global")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "ADAUSDT", AssetStateEnum.CANDIDATE, 0, 0,
+                "analysis-6", "trace-6", "PROMOTION_DURING_COOLING", OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.state()).isEqualTo(AssetStateEnum.COOLING);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.suppressed()).isTrue();
+        assertThat(result.reason()).startsWith("PRECEDENCE_PRESERVED:");
+
+        ArgumentCaptor<AssetStateDO> state = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).mergeUpsertCore(state.capture());
+        assertThat(state.getValue().getCoolingUntil()).isEqualTo(current.getCoolingUntil());
+    }
+
+    @Test
+    void expiredCoolingWindowReturnsToObservingBeforeNormalPromotion() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.COOLING);
+        current.setCoolingUntil(LocalDateTime.now(Clock.systemUTC()).minusSeconds(1));
+        current.setStateEnteredAt(LocalDateTime.now(Clock.systemUTC()).minusMinutes(16));
+        current.setLastUpdateTime(LocalDateTime.now(Clock.systemUTC()));
+        when(assetStateMapper.selectBySymbolAndTimeframe("ADAUSDT", "5m")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "ADAUSDT", "5m", AssetStateEnum.CANDIDATE, 0, 0,
+                "analysis-after-cooling", "trace-after-cooling", "COOLING_COMPLETED",
+                OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.state()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(result.changed()).isTrue();
+        assertThat(result.suppressed()).isFalse();
+    }
+
+    @Test
+    void invalidatedCanEnterCoolingAndAuditRecordsTheTransition() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.INVALIDATED);
+        current.setStateEnteredAt(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "5m")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "BTCUSDT", "5m", AssetStateEnum.COOLING, 20, 0,
+                "analysis-cooling", "trace-cooling", "INVALIDATION_COOLDOWN",
+                OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.previousState()).isEqualTo(AssetStateEnum.INVALIDATED);
+        assertThat(result.state()).isEqualTo(AssetStateEnum.COOLING);
+        assertThat(result.changed()).isTrue();
+        ArgumentCaptor<OpportunityStateTransitionDO> audit =
+                ArgumentCaptor.forClass(OpportunityStateTransitionDO.class);
+        verify(transitionMapper).insert(audit.capture());
+        assertThat(audit.getValue().getFromState()).isEqualTo("INVALIDATED");
+        assertThat(audit.getValue().getToState()).isEqualTo("COOLING");
+        assertThat(audit.getValue().getTimeframe()).isEqualTo("5m");
+        assertThat(audit.getValue().getOccurredAt()).isNotNull();
+    }
+
+    @Test
+    void confusedCannotEnterCoolingOrJumpDirectlyToTriggered() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.CONFUSED);
+        current.setStateEnteredAt(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("ETHUSDT", "1h")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "ETHUSDT", "1h", AssetStateEnum.COOLING, 30, 3,
+                "analysis-confused-cooling", "trace-confused-cooling", "CONFUSED_RECOVERY",
+                OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.previousState()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(result.state()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.suppressed()).isTrue();
+
+        OpportunityTransitionResult triggered = service.transition(
+                "ETHUSDT", "1h", AssetStateEnum.TRIGGERED, 30, 3,
+                "analysis-confused-trigger", "trace-confused-trigger", "CONFUSED_DIRECT_TRIGGER",
+                OpportunityTriggerSource.ANALYSIS);
+        assertThat(triggered.state()).isEqualTo(AssetStateEnum.CONFUSED);
+        assertThat(triggered.suppressed()).isTrue();
+    }
+
+    @Test
+    void highRiskCanEnterCoolingWithoutOrdinaryDebounceBlockingTransition() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO current = currentState(AssetStateEnum.HIGH_RISK);
+        current.setStateEnteredAt(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("LINKUSDT", "4h")).thenReturn(current);
+
+        OpportunityTransitionResult result = service.transition(
+                "LINKUSDT", "4h", AssetStateEnum.COOLING, 40, 0,
+                "analysis-high-risk-cooling", "trace-high-risk-cooling", "HIGH_RISK_COOLDOWN",
+                OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(result.previousState()).isEqualTo(AssetStateEnum.HIGH_RISK);
+        assertThat(result.state()).isEqualTo(AssetStateEnum.COOLING);
+        assertThat(result.changed()).isTrue();
+        assertThat(result.suppressed()).isFalse();
+    }
+
+    @Test
+    void sameSymbolUsesIndependentDebounceStatePerTimeframe() {
+        service = new AssetStateServiceImpl(assetStateMapper, hotResetEventMapper, transitionMapper);
+        AssetStateDO fiveMinute = currentState(AssetStateEnum.OBSERVING);
+        fiveMinute.setStateEnteredAt(LocalDateTime.now());
+        fiveMinute.setLastUpdateTime(LocalDateTime.now());
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "5m")).thenReturn(fiveMinute);
+        when(assetStateMapper.selectBySymbolAndTimeframe("BTCUSDT", "1h")).thenReturn(null);
+
+        OpportunityTransitionResult fiveMinuteResult = service.transition(
+                "BTCUSDT", "5m", AssetStateEnum.CANDIDATE, 10, 0,
+                "analysis-5m", "trace-5m", "PROMOTE_5M", OpportunityTriggerSource.ANALYSIS);
+        OpportunityTransitionResult oneHourResult = service.transition(
+                "BTCUSDT", "1h", AssetStateEnum.CANDIDATE, 10, 0,
+                "analysis-1h", "trace-1h", "PROMOTE_1H", OpportunityTriggerSource.ANALYSIS);
+
+        assertThat(fiveMinuteResult.state()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(fiveMinuteResult.suppressed()).isTrue();
+        assertThat(oneHourResult.state()).isEqualTo(AssetStateEnum.CANDIDATE);
+        assertThat(oneHourResult.suppressed()).isFalse();
+        assertThat(oneHourResult.opportunityId()).isEqualTo("opp-btcusdt-1h");
+    }
+
+    private static AssetStateDO currentState(AssetStateEnum state) {
+        AssetStateDO row = new AssetStateDO();
+        row.setSymbol("SYMBOL");
+        row.setState(state);
+        row.setOpportunityId("opp-existing");
+        row.setStateEnteredAt(LocalDateTime.now().minusHours(1));
+        row.setLastUpdateTime(LocalDateTime.now().minusMinutes(1));
+        row.setTraceId("trace-existing");
+        return row;
     }
 }

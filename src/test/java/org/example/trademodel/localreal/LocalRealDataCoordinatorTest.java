@@ -6,6 +6,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.service.AnalysisSchedulerService;
 import org.example.trademodel.service.PersistedOhlcvIngestionScheduler;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,8 +24,11 @@ import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class LocalRealDataCoordinatorTest {
+    private static final List<String> POOL_SYMBOLS = List.of(
+            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
     @Mock PersistedOhlcvIngestionScheduler ingestionScheduler;
     @Mock AnalysisSchedulerService analysisSchedulerService;
+    @Mock AssetPoolService assetPoolService;
 
     @Test
     void bootstrapRequestsSixAssetsAndFourTimeframesAndWaitsForReadiness() {
@@ -38,7 +42,7 @@ class LocalRealDataCoordinatorTest {
         ArgumentCaptor<String> symbols = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> timeframes = ArgumentCaptor.forClass(String.class);
         verify(ingestionScheduler, org.mockito.Mockito.times(24)).ingestOne(symbols.capture(), timeframes.capture());
-        assertThat(symbols.getAllValues()).containsAll(LocalRealDataCoordinator.SYMBOLS);
+        assertThat(symbols.getAllValues()).containsAll(POOL_SYMBOLS);
         assertThat(timeframes.getAllValues()).containsAll(LocalRealDataCoordinator.TIMEFRAMES);
         verify(analysisSchedulerService, never()).runScheduledCycle();
         assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DEGRADED);
@@ -126,8 +130,33 @@ class LocalRealDataCoordinatorTest {
         coordinator.shutdown();
     }
 
+    @Test
+    void bootstrapUsesEveryAssetPoolSymbolBeyondHomeTopSixCapacity() {
+        List<String> tenAssets = List.of(
+                "BTCUSDT", "ETHUSDT", "SOLUSDT", "AAVEUSDT", "LINKUSDT",
+                "TAOUSDT", "SUIUSDT", "ARBUSDT", "XRPUSDT", "ADAUSDT");
+        when(ingestionScheduler.ingestOne(anyString(), anyString())).thenReturn(readyIngestion());
+        when(analysisSchedulerService.marketDataReady(anyString())).thenReturn(false);
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        LocalRealDataCoordinator coordinator = coordinator(readiness, tenAssets);
+
+        coordinator.bootstrap();
+
+        ArgumentCaptor<String> symbols = ArgumentCaptor.forClass(String.class);
+        verify(ingestionScheduler, org.mockito.Mockito.times(40)).ingestOne(symbols.capture(), anyString());
+        assertThat(symbols.getAllValues()).containsAll(tenAssets);
+        assertThat(readiness.assets()).hasSize(10);
+        coordinator.shutdown();
+    }
+
     private LocalRealDataCoordinator coordinator(LocalRealReadinessService readiness) {
-        return new LocalRealDataCoordinator(ingestionScheduler, analysisSchedulerService, readiness);
+        return coordinator(readiness, POOL_SYMBOLS);
+    }
+
+    private LocalRealDataCoordinator coordinator(LocalRealReadinessService readiness, List<String> symbols) {
+        when(assetPoolService.listScanSymbols()).thenReturn(symbols);
+        return new LocalRealDataCoordinator(
+                ingestionScheduler, analysisSchedulerService, assetPoolService, readiness);
     }
 
     private static OhlcvIngestionResult readyIngestion() {
