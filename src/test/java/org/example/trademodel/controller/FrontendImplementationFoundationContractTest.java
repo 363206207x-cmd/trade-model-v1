@@ -108,7 +108,7 @@ class FrontendImplementationFoundationContractTest {
                 .doesNotContain("/api/order", "/api/trade", "AI 投票", "投票比例")
                 .doesNotContain(">买入</button>", ">卖出</button>", ">下单</button>", ">执行交易</button>");
         assertThat(desktop)
-                .contains("notTradeInstruction=")
+                .contains("frontendContract.executionPlanAccess(s)")
                 .contains("仅供人工复核，不会自动下单或创建持仓")
                 .doesNotContain("AI 投票", "投票比例");
     }

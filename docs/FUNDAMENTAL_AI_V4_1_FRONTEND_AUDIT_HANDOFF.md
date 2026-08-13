@@ -6,92 +6,104 @@
 - Issue: `#1178`
 - PR: `#1179` (Draft, unmerged)
 - Branch: `codex/v4-1-frontend-runtime-alignment`
-- Base: `edc3615c03c9b71763c32574f1d811c1d9a8954d`
-- Starting implementation head: `490919d6f8c763ffaac634cfbffd02ad8eaf66c4`
-- Candidate state: `LATEST_UI_IMPLEMENTATION_COMPLETE_PENDING_INDEPENDENT_FRONTEND_AUDIT`
+- Base main: `edc3615c03c9b71763c32574f1d811c1d9a8954d`
+- Productization starting Head: `3c485d40f9668f6835328bf8f917fde62d73ebc1`
+- Candidate Head: the exact remote PR Head after this remediation push
+- Candidate state: `PRODUCTIZED_UI_CANDIDATE_PENDING_INDEPENDENT_AUDIT`
 
-The auditor must record and use the pushed PR Head as an immutable target. The audit is read-only and must not fix findings.
+The auditor must record the remote PR Head before reading evidence and audit that immutable commit. The audit is read-only and must not repair findings.
 
 ## Required Reading
 
-1. `docs/FUNDAMENTAL_AI_V4_1_LATEST_UI_FIGMA_MAPPING.md`
-2. `docs/FUNDAMENTAL_AI_V4_1_LATEST_UI_IMPLEMENTATION_REPORT.md`
-3. `docs/FUNDAMENTAL_AI_V4_1_LATEST_UI_VISUAL_TEST_REPORT.md`
-4. `docs/FUNDAMENTAL_AI_V4_1_FRONTEND_CONTRACT_MAPPING.md`
-5. `docs/FUNDAMENTAL_AI_V4_1_SCENARIO_VALIDATION_REPORT.md`
+1. `docs/FUNDAMENTAL_AI_V4_1_PRODUCTIZED_UI_REMEDIATION.md`
+2. `docs/FUNDAMENTAL_AI_V4_1_USER_FACING_SEMANTIC_MAPPING.md`
+3. `docs/FUNDAMENTAL_AI_V4_1_UI_INTERACTION_STATE_MATRIX.md`
+4. `docs/FUNDAMENTAL_AI_V4_1_UI_VISUAL_SYSTEM.md`
+5. `docs/FUNDAMENTAL_AI_V4_1_RUNTIME_VISUAL_VALIDATION.md`
 6. `docs/FUNDAMENTAL_AI_V4_1_FRONTEND_TEST_REPORT.md`
 7. `docs/FUNDAMENTAL_AI_V4_1_FRONTEND_REMAINING_GAPS.md`
-8. `docs/evidence/v4_1_latest_ui/README.md`
-9. `docs/evidence/v4_1_latest_ui/browser-qa.json`
+8. `docs/evidence/v4_1_productized_ui/README.md`
+9. `docs/evidence/v4_1_productized_ui/browser-qa.json`
 
-## Source Priority
+## Production Path And Selectors
 
-1. Final frozen product contract for semantics and fail-closed behavior.
-2. Latest approved Figma file `rdMYmsAvZYkXHJX8hdl7UN` for visual structure.
-3. Merged v4.1 APIs for runtime data ownership.
-4. Existing code only as an implementation asset.
-
-Required Figma nodes: `28:154`, `31:23`, `520:212`, `523:748`, `35:97`, `35:4`, `35:35`, `35:66`. Node `519:3` is explicitly rejected as the target.
+| Contract surface | Selector / function |
+|---|---|
+| Product root | `[data-latest-approved-home]` |
+| System Status | `.latest-system-status` |
+| Alerts / Event Calendar | `.latest-signal-grid` |
+| Dynamic Top6 | `#tilesRow`, `authoritativeHomeAssetList` |
+| Asset Pool / Search | `#symbolSearch`, `#assetPoolPanel`, `renderAssetSearchSuggestions` |
+| Position Monitoring | `#homePositionCard`, `renderHomePositionsFromPayload` |
+| Final Plan | `#homeExecutionCard`, `renderHomeExecutionFromPayload` |
+| Three AI | `#homeAiPanel`, `renderHomeAiRoleTab` |
+| Conflict/final adjustment | `#homeConsistencyContent`, `renderHomeConsistencyCard` |
 
 ## Independent Audit Checklist
 
-### Scope And Production Path
+### Scope
 
-- Confirm no schema/migration, Backend algorithm, API contract, Mobile, or Figma file changed in the latest UI replacement.
-- Confirm `data-latest-approved-home` is the sole active Desktop Home production subtree.
-- Confirm legacy layer/tiles/position-execution/three-card DOM and renderers are absent from that subtree.
+- Confirm no Backend business model, API contract, Schema, Mobile, or Figma changes.
 - Search for automatic open/close/add/reduce/reverse/order capability; expected count is zero.
+- Confirm `TradeModelFrontendContract.USER_FACING_SEMANTIC_MAPPER` remains the single primary-copy mapper.
 
-### Visual Contract
+### Productized Hierarchy
 
-- Compare the current-code browser captures to the latest Figma component sources, not old node `519:3`.
-- Confirm module order, restrained Desktop workspace expression, light/dark tokens and no fake chart.
-- Confirm Position/Execution width ratio is approximately `70:30`.
-- Confirm horizontal/text overflow, top-level overlap, console error/warning, unhandled rejection and detached visual state are all zero.
+- Confirm brand is `Fundamental AI` and subtitle is `多源证据决策系统` or its approved English equivalent.
+- Confirm header focuses on update/data/current asset rather than diagnostics.
+- Confirm system status, compact alert/event rows, Current Opportunities, Position, Final, Three AI, and conflict adjustment preserve frozen boundaries.
+- Confirm light/dark semantic colors do not encode unavailable or selected state as success.
 
-### Dynamic Top6 And Asset Context
+### Dynamic Top6 And Search
 
-- Verify all management actions use existing Asset Pool APIs.
-- Verify Home retains backend ranking order, limits to six, and never ranks/fills/fixes symbols in JavaScript.
-- Verify the real search input accepts text and Pool controls are operative.
-- Verify asset switching updates only Final Plan, Three AI, Consistency and selected-asset context.
-- Verify System Status, alerts/events, Top6 and User Positions do not change during selection.
+- Confirm Home preserves authoritative backend ranking order, filters default slots, and limits to six without local ranking or symbol fill.
+- Exercise all three states: Pool empty, Pool populated/no opportunity, ranking unavailable.
+- Confirm search does not mutate the Pool and Add/Analyze remain disabled until explicit result selection.
+- Confirm switching assets clears old decision content immediately and ignores stale responses while leaving status, alert/event, Top6, and positions unchanged.
 
-### Position And Final Plan
+### Position And Final
 
-- Verify Position Monitoring uses P1-KD judgment/facts/basis semantics and Top3.
-- Verify No Position and untrusted-monitor states contain no fake row, risk, PnL, conclusion or action.
-- Verify the Final body opens only for validated Final/source/chain/not-trade gates.
-- Verify Candidate cannot be exposed as Final and Execution Plan remains separate from User Position.
+- Confirm No Position renders no fake row, PnL, risk, conclusion, or close action.
+- Confirm untrusted monitor state keeps risk/conclusion/action/PnL closed.
+- Confirm trusted Top3 fields remain independent and Execution Plan fields never enter Position rows.
+- Confirm Final opens only through Final/source/validation/chain/not-trade gates and Candidate never appears as Final.
 
-### Three AI And Consistency
+### Three AI And Adjustment
 
-- Verify one workspace, three tabs and one visible role.
-- Verify GPT/Gemini/Grok structured fields remain role-specific.
-- Verify role state and collection state remain independent.
-- Verify no cross-role fallback, generated evidence, vote, percentage, chart, or fourth role.
+- Confirm one workspace, three tabs, and exactly one visible role.
+- Confirm GPT explains candidate formation, Gemini reviews evidence/risk, and Grok challenges failure paths.
+- Confirm role state and every collection state remain independent; unavailable roles do not render a detailed field grid.
+- Confirm additional evidence and audit metadata use progressive disclosure.
+- Confirm `冲突与最终调整` is dependent summary only, with no percentage, vote, chart, score, or fourth role.
 
-### Validation
+### Evidence And Validation
 
-Re-run:
+- Inspect all 21 images under `docs/evidence/v4_1_productized_ui/runtime/` manually.
+- Verify `browser-qa.json` source hashes against the exact PR Head.
+- Re-run `./mvnw test -q`, Product Source Gate, Workflow Contract, fixture compile, and `git diff --check`.
+- Treat actual-Spring browser/runtime acceptance as BLOCKED until approved target-browser evidence exists.
+
+## Current Evidence
 
 ```text
-./mvnw test -q
-bash scripts/product-source-gate.sh
-bash scripts/check-workflow-contract.sh
-python3 -m py_compile scripts/dashboard-visual-acceptance-fixture.py
-git diff --check
+CONTROLLED_BROWSER=PASS
+SCREENSHOT_COUNT=21
+HORIZONTAL_OVERFLOW_COUNT=0
+TEXT_OVERFLOW_COUNT=0
+TOP_LEVEL_OVERLAP_COUNT=0
+CONSOLE_ERROR_COUNT=0
+VISIBLE_AI_ROLE_COUNT=1
+RAW_ENUM_PRIMARY_DISPLAY_COUNT=0
+FAKE_RUNTIME_VALUE_COUNT=0
+MAVEN=4519 tests / 0 failures / 0 errors / 14 skipped
+PRODUCT_SOURCE_GATE=PASS
+WORKFLOW_CONTRACT=PASS
+ACTUAL_SPRING_AUTHENTICATED_HTTP=PASS
+ACTUAL_SPRING_BROWSER=BLOCKED_BY_BROWSER_URL_POLICY
 ```
-
-Review all 20 current-code images under `docs/evidence/v4_1_latest_ui/runtime/` and verify `browser-qa.json` against the production DOM.
 
 ## Decision Boundary
 
-Allowed independent-audit result:
+Allowed independent-audit result: `APPROVE` or `REQUEST_CHANGES`.
 
-- `APPROVE`
-- `REQUEST_CHANGES`
-
-Approval must not claim live-provider or merged-main acceptance. `TARGET_RUNTIME_EVIDENCE_PENDING` remains explicit.
-
-No merge, Mobile work, Figma change, next product package, or automatic-trading expansion is allowed inside this handoff.
+Approval must not claim actual authenticated provider acceptance, merge, or merged-main effectiveness. No merge, Mobile work, Figma change, next product package, or automatic-trading expansion is allowed inside this handoff.

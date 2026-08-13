@@ -182,9 +182,10 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("MANUAL_INDEPENDENT");
         assertThat(desktop)
                 .contains(
-                        "等待可验证 Final Plan",
                         "等待 Final Plan",
-                        "Candidate 不会在此展示");
+                        "暂无最终执行计划",
+                        "当前资产尚未形成通过规则校验的计划。",
+                        "frontendContract.executionPlanAccess(s)");
         assertThat(mobileAi)
                 .contains("data-ai-role-summary")
                 .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")
@@ -404,7 +405,7 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(desktop)
                 .contains(
                         "id=\"homeConsistencyContent\"",
-                        "AI 一致性摘要",
+                        "冲突与最终调整",
                         "latest-consistency")
                 .doesNotContain(
                         "homeConsistencyPanel",

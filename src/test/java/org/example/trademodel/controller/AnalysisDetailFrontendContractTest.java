@@ -172,9 +172,9 @@ class AnalysisDetailFrontendContractTest {
                 .contains("data-timeframe=\"15M\">待同步")
                 .contains("data-timeframe=\"5M\">待同步")
                 .contains("5M 仅作为短期风险过滤，不作为主趋势方向")
-                .contains("GPT_FINAL / 最终裁决官")
-                .contains("GEMINI_REVIEW / 冲突复核官")
-                .contains("GROK_CHALLENGE / 反方挑战官")
+                .contains("证据综合与候选形成 <small>GPT_FINAL</small>")
+                .contains("证据与风险复核 <small>GEMINI_REVIEW</small>")
+                .contains("失败路径与压力测试 <small>GROK_CHALLENGE</small>")
                 .contains("不从其他 analysis 或当前首页补全")
                 .contains("不生成独立交易方向")
                 .contains("不补写外部事件或技术证据");

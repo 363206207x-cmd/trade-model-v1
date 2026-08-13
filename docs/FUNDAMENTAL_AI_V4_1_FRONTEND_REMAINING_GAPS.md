@@ -1,48 +1,65 @@
 # Fundamental AI v4.1 Frontend Remaining Gaps
 
-## Blocking For This Candidate
+## Candidate-Level Result
 
-No known latest-approved-UI, frontend contract, or deterministic browser blocker remains in the candidate.
+No known productized Desktop UI, semantic mapping, controlled-browser, or automated-test defect remains in the current candidate.
 
-The candidate is still not complete or effective because these process gates remain:
+The following process and runtime gates remain open.
 
-1. independent exact-Head frontend contract and runtime capability audit;
-2. Draft PR CI and review;
-3. merge and merged-main validation.
+## 1. Actual Application Browser Validation
 
-The independent audit must validate the current PR Head against `docs/FUNDAMENTAL_AI_V4_1_LATEST_UI_FIGMA_MAPPING.md` and `docs/evidence/v4_1_latest_ui/`; it must not use old P1-KB node `519:3` or the previous candidate screenshots as the target.
+Status: `BLOCKED_BY_BROWSER_URL_POLICY`.
 
-## Evidence Still Pending
+The current Spring application was started on loopback with authentication enabled. Login, authenticated `/dashboard`, authenticated `/api/dashboard/home`, health, and served-asset hash checks passed over HTTP. The in-app browser rejected navigation to the local runtime port under URL security policy. Therefore this task has no actual-Spring browser screenshot or actual-Spring console trace. No policy workaround or alternate browser was used.
 
-### Target Runtime Provider Evidence
+Required closure evidence:
+
+- open the authenticated target runtime in an approved browser session;
+- verify `[data-latest-approved-home]`, `#tilesRow`, `#homePositionCard`, `#homeExecutionCard`, `#homeAiPanel`, and `#homeConsistencyContent`;
+- verify horizontal overflow and console errors remain zero;
+- verify one visible AI role and no raw enum in the primary surface.
+
+## 2. Authenticated Real-Provider Scenario
 
 Status: `TARGET_RUNTIME_EVIDENCE_PENDING`.
 
-This package does not have authority or credentials to manufacture a live provider result. The deterministic fixture proves UI/state behavior only. A later target-environment acceptance run must establish:
+The controlled fixture proves state handling and visual behavior, not live-provider truth. Target acceptance still needs:
 
-- real authenticated user and persisted Pool membership;
-- real provider freshness and trusted opportunity projection;
-- real dynamic Top6 changes from live ranked opportunities;
-- real persisted on-demand preview behavior;
-- real validated Final Plan and trace chain;
-- stale/invalid/failure fail-closed behavior in the deployed runtime.
+- a real authenticated user and persisted Asset Pool;
+- fresh, trusted opportunity ranking and changing Dynamic Top6;
+- persisted on-demand analysis;
+- validated Final Plan and trace chain;
+- real UserPosition / Position Monitoring data;
+- stale, invalid, unavailable, partial, and fallback fail-closed evidence.
 
-This gap does not justify fake values or lowering a trust/quality threshold.
+This gap must not be closed with simulated VERIFIED state, fake values, or lower trust thresholds.
+
+## 3. Delivery Process
+
+The candidate remains Draft and unmerged. It still requires:
+
+1. independent exact-Head Productized UI and frontend runtime audit;
+2. PR `#1179` CI/review;
+3. merge authorization;
+4. merged-main validation.
 
 ## Explicit Non-Gaps
 
-- Schema change is not required.
-- A parallel API is not required.
-- A second Home, Analysis Detail, or AI Workspace is not required.
-- The previous candidate UI is not an accepted visual fallback.
-- Mobile and Figma changes are not required for this package.
-- Automatic trading is neither required nor authorized.
+- Backend, API, and Schema changes are not required for this remediation.
+- Mobile and Figma changes are outside scope.
+- A second Home, AI workspace, consistency module, or semantic mapper is not required.
+- Automatic open, close, add, reduce, reverse, order, or exchange execution remains unauthorized and absent.
+- The previous UI is comparison material, not a fallback implementation.
 
 ## Status Boundary
 
 ```text
+CONTROLLED_BROWSER_VALIDATION=PASS
+ACTUAL_RUNTIME_VALIDATION=BLOCKED
 IMPLEMENTATION_CANDIDATE=READY_FOR_INDEPENDENT_FRONTEND_AUDIT
+PR_DRAFT=YES
 MERGED_MAIN_EFFECTIVE=NO
 FUNCTIONALLY_ACCEPTED=NO
 REAL_PROVIDER_ACCEPTED=NO
+CURRENT_PHASE_DONE=NO
 ```

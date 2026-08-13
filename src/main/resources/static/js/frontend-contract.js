@@ -2,9 +2,9 @@
   "use strict";
 
   var AI_ROLES = Object.freeze([
-    Object.freeze({ role: "GPT_FINAL", label: "最终裁决官" }),
-    Object.freeze({ role: "GEMINI_REVIEW", label: "冲突复核官" }),
-    Object.freeze({ role: "GROK_CHALLENGE", label: "反方挑战官" })
+    Object.freeze({ role: "GPT_FINAL", label: "证据综合与候选形成" }),
+    Object.freeze({ role: "GEMINI_REVIEW", label: "证据与风险复核" }),
+    Object.freeze({ role: "GROK_CHALLENGE", label: "失败路径与压力测试" })
   ]);
 
   var ASSET_STATES = Object.freeze({
@@ -111,13 +111,94 @@
     BLOCKED: "阻断"
   });
 
+  var OPPORTUNITY_TYPE_LABELS = Object.freeze({
+    STRUCTURE_CONFIRMATION: "结构确认",
+    TREND_CONTINUATION: "趋势延续",
+    REVERSAL_CONFIRMATION: "反转确认",
+    EVENT_DRIVEN: "事件驱动",
+    RANGE_BOUND: "区间观察"
+  });
+
+  var USER_FACING_VALUE_LABELS = Object.freeze({
+    STRONG_BULLISH: "强偏多",
+    BULLISH: "偏多",
+    WEAK_BULLISH: "弱偏多",
+    RANGE: "震荡",
+    WEAK_BEARISH: "弱偏空",
+    BEARISH: "偏空",
+    STRONG_BEARISH: "强偏空",
+    WAIT: "观望",
+    CONFIRMATION: "确认型",
+    PREPARATION: "预备型",
+    REDUCED: "缩减型",
+    OBSERVATION: "观察",
+    BLOCKED: "阻断",
+    HIGH: "高",
+    MEDIUM: "中",
+    LOW: "低",
+    EXTREME: "极高",
+    TIMEFRAME: "周期冲突",
+    REVERSAL: "反转",
+    LIQUIDITY: "流动性",
+    MONITOR: "观察指标",
+    CONTROLLED_VISUAL_FIXTURE: "受控验证数据"
+  });
+
   var COLLECTION_STATE_LABELS = Object.freeze({
-    FOUND: "已找到可验证内容",
-    NONE_FOUND: "已完成检查，未发现",
-    INSUFFICIENT_DATA: "数据不足，无法完成检查",
-    SOURCE_UNAVAILABLE: "来源不可用",
+    FOUND: "已发现",
+    NONE_FOUND: "完成检查，未发现",
+    INSUFFICIENT_DATA: "数据不足，无法判断",
+    SOURCE_UNAVAILABLE: "数据来源暂不可用",
     STALE: "数据已过期",
-    NO_VERIFIABLE_FAILURE_PATH: "未找到可验证失败路径"
+    NO_VERIFIABLE_FAILURE_PATH: "暂无可验证失败路径"
+  });
+
+  var ROLE_STATE_VIEWS = Object.freeze({
+    READY: Object.freeze({ label: "分析完成", tone: "positive" }),
+    PARTIAL: Object.freeze({ label: "部分结果可用", tone: "warning" }),
+    FALLBACK: Object.freeze({ label: "当前使用规则降级结果", tone: "warning" }),
+    UNAVAILABLE: Object.freeze({ label: "当前分析不可用", tone: "unavailable" }),
+    ERROR: Object.freeze({ label: "分析失败", tone: "danger" })
+  });
+
+  var COLLECTION_STATE_VIEWS = Object.freeze({
+    FOUND: Object.freeze({ label: "已发现", detail: "已发现可验证内容。", tone: "positive" }),
+    NONE_FOUND: Object.freeze({ label: "完成检查，未发现", detail: "检查已完成，当前没有可验证条目。", tone: "neutral" }),
+    INSUFFICIENT_DATA: Object.freeze({ label: "数据不足，无法判断", detail: "当前数据不足，暂时无法形成可靠判断。", tone: "unavailable" }),
+    SOURCE_UNAVAILABLE: Object.freeze({ label: "数据来源暂不可用", detail: "当前无法读取可信数据来源。", tone: "unavailable" }),
+    STALE: Object.freeze({ label: "数据已过期", detail: "现有数据已过期，需要重新分析。", tone: "warning" }),
+    NO_VERIFIABLE_FAILURE_PATH: Object.freeze({ label: "暂无可验证失败路径", detail: "当前没有可验证的失败路径。", tone: "neutral" })
+  });
+
+  var PLAN_STATE_VIEWS = Object.freeze({
+    NO_COMPLETE_PLAN: Object.freeze({ label: "暂无最终执行计划", detail: "当前资产尚未形成通过规则校验的计划。", tone: "neutral" }),
+    WAITING_ANALYSIS: Object.freeze({ label: "等待分析", detail: "当前资产的可信分析尚未完成。", tone: "warning" }),
+    INSUFFICIENT_DATA: Object.freeze({ label: "数据不足", detail: "当前数据不足以形成通过规则校验的计划。", tone: "unavailable" }),
+    STALE: Object.freeze({ label: "数据已过期", detail: "需要使用新鲜数据重新分析。", tone: "warning" }),
+    RULE_VETOED: Object.freeze({ label: "规则校验未通过", detail: "规则层已阻止当前计划成为最终执行计划。", tone: "danger" }),
+    AI_UNAVAILABLE: Object.freeze({ label: "AI解释暂不可用", detail: "规则结果仍保留，AI解释当前不可用。", tone: "unavailable" }),
+    PREPARATION: Object.freeze({ label: "等待触发", detail: "当前机会尚未满足确认条件。", tone: "warning" }),
+    OBSERVATION: Object.freeze({ label: "当前仅观察", detail: "当前只保留观察结论，不形成方向性计划。", tone: "neutral" }),
+    BLOCKED: Object.freeze({ label: "当前已阻断", detail: "当前计划被风险、冲突或规则条件阻断。", tone: "danger" }),
+    LOADING: Object.freeze({ label: "正在同步计划", detail: "正在读取当前资产的最终计划状态。", tone: "neutral" }),
+    MISSING: Object.freeze({ label: "暂无最终执行计划", detail: "当前资产尚未形成通过规则校验的计划。", tone: "neutral" }),
+    ERROR: Object.freeze({ label: "计划暂不可用", detail: "最终执行计划读取失败，请稍后重试。", tone: "danger" })
+  });
+
+  var DATA_STATE_VIEWS = Object.freeze({
+    READY: Object.freeze({ label: "数据可用", tone: "positive" }),
+    FOUND: Object.freeze({ label: "数据可用", tone: "positive" }),
+    LOADING: Object.freeze({ label: "正在同步", tone: "neutral" }),
+    PARTIAL: Object.freeze({ label: "部分数据可用", tone: "warning" }),
+    EMPTY: Object.freeze({ label: "暂无数据", tone: "neutral" }),
+    NONE_FOUND: Object.freeze({ label: "暂无数据", tone: "neutral" }),
+    INSUFFICIENT_DATA: Object.freeze({ label: "数据不足", tone: "unavailable" }),
+    SOURCE_UNAVAILABLE: Object.freeze({ label: "数据来源暂不可用", tone: "unavailable" }),
+    UNAVAILABLE: Object.freeze({ label: "当前不可用", tone: "unavailable" }),
+    STALE: Object.freeze({ label: "数据已过期", tone: "warning" }),
+    MISSING: Object.freeze({ label: "暂无数据", tone: "unavailable" }),
+    ERROR: Object.freeze({ label: "读取失败", tone: "danger" }),
+    INVALID: Object.freeze({ label: "当前不可查看", tone: "danger" })
   });
 
   var ROLE_STATES = Object.freeze([
@@ -180,9 +261,70 @@
     return PLAN_MODE_LABELS[normalized] || "当前不可查看";
   }
 
+  function opportunityTypeLabel(value) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return OPPORTUNITY_TYPE_LABELS[normalized] || "当前不可查看";
+  }
+
+  function userFacingValue(value) {
+    if (!hasText(value)) return "";
+    var text = String(value);
+    var exact = USER_FACING_VALUE_LABELS[text.trim().toUpperCase()];
+    if (exact) return exact;
+    Object.keys(USER_FACING_VALUE_LABELS)
+      .sort(function (left, right) { return right.length - left.length; })
+      .forEach(function (code) {
+        text = text.replace(
+          new RegExp("\\b" + code + "\\b", "gi"),
+          USER_FACING_VALUE_LABELS[code]
+        );
+      });
+    return text
+      .replace(/\bCandidate\b/gi, "候选方案")
+      .replace(/\bFinal Plan\b/gi, "最终执行计划")
+      .replace(/\bFinal\b/gi, "最终执行计划")
+      .replace(/\bResolver\b/gi, "冲突处理")
+      .replace(/\bRule Validation\b/gi, "规则校验");
+  }
+
+  function mappedView(table, value, fallback) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return table[normalized] || fallback;
+  }
+
+  function roleStateView(value) {
+    return mappedView(ROLE_STATE_VIEWS, value, ROLE_STATE_VIEWS.UNAVAILABLE);
+  }
+
+  function collectionStateView(value) {
+    return mappedView(
+      COLLECTION_STATE_VIEWS,
+      value,
+      COLLECTION_STATE_VIEWS.SOURCE_UNAVAILABLE
+    );
+  }
+
+  function planStateView(value) {
+    return mappedView(PLAN_STATE_VIEWS, value, PLAN_STATE_VIEWS.MISSING);
+  }
+
+  function dataStateView(value) {
+    return mappedView(DATA_STATE_VIEWS, value, DATA_STATE_VIEWS.UNAVAILABLE);
+  }
+
+  var USER_FACING_SEMANTIC_MAPPER = Object.freeze({
+    planState: planStateView,
+    roleState: roleStateView,
+    collectionState: collectionStateView,
+    dataState: dataStateView,
+    marketBias: marketBiasHierarchyLabel,
+    planMode: planModeLabel,
+    opportunityType: opportunityTypeLabel,
+    value: userFacingValue
+  });
+
   function collectionStateLabel(value) {
-    var normalized = String(value || "SOURCE_UNAVAILABLE").trim().toUpperCase();
-    return COLLECTION_STATE_LABELS[normalized] || COLLECTION_STATE_LABELS.SOURCE_UNAVAILABLE;
+    return collectionStateView(value).label;
   }
 
   function normalizeRoleState(value) {
@@ -419,7 +561,13 @@
     DATA_QUALITY_LABELS: DATA_QUALITY_LABELS,
     MARKET_BIAS_HIERARCHY_LABELS: MARKET_BIAS_HIERARCHY_LABELS,
     PLAN_MODE_LABELS: PLAN_MODE_LABELS,
+    OPPORTUNITY_TYPE_LABELS: OPPORTUNITY_TYPE_LABELS,
     COLLECTION_STATE_LABELS: COLLECTION_STATE_LABELS,
+    ROLE_STATE_VIEWS: ROLE_STATE_VIEWS,
+    COLLECTION_STATE_VIEWS: COLLECTION_STATE_VIEWS,
+    PLAN_STATE_VIEWS: PLAN_STATE_VIEWS,
+    DATA_STATE_VIEWS: DATA_STATE_VIEWS,
+    USER_FACING_SEMANTIC_MAPPER: USER_FACING_SEMANTIC_MAPPER,
     ROLE_STATES: ROLE_STATES,
     hasText: hasText,
     displayText: displayText,
@@ -429,6 +577,12 @@
     dataQualityLabel: dataQualityLabel,
     marketBiasHierarchyLabel: marketBiasHierarchyLabel,
     planModeLabel: planModeLabel,
+    opportunityTypeLabel: opportunityTypeLabel,
+    userFacingValue: userFacingValue,
+    roleStateView: roleStateView,
+    collectionStateView: collectionStateView,
+    planStateView: planStateView,
+    dataStateView: dataStateView,
     collectionStateLabel: collectionStateLabel,
     normalizeRoleState: normalizeRoleState,
     parseApiEnvelope: parseApiEnvelope,

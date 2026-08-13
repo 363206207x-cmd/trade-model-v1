@@ -57,6 +57,9 @@ SCENARIOS = {
     "position-risk-escalated",
     "position-stale",
     "multi-position",
+    "pool-empty",
+    "pool-no-opportunities",
+    "ranking-unavailable",
     "placeholder",
     "home-failure",
     "detail-late",
@@ -194,13 +197,13 @@ def ai_role(role: str, label: str, symbol: str = "BTCUSDT") -> dict[str, object]
     if role == "GPT_FINAL":
         return base | {
             "coreJudgment": {
-                "text": "规则方向与主要证据一致，Final Plan 仅供人工复核",
+                "text": "规则方向与主要证据一致，候选计划进入人工复核",
                 "ruleBaseDirection": "BULLISH",
                 "marketBias": "BULLISH",
                 "opportunityState": "triggered",
             },
             "candidateSummary": {
-                "summary": "Candidate 已由 Resolver 与 Rule Validation 校验",
+                "summary": "候选已完成冲突处理与规则校验",
                 "direction": "BULLISH",
                 "confidence": "HIGH",
                 "riskLevel": "MEDIUM",
@@ -330,9 +333,9 @@ def ai_decision_success(symbol: str = "BTCUSDT") -> dict[str, object]:
         "decisionModeLabel": "仅供人工复核",
         "activeTab": "GPT_FINAL",
         "tabs": [
-            ai_role("GPT_FINAL", "最终裁决官", symbol),
-            ai_role("GEMINI_REVIEW", "冲突复核官", symbol),
-            ai_role("GROK_CHALLENGE", "反方挑战官", symbol),
+            ai_role("GPT_FINAL", "证据综合与候选形成", symbol),
+            ai_role("GEMINI_REVIEW", "证据与风险复核", symbol),
+            ai_role("GROK_CHALLENGE", "失败路径与压力测试", symbol),
         ],
         "consistency": {
             "dataState": "READY",
@@ -351,9 +354,9 @@ def ai_decision_success(symbol: str = "BTCUSDT") -> dict[str, object]:
 def ai_decision_all_abstain() -> dict[str, object]:
     tabs = []
     for role, role_label in (
-        ("GPT_FINAL", "最终裁决官"),
-        ("GEMINI_REVIEW", "冲突复核官"),
-        ("GROK_CHALLENGE", "反方挑战官"),
+        ("GPT_FINAL", "证据综合与候选形成"),
+        ("GEMINI_REVIEW", "证据与风险复核"),
+        ("GROK_CHALLENGE", "失败路径与压力测试"),
     ):
         tabs.append({
             "role": role,
@@ -388,9 +391,9 @@ def ai_decision_all_abstain() -> dict[str, object]:
 def unavailable_ai(status: str, label: str, message: str, directional_blocked: bool = False) -> dict[str, object]:
     tabs = []
     for role, role_label in (
-        ("GPT_FINAL", "最终裁决官"),
-        ("GEMINI_REVIEW", "冲突复核官"),
-        ("GROK_CHALLENGE", "反方挑战官"),
+        ("GPT_FINAL", "证据综合与候选形成"),
+        ("GEMINI_REVIEW", "证据与风险复核"),
+        ("GROK_CHALLENGE", "失败路径与压力测试"),
     ):
         tabs.append({
             "role": role,
@@ -776,6 +779,11 @@ def scenario_home(
             "当前暂无完整执行计划",
             "执行计划字段不完整",
         )
+        gpt_role = home["aiDecision"]["tabs"][0]
+        gpt_role["roleState"] = "PARTIAL"
+        gpt_role["supportingEvidenceState"] = "FOUND"
+        gpt_role["opposingEvidenceState"] = "SOURCE_UNAVAILABLE"
+        gpt_role["opposingEvidence"] = []
 
     elif scenario == "empty":
         home["assets"] = []
@@ -951,6 +959,23 @@ def scenario_home(
                 "POSITION_SELECTION_REQUIRED" if selected_position_id is None else "POSITION_NOT_FOUND"
             )
 
+    elif scenario in {"pool-empty", "pool-no-opportunities", "ranking-unavailable"}:
+        home["assets"] = []
+        home["positions"] = []
+        home["executionSuggestion"] = {
+            "status": "NO_COMPLETE_PLAN",
+            "statusLabel": "暂无最终执行计划",
+            "blockedReason": "当前没有可用于生成最终计划的重点机会",
+            "positionMode": False,
+            "moduleState": "MISSING",
+        }
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "未调用", "当前没有可供角色解释的重点机会"
+        )
+        home["_assetStateOverride"] = (
+            "ERROR" if scenario == "ranking-unavailable" else "EMPTY"
+        )
+
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]
 
@@ -1032,9 +1057,9 @@ def analysis_preview_fixture(symbol: str) -> dict[str, object]:
     roles = {
         role: ai_role(role, label)
         for role, label in (
-            ("GPT_FINAL", "最终裁决官"),
-            ("GEMINI_REVIEW", "冲突复核官"),
-            ("GROK_CHALLENGE", "反方挑战官"),
+            ("GPT_FINAL", "证据综合与候选形成"),
+            ("GEMINI_REVIEW", "证据与风险复核"),
+            ("GROK_CHALLENGE", "失败路径与压力测试"),
         )
     }
 
@@ -1063,9 +1088,9 @@ def analysis_audit_fixture(analysis_id: str, symbol: str) -> dict[str, object]:
     roles = {
         role: ai_role(role, label)
         for role, label in (
-            ("GPT_FINAL", "最终裁决官"),
-            ("GEMINI_REVIEW", "冲突复核官"),
-            ("GROK_CHALLENGE", "反方挑战官"),
+            ("GPT_FINAL", "证据综合与候选形成"),
+            ("GEMINI_REVIEW", "证据与风险复核"),
+            ("GROK_CHALLENGE", "失败路径与压力测试"),
         )
     }
     for role, payload in roles.items():
@@ -1503,7 +1528,8 @@ window.addEventListener("load", function () {{
             return
 
         if parsed.path == "/api/asset-pool":
-            self._json({"code": 200, "msg": "success", "data": pool_items_fixture()})
+            data = [] if self._scenario() == "pool-empty" else pool_items_fixture()
+            self._json({"code": 200, "msg": "success", "data": data})
             return
 
         if parsed.path == "/favicon.ico":

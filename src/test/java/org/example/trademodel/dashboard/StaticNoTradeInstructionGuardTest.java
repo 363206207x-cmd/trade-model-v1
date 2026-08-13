@@ -131,11 +131,13 @@ class StaticNoTradeInstructionGuardTest {
 
         assertThat(row).contains("持仓监控 Top3");
         assertThat(row).contains("用户真实持仓 · 与系统执行建议独立");
-        assertThat(row).contains("暂无手动录入持仓");
-        assertThat(row).contains("录入真实持仓后，系统才进入持续监控。");
+        assertThat(row).contains("暂无活动持仓");
+        assertThat(row).contains("系统只监控用户实际开仓并手动录入的持仓。");
+        assertThat(row).contains("执行计划不会自动创建仓位。");
         assertThat(row).contains("最终执行计划");
-        assertThat(row).contains("仅展示 Rule Validation 通过的 Final");
-        assertThat(row).contains("Candidate 不会在此展示");
+        assertThat(row).contains("仅展示冲突处理与规则校验通过的最终结果");
+        assertThat(row).contains("暂无最终执行计划");
+        assertThat(row).contains("当前资产尚未形成通过规则校验的计划。");
         assertThat(row).contains("manualPositionBtn", "录入持仓");
         assertThat(row).doesNotContain("<form");
         assertThat(row).doesNotContain("openPositionBtn");

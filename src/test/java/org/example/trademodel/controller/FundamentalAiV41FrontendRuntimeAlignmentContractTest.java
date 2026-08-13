@@ -22,7 +22,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
     private static final Path HOME_VO = Path.of("src/main/java/org/example/trademodel/vo/DashboardHomeVO.java");
     private static final Path HOME_SERVICE = Path.of(
             "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java");
-    private static final Path LATEST_EVIDENCE = Path.of("docs/evidence/v4_1_latest_ui");
+    private static final Path LATEST_EVIDENCE = Path.of("docs/evidence/v4_1_productized_ui");
 
     @Test
     void desktopHomeKeepsTheFrozenModuleOrder() throws Exception {
@@ -95,7 +95,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(cards)
                 .contains(
                         "authoritativeHomeAssetList(assets)",
-                        "动态 Top6 不使用固定资产或默认值补位",
+                        "homeAssetEmptyStateMarkup(emptyKind)",
                         "latest-asset-card",
                         "data-home-asset-remove",
                         "asset.opportunityScore",
@@ -130,9 +130,9 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "OBSERVATION: \"观察\"",
                         "BLOCKED: \"阻断\"");
         assertThat(html)
-                .contains("<dt>Market Bias</dt>")
+                .contains("<dt>市场方向</dt>")
                 .contains("latest-asset-fields")
-                .contains("<dt>Plan Mode</dt>")
+                .contains("<dt>计划模式</dt>")
                 .contains("data-opportunity-state=")
                 .contains("data-plan-mode=");
     }
@@ -156,9 +156,9 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 .contains("当前 Final Plan 不可验证");
         assertThat(renderer)
                 .contains(
-                        "Candidate 与未通过 Rule Validation 的内容不会在此显示",
-                        "Final Market Bias",
-                        "Final Plan Mode",
+                        "userFacingSemantic.planState",
+                        "最终市场方向",
+                        "最终计划模式",
                         "推荐方向",
                         "是否值得开仓",
                         "机会类型",
@@ -185,7 +185,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "降级原因",
                         "否决原因",
                         "来源状态",
-                        "s.notTradeInstruction === true")
+                        "仅供人工复核，不会自动下单或创建持仓")
                 .contains("data-plan-source=\"final\"")
                 .doesNotContain("defaultEntry", "defaultStop", "defaultTakeProfit", "candidateSummary");
     }
@@ -207,12 +207,12 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(contract)
                 .contains("\"READY\", \"PARTIAL\", \"FALLBACK\", \"UNAVAILABLE\", \"ERROR\"")
                 .contains(
-                        "FOUND: \"已找到可验证内容\"",
-                        "NONE_FOUND: \"已完成检查，未发现\"",
-                        "INSUFFICIENT_DATA: \"数据不足，无法完成检查\"",
-                        "SOURCE_UNAVAILABLE: \"来源不可用\"",
+                        "FOUND: \"已发现\"",
+                        "NONE_FOUND: \"完成检查，未发现\"",
+                        "INSUFFICIENT_DATA: \"数据不足，无法判断\"",
+                        "SOURCE_UNAVAILABLE: \"数据来源暂不可用\"",
                         "STALE: \"数据已过期\"",
-                        "NO_VERIFIABLE_FAILURE_PATH: \"未找到可验证失败路径\"")
+                        "NO_VERIFIABLE_FAILURE_PATH: \"暂无可验证失败路径\"")
                 .contains(
                         "supportingEvidence",
                         "opposingEvidence",
@@ -226,7 +226,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "watchIndicators");
         assertThat(renderer)
                 .contains(
-                        "[\"角色状态\", role.roleState]",
+                        "[\"角色状态\", userFacingSemantic.roleState(role.roleState).label]",
                         "[\"Analysis\", role.analysisId]",
                         "[\"Trace\", role.traceId]",
                         "[\"生成时间\", role.generatedAt]",
@@ -236,7 +236,8 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "renderFormalCollection(\"逻辑冲突\"",
                         "renderFormalCollection(\"失败路径\"",
                         "renderFormalCollection(\"外部事件风险\"")
-                .contains("latest-ai-content", "latest-ai-metadata", "renderFormalCollection")
+                .contains("latest-ai-content", "latest-ai-metadata", "renderFormalCollection",
+                        "latest-collection-details", "查看审计详情")
                 .doesNotContain("winner", "vote", "consistencyScore");
     }
 
@@ -250,7 +251,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(html)
                 .contains("<aside class=\"latest-module latest-consistency\"")
                 .contains("id=\"homeConsistencyContent\"")
-                .contains("暂无一致性数据");
+                .contains("暂无冲突与调整数据");
         assertThat(renderer)
                 .contains(
                         "options.dataState",
@@ -402,14 +403,14 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         String index = Files.readString(LATEST_EVIDENCE.resolve("README.md"));
         String qa = Files.readString(LATEST_EVIDENCE.resolve("browser-qa.json"));
         BufferedImage light = ImageIO.read(LATEST_EVIDENCE.resolve(
-                "runtime/01-desktop-1440x900-light.png").toFile());
+                "runtime/02-after-first-viewport.png").toFile());
         BufferedImage full = ImageIO.read(LATEST_EVIDENCE.resolve(
-                "runtime/02-desktop-full-page-light.png").toFile());
+                "runtime/21-desktop-full-page.png").toFile());
 
         assertThat(index).contains(
                 "28:154", "31:23", "520:212", "523:748", "35:97",
                 "Node `519:3` is the rejected old P1-KB baseline");
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 21; i++) {
             assertThat(index).contains(String.format("| %02d |", i));
         }
         assertThat(light.getWidth()).isEqualTo(1440);
@@ -477,9 +478,9 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "八项评分逐项绑定；缺失不是 0",
                         "支持与反对证据均保留来源、观测时间和新鲜度",
                         "多周期摘要",
-                        "GPT_FINAL / 最终裁决官",
-                        "GEMINI_REVIEW / 冲突复核官",
-                        "GROK_CHALLENGE / 反方挑战官",
+                        "证据综合与候选形成 <small>GPT_FINAL</small>",
+                        "证据与风险复核 <small>GEMINI_REVIEW</small>",
+                        "失败路径与压力测试 <small>GROK_CHALLENGE</small>",
                         "决策责任链",
                         "Conflict Resolver",
                         "Rule Validation",
