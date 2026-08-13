@@ -22,7 +22,8 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
     private static final Path HOME_VO = Path.of("src/main/java/org/example/trademodel/vo/DashboardHomeVO.java");
     private static final Path HOME_SERVICE = Path.of(
             "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java");
-    private static final Path LATEST_EVIDENCE = Path.of("docs/evidence/v4_1_productized_ui");
+    private static final Path LATEST_EVIDENCE = Path.of(
+            "docs/evidence/v4_1_execution_plan_semantics");
 
     @Test
     void desktopHomeKeepsTheFrozenModuleOrder() throws Exception {
@@ -156,38 +157,39 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 .contains("当前 Final Plan 不可验证");
         assertThat(renderer)
                 .contains(
-                        "userFacingSemantic.planState",
+                        "userFacingSemantic.planMode",
+                        "userFacingSemantic.planDataState",
                         "最终市场方向",
-                        "最终计划模式",
-                        "推荐方向",
-                        "是否值得开仓",
+                        "计划模式",
+                        "当前计划状态",
                         "机会类型",
-                        "建议动作",
                         "入场逻辑",
-                        "入场区",
+                        "入场区间",
                         "触发条件",
+                        "失效与止损",
                         "止损逻辑",
-                        "止损区",
-                        "止盈逻辑",
-                        "目标区 / 止盈规则",
-                        "加仓条件",
+                        "止损区间",
+                        "目标与趋势跟踪",
+                        "目标逻辑",
+                        "目标区域",
                         "减仓条件",
                         "放弃条件",
                         "失效条件",
                         "杠杆上限",
                         "仓位上限",
                         "预期风险收益",
-                        "有效期",
-                        "Valid From",
-                        "Valid Until",
-                        "持有周期",
+                        "时间有效性",
+                        "有效开始",
+                        "有效截止",
+                        "预计持有周期",
                         "Rule Validation",
                         "降级原因",
-                        "否决原因",
                         "来源状态",
-                        "仅供人工复核，不会自动下单或创建持仓")
+                        "安全门禁")
                 .contains("data-plan-source=\"final\"")
-                .doesNotContain("defaultEntry", "defaultStop", "defaultTakeProfit", "candidateSummary");
+                .doesNotContain(
+                        "defaultEntry", "defaultStop", "defaultTakeProfit", "candidateSummary",
+                        "是否值得开仓", "latest-plan-safety");
     }
 
     @Test
@@ -399,20 +401,24 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
     }
 
     @Test
-    void visualEvidenceLocksLatestFigmaNodesViewportThemesAndRequiredScenarios() throws Exception {
+    void visualEvidenceLocksExecutionPlanSemanticsViewportAndRequiredScenarios() throws Exception {
         String index = Files.readString(LATEST_EVIDENCE.resolve("README.md"));
         String qa = Files.readString(LATEST_EVIDENCE.resolve("browser-qa.json"));
         BufferedImage light = ImageIO.read(LATEST_EVIDENCE.resolve(
-                "runtime/02-after-first-viewport.png").toFile());
+                "runtime/12-desktop-first-viewport-1440x900.png").toFile());
         BufferedImage full = ImageIO.read(LATEST_EVIDENCE.resolve(
-                "runtime/21-desktop-full-page.png").toFile());
+                "runtime/13-desktop-full-page.png").toFile());
 
         assertThat(index).contains(
                 "28:154", "31:23", "520:212", "523:748", "35:97",
                 "Node `519:3` is the rejected old P1-KB baseline");
-        for (int i = 1; i <= 21; i++) {
+        for (int i = 1; i <= 13; i++) {
             assertThat(index).contains(String.format("| %02d |", i));
         }
+        assertThat(index).contains(
+                "未选择资产", "等待分析", "PREPARATION", "OBSERVATION", "BLOCKED",
+                "CONFIRMATION", "REDUCED", "Candidate 有、Final 无", "Final 有、AI 不可用",
+                "GPT Candidate", "Before / After", "1440 x 900", "Full page");
         assertThat(light.getWidth()).isEqualTo(1440);
         assertThat(light.getHeight()).isEqualTo(900);
         assertThat(full.getWidth()).isEqualTo(1440);
@@ -431,9 +437,13 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 "\"visibleAiRoleCount\": 1",
                 "\"positionExecutionWidthRatio\": 2.3333",
                 "\"candidateVisibleAsFinal\": false",
+                "\"visibleDisclaimerCopyCount\": 0",
+                "\"rawEnumPrimaryDisplayCount\": 0",
+                "\"staleAssetContentCount\": 0",
                 "\"systemStatusUnchanged\": true",
                 "\"alertsAndEventsUnchanged\": true",
-                "\"positionsUnchanged\": true");
+                "\"positionsUnchanged\": true",
+                "\"browserStatus\": \"PASS\"");
     }
 
     @Test

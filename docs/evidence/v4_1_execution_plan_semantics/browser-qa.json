@@ -1,0 +1,249 @@
+{
+  "capturedAt": "2026-08-13T14:06:26.161Z",
+  "branch": "codex/v4-1-frontend-runtime-alignment",
+  "pullRequest": 1179,
+  "startingHead": "3c3f7e96a8f384bbac1f1aa6f2534ef8d76b0efd",
+  "baseMain": "edc3615c03c9b71763c32574f1d811c1d9a8954d",
+  "sourceMode": "CONTROLLED_VISUAL_FIXTURE_PLUS_AUTHENTICATED_SPRING_RUNTIME",
+  "runtimeSourceHashes": {
+    "dashboardHtml": "c12493aed793bf12ca4daa58788c62c43811ab3600e91cf8ce1725a77d09c5b2",
+    "dashboardLatestCss": "dec503482fd78d0414993ada9772bae7d22f7249b925f5e1d3aa60606b305c2d",
+    "frontendContractJs": "dd02c4aaed2f05923fa47e258ddc41c8b6d679dda8bd4653c495ba5250ad4a5b",
+    "visualFixture": "7bb2bcf8fed2761c2d40ae7d79d2e0084010476332886842eb3b877afc7c7785"
+  },
+  "externalCalls": 0,
+  "writesRejected": true,
+  "primaryViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "document": {
+    "width": 1440,
+    "height": 2631
+  },
+  "metrics": {
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "topLevelOverlap": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "unhandledRejections": 0,
+    "visibleAiRoleCount": 1,
+    "positionExecutionWidthRatio": 2.3333,
+    "candidateVisibleAsFinal": false,
+    "visibleDisclaimerCopyCount": 0,
+    "rawEnumPrimaryDisplayCount": 0,
+    "staleAssetContentCount": 0
+  },
+  "assetSwitch": {
+    "from": "BTCUSDT",
+    "to": "ETHUSDT",
+    "systemStatusUnchanged": true,
+    "alertsAndEventsUnchanged": true,
+    "positionsUnchanged": true,
+    "executionPlanUpdated": true,
+    "aiWorkspaceUpdated": true,
+    "staleAssetContentCount": 0
+  },
+  "scenarioChecks": {
+    "unselected": true,
+    "waiting": true,
+    "preparation": true,
+    "observation": true,
+    "blocked": true,
+    "confirmation": true,
+    "reduced": true,
+    "candidateIsolation": true,
+    "finalAiUnavailable": true
+  },
+  "scenarios": [
+    {
+      "scenario": "unselected",
+      "finalVisible": false,
+      "planMode": null,
+      "dataState": "unselected",
+      "headline": [
+        "请选择资产",
+        "选择一个重点机会资产后查看执行计划。",
+        "查看审计详情"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "waiting-analysis",
+      "finalVisible": false,
+      "planMode": null,
+      "dataState": "generating_evidence",
+      "headline": [
+        "正在分析",
+        "正在生成证据",
+        "查看审计详情"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "plan-preparation",
+      "finalVisible": true,
+      "planMode": "preparation",
+      "dataState": null,
+      "headline": [
+        "等待触发",
+        "方向和主要逻辑已经形成，当前等待价格、结构或事件条件触发。",
+        "预备型"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "plan-observation",
+      "finalVisible": true,
+      "planMode": "observation",
+      "dataState": null,
+      "headline": [
+        "当前仅观察",
+        "当前判断具有分析价值，但尚不形成方向性参与计划。",
+        "观察"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "plan-blocked-final",
+      "finalVisible": true,
+      "planMode": "blocked",
+      "dataState": null,
+      "headline": [
+        "当前已阻断",
+        "数据质量、风险、冲突、状态机或规则校验阻止当前方向性参与。",
+        "阻断"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "plan-confirmation",
+      "finalVisible": true,
+      "planMode": "confirmation",
+      "dataState": null,
+      "headline": [
+        "条件已确认",
+        "方向、证据、触发、风险和规则校验均已满足。",
+        "确认型"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "plan-reduced",
+      "finalVisible": true,
+      "planMode": "reduced",
+      "dataState": null,
+      "headline": [
+        "降低强度",
+        "机会仍然成立，当前按反证与风险约束降低参与强度。",
+        "缩减型"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "candidate-only",
+      "finalVisible": false,
+      "planMode": null,
+      "dataState": "candidate_only",
+      "headline": [
+        "等待规则校验",
+        "候选计划已形成，正在等待规则校验",
+        "查看审计详情"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    },
+    {
+      "scenario": "final-ai-unavailable",
+      "finalVisible": true,
+      "planMode": "confirmation",
+      "dataState": null,
+      "headline": [
+        "条件已确认",
+        "方向、证据、触发、风险和规则校验均已满足。",
+        "确认型"
+      ],
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0,
+      "rawEnumPrimaryDisplayCount": 0,
+      "horizontalOverflow": 0,
+      "textOverflow": 0
+    }
+  ],
+  "screenshots": {
+    "01-unselected.png": "e409b869a0b16f452326fa0c36241893649827b56fb1a9b0ac2a4a75ab9f3a96",
+    "02-waiting-analysis.png": "b52dffa0f23d09a0bdde8fb3beda60d9a68a73b0505510e94988548cfb324c6e",
+    "03-plan-preparation.png": "58d55ed4e2dd1989f7ebdec79382f3ee2aa681168f84ad4e4ec6bf6ebd216226",
+    "04-plan-observation.png": "7006a1dd6e1fdbab9811b3f03032f15119fa3f1443b2956eae0caa3cfd0be658",
+    "05-plan-blocked.png": "3494aaf676bccc5032b5924ac8dead16c3236e8b1fef48779882e0f30ccc236d",
+    "06-plan-confirmation.png": "38f13b5ea6f34351e8762e94489d9d84391f8f8901a7c2406ad9dfdedb88c768",
+    "07-plan-reduced.png": "1c897fd0e055615a63467c4874592ffce88bbf93d1bfa5541aec5b65885e273c",
+    "08-candidate-no-final.png": "85c17909a235ea1e02b31cba73d4c17c49d71e2eccf175e4835a9d250608f30f",
+    "09-final-ai-unavailable.png": "ab32dff015ed591c6d9633623b296a1ab63859ae36f169984fca987fb4da1040",
+    "10-gpt-candidate.png": "6b41f404bfdcda405e82f070c3bda23911d79f9ab124b4b4e2a80bfe744955d1",
+    "11-after-execution-plan.png": "38f13b5ea6f34351e8762e94489d9d84391f8f8901a7c2406ad9dfdedb88c768",
+    "11-before-execution-plan.png": "8e873f8040d315dc1677d3ff8d543d1562aea3c6d84adb9a273d9cf1c58dafd9",
+    "12-desktop-first-viewport-1440x900.png": "31b531648b536030b6ce9613e8008a025369a261fa40124ce0ec69f3b9e7c980",
+    "13-desktop-full-page.png": "157e3b814c7c6c96ce657595670af482042b25bfcf52269d5a3a93af2277844d",
+    "14-actual-spring-runtime.png": "c88e8d399c8ae3c13cfdce3099623d7c43939003d56d81aecaff676818911284"
+  },
+  "actualSpringRuntime": {
+    "pageHttpStatus": 200,
+    "pageResponseBytes": 716941,
+    "authenticationEnabled": true,
+    "authenticatedLoginStatus": 302,
+    "health": "UP",
+    "staticResourceHashesMatch": true,
+    "authenticatedDashboardApiStatus": 200,
+    "browserStatus": "PASS",
+    "browserAudit": {
+      "binaryWorthOpeningCount": 0,
+      "executionHeading": "执行计划",
+      "horizontalOverflow": 0,
+      "planText": "请选择资产\n暂无有效分析快照\n查看审计详情",
+      "singleWorkspace": true,
+      "textOverflow": 0,
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      },
+      "visibleAiRoleCount": 1,
+      "visibleDisclaimerCopyCount": 0
+    },
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "authenticatedProviderEvidence": false
+  }
+}

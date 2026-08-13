@@ -26,7 +26,15 @@ class DashboardLocalRealBindingContractTest {
     @Test
     void dashboardKeepsProviderDiagnosticsOutOfCompactAssetCard() throws Exception {
         String template = Files.readString(Path.of("src/main/resources/templates/dashboard.html"));
+        int assetRendererStart = template.indexOf("function renderHomeAssetsFromPayload(assets, moduleState)");
+        int assetRendererEnd = template.indexOf("function renderHomePositionsFromPayload(positions)", assetRendererStart);
+        assertThat(assetRendererStart).isGreaterThanOrEqualTo(0);
+        assertThat(assetRendererEnd).isGreaterThan(assetRendererStart);
+        String compactAssetRenderer = template.substring(assetRendererStart, assetRendererEnd);
+
         assertThat(template).contains("sourceProvider", "timeframeFreshness")
+                .isNotEmpty();
+        assertThat(compactAssetRenderer)
                 .doesNotContain("数据来源", "四周期新鲜度", "证据数", "分析时间");
     }
 

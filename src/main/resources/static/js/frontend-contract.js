@@ -11,7 +11,7 @@
     OBSERVING: Object.freeze({ label: "观察中", tone: "neutral" }),
     CANDIDATE: Object.freeze({ label: "待复核候选", tone: "info" }),
     WAITING_TRIGGER: Object.freeze({ label: "等待触发", tone: "warning" }),
-    TRIGGERED: Object.freeze({ label: "条件已触发，不代表已开仓", tone: "info" }),
+    TRIGGERED: Object.freeze({ label: "条件已触发", tone: "info" }),
     HIGH_RISK: Object.freeze({ label: "高风险", tone: "danger" }),
     INVALIDATED: Object.freeze({ label: "已失效", tone: "muted" }),
     COOLING: Object.freeze({ label: "冷却中", tone: "muted" }),
@@ -111,6 +111,44 @@
     BLOCKED: "阻断"
   });
 
+  var PLAN_MODE_VIEWS = Object.freeze({
+    CONFIRMATION: Object.freeze({
+      typeLabel: "确认型",
+      participationLabel: "条件已确认",
+      detail: "方向、证据、触发、风险和规则校验均已满足。",
+      tone: "positive",
+      profile: "confirmation"
+    }),
+    PREPARATION: Object.freeze({
+      typeLabel: "预备型",
+      participationLabel: "等待触发",
+      detail: "方向和主要逻辑已经形成，当前等待价格、结构或事件条件触发。",
+      tone: "warning",
+      profile: "preparation"
+    }),
+    REDUCED: Object.freeze({
+      typeLabel: "缩减型",
+      participationLabel: "降低强度",
+      detail: "机会仍然成立，当前按反证与风险约束降低参与强度。",
+      tone: "reduced",
+      profile: "reduced"
+    }),
+    OBSERVATION: Object.freeze({
+      typeLabel: "观察",
+      participationLabel: "当前仅观察",
+      detail: "当前判断具有分析价值，但尚不形成方向性参与计划。",
+      tone: "neutral",
+      profile: "observation"
+    }),
+    BLOCKED: Object.freeze({
+      typeLabel: "阻断",
+      participationLabel: "当前已阻断",
+      detail: "数据质量、风险、冲突、状态机或规则校验阻止当前方向性参与。",
+      tone: "danger",
+      profile: "blocked"
+    })
+  });
+
   var OPPORTUNITY_TYPE_LABELS = Object.freeze({
     STRUCTURE_CONFIRMATION: "结构确认",
     TREND_CONTINUATION: "趋势延续",
@@ -157,7 +195,7 @@
     READY: Object.freeze({ label: "分析完成", tone: "positive" }),
     PARTIAL: Object.freeze({ label: "部分结果可用", tone: "warning" }),
     FALLBACK: Object.freeze({ label: "当前使用规则降级结果", tone: "warning" }),
-    UNAVAILABLE: Object.freeze({ label: "当前分析不可用", tone: "unavailable" }),
+    UNAVAILABLE: Object.freeze({ label: "AI解释暂不可用", tone: "unavailable" }),
     ERROR: Object.freeze({ label: "分析失败", tone: "danger" })
   });
 
@@ -170,19 +208,33 @@
     NO_VERIFIABLE_FAILURE_PATH: Object.freeze({ label: "暂无可验证失败路径", detail: "当前没有可验证的失败路径。", tone: "neutral" })
   });
 
-  var PLAN_STATE_VIEWS = Object.freeze({
-    NO_COMPLETE_PLAN: Object.freeze({ label: "暂无最终执行计划", detail: "当前资产尚未形成通过规则校验的计划。", tone: "neutral" }),
-    WAITING_ANALYSIS: Object.freeze({ label: "等待分析", detail: "当前资产的可信分析尚未完成。", tone: "warning" }),
-    INSUFFICIENT_DATA: Object.freeze({ label: "数据不足", detail: "当前数据不足以形成通过规则校验的计划。", tone: "unavailable" }),
-    STALE: Object.freeze({ label: "数据已过期", detail: "需要使用新鲜数据重新分析。", tone: "warning" }),
-    RULE_VETOED: Object.freeze({ label: "规则校验未通过", detail: "规则层已阻止当前计划成为最终执行计划。", tone: "danger" }),
-    AI_UNAVAILABLE: Object.freeze({ label: "AI解释暂不可用", detail: "规则结果仍保留，AI解释当前不可用。", tone: "unavailable" }),
-    PREPARATION: Object.freeze({ label: "等待触发", detail: "当前机会尚未满足确认条件。", tone: "warning" }),
-    OBSERVATION: Object.freeze({ label: "当前仅观察", detail: "当前只保留观察结论，不形成方向性计划。", tone: "neutral" }),
-    BLOCKED: Object.freeze({ label: "当前已阻断", detail: "当前计划被风险、冲突或规则条件阻断。", tone: "danger" }),
-    LOADING: Object.freeze({ label: "正在同步计划", detail: "正在读取当前资产的最终计划状态。", tone: "neutral" }),
-    MISSING: Object.freeze({ label: "暂无最终执行计划", detail: "当前资产尚未形成通过规则校验的计划。", tone: "neutral" }),
-    ERROR: Object.freeze({ label: "计划暂不可用", detail: "最终执行计划读取失败，请稍后重试。", tone: "danger" })
+  var PLAN_DATA_STATE_VIEWS = Object.freeze({
+    UNSELECTED: Object.freeze({ label: "请选择资产", detail: "选择一个重点机会资产后查看执行计划。", tone: "neutral" }),
+    LOADING: Object.freeze({ label: "正在分析", detail: "正在获取当前资产的最新分析状态。", tone: "neutral" }),
+    WAITING_ANALYSIS: Object.freeze({ label: "正在分析", detail: "正在获取数据并生成证据。", tone: "neutral" }),
+    FETCHING_DATA: Object.freeze({ label: "正在分析", detail: "正在获取数据。", tone: "neutral" }),
+    GENERATING_EVIDENCE: Object.freeze({ label: "正在分析", detail: "正在生成证据。", tone: "neutral" }),
+    BUILDING_CANDIDATE: Object.freeze({ label: "正在分析", detail: "正在形成候选计划。", tone: "neutral" }),
+    REVIEWING_RISK: Object.freeze({ label: "正在分析", detail: "正在进行风险复核。", tone: "neutral" }),
+    WAITING_RULE_VALIDATION: Object.freeze({ label: "等待规则校验", detail: "候选计划正在等待规则校验。", tone: "warning" }),
+    RULE_VALIDATION_PENDING: Object.freeze({ label: "等待规则校验", detail: "候选计划正在等待规则校验。", tone: "warning" }),
+    CANDIDATE_ONLY: Object.freeze({ label: "等待规则校验", detail: "候选计划已形成，尚未完成规则校验。", tone: "warning" }),
+    INSUFFICIENT_DATA: Object.freeze({ label: "当前数据不足", detail: "当前证据不足以形成可信的最终计划。", tone: "unavailable" }),
+    DATA_QUALITY_BLOCKED: Object.freeze({ label: "当前数据不足", detail: "数据质量未达到最终计划门槛。", tone: "unavailable" }),
+    PLAN_INCOMPLETE: Object.freeze({ label: "当前数据不足", detail: "当前计划所需信息尚不完整。", tone: "unavailable" }),
+    SOURCE_UNAVAILABLE: Object.freeze({ label: "数据来源暂不可用", detail: "当前无法读取可信数据来源。", tone: "unavailable" }),
+    PLAN_IDENTITY_MISSING: Object.freeze({ label: "数据来源暂不可用", detail: "当前计划来源暂不可验证。", tone: "unavailable" }),
+    PLAN_IDENTITY_ERROR: Object.freeze({ label: "数据来源暂不可用", detail: "当前计划来源暂不可验证。", tone: "unavailable" }),
+    STALE: Object.freeze({ label: "当前结果已过期", detail: "需要重新扫描或重新分析。", tone: "warning" }),
+    EXPIRED: Object.freeze({ label: "当前结果已过期", detail: "需要重新扫描或重新分析。", tone: "warning" }),
+    STATE_SNAPSHOT_MISMATCH: Object.freeze({ label: "当前结果已过期", detail: "资产状态已变化，需要重新分析。", tone: "warning" }),
+    REVALIDATION_REQUIRED: Object.freeze({ label: "等待规则校验", detail: "当前结果需要重新校验。", tone: "warning" }),
+    RULE_VETOED: Object.freeze({ label: "尚未形成最终计划", detail: "当前候选未通过规则校验。", tone: "danger" }),
+    AI_UNAVAILABLE: Object.freeze({ label: "尚未形成最终计划", detail: "AI 解释暂不可用，当前没有可展示的最终计划。", tone: "unavailable" }),
+    NO_COMPLETE_PLAN: Object.freeze({ label: "尚未形成最终计划", detail: "当前没有已持久化的最终计划。", tone: "neutral" }),
+    PLAN_MISSING: Object.freeze({ label: "尚未形成最终计划", detail: "当前没有已持久化的最终计划。", tone: "neutral" }),
+    MISSING: Object.freeze({ label: "尚未形成最终计划", detail: "当前没有已持久化的最终计划。", tone: "neutral" }),
+    ERROR: Object.freeze({ label: "数据来源暂不可用", detail: "执行计划读取失败，请稍后重试。", tone: "danger" })
   });
 
   var DATA_STATE_VIEWS = Object.freeze({
@@ -258,7 +310,9 @@
 
   function planModeLabel(value) {
     var normalized = String(value || "").trim().toUpperCase();
-    return PLAN_MODE_LABELS[normalized] || "当前不可查看";
+    return PLAN_MODE_VIEWS[normalized]
+      ? PLAN_MODE_VIEWS[normalized].typeLabel
+      : "当前不可查看";
   }
 
   function opportunityTypeLabel(value) {
@@ -304,8 +358,17 @@
     );
   }
 
-  function planStateView(value) {
-    return mappedView(PLAN_STATE_VIEWS, value, PLAN_STATE_VIEWS.MISSING);
+  function planModeView(value) {
+    var normalized = String(value || "").trim().toUpperCase();
+    return PLAN_MODE_VIEWS[normalized] || null;
+  }
+
+  function planDataStateView(value) {
+    return mappedView(
+      PLAN_DATA_STATE_VIEWS,
+      value,
+      PLAN_DATA_STATE_VIEWS.MISSING
+    );
   }
 
   function dataStateView(value) {
@@ -313,12 +376,13 @@
   }
 
   var USER_FACING_SEMANTIC_MAPPER = Object.freeze({
-    planState: planStateView,
+    planMode: planModeView,
+    planDataState: planDataStateView,
     roleState: roleStateView,
     collectionState: collectionStateView,
     dataState: dataStateView,
     marketBias: marketBiasHierarchyLabel,
-    planMode: planModeLabel,
+    planModeLabel: planModeLabel,
     opportunityType: opportunityTypeLabel,
     value: userFacingValue
   });
@@ -561,11 +625,12 @@
     DATA_QUALITY_LABELS: DATA_QUALITY_LABELS,
     MARKET_BIAS_HIERARCHY_LABELS: MARKET_BIAS_HIERARCHY_LABELS,
     PLAN_MODE_LABELS: PLAN_MODE_LABELS,
+    PLAN_MODE_VIEWS: PLAN_MODE_VIEWS,
     OPPORTUNITY_TYPE_LABELS: OPPORTUNITY_TYPE_LABELS,
     COLLECTION_STATE_LABELS: COLLECTION_STATE_LABELS,
     ROLE_STATE_VIEWS: ROLE_STATE_VIEWS,
     COLLECTION_STATE_VIEWS: COLLECTION_STATE_VIEWS,
-    PLAN_STATE_VIEWS: PLAN_STATE_VIEWS,
+    PLAN_DATA_STATE_VIEWS: PLAN_DATA_STATE_VIEWS,
     DATA_STATE_VIEWS: DATA_STATE_VIEWS,
     USER_FACING_SEMANTIC_MAPPER: USER_FACING_SEMANTIC_MAPPER,
     ROLE_STATES: ROLE_STATES,
@@ -579,9 +644,10 @@
     planModeLabel: planModeLabel,
     opportunityTypeLabel: opportunityTypeLabel,
     userFacingValue: userFacingValue,
+    planModeView: planModeView,
+    planDataStateView: planDataStateView,
     roleStateView: roleStateView,
     collectionStateView: collectionStateView,
-    planStateView: planStateView,
     dataStateView: dataStateView,
     collectionStateLabel: collectionStateLabel,
     normalizeRoleState: normalizeRoleState,

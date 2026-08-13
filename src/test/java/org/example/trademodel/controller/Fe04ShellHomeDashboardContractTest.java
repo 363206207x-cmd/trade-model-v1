@@ -172,7 +172,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("记录平仓")
                 .doesNotContain("复盘中心");
         assertThat(desktopPosition)
-                .contains("持仓监控 Top3", "用户真实持仓", "与系统执行建议独立")
+                .contains("持仓监控 Top3", "风险变化、监控结论与建议动作")
                 .contains("manualPositionBtn")
                 .doesNotContain("reviewCenterLink");
         assertThat(desktop)
@@ -182,9 +182,8 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("MANUAL_INDEPENDENT");
         assertThat(desktop)
                 .contains(
-                        "等待 Final Plan",
-                        "暂无最终执行计划",
-                        "当前资产尚未形成通过规则校验的计划。",
+                        "请选择资产",
+                        "选择一个重点机会资产后查看执行计划。",
                         "frontendContract.executionPlanAccess(s)");
         assertThat(mobileAi)
                 .contains("data-ai-role-summary")

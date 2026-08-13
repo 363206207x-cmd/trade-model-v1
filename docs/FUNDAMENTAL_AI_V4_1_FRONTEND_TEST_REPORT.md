@@ -2,106 +2,85 @@
 
 ## Scope
 
-This report covers PR `#1179` productized Desktop UI remediation only. The production files under test are:
+This report covers PR `#1179` Desktop Home Execution Plan semantic and interaction remediation. Production changes are limited to:
 
 - `src/main/resources/templates/dashboard.html`
-- `src/main/resources/templates/login.html`
-- `src/main/resources/templates/analysis-detail.html`
 - `src/main/resources/static/css/dashboard-latest.css`
 - `src/main/resources/static/js/frontend-contract.js`
 - `scripts/dashboard-visual-acceptance-fixture.py`
 
-No Backend business model, API contract, Schema, Mobile, Figma, or automatic-trading capability changed.
+No Backend business logic, API contract, Schema, Figma, Mobile, or automatic-trading capability changed.
 
 ## Automated Results
 
 | Validation | Result |
 |---|---|
-| Productized UI + Home compatibility (`DashboardControllerTest` and two v4.1 suites) | `174` tests, `0` failures, `0` errors, `0` skipped |
-| FE-04 / foundation / no-trade compatibility | `22` tests, `0` failures, `0` errors, `0` skipped |
-| Maven full suite | `4519` tests, `0` failures, `0` errors, `14` skipped |
+| Execution Plan / productized Home focused suites | `202` tests, `0` failures, `0` errors, `0` skipped |
+| Maven full suite | `4525` tests, `0` failures, `0` errors, `14` skipped |
 | Product Source Gate | PASS |
 | Workflow Contract | PASS (`WORKFLOW_CONTRACT_OK`) |
-| `frontend-contract.js` syntax with bundled Node.js | PASS |
-| Python visual fixture compile | PASS |
-| `git diff --check` | PASS after final documentation update |
+| `frontend-contract.js` syntax | PASS |
+| visual fixture compile | PASS |
+| `git diff --check` | PASS |
 
-The 14 skipped tests are existing environment-gated paths, including unavailable Docker or external-provider fixtures. This revision did not add exclusions or suppressions.
-
-## Defects Found During Validation
-
-The first full run found three categories of issue, all resolved before the final run:
-
-1. Nineteen `DashboardControllerTest` assertions referenced removed P1 copy or DOM. Their fail-closed, field-isolation, single-workspace, Dynamic Top6, and no-trade intent now targets the current product contract.
-2. Four FE-04/foundation guards referenced old consistency, Final, and no-position copy. Their safety assertions were retained with current user-facing semantics.
-3. A nested JavaScript action array inside the Thymeleaf template was interpreted as an inline expression. `homeAssetEmptyStateMarkup` now uses object entries, preserving the rendered UI while allowing authenticated server-side template processing.
-
-Authentication/session regression tests confirm the corrected template renders successfully.
+The 14 skips are existing environment-gated tests, including unavailable Docker or external-provider paths. This remediation adds no exclusion or suppression.
 
 ## Contract Coverage
 
-`FundamentalAiV41ProductizedDesktopUiContractTest` and `FundamentalAiV41FrontendRuntimeAlignmentContractTest` verify these selectors and behaviors:
+`FundamentalAiV41ExecutionPlanSemanticAlignmentContractTest` and the updated Home suites verify:
 
-| Surface | Production selector / function | Covered behavior |
-|---|---|---|
-| Product root | `[data-latest-approved-home]` | brand, hierarchy, current production path |
-| System status | `.latest-system-status` | six semantic statuses and tone mapping |
-| Alerts/events | `.latest-signal-grid` | compact rows and exact empty states |
-| Dynamic Top6 | `#tilesRow`, `authoritativeHomeAssetList` | backend order, limit six, no fixed-symbol fill |
-| Asset search | `#symbolSearch`, `renderAssetSearchSuggestions` | select-first gating for Add/Analyze |
-| Position | `#homePositionCard`, `renderHomePositionsFromPayload` | no-position, waiting, trusted Top3, no semantic fallback |
-| Final | `#homeExecutionCard`, `renderHomeExecutionFromPayload` | validated Final only; Candidate never exposed as Final |
-| Three AI | `#homeAiPanel`, `renderHomeAiRoleTab` | one workspace, one visible role, role-specific structure |
-| Adjustment | `#homeConsistencyContent`, `renderHomeConsistencyCard` | dependent conflict/final-adjustment summary, no vote/chart |
-| Asset switch | `renderAssetContextLoading`, `fetchDashboardHome` | stale response guard and global-state isolation |
+| Contract | Evidence |
+|---|---|
+| five formal Final modes | centralized `PLAN_MODE_VIEWS` and mode-specific renderer profiles |
+| Plan Mode / data-state separation | independent `PLAN_MODE_VIEWS` and `PLAN_DATA_STATE_VIEWS` |
+| PREPARATION is Final | Final mode renderer; no no-plan fallback |
+| OBSERVATION / BLOCKED are Final | formal Final rendering without entry/stop/target sections |
+| structured plan sections | 入场与触发, 失效与止损, 目标与趋势跟踪, 风险限制, 时间有效性 |
+| Candidate / Final isolation | GPT `data-result-layer="candidate"`; Execution Plan `data-plan-source="final"` |
+| Final source gate | Final, Rule Validation, chain, source, and `notTradeInstruction` checks |
+| user-facing semantics | no binary worth-opening field, raw enum, or default-visible disclaimer copy |
+| optional value safety | missing values are omitted; no zero or placeholder synthesis |
+| interaction isolation | asset switch clears stale decision context and ignores stale responses |
 
-## Controlled Browser Matrix
+## Defects Closed During Validation
 
-The read-only fixture served the real current templates and assets at `1440 x 900`. It rejected writes and performed zero external calls.
+1. Missing optional Final fields exposed `暂无 AI 原始输出`; these fields are now omitted.
+2. Final-with-AI-unavailable used legacy copy; the workspace now shows `AI解释暂不可用` without borrowing Final fields.
+3. Two legacy tests used removed disclaimer copy as a safety proof; they now assert the actual Final gate and Candidate/Final boundary.
+4. One asset-card test scoped a diagnostics-copy assertion to the entire dashboard; it now inspects the asset-card renderer only.
+
+## Browser Matrix
 
 ```text
-SCREENSHOT_COUNT=21
+REQUIRED_SCENARIO_GROUPS=13/13
 HORIZONTAL_OVERFLOW_COUNT=0
 TEXT_OVERFLOW_COUNT=0
 TOP_LEVEL_OVERLAP_COUNT=0
 CONSOLE_ERROR_COUNT=0
 CONSOLE_WARNING_COUNT=0
 UNHANDLED_REJECTION_COUNT=0
-DETACHED_VISUAL_STATE_COUNT=0
-RAW_ENUM_PRIMARY_DISPLAY_COUNT=0
-DUPLICATE_CONSISTENCY_COUNT=0
 VISIBLE_AI_ROLE_COUNT=1
-FAKE_RUNTIME_VALUE_COUNT=0
+VISIBLE_DISCLAIMER_COPY_COUNT=0
+RAW_ENUM_PRIMARY_DISPLAY_COUNT=0
+STALE_ASSET_CONTENT_COUNT=0
 CANDIDATE_VISIBLE_AS_FINAL=false
 ```
 
-The complete scenario-to-file index is in `docs/evidence/v4_1_productized_ui/README.md`; machine-readable measurements and source hashes are in `browser-qa.json`.
+The complete index and hashes are under `docs/evidence/v4_1_execution_plan_semantics/`.
 
 ## Actual Spring Runtime
 
-The current branch started successfully on `127.0.0.1` with authentication enabled and a throwaway local user. Schedulers, external providers, push, and automatic trading were disabled.
-
-| Check | Result |
-|---|---|
-| login page / authenticated login | HTTP `200` / `302` |
-| authenticated `/dashboard` | HTTP `200`; complete 711,507-byte response; current productized markers present |
-| `/actuator/health` | `UP` |
-| served CSS and semantic mapper | exact worktree SHA-256 match |
-| authenticated `/api/dashboard/home` | HTTP `200`; current Dashboard contract returned |
-| actual Spring page in in-app browser | BLOCKED by browser URL policy |
-| authenticated real-provider browser scenario | NOT EXECUTED |
-
-The controlled browser matrix and authenticated local HTTP/template rendering are PASS. Actual Spring browser inspection and authenticated real-provider acceptance remain BLOCKED and are not claimed as complete.
+Authenticated login, `/dashboard`, `/api/dashboard/home`, and health all passed. The exact worktree CSS and JavaScript were served, and the real application page passed browser inspection at `1440 x 900` with no overflow, console errors, raw binary worth-opening field, or visible disclaimer copy.
 
 ## Commands
 
 ```text
-./mvnw -q -Dtest=DashboardControllerTest,FundamentalAiV41ProductizedDesktopUiContractTest,FundamentalAiV41FrontendRuntimeAlignmentContractTest test
-./mvnw -q -Dtest=Fe04ShellHomeDashboardContractTest,FrontendImplementationFoundationContractTest,StaticNoTradeInstructionGuardTest test
+./mvnw -q -Dtest=DashboardControllerTest,FundamentalAiV41ProductizedDesktopUiContractTest,FundamentalAiV41FrontendRuntimeAlignmentContractTest,FundamentalAiV41ExecutionPlanSemanticAlignmentContractTest,Fe04ShellHomeDashboardContractTest,FrontendImplementationFoundationContractTest,StaticNoTradeInstructionGuardTest test
+./mvnw -q -Dtest=DashboardLocalRealBindingContractTest test
 ./mvnw test -q
 bash scripts/product-source-gate.sh
 bash scripts/check-workflow-contract.sh
 <bundled-node> --check src/main/resources/static/js/frontend-contract.js
-PYTHONPYCACHEPREFIX=/tmp/codex-pyc python3 -m py_compile scripts/dashboard-visual-acceptance-fixture.py
+PYTHONPYCACHEPREFIX=/tmp/codex-pycache <bundled-python> -m py_compile scripts/dashboard-visual-acceptance-fixture.py
 git diff --check
 ```

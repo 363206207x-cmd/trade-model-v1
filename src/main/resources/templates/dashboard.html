@@ -4608,7 +4608,7 @@
     <header class="top-bar">
         <div class="brand-block">
             <h1><span data-desktop-page-title tabindex="-1">首页总览</span></h1>
-            <p class="desktop-breadcrumb">当前机会、最终执行计划与真实持仓相互独立</p>
+            <p class="desktop-breadcrumb">查看当前机会、参与条件与真实持仓状态</p>
         </div>
         <div class="top-right">
             <span class="header-update">数据更新 <span id="lastUpdatedText">等待同步</span></span>
@@ -4654,9 +4654,6 @@
                 <div class="sidebar-slot-list" id="sidebarSlotList" hidden></div>
                 <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">消息与个人页暂未开放</p>
                 <div class="sidebar-divider" aria-hidden="true"></div>
-                <div class="sidebar-product-boundary">
-                    <p>非交易指令 · 人工决策</p>
-                </div>
             </aside>
             <main class="dashboard-main">
         <div data-desktop-home-view data-desktop-dashboard-root data-latest-approved-home
@@ -4774,12 +4771,12 @@
             </div>
         </section>
 
-        <section class="latest-decision-grid" data-position-execution-ratio="70:30" aria-label="持仓监控与最终执行计划">
+        <section class="latest-decision-grid" data-position-execution-ratio="70:30" aria-label="持仓监控与执行计划">
             <article class="latest-module latest-position-module" id="homePositionCard" aria-label="持仓监控">
                 <header class="latest-module-head">
                     <div>
                         <h2>持仓监控 Top3</h2>
-                        <p>用户真实持仓 · 与系统执行建议独立</p>
+                        <p>风险变化、监控结论与建议动作</p>
                     </div>
                     <div class="latest-module-actions">
                         <button type="button" class="latest-button latest-button-secondary" id="manualPositionBtn">录入持仓</button>
@@ -4789,24 +4786,23 @@
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
                 <div id="homePositionContent">
                     <div class="latest-empty-state" role="status">
-                        <strong>暂无活动持仓</strong><span>系统只监控用户实际开仓并手动录入的持仓。</span>
-                        <span>执行计划不会自动创建仓位。</span>
+                        <strong>暂无活动持仓</strong><span>录入真实持仓后查看风险变化与监控结论。</span>
                     </div>
                 </div>
             </article>
-            <article class="latest-module latest-plan-module" id="homeExecutionCard" aria-label="最终执行计划">
+            <article class="latest-module latest-plan-module" id="homeExecutionCard" aria-label="执行计划">
                 <header class="latest-module-head latest-plan-head">
                     <div>
-                        <h2>最终执行计划</h2>
-                        <p>仅展示冲突处理与规则校验通过的最终结果</p>
+                        <h2>执行计划</h2>
+                        <p>当前资产的参与方式、风险限制与有效条件</p>
                     </div>
                     <div class="latest-plan-context">
-                        <strong id="homeExecutionStatus">等待 Final Plan</strong>
-                        <span id="homeExecutionSymbol">等待资产</span>
+                        <strong id="homeExecutionStatus">请选择资产</strong>
+                        <span id="homeExecutionSymbol">未选择</span>
                     </div>
                 </header>
                 <div id="homeExecutionContent">
-                    <div class="latest-plan-empty" role="status"><strong>暂无最终执行计划</strong><span>当前资产尚未形成通过规则校验的计划。</span></div>
+                    <div class="latest-plan-empty" role="status"><strong>请选择资产</strong><span>选择一个重点机会资产后查看执行计划。</span></div>
                 </div>
             </article>
         </section>
@@ -4830,7 +4826,7 @@
                     <div class="latest-ai-panels">
                         <article class="latest-ai-panel" role="tabpanel" data-home-ai-role="GPT_FINAL">
                             <div class="latest-ai-role-head"><strong>证据综合与候选形成 <small>GPT_FINAL</small></strong><span>待同步</span></div>
-                            <div class="latest-ai-empty">尚未生成AI解释</div>
+                            <div class="latest-ai-empty">AI解释暂不可用</div>
                         </article>
                     </div>
                 </div>
@@ -7584,10 +7580,10 @@
         var labels = {
             CONFIRMATION: "确认型",
             PREPARATION: "预备型",
-            REDUCED: "降级复核",
+            REDUCED: "缩减型",
             OBSERVATION: "观察",
-            BLOCKED: "已阻断",
-            NO_PLAN: "暂无计划"
+            BLOCKED: "阻断",
+            NO_PLAN: "尚未形成最终计划"
         };
         var key = String(raw || "").trim().toUpperCase();
         return key ? (labels[key] || "未知状态") : "暂无";
@@ -8356,8 +8352,7 @@
         var candidate = role.candidateSummary || {};
         var multi = role.multiTimeframeExplanation || {};
         var adjustment = role.biasAdjustment || {};
-        return '<div class="latest-ai-content" data-structured-role="GPT_FINAL">'
-            + '<p class="latest-ai-boundary">AI 负责解释证据并形成候选；最终结果仍由冲突处理与规则校验确认。</p>'
+        return '<div class="latest-ai-content" data-structured-role="GPT_FINAL" data-result-layer="candidate">'
             + '<section class="latest-ai-primary"><span>核心解释</span><strong>'
             + escapeHtml(formalContractValue(userFacingSemantic.value(judgment.text))) + '</strong></section>'
             + aiRoleSummaryStrip([
@@ -8388,7 +8383,6 @@
         role = role || {};
         var downgrade = role.downgradeSuggestion || {};
         return '<div class="latest-ai-content" data-structured-role="GEMINI_REVIEW">'
-            + '<p class="latest-ai-boundary">复核只影响置信度、风险与计划模式；不能生成最终执行计划或修改状态机。</p>'
             + '<section class="latest-ai-primary"><span>复核结论</span><strong>'
             + escapeHtml(formalContractValue(userFacingSemantic.value(role.reviewResult))) + '</strong></section>'
             + aiRoleSummaryStrip([
@@ -8414,7 +8408,6 @@
     function renderGrokChallengeHomeRole(role) {
         role = role || {};
         return '<div class="latest-ai-content" data-structured-role="GROK_CHALLENGE">'
-            + '<p class="latest-ai-boundary">反方挑战只提供反证与风险影响；不能生成计划或修改状态机。</p>'
             + '<section class="latest-ai-primary"><span>挑战摘要</span><strong>'
             + escapeHtml(formalContractValue(userFacingSemantic.value(role.challengeSummary))) + '</strong></section>'
             + aiRoleSummaryStrip([
@@ -8440,7 +8433,7 @@
     function renderUnavailableAiRole(role) {
         role = role || {};
         return '<div class="latest-ai-content" data-role-unavailable="true">'
-            + '<div class="latest-ai-compact-empty" role="status"><strong>尚未生成AI解释</strong>'
+            + '<div class="latest-ai-compact-empty" role="status"><strong>AI解释暂不可用</strong>'
             + '<span>当前未选择有效机会资产，或数据质量尚未达到AI调用条件。</span>'
             + '<div class="latest-empty-actions"><button type="button" data-ai-empty-action="assets">选择重点机会</button>'
             + '<button type="button" data-ai-empty-action="pool">打开资产池</button>'
@@ -9013,8 +9006,7 @@
         if (!list.length) {
             box.innerHTML = '<div class="latest-empty-state" role="status" data-position-state="no-position">'
                 + '<strong>暂无活动持仓</strong>'
-                + '<span>系统只监控用户实际开仓并手动录入的持仓。</span>'
-                + '<span>执行计划不会自动创建仓位。</span>'
+                + '<span>录入真实持仓后查看风险变化与监控结论。</span>'
                 + '<div class="latest-empty-actions"><button type="button" data-position-empty-action="open">录入持仓</button>'
                 + '<a href="/dashboard/positions">查看历史</a></div></div>';
             var open = box.querySelector('[data-position-empty-action="open"]');
@@ -9116,7 +9108,8 @@
         if (!box) return;
         var s = suggestion || {};
         var selectedExecutionSymbol = normalizeDisplaySymbol(selectedAsset && (selectedAsset.rawSymbol || selectedAsset.symbol));
-        setText("homeExecutionSymbol", selectedExecutionSymbol || "等待资产");
+        var displaySymbol = selectedExecutionSymbol ? formatSymbolPair(selectedExecutionSymbol) : "";
+        setText("homeExecutionSymbol", displaySymbol || "未选择");
         var rawStatus = String(s.status || "").toUpperCase();
         var derivedModuleState = s.moduleState
             || (rawStatus === "LOADING" ? "LOADING"
@@ -9124,48 +9117,78 @@
                     : (rawStatus.indexOf("MISSING") >= 0 ? "MISSING" : "PARTIAL")));
         box.dataset.moduleState = frontendContract.normalizeModuleState(derivedModuleState, "MISSING").toLowerCase();
         var access = frontendContract.executionPlanAccess(s);
-        function displayValue(raw, fallback) {
+        var modeView = userFacingSemantic.planMode(s.finalPlanMode);
+        var finalVisible = !!selectedExecutionSymbol && access.visible && !!modeView;
+        function optionalValue(raw) {
             var cleaned = evidenceValueText(raw);
-            return cleaned || fallback || "当前不可查看";
+            if (!cleaned || cleaned === "--" || cleaned === "—"
+                    || cleaned === "null" || cleaned === "undefined"
+                    || cleaned === "暂无 AI 原始输出" || cleaned === "暂无数据"
+                    || cleaned === "当前不可查看") return "";
+            return cleaned;
         }
-        box.dataset.exactPlanVisible = String(access.visible);
-        var worthOpening = access.visible && s.worthOpening === true
-            ? "值得人工参与" : (access.visible && s.worthOpening === false ? "不建议人工参与" : "当前不可查看");
-        var planState = userFacingSemantic.planState(s.finalPlanMode || s.status || "MISSING");
-        setText("homeExecutionStatus", access.visible ? worthOpening : planState.label);
+        function userValue(raw) {
+            var value = optionalValue(raw);
+            return value ? optionalValue(userFacingSemantic.value(value)) : "";
+        }
+        function mappedValue(raw, mapper) {
+            return optionalValue(raw) ? optionalValue(mapper(raw)) : "";
+        }
+        function humanDetail(raw, fallback) {
+            var value = optionalValue(raw);
+            if (!value || /^[A-Z][A-Z0-9_:-]*$/.test(value)) return fallback;
+            return userValue(value) || fallback;
+        }
+        box.dataset.exactPlanVisible = String(finalVisible);
+        var planDataState = userFacingSemantic.planDataState(
+            selectedExecutionSymbol ? (rawStatus || "MISSING") : "UNSELECTED"
+        );
+        setText("homeExecutionStatus", finalVisible ? modeView.participationLabel : planDataState.label);
         function validityPeriod() {
             var direct = cleanBlankValue(s.validPeriod);
             if (direct) return direct;
-            var from = homeBusinessTime(s.validFrom);
-            var until = homeBusinessTime(firstNonEmpty(s.validUntil, s.expiresAt));
-            return (from !== "--" || until !== "--") ? from + " 至 " + until : "当前不可查看";
+            var rawFrom = cleanBlankValue(s.validFrom);
+            var rawUntil = cleanBlankValue(firstNonEmpty(s.validUntil, s.expiresAt));
+            var from = rawFrom ? homeAssetBusinessTime(rawFrom) : "";
+            var until = rawUntil ? homeAssetBusinessTime(rawUntil) : "";
+            if (from && until) return from + " 至 " + until;
+            return from || until;
         }
-        if (!access.visible) {
-            var nonFinalState = String(s.finalPlanMode || s.status || "MISSING").toUpperCase();
-            var noAsset = !selectedExecutionSymbol;
-            var emptyTitle = noAsset ? "请选择当前重点机会" : planState.label;
-            var emptyDetail = noAsset
-                ? "选择资产后，系统会读取该资产通过规则校验的最终计划。"
-                : planState.detail;
+        if (!finalVisible) {
+            var nonFinalState = selectedExecutionSymbol ? (rawStatus || "MISSING") : "UNSELECTED";
+            var stageDetail = firstNonEmpty(
+                s.analysisStageLabel,
+                s.currentStageLabel,
+                s.stageLabel
+            );
+            var emptyDetail = stageDetail
+                ? humanDetail(stageDetail, planDataState.detail)
+                : humanDetail(s.blockedReason, planDataState.detail);
             var nextCondition = cleanBlankValue(s.recoveryCondition || s.nextCondition);
             box.innerHTML = '<div class="latest-plan-empty" role="status" data-final-plan-visible="false"'
-                + ' data-plan-state="' + escapeHtml(nonFinalState.toLowerCase()) + '">'
-                + '<strong>' + escapeHtml(emptyTitle) + '</strong>'
+                + ' data-plan-data-state="' + escapeHtml(nonFinalState.toLowerCase()) + '"'
+                + ' data-semantic-tone="' + escapeHtml(planDataState.tone) + '">'
+                + '<strong>' + escapeHtml(planDataState.label) + '</strong>'
                 + '<span>' + escapeHtml(emptyDetail) + '</span>'
                 + (nextCondition ? '<span>下一条件：' + escapeHtml(nextCondition) + '</span>' : '')
                 + '<details class="latest-audit-details"><summary>查看审计详情</summary><dl class="latest-ai-metadata">'
                 + aiSummaryItem("原始状态", nonFinalState)
+                + aiSummaryItem("Final Plan", s.finalPlan === true ? "存在" : "不存在")
                 + aiSummaryItem("校验说明", access.reason)
                 + '</dl></details></div>';
             return;
         }
-        var identity = displayValue(s.sourceExecutionPlanId);
         function contractRow(label, rowValue) {
-            return '<div><dt>' + escapeHtml(label) + '</dt><dd>' + escapeHtml(displayValue(rowValue)) + '</dd></div>';
+            var value = optionalValue(rowValue);
+            return value
+                ? '<div><dt>' + escapeHtml(label) + '</dt><dd>' + escapeHtml(value) + '</dd></div>'
+                : '';
         }
         function section(title, rows, className) {
+            var content = rows.filter(Boolean).join("");
+            if (!content) return "";
             return '<section class="latest-plan-section"><h3>' + escapeHtml(title) + '</h3><dl class="latest-plan-group'
-                + (className ? ' ' + className : '') + '">' + rows.join("") + '</dl></section>';
+                + (className ? ' ' + className : '') + '">' + content + '</dl></section>';
         }
         var invalidation = firstNonEmpty(s.invalidationCondition, s.invalidCondition);
         var leverageLimit = firstNonEmpty(s.leverageLimit, s.leverageSuggestion);
@@ -9173,49 +9196,116 @@
         var expectedRR = firstNonEmpty(s.expectedRR, s.expectedRiskReward);
         var validUntil = firstNonEmpty(s.validUntil, s.expiresAt);
         var vetoReason = firstNonEmpty(s.vetoReason, s.ruleVetoReason);
-        box.innerHTML = '<div class="latest-plan-body" data-final-plan-visible="true" data-plan-source="final">'
-            + '<div class="latest-plan-status" role="status"><span><strong>'
-            + '最终计划已通过校验</strong><span>仅供人工复核，不会自动创建持仓</span></span></div>'
-            + '<dl class="latest-plan-decision">'
-            + contractRow("最终市场方向", marketBiasLabel(s.finalMarketBias))
-            + contractRow("最终计划模式", frontendContract.planModeLabel(s.finalPlanMode))
-            + contractRow("推荐方向", marketBiasLabel(s.direction))
-            + contractRow("是否值得开仓", worthOpening)
-            + contractRow("建议动作", s.recommendedAction)
-            + contractRow("机会类型", userFacingSemantic.opportunityType(s.opportunityType)) + '</dl>'
-            + section("价格计划", [
-                contractRow("入场区", s.entryZone),
-                contractRow("触发条件", s.triggerCondition),
-                contractRow("止损区", firstNonEmpty(s.stopZone, s.stopLoss)),
-                contractRow("目标区 / 止盈规则", firstNonEmpty(s.targetZones, s.takeProfitRules))
-            ])
-            + section("失效与有效期", [
-                contractRow("失效条件", invalidation),
+        var opportunityState = mappedValue(
+            selectedAsset && (selectedAsset.assetState || selectedAsset.opportunityState),
+            assetStateLabel
+        );
+        var commonSummary = [
+            contractRow("资产", displaySymbol),
+            contractRow("最终市场方向", mappedValue(s.finalMarketBias, marketBiasLabel)),
+            contractRow("机会状态", opportunityState),
+            contractRow("计划模式", modeView.typeLabel),
+            contractRow("当前计划状态", modeView.participationLabel),
+            contractRow("机会类型", mappedValue(s.opportunityType, userFacingSemantic.opportunityType))
+        ].filter(Boolean).join("");
+        var upgradeCondition = firstNonEmpty(s.upgradeCondition, s.recoveryCondition, s.nextCondition);
+        var revalidationCondition = firstNonEmpty(s.revalidationCondition, s.recheckCondition, s.nextCondition);
+        var entryAndTrigger = section("入场与触发", [
+            contractRow("入场逻辑", userValue(s.entryLogic)),
+            contractRow("入场区间", s.entryZone),
+            contractRow("触发条件", userValue(s.triggerCondition)),
+            contractRow("触发周期", s.triggerTimeframe),
+            contractRow("相对入场区位置", userValue(s.currentPricePosition))
+        ]);
+        var invalidationAndStop = section("失效与止损", [
+            contractRow("失效条件", userValue(invalidation)),
+            contractRow("关键结构", userValue(s.brokenStructure || s.keyStructure)),
+            contractRow("止损逻辑", userValue(s.stopLogic)),
+            contractRow("止损区间", firstNonEmpty(s.stopZone, s.stopLoss)),
+            contractRow("流动性保护", userValue(s.liquidityProtectionCondition))
+        ]);
+        var targetsAndTrend = section("目标与趋势跟踪", [
+            contractRow("目标区域", firstNonEmpty(s.targetZones, s.takeProfitRules)),
+            contractRow("目标逻辑", userValue(s.targetLogic)),
+            contractRow("趋势成立条件", userValue(s.trendContinuationCondition)),
+            contractRow("减仓条件", userValue(s.reduceCondition)),
+            contractRow("放弃条件", userValue(s.abandonCondition))
+        ]);
+        var riskLimits = section("风险限制", [
+            contractRow("杠杆上限", leverageLimit),
+            contractRow("仓位上限", positionLimit),
+            contractRow("风险上限", userValue(s.riskLimit)),
+            contractRow("预期风险收益", expectedRR),
+            contractRow("账户风险状态", userValue(s.accountRiskStatus))
+        ]);
+        var timeValidity = section("时间有效性", [
+            contractRow("分析周期", s.analysisTimeframes),
+            contractRow("触发周期", s.triggerTimeframe),
+            contractRow("有效开始", cleanBlankValue(s.validFrom) ? homeAssetBusinessTime(s.validFrom) : ""),
+            contractRow("有效截止", cleanBlankValue(validUntil) ? homeAssetBusinessTime(validUntil) : ""),
+            contractRow("预计持有周期", userValue(s.holdingHorizon)),
+            contractRow("重新验证条件", userValue(revalidationCondition))
+        ]);
+        var modeSections = "";
+        if (modeView.profile === "confirmation") {
+            modeSections = entryAndTrigger + invalidationAndStop + targetsAndTrend + riskLimits + timeValidity;
+        } else if (modeView.profile === "preparation") {
+            modeSections = section("等待触发", [
+                contractRow("当前缺少的触发", userValue(firstNonEmpty(s.missingTrigger, s.waitingCondition))),
+                contractRow("触发条件", userValue(s.triggerCondition)),
+                contractRow("触发周期", s.triggerTimeframe),
+                contractRow("升级条件", userValue(upgradeCondition)),
+                contractRow("失效条件", userValue(invalidation)),
                 contractRow("有效期", validityPeriod())
-            ])
-            + section("风险限制", [
-                contractRow("杠杆上限", leverageLimit),
-                contractRow("仓位上限", positionLimit),
-                contractRow("预期风险收益", expectedRR)
-            ], "is-three")
-            + '<details class="latest-plan-disclosure"><summary>查看次级条件与审计信息</summary>'
-            + section("次级条件", [
-                contractRow("入场逻辑", s.entryLogic),
-                contractRow("止损逻辑", s.stopLogic),
-                contractRow("止盈逻辑", s.targetLogic),
-                contractRow("加仓条件", s.addCondition),
-                contractRow("减仓条件", s.reduceCondition),
-                contractRow("放弃条件", s.abandonCondition),
-                contractRow("Valid From", homeAssetBusinessTime(s.validFrom)),
-                contractRow("Valid Until", homeAssetBusinessTime(validUntil)),
-                contractRow("持有周期", s.holdingHorizon),
+            ]) + section("已确认边界", [
+                contractRow("入场区间", s.entryZone),
+                contractRow("止损区间", firstNonEmpty(s.stopZone, s.stopLoss)),
+                contractRow("目标区域", firstNonEmpty(s.targetZones, s.takeProfitRules))
+            ]);
+        } else if (modeView.profile === "reduced") {
+            modeSections = section("降级与恢复", [
+                contractRow("降级原因", userValue(s.downgradeReason)),
+                contractRow("原计划模式", mappedValue(s.previousPlanMode || s.planModeBefore, frontendContract.planModeLabel)),
+                contractRow("当前计划模式", modeView.typeLabel),
+                contractRow("风险原因", userValue(s.riskReason)),
+                contractRow("恢复条件", userValue(upgradeCondition))
+            ], "is-prominent") + entryAndTrigger + invalidationAndStop + targetsAndTrend + riskLimits + timeValidity;
+        } else if (modeView.profile === "observation") {
+            modeSections = section("观察重点", [
+                contractRow("观察原因", userValue(firstNonEmpty(s.observationReason, s.downgradeReason, s.recommendedAction))),
+                contractRow("继续观察指标", userValue(firstNonEmpty(s.watchIndicators, s.triggerCondition))),
+                contractRow("升级条件", userValue(upgradeCondition)),
+                contractRow("失效条件", userValue(invalidation)),
+                contractRow("观察窗口", validityPeriod() || userValue(s.holdingHorizon))
+            ]);
+        } else if (modeView.profile === "blocked") {
+            modeSections = section("阻断与恢复", [
+                contractRow("阻断原因", userValue(firstNonEmpty(s.blockedReason, vetoReason, s.downgradeReason))),
+                contractRow("冲突来源", userValue(firstNonEmpty(s.conflictSource, s.conflictSources))),
+                contractRow("规则否决原因", userValue(vetoReason)),
+                contractRow("风险原因", userValue(s.riskReason)),
+                contractRow("恢复条件", userValue(upgradeCondition)),
+                contractRow("重新验证条件", userValue(revalidationCondition))
+            ], "is-prominent");
+        }
+        box.innerHTML = '<div class="latest-plan-body" data-final-plan-visible="true" data-plan-source="final"'
+            + ' data-plan-mode="' + escapeHtml(String(s.finalPlanMode || "").toLowerCase()) + '"'
+            + ' data-plan-profile="' + escapeHtml(modeView.profile) + '">'
+            + '<div class="latest-plan-status" role="status" data-semantic-tone="' + escapeHtml(modeView.tone) + '">'
+            + '<span><strong>' + escapeHtml(modeView.participationLabel) + '</strong><span>'
+            + escapeHtml(modeView.detail) + '</span></span><span class="latest-plan-mode-chip">'
+            + escapeHtml(modeView.typeLabel) + '</span></div>'
+            + '<dl class="latest-plan-decision">' + commonSummary + '</dl>'
+            + modeSections
+            + '<details class="latest-plan-disclosure"><summary>查看审计详情</summary>'
+            + section("Final Execution Plan", [
+                contractRow("Final Plan ID", s.sourceExecutionPlanId),
+                contractRow("Analysis ID", s.sourceAnalysisId),
+                contractRow("Candidate ID", s.candidateId),
                 contractRow("Rule Validation", s.validationStatus),
-                contractRow("降级原因", s.downgradeReason),
-                contractRow("否决原因", vetoReason),
                 contractRow("来源状态", s.sourceStatus),
-                contractRow("计划标识", identity)
-            ]) + '</details>'
-            + '<p class="latest-plan-safety">仅供人工复核，不会自动下单或创建持仓。</p></div>';
+                contractRow("安全门禁", s.notTradeInstruction === true ? "已通过" : "未通过")
+            ]) + '</details></div>';
     }
 
     function renderHomeAiDecisionFromPayload(aiDecision, asset) {
@@ -9379,7 +9469,7 @@
             statusLabel: "正在同步",
             blockedReason: "当前资产上下文同步中",
             positionMode: false
-        }, null);
+        }, { symbol: symbol });
         renderHomeAiDecisionFromPayload({
             runStatus: "LOADING",
             runStatusLabel: "正在同步",
@@ -9461,7 +9551,8 @@
         if (execution) {
             execution.dataset.moduleState = "error";
             execution.innerHTML = '<div class="latest-plan-empty" role="status" data-final-plan-visible="false">'
-                + '<strong>当前不展示执行计划</strong><span>首页数据暂不可用，等待重新同步</span></div>';
+                + '<strong>数据来源暂不可用</strong><span>首页数据读取失败，请稍后重试。</span></div>';
+            setText("homeExecutionStatus", "数据来源暂不可用");
         }
         renderHomeAiDecisionFromPayload({
             runStatus: "LOAD_FAILED",
@@ -9505,11 +9596,11 @@
         }
         setText("homeAssetScanState", missing ? "当前资产不可查看" : "切换失败，可重试");
         renderHomeExecutionFromPayload({
-            status: missing ? "MISSING" : "LOAD_FAILED",
+            status: "SOURCE_UNAVAILABLE",
             statusLabel: statusLabel,
             blockedReason: blockedReason,
             positionMode: false
-        }, null);
+        }, { symbol: selectedSymbol });
         renderHomeAiDecisionFromPayload({
             runStatus: "LOAD_FAILED",
             runStatusLabel: "当前不可查看",

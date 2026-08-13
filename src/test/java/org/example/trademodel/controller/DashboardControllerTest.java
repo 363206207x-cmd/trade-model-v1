@@ -248,7 +248,7 @@ public class DashboardControllerTest {
         assertThat(router.indexOf("roleState === \"UNAVAILABLE\""))
                 .isLessThan(router.indexOf("renderGptFinalHomeRole"));
         assertThat(unavailable).contains(
-                "roleMetadata(role)", "尚未生成AI解释", "选择重点机会", "打开资产池", "扫描资产池");
+                "roleMetadata(role)", "AI解释暂不可用", "选择重点机会", "打开资产池", "扫描资产池");
         assertThat(unavailable).doesNotContain(
                 "候选市场方向", "候选计划模式", "复核结论", "挑战摘要");
     }
@@ -441,7 +441,7 @@ public class DashboardControllerTest {
         assertThat(visibleDom).doesNotContain("pendingCount", "degraded",
                 "latestAnalysisFailureCode", "failureReasonCode");
         assertThat(visibleDom).contains(
-                "当前重点机会", "最终执行计划", "冲突与最终调整",
+                "当前重点机会", "执行计划", "冲突与最终调整",
                 "持仓监控 Top3", "暂无活动持仓");
 
         String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
@@ -585,14 +585,14 @@ public class DashboardControllerTest {
         assertThat(renderer)
                 .contains("frontendContract.executionPlanAccess(s)")
                 .contains(
-                        "最终市场方向", "最终计划模式", "推荐方向", "人工参与",
-                        "入场区", "止损逻辑", "止损区", "目标区 / 止盈规则",
-                        "杠杆上限", "仓位上限", "有效期", "失效条件",
-                        "Rule Validation", "function validityPeriod()",
-                        "仅供人工复核，不会自动下单或创建持仓。")
+                        "最终市场方向", "计划模式", "当前计划状态",
+                        "入场与触发", "入场区间", "失效与止损", "止损逻辑", "止损区间",
+                        "目标与趋势跟踪", "目标区域", "杠杆上限", "仓位上限",
+                        "时间有效性", "失效条件", "Rule Validation", "function validityPeriod()")
                 .doesNotContain(
                         "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
-                        "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
+                        "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态",
+                        "是否值得开仓", "latest-plan-safety");
     }
 
     @Test
@@ -602,15 +602,15 @@ public class DashboardControllerTest {
 
         assertThat(renderer)
                 .contains(
-                        "if (!access.visible)",
+                        "if (!finalVisible)",
                         "data-final-plan-visible=\"false\"",
                         "查看审计详情", "校验说明", "return;")
                 .doesNotContain("originalRows", "execution-original-plan");
         assertThat(contract)
                 .contains(
                         "当前 Final Plan 不可验证",
-                        "暂无最终执行计划",
-                        "当前资产尚未形成通过规则校验的计划。",
+                        "尚未形成最终计划",
+                        "当前没有已持久化的最终计划。",
                         "plan.finalPlan === true",
                         "validationStatus", "PASS",
                         "chainStatus", "FINAL_VALIDATED",
@@ -631,10 +631,10 @@ public class DashboardControllerTest {
                 "plan.notTradeInstruction === true");
         assertThat(renderer).contains(
                 "frontendContract.executionPlanAccess(s)",
-                "if (!access.visible)",
-                "contractRow(\"入场区\", s.entryZone)",
-                "contractRow(\"止损区\", firstNonEmpty(s.stopZone, s.stopLoss))",
-                "contractRow(\"目标区 / 止盈规则\", firstNonEmpty(s.targetZones, s.takeProfitRules))",
+                "if (!finalVisible)",
+                "contractRow(\"入场区间\", s.entryZone)",
+                "contractRow(\"止损区间\", firstNonEmpty(s.stopZone, s.stopLoss))",
+                "contractRow(\"目标区域\", firstNonEmpty(s.targetZones, s.takeProfitRules))",
                 "function validityPeriod()");
     }
 
@@ -647,7 +647,7 @@ public class DashboardControllerTest {
         assertThat(fixture).contains(
                 "def asset_execution_suggestion(symbol: str)",
                 "\"status\": \"USABLE_REVIEW_PLAN\"",
-                "\"statusLabel\": \"资产执行计划，仅供人工复核\"",
+                "\"statusLabel\": \"当前资产执行计划\"",
                 "\"positionMode\": False",
                 "\"positionMonitor\": None",
                 "home[\"executionSuggestion\"] = asset_execution_suggestion(selected_symbol)");
@@ -745,8 +745,7 @@ public class DashboardControllerTest {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
 
         assertThat(renderer).contains(
-                "暂无活动持仓", "系统只监控用户实际开仓并手动录入的持仓。",
-                "执行计划不会自动创建仓位。",
+                "暂无活动持仓", "录入真实持仓后查看风险变化与监控结论。",
                 "if (!monitorView.trusted)", "当前不可查看",
                 "data-monitor-trusted=\"false\"");
         assertThat(trustView).contains(
@@ -847,7 +846,7 @@ public class DashboardControllerTest {
         assertThat(unavailable).contains(
                 "runtimeState = missing ? \"MISSING\" : \"ERROR\"",
                 "assets.dataset.homeState = missing ? \"missing\" : \"error\"",
-                "status: missing ? \"MISSING\" : \"LOAD_FAILED\"");
+                "status: \"SOURCE_UNAVAILABLE\"");
         assertThat(unavailable).doesNotContain(
                 "renderHomePositionsFromPayload", "selectedPositionId = null", "POSITION_MONITORING");
     }
@@ -891,11 +890,11 @@ public class DashboardControllerTest {
                 "POSITION_SELECTION_REQUIRED", "POSITION_NOT_FOUND", "POSITION_SYMBOL_MISMATCH",
                 "请选择具体持仓");
         assertThat(executionRenderer).contains(
-                "if (!access.visible)",
+                "if (!finalVisible)",
                 "data-final-plan-visible=\"false\"",
                 "查看审计详情", "校验说明",
                 "return;");
-        assertThat(unavailable).contains("selectedPositionId = null", "当前不展示执行计划");
+        assertThat(unavailable).contains("selectedPositionId = null", "数据来源暂不可用");
     }
 
     @Test
@@ -1019,7 +1018,7 @@ public class DashboardControllerTest {
                 .doesNotContain(
                         "fetchLocalRealPipelineStatus", "fetchProviderRuntimeStatus",
                         "requestDetailForSelectedSymbol", "refreshDashboardDiagnostics");
-        assertThat(unavailable).contains("首页数据暂不可用", "等待重新同步", "当前不展示执行计划");
+        assertThat(unavailable).contains("首页数据暂不可用", "等待重新同步", "数据来源暂不可用");
         assertThat(unavailable).doesNotContain("entryZone", "stopLoss", "takeProfitRules", "finalPlanMode");
     }
 
@@ -1195,7 +1194,7 @@ public class DashboardControllerTest {
                 "data-figma-contract=\"28:154 31:23 520:212 523:748 35:97\"",
                 "class=\"latest-assets-section\"",
                 "class=\"latest-decision-grid\"",
-                "最终执行计划", "持仓监控 Top3",
+                "执行计划", "持仓监控 Top3",
                 "class=\"latest-ai-tabs\" role=\"tablist\"",
                 "GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(fixture).contains(
@@ -2128,12 +2127,11 @@ public class DashboardControllerTest {
         assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
         assertThat(positionCard).contains(
                 "持仓监控 Top3",
-                "用户真实持仓 · 与系统执行建议独立",
+                "风险变化、监控结论与建议动作",
                 "暂无活动持仓",
-                "系统只监控用户实际开仓并手动录入的持仓。",
-                "执行计划不会自动创建仓位。",
+                "录入真实持仓后查看风险变化与监控结论。",
                 "manualPositionBtn", "录入持仓");
-        assertThat(executionCard).contains("最终执行计划", "仅展示冲突处理与规则校验通过的最终结果");
+        assertThat(executionCard).contains("执行计划", "当前资产的参与方式、风险限制与有效条件");
 
         assertThat(realPositionDetector).contains("hasOpenPosition");
         assertThat(realPositionDetector).contains("positionStatus");

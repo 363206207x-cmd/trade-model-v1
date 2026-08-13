@@ -28,6 +28,14 @@ ANALYSIS_STYLE = ROOT / "src/main/resources/static/css/analysis-detail.css"
 ALERT_EXPLAIN = ROOT / "src/main/resources/static/js/alert-explain.js"
 SCENARIOS = {
     "normal",
+    "unselected",
+    "waiting-analysis",
+    "plan-confirmation",
+    "plan-preparation",
+    "plan-reduced",
+    "plan-observation",
+    "plan-blocked-final",
+    "final-ai-unavailable",
     "loading",
     "partial",
     "empty",
@@ -162,15 +170,15 @@ def assets_fixture() -> list[dict[str, object]]:
         asset(1, "BTCUSDT", "OBSERVING", "观察", "BULLISH", "偏多", "HIGH", "高", "LOW", "低", False,
               "结构仍在观察，等待规则条件进一步确认", "64218.40"),
         asset(2, "ETHUSDT", "CANDIDATE", "候选", "WEAK_BULLISH", "弱偏多", "MEDIUM", "中", "MEDIUM", "中", True,
-              "已进入候选，仍需人工复核关键边界", "3521.18"),
+              "已进入候选，等待关键边界确认", "3521.18"),
         asset(3, "SOLUSDT", "HIGH_RISK", "高风险观察", "WAIT", "观望", "LOW", "低", "HIGH", "高", False,
               "波动与流动性风险偏高，暂不形成执行建议", "148.72"),
         asset(4, "BNBUSDT", "WAITING_TRIGGER", "等待触发", "RANGE", "震荡", "LOW", "低", "MEDIUM", "中", False,
               "机会已保留，等待触发条件满足", "592.36"),
         asset(5, "XRPUSDT", "TRIGGERED", "条件已触发", "WEAK_BULLISH", "弱偏多", "MEDIUM", "中", "MEDIUM", "中", True,
-              "条件已触发但不代表开仓，等待人工决策", "0.5218"),
+              "触发条件已满足，当前进入确认型计划", "0.5218"),
         asset(6, "DOGEUSDT", "CANDIDATE", "候选", "WEAK_BEARISH", "弱偏空", "LOW", "低", "HIGH", "高", False,
-              "候选机会风险偏高，仅供人工复核", "0.1284"),
+              "候选机会风险偏高，等待风险复核", "0.1284"),
     ]
 
 
@@ -203,7 +211,7 @@ def ai_role(role: str, label: str, symbol: str = "BTCUSDT") -> dict[str, object]
                 "opportunityState": "triggered",
             },
             "candidateSummary": {
-                "summary": "候选已完成冲突处理与规则校验",
+                "summary": "候选方向与主要证据一致，等待后续复核链处理",
                 "direction": "BULLISH",
                 "confidence": "HIGH",
                 "riskLevel": "MEDIUM",
@@ -330,7 +338,7 @@ def ai_decision_success(symbol: str = "BTCUSDT") -> dict[str, object]:
         "runStatus": "SUCCESS",
         "runStatusLabel": "正常",
         "decisionMode": "REVIEW_ONLY",
-        "decisionModeLabel": "仅供人工复核",
+        "decisionModeLabel": "解释链已完成",
         "activeTab": "GPT_FINAL",
         "tabs": [
             ai_role("GPT_FINAL", "证据综合与候选形成", symbol),
@@ -437,7 +445,7 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             "marketTrend": status_card("震荡偏多", "系统级市场趋势，不随资产切换"),
             "riskLevel": status_card("中", "系统级风险，不随资产切换"),
             "dataQuality": status_card("92", "确定性 fixture 数据完整"),
-            "aiConflict": status_card("轻微分歧", "三角色结果仅供人工复核"),
+            "aiConflict": status_card("轻微分歧", "三角色分析已完成"),
             "pendingReview": status_card("2", "待复核数量"),
             "confused": status_card("否", "未进入冲突阻断"),
             "hotReset": status_card("未触发", "当前无需热重置"),
@@ -567,7 +575,7 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
     )
     return {
         "status": "USABLE_REVIEW_PLAN",
-        "statusLabel": "资产执行计划，仅供人工复核",
+        "statusLabel": "当前资产执行计划",
         "moduleState": "READY",
         "positionMode": False,
         "positionMonitor": None,
@@ -588,23 +596,23 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
         "direction": "BULLISH",
         "worthOpening": True,
         "opportunityType": "STRUCTURE_CONFIRMATION",
-        "recommendedAction": "等待用户人工确认后决定是否参与",
+        "recommendedAction": "按当前参与条件评估",
         "entryLogic": "规则方向与多周期结构一致，等待回踩确认",
         "entryZone": entry_zone,
         "triggerCondition": "5m 回踩区间后重新站稳",
         "stopLogic": "关键结构失效后退出人工复核计划",
         "stopZone": stop_loss,
         "stopLoss": stop_loss,
-        "targetLogic": "按结构目标分批管理，不自动执行",
+        "targetLogic": "按结构目标分批跟踪",
         "targetZones": take_profit,
         "takeProfitRules": take_profit,
-        "addCondition": "仅在数据质量与结构继续确认时重新人工评估",
+        "addCondition": "数据质量与结构继续确认后重新评估",
         "reduceCondition": "风险趋势上升或反向证据增加",
         "abandonCondition": invalid_condition,
         "expectedRiskReward": risk_reward,
         "riskRewardRatio": risk_reward,
         "leverageSuggestion": "不高于 2 倍",
-        "positionSuggestion": "仅供人工复核",
+        "positionSuggestion": "不高于账户风险上限",
         "analysisTimeframes": "4h / 1h / 15m / 5m",
         "triggerTimeframe": "5m",
         "validFrom": "2026-07-13T12:00:00Z",
@@ -615,6 +623,63 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
         "downgradeReason": None,
         "ruleVetoReason": None,
     }
+
+
+def final_plan_mode_fixture(symbol: str, mode: str) -> dict[str, object]:
+    plan = asset_execution_suggestion(symbol)
+    plan["finalPlanMode"] = mode
+    plan["statusLabel"] = "当前资产执行计划"
+    if mode == "PREPARATION":
+        plan.update({
+            "missingTrigger": "5m 回踩确认尚未完成",
+            "upgradeCondition": "5m 回踩区间后重新站稳并保持数据新鲜",
+            "recommendedAction": "等待触发条件完成",
+        })
+    elif mode == "REDUCED":
+        plan.update({
+            "planModeBefore": "CONFIRMATION",
+            "downgradeReason": "短周期流动性风险与反向证据增加",
+            "riskReason": "盘口深度下降，价差扩大",
+            "recoveryCondition": "流动性恢复且短周期结构重新收敛",
+            "recommendedAction": "降低仓位与杠杆强度",
+            "leverageSuggestion": "不高于 1.5 倍",
+            "positionSuggestion": "不高于常规上限的 50%",
+        })
+    elif mode == "OBSERVATION":
+        plan.update({
+            "finalMarketBias": "WAIT",
+            "direction": "WAIT",
+            "observationReason": "主要证据尚未收敛，当前保留观察价值",
+            "watchIndicators": ["15m 结构收敛", "成交延续", "数据质量"],
+            "upgradeCondition": "多周期方向收敛并形成有效触发",
+            "recommendedAction": "继续观察关键指标",
+            "validPeriod": "未来 6 小时观察窗口",
+        })
+        for key in (
+            "entryLogic", "entryZone", "triggerCondition", "stopLogic", "stopZone",
+            "stopLoss", "targetLogic", "targetZones", "takeProfitRules",
+            "leverageSuggestion", "positionSuggestion", "expectedRiskReward",
+        ):
+            plan.pop(key, None)
+    elif mode == "BLOCKED":
+        plan.update({
+            "finalMarketBias": "WAIT",
+            "direction": "WAIT",
+            "blockedReason": "数据质量与规则状态阻止当前方向性参与",
+            "conflictSource": "多周期证据冲突",
+            "ruleVetoReason": "规则状态仍处于 confused",
+            "riskReason": "数据质量下降且反向证据增加",
+            "recoveryCondition": "数据质量恢复并解除多周期冲突",
+            "revalidationCondition": "重新扫描后完成冲突处理与规则校验",
+            "recommendedAction": "等待重新分析",
+        })
+        for key in (
+            "entryLogic", "entryZone", "triggerCondition", "stopLogic", "stopZone",
+            "stopLoss", "targetLogic", "targetZones", "takeProfitRules",
+            "leverageSuggestion", "positionSuggestion", "expectedRiskReward",
+        ):
+            plan.pop(key, None)
+    return plan
 
 
 def unavailable_asset_execution_suggestion(
@@ -759,7 +824,61 @@ def scenario_home(
     selected_asset = next((item for item in home["assets"] if item["rawSymbol"] == selected_symbol), home["assets"][0])
     home["executionSuggestion"] = asset_execution_suggestion(selected_symbol)
 
-    if scenario == "partial":
+    if scenario == "unselected":
+        home["selectedSymbol"] = ""
+        home["executionSuggestion"] = {
+            "status": "NO_COMPLETE_PLAN",
+            "statusLabel": "尚未选择资产",
+            "positionMode": False,
+            "moduleState": "EMPTY",
+        }
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "等待选择资产", "选择资产后查看分析解释"
+        )
+
+    elif scenario == "waiting-analysis":
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "GENERATING_EVIDENCE",
+            "正在生成证据",
+            "正在生成证据",
+        )
+        home["executionSuggestion"]["analysisStageLabel"] = "正在生成证据"
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "正在分析", "等待证据链完成"
+        )
+
+    elif scenario in {
+        "plan-confirmation", "plan-preparation", "plan-reduced",
+        "plan-observation", "plan-blocked-final",
+    }:
+        mode = {
+            "plan-confirmation": "CONFIRMATION",
+            "plan-preparation": "PREPARATION",
+            "plan-reduced": "REDUCED",
+            "plan-observation": "OBSERVATION",
+            "plan-blocked-final": "BLOCKED",
+        }[scenario]
+        home["executionSuggestion"] = final_plan_mode_fixture(selected_symbol, mode)
+        selected_asset.update({
+            "assetState": {
+                "CONFIRMATION": "TRIGGERED",
+                "PREPARATION": "WAITING_TRIGGER",
+                "REDUCED": "TRIGGERED",
+                "OBSERVATION": "OBSERVING",
+                "BLOCKED": "CONFUSED",
+            }[mode],
+            "planMode": mode,
+        })
+        home["aiDecision"]["consistency"]["finalPlanMode"] = mode
+
+    elif scenario == "final-ai-unavailable":
+        home["executionSuggestion"] = final_plan_mode_fixture(selected_symbol, "CONFIRMATION")
+        home["aiDecision"] = unavailable_ai(
+            "UNAVAILABLE", "当前分析不可用", "AI解释暂不可用"
+        )
+
+    elif scenario == "partial":
         selected_asset.update({
             "compositeScore": 61,
             "confidenceLevel": "LOW",
@@ -816,11 +935,12 @@ def scenario_home(
 
     elif scenario == "candidate-only":
         home["executionSuggestion"].update({
+            "status": "CANDIDATE_ONLY",
             "finalPlan": False,
             "validationStatus": "PENDING",
             "chainStatus": "CANDIDATE_ONLY",
-            "statusLabel": "Candidate 已生成，等待 Rule Validation",
-            "blockedReason": "Candidate 不是 Final Execution Plan",
+            "statusLabel": "等待规则校验",
+            "blockedReason": "候选计划已形成，正在等待规则校验",
         })
 
     elif scenario in {"low-quality", "data-quality-60", "data-quality-69", "data-quality-70"}:
@@ -964,7 +1084,7 @@ def scenario_home(
         home["positions"] = []
         home["executionSuggestion"] = {
             "status": "NO_COMPLETE_PLAN",
-            "statusLabel": "暂无最终执行计划",
+            "statusLabel": "尚未形成最终计划",
             "blockedReason": "当前没有可用于生成最终计划的重点机会",
             "positionMode": False,
             "moduleState": "MISSING",
