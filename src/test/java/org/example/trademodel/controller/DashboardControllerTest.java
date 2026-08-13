@@ -97,9 +97,9 @@ public class DashboardControllerTest {
     private static final String CANDIDATE_REVIEW_START =
             "<section class=\"card module-status-card review-display-card\" id=\"candidateReviewDisplay\"";
     private static final String HOME_POSITION_CARD_START =
-            "<section class=\"card\" id=\"homePositionCard\"";
+            "<article class=\"latest-module latest-position-module\" id=\"homePositionCard\"";
     private static final String HOME_EXECUTION_CARD_START =
-            "<section class=\"card\" id=\"homeExecutionCard\"";
+            "<article class=\"latest-module latest-plan-module\" id=\"homeExecutionCard\"";
     private static final String HAS_REAL_POSITION_DETAIL_START =
             "function hasRealPositionDetail(d)";
     private static final String UPDATE_MODE_HINT_START =
@@ -192,7 +192,7 @@ public class DashboardControllerTest {
         assertThat(html).contains("renderGptFinalHomeRole");
         assertThat(html).contains("renderGeminiReviewHomeRole");
         assertThat(html).contains("renderGrokChallengeHomeRole");
-        assertThat(html).contains("核心判断", "支持证据", "反对证据", "Candidate形成摘要");
+        assertThat(html).contains("最终结论摘要", "支持证据", "反对证据", "Candidate 形成原因");
         assertThat(html).contains("证据缺口", "逻辑冲突", "风险低估", "降级建议");
         assertThat(html).contains("失败路径", "反向情景", "外部事件风险", "观察指标");
         assertThat(html).doesNotContain("完整证据关联尚未提供", "暂无该角色证据");
@@ -206,8 +206,8 @@ public class DashboardControllerTest {
         assertThat(panel).contains("置信度");
         assertThat(panel).contains("风险");
         assertThat(panel).contains("是否值得开仓");
-        assertThat(panel).contains("核心判断", "支持证据", "反对证据");
-        assertThat(panel).contains("4h", "1h", "15m", "5m", "方向调整", "Candidate形成摘要");
+        assertThat(panel).contains("最终结论摘要", "支持证据", "反对证据");
+        assertThat(panel).contains("4h", "1h", "15m", "5m", "方向调整", "Candidate 形成原因");
         assertThat(panel).doesNotContain("return aiRoleEmptyState");
     }
 
@@ -231,7 +231,7 @@ public class DashboardControllerTest {
 
     @Test
     void rolePanelsDoNotUseSameFieldList() throws Exception {
-        Set<String> gptLabels = Set.of("Market Bias", "Opportunity State", "Plan Mode", "核心判断", "支持证据", "反对证据");
+        Set<String> gptLabels = Set.of("Market Bias", "Opportunity State", "Plan Mode", "最终结论摘要", "支持证据", "反对证据");
         Set<String> geminiLabels = Set.of("复核结论", "证据缺口", "逻辑冲突", "风险低估", "降级建议", "恢复条件");
         Set<String> grokLabels = Set.of("失败路径", "反向情景", "外部事件风险", "微观结构风险", "观察指标", "挑战摘要");
 
@@ -246,9 +246,9 @@ public class DashboardControllerTest {
         String router = functionBody("renderHomeAiRoleTab");
         String unavailable = functionBody("renderUnavailableAiRole");
 
-        assertThat(router.indexOf("role.resultAvailable !== true"))
+        assertThat(router.indexOf("roleState === \"UNAVAILABLE\""))
                 .isLessThan(router.indexOf("renderGptFinalHomeRole"));
-        assertThat(unavailable).contains("roleMetadata(role)", "调用状态", "状态说明");
+        assertThat(unavailable).contains("roleMetadata(role)", "调用状态", "错误 / Fallback");
         assertThat(unavailable).doesNotContain(
                 "Market Bias", "Plan Mode", "是否值得开仓", "AI 复核结果已返回");
     }
@@ -363,15 +363,15 @@ public class DashboardControllerTest {
                 "positionLogicStatusLabel(p.entryLogicStatus)",
                 "reversalStatusLabel(p.reversalStatus)",
                 "riskReasonLabel(p.riskReason)",
-                "riskTrendLabel(p.riskTrend)",
                 "p.markPrice", "p.pnlAmount", "p.pnlPercent", "p.lastMonitorTime",
-                "<dt>监控结论</dt>",
-                "<dt>建议动作</dt>",
+                "<span>监控结论</span>",
+                "<span>建议动作</span>",
                 "<dt>入场逻辑状态</dt>",
                 "<dt>反转状态</dt>",
-                "<dt>风险趋势</dt>",
                 "<dt>风险变化原因</dt>",
-                "<dt>最近监控时间</dt>");
+                "<dt>最近监控时间</dt>",
+                "data-risk-trend=",
+                "data-risk-escalated=");
         assertThat(positionRows).doesNotContain(
                 "p.directionLabel", "p.riskLevelLabel", "p.monitorConclusionLabel",
                 "p.suggestedManualActionText", "p.suggestedManualAction",
@@ -442,7 +442,7 @@ public class DashboardControllerTest {
                 "latestAnalysisFailureCode", "failureReasonCode");
         assertThat(visibleDom).contains(
                 "重点资产", "FINAL EXECUTION PLAN", "AI 一致性摘要",
-                "持仓摘要", "录入真实持仓后开始监控");
+                "持仓监控 Top3", "暂无手动录入持仓");
 
         String localRealRenderer = functionBody("renderLocalRealPipelineStatus");
         assertThat(localRealRenderer).contains("localRealFailureLabel", "latestFailureLabel");
@@ -464,7 +464,7 @@ public class DashboardControllerTest {
                 "marketBiasLabel", "confidenceLabel", "riskLevelLabel",
                 "opportunityScore", "rankingReason", "analysisId");
         assertThat(renderer).contains(
-                "可信价格", "Market Bias", "Opportunity Score", "置信度", "风险",
+                "可信价格", "Market Bias", "机会评分", "置信度", "风险",
                 "data-opportunity-state", "data-plan-mode");
         assertThat(renderer).doesNotContain(
                 "一句话结论", "是否值得开仓", "数据来源", "数据状态",
@@ -481,10 +481,10 @@ public class DashboardControllerTest {
         String retry = functionBody("bindHomeRetry");
 
         assertThat(assets).contains(
-                "可信价格", "Opportunity Score", "Market Bias", "置信度", "风险",
+                "可信价格", "机会评分", "Market Bias", "置信度", "风险",
                 "data-opportunity-state", "data-plan-mode", "data-analysis-id")
                 .doesNotContain(
-                        "数据质量", "多周期", "Confused", "更新",
+                        "数据质量", "多周期", "Confused", "<dt>更新</dt>",
                         "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
                         "fieldSourceBadge(\"置信\"");
         assertThat(html).contains("data-home-retry", "homeRetryButton");
@@ -493,12 +493,16 @@ public class DashboardControllerTest {
                 "window.__lastHomeDiagnostics = {}",
                 "allDecisions = []", "displayDecisions = []",
                 "renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload",
-                "updateAssetDetailLink(null)", "旧资产上下文已清除");
+                "updateAssetDetailLink(null)",
+                "assets.setAttribute(\"aria-busy\", \"true\")")
+                .doesNotContain("renderHomeSystemStateFromPayload", "renderHomeAlertEventRowsFromPayload");
         assertThat(unavailable).contains(
                 "window.__lastDashboardHome = null",
                 "setHomeRetryVisible(true, true)",
                 "updateAssetDetailLink(null)",
-                "当前资产不可查看");
+                "当前资产不可查看",
+                "assets.setAttribute(\"aria-busy\", \"false\")")
+                .doesNotContain("renderHomeSystemStateFromPayload", "renderHomeAlertEventRowsFromPayload", "window.__lastSystemStatus =");
         assertThat(retry).contains(
                 "preservePositionSummary", "refreshAssetContext()", "refreshDashboard()");
         assertThat(loading + unavailable).doesNotContain("renderHomePositionsFromPayload");
@@ -582,9 +586,9 @@ public class DashboardControllerTest {
                 .contains("frontendContract.executionPlanAccess(s)")
                 .contains(
                         "Final Market Bias", "Final Plan Mode", "推荐方向", "人工参与",
-                        "入场区间", "止损逻辑", "止损区", "目标区 / 止盈规则",
+                        "入场区", "止损逻辑", "止损区", "目标区 / 止盈规则",
                         "杠杆上限", "仓位上限", "有效期", "失效条件",
-                        "Rule Validation", "notTradeInstruction=true", "function validityPeriod()")
+                        "Rule Validation", "s.notTradeInstruction === true", "function validityPeriod()")
                 .doesNotContain(
                         "positionMonitor", "用户开仓价", "用户止损", "用户止盈",
                         "系统建议止损", "系统建议止盈", "浮动盈亏", "持仓状态");
@@ -625,9 +629,9 @@ public class DashboardControllerTest {
         assertThat(renderer).contains(
                 "frontendContract.executionPlanAccess(s)",
                 "if (!access.visible)",
-                "contractRow(\"入场区间\", s.entryZone)",
-                "contractRow(\"止损区\", s.stopZone || s.stopLoss)",
-                "contractRow(\"目标区 / 止盈规则\", s.targetZones || s.takeProfitRules)",
+                "contractRow(\"入场区\", s.entryZone)",
+                "contractRow(\"止损区\", firstNonEmpty(s.stopZone, s.stopLoss))",
+                "contractRow(\"目标区 / 止盈规则\", firstNonEmpty(s.targetZones, s.takeProfitRules))",
                 "function validityPeriod()");
     }
 
@@ -738,7 +742,7 @@ public class DashboardControllerTest {
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
 
         assertThat(renderer).contains(
-                "暂无手动持仓", "录入真实持仓后开始监控",
+                "暂无手动录入持仓", "录入真实持仓后，系统才进入持续监控。",
                 "if (!monitorView.trusted)", "当前不可查看",
                 "data-monitor-trusted=\"false\"");
         assertThat(trustView).contains(
@@ -759,9 +763,10 @@ public class DashboardControllerTest {
 
         assertThat(renderer).contains(
                 "p.symbol", "p.direction", "p.entryPrice", "p.markPrice",
-                "p.pnlAmount", "p.pnlPercent", "p.riskLevel", "p.riskTrend",
+                "p.pnlAmount", "p.pnlPercent", "p.riskLevel", "monitorView.riskTrend",
                 "p.monitorConclusion", "p.entryLogicStatus", "p.reversalStatus",
                 "p.riskReason", "p.suggestedAction", "p.lastMonitorTime");
+        assertThat(functionBody("homePositionMonitorView")).contains("p.riskTrend");
         assertThat(fixture).contains(
                 "\"position-monitored\"",
                 "\"markPriceFresh\": True",
@@ -823,17 +828,18 @@ public class DashboardControllerTest {
         assertThat(unavailable).contains(
                 "window.__lastDashboardHome = null",
                 "window.__lastHomeDiagnostics = {}",
-                "window.__lastSystemStatus =",
                 "allDecisions = []",
                 "displayDecisions = []",
                 "setRuntimeStatus(runtimeState)",
                 "setHeaderAiStatus(\"LOAD_FAILED\", \"当前不可查看\")",
-                "renderHomeSystemStateFromPayload({},",
-                "renderHomeAlertEventRowsFromPayload({})",
                 "updateAssetDetailLink(null)",
                 "当前资产不可查看",
                 "执行计划已清除",
-                "dataState: \"SOURCE_UNAVAILABLE\"");
+                "dataState: \"SOURCE_UNAVAILABLE\"")
+                .doesNotContain(
+                        "window.__lastSystemStatus =",
+                        "renderHomeSystemStateFromPayload({},",
+                        "renderHomeAlertEventRowsFromPayload({})");
         assertThat(unavailable).contains(
                 "runtimeState = missing ? \"MISSING\" : \"ERROR\"",
                 "assets.dataset.homeState = missing ? \"missing\" : \"error\"",
@@ -847,7 +853,7 @@ public class DashboardControllerTest {
         String positionRows = functionBody("renderHomePositionsFromPayload");
 
         assertThat(positionRows).contains(
-                "home-position-summary-card", "data-position-id=", "list.slice(0, 3)");
+                "latest-position-list", "latest-position-row", "data-position-id=", "list.slice(0, 3)");
         assertThat(positionRows).doesNotContain(
                 "role=\"button\"", "tabindex=", "data-symbol=", "bindHomePositionRows()",
                 "refreshDashboard()", "selectedSymbol =", "selectedPositionId =");
@@ -1081,9 +1087,10 @@ public class DashboardControllerTest {
 
         assertThat(filter).contains(
                 "slotType !== \"DEFAULT_SLOT\"",
-                "invalidated", "cooling", "confused", "planMode !== \"BLOCKED\"");
+                ".slice(0, 6)")
+                .doesNotContain("BTCUSDT", "ETHUSDT", "SOLUSDT", ".sort(");
         assertThat(tiles)
-                .contains("暂无合格机会资产", "动态 Top6 不使用默认资产补位")
+                .contains("暂无合格机会资产", "动态 Top6 不使用固定资产或默认值补位")
                 .doesNotContain("__placeholder", "等待首轮分析");
         assertThat(sidebar)
                 .contains("authoritativeHomeAssetList(homeAssets)", "暂无可验证重点资产")
@@ -1139,7 +1146,7 @@ public class DashboardControllerTest {
         String aiRenderer = functionBody("renderHomeAiDecisionFromPayload");
 
         assertThat(html).contains(
-                "class=\"home-ai-role-tabs\" role=\"tablist\"",
+                "class=\"latest-ai-tabs\" role=\"tablist\"",
                 "GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(aiRenderer).contains(
                 "data-home-ai-tab=",
@@ -1156,8 +1163,8 @@ public class DashboardControllerTest {
         String html = Files.readString(DASHBOARD_TEMPLATE);
         String fixture = Files.readString(DASHBOARD_VISUAL_FIXTURE);
 
-        int focus = html.indexOf("id=\"homeFocusSummary\"");
-        int signals = html.indexOf("class=\"home-alert-event-row\"");
+        int focus = html.indexOf("class=\"latest-system-status\"");
+        int signals = html.indexOf("class=\"latest-signal-grid\"");
         int assets = html.indexOf("id=\"tilesRow\"");
         int execution = html.indexOf("id=\"homeExecutionCard\"");
         int positions = html.indexOf("id=\"homePositionCard\"");
@@ -1170,16 +1177,13 @@ public class DashboardControllerTest {
         assertThat(execution).isGreaterThan(positions);
         assertThat(ai).isGreaterThan(execution);
         assertThat(html).contains(
-                "--ui-space-1", "--ui-radius-md", "--ui-number-font",
-                "--ui-motion-standard", "[data-theme=\"dark\"]",
-                "@media (prefers-reduced-motion: reduce)",
-                "id=\"homeFocusSymbol\"", "id=\"homeFocusAssetState\"",
-                "id=\"homeFocusDirection\"", "id=\"homeFocusConfidence\"",
-                "id=\"homeFocusRisk\"", "id=\"homeFocusDataQuality\"",
-                "id=\"homeFocusScore\"", "id=\"homeFocusMultiTimeframe\"",
-                "id=\"homeFocusConfused\"", "id=\"homeFocusUpdatedAt\"",
-                "FINAL EXECUTION PLAN", "Top 3 UserPosition",
-                "class=\"home-ai-role-tabs\" role=\"tablist\"",
+                "href=\"/css/dashboard-latest.css\"",
+                "data-latest-approved-home",
+                "data-figma-contract=\"28:154 31:23 520:212 523:748 35:97\"",
+                "class=\"latest-assets-section\"",
+                "class=\"latest-decision-grid\"",
+                "FINAL EXECUTION PLAN", "持仓监控 Top3",
+                "class=\"latest-ai-tabs\" role=\"tablist\"",
                 "GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         assertThat(fixture).contains(
                 "\"long-content\"",
@@ -2110,13 +2114,12 @@ public class DashboardControllerTest {
         assertThat(html).contains(CANDIDATE_REVIEW_START);
         assertThat(html).contains(INTERNAL_PUSH_PREVIEW_START);
         assertThat(positionCard).contains(
-                "持仓摘要",
-                "用户真实持仓 Top 3 摘要",
-                "仅显示手动录入持仓",
-                "暂无手动持仓",
-                "录入真实持仓后开始监控",
+                "持仓监控 Top3",
+                "用户真实持仓 · 与系统执行建议独立",
+                "暂无手动录入持仓",
+                "录入真实持仓后，系统才进入持续监控。",
                 "manualPositionBtn", "录入持仓");
-        assertThat(executionCard).contains("系统执行建议（非交易指令）");
+        assertThat(executionCard).contains("最终执行计划", "仅展示 Rule Validation 通过的 Final");
 
         assertThat(realPositionDetector).contains("hasOpenPosition");
         assertThat(realPositionDetector).contains("positionStatus");
@@ -2135,8 +2138,7 @@ public class DashboardControllerTest {
                 "p.entryPrice", "p.markPrice", "p.pnlAmount", "p.pnlPercent",
                 "p.riskLevel", "p.riskTrend", "p.monitorConclusion", "p.entryLogicStatus",
                 "p.reversalStatus", "p.riskReason", "p.suggestedAction", "p.lastMonitorTime",
-                "p.dataState", "p.markPriceFresh", "p.sourceType", "p.finalPlanId",
-                "SYSTEM_PLAN_POSITION", "MANUAL_INDEPENDENT");
+                "p.dataState", "p.markPriceFresh", "p.sourceType", "p.finalPlanId");
         assertThat(positionFrontendContract).doesNotContain("fetch(");
         assertThat(positionFrontendContract).doesNotContain("/api/user-positions/manual-open");
         assertThat(positionFrontendContract).doesNotContain("/api/user-positions/");
@@ -4326,7 +4328,7 @@ public class DashboardControllerTest {
 
     private String consistencyCardSection() throws Exception {
         String html = Files.readString(DASHBOARD_TEMPLATE);
-        int startIndex = html.indexOf("<aside class=\"home-consistency-summary");
+        int startIndex = html.indexOf("<aside class=\"latest-module latest-consistency");
         assertThat(startIndex).isGreaterThanOrEqualTo(0);
         int endIndex = html.indexOf("</aside>", startIndex);
         assertThat(endIndex).isGreaterThan(startIndex);
@@ -4355,10 +4357,11 @@ public class DashboardControllerTest {
         int sectionStart = html.indexOf(sectionStartMarker);
         assertThat(sectionStart).isNotNegative();
 
-        int sectionEnd = html.indexOf(SECTION_END, sectionStart);
+        String endMarker = sectionStartMarker.startsWith("<article") ? "</article>" : SECTION_END;
+        int sectionEnd = html.indexOf(endMarker, sectionStart);
         assertThat(sectionEnd).isNotNegative();
 
-        return html.substring(sectionStart, sectionEnd + SECTION_END.length());
+        return html.substring(sectionStart, sectionEnd + endMarker.length());
     }
 
     private static String htmlBlock(String startMarker, String endMarker) throws Exception {

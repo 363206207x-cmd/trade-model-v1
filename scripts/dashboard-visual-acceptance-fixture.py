@@ -20,6 +20,7 @@ TEMPLATE = ROOT / "src/main/resources/templates/dashboard.html"
 MOBILE_TEMPLATE = ROOT / "src/main/resources/templates/dashboard-mobile.html"
 ANALYSIS_TEMPLATE = ROOT / "src/main/resources/templates/analysis-detail.html"
 FRONTEND_CONTRACT = ROOT / "src/main/resources/static/js/frontend-contract.js"
+LATEST_DESKTOP_STYLE = ROOT / "src/main/resources/static/css/dashboard-latest.css"
 MOBILE_SCRIPT = ROOT / "src/main/resources/static/js/dashboard-mobile.js"
 MOBILE_STYLE = ROOT / "src/main/resources/static/css/dashboard-mobile.css"
 ANALYSIS_SCRIPT = ROOT / "src/main/resources/static/js/analysis-detail.js"
@@ -50,6 +51,7 @@ SCENARIOS = {
     "plan-partial",
     "plan-missing",
     "position-monitored",
+    "position-empty",
     "position-waiting",
     "position-high-stable",
     "position-risk-escalated",
@@ -169,7 +171,9 @@ def assets_fixture() -> list[dict[str, object]]:
     ]
 
 
-def ai_role(role: str, label: str) -> dict[str, object]:
+def ai_role(role: str, label: str, symbol: str = "BTCUSDT") -> dict[str, object]:
+    marker = symbol.removesuffix("USDT").lower() or symbol.lower()
+    analysis_id = f"analysis-{marker}-asset"
     base = {
         "role": role,
         "roleLabel": label,
@@ -178,8 +182,8 @@ def ai_role(role: str, label: str) -> dict[str, object]:
         "resultAvailable": True,
         "roleState": "READY",
         "dataState": "READY",
-        "analysisId": "analysis-btc-asset",
-        "traceId": f"trace-{role.lower()}-btc",
+        "analysisId": analysis_id,
+        "traceId": f"trace-{role.lower()}-{marker}",
         "provider": "CONTROLLED_VISUAL_FIXTURE",
         "sourceRole": role,
         "generatedAt": "2026-07-13T12:00:00Z",
@@ -226,7 +230,7 @@ def ai_role(role: str, label: str) -> dict[str, object]:
                 "confidence": "HIGH",
                 "observedAt": "2026-07-13T11:59:00Z",
                 "freshness": "FRESH",
-                "analysisId": "analysis-btc-asset",
+                "analysisId": analysis_id,
             }],
             "opposingEvidenceState": "FOUND",
             "opposingEvidence": [{
@@ -240,7 +244,7 @@ def ai_role(role: str, label: str) -> dict[str, object]:
                 "confidence": "MEDIUM",
                 "observedAt": "2026-07-13T11:58:00Z",
                 "freshness": "FRESH",
-                "analysisId": "analysis-btc-asset",
+                "analysisId": analysis_id,
             }],
         }
     if role == "GEMINI_REVIEW":
@@ -317,7 +321,7 @@ def ai_role(role: str, label: str) -> dict[str, object]:
     }
 
 
-def ai_decision_success() -> dict[str, object]:
+def ai_decision_success(symbol: str = "BTCUSDT") -> dict[str, object]:
     return {
         "schemaVersion": "AI_ROLE_RESULTS_SCHEMA_V1",
         "runStatus": "SUCCESS",
@@ -326,9 +330,9 @@ def ai_decision_success() -> dict[str, object]:
         "decisionModeLabel": "仅供人工复核",
         "activeTab": "GPT_FINAL",
         "tabs": [
-            ai_role("GPT_FINAL", "最终裁决官"),
-            ai_role("GEMINI_REVIEW", "冲突复核官"),
-            ai_role("GROK_CHALLENGE", "反方挑战官"),
+            ai_role("GPT_FINAL", "最终裁决官", symbol),
+            ai_role("GEMINI_REVIEW", "冲突复核官", symbol),
+            ai_role("GROK_CHALLENGE", "反方挑战官", symbol),
         ],
         "consistency": {
             "dataState": "READY",
@@ -417,7 +421,6 @@ def unavailable_ai(status: str, label: str, message: str, directional_blocked: b
 
 def base_home(selected_symbol: str) -> dict[str, object]:
     assets = assets_fixture()
-    chosen = next((item for item in assets if item["rawSymbol"] == selected_symbol), assets[0])
     return {
         "header": {
             "pageTitle": "首页总览",
@@ -428,8 +431,8 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             "updatedAt": "2026-07-13T12:00:00",
         },
         "systemState": {
-            "marketTrend": status_card(chosen["marketBiasLabel"], "当前选择资产的规则方向"),
-            "riskLevel": status_card(chosen["riskLabel"], "当前风险分层"),
+            "marketTrend": status_card("震荡偏多", "系统级市场趋势，不随资产切换"),
+            "riskLevel": status_card("中", "系统级风险，不随资产切换"),
             "dataQuality": status_card("92", "确定性 fixture 数据完整"),
             "aiConflict": status_card("轻微分歧", "三角色结果仅供人工复核"),
             "pendingReview": status_card("2", "待复核数量"),
@@ -456,7 +459,7 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             "positionMode": False,
             "moduleState": "PARTIAL",
         },
-        "aiDecision": ai_decision_success(),
+        "aiDecision": ai_decision_success(selected_symbol),
         "pushInbox": {
             "telegramStatus": "NOT_CONNECTED",
             "hasOpenPosition": True,
@@ -891,6 +894,11 @@ def scenario_home(
             "positionMonitor": None,
         }
 
+    elif scenario == "position-empty":
+        home["positions"] = []
+        home["pushInbox"]["hasOpenPosition"] = False
+        home["pushInbox"]["counts"]["positionRisk"] = 0
+
     elif scenario in {
         "position-monitored",
         "position-waiting",
@@ -1235,6 +1243,10 @@ def render_static_fixture(scenario: str, output: Path) -> None:
         '<script src="/js/alert-explain.js"></script>',
         "<script>" + ALERT_EXPLAIN.read_text(encoding="utf-8") + "</script>",
     )
+    html = html.replace(
+        '<link rel="stylesheet" th:href="@{/css/dashboard-latest.css}" href="/css/dashboard-latest.css">',
+        "<style>" + LATEST_DESKTOP_STYLE.read_text(encoding="utf-8") + "</style>",
+    )
     html = html.replace("</head>", interceptor + "\n</head>", 1)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(html, encoding="utf-8")
@@ -1378,6 +1390,10 @@ window.addEventListener("load", function () {{
 
         if parsed.path == "/css/dashboard-mobile.css":
             self._stylesheet(MOBILE_STYLE)
+            return
+
+        if parsed.path == "/css/dashboard-latest.css":
+            self._stylesheet(LATEST_DESKTOP_STYLE)
             return
 
         if parsed.path == "/css/analysis-detail.css":

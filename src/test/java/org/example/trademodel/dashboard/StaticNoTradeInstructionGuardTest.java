@@ -16,9 +16,9 @@ class StaticNoTradeInstructionGuardTest {
             "<section class=\"card module-status-card review-display-card\" id=\"candidateReviewDisplay\"";
     private static final String SKELETON_END = "</section>";
     private static final String POSITION_EXECUTION_ROW_START =
-            "<div class=\"position-execution-row\">";
+            "<section class=\"latest-decision-grid\"";
     private static final String POSITION_EXECUTION_ROW_END =
-            "<div class=\"ai-decision-row\">";
+            "<section class=\"latest-ai-grid\"";
     private static final String ALLOWED_NEGATIVE_CONTEXT =
             "no order, execution, reverse, signal, or auto-trading action is available here.";
     private static final List<String> MANDATORY_SAFE_LABELS = List.of(
@@ -129,12 +129,13 @@ class StaticNoTradeInstructionGuardTest {
     void dashboardPositionExecutionRowKeepsManualPositionDisplayPassive() throws Exception {
         String row = positionExecutionRow();
 
-        assertThat(row).contains("持仓摘要");
-        assertThat(row).contains("用户真实持仓 Top 3 摘要");
-        assertThat(row).contains("仅显示手动录入持仓");
-        assertThat(row).contains("暂无手动持仓");
-        assertThat(row).contains("录入真实持仓后开始监控");
-        assertThat(row).contains("系统执行建议（非交易指令）");
+        assertThat(row).contains("持仓监控 Top3");
+        assertThat(row).contains("用户真实持仓 · 与系统执行建议独立");
+        assertThat(row).contains("暂无手动录入持仓");
+        assertThat(row).contains("录入真实持仓后，系统才进入持续监控。");
+        assertThat(row).contains("最终执行计划");
+        assertThat(row).contains("仅展示 Rule Validation 通过的 Final");
+        assertThat(row).contains("Candidate 不会在此展示");
         assertThat(row).contains("manualPositionBtn", "录入持仓");
         assertThat(row).doesNotContain("<form");
         assertThat(row).doesNotContain("openPositionBtn");

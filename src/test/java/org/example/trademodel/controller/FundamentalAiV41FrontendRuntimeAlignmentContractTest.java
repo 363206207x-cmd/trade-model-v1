@@ -3,35 +3,45 @@ package org.example.trademodel.controller;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("core-regression")
 class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
     private static final Path DASHBOARD = Path.of("src/main/resources/templates/dashboard.html");
+    private static final Path LATEST_STYLE = Path.of("src/main/resources/static/css/dashboard-latest.css");
     private static final Path CONTRACT = Path.of("src/main/resources/static/js/frontend-contract.js");
     private static final Path ANALYSIS_DETAIL = Path.of("src/main/resources/templates/analysis-detail.html");
     private static final Path ANALYSIS_SCRIPT = Path.of("src/main/resources/static/js/analysis-detail.js");
     private static final Path HOME_VO = Path.of("src/main/java/org/example/trademodel/vo/DashboardHomeVO.java");
     private static final Path HOME_SERVICE = Path.of(
             "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java");
+    private static final Path LATEST_EVIDENCE = Path.of("docs/evidence/v4_1_latest_ui");
 
     @Test
     void desktopHomeKeepsTheFrozenModuleOrder() throws Exception {
         String html = Files.readString(DASHBOARD);
 
         assertOrdered(html,
-                "<div class=\"layer1\">",
-                "<h2>实时告警与关键事件</h2>",
-                "<div class=\"tiles-row\" id=\"tilesRow\"></div>",
+                "class=\"latest-system-status\"",
+                "class=\"latest-signal-grid\"",
+                "class=\"latest-assets-section\"",
                 "id=\"homePositionCard\"",
                 "id=\"homeExecutionCard\"",
                 "id=\"homeAiPanel\"",
                 "id=\"homeConsistencyContent\"");
         assertThat(html)
-                .contains("position-execution-row", "ai-decision-row")
+                .contains(
+                        "data-position-execution-ratio=\"70:30\"",
+                        "class=\"latest-ai-grid\"",
+                        "data-latest-approved-home",
+                        "data-figma-contract=\"28:154 31:23 520:212 523:748 35:97\"")
                 .doesNotContain("模拟K线", "模拟走势", "虚假行情图");
     }
 
@@ -80,13 +90,14 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(renderer)
                 .contains("return (assets || []).filter(function (asset)")
                 .contains("slotType !== \"DEFAULT_SLOT\"")
-                .contains("[\"invalidated\", \"cooling\", \"confused\"].indexOf(opportunityState) < 0")
-                .contains("planMode !== \"BLOCKED\"")
+                .contains(".slice(0, 6)")
                 .doesNotContain("BTCUSDT", "ETHUSDT", "SOLUSDT", ".sort(");
         assertThat(cards)
                 .contains(
                         "authoritativeHomeAssetList(assets)",
-                        "动态 Top6 不使用默认资产补位",
+                        "动态 Top6 不使用固定资产或默认值补位",
+                        "latest-asset-card",
+                        "data-home-asset-remove",
                         "asset.opportunityScore",
                         "asset.rankingReason",
                         "asset.analysisId",
@@ -119,9 +130,9 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "OBSERVATION: \"观察\"",
                         "BLOCKED: \"阻断\"");
         assertThat(html)
-                .contains("<small>Market Bias</small>")
-                .contains("tile-score-pill")
-                .contains("<span>Plan Mode <strong>")
+                .contains("<dt>Market Bias</dt>")
+                .contains("latest-asset-fields")
+                .contains("<dt>Plan Mode</dt>")
                 .contains("data-opportunity-state=")
                 .contains("data-plan-mode=");
     }
@@ -149,11 +160,11 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "Final Market Bias",
                         "Final Plan Mode",
                         "推荐方向",
-                        "人工参与",
+                        "是否值得开仓",
                         "机会类型",
                         "建议动作",
                         "入场逻辑",
-                        "入场区间",
+                        "入场区",
                         "触发条件",
                         "止损逻辑",
                         "止损区",
@@ -166,15 +177,17 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "杠杆上限",
                         "仓位上限",
                         "预期风险收益",
-                        "分析周期",
-                        "触发周期",
                         "有效期",
+                        "Valid From",
+                        "Valid Until",
                         "持有周期",
                         "Rule Validation",
-                        "降级 / 否决原因",
+                        "降级原因",
+                        "否决原因",
                         "来源状态",
-                        "notTradeInstruction=true")
-                .doesNotContain("defaultEntry", "defaultStop", "defaultTakeProfit");
+                        "s.notTradeInstruction === true")
+                .contains("data-plan-source=\"final\"")
+                .doesNotContain("defaultEntry", "defaultStop", "defaultTakeProfit", "candidateSummary");
     }
 
     @Test
@@ -182,8 +195,8 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         String contract = Files.readString(CONTRACT);
         String html = Files.readString(DASHBOARD);
         String workspace = slice(html,
-                "<section class=\"card\" id=\"homeAiPanel\"",
-                "</section>");
+                "<article class=\"latest-module latest-ai-workspace\" id=\"homeAiPanel\"",
+                "<aside class=\"latest-module latest-consistency\"");
         String renderer = slice(html,
                 "function roleMetadata(role)",
                 "function renderHomeFocusSummary");
@@ -223,6 +236,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "renderFormalCollection(\"逻辑冲突\"",
                         "renderFormalCollection(\"失败路径\"",
                         "renderFormalCollection(\"外部事件风险\"")
+                .contains("latest-ai-content", "latest-ai-metadata", "renderFormalCollection")
                 .doesNotContain("winner", "vote", "consistencyScore");
     }
 
@@ -234,7 +248,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 "function roleMetadata(role)");
 
         assertThat(html)
-                .contains("<aside class=\"home-consistency-summary home-consistency-contract\"")
+                .contains("<aside class=\"latest-module latest-consistency\"")
                 .contains("id=\"homeConsistencyContent\"")
                 .contains("暂无一致性数据");
         assertThat(renderer)
@@ -257,10 +271,8 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
 
         assertThat(renderer)
                 .contains(
-                        "SYSTEM_PLAN_POSITION",
-                        "系统 Final Plan · ",
-                        "MANUAL_INDEPENDENT",
-                        "独立手动持仓 · 无系统计划关联",
+                        "data-position-source",
+                        "data-final-plan-id",
                         "持仓风险",
                         "监控结论",
                         "建议动作",
@@ -272,10 +284,155 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "反转状态",
                         "风险变化原因",
                         "最近监控时间")
-                .contains("风险、结论、建议、标记价格与盈亏均保持关闭")
+                .contains("风险、结论与建议保持关闭")
                 .contains("list.slice(0, 3)")
                 .contains("isLocallyClosedPosition(positionId)")
-                .doesNotContain("systemStopLoss", "systemTakeProfit", "autoClose", "autoOrder");
+                .doesNotContain(
+                        "系统建议止损", "系统建议止盈", "剩余仓位", "仓位状态",
+                        "反向预警", "是否反转", "systemStopLoss", "systemTakeProfit", "autoClose", "autoOrder");
+    }
+
+    @Test
+    void latestDesktopStyleOwnsTheNewModulesAndSupportsLightAndDarkTokens() throws Exception {
+        String html = Files.readString(DASHBOARD);
+        String css = Files.readString(LATEST_STYLE);
+
+        assertThat(html)
+                .contains("href=\"/css/dashboard-latest.css\"")
+                .contains("class=\"latest-system-status\"")
+                .contains("class=\"latest-asset-grid\"")
+                .contains("class=\"latest-decision-grid\"")
+                .contains("class=\"latest-ai-grid\"");
+        assertThat(css)
+                .contains(
+                        ":root {",
+                        "[data-theme=\"dark\"]",
+                        ".latest-system-status",
+                        ".latest-asset-card",
+                        ".latest-position-row",
+                        ".latest-plan-body",
+                        ".latest-ai-shell",
+                        ".latest-consistency")
+                .doesNotContain("linear-gradient", "radial-gradient");
+    }
+
+    @Test
+    void latestHomeUsesSixSystemStatusesAndRealAssetPoolControls() throws Exception {
+        String html = Files.readString(DASHBOARD);
+        String home = slice(html,
+                "<div data-desktop-home-view data-desktop-dashboard-root data-latest-approved-home",
+                "<div class=\"runtime-status-stack\"");
+
+        assertThat(home)
+                .containsOnlyOnce("id=\"cardTrend\"")
+                .containsOnlyOnce("id=\"cardRisk\"")
+                .containsOnlyOnce("id=\"cardDataQuality\"")
+                .containsOnlyOnce("id=\"cardAiSystem\"")
+                .containsOnlyOnce("id=\"cardOpportunity\"")
+                .containsOnlyOnce("id=\"cardHotReset\"")
+                .contains(
+                        "<input type=\"search\" id=\"symbolSearch\"",
+                        "id=\"btnAdd\"",
+                        "id=\"assetPoolToggle\"",
+                        "id=\"btnReset\"",
+                        "id=\"homeAssetScanState\"");
+        assertThat(home)
+                .doesNotContain("id=\"cardAiConflict\"", "id=\"cardConfused\"");
+    }
+
+    @Test
+    void oldHomeRenderersAreAbsentFromTheLatestProductionPath() throws Exception {
+        String html = Files.readString(DASHBOARD);
+        String home = slice(html,
+                "<div data-desktop-home-view data-desktop-dashboard-root data-latest-approved-home",
+                "<div class=\"runtime-status-stack\"");
+        String assetRenderer = slice(html,
+                "function renderHomeAssetsFromPayload(assets, moduleState)",
+                "function renderHomePositionsFromPayload");
+        String positionRenderer = slice(html,
+                "function renderHomePositionsFromPayload(positions)",
+                "function renderHomeExecutionFromPayload");
+        String planRenderer = slice(html,
+                "function renderHomeExecutionFromPayload(suggestion, selectedAsset)",
+                "function renderHomeAiDecisionFromPayload");
+        String aiRenderer = slice(html,
+                "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
+                "function renderHomePushInboxFromPayload");
+
+        assertThat(home).doesNotContain(
+                "class=\"layer1\"",
+                "class=\"tiles-row\"",
+                "class=\"position-execution-row\"",
+                "class=\"ai-decision-row\"",
+                "class=\"home-ai-summary-card\"");
+        assertThat(assetRenderer).doesNotContain("coin-tile", "tile-score-pill");
+        assertThat(positionRenderer).doesNotContain("home-position-summary-card", "home-position-semantic-grid");
+        assertThat(planRenderer).doesNotContain("execution-card-body", "final-plan-contract");
+        assertThat(aiRenderer).doesNotContain("home-ai-role-tabs", "home-ai-summary-card");
+    }
+
+    @Test
+    void assetContextSwitchUpdatesOnlyAssetBoundDecisionModules() throws Exception {
+        String html = Files.readString(DASHBOARD);
+        String loading = slice(html,
+                "function renderAssetContextLoading(symbol)",
+                "function renderDashboardHomePayload");
+        String payload = slice(html,
+                "function renderDashboardHomePayload(home, preservePositionSummary)",
+                "function renderDashboardHomeUnavailable");
+        String unavailable = slice(html,
+                "function renderAssetContextUnavailable(contextState)",
+                "function fetchDashboardHome");
+
+        assertThat(loading)
+                .contains("renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload")
+                .doesNotContain("renderHomeSystemStateFromPayload", "renderHomeAlertEventRowsFromPayload",
+                        "renderHomePositionsFromPayload");
+        assertThat(payload)
+                .contains("if (!preservePositionSummary)", "renderHomeSystemStateFromPayload",
+                        "renderHomeAlertEventRowsFromPayload", "renderHomePositionsFromPayload");
+        assertThat(unavailable)
+                .contains("renderHomeExecutionFromPayload", "renderHomeAiDecisionFromPayload")
+                .doesNotContain("renderHomeSystemStateFromPayload", "renderHomeAlertEventRowsFromPayload",
+                        "renderHomePositionsFromPayload", "window.__lastSystemStatus =");
+    }
+
+    @Test
+    void visualEvidenceLocksLatestFigmaNodesViewportThemesAndRequiredScenarios() throws Exception {
+        String index = Files.readString(LATEST_EVIDENCE.resolve("README.md"));
+        String qa = Files.readString(LATEST_EVIDENCE.resolve("browser-qa.json"));
+        BufferedImage light = ImageIO.read(LATEST_EVIDENCE.resolve(
+                "runtime/01-desktop-1440x900-light.png").toFile());
+        BufferedImage full = ImageIO.read(LATEST_EVIDENCE.resolve(
+                "runtime/02-desktop-full-page-light.png").toFile());
+
+        assertThat(index).contains(
+                "28:154", "31:23", "520:212", "523:748", "35:97",
+                "Node `519:3` is the rejected old P1-KB baseline");
+        for (int i = 1; i <= 20; i++) {
+            assertThat(index).contains(String.format("| %02d |", i));
+        }
+        assertThat(light.getWidth()).isEqualTo(1440);
+        assertThat(light.getHeight()).isEqualTo(900);
+        assertThat(full.getWidth()).isEqualTo(1440);
+        assertThat(full.getHeight()).isGreaterThan(900);
+        assertThat(qa).contains(
+                "\"dashboardHtml\": \"" + sha256(DASHBOARD) + "\"",
+                "\"dashboardLatestCss\": \"" + sha256(LATEST_STYLE) + "\"",
+                "\"frontendContractJs\": \"" + sha256(CONTRACT) + "\"",
+                "\"visualFixture\": \"" + sha256(Path.of(
+                        "scripts/dashboard-visual-acceptance-fixture.py")) + "\"",
+                "\"horizontalOverflow\": 0",
+                "\"textOverflow\": 0",
+                "\"topLevelOverlap\": 0",
+                "\"consoleErrors\": 0",
+                "\"consoleWarnings\": 0",
+                "\"visibleAiRoleCount\": 1",
+                "\"positionExecutionWidthRatio\": 2.3333",
+                "\"candidateVisibleAsFinal\": false",
+                "\"systemStatusUnchanged\": true",
+                "\"alertsAndEventsUnchanged\": true",
+                "\"positionsUnchanged\": true");
     }
 
     @Test
@@ -355,5 +512,10 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(startIndex).isGreaterThanOrEqualTo(0);
         assertThat(endIndex).isGreaterThan(startIndex);
         return source.substring(startIndex, endIndex);
+    }
+
+    private String sha256(Path source) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(Files.readAllBytes(source)));
     }
 }

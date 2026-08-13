@@ -118,14 +118,15 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("window.__lastDashboardHome = null")
                 .contains("setRuntimeStatus(runtimeState)")
                 .contains("runtimeState = missing ? \"MISSING\" : \"ERROR\"")
-                .contains("renderHomeSystemStateFromPayload({},")
-                .contains("renderHomeAlertEventRowsFromPayload({})")
                 .contains("assets.dataset.homeState = missing ? \"missing\" : \"error\"")
                 .contains("renderHomeExecutionFromPayload({")
                 .contains("runStatus: \"LOAD_FAILED\"")
                 .contains("runStatusLabel: \"当前不可查看\"")
                 .contains("}, null);")
-                .doesNotContain("renderHomePositionsFromPayload")
+                .doesNotContain(
+                        "renderHomeSystemStateFromPayload",
+                        "renderHomeAlertEventRowsFromPayload",
+                        "renderHomePositionsFromPayload")
                 .doesNotContain("selectedPositionId = null");
     }
 
@@ -147,8 +148,8 @@ class Fe04ShellHomeDashboardContractTest {
                 "</section>");
         String desktopPosition = slice(
                 desktop,
-                "<section class=\"card\" id=\"homePositionCard\"",
-                "</section>");
+                "<article class=\"latest-module latest-position-module\" id=\"homePositionCard\"",
+                "<article class=\"latest-module latest-plan-module\" id=\"homeExecutionCard\"");
 
         assertThat(mobileExecution)
                 .contains(
@@ -171,18 +172,17 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("记录平仓")
                 .doesNotContain("复盘中心");
         assertThat(desktopPosition)
-                .contains("Top 3", "仅显示手动录入持仓")
+                .contains("持仓监控 Top3", "用户真实持仓", "与系统执行建议独立")
                 .contains("manualPositionBtn")
                 .doesNotContain("reviewCenterLink");
         assertThat(desktop)
-                .contains("class=\"position-action-btn\"")
+                .contains("class=\"latest-position-close\"")
                 .contains("记录平仓")
-                .contains("SYSTEM_PLAN_POSITION")
+                .contains("data-position-source=", "data-final-plan-id=")
                 .contains("MANUAL_INDEPENDENT");
         assertThat(desktop)
                 .contains(
-                        "资产状态 · 正在同步",
-                        "系统冲突阻断",
+                        "等待可验证 Final Plan",
                         "等待 Final Plan",
                         "Candidate 不会在此展示");
         assertThat(mobileAi)
@@ -382,12 +382,12 @@ class Fe04ShellHomeDashboardContractTest {
         String desktop = Files.readString(DESKTOP);
         String aiPanel = slice(
                 desktop,
-                "<section class=\"card\" id=\"homeAiPanel\"",
-                "</section>");
+                "<article class=\"latest-module latest-ai-workspace\" id=\"homeAiPanel\"",
+                "<aside class=\"latest-module latest-consistency\"");
         String consistencyRenderer = slice(
                 desktop,
                 "function renderHomeConsistencyCard(options)",
-                "function renderGptFinalHomeRole");
+                "function roleMetadata(role)");
         String payloadRenderer = slice(
                 desktop,
                 "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
@@ -405,7 +405,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains(
                         "id=\"homeConsistencyContent\"",
                         "AI 一致性摘要",
-                        "home-consistency-summary")
+                        "latest-consistency")
                 .doesNotContain(
                         "homeConsistencyPanel",
                         "consistency-ring",

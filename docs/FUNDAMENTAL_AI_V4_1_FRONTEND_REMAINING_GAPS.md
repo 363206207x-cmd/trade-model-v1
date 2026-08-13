@@ -2,13 +2,15 @@
 
 ## Blocking For This Candidate
 
-No known frontend contract or deterministic runtime blocker remains in the candidate.
+No known latest-approved-UI, frontend contract, or deterministic browser blocker remains in the candidate.
 
 The candidate is still not complete or effective because these process gates remain:
 
 1. independent exact-Head frontend contract and runtime capability audit;
 2. Draft PR CI and review;
 3. merge and merged-main validation.
+
+The independent audit must validate the current PR Head against `docs/FUNDAMENTAL_AI_V4_1_LATEST_UI_FIGMA_MAPPING.md` and `docs/evidence/v4_1_latest_ui/`; it must not use old P1-KB node `519:3` or the previous candidate screenshots as the target.
 
 ## Evidence Still Pending
 
@@ -32,6 +34,7 @@ This gap does not justify fake values or lowering a trust/quality threshold.
 - Schema change is not required.
 - A parallel API is not required.
 - A second Home, Analysis Detail, or AI Workspace is not required.
+- The previous candidate UI is not an accepted visual fallback.
 - Mobile and Figma changes are not required for this package.
 - Automatic trading is neither required nor authorized.
 
