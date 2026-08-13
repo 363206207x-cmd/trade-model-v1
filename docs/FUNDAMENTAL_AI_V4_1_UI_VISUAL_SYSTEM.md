@@ -41,4 +41,3 @@ Primary surfaces contain the decision, current state, and user action boundary. 
 ## Theme Verification
 
 Light and dark themes use the same semantic hierarchy. Evidence: `docs/evidence/v4_1_productized_ui/runtime/19-desktop-light.png` and `20-desktop-dark.png`.
-

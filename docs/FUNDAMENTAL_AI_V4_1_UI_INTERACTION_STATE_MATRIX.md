@@ -49,4 +49,3 @@ Candidate-only, missing-source, invalid-chain, and stale responses never open th
 ## Three AI
 
 One workspace contains three tabs and exactly one visible role. Role state and each collection state remain independent. Top evidence is visible; remaining evidence and technical audit metadata use progressive disclosure. Unavailable roles render one compact state rather than placeholder fields.
-

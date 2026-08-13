@@ -52,4 +52,3 @@ Provider, trace, raw state, fallback reason, analysis identity, and generation m
 ## Fail-Closed Rule
 
 An unknown or absent value maps to a neutral unavailable state. The mapper never invents a positive, trusted, actionable, or numeric value.
-
