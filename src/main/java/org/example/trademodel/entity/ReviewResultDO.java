@@ -14,6 +14,17 @@ public class ReviewResultDO {
     private String finalPlanId;
     private String candidateId;
     private String traceId;
+    private String opportunityId;
+    private String resolverResultId;
+    private String validationResultId;
+    private String reviewType;
+    private String outcome;
+    private String executionDeviation;
+    private String aiAssessment;
+    private String ruleAssessment;
+    private String ruleFeedback;
+    private String metricsJson;
+    private String contractVersion;
     private String reviewScopeKey;
     private String errorType;
     private String actualOutcome;
@@ -59,6 +70,28 @@ public class ReviewResultDO {
     public void setCandidateId(String candidateId) { this.candidateId = candidateId; }
     public String getTraceId() { return traceId; }
     public void setTraceId(String traceId) { this.traceId = traceId; }
+    public String getOpportunityId() { return opportunityId; }
+    public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
+    public String getResolverResultId() { return resolverResultId; }
+    public void setResolverResultId(String resolverResultId) { this.resolverResultId = resolverResultId; }
+    public String getValidationResultId() { return validationResultId; }
+    public void setValidationResultId(String validationResultId) { this.validationResultId = validationResultId; }
+    public String getReviewType() { return reviewType; }
+    public void setReviewType(String reviewType) { this.reviewType = reviewType; }
+    public String getOutcome() { return outcome; }
+    public void setOutcome(String outcome) { this.outcome = outcome; }
+    public String getExecutionDeviation() { return executionDeviation; }
+    public void setExecutionDeviation(String executionDeviation) { this.executionDeviation = executionDeviation; }
+    public String getAiAssessment() { return aiAssessment; }
+    public void setAiAssessment(String aiAssessment) { this.aiAssessment = aiAssessment; }
+    public String getRuleAssessment() { return ruleAssessment; }
+    public void setRuleAssessment(String ruleAssessment) { this.ruleAssessment = ruleAssessment; }
+    public String getRuleFeedback() { return ruleFeedback; }
+    public void setRuleFeedback(String ruleFeedback) { this.ruleFeedback = ruleFeedback; }
+    public String getMetricsJson() { return metricsJson; }
+    public void setMetricsJson(String metricsJson) { this.metricsJson = metricsJson; }
+    public String getContractVersion() { return contractVersion; }
+    public void setContractVersion(String contractVersion) { this.contractVersion = contractVersion; }
 
     public String getReviewScopeKey() {
         return reviewScopeKey;

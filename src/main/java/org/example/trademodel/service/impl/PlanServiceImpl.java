@@ -10,6 +10,7 @@ import org.example.trademodel.dto.planboundary.SourceTraceDTO;
 import org.example.trademodel.dto.planboundary.SourceTraceFallbackStatusEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
+import org.example.trademodel.service.support.ExecutionFeasibilityContract;
 import org.example.trademodel.service.PlanService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DashboardDetailResponseVO;
@@ -40,6 +41,51 @@ public class PlanServiceImpl implements PlanService {
     private static final String STAMPEDE_RISK_REVIEW_ONLY = "STAMPEDE_RISK_REVIEW_ONLY";
     private static final String WICK_ONLY_RISK_REVIEW_ONLY = "WICK_ONLY_RISK_REVIEW_ONLY";
     private static final String RISK_ACTION_GUARD_BLOCKED = "RISK_ACTION_GUARD_BLOCKED";
+
+    @Override
+    public ExecutionPlanVO buildRuleExecutionAssessment(
+            DecisionBundleVO decisionBundle,
+            SourceTraceBoundaryProducerResult boundaryResult
+    ) {
+        ExecutionPlanVO assessment = new ExecutionPlanVO();
+        assessment.setPlanId("rule-assessment-" + UUID.randomUUID());
+        assessment.setManualReviewRequired(true);
+        assessment.setNotTradeInstruction(true);
+        assessment.setNotExecutable(true);
+        assessment.setNotAutoTrading(true);
+        assessment.setNotOrderExecution(true);
+        assessment.setNotUserPositionCreation(true);
+        assessment.setFinalPlan(false);
+        assessment.setChainStatus("RULE_BASE_ASSESSMENT");
+        assessment.setRuleValidationStatus("NOT_RUN");
+        ExecutionFeasibilityContract.initializeUnavailable(assessment,
+                ExecutionFeasibilityContract.DEFAULT_REASON);
+
+        SourceTraceDTO sourceTrace = boundaryResult == null ? null : boundaryResult.getSourceTrace();
+        applySourceTraceReadiness(assessment, sourceTrace);
+        if (boundaryResult != null) {
+            appendUnique(assessment.getMissingSourceReasons(), boundaryResult.getMissingFields());
+            appendUnique(assessment.getSourceBlockerReasons(), boundaryResult.getBlockingReasons());
+        }
+        if (boundaryResult == null
+                || !boundaryResult.isBoundaryReady()
+                || !boundaryResult.isSourceTraceReady()
+                || !hasRequiredBoundaryEvidence(boundaryResult)) {
+            assessment.setSourceGateComplete(false);
+            if (!assessment.getSourceBlockerReasons().isEmpty()) {
+                assessment.setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+                assessment.setSourceCompletenessSummary(
+                        "rule source gate BLOCKED: " + String.join("; ", assessment.getSourceBlockerReasons()));
+            } else {
+                assessment.setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+                assessment.setSourceCompletenessSummary("rule source gate INCOMPLETE");
+            }
+        }
+        // This object is a non-final rule assessment, never a detailed plan.
+        assessment.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        applyExternalContextReadiness(assessment, decisionBundle);
+        return assessment;
+    }
 
     @Override
     public ExecutionPlanVO generateExecutionPlan(DecisionBundleVO decisionBundle, List<ScoreItemVO> scoreList,
@@ -85,6 +131,8 @@ public class PlanServiceImpl implements PlanService {
         plan.setTakeProfitRules(PLACEHOLDER_NOT_AVAILABLE);
         plan.setLeverageSuggestion("1-5x");
         plan.setPositionSuggestion("单笔风险不超过总资金 2%");
+        ExecutionFeasibilityContract.initializeUnavailable(plan,
+                ExecutionFeasibilityContract.DEFAULT_REASON);
         plan.setPlanMode(resolvePlanMode(plan, decisionBundle));
         applySourceTraceReadiness(plan, sourceTrace);
         applyRiskActionGuardReadiness(plan, riskActionGuardDisplay);

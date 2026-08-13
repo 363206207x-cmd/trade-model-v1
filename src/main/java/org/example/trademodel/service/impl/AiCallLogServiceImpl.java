@@ -111,6 +111,9 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setTimeoutFlag(result.getCallStatus() == org.example.trademodel.ai.AiProviderCallStatus.TIMEOUT);
         log.setErrorCode(safe(result.getErrorCode(), 128));
         log.setErrorMessage(safe(result.getFallbackReason(), 512));
+        log.setCacheHit(result.isCacheHit());
+        log.setObservedAt(result.getGeneratedAt() == null
+                ? now : result.getGeneratedAt().toLocalDateTime());
         log.setResponseSummary(decisionChainResponseSummary(result));
         String auditOutput = result.getAuditOutput() == null
                 ? result.getPayloadJson() : result.getAuditOutput();
@@ -130,8 +133,21 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     @Override
     public List<AiCallLogDO> query(String analysisId, String traceId, String providerName, String callStatus,
                                    LocalDateTime from, LocalDateTime to, int limit) {
-        return mapper.query(analysisId, traceId, providerName, callStatus,
+        return mapper.query(analysisId, traceId, null, null, providerName, callStatus,
                 from, to, Math.max(1, Math.min(500, limit)));
+    }
+
+    @Override
+    public List<AiCallLogDO> queryOwned(Long userId, String analysisId, String traceId,
+                                        String candidateId, String role, String providerName,
+                                        String callStatus, LocalDateTime from, LocalDateTime to,
+                                        int limit) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        return mapper.queryOwned(userId, safe(analysisId, 64), safe(traceId, 128),
+                safe(candidateId, 64), safe(role, 64), safe(providerName, 32),
+                safe(callStatus, 32), from, to, Math.max(1, Math.min(500, limit)));
     }
 
     @Override
@@ -181,7 +197,9 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setCallId("ai-call-" + UUID.randomUUID());
         log.setAnalysisId(safe(request.getAnalysisId(), 64));
         log.setTraceId(safe(request.getTraceId(), 128));
-        log.setRequestId("ai-req-" + UUID.randomUUID());
+        log.setRequestId(safe(request.getRequestId(), 128) == null
+                ? "ai-req-" + UUID.randomUUID() : safe(request.getRequestId(), 128));
+        log.setOpportunityId(safe(request.getOpportunityId(), 64));
         log.setProviderName(provider == null ? "UNKNOWN" : provider.name());
         log.setModelName(safe(modelName == null || modelName.isBlank() ? "UNAVAILABLE" : modelName, 128));
         log.setAiRole(request.getRole().name());
@@ -190,10 +208,13 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setCalculatedCostUsd(BigDecimal.ZERO);
         log.setContractType("DECISION_CHAIN_V4_1");
         log.setCandidateId(safe(request.getCandidateId(), 64));
+        log.setCacheHit(false);
+        log.setObservedAt(now);
         String canonicalInput = canonicalDecisionChainRequest(request);
         log.setRequestSummary(truncate(canonicalInput, DECISION_CHAIN_SUMMARY_CHARS));
         log.setRequestHash(hash(canonicalInput));
-        log.setRuleVersion("FUNDAMENTAL_AI_V4_1");
+        log.setRuleVersion(safe(request.getRuleVersion(), 32) == null
+                ? "FUNDAMENTAL_AI_V4_1" : safe(request.getRuleVersion(), 32));
         boolean reviewOnly = request.getRole() != AiDecisionChainRole.GPT_FINAL;
         log.setReviewOnly(reviewOnly);
         log.setNotExecutionPlanCreation(reviewOnly);
@@ -275,6 +296,9 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         summary.put("analysisId", request.getAnalysisId());
         summary.put("traceId", request.getTraceId());
         summary.put("candidateId", request.getCandidateId());
+        summary.put("opportunityId", request.getOpportunityId());
+        summary.put("requestId", request.getRequestId());
+        summary.put("ruleVersion", request.getRuleVersion());
         summary.put("role", request.getRole() == null ? null : request.getRole().name());
         summary.put("symbol", request.getSymbol());
         summary.put("timeframe", request.getTimeframe());
@@ -313,7 +337,11 @@ public class AiCallLogServiceImpl implements AiCallLogService {
 
     private static String sanitize(String value) {
         if (value == null) return null;
-        return value.replaceAll("(?i)Bearer\\s+[A-Za-z0-9._\\-]{8,}", "Bearer ***")
+        return value.replaceAll(
+                        "(?i)(\\\"(?:api[_-]?key|api[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|password|passphrase|client[_-]?secret|private[_-]?key|cookie|credentials?)\\\"\\s*:\\s*\\\")[^\\\"]*(\\\")",
+                        "$1***$2")
+                .replaceAll("(?i)((?:api[_-]?key|api[_-]?secret|access[_-]?token|refresh[_-]?token|authorization|password|client[_-]?secret)=)[^&\\s]+", "$1***")
+                .replaceAll("(?i)Bearer\\s+[A-Za-z0-9._\\-]{8,}", "Bearer ***")
                 .replaceAll("sk-[A-Za-z0-9]+", "sk-***")
                 .replaceAll("AIza[A-Za-z0-9_\\-]+", "AIza***")
                 .replaceAll("xai-[A-Za-z0-9]+", "xai-***");

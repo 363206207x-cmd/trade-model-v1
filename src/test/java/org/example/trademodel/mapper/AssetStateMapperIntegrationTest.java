@@ -87,6 +87,7 @@ class AssetStateMapperIntegrationTest {
         row.setConfusedLowStreak(confusedLowStreak);
         row.setLastUpdateTime(updateTime);
         row.setTraceId(traceId);
+        row.setRuleVersion("rules-asset-state-it");
         return row;
     }
 }

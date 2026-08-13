@@ -1,7 +1,9 @@
 package org.example.trademodel.vo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import org.example.trademodel.ai.AiRoleResultsPayload;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -471,6 +473,7 @@ public class DashboardHomeVO {
         private String slotType;
         private String symbol;
         private String rawSymbol;
+        private String name;
         private Long assetId;
         private String analysisId;
         private String opportunityId;
@@ -535,6 +538,14 @@ public class DashboardHomeVO {
 
         public void setRawSymbol(String rawSymbol) {
             this.rawSymbol = rawSymbol;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
 
         @JsonSerialize(using = ToStringSerializer.class)
@@ -978,15 +989,24 @@ public class DashboardHomeVO {
         private String originalPlanIdentity;
         private String originalPlanCurrentValidity;
         private String direction;
+        private String finalMarketBias;
+        private String finalPlanMode;
+        private Boolean worthOpening;
+        private String opportunityType;
+        private String recommendedAction;
         private String entryZone;
+        private String triggerCondition;
         private String stopLoss;
         private String takeProfitRules;
         private String leverageSuggestion;
         private String positionSuggestion;
+        private String executionFeasibilityStatus;
+        private String executionFeasibilityReason;
         private String validPeriod;
         private OffsetDateTime validFrom;
         private OffsetDateTime expiresAt;
         private String invalidCondition;
+        private Boolean notTradeInstruction = true;
         private String moduleState = "MISSING";
 
         public String getStatus() { return status; }
@@ -1022,6 +1042,17 @@ public class DashboardHomeVO {
             this.direction = direction;
         }
 
+        public String getFinalMarketBias() { return finalMarketBias; }
+        public void setFinalMarketBias(String value) { this.finalMarketBias = value; }
+        public String getFinalPlanMode() { return finalPlanMode; }
+        public void setFinalPlanMode(String value) { this.finalPlanMode = value; }
+        public Boolean getWorthOpening() { return worthOpening; }
+        public void setWorthOpening(Boolean value) { this.worthOpening = value; }
+        public String getOpportunityType() { return opportunityType; }
+        public void setOpportunityType(String value) { this.opportunityType = value; }
+        public String getRecommendedAction() { return recommendedAction; }
+        public void setRecommendedAction(String value) { this.recommendedAction = value; }
+
         public String getEntryZone() {
             return entryZone;
         }
@@ -1029,6 +1060,9 @@ public class DashboardHomeVO {
         public void setEntryZone(String entryZone) {
             this.entryZone = entryZone;
         }
+
+        public String getTriggerCondition() { return triggerCondition; }
+        public void setTriggerCondition(String value) { this.triggerCondition = value; }
 
         public String getStopLoss() {
             return stopLoss;
@@ -1062,6 +1096,11 @@ public class DashboardHomeVO {
             this.positionSuggestion = positionSuggestion;
         }
 
+        public String getExecutionFeasibilityStatus() { return executionFeasibilityStatus; }
+        public void setExecutionFeasibilityStatus(String value) { this.executionFeasibilityStatus = value; }
+        public String getExecutionFeasibilityReason() { return executionFeasibilityReason; }
+        public void setExecutionFeasibilityReason(String value) { this.executionFeasibilityReason = value; }
+
         public String getValidPeriod() {
             return validPeriod;
         }
@@ -1082,6 +1121,9 @@ public class DashboardHomeVO {
         public void setInvalidCondition(String invalidCondition) {
             this.invalidCondition = invalidCondition;
         }
+
+        public Boolean getNotTradeInstruction() { return notTradeInstruction; }
+        public void setNotTradeInstruction(Boolean value) { this.notTradeInstruction = value; }
 
         public String getModuleState() { return moduleState; }
         public void setModuleState(String moduleState) { this.moduleState = moduleState; }
@@ -1142,41 +1184,112 @@ public class DashboardHomeVO {
     public static class AiTabVO {
         private String role;
         private String roleLabel;
+        private String analysisId;
+        private String traceId;
+        private String roleState;
+        private String dataState;
+        private String generatedAt;
         private String runStatus;
         private String runStatusLabel;
         private Boolean resultAvailable = false;
         private String statusMessage;
+        @JsonIgnore
         private String stance;
+        @JsonIgnore
         private String direction;
+        @JsonIgnore
         private String confidenceLevel;
+        @JsonIgnore
         private List<String> supportEvidence = new ArrayList<>();
+        @JsonIgnore
         private List<String> againstEvidence = new ArrayList<>();
+        @JsonIgnore
         private List<String> riskPoints = new ArrayList<>();
+        @JsonIgnore
         private String downgradeReason;
+        @JsonIgnore
         private String reviewConclusion;
+        @JsonIgnore
         private String finalMarketBias;
+        @JsonIgnore
         private String finalConfidence;
+        @JsonIgnore
         private String finalRiskLevel;
+        @JsonIgnore
         private String finalPlanMode;
+        @JsonIgnore
         private String worthOpening;
+        @JsonIgnore
         private String finalConclusion;
+        @JsonIgnore
         private List<String> coreSupportingEvidence = new ArrayList<>();
+        @JsonIgnore
         private List<String> coreCounterEvidence = new ArrayList<>();
+        @JsonIgnore
         private String decisionSummary;
+        @JsonIgnore
         private String reviewVerdict;
+        @JsonIgnore
         private List<String> detectedContradictions = new ArrayList<>();
+        @JsonIgnore
         private List<String> weakEvidence = new ArrayList<>();
+        @JsonIgnore
         private List<String> logicGaps = new ArrayList<>();
+        @JsonIgnore
         private String downgradeRecommendation;
+        @JsonIgnore
         private String riskAdjustmentSuggestion;
+        @JsonIgnore
         private String manualReviewRequired;
+        @JsonIgnore
         private String challengeThesis;
+        @JsonIgnore
         private List<String> eventRisks = new ArrayList<>();
+        @JsonIgnore
         private List<String> sentimentReversalRisks = new ArrayList<>();
+        @JsonIgnore
         private List<String> microstructureTraps = new ArrayList<>();
+        @JsonIgnore
         private List<String> liquidityRisks = new ArrayList<>();
+        @JsonIgnore
         private List<String> counterEvidence = new ArrayList<>();
+        @JsonIgnore
         private String challengeConclusion;
+        private AiRoleResultsPayload.CoreJudgment coreJudgment;
+        private List<AiRoleResultsPayload.EvidencePayload> supportingEvidence = new ArrayList<>();
+        private String supportingEvidenceState;
+        private List<AiRoleResultsPayload.EvidencePayload> opposingEvidence = new ArrayList<>();
+        private String opposingEvidenceState;
+        private AiRoleResultsPayload.MultiTimeframeExplanation multiTimeframeExplanation;
+        private AiRoleResultsPayload.BiasAdjustment biasAdjustment;
+        private AiRoleResultsPayload.CandidateSummary candidateSummary;
+        private List<AiRoleResultsPayload.FindingPayload> evidenceGaps = new ArrayList<>();
+        private String evidenceGapsState;
+        private List<AiRoleResultsPayload.FindingPayload> logicConflicts = new ArrayList<>();
+        private String logicConflictsState;
+        private List<AiRoleResultsPayload.FindingPayload> underestimatedRisks = new ArrayList<>();
+        private String underestimatedRisksState;
+        private AiRoleResultsPayload.DowngradeSuggestion downgradeSuggestion;
+        private String reviewResult;
+        private String finalDirectionImpact;
+        private String confidenceAdjustment;
+        private String riskAdjustment;
+        private String planModeAdjustment;
+        private String recoveryCondition;
+        private List<AiRoleResultsPayload.FailurePathPayload> failurePaths = new ArrayList<>();
+        private String failurePathState;
+        private List<AiRoleResultsPayload.FindingPayload> opposingScenarios = new ArrayList<>();
+        private String opposingScenariosState;
+        private List<AiRoleResultsPayload.FindingPayload> externalEventRisks = new ArrayList<>();
+        private String externalEventRisksState;
+        private List<AiRoleResultsPayload.FindingPayload> microstructureRisks = new ArrayList<>();
+        private String microstructureRisksState;
+        private List<AiRoleResultsPayload.FindingPayload> watchIndicators = new ArrayList<>();
+        private String watchIndicatorsState;
+        private String challengeSummary;
+        private String currentDirectionChallenge;
+        private Boolean majorCounterEvidence;
+        private String planModeImpact;
 
         public String getRole() {
             return role;
@@ -1193,6 +1306,17 @@ public class DashboardHomeVO {
         public void setRoleLabel(String roleLabel) {
             this.roleLabel = roleLabel;
         }
+
+        public String getAnalysisId() { return analysisId; }
+        public void setAnalysisId(String value) { this.analysisId = value; }
+        public String getTraceId() { return traceId; }
+        public void setTraceId(String value) { this.traceId = value; }
+        public String getRoleState() { return roleState; }
+        public void setRoleState(String value) { this.roleState = value; }
+        public String getDataState() { return dataState; }
+        public void setDataState(String value) { this.dataState = value; }
+        public String getGeneratedAt() { return generatedAt; }
+        public void setGeneratedAt(String value) { this.generatedAt = value; }
 
         public String getRunStatus() { return runStatus; }
         public void setRunStatus(String runStatus) { this.runStatus = runStatus; }
@@ -1444,17 +1568,129 @@ public class DashboardHomeVO {
         public void setChallengeConclusion(String challengeConclusion) {
             this.challengeConclusion = challengeConclusion;
         }
+
+        public AiRoleResultsPayload.CoreJudgment getCoreJudgment() { return coreJudgment; }
+        public void setCoreJudgment(AiRoleResultsPayload.CoreJudgment value) { this.coreJudgment = value; }
+        public List<AiRoleResultsPayload.EvidencePayload> getSupportingEvidence() { return supportingEvidence; }
+        public void setSupportingEvidence(List<AiRoleResultsPayload.EvidencePayload> value) {
+            this.supportingEvidence = value == null ? new ArrayList<>() : value;
+        }
+        public String getSupportingEvidenceState() { return supportingEvidenceState; }
+        public void setSupportingEvidenceState(String value) { this.supportingEvidenceState = value; }
+        public List<AiRoleResultsPayload.EvidencePayload> getOpposingEvidence() { return opposingEvidence; }
+        public void setOpposingEvidence(List<AiRoleResultsPayload.EvidencePayload> value) {
+            this.opposingEvidence = value == null ? new ArrayList<>() : value;
+        }
+        public String getOpposingEvidenceState() { return opposingEvidenceState; }
+        public void setOpposingEvidenceState(String value) { this.opposingEvidenceState = value; }
+        public AiRoleResultsPayload.MultiTimeframeExplanation getMultiTimeframeExplanation() {
+            return multiTimeframeExplanation;
+        }
+        public void setMultiTimeframeExplanation(AiRoleResultsPayload.MultiTimeframeExplanation value) {
+            this.multiTimeframeExplanation = value;
+        }
+        public AiRoleResultsPayload.BiasAdjustment getBiasAdjustment() { return biasAdjustment; }
+        public void setBiasAdjustment(AiRoleResultsPayload.BiasAdjustment value) { this.biasAdjustment = value; }
+        public AiRoleResultsPayload.CandidateSummary getCandidateSummary() { return candidateSummary; }
+        public void setCandidateSummary(AiRoleResultsPayload.CandidateSummary value) { this.candidateSummary = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getEvidenceGaps() { return evidenceGaps; }
+        public void setEvidenceGaps(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.evidenceGaps = value == null ? new ArrayList<>() : value;
+        }
+        public String getEvidenceGapsState() { return evidenceGapsState; }
+        public void setEvidenceGapsState(String value) { this.evidenceGapsState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getLogicConflicts() { return logicConflicts; }
+        public void setLogicConflicts(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.logicConflicts = value == null ? new ArrayList<>() : value;
+        }
+        public String getLogicConflictsState() { return logicConflictsState; }
+        public void setLogicConflictsState(String value) { this.logicConflictsState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getUnderestimatedRisks() { return underestimatedRisks; }
+        public void setUnderestimatedRisks(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.underestimatedRisks = value == null ? new ArrayList<>() : value;
+        }
+        public String getUnderestimatedRisksState() { return underestimatedRisksState; }
+        public void setUnderestimatedRisksState(String value) { this.underestimatedRisksState = value; }
+        public AiRoleResultsPayload.DowngradeSuggestion getDowngradeSuggestion() { return downgradeSuggestion; }
+        public void setDowngradeSuggestion(AiRoleResultsPayload.DowngradeSuggestion value) {
+            this.downgradeSuggestion = value;
+        }
+        public String getReviewResult() { return reviewResult; }
+        public void setReviewResult(String value) { this.reviewResult = value; }
+        public String getFinalDirectionImpact() { return finalDirectionImpact; }
+        public void setFinalDirectionImpact(String value) { this.finalDirectionImpact = value; }
+        public String getConfidenceAdjustment() { return confidenceAdjustment; }
+        public void setConfidenceAdjustment(String value) { this.confidenceAdjustment = value; }
+        public String getRiskAdjustment() { return riskAdjustment; }
+        public void setRiskAdjustment(String value) { this.riskAdjustment = value; }
+        public String getPlanModeAdjustment() { return planModeAdjustment; }
+        public void setPlanModeAdjustment(String value) { this.planModeAdjustment = value; }
+        public String getRecoveryCondition() { return recoveryCondition; }
+        public void setRecoveryCondition(String value) { this.recoveryCondition = value; }
+        public List<AiRoleResultsPayload.FailurePathPayload> getFailurePaths() { return failurePaths; }
+        public void setFailurePaths(List<AiRoleResultsPayload.FailurePathPayload> value) {
+            this.failurePaths = value == null ? new ArrayList<>() : value;
+        }
+        public String getFailurePathState() { return failurePathState; }
+        public void setFailurePathState(String value) { this.failurePathState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getOpposingScenarios() { return opposingScenarios; }
+        public void setOpposingScenarios(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.opposingScenarios = value == null ? new ArrayList<>() : value;
+        }
+        public String getOpposingScenariosState() { return opposingScenariosState; }
+        public void setOpposingScenariosState(String value) { this.opposingScenariosState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getExternalEventRisks() { return externalEventRisks; }
+        public void setExternalEventRisks(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.externalEventRisks = value == null ? new ArrayList<>() : value;
+        }
+        public String getExternalEventRisksState() { return externalEventRisksState; }
+        public void setExternalEventRisksState(String value) { this.externalEventRisksState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getMicrostructureRisks() { return microstructureRisks; }
+        public void setMicrostructureRisks(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.microstructureRisks = value == null ? new ArrayList<>() : value;
+        }
+        public String getMicrostructureRisksState() { return microstructureRisksState; }
+        public void setMicrostructureRisksState(String value) { this.microstructureRisksState = value; }
+        public List<AiRoleResultsPayload.FindingPayload> getWatchIndicators() { return watchIndicators; }
+        public void setWatchIndicators(List<AiRoleResultsPayload.FindingPayload> value) {
+            this.watchIndicators = value == null ? new ArrayList<>() : value;
+        }
+        public String getWatchIndicatorsState() { return watchIndicatorsState; }
+        public void setWatchIndicatorsState(String value) { this.watchIndicatorsState = value; }
+        public String getChallengeSummary() { return challengeSummary; }
+        public void setChallengeSummary(String value) { this.challengeSummary = value; }
+        public String getCurrentDirectionChallenge() { return currentDirectionChallenge; }
+        public void setCurrentDirectionChallenge(String value) { this.currentDirectionChallenge = value; }
+        public Boolean getMajorCounterEvidence() { return majorCounterEvidence; }
+        public void setMajorCounterEvidence(Boolean value) { this.majorCounterEvidence = value; }
+        public String getPlanModeImpact() { return planModeImpact; }
+        public void setPlanModeImpact(String value) { this.planModeImpact = value; }
     }
 
     public static class ConsistencyVO {
+        private String dataState;
+        private String conflictLevel;
+        private String finalMarketBias;
+        private String finalPlanMode;
+        private String mainReason;
+        private String recoveryCondition;
+        @JsonIgnore
         private String level;
+        @JsonIgnore
         private Integer score;
+        @JsonIgnore
         private Boolean confused;
+        @JsonIgnore
         private Boolean aiApplicable;
+        @JsonIgnore
         private Boolean directionalPushBlocked;
+        @JsonIgnore
         private Integer consistencyScore;
+        @JsonIgnore
         private String consistencyLevel;
+        @JsonIgnore
         private String consistencySummary;
+        @JsonIgnore
         private String downgradeReason;
 
         public String getLevel() {
@@ -1519,6 +1755,19 @@ public class DashboardHomeVO {
         public void setDowngradeReason(String downgradeReason) {
             this.downgradeReason = downgradeReason;
         }
+
+        public String getDataState() { return dataState; }
+        public void setDataState(String value) { this.dataState = value; }
+        public String getConflictLevel() { return conflictLevel; }
+        public void setConflictLevel(String value) { this.conflictLevel = value; }
+        public String getFinalMarketBias() { return finalMarketBias; }
+        public void setFinalMarketBias(String value) { this.finalMarketBias = value; }
+        public String getFinalPlanMode() { return finalPlanMode; }
+        public void setFinalPlanMode(String value) { this.finalPlanMode = value; }
+        public String getMainReason() { return mainReason; }
+        public void setMainReason(String value) { this.mainReason = value; }
+        public String getRecoveryCondition() { return recoveryCondition; }
+        public void setRecoveryCondition(String value) { this.recoveryCondition = value; }
     }
 
     public static class PushInboxVO {

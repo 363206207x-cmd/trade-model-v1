@@ -478,7 +478,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setStopLoss(new BigDecimal("99"));
         row.setTakeProfit(new BigDecimal("103"));
         row.setOpenedAt(AS_OF_UTC.minusHours(2));
-        row.setSourceType("MANUAL_POSITION");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(planId));
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);

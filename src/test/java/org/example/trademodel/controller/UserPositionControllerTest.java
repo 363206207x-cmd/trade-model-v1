@@ -66,7 +66,7 @@ class UserPositionControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value("11"))
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
-                .andExpect(jsonPath("$.data.sourceType").value("MANUAL_POSITION"))
+                .andExpect(jsonPath("$.data.sourceType").value("MANUAL_INDEPENDENT"))
                 .andExpect(jsonPath("$.data.manualReviewRequired").value(true))
                 .andExpect(jsonPath("$.data.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.data.notAutoTrading").value(true))
@@ -138,7 +138,7 @@ class UserPositionControllerTest {
     void controllerReturnsBadRequestOnFailClosedValidation() throws Exception {
         when(userPositionService.manualOpenForUser(eq(7L), any()))
                 .thenThrow(new IllegalArgumentException(
-                        "source_type must be MANUAL_POSITION or SYSTEM_PLAN_POSITION"));
+                        "source_type must be MANUAL_INDEPENDENT or SYSTEM_PLAN_POSITION"));
 
         mockMvc.perform(post("/api/user-positions/manual-open")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -167,7 +167,7 @@ class UserPositionControllerTest {
         vo.setQuantity(new BigDecimal("0.25"));
         vo.setLeverage(new BigDecimal("2"));
         vo.setOpenedAt(LocalDateTime.of(2026, 6, 22, 8, 30));
-        vo.setSourceType("MANUAL_POSITION");
+        vo.setSourceType("MANUAL_INDEPENDENT");
         vo.setManualReviewRequired(true);
         vo.setNotTradeInstruction(true);
         vo.setNotAutoTrading(true);

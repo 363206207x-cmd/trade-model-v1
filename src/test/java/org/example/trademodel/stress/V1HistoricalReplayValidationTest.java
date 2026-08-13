@@ -42,6 +42,7 @@ import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.PushRecheckServiceImpl;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.RuleConfigContractService;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.DecisionResultVO;
@@ -488,7 +489,7 @@ class V1HistoricalReplayValidationTest {
         position.setLeverage(decimal("2"));
         position.setStopLoss(decimal(stopLoss));
         position.setTakeProfit(decimal(takeProfit));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setSourceRefId(planId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -497,21 +498,12 @@ class V1HistoricalReplayValidationTest {
     }
 
     private static ExecutionPlanDO monitorPlan(String planId) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId("analysis-" + planId);
-        plan.setExecutionPlanStatus("VALID");
-        plan.setSourceGateStatus("VALID");
-        plan.setSourceGateComplete(true);
+        String analysisId = "analysis-" + planId;
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                planId, analysisId, LocalDateTime.now(ZoneOffset.UTC));
         plan.setEntryZone("95-105");
         plan.setStopLoss("90");
         plan.setTakeProfitRules("120");
-        plan.setManualReviewRequired(true);
-        plan.setNotTradeInstruction(true);
-        plan.setNotExecutable(true);
-        plan.setNotAutoTrading(true);
-        plan.setNotOrderExecution(true);
-        plan.setNotUserPositionCreation(true);
         return plan;
     }
 
@@ -670,7 +662,7 @@ class V1HistoricalReplayValidationTest {
             currentDecision.setSymbol(SYMBOL);
             currentDecision.setTimeframe("5m");
             currentDecision.setMarketBiasHierarchy("STRONG_REVERSAL".equals(point.name())
-                    ? "STRONG_BEARISH" : "RANGE");
+                    ? "STRONG_BEARISH" : "BULLISH");
             currentDecision.setMultiTfConvergence("ALIGNED");
             currentDecision.setDataQualityScore(90);
             currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));

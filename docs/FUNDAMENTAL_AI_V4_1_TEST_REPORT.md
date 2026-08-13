@@ -1,94 +1,111 @@
 # Fundamental AI v4.1 Test Report
 
-Status: `DYNAMIC_ASSET_RANKING_LOCAL_VALIDATION_PASS`
+Status: `FINAL_CONTRACT_REGRESSION_PASS`
 
 ## Full Maven Validation
 
 Command: `./mvnw test -q`
 
-Result:
+Regular isolated result:
 
-- suites: `399`
-- tests: `4404`
-- passed: `4390`
+- tests: `4497`
+- passed: `4483`
 - failures: `0`
 - errors: `0`
 - skipped: `14`
+- suites: `408`
 
-## v4.1 Focused Coverage
+The regular sandbox run conditionally skipped the Docker-backed PostgreSQL
+migration test. That exact test was then run against a fresh controlled
+PostgreSQL instance and replaced one skip with one pass.
 
-The principal new/extended contract suites contain `72` passing tests and no
-failure or skip:
+Final combined Surefire report set:
 
-- AI response/authority/input safety and failure traces: `13`
-- Candidate/Resolver/Final persistence: `4`
-- role-specific AI orchestration: `4`
-- Rule Validation: `5`
-- decision-chain orchestration: `5`
-- persistent Asset Pool: `5`
-- Opportunity priority ranking: `5`
-- market catalog search: `2`
-- conflict resolver: `15`
-- Opportunity state machine: `14`
+- tests: `4497`
+- passed: `4484`
+- failures: `0`
+- errors: `0`
+- skipped: `13`
+- suites: `408`
 
-Additional full-suite coverage verifies Analysis/Evidence/Score/Decision
-integration, mapper dialect variants, Hot Reset canonical transition use,
-manual UserPosition linkage, Review provenance, Dashboard compatibility, and
-legacy behavior.
+## PostgreSQL V12 Migration
 
-## Required Scenario Coverage
+Test: `PostgreSqlFlywayMigrationSmokeTest`
 
-| Requirement | Evidence result |
-|---|---|
-| Asset Pool search/fuzzy/add/remove/restore/scan | `PASS` |
-| Asset Pool is the Opportunity source gate | `PASS` |
-| eight states, transition audit, Cooling recovery | `PASS` |
-| debounce isolation by symbol and timeframe | `PASS` |
-| GPT cannot create Final | `PASS` |
-| Gemini/Grok cannot generate plans | `PASS` |
-| Candidate cannot bypass Rule Validation | `PASS` |
-| Candidate and Final identities differ | `PASS` |
-| Confused produces blocked plan through canonical transition | `PASS` |
-| blocked plan alone does not fabricate Confused | `PASS` |
-| explicit manual/system-plan UserPosition source | `PASS` |
-| system-plan UserPosition requires validated Final | `PASS` |
-| AI success/failure/timeout trace completeness | `PASS` |
-| canonical Conflict Level 1-4 and Plan Mode mapping | `PASS` |
-| no automatic trading capability | `PASS` |
-| ten Asset Pool assets remain fully manageable | `PASS` |
-| Top 6 changes when ranked opportunity inputs change | `PASS` |
-| Home projection never exceeds six assets | `PASS` |
-| removed defaults are not reintroduced | `PASS` |
-| exact Asset Pool + Opportunity + Analysis source is required | `PASS` |
-| only a Rule-validated Final Plan can supply ranking Plan Mode | `PASS` |
-| newer Rule-blocked plan cannot override validated Final Plan Mode | `PASS` |
-| Opportunity Score, confidence, risk, Plan Mode, AI result, and Data Quality affect ordering | `PASS` |
-| Home service consumes ranking order without Asset Pool first-N fallback | `PASS` |
-| Home API serializes ranking identity and provenance | `PASS` |
+Controlled target:
 
-## PostgreSQL V11 Migration
+- PostgreSQL `16.14` in a disposable local container;
+- fixed non-production database `trade_model_v1_test`;
+- migrations validated: `12`;
+- path: empty -> V8 historical fixture -> V9/V10/V11 fixture -> V12;
+- result: tests `1`, passed `1`, failures `0`, errors `0`, skipped `0`;
+- container cleanup: `PASS`.
 
-`PostgreSqlFlywayMigrationSmokeTest` includes V11 coverage for historical state
-normalization, six defaults, new tables/indexes, Candidate -> Resolver -> Final,
-invalid Final rejection, and manual-only UserPosition linkage.
+The real run verified historical UserPosition/Monitor migrations, V11 decision
+chain data, V12 Asset ownership, exact Market Bias and Plan Mode constraints,
+Candidate/Resolver/Final audit text, dynamic ranking reads and Flyway history.
 
-Local controlled result: `PASS` against disposable PostgreSQL `16.14`.
+It also found and drove correction of two PostgreSQL-only migration defects:
 
-- migrations validated: `11`;
-- historical path: empty -> V8 fixture -> V9/V10/V11;
-- V11 historical AssetState timeframe normalization: `PASS`;
-- canonical Conflict Level database constraint: `PASS`;
-- UserPosition source/Final association constraints: `PASS`;
-- dynamic ranking Decision/Score/validated-Final-Plan query: `PASS`;
-- dynamic ranking Opportunity-state query: `PASS`;
-- tests: `1`, failures: `0`, errors: `0`, skipped: `0`.
+1. unmatched historical AssetState rows had null V12 timestamps;
+2. Candidate Plan Mode values were converted before the legacy constraint was
+   removed.
 
-The test was executed through its explicit controlled PostgreSQL target. The
-complete test body ran against a real disposable PostgreSQL 16 database, and
-the container was removed after validation.
+The final clean rerun passed after both fixes.
 
-## Contract Gates
+## Final Contract Coverage
 
-- Product Source Gate: `PASS`.
-- Workflow Contract: `PASS`.
-- Diff whitespace validation: `PASS`.
+| Requirement | Result | Principal suites |
+|---|---|---|
+| Asset Pool search/fuzzy/add/remove/restore/batch/scan | PASS | `PersistentAssetPoolServiceTest` and controller tests |
+| Asset Pool is the sole persistent Opportunity source | PASS | `DecisionChainSourceGateTest`, `AssetPoolBackedUniverseSourceTest` |
+| Search preview isolation and on-demand Three-AI | PASS | pool/controller and decision-chain tests |
+| Dynamic eligible/fresh/configured Top 6 | PASS | `OpportunityPriorityRankingServiceImplTest`, `DashboardHomeServiceImplTest` |
+| Eight Market Bias values | PASS | `MarketBiasPolicyTest`, validator and migration tests |
+| Eight Opportunity states | PASS | `AssetStateServiceImplTest` |
+| Five Plan Modes | PASS | resolver, validator, ranking and migration tests |
+| One canonical state writer, audit, debounce, cooling, precedence | PASS | state service and mapper integration tests |
+| GPT/Gemini/Grok authority isolation | PASS | AI contract and orchestrator tests |
+| Complete structured role semantics | PASS | schema, codec, orchestrator and Dashboard tests |
+| Role and collection state separation | PASS | AI contract/codec tests |
+| Evidence/source anti-hallucination | PASS | orchestrator provenance/state tests |
+| Success/failure/timeout/fallback/cache trace | PASS | orchestrator and call-log tests |
+| Candidate/Final isolation | PASS | persistence and controller source-gate tests |
+| Conflict Level 1-4 and opportunity preservation | PASS | conflict resolver and decision-chain tests |
+| Rule Validation and numeric source gate | PASS | rule validator tests |
+| Push Recheck is not trading permission | PASS | push snapshot/message tests |
+| UserPosition is separate from Plan | PASS | lifecycle, controller and ownership tests |
+| Existing P2 Position Monitoring preserved | PASS | monitor, risk and Dashboard suites |
+| Review responsibility chain and metrics | PASS | review policy/ownership/metrics tests |
+| Common API envelope | PASS | `ApiResponseContractTest` |
+| Zero automatic trading capability | PASS | safety tests and static scan |
+
+## Focused Contract Suites
+
+The final targeted contract run covered AI schema/codec/orchestration,
+Candidate/Resolver/Validation/Final, audit aggregation, Dynamic Top 6, state
+machine, Asset Pool, Review, Position Monitoring and Dashboard contracts and
+completed with exit code `0`.
+
+## Governance Gates
+
+- `bash scripts/product-source-gate.sh`: `PASS`.
+- `bash scripts/check-workflow-contract.sh`: `PASS`,
+  `WORKFLOW_CONTRACT_OK`.
+- `git diff --check`: `PASS`.
+- `bash scripts/v1-state.sh`: diagnostic completed; the dirty candidate branch
+  is correctly not treated as merged-main completion.
+
+## Environment Notes
+
+- External AI live smoke remained disabled; no credentials were read and no
+  provider success was fabricated.
+- Real historical replay without a provider fixture remained explicitly
+  blocked rather than simulated.
+- Controlled PostgreSQL tests use a fixed target and must run in isolated
+  database instances; sharing that target among unrelated controlled suites is
+  intentionally not used as a valid combined test mode.
+
+`TEST_STATUS = PASS`
+
+`READY_FOR_INDEPENDENT_FINAL_REAUDIT`

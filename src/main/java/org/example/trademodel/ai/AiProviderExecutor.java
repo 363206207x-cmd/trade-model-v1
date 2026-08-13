@@ -1,6 +1,7 @@
 package org.example.trademodel.ai;
 
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
@@ -19,8 +20,16 @@ public class AiProviderExecutor {
     public static final int QUEUE_CAPACITY = 3;
 
     private final ThreadPoolExecutor executor;
+    private final int queueCapacity;
 
     public AiProviderExecutor() {
+        this(new AiOrchestratorProperties());
+    }
+
+    @Autowired
+    public AiProviderExecutor(AiOrchestratorProperties properties) {
+        int threadCount = properties == null ? THREAD_COUNT : properties.getMaxConcurrentCalls();
+        this.queueCapacity = properties == null ? QUEUE_CAPACITY : properties.getMaxQueuedCalls();
         AtomicInteger sequence = new AtomicInteger();
         ThreadFactory threadFactory = task -> {
             Thread thread = new Thread(task, "ai-provider-worker-" + sequence.incrementAndGet());
@@ -28,11 +37,11 @@ public class AiProviderExecutor {
             return thread;
         };
         this.executor = new ThreadPoolExecutor(
-                THREAD_COUNT,
-                THREAD_COUNT,
+                threadCount,
+                threadCount,
                 0L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(QUEUE_CAPACITY),
+                new ArrayBlockingQueue<>(queueCapacity),
                 threadFactory,
                 new ThreadPoolExecutor.AbortPolicy());
     }
@@ -60,7 +69,7 @@ public class AiProviderExecutor {
     }
 
     public int getQueueCapacity() {
-        return QUEUE_CAPACITY;
+        return queueCapacity;
     }
 
     public int getQueueSize() {

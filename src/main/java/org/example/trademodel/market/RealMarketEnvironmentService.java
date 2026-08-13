@@ -3,6 +3,9 @@ package org.example.trademodel.market;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +90,16 @@ public class RealMarketEnvironmentService {
             env.setVolatilityRegime(describeVolatilityRegime(rangePct));
         }
         env.setSummary(buildSummary(q, timeframe, rangePct));
+        var metadata = q.metadata();
+        Instant observedAt = metadata != null && metadata.providerDataTime() != null
+                ? metadata.providerDataTime() : q.sourceFetchedAt();
+        env.setSourceProvider(q.sourceProvider());
+        env.setSourceReference(metadata != null && metadata.requestKey() != null
+                ? metadata.requestKey() : q.symbol() + ":24h-ticker");
+        env.setSourceTraceId(metadata == null ? null : metadata.traceId());
+        env.setObservedAt(observedAt == null ? null : LocalDateTime.ofInstant(observedAt, ZoneOffset.UTC));
+        env.setFreshness(metadata != null && metadata.freshnessStatus() != null
+                ? metadata.freshnessStatus().name() : null);
         return env;
     }
 
@@ -155,6 +168,19 @@ public class RealMarketEnvironmentService {
                     AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "market-env-derivatives-" + UUID.randomUUID());
             MinimalDerivativesSnapshot snapshot = result == null ? null : result.payload();
             if (snapshot == null) return;
+            var metadata = snapshot.metadata() != null ? snapshot.metadata()
+                    : result == null ? null : result.metadata();
+            if (metadata != null) {
+                Instant observedAt = metadata.providerDataTime() != null
+                        ? metadata.providerDataTime() : metadata.fetchTime();
+                env.setDerivativesSourceProvider(metadata.provider());
+                env.setDerivativesSourceReference(metadata.requestKey());
+                env.setDerivativesSourceTraceId(metadata.traceId());
+                env.setDerivativesObservedAt(observedAt == null ? null
+                        : LocalDateTime.ofInstant(observedAt, ZoneOffset.UTC));
+                env.setDerivativesFreshness(metadata.freshnessStatus() == null
+                        ? null : metadata.freshnessStatus().name());
+            }
             if (snapshot.lastFundingRate() != null) {
                 env.setLastFundingRate(snapshot.lastFundingRate());
                 env.setSummary((env.getSummary() == null ? "" : env.getSummary())

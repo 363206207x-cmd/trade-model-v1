@@ -148,7 +148,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .content(validManualOpenJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
-                .andExpect(jsonPath("$.data.sourceType").value("MANUAL_POSITION"))
+                .andExpect(jsonPath("$.data.sourceType").value("MANUAL_INDEPENDENT"))
                 .andExpect(jsonPath("$.data.notTradeInstruction").value(true))
                 .andExpect(jsonPath("$.data.notAutoTrading").value(true))
                 .andReturn().getResponse().getContentAsString();
@@ -159,7 +159,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
         UserPositionDO persisted = userPositionMapper.selectByIdAndUserId(id, userAId);
         assertThat(persisted).isNotNull();
         assertThat(persisted.getUserId()).isEqualTo(userAId);
-        assertThat(persisted.getSourceType()).isEqualTo("MANUAL_POSITION");
+        assertThat(persisted.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(persisted.getStatus()).isEqualTo("OPEN");
         assertThat(data.has("userId")).isFalse();
         assertThat(data.has("ownerId")).isFalse();
@@ -478,7 +478,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
             row.setClosePrice(new BigDecimal("110"));
             row.setCloseReason("manual fixture close");
         }
-        row.setSourceType("MANUAL_POSITION");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setSourceRefId(sourceRefId);
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);

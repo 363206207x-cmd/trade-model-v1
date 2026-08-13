@@ -7,6 +7,7 @@ import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiProviderRole;
 import org.example.trademodel.ai.AiReviewStance;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.enums.AiConflictLevelEnum;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.entity.AnalysisRunDO;
@@ -192,6 +193,7 @@ class DecisionEngineServiceTest {
                 ExecutionPlanVO plan = new ExecutionPlanVO();
                 plan.setEntryZone("100-102");
                 plan.setStopLoss("98");
+                plan.setFinalPlan(true);
                 snapshotService.insertAuthoritativeSnapshot(run, analysis, decision, plan, 10L);
             }
         } finally {
@@ -322,7 +324,7 @@ class DecisionEngineServiceTest {
     }
 
     @Test
-    void makeDecision_fourHourAndOneHourConflictBlocksWorthOpening() {
+    void makeDecision_threeAlignedTimeframesMeetTheFrozenConvergenceThreshold() {
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "1h".equals(invocation.getArgument(1))
                         ? bearishKlines()
@@ -331,8 +333,8 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-mtf-conflict", 85, 65);
 
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
-        assertThat(decision.getMultiTfConvergence()).isEqualTo("WEAK");
-        assertThat(decision.getIsWorthOpening()).isFalse();
+        assertThat(decision.getMultiTfConvergence()).isEqualTo("STRONG");
+        assertThat(decision.getIsWorthOpening()).isTrue();
     }
 
     @Test
@@ -349,6 +351,21 @@ class DecisionEngineServiceTest {
                 85, 65, null, null, 100);
 
         assertThat(decision.getConclusionSummary()).contains("八项评分修正 +1");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+    }
+
+    @Test
+    void decisionChainUsesConfiguredCandidatePromotionThresholdWithoutLegacyFallback() {
+        FundamentalAiV41Properties properties = FundamentalAiV41Properties.contractFixture();
+        properties.getOpportunityState().setCandidatePromotionScore(98);
+        properties.validate();
+        service.setFundamentalAiV41Properties(properties);
+
+        DecisionBundleVO decision = service.makeDecisionForDecisionChain(
+                "BTCUSDT", "5m", "analysis-v41-candidate-threshold",
+                85, 65, null, null, 50);
+
+        assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
     }
 

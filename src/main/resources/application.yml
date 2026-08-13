@@ -116,14 +116,12 @@ trade-model:
     venue: BINANCE
     market-type: PERPETUAL
     contract-type: LINEAR
-    symbols: ${TRADE_MODEL_WATCHLIST_SYMBOLS:BTC/USDT,ETH/USDT}
   discovery:
     enabled: ${TRADE_MODEL_DISCOVERY_ENABLED:true}
     max-assets: 20
     venue: BINANCE
     market-type: PERPETUAL
     contract-type: LINEAR
-    symbols: ${TRADE_MODEL_DISCOVERY_SYMBOLS:SOL/USDT,BNB/USDT,XRP/USDT}
   candidate-promotion:
     promotion-confirmation-cycles: 2
     minimum-candidate-hold-seconds: 300
@@ -131,6 +129,51 @@ trade-model:
     promotion-cooldown-seconds: 300
     retrigger-cooldown-seconds: 900
     degradation-confirmation-cycles: 2
+  fundamental-ai-v4-1:
+    ranking:
+      home-capacity: 6
+      freshness-window-seconds: 3600
+      minimum-data-quality: 70
+      opportunity-score-weight: 0.30
+      confidence-weight: 0.15
+      risk-weight: 0.10
+      plan-mode-weight: 0.15
+      data-quality-weight: 0.10
+      freshness-weight: 0.08
+      conflict-weight: 0.07
+      stability-weight: 0.05
+    opportunity-state:
+      minimum-dwell-seconds: 300
+      cooling-seconds: 900
+      candidate-promotion-score: 70
+      confused-enter-threshold: 70
+      directional-push-block-threshold: 85
+    ai-gate:
+      minimum-data-quality: 85
+      circuit-breaker-score: 70
+      minimum-significant-evidence-strength: 60
+      cache-ttl-seconds: 300
+      cache-max-entries: 500
+    multi-timeframe:
+      four-hour-weight: 0.40
+      one-hour-weight: 0.30
+      fifteen-minute-weight: 0.20
+      five-minute-weight: 0.10
+      minimum-aligned-count: 3
+      minimum-aligned-weight: 0.60
+      maximum-trend-score-difference: 15
+    account-risk:
+      low-max-exposure: 0.30
+      medium-max-exposure: 0.20
+      high-max-exposure: 0.10
+      extreme-max-exposure: 0.05
+      max-leverage: 10
+      freshness-seconds: 300
+    execution-feasibility:
+      quote-freshness-seconds: ${TRADE_MODEL_EXECUTION_QUOTE_FRESHNESS_SECONDS:30}
+      max-spread-bps: ${TRADE_MODEL_EXECUTION_MAX_SPREAD_BPS:15}
+      minimum-top-of-book-notional: ${TRADE_MODEL_EXECUTION_MIN_TOP_BOOK_NOTIONAL:10000}
+      max-entry-drift-bps: ${TRADE_MODEL_EXECUTION_MAX_ENTRY_DRIFT_BPS:10}
   instruments:
     mappings:
       - { provider: BINANCE, base-asset: BTC, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: BTCUSDT, source-version: BINANCE_SPOT_V1 }
@@ -185,7 +228,7 @@ trade-model:
     push-recheck:
       enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:true}
     position-sync:
-      enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:true}
+      enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:false}
     position-monitor:
       enabled: ${TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED:false}
       initial-delay-ms: ${TRADE_MODEL_POSITION_MONITOR_INITIAL_DELAY_MS:15000}
@@ -199,6 +242,7 @@ trade-model:
       symbols: ${TRADE_MODEL_OHLCV_INGESTION_SYMBOLS:}
       timeframes: ${TRADE_MODEL_OHLCV_INGESTION_TIMEFRAMES:5m,15m,1h,4h}
       bar-limit: ${TRADE_MODEL_OHLCV_INGESTION_BAR_LIMIT:100}
+      max-symbols: ${TRADE_MODEL_OHLCV_INGESTION_MAX_SYMBOLS:6}
     watchlist:
       enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:true}
   analysis:
@@ -206,8 +250,17 @@ trade-model:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
       initial-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_INITIAL_DELAY_MS:60000}
       fixed-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_FIXED_DELAY_MS:60000}
-      symbols: ${TRADE_MODEL_ANALYSIS_SCHEDULER_SYMBOLS:BTCUSDT}
-      timeframes: ${TRADE_MODEL_ANALYSIS_SCHEDULER_TIMEFRAMES:1m}
+      # Compatibility-only binding. Persistent analysis symbols come from Asset Pool.
+      symbols: ${TRADE_MODEL_ANALYSIS_SCHEDULER_SYMBOLS:}
+      timeframes: ${TRADE_MODEL_ANALYSIS_SCHEDULER_TIMEFRAMES:5m,15m,1h,4h}
+      observing-interval-seconds: ${TRADE_MODEL_ANALYSIS_OBSERVING_INTERVAL_SECONDS:900}
+      candidate-interval-seconds: ${TRADE_MODEL_ANALYSIS_CANDIDATE_INTERVAL_SECONDS:300}
+      waiting-trigger-interval-seconds: ${TRADE_MODEL_ANALYSIS_WAITING_TRIGGER_INTERVAL_SECONDS:120}
+      triggered-interval-seconds: ${TRADE_MODEL_ANALYSIS_TRIGGERED_INTERVAL_SECONDS:60}
+      high-risk-interval-seconds: ${TRADE_MODEL_ANALYSIS_HIGH_RISK_INTERVAL_SECONDS:60}
+      invalidated-interval-seconds: ${TRADE_MODEL_ANALYSIS_INVALIDATED_INTERVAL_SECONDS:900}
+      cooling-interval-seconds: ${TRADE_MODEL_ANALYSIS_COOLING_INTERVAL_SECONDS:900}
+      confused-interval-seconds: ${TRADE_MODEL_ANALYSIS_CONFUSED_INTERVAL_SECONDS:120}
     idempotency:
       lease-seconds: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_LEASE_SECONDS:120}
       max-recovery-attempts: ${TRADE_MODEL_ANALYSIS_IDEMPOTENCY_MAX_RECOVERY_ATTEMPTS:3}
@@ -223,6 +276,9 @@ trade-model:
     overall-timeout-ms: ${TRADE_MODEL_AI_OVERALL_TIMEOUT_MS:8000}
     max-input-chars: ${TRADE_MODEL_AI_MAX_INPUT_CHARS:24000}
     max-output-tokens: ${TRADE_MODEL_AI_MAX_OUTPUT_TOKENS:500}
+    max-concurrent-calls: ${TRADE_MODEL_AI_MAX_CONCURRENT_CALLS:3}
+    max-queued-calls: ${TRADE_MODEL_AI_MAX_QUEUED_CALLS:3}
+    per-asset-role-min-interval-ms: ${TRADE_MODEL_AI_PER_ASSET_ROLE_MIN_INTERVAL_MS:1000}
     provider-timeouts:
       openai-ms: ${TRADE_MODEL_AI_OPENAI_TIMEOUT_MS:10000}
       gemini-ms: ${TRADE_MODEL_AI_GEMINI_TIMEOUT_MS:25000}

@@ -253,7 +253,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (!sourceType.finalPlanRequired()) {
             if (finalPlanId != null) {
                 throw new IllegalArgumentException(
-                        "MANUAL_POSITION must not carry final_plan_id; use SYSTEM_PLAN_POSITION");
+                        "MANUAL_INDEPENDENT must not carry final_plan_id; use SYSTEM_PLAN_POSITION");
             }
             return null;
         }

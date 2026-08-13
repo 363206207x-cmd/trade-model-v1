@@ -12,6 +12,13 @@ public class WriteReviewResultReq {
     private String errorType;
     private String actualOutcome;
     private String adjustmentSuggestion;
+    private String reviewType;
+    private String outcome;
+    private String executionDeviation;
+    private String aiAssessment;
+    private String ruleAssessment;
+    private String ruleFeedback;
+    private String metricsJson;
 
     public String getAnalysisId() {
         return analysisId;
@@ -44,4 +51,19 @@ public class WriteReviewResultReq {
     public void setAdjustmentSuggestion(String adjustmentSuggestion) {
         this.adjustmentSuggestion = adjustmentSuggestion;
     }
+
+    public String getReviewType() { return reviewType; }
+    public void setReviewType(String reviewType) { this.reviewType = reviewType; }
+    public String getOutcome() { return outcome; }
+    public void setOutcome(String outcome) { this.outcome = outcome; }
+    public String getExecutionDeviation() { return executionDeviation; }
+    public void setExecutionDeviation(String executionDeviation) { this.executionDeviation = executionDeviation; }
+    public String getAiAssessment() { return aiAssessment; }
+    public void setAiAssessment(String aiAssessment) { this.aiAssessment = aiAssessment; }
+    public String getRuleAssessment() { return ruleAssessment; }
+    public void setRuleAssessment(String ruleAssessment) { this.ruleAssessment = ruleAssessment; }
+    public String getRuleFeedback() { return ruleFeedback; }
+    public void setRuleFeedback(String ruleFeedback) { this.ruleFeedback = ruleFeedback; }
+    public String getMetricsJson() { return metricsJson; }
+    public void setMetricsJson(String metricsJson) { this.metricsJson = metricsJson; }
 }

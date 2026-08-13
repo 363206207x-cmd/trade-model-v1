@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.service.DashboardReadService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,12 +24,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DashboardOverviewControllerTest {
     @Mock
     private DashboardReadService dashboardReadService;
+    @Mock
+    private AuthenticatedUserIdResolver userIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new DashboardOverviewController(dashboardReadService)).build();
+        lenient().when(userIdResolver.requireCurrentUserId()).thenReturn(7L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new DashboardOverviewController(dashboardReadService, userIdResolver)).build();
     }
 
     @Test
@@ -87,7 +93,7 @@ class DashboardOverviewControllerTest {
 
     @Test
     void traceSummaryRendersPartialTrace() throws Exception {
-        when(dashboardReadService.traceSummary("ana-1", null, null)).thenReturn(Map.of(
+        when(dashboardReadService.traceSummary(7L, "ana-1", null, null)).thenReturn(Map.of(
                 "analysisId", "ana-1",
                 "traceId", "trace-1",
                 "traceStatus", "PARTIAL_TRACE",
@@ -100,12 +106,12 @@ class DashboardOverviewControllerTest {
                 .andExpect(jsonPath("$.data.missingSegments[0]").value("executionPlan"))
                 .andExpect(jsonPath("$.data.notTradeInstruction").value(true));
 
-        verify(dashboardReadService).traceSummary("ana-1", null, null);
+        verify(dashboardReadService).traceSummary(7L, "ana-1", null, null);
     }
 
     @Test
     void traceSummaryReturnsNotFoundWhenTraceDoesNotExist() throws Exception {
-        when(dashboardReadService.traceSummary(null, "missing-trace", null)).thenReturn(Map.of(
+        when(dashboardReadService.traceSummary(7L, null, "missing-trace", null)).thenReturn(Map.of(
                 "traceStatus", "NOT_FOUND",
                 "missingSegments", List.of("analysisRun")));
 
@@ -113,6 +119,6 @@ class DashboardOverviewControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
 
-        verify(dashboardReadService).traceSummary(null, "missing-trace", null);
+        verify(dashboardReadService).traceSummary(7L, null, "missing-trace", null);
     }
 }

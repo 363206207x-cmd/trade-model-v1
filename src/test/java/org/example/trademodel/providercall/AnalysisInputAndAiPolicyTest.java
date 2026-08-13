@@ -45,8 +45,8 @@ class AnalysisInputAndAiPolicyTest {
         String trace = "analysis-trace-1";
         List<OhlcvSnapshotReference> refs = List.of(ref("5m", trace), ref("15m", trace),
                 ref("1h", trace), ref("4h", trace));
-        MarketPriceSnapshot price = new MarketPriceSnapshot("BTCUSDT", new BigDecimal("65000"), null, null, null,
-                null, null, null, "BINANCE_PUBLIC", Instant.now(),
+        MarketPriceSnapshot price = new MarketPriceSnapshot("BTCUSDT", new BigDecimal("65000"), null, null,
+                null, null, null, null, null, null, "BINANCE_PUBLIC", Instant.now(),
                 metadata(ProviderDatasetType.PRICE, "GLOBAL", trace));
         AnalysisInputBundle bundle = new AnalysisInputBundleAssembler(
                 Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneOffset.UTC))

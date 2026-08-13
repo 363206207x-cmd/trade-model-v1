@@ -36,6 +36,11 @@ public interface UserPositionMapper {
             "ORDER BY opened_at DESC, id DESC")
     List<UserPositionDO> listOpenByUserId(@Param("userId") Long userId);
 
+    @Select("SELECT * FROM tm_user_position WHERE user_id = #{userId} AND final_plan_id = #{finalPlanId} " +
+            "ORDER BY opened_at, id")
+    List<UserPositionDO> listByFinalPlanIdAndUserId(@Param("finalPlanId") String finalPlanId,
+                                                    @Param("userId") Long userId);
+
     @Select("SELECT * FROM tm_user_position WHERE id = #{id} AND user_id IS NOT NULL")
     UserPositionDO selectClaimedByIdForSystem(@Param("id") Long id);
 
@@ -46,14 +51,14 @@ public interface UserPositionMapper {
 
     @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id IS NOT NULL " +
-            "AND source_type IN ('MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
+            "AND source_type IN ('MANUAL_INDEPENDENT', 'MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
             "AND source_ref_id = #{sourceRefId} " +
             "ORDER BY opened_at ASC, id ASC")
     List<UserPositionDO> listClaimedByExactSourceRefIdForSystem(@Param("sourceRefId") String sourceRefId);
 
     @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id = #{userId} " +
-            "AND source_type IN ('MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
+            "AND source_type IN ('MANUAL_INDEPENDENT', 'MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
             "AND source_ref_id = #{sourceRefId} " +
             "ORDER BY opened_at ASC, id ASC")
     List<UserPositionDO> listByExactSourceRefIdAndUserId(@Param("sourceRefId") String sourceRefId,
@@ -61,7 +66,7 @@ public interface UserPositionMapper {
 
     @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id = #{userId} AND status = 'CLOSED' " +
-            "AND source_type IN ('MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
+            "AND source_type IN ('MANUAL_INDEPENDENT', 'MANUAL_POSITION', 'SYSTEM_PLAN_POSITION', 'MANUAL') " +
             "ORDER BY closed_at DESC, updated_at DESC, id DESC LIMIT #{limit}")
     List<UserPositionDO> listClosedManualByUserId(@Param("userId") Long userId, @Param("limit") int limit);
 

@@ -35,6 +35,12 @@ class PersistedRealMarketEnvironmentServiceTest {
         assertThat(result.closedBarCount()).isEqualTo(400);
         assertThat(result.sourceTraceRefs()).isNotEmpty();
         assertThat(result.environment().getSummary()).contains("Real persisted OHLCV", "KRAKEN SPOT");
+        assertThat(result.environment().getSourceProvider()).isEqualTo("KRAKEN");
+        assertThat(result.environment().getSourceReference())
+                .startsWith("KRAKEN:BTCUSDT:1h:");
+        assertThat(result.environment().getSourceTraceId()).isNotBlank();
+        assertThat(result.environment().getObservedAt()).isNotNull();
+        assertThat(result.environment().getFreshness()).isEqualTo("FRESH");
     }
 
     @Test

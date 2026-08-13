@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.util.StringJoiner;
 
 import org.example.trademodel.common.EvidenceTypeConstants;
+import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
 import org.example.trademodel.mapper.ScoreItemMapper;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -172,6 +173,7 @@ public class ScoreServiceImpl implements ScoreService {
         eventImpactScore.setWeight(1.0);
         eventImpactScore.setDescription(eventImpactEval.description);
         list.add(eventImpactScore);
+        list.forEach(score -> score.setScoreId(AnalysisPersistenceIds.scoreId()));
         return list;
     }
 

@@ -359,7 +359,9 @@ class Fe04ShellHomeDashboardContractTest {
                         "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true",
                         "data-desktop-ai-role-output hidden",
                         "roleOutput.hidden = !resultAvailable",
-                        "if (!roleObj || roleObj.resultAvailable !== true)")
+                        "if (role.resultAvailable !== true) roleHtml = renderUnavailableAiRole(role)",
+                        "function renderUnavailableAiRole(role)",
+                        "roleMetadata(role)")
                 .doesNotContain("Boolean(tab.resultAvailable)");
     }
 
@@ -384,10 +386,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains(
                         "id=\"homeConsistencyContent\"",
                         "AI 一致性摘要",
-                        "一致性等级",
                         "冲突等级",
-                        "AI 一致性阻断",
-                        "一句话摘要",
                         "GPT_FINAL",
                         "GEMINI_REVIEW",
                         "GROK_CHALLENGE")
@@ -395,20 +394,20 @@ class Fe04ShellHomeDashboardContractTest {
                         "homeConsistencyPanel",
                         "consistency-ring",
                         "一致性评分",
-                        "AI 计划模式");
+                        "投票百分比");
         assertThat(consistencyRenderer)
-                .contains("options.level", "options.conflictLevel", "options.confused", "options.summary")
+                .contains("options.dataState", "options.conflictLevel", "options.finalMarketBias",
+                        "options.finalPlanMode", "options.mainReason", "options.recoveryCondition")
                 .doesNotContain(
                         "actualConsistencyScore",
                         "consistencyScore",
                         "agreementScore",
-                        "finalTendency",
-                        "planMode",
+                        "aiApplicable",
                         "directionalPushBlocked",
                         "downgradeReason");
         assertThat(payloadRenderer)
-                .contains("var c = ai.consistency || {}")
-                .doesNotContain("finalRole", "finalPlanMode", "planMode");
+                .contains("var c = ai.consistency || {}", "finalMarketBias", "finalPlanMode")
+                .doesNotContain("finalRole", "consistencyScore", "consistencyLevel");
     }
 
     @Test

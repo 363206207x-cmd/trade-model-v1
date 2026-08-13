@@ -75,6 +75,17 @@ public class DecisionResult {
     @Column(name = "ai_plan_mode")
     private String aiPlanMode;
 
+    private String ruleMarketBias;
+    private String finalMarketBias;
+    private String ruleConfidence;
+    private String ruleRisk;
+    private String rulePlanMode;
+    private Boolean ruleCanExecute;
+    private String candidatePlanMode;
+    private String finalPlanMode;
+    private String biasAdjustmentReason;
+    private String planModeAdjustmentReason;
+
     @Column(name = "confused_score")
     private Integer confusedScore;
 
@@ -279,6 +290,27 @@ public class DecisionResult {
     public void setAiPlanMode(String aiPlanMode) {
         this.aiPlanMode = aiPlanMode;
     }
+
+    public String getRuleMarketBias() { return ruleMarketBias; }
+    public void setRuleMarketBias(String value) { this.ruleMarketBias = value; }
+    public String getFinalMarketBias() { return finalMarketBias; }
+    public void setFinalMarketBias(String value) { this.finalMarketBias = value; }
+    public String getRuleConfidence() { return ruleConfidence; }
+    public void setRuleConfidence(String value) { this.ruleConfidence = value; }
+    public String getRuleRisk() { return ruleRisk; }
+    public void setRuleRisk(String value) { this.ruleRisk = value; }
+    public String getRulePlanMode() { return rulePlanMode; }
+    public void setRulePlanMode(String value) { this.rulePlanMode = value; }
+    public Boolean getRuleCanExecute() { return ruleCanExecute; }
+    public void setRuleCanExecute(Boolean value) { this.ruleCanExecute = value; }
+    public String getCandidatePlanMode() { return candidatePlanMode; }
+    public void setCandidatePlanMode(String value) { this.candidatePlanMode = value; }
+    public String getFinalPlanMode() { return finalPlanMode; }
+    public void setFinalPlanMode(String value) { this.finalPlanMode = value; }
+    public String getBiasAdjustmentReason() { return biasAdjustmentReason; }
+    public void setBiasAdjustmentReason(String value) { this.biasAdjustmentReason = value; }
+    public String getPlanModeAdjustmentReason() { return planModeAdjustmentReason; }
+    public void setPlanModeAdjustmentReason(String value) { this.planModeAdjustmentReason = value; }
 
     public Integer getConfusedScore() {
         return confusedScore;

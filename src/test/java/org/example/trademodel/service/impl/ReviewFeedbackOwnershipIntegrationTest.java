@@ -7,6 +7,7 @@ import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
+import org.example.trademodel.enums.ReviewTypeEnum;
 import org.example.trademodel.service.ReviewCenterService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.userposition.UserPositionConflictException;
@@ -112,12 +113,66 @@ class ReviewFeedbackOwnershipIntegrationTest {
                 .doesNotContain("suggestion-a-updated", "suggestion-a-2", "shared-only");
     }
 
+    @Test
+    void everyFrozenReviewOutcomePersistsWithoutCollapsingAiRuleOrUserResponsibility() {
+        int index = 0;
+        for (ReviewTypeEnum reviewType : ReviewTypeEnum.values()) {
+            String analysisId = "review-contract-" + index++;
+            WriteReviewResultReq req = new WriteReviewResultReq();
+            req.setAnalysisId(analysisId);
+            req.setReviewType(reviewType.name());
+            req.setOutcome("OUTCOME_" + reviewType.name());
+            req.setExecutionDeviation("USER_EXECUTION_DEVIATION_" + reviewType.name());
+            req.setAiAssessment("AI_RESPONSIBILITY_" + reviewType.name());
+            req.setRuleAssessment("RULE_RESPONSIBILITY_" + reviewType.name());
+            req.setRuleFeedback("RULE_FEEDBACK_" + reviewType.name());
+            req.setMetricsJson(readyMetricsJson());
+
+            reviewService.saveOrUpdate(req);
+
+            assertThat(reviewResultMapper.selectByAnalysisId(analysisId)).satisfies(saved -> {
+                assertThat(saved.getReviewType()).isEqualTo(reviewType.name());
+                assertThat(saved.getOutcome()).isEqualTo("OUTCOME_" + reviewType.name());
+                assertThat(saved.getExecutionDeviation()).contains(reviewType.name());
+                assertThat(saved.getAiAssessment()).contains(reviewType.name());
+                assertThat(saved.getRuleAssessment()).contains(reviewType.name());
+                assertThat(saved.getRuleFeedback()).contains(reviewType.name());
+                assertThat(saved.getMetricsJson())
+                        .contains("structuredOutputCompletenessRate", "fabricatedFillRate");
+            });
+        }
+    }
+
     private ReviewResultDO ownerRow(Long userId, Long positionId) {
         return reviewResultMapper.selectByUserPositionScope(
                 SHARED_ANALYSIS_ID,
                 userId,
                 positionId,
                 "USER:" + userId + ":POSITION:" + positionId);
+    }
+
+    private static String readyMetricsJson() {
+        return """
+                {
+                  "schemaVersion":"FUNDAMENTAL_AI_V4_1_REVIEW_METRICS",
+                  "dataState":"READY",
+                  "evidenceTraceabilityRate":1.0,
+                  "structuredOutputCompletenessRate":{
+                    "byRole":{"GPT_FINAL":1.0,"GEMINI_REVIEW":1.0,"GROK_CHALLENGE":1.0},
+                    "byPlanMode":{"CONFIRMATION":1.0,"REDUCED":1.0,"PREPARATION":1.0,"OBSERVATION":1.0}
+                  },
+                  "unsupportedConclusionRate":0.0,
+                  "fabricatedFillRate":0.0,
+                  "confidenceCalibration":0.95,
+                  "falsePositiveCount":0,
+                  "falseNegativeCount":0,
+                  "missedValidOpportunityCount":0,
+                  "planModeEffectiveness":{"CONFIRMATION":0.9,"REDUCED":0.8,"PREPARATION":0.7,"OBSERVATION":0.6},
+                  "effectiveDowngradeRate":0.8,
+                  "failurePathHitRate":0.5,
+                  "opportunityOmissionQuality":{"MISSED_VALID":0,"PUSHED_NOT_FILLED_VALID":0,"BLOCKED_BY_RISK_VALID":0}
+                }
+                """;
     }
 
     private static WriteReviewResultReq feedback(String outcome, String suggestion) {
@@ -156,7 +211,7 @@ class ReviewFeedbackOwnershipIntegrationTest {
             row.setClosePrice(new BigDecimal("110"));
             row.setCloseReason("manual fixture close");
         }
-        row.setSourceType("MANUAL_POSITION");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

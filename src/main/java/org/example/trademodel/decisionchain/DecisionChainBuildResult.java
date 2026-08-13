@@ -10,5 +10,14 @@ public record DecisionChainBuildResult(
         ExecutionPlanCandidateDO candidate,
         ConflictResolverResultDO conflict,
         RuleValidationResult validation,
-        ExecutionPlanVO finalPlan) {
+        ExecutionPlanVO finalPlan,
+        boolean preview) {
+
+    public DecisionChainBuildResult(OpportunityTransitionResult opportunity,
+                                    ExecutionPlanCandidateDO candidate,
+                                    ConflictResolverResultDO conflict,
+                                    RuleValidationResult validation,
+                                    ExecutionPlanVO finalPlan) {
+        this(opportunity, candidate, conflict, validation, finalPlan, false);
+    }
 }

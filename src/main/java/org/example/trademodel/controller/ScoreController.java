@@ -1,11 +1,8 @@
 package org.example.trademodel.controller;
 
-import java.util.List;
-
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.service.ScoreService;
 import org.example.trademodel.vo.AssetAnalysisVO;
-import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,16 +24,15 @@ public class ScoreController {
     }
 
     @PostMapping("/build")
-    public ApiResponse<List<ScoreItemVO>> buildScore(@RequestBody AssetAnalysisVO request) {
-        List<ScoreItemVO> scores = scoreService.buildScoreListFromEnvironment(request.getMarketEnvironment());
-        return ApiResponse.success(scores);
+    public ApiResponse<java.util.List<ScoreItemVO>> buildScore(@RequestBody AssetAnalysisVO request) {
+        return ApiResponse.conflict(
+                "DIRECT_SCORE_BUILD_DISABLED_USE_ANALYSIS_RUN_DECISION_CHAIN");
     }
 
     @GetMapping("/list")
-    public ApiResponse<List<ScoreItemVO>> getScoreList(@RequestParam String symbol, @RequestParam String timeframe) {
-        MarketEnvironmentVO env = new MarketEnvironmentVO();
-        env.setSummary(symbol + "-" + timeframe);
-        List<ScoreItemVO> scores = scoreService.buildScoreListFromEnvironment(env);
-        return ApiResponse.success(scores);
+    public ApiResponse<java.util.List<ScoreItemVO>> getScoreList(
+            @RequestParam String symbol, @RequestParam String timeframe) {
+        return ApiResponse.conflict(
+                "DIRECT_SCORE_BUILD_DISABLED_USE_ANALYSIS_RUN_DECISION_CHAIN");
     }
 }

@@ -40,7 +40,7 @@ import org.springframework.stereotype.Service;
 public class DecisionServiceImpl implements DecisionService {
     private static final int MAX_DASHBOARD_SUMMARY_LIMIT = 24;
     private static final Set<String> USER_POSITION_SOURCE_TYPES =
-            Set.of("MANUAL", "MANUAL_POSITION", "SYSTEM_PLAN_POSITION");
+            Set.of("MANUAL_INDEPENDENT", "MANUAL", "MANUAL_POSITION", "SYSTEM_PLAN_POSITION");
     private static final String STATUS_OPEN = "OPEN";
     private static final String STATUS_PARTIALLY_CLOSED = "PARTIALLY_CLOSED";
 

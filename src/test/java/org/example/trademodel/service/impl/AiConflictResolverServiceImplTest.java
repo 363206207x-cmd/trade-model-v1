@@ -1,6 +1,7 @@
 package org.example.trademodel.service.impl;
 
 import org.example.trademodel.enums.AiConflictLevelEnum;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.entity.ConflictResolverResultDO;
 import org.example.trademodel.entity.ExecutionPlanCandidateDO;
 import org.example.trademodel.service.AiConflictResult;
@@ -14,7 +15,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AiConflictResolverServiceImplTest {
 
-    private final AiConflictResolverServiceImpl service = new AiConflictResolverServiceImpl();
+    private final AiConflictResolverServiceImpl service = new AiConflictResolverServiceImpl(
+            FundamentalAiV41Properties.contractFixture());
 
     @Test
     void alignedConflictPreservesDirectionAndConfidence() {
@@ -27,7 +29,7 @@ class AiConflictResolverServiceImplTest {
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("HIGH");
         assertThat(result.getRiskAdjustment()).isEqualTo("UNCHANGED");
-        assertThat(result.getPlanMode()).isEqualTo("CONFIRM");
+        assertThat(result.getPlanMode()).isEqualTo("CONFIRMATION");
         assertThat(result.getAiObjectionCount()).isZero();
     }
 
@@ -66,7 +68,7 @@ class AiConflictResolverServiceImplTest {
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getAdjustedConfidence()).isEqualTo("LOW");
         assertThat(result.getRiskAdjustment()).isEqualTo("RAISED");
-        assertThat(result.getPlanMode()).isEqualTo("PREPARE_ONLY");
+        assertThat(result.getPlanMode()).isEqualTo("OBSERVATION");
         assertThat(result.isNotStateMachineOverride()).isTrue();
     }
 
@@ -88,7 +90,7 @@ class AiConflictResolverServiceImplTest {
         assertThat(result.getBaseMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(result.getRiskAdjustment()).isEqualTo("HIGH");
-        assertThat(result.getPlanMode()).isEqualTo("CONFUSED");
+        assertThat(result.getPlanMode()).isEqualTo("BLOCKED");
         assertThat(result.getConfusedContribution()).isGreaterThanOrEqualTo(70);
     }
 
@@ -191,12 +193,17 @@ class AiConflictResolverServiceImplTest {
 
         assertThat(result.getConflictScore()).isZero();
         assertThat(result.getConflictLevel()).isEqualTo("LEVEL_1_CONSISTENT");
-        assertThat(result.getPlanModeAfter()).isEqualTo("CONFIRM");
+        assertThat(result.getPlanModeAfter()).isEqualTo("CONFIRMATION");
         assertThat(result.getConfidenceAfter()).isEqualTo("HIGH");
         assertThat(result.getRiskAfter()).isEqualTo("LOW");
         assertThat(result.getDowngradeReason())
                 .contains("GEMINI_UNAVAILABLE_RULE_FALLBACK", "GROK_UNAVAILABLE_RULE_FALLBACK");
         assertThat(result.getConfusedDecision()).isFalse();
+        assertThat(result.getRulePlanMode()).isEqualTo("CONFIRMATION");
+        assertThat(result.getRuleCanExecute()).isTrue();
+        assertThat(result.getDataQualityScore()).isEqualTo(90);
+        assertThat(result.getConfusedScore()).isEqualTo(10);
+        assertThat(result.getAccountRiskState()).isEqualTo("READY");
     }
 
     @Test
@@ -235,7 +242,9 @@ class AiConflictResolverServiceImplTest {
                 90, 10, "READY");
 
         assertThat(result.getRuleDirection()).isEqualTo("BULLISH");
-        assertThat(result.getRuleVetoReason()).isEqualTo("CANDIDATE_DIRECTION_DIFFERS_FROM_RULE");
+        assertThat(result.getRuleVetoReason()).isEqualTo("CANDIDATE_DIRECTION_CROSSES_RULE_FAMILY");
+        assertThat(result.getBiasAfter()).isEqualTo("BULLISH");
+        assertThat(result.getRuleDirectionPreserved()).isTrue();
         assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
         assertThat(result.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
         assertThat(result.getConfusedDecision()).isTrue();
@@ -252,7 +261,7 @@ class AiConflictResolverServiceImplTest {
                 "{\"fallback\":true}",
                 90, 10, "READY");
 
-        assertThat(result.getPlanModeAfter()).isEqualTo("BLOCKED");
+        assertThat(result.getPlanModeAfter()).isEqualTo("OBSERVATION");
         assertThat(result.getConfusedDecision()).isFalse();
     }
 
@@ -276,10 +285,10 @@ class AiConflictResolverServiceImplTest {
                 "{\"fallback\":true}", 90, 10, "READY");
 
         assertThat(levelTwo.getConflictLevel()).isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
-        assertThat(levelTwo.getPlanModeAfter()).isEqualTo("PREPARE");
+        assertThat(levelTwo.getPlanModeAfter()).isEqualTo("PREPARATION");
         assertThat(levelTwo.getConfusedDecision()).isFalse();
         assertThat(levelThree.getConflictLevel()).isEqualTo("LEVEL_3_SIGNIFICANT_DISAGREEMENT");
-        assertThat(levelThree.getPlanModeAfter()).isEqualTo("REDUCE");
+        assertThat(levelThree.getPlanModeAfter()).isEqualTo("OBSERVATION");
         assertThat(levelThree.getConfusedDecision()).isFalse();
     }
 
@@ -309,7 +318,9 @@ class AiConflictResolverServiceImplTest {
         candidate.setRuleConfidence("HIGH");
         candidate.setRuleRisk("LOW");
         candidate.setCandidateDirection("BULLISH");
-        candidate.setPlanMode("CONFIRM");
+        candidate.setRulePlanMode("CONFIRMATION");
+        candidate.setRuleCanExecute(true);
+        candidate.setPlanMode("CONFIRMATION");
         candidate.setConfidenceLevel("HIGH");
         candidate.setRiskLevel("LOW");
         return candidate;

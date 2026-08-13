@@ -70,7 +70,7 @@ class UserPositionServiceImplTest {
         assertThat(row.getEntryPrice()).isEqualByComparingTo("100.50");
         assertThat(row.getQuantity()).isEqualByComparingTo("0.25");
         assertThat(row.getLeverage()).isEqualByComparingTo("2");
-        assertThat(row.getSourceType()).isEqualTo("MANUAL_POSITION");
+        assertThat(row.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(row.getFinalPlanId()).isNull();
         assertThat(row.getManualReviewRequired()).isTrue();
         assertThat(row.getNotTradeInstruction()).isTrue();
@@ -79,7 +79,7 @@ class UserPositionServiceImplTest {
         assertThat(row.getNotPositionSync()).isTrue();
 
         assertThat(vo.getStatus()).isEqualTo("OPEN");
-        assertThat(vo.getSourceType()).isEqualTo("MANUAL_POSITION");
+        assertThat(vo.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(vo.isManualReviewRequired()).isTrue();
         assertThat(vo.isNotTradeInstruction()).isTrue();
         assertThat(vo.isNotAutoTrading()).isTrue();
@@ -175,13 +175,13 @@ class UserPositionServiceImplTest {
     }
 
     @Test
-    void explicitLegacyManualAliasNormalizesToManualPosition() {
+    void explicitLegacyManualAliasNormalizesToManualIndependent() {
         CreateUserPositionReq request = validOpenRequest();
         request.setSourceType("MANUAL");
 
         UserPositionVO result = service.manualOpenForUser(USER_ID, request);
 
-        assertThat(result.getSourceType()).isEqualTo("MANUAL_POSITION");
+        assertThat(result.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
     }
 
     @Test
@@ -387,7 +387,7 @@ class UserPositionServiceImplTest {
         request.setSourceType(sourceType);
         assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("source_type must be MANUAL_POSITION or SYSTEM_PLAN_POSITION");
+                .hasMessageContaining("source_type must be MANUAL_INDEPENDENT or SYSTEM_PLAN_POSITION");
     }
 
     private static CreateUserPositionReq validOpenRequest() {
@@ -399,7 +399,7 @@ class UserPositionServiceImplTest {
         request.setLeverage(new BigDecimal("2"));
         request.setStopLoss(new BigDecimal("95.00"));
         request.setTakeProfit(new BigDecimal("120.00"));
-        request.setSourceType("MANUAL_POSITION");
+        request.setSourceType("MANUAL_INDEPENDENT");
         request.setSourceRefId("manual-note-1");
         return request;
     }
@@ -422,7 +422,7 @@ class UserPositionServiceImplTest {
         row.setQuantity(new BigDecimal("0.25"));
         row.setLeverage(new BigDecimal("2"));
         row.setOpenedAt(LocalDateTime.of(2026, 6, 22, 8, 30));
-        row.setSourceType("MANUAL_POSITION");
+        row.setSourceType("MANUAL_INDEPENDENT");
         row.setManualReviewRequired(true);
         row.setNotTradeInstruction(true);
         row.setNotAutoTrading(true);

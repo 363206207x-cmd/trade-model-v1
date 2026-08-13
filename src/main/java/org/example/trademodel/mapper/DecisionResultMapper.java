@@ -14,8 +14,8 @@ import java.util.List;
 @Mapper
 public interface DecisionResultMapper {
 
-    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, confused_score, asset_state_snapshot, create_time) " +
-            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
+    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, rule_market_bias, final_market_bias, rule_confidence, rule_risk, rule_plan_mode, rule_can_execute, candidate_plan_mode, final_plan_mode, bias_adjustment_reason, plan_mode_adjustment_reason, confused_score, asset_state_snapshot, create_time) " +
+            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{ruleMarketBias}, #{finalMarketBias}, #{ruleConfidence}, #{ruleRisk}, #{rulePlanMode}, #{ruleCanExecute}, #{candidatePlanMode}, #{finalPlanMode}, #{biasAdjustmentReason}, #{planModeAdjustmentReason}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
     int insert(DecisionResult decision);
 
     @Select("SELECT * FROM tm_decision_result ORDER BY create_time DESC LIMIT #{limit}")
@@ -30,25 +30,28 @@ public interface DecisionResultMapper {
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
             d.valid_from AS validFrom, d.expires_at AS expiresAt,
-            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
+            p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
-            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition)), '') <> '' THEN ' | ' ELSE '' END || COALESCE(COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition), '')), '') AS executionPlanSummary,
+            p.invalid_condition AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
-            p.plan_mode AS planMode,
+            p.final_plan_mode AS planMode,
             p.entry_zone AS entryZone,
             p.stop_loss AS stopLoss,
             p.take_profit_rules AS takeProfitRules,
-            p.leverage_suggestion AS leverageSuggestion,
-            p.position_suggestion AS positionSuggestion,
+            p.leverage_limit AS leverageSuggestion,
+            p.position_limit AS positionSuggestion,
             ar.data_quality_score AS dataQualityScore
             FROM tm_decision_result d
             LEFT JOIN (
-              SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
-                     leverage_suggestion, position_suggestion, invalid_condition,
+              SELECT plan_id, analysis_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
+                     leverage_limit, position_limit, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn
               FROM tm_execution_plan
+              WHERE final_plan = TRUE
+                AND rule_validation_status = 'PASS'
+                AND chain_status = 'FINAL_VALIDATED'
             ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
             LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id
             ORDER BY d.create_time DESC LIMIT #{limit}
@@ -64,25 +67,28 @@ public interface DecisionResultMapper {
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
             d.valid_from AS validFrom, d.expires_at AS expiresAt,
-            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
+            p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
-            NULLIF(TRIM(COALESCE(d.valid_period, '') || CASE WHEN COALESCE(TRIM(d.valid_period), '') <> '' AND COALESCE(TRIM(COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition)), '') <> '' THEN ' | ' ELSE '' END || COALESCE(COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition), '')), '') AS executionPlanSummary,
+            p.invalid_condition AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
-            p.plan_mode AS planMode,
+            p.final_plan_mode AS planMode,
             p.entry_zone AS entryZone,
             p.stop_loss AS stopLoss,
             p.take_profit_rules AS takeProfitRules,
-            p.leverage_suggestion AS leverageSuggestion,
-            p.position_suggestion AS positionSuggestion,
+            p.leverage_limit AS leverageSuggestion,
+            p.position_limit AS positionSuggestion,
             ar.data_quality_score AS dataQualityScore
             FROM tm_decision_result d
             LEFT JOIN (
-              SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
-                     leverage_suggestion, position_suggestion, invalid_condition,
+              SELECT plan_id, analysis_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
+                     leverage_limit, position_limit, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn
               FROM tm_execution_plan
+              WHERE final_plan = TRUE
+                AND rule_validation_status = 'PASS'
+                AND chain_status = 'FINAL_VALIDATED'
             ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
             LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id
             WHERE UPPER(TRIM(d.symbol)) = #{normalizedSymbol}
@@ -93,42 +99,51 @@ public interface DecisionResultMapper {
     @Select({
             "<script>",
             "SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,",
-            "ar.timeframe AS timeframe,",
+            "ar.timeframe AS timeframe, ar.analysis_time AS analysisTime,",
             "d.market_bias_hierarchy AS marketBiasHierarchy, d.trade_type AS tradeType,",
             "d.confidence_level AS confidenceLevel, d.risk_level AS riskLevel, d.action_priority AS actionPriority,",
             "d.conclusion_summary AS conclusionSummary, d.is_worth_opening AS isWorthOpening,",
             "d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,",
             "d.is_adopted AS isAdopted, d.valid_period AS validPeriod,",
             "d.valid_from AS validFrom, d.expires_at AS expiresAt,",
-            "COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,",
+            "p.invalid_condition AS invalidCondition,",
             "d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson,",
             "d.review_reasons AS reviewReasons, d.ai_conflict_level AS aiConflictLevel,",
             "d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,",
             "d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot,",
             "d.create_time AS createTime, p.recommended_action AS recommendedAction,",
-            "p.plan_mode AS planMode, p.entry_zone AS entryZone, p.stop_loss AS stopLoss,",
-            "p.take_profit_rules AS takeProfitRules, p.leverage_suggestion AS leverageSuggestion,",
-            "p.position_suggestion AS positionSuggestion, ar.data_quality_score AS dataQualityScore,",
+            "p.final_plan_mode AS planMode, p.final_market_bias AS finalMarketBias, p.entry_zone AS entryZone, p.stop_loss AS stopLoss,",
+            "p.take_profit_rules AS takeProfitRules, p.leverage_limit AS leverageSuggestion,",
+            "p.position_limit AS positionSuggestion, ar.data_quality_score AS dataQualityScore,",
             "scores.opportunity_score AS opportunityScore",
             "FROM (",
             "  SELECT src.*, ROW_NUMBER() OVER (",
             "    PARTITION BY UPPER(TRIM(src.symbol))",
-            "    ORDER BY src.create_time DESC, src.decision_id DESC",
+            "    ORDER BY owner_run.analysis_time DESC, src.create_time DESC, src.decision_id DESC",
             "  ) AS symbol_rank",
             "  FROM tm_decision_result src",
+            "  INNER JOIN tm_analysis_run owner_run ON owner_run.analysis_id = src.analysis_id",
             "  WHERE UPPER(TRIM(src.symbol)) IN",
             "  <foreach collection='symbols' item='symbol' open='(' separator=',' close=')'>",
             "    #{symbol}",
             "  </foreach>",
+            "  AND ((#{ownerType} = 'SYSTEM' AND owner_run.owner_type = 'SYSTEM' AND owner_run.owner_id = 0)",
+            "    OR (#{ownerType} = 'USER' AND ((owner_run.owner_type = 'USER' AND owner_run.owner_id = #{ownerId})",
+            "      OR (owner_run.owner_type = 'SYSTEM' AND owner_run.owner_id = 0))))",
+            "  AND EXISTS (SELECT 1 FROM tm_execution_plan eligible_plan",
+            "    WHERE eligible_plan.analysis_id = src.analysis_id",
+            "      AND eligible_plan.final_plan = TRUE",
+            "      AND eligible_plan.rule_validation_status = 'PASS'",
+            "      AND eligible_plan.chain_status = 'FINAL_VALIDATED')",
             ") d",
             "LEFT JOIN (",
-            "  SELECT plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss,",
-            "         take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition,",
+            "  SELECT plan_id, analysis_id, final_plan_mode, final_market_bias, recommended_action, entry_zone, stop_loss,",
+            "         take_profit_rules, leverage_limit, position_limit, invalid_condition,",
             "         ROW_NUMBER() OVER (PARTITION BY analysis_id ORDER BY create_time DESC, plan_id DESC) AS rn",
             "  FROM tm_execution_plan",
             "  WHERE final_plan = TRUE",
             "    AND rule_validation_status = 'PASS'",
-            "    AND chain_status IN ('FINAL_VALIDATED', 'RULE_FALLBACK_VALIDATED')",
+            "    AND chain_status = 'FINAL_VALIDATED'",
             ") p ON d.analysis_id = p.analysis_id AND p.rn = 1",
             "LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id",
             "LEFT JOIN (",
@@ -136,11 +151,13 @@ public interface DecisionResultMapper {
             "  FROM tm_score_item GROUP BY analysis_id",
             ") scores ON scores.analysis_id = d.analysis_id",
             "WHERE d.symbol_rank = 1",
-            "ORDER BY d.create_time DESC, d.decision_id DESC",
+            "ORDER BY ar.analysis_time DESC, d.create_time DESC, d.decision_id DESC",
             "</script>"
     })
     List<DecisionResultVO> findLatestDecisionResultsForSymbolsJoined(
-            @Param("symbols") List<String> symbols);
+            @Param("symbols") List<String> symbols,
+            @Param("ownerType") String ownerType,
+            @Param("ownerId") Long ownerId);
 
     @Select("""
             SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,
@@ -151,17 +168,17 @@ public interface DecisionResultMapper {
             d.multi_tf_convergence AS multiTfConvergence, d.ai_role_results AS aiRoleResults,
             d.is_adopted AS isAdopted, d.valid_period AS validPeriod,
             d.valid_from AS validFrom, d.expires_at AS expiresAt,
-            COALESCE(NULLIF(TRIM(p.invalid_condition), ''), d.invalid_condition) AS invalidCondition,
+            p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
             p.recommended_action AS recommendedAction,
-            p.plan_mode AS planMode,
+            p.final_plan_mode AS planMode,
             p.entry_zone AS entryZone,
             p.stop_loss AS stopLoss,
             p.take_profit_rules AS takeProfitRules,
-            p.leverage_suggestion AS leverageSuggestion,
-            p.position_suggestion AS positionSuggestion,
+            p.leverage_limit AS leverageSuggestion,
+            p.position_limit AS positionSuggestion,
             ar.data_quality_score AS dataQualityScore
             FROM tm_decision_result d
             INNER JOIN tm_execution_plan p

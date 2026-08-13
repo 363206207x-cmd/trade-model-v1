@@ -5,11 +5,16 @@ import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
 import org.example.trademodel.dto.assetpool.AssetPoolScanResultDTO;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetPoolItemDO;
+import org.example.trademodel.entity.AssetDO;
+import org.example.trademodel.mapper.AssetMapper;
 import org.example.trademodel.mapper.AssetPoolItemMapper;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -23,6 +28,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +38,8 @@ class PersistentAssetPoolServiceTest {
     @Mock
     private AssetPoolItemMapper mapper;
     @Mock
+    private AssetMapper assetMapper;
+    @Mock
     private MarketAssetCatalog marketAssetCatalog;
     @Mock
     private AnalysisRunOrchestrator analysisRunOrchestrator;
@@ -40,7 +48,7 @@ class PersistentAssetPoolServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PersistentAssetPoolService(mapper, marketAssetCatalog, analysisRunOrchestrator);
+        service = new PersistentAssetPoolService(mapper, assetMapper, marketAssetCatalog, analysisRunOrchestrator);
     }
 
     @Test
@@ -64,6 +72,7 @@ class PersistentAssetPoolServiceTest {
         when(marketAssetCatalog.requireTradable("eth/usdt"))
                 .thenReturn(new MarketAssetDTO("ETHUSDT", "ETH", "USDT", "SPOT"));
         when(mapper.maxUserSortOrder(9L)).thenReturn(20);
+        when(assetMapper.selectBySymbol("ETHUSDT")).thenReturn(asset(101L, "ETHUSDT"));
 
         AssetPoolAssetDTO added = service.addForUser(9L, "eth/usdt", true);
 
@@ -72,6 +81,7 @@ class PersistentAssetPoolServiceTest {
         assertThat(added.symbol()).isEqualTo("ETHUSDT");
         assertThat(writes.getValue().getOwnerType()).isEqualTo("USER");
         assertThat(writes.getValue().getOwnerId()).isEqualTo(9L);
+        assertThat(writes.getValue().getAssetId()).isEqualTo(101L);
         assertThat(writes.getValue().getSourceType()).isEqualTo("USER_ADDED");
         assertThat(writes.getValue().getActive()).isTrue();
 
@@ -83,6 +93,7 @@ class PersistentAssetPoolServiceTest {
         assertThat(removed.getSourceType()).isEqualTo("USER_OVERRIDE");
         assertThat(removed.getActive()).isFalse();
         assertThat(removed.getFocusEnabled()).isFalse();
+        verify(marketAssetCatalog, org.mockito.Mockito.times(1)).requireTradable(any());
 
         when(mapper.listSystemDefaults()).thenReturn(List.of(
                 row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT")));
@@ -93,15 +104,90 @@ class PersistentAssetPoolServiceTest {
     }
 
     @Test
-    void searchAndOpportunityMembershipAreDelegatedToCanonicalSources() {
+    void removalUsesCanonicalAssetAndDoesNotDependOnMarketProviderAvailability() {
+        when(assetMapper.selectBySymbol("ETHUSDT")).thenReturn(asset(101L, "ETHUSDT"));
+        when(mapper.selectByOwnerAndSymbol("USER", 9L, "ETHUSDT")).thenReturn(null);
+        when(mapper.selectByOwnerAndSymbol("SYSTEM", 0L, "ETHUSDT"))
+                .thenReturn(row("SYSTEM", 0L, "ETHUSDT", true, true, 20, "DEFAULT"));
+
+        service.removeForUser(9L, "eth/usdt");
+
+        verifyNoInteractions(marketAssetCatalog);
+        ArgumentCaptor<AssetPoolItemDO> write = ArgumentCaptor.forClass(AssetPoolItemDO.class);
+        verify(mapper).upsert(write.capture());
+        assertThat(write.getValue().getAssetId()).isEqualTo(101L);
+        assertThat(write.getValue().getActive()).isFalse();
+        assertThat(write.getValue().getWatchStatus()).isEqualTo("REMOVED");
+    }
+
+    @Test
+    void searchAndOpportunityMembershipAreScopedToTheEffectiveOwnerPool() {
         when(marketAssetCatalog.search("eth", 25))
                 .thenReturn(List.of(new MarketAssetDTO("ETHUSDT", "ETH", "USDT", "SPOT")));
-        when(mapper.countActiveBySymbol("ETHUSDT")).thenReturn(1);
+        when(mapper.listSystemDefaults()).thenReturn(List.of(
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 10, "DEFAULT")));
+        when(mapper.listUserOverrides(41L)).thenReturn(List.of(
+                row("USER", 41L, "ETHUSDT", false, false, 20, "USER_OVERRIDE")));
+        when(mapper.listUserOverrides(42L)).thenReturn(List.of());
+        when(mapper.listUserOverrides(99L)).thenReturn(List.of());
 
         assertThat(service.searchMarket("eth", 25)).extracting(MarketAssetDTO::symbol)
                 .containsExactly("ETHUSDT");
-        assertThat(service.isOpportunitySource("eth/usdt")).isTrue();
-        assertThat(service.isOpportunitySource("unknownusdt")).isFalse();
+        assertThat(service.isOpportunitySource("SYSTEM", 0L, 10L, "eth/usdt")).isTrue();
+        assertThat(service.isOpportunitySource("USER", 41L, null, "eth/usdt")).isFalse();
+        assertThat(service.isOpportunitySource("USER", 42L, 10L, "eth/usdt")).isTrue();
+        assertThat(service.isOpportunitySource("USER", 42L, 999L, "eth/usdt")).isFalse();
+        assertThat(service.isOpportunitySource("USER", 99L, null, "unknownusdt")).isFalse();
+        assertThat(service.isOpportunitySource("USER", null, null, "eth/usdt")).isFalse();
+    }
+
+    @Test
+    void batchAddRemoveAndSelectedScanUseOnlyExplicitEffectivePoolAssets() {
+        when(marketAssetCatalog.requireTradable("AAVEUSDT"))
+                .thenReturn(new MarketAssetDTO("AAVEUSDT", "AAVE", "USDT", "SPOT"));
+        when(marketAssetCatalog.requireTradable("LINKUSDT"))
+                .thenReturn(new MarketAssetDTO("LINKUSDT", "LINK", "USDT", "SPOT"));
+        when(mapper.maxUserSortOrder(55L)).thenReturn(100, 110, 120, 130);
+        when(assetMapper.selectBySymbol("AAVEUSDT")).thenReturn(asset(201L, "AAVEUSDT"));
+        when(assetMapper.selectBySymbol("LINKUSDT")).thenReturn(asset(202L, "LINKUSDT"));
+
+        List<AssetPoolAssetDTO> added = service.addManyForUser(
+                55L, List.of("aave/usdt", "LINK-USDT", "aave_usdt"), true);
+
+        assertThat(added).extracting(AssetPoolAssetDTO::symbol)
+                .containsExactly("AAVEUSDT", "LINKUSDT");
+        service.removeManyForUser(55L, List.of("aaveusdt", "LINK/USDT"));
+        verify(mapper, org.mockito.Mockito.times(4)).upsert(any());
+
+        when(mapper.listSystemDefaults()).thenReturn(List.of(
+                row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT"),
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 20, "DEFAULT")));
+        when(mapper.listUserOverrides(55L)).thenReturn(List.of(
+                row("USER", 55L, "LINKUSDT", true, true, 120, "USER_ADDED")));
+        when(analysisRunOrchestrator.run(any())).thenAnswer(invocation -> {
+            AnalysisRunCommand command = invocation.getArgument(0);
+            AnalysisRunDO run = new AnalysisRunDO();
+            run.setAnalysisId("analysis-" + command.getSymbol());
+            run.setStatus("SUCCESS");
+            return AnalysisRunResult.executed(run, null, false, false);
+        });
+
+        List<AssetPoolScanResultDTO> results = service.scanSelectedForUser(
+                55L, List.of("linkusdt", "btcusdt"), "1h");
+
+        assertThat(results).extracting(AssetPoolScanResultDTO::symbol)
+                .containsExactly("BTCUSDT", "LINKUSDT");
+        ArgumentCaptor<AnalysisRunCommand> scans = ArgumentCaptor.forClass(AnalysisRunCommand.class);
+        verify(analysisRunOrchestrator, org.mockito.Mockito.times(2)).run(scans.capture());
+        assertThat(scans.getAllValues()).allSatisfy(command -> {
+            assertThat(command.getOwnerType()).isEqualTo("USER");
+            assertThat(command.getOwnerId()).isEqualTo(55L);
+            assertThat(command.getTimeframe()).isEqualTo("1h");
+        });
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        service.scanSelectedForUser(55L, List.of("SOLUSDT"), "1h"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not in the effective Asset Pool");
     }
 
     @Test
@@ -155,6 +241,44 @@ class PersistentAssetPoolServiceTest {
                         "TAOUSDT", "SUIUSDT", "ARBUSDT", "OPUSDT", "NEARUSDT");
     }
 
+    @Test
+    void searchedAssetPreviewRunsThreeAiAnalysisWithoutMutatingPoolOrDecisionOwners() {
+        when(marketAssetCatalog.requireTradable("aave/usdt"))
+                .thenReturn(new MarketAssetDTO("AAVEUSDT", "AAVE", "USDT", "SPOT"));
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId("preview-analysis-1");
+        run.setTraceId("preview-trace-1");
+        run.setStatus("SUCCESS");
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setAiRoleResults("""
+                {"roles":{"GPT_FINAL":{},"GEMINI_REVIEW":{},"GROK_CHALLENGE":{}}}
+                """);
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId("preview-analysis-1");
+        analysis.setDecisionBundle(decision);
+        when(analysisRunOrchestrator.run(any())).thenReturn(AnalysisRunResult.executed(run, analysis, false, false));
+
+        AssetAnalysisPreviewDTO preview = service.analyzePreviewForUser(31L, "aave/usdt", "15m");
+
+        assertThat(preview.previewOnly()).isTrue();
+        assertThat(preview.poolMutationPerformed()).isFalse();
+        assertThat(preview.opportunityPersisted()).isFalse();
+        assertThat(preview.candidatePersisted()).isFalse();
+        assertThat(preview.finalPlanPersisted()).isFalse();
+        assertThat(preview.symbol()).isEqualTo("AAVEUSDT");
+        assertThat(preview.analysisId()).isEqualTo("preview-analysis-1");
+        assertThat(preview.analysis().getDecisionBundle().getAiRoleResults())
+                .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        ArgumentCaptor<AnalysisRunCommand> command = ArgumentCaptor.forClass(AnalysisRunCommand.class);
+        verify(analysisRunOrchestrator).run(command.capture());
+        assertThat(command.getValue().getTriggerType()).isEqualTo(AnalysisRunTriggerType.ANALYSIS_PREVIEW);
+        assertThat(command.getValue().isPreview()).isTrue();
+        assertThat(command.getValue().getOwnerType()).isEqualTo("USER");
+        assertThat(command.getValue().getOwnerId()).isEqualTo(31L);
+        assertThat(command.getValue().getAssetId()).isNull();
+        verifyNoInteractions(mapper);
+    }
+
     private static AssetPoolItemDO row(String ownerType,
                                        Long ownerId,
                                        String symbol,
@@ -164,6 +288,7 @@ class PersistentAssetPoolServiceTest {
                                        String sourceType) {
         AssetPoolItemDO row = new AssetPoolItemDO();
         row.setId((long) sortOrder);
+        row.setAssetId((long) sortOrder);
         row.setOwnerType(ownerType);
         row.setOwnerId(ownerId);
         row.setSymbol(symbol);
@@ -174,6 +299,19 @@ class PersistentAssetPoolServiceTest {
         row.setFocusEnabled(focus);
         row.setSortOrder(sortOrder);
         row.setSourceType(sourceType);
+        row.setWatchStatus(active ? "OBSERVING" : "REMOVED");
+        row.setVersion(1);
+        return row;
+    }
+
+    private static AssetDO asset(Long id, String symbol) {
+        AssetDO row = new AssetDO();
+        row.setId(id);
+        row.setSymbol(symbol);
+        row.setAssetName(symbol.replace("USDT", ""));
+        row.setSource("MARKET_CATALOG");
+        row.setStatus("ACTIVE");
+        row.setVersion(1);
         return row;
     }
 }

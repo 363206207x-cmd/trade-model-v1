@@ -21,10 +21,22 @@ public class AnalysisRunProperties {
         private boolean enabled = false;
         private long initialDelayMs = 60000L;
         private long fixedDelayMs = 60000L;
-        private List<String> symbols = new ArrayList<>(List.of("BTCUSDT"));
-        private List<String> timeframes = new ArrayList<>(List.of("1m"));
+        /**
+         * Legacy configuration surface retained for compatible binding only.
+         * Persistent analysis scheduling is sourced exclusively from Asset Pool.
+         */
+        private List<String> symbols = new ArrayList<>();
+        private List<String> timeframes = new ArrayList<>(List.of("5m", "15m", "1h", "4h"));
         private List<String> requiredMarketTimeframes = new ArrayList<>();
         private int requiredClosedBars;
+        private long observingIntervalSeconds = 900L;
+        private long candidateIntervalSeconds = 300L;
+        private long waitingTriggerIntervalSeconds = 120L;
+        private long triggeredIntervalSeconds = 60L;
+        private long highRiskIntervalSeconds = 60L;
+        private long invalidatedIntervalSeconds = 900L;
+        private long coolingIntervalSeconds = 900L;
+        private long confusedIntervalSeconds = 120L;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -33,9 +45,11 @@ public class AnalysisRunProperties {
         public long getFixedDelayMs() { return fixedDelayMs; }
         public void setFixedDelayMs(long fixedDelayMs) { this.fixedDelayMs = Math.max(1000L, fixedDelayMs); }
         public List<String> getSymbols() { return symbols; }
-        public void setSymbols(List<String> symbols) { this.symbols = normalize(symbols, List.of("BTCUSDT")); }
+        public void setSymbols(List<String> symbols) { this.symbols = normalize(symbols, List.of()); }
         public List<String> getTimeframes() { return timeframes; }
-        public void setTimeframes(List<String> timeframes) { this.timeframes = normalize(timeframes, List.of("1m")); }
+        public void setTimeframes(List<String> timeframes) {
+            this.timeframes = normalize(timeframes, List.of("5m", "15m", "1h", "4h"));
+        }
         public List<String> getRequiredMarketTimeframes() { return requiredMarketTimeframes; }
         public void setRequiredMarketTimeframes(List<String> values) {
             this.requiredMarketTimeframes = normalize(values, List.of());
@@ -43,6 +57,46 @@ public class AnalysisRunProperties {
         public int getRequiredClosedBars() { return requiredClosedBars; }
         public void setRequiredClosedBars(int requiredClosedBars) {
             this.requiredClosedBars = Math.max(0, requiredClosedBars);
+        }
+        public long getObservingIntervalSeconds() { return observingIntervalSeconds; }
+        public void setObservingIntervalSeconds(long value) { this.observingIntervalSeconds = value; }
+        public long getCandidateIntervalSeconds() { return candidateIntervalSeconds; }
+        public void setCandidateIntervalSeconds(long value) { this.candidateIntervalSeconds = value; }
+        public long getWaitingTriggerIntervalSeconds() { return waitingTriggerIntervalSeconds; }
+        public void setWaitingTriggerIntervalSeconds(long value) { this.waitingTriggerIntervalSeconds = value; }
+        public long getTriggeredIntervalSeconds() { return triggeredIntervalSeconds; }
+        public void setTriggeredIntervalSeconds(long value) { this.triggeredIntervalSeconds = value; }
+        public long getHighRiskIntervalSeconds() { return highRiskIntervalSeconds; }
+        public void setHighRiskIntervalSeconds(long value) { this.highRiskIntervalSeconds = value; }
+        public long getInvalidatedIntervalSeconds() { return invalidatedIntervalSeconds; }
+        public void setInvalidatedIntervalSeconds(long value) { this.invalidatedIntervalSeconds = value; }
+        public long getCoolingIntervalSeconds() { return coolingIntervalSeconds; }
+        public void setCoolingIntervalSeconds(long value) { this.coolingIntervalSeconds = value; }
+        public long getConfusedIntervalSeconds() { return confusedIntervalSeconds; }
+        public void setConfusedIntervalSeconds(long value) { this.confusedIntervalSeconds = value; }
+
+        public boolean cadenceConfigured() {
+            return observingIntervalSeconds > 0
+                    && candidateIntervalSeconds > 0
+                    && waitingTriggerIntervalSeconds > 0
+                    && triggeredIntervalSeconds > 0
+                    && highRiskIntervalSeconds > 0
+                    && invalidatedIntervalSeconds > 0
+                    && coolingIntervalSeconds > 0
+                    && confusedIntervalSeconds > 0;
+        }
+
+        public long intervalSeconds(String state) {
+            return switch (state == null ? "OBSERVING" : state.trim().toUpperCase()) {
+                case "CANDIDATE" -> candidateIntervalSeconds;
+                case "WAITING_TRIGGER" -> waitingTriggerIntervalSeconds;
+                case "TRIGGERED" -> triggeredIntervalSeconds;
+                case "HIGH_RISK" -> highRiskIntervalSeconds;
+                case "INVALIDATED" -> invalidatedIntervalSeconds;
+                case "COOLING" -> coolingIntervalSeconds;
+                case "CONFUSED" -> confusedIntervalSeconds;
+                default -> observingIntervalSeconds;
+            };
         }
 
         private static List<String> normalize(List<String> raw, List<String> defaults) {

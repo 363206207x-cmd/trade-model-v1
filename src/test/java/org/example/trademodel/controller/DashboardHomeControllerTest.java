@@ -81,7 +81,7 @@ class DashboardHomeControllerTest {
         ai.setRunStatusLabel("未调用");
         ai.setDecisionModeLabel("仅规则判断");
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
-        consistency.setConsistencyLevel("不适用");
+        consistency.setDataState("SOURCE_UNAVAILABLE");
         ai.setConsistency(consistency);
         home.setAiDecision(ai);
 
@@ -98,7 +98,8 @@ class DashboardHomeControllerTest {
                 .andExpect(jsonPath("$.data.assets[0].marketBiasLabel").value("观望"))
                 .andExpect(jsonPath("$.data.aiDecision.runStatusLabel").value("未调用"))
                 .andExpect(jsonPath("$.data.aiDecision.decisionModeLabel").value("仅规则判断"))
-                .andExpect(jsonPath("$.data.aiDecision.consistency.consistencyLevel").value("不适用"))
+                .andExpect(jsonPath("$.data.aiDecision.consistency.dataState").value("SOURCE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.data.aiDecision.consistency.consistencyLevel").doesNotExist())
                 .andExpect(jsonPath("$.data.executionSuggestion.status").value("DATA_QUALITY_BLOCKED"))
                 .andExpect(jsonPath("$.data.executionSuggestion.entryZone").doesNotExist())
                 .andExpect(jsonPath("$.data.executionSuggestion.stopLoss").doesNotExist())
@@ -114,6 +115,7 @@ class DashboardHomeControllerTest {
         asset.setAssetId(9_007_199_254_740_993L);
         asset.setSymbol("LINK/USDT");
         asset.setRawSymbol("LINKUSDT");
+        asset.setName("Chainlink");
         asset.setAnalysisId("analysis-link-ranked");
         asset.setOpportunityId("opportunity-link-ranked");
         asset.setOpportunityState("CANDIDATE");
@@ -131,6 +133,7 @@ class DashboardHomeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.assets[0].assetId").value("9007199254740993"))
                 .andExpect(jsonPath("$.data.assets[0].symbol").value("LINK/USDT"))
+                .andExpect(jsonPath("$.data.assets[0].name").value("Chainlink"))
                 .andExpect(jsonPath("$.data.assets[0].analysisId").value("analysis-link-ranked"))
                 .andExpect(jsonPath("$.data.assets[0].opportunityId").value("opportunity-link-ranked"))
                 .andExpect(jsonPath("$.data.assets[0].opportunityState").value("CANDIDATE"))

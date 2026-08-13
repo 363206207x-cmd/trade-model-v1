@@ -2,6 +2,8 @@ package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -54,9 +56,10 @@ public class AiRoleResultsCodec {
         for (AiDecisionChainRole role : AiDecisionChainRole.values()) {
             AiDecisionChainResult result = results == null ? null : results.get(role);
             if (result == null) {
-                continue;
+                result = unavailableRoleResult(role);
             }
-            roles.put(role.name(), decisionChainRolePayload(role, result, ruleDirection));
+            roles.put(role.name(), decisionChainRolePayload(
+                    role, result, ruleDirection, analysisId, traceId));
         }
         List<String> reasons = roles.values().stream()
                 .filter(role -> Boolean.TRUE.equals(role.fallback()))
@@ -67,7 +70,7 @@ public class AiRoleResultsCodec {
                 .limit(8)
                 .toList();
         AiRoleResultsPayload payload = new AiRoleResultsPayload(
-                AiRoleResultsPayload.AI_ROLE_RESULTS_SCHEMA_V1,
+                AiRoleResultsPayload.CURRENT_SCHEMA_VERSION,
                 sanitize(analysisId, 128),
                 sanitize(traceId, 128),
                 "v4.1",
@@ -83,6 +86,18 @@ public class AiRoleResultsCodec {
         }
     }
 
+    private static AiDecisionChainResult unavailableRoleResult(AiDecisionChainRole role) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(
+                switch (role) {
+                    case GPT_FINAL -> AiProviderName.OPENAI;
+                    case GEMINI_REVIEW -> AiProviderName.GEMINI;
+                    case GROK_CHALLENGE -> AiProviderName.XAI;
+                }, role, AiProviderCallStatus.FAILED, "ROLE_RESULT_UNAVAILABLE");
+        result.setRoleState(AiRoleState.UNAVAILABLE);
+        result.setDataState(AiRoleDataState.SOURCE_UNAVAILABLE);
+        return result;
+    }
+
     public ParseResult parse(String raw) {
         if (raw == null || raw.isBlank()) {
             return new ParseResult(ParseStatus.EMPTY, null);
@@ -96,7 +111,9 @@ public class AiRoleResultsCodec {
             if (root == null || !root.isObject()) {
                 return new ParseResult(ParseStatus.MALFORMED, null);
             }
-            if (!AiRoleResultsPayload.AI_ROLE_RESULTS_SCHEMA_V1.equals(root.path("schemaVersion").asText(null))) {
+            String schemaVersion = root.path("schemaVersion").asText(null);
+            if (!AiRoleResultsPayload.AI_ROLE_RESULTS_SCHEMA_V1.equals(schemaVersion)
+                    && !AiRoleResultsPayload.AI_ROLE_RESULTS_SCHEMA_V2.equals(schemaVersion)) {
                 return new ParseResult(ParseStatus.UNSUPPORTED_SCHEMA, null);
             }
             JsonNode roles = root.get("roles");
@@ -108,6 +125,14 @@ public class AiRoleResultsCodec {
                 JsonNode roleNode = roles.get(role);
                 if (!ROLE_KEYS.contains(role) || !roleNode.isObject()
                         || !role.equals(roleNode.path("role").asText(null))) {
+                    return new ParseResult(ParseStatus.MALFORMED, null);
+                }
+                if (AiRoleResultsPayload.AI_ROLE_RESULTS_SCHEMA_V2.equals(schemaVersion)
+                        && (!roleNode.hasNonNull("analysisId")
+                        || !roleNode.hasNonNull("traceId")
+                        || !roleNode.hasNonNull("roleState")
+                        || !roleNode.hasNonNull("dataState")
+                        || !roleNode.hasNonNull("generatedAt"))) {
                     return new ParseResult(ParseStatus.MALFORMED, null);
                 }
             }
@@ -146,38 +171,118 @@ public class AiRoleResultsCodec {
 
     private AiRoleResultsPayload.RolePayload decisionChainRolePayload(AiDecisionChainRole role,
                                                                       AiDecisionChainResult result,
-                                                                      String ruleDirection) {
+                                                                      String ruleDirection,
+                                                                      String analysisId,
+                                                                      String traceId) {
         JsonNode payload = parsePayload(result.getPayloadJson());
         String stance = switch (role) {
-            case GPT_FINAL -> sameDirection(ruleDirection, payload.path("direction").asText(null))
+            case GPT_FINAL -> sameBiasFamily(ruleDirection,
+                    payload.path("biasAdjustment").path("after").asText(
+                            payload.path("coreJudgment").path("marketBias").asText(null)))
                     ? "SUPPORT" : "CHALLENGE";
-            case GEMINI_REVIEW -> "APPROVE".equalsIgnoreCase(payload.path("verdict").asText())
+            case GEMINI_REVIEW -> "APPROVE".equalsIgnoreCase(payload.path("reviewResult").asText())
                     ? "SUPPORT" : "CHALLENGE";
             case GROK_CHALLENGE -> payload.path("majorCounterEvidence").asBoolean(false)
-                    || !"NONE".equalsIgnoreCase(payload.path("challengeLevel").asText("NONE"))
+                    || !"LEVEL_1_CONSISTENT".equalsIgnoreCase(
+                            payload.path("conflictLevel").asText("LEVEL_1_CONSISTENT"))
                     ? "CHALLENGE" : "ABSTAIN";
         };
         String conflictLevel = switch (role) {
             case GPT_FINAL -> "NONE";
             case GEMINI_REVIEW -> payload.path("conflictLevel").asText(null);
-            case GROK_CHALLENGE -> payload.path("challengeLevel").asText(null);
+            case GROK_CHALLENGE -> payload.path("conflictLevel").asText(null);
         };
-        List<String> reasonCodes = payload.has("reasons") && payload.path("reasons").isArray()
-                ? objectMapper.convertValue(payload.path("reasons"),
-                objectMapper.getTypeFactory().constructCollectionType(List.class, String.class))
-                : List.of();
-        return new AiRoleResultsPayload.RolePayload(
-                role.name(),
-                result.getProvider() == null ? null : result.getProvider().name(),
-                role.name(),
-                result.getCallStatus() == null ? null : result.getCallStatus().name(),
-                result.successful() ? stance : null,
-                result.successful() ? sanitize(conflictLevel, 64) : null,
-                sanitizeReasonCodes(reasonCodes),
-                result.successful() ? sanitize(payload.path("summary").asText(null), 512) : null,
-                result.isFallback() ? Boolean.TRUE : null,
-                sanitize(result.getFallbackReason(), 128),
-                Boolean.TRUE);
+        ObjectNode rolePayload = result.successful() && payload.isObject()
+                ? ((ObjectNode) payload).deepCopy()
+                : objectMapper.createObjectNode();
+        if (!result.successful()) initializeEmptyCollections(role, rolePayload, collectionStateFor(result));
+        rolePayload.put("role", role.name());
+        if (result.getProvider() != null) rolePayload.put("provider", result.getProvider().name());
+        rolePayload.put("sourceRole", role.name());
+        if (result.getCallStatus() != null) rolePayload.put("callStatus", result.getCallStatus().name());
+        rolePayload.put("analysisId", sanitize(defaultText(result.getAnalysisId(), analysisId), 128));
+        rolePayload.put("traceId", sanitize(defaultText(result.getTraceId(), traceId), 128));
+        rolePayload.put("roleState", enumName(defaultRoleState(result)));
+        rolePayload.put("dataState", enumName(defaultDataState(result)));
+        rolePayload.put("generatedAt", result.getGeneratedAt() == null
+                ? java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
+                : result.getGeneratedAt().toString());
+        if (result.successful()) rolePayload.put("stance", stance);
+        if (result.successful() && conflictLevel != null) rolePayload.put("conflictLevel", sanitize(conflictLevel, 64));
+        rolePayload.set("reasonCodes", objectMapper.valueToTree(List.of()));
+        String summary = structuredSummary(role, payload);
+        if (summary != null) rolePayload.put("summary", sanitize(summary, 512));
+        if (result.isFallback()) rolePayload.put("fallback", true);
+        String fallbackReason = sanitize(result.getFallbackReason(), 128);
+        if (fallbackReason != null) rolePayload.put("fallbackReason", fallbackReason);
+        rolePayload.put("manualReviewRequired", true);
+        try {
+            return objectMapper.treeToValue(rolePayload, AiRoleResultsPayload.RolePayload.class);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Decision-chain role payload mapping failed", exception);
+        }
+    }
+
+    private void initializeEmptyCollections(AiDecisionChainRole role,
+                                            ObjectNode payload,
+                                            String collectionState) {
+        switch (role) {
+            case GPT_FINAL -> {
+                emptyCollection(payload, "supportingEvidence", "supportingEvidenceState", collectionState);
+                emptyCollection(payload, "opposingEvidence", "opposingEvidenceState", collectionState);
+            }
+            case GEMINI_REVIEW -> {
+                emptyCollection(payload, "evidenceGaps", "evidenceGapsState", collectionState);
+                emptyCollection(payload, "logicConflicts", "logicConflictsState", collectionState);
+                emptyCollection(payload, "underestimatedRisks", "underestimatedRisksState", collectionState);
+            }
+            case GROK_CHALLENGE -> {
+                emptyCollection(payload, "failurePaths", "failurePathState", collectionState);
+                emptyCollection(payload, "opposingScenarios", "opposingScenariosState", collectionState);
+                emptyCollection(payload, "externalEventRisks", "externalEventRisksState", collectionState);
+                emptyCollection(payload, "microstructureRisks", "microstructureRisksState", collectionState);
+                emptyCollection(payload, "watchIndicators", "watchIndicatorsState", collectionState);
+            }
+        }
+    }
+
+    private void emptyCollection(ObjectNode payload, String collection, String state, String value) {
+        ArrayNode empty = objectMapper.createArrayNode();
+        payload.set(collection, empty);
+        payload.put(state, value);
+    }
+
+    private static String collectionStateFor(AiDecisionChainResult result) {
+        if (result != null && result.getDataState() == AiRoleDataState.STALE) return AiCollectionState.STALE.name();
+        if (result != null && result.getDataState() == AiRoleDataState.INSUFFICIENT_DATA) {
+            return AiCollectionState.INSUFFICIENT_DATA.name();
+        }
+        return AiCollectionState.SOURCE_UNAVAILABLE.name();
+    }
+
+    private static String structuredSummary(AiDecisionChainRole role, JsonNode payload) {
+        return switch (role) {
+            case GPT_FINAL -> payload.path("candidateSummary").path("summary").asText(null);
+            case GEMINI_REVIEW -> payload.path("downgradeSuggestion").path("reason").asText(null);
+            case GROK_CHALLENGE -> payload.path("challengeSummary").asText(null);
+        };
+    }
+
+    private static AiRoleState defaultRoleState(AiDecisionChainResult result) {
+        if (result.getRoleState() != null) return result.getRoleState();
+        if (result.successful()) return AiRoleState.READY;
+        return result.isFallback() ? AiRoleState.FALLBACK : AiRoleState.ERROR;
+    }
+
+    private static AiRoleDataState defaultDataState(AiDecisionChainResult result) {
+        if (result.getDataState() != null) return result.getDataState();
+        if (result.successful()) return AiRoleDataState.READY;
+        if (result.getCallStatus() == AiProviderCallStatus.TIMEOUT) return AiRoleDataState.AI_TIMEOUT;
+        return AiRoleDataState.AI_FAILED;
+    }
+
+    private static String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private JsonNode parsePayload(String raw) {
@@ -189,11 +294,17 @@ public class AiRoleResultsCodec {
         }
     }
 
-    private static boolean sameDirection(String left, String right) {
+    private static boolean sameBiasFamily(String left, String right) {
         if (left == null || right == null) {
             return false;
         }
-        return left.trim().equalsIgnoreCase(right.trim());
+        String before = left.trim().toUpperCase(Locale.ROOT);
+        String after = right.trim().toUpperCase(Locale.ROOT);
+        if (before.equals(after)) return true;
+        if ("WAIT".equals(before) || "WAIT".equals(after)) return false;
+        return (before.contains("BULLISH") && after.contains("BULLISH"))
+                || (before.contains("BEARISH") && after.contains("BEARISH"))
+                || ("RANGE".equals(before) && "RANGE".equals(after));
     }
 
     private AiRoleResultsPayload.SynthesisPayload sanitizeSynthesis(
@@ -205,6 +316,7 @@ public class AiRoleResultsCodec {
                 sanitize(source.finalMarketBias(), 64),
                 sanitize(source.finalConfidence(), 64),
                 sanitize(source.finalRiskLevel(), 64),
+                sanitize(source.finalPlanMode(), 64),
                 source.worthOpening(),
                 sanitize(source.conflictLevel(), 64),
                 source.conflictScore(),
@@ -212,7 +324,9 @@ public class AiRoleResultsCodec {
                 sanitize(source.riskAdjustment(), 64),
                 sanitize(source.planModeAdjustment(), 64),
                 source.confused(),
-                sanitize(source.downgradeReason(), 256));
+                sanitize(source.downgradeReason(), 256),
+                sanitize(source.mainReason(), 256),
+                sanitize(source.recoveryCondition(), 512));
     }
 
     private List<String> sanitizeReasonCodes(List<String> reasonCodes) {

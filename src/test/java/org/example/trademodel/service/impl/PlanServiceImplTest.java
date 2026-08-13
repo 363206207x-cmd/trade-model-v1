@@ -23,6 +23,36 @@ class PlanServiceImplTest {
     private final PlanServiceImpl service = new PlanServiceImpl();
 
     @Test
+    void buildRuleExecutionAssessmentNeverCreatesDetailedCandidateOrFinalFields() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setIsWorthOpening(true);
+        SourceTraceBoundaryProducerResult boundary = readyBoundaryOnlyResult();
+        boundary.setSourceTrace(validSourceTrace());
+        boundary.setSourceTraceReady(true);
+        boundary.setMissingFields(List.of());
+        boundary.setBlockingReasons(List.of());
+
+        ExecutionPlanVO assessment = service.buildRuleExecutionAssessment(decision, boundary);
+
+        assertThat(assessment.getChainStatus()).isEqualTo("RULE_BASE_ASSESSMENT");
+        assertThat(assessment.getFinalPlan()).isFalse();
+        assertThat(assessment.getSourceGateStatus()).isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID);
+        assertThat(assessment.getSourceGateComplete()).isTrue();
+        assertThat(assessment.getExecutionPlanStatus())
+                .isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        assertThat(assessment.getRecommendedAction()).isNull();
+        assertThat(assessment.getEntryZone()).isNull();
+        assertThat(assessment.getStopLoss()).isNull();
+        assertThat(assessment.getTakeProfitRules()).isNull();
+        assertThat(assessment.getLeverageSuggestion()).isNull();
+        assertThat(assessment.getPositionSuggestion()).isNull();
+        assertThat(assessment.getInvalidCondition()).isNull();
+        assertThat(assessment.getNotAutoTrading()).isTrue();
+        assertThat(assessment.getNotOrderExecution()).isTrue();
+        assertThat(assessment.getNotUserPositionCreation()).isTrue();
+    }
+
+    @Test
     void generateExecutionPlan_setsPlanModeNonNullAndWithinAllowedValues() {
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setIsWorthOpening(false);

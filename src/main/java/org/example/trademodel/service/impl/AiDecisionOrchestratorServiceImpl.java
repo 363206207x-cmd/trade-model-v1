@@ -65,7 +65,7 @@ public class AiDecisionOrchestratorServiceImpl implements AiDecisionOrchestrator
                                       CompletionWaiter completionWaiter) {
         this.providerClients = providerClients == null ? List.of() : providerClients.stream()
                 .sorted(Comparator.comparingInt(client -> roleOrder(client.role())))
-                .limit(AiProviderExecutor.THREAD_COUNT)
+                .limit(providerExecutor.getMaximumPoolSize())
                 .toList();
         this.usageGuard = usageGuard;
         this.callLogService = callLogService;

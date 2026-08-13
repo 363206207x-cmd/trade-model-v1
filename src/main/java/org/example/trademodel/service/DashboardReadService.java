@@ -9,5 +9,5 @@ public interface DashboardReadService {
 
     Map<String, Object> schedulerStatus();
 
-    Map<String, Object> traceSummary(String analysisId, String traceId, String requestId);
+    Map<String, Object> traceSummary(Long userId, String analysisId, String traceId, String requestId);
 }

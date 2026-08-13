@@ -49,6 +49,17 @@ public class AssetStateDO {
     private LocalDateTime lastUpdateTime = LocalDateTime.now();
 
     private String traceId;
+    private String ownerType = "SYSTEM";
+    private Long ownerId = 0L;
+    private Long assetId;
+    private Long poolItemId;
+    private Integer opportunityScore;
+    private String confidence;
+    private String risk;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String ruleVersion;
+    private String extJson;
 
     public Long getId() {
         return id;
@@ -169,4 +180,26 @@ public class AssetStateDO {
     public void setTraceId(String traceId) {
         this.traceId = traceId;
     }
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public Long getAssetId() { return assetId; }
+    public void setAssetId(Long assetId) { this.assetId = assetId; }
+    public Long getPoolItemId() { return poolItemId; }
+    public void setPoolItemId(Long poolItemId) { this.poolItemId = poolItemId; }
+    public Integer getOpportunityScore() { return opportunityScore; }
+    public void setOpportunityScore(Integer opportunityScore) { this.opportunityScore = opportunityScore; }
+    public String getConfidence() { return confidence; }
+    public void setConfidence(String confidence) { this.confidence = confidence; }
+    public String getRisk() { return risk; }
+    public void setRisk(String risk) { this.risk = risk; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getRuleVersion() { return ruleVersion; }
+    public void setRuleVersion(String ruleVersion) { this.ruleVersion = ruleVersion; }
+    public String getExtJson() { return extJson; }
+    public void setExtJson(String extJson) { this.extJson = extJson; }
 }

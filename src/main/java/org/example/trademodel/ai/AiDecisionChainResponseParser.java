@@ -3,7 +3,9 @@ package org.example.trademodel.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class AiDecisionChainResponseParser {
@@ -12,7 +14,7 @@ public class AiDecisionChainResponseParser {
     static final int MAX_REASON_COUNT = 8;
 
     private static final Set<String> FORBIDDEN_FIELDS = Set.of(
-            "finalExecutionPlan", "finalPlan", "opportunityState", "stateMachineState",
+            "finalExecutionPlan", "finalPlan", "stateMachineState",
             "userPosition", "order", "orderAction", "autoTrade", "autoClose", "autoReverse");
 
     private final ObjectMapper objectMapper;
@@ -35,19 +37,10 @@ public class AiDecisionChainResponseParser {
         try {
             JsonNode root = objectMapper.readTree(unwrapJson(content));
             if (root == null || !root.isObject()) return invalid(result, "INVALID_RESPONSE_NOT_OBJECT");
-            Set<String> allowed = AiDecisionChainSchema.fields(role);
-            for (var fields = root.fieldNames(); fields.hasNext(); ) {
-                String field = fields.next();
-                if (!allowed.contains(field)) return invalid(result, "INVALID_UNKNOWN_FIELD_" + code(field));
-            }
             String forbidden = findForbidden(root);
             if (forbidden != null) return invalid(result, "INVALID_FORBIDDEN_FIELD_" + code(forbidden));
-            for (String required : AiDecisionChainSchema.requiredFields(role)) {
-                if (!root.has(required) || root.get(required).isNull()) {
-                    return invalid(result, "INVALID_MISSING_FIELD_" + code(required));
-                }
-            }
-            String valueError = validateValues(role, root);
+            String valueError = validateSchema(root, AiDecisionChainSchema.responseJsonSchema(role), "");
+            if (valueError == null) valueError = validateCollectionStates(role, root);
             if (valueError != null) return invalid(result, valueError);
             result.setCallStatus(AiProviderCallStatus.SUCCESS);
             String payloadJson = objectMapper.writeValueAsString(root);
@@ -59,36 +52,117 @@ public class AiDecisionChainResponseParser {
         }
     }
 
-    private static String validateValues(AiDecisionChainRole role, JsonNode root) {
-        for (String field : AiDecisionChainSchema.fields(role)) {
-            JsonNode value = root.get(field);
-            if ("worthOpening".equals(field) || "majorCounterEvidence".equals(field)) {
-                if (!value.isBoolean()) return "INVALID_FIELD_TYPE_" + code(field);
-            } else if ("reasons".equals(field)) {
-                if (!value.isArray()) return "INVALID_FIELD_TYPE_" + code(field);
-                if (value.size() > MAX_REASON_COUNT) return "INVALID_FIELD_SIZE_" + code(field);
-                for (JsonNode reason : value) {
-                    if (!reason.isTextual() || reason.asText().isBlank()) {
-                        return "INVALID_FIELD_VALUE_" + code(field);
-                    }
-                    if (reason.asText().length() > MAX_TEXT_CHARS) {
-                        return "INVALID_FIELD_SIZE_" + code(field);
-                    }
-                }
-            } else if (!value.isTextual()) {
-                return "INVALID_FIELD_TYPE_" + code(field);
-            } else if (value.asText().isBlank()) {
-                return "INVALID_FIELD_VALUE_" + code(field);
-            } else if (value.asText().length() > MAX_TEXT_CHARS) {
-                return "INVALID_FIELD_SIZE_" + code(field);
-            } else {
-                Set<String> allowed = AiDecisionChainSchema.allowedValues(role, field);
-                if (!allowed.isEmpty() && !allowed.contains(value.asText().trim().toUpperCase(Locale.ROOT))) {
-                    return "INVALID_FIELD_VALUE_" + code(field);
+    @SuppressWarnings("unchecked")
+    private static String validateSchema(JsonNode value, Map<String, Object> schema, String path) {
+        String type = String.valueOf(schema.get("type"));
+        String fieldCode = code(path.isBlank() ? "ROOT" : path);
+        if ("object".equals(type)) {
+            if (!value.isObject()) return "INVALID_FIELD_TYPE_" + fieldCode;
+            Map<String, Object> properties = (Map<String, Object>) schema.getOrDefault("properties", Map.of());
+            if (Boolean.FALSE.equals(schema.get("additionalProperties"))) {
+                for (var fields = value.fieldNames(); fields.hasNext(); ) {
+                    String field = fields.next();
+                    if (!properties.containsKey(field)) return "INVALID_UNKNOWN_FIELD_" + code(join(path, field));
                 }
             }
+            List<String> required = (List<String>) schema.getOrDefault("required", List.of());
+            for (String requiredField : required) {
+                if (!value.has(requiredField) || value.get(requiredField).isNull()) {
+                    return "INVALID_MISSING_FIELD_" + code(join(path, requiredField));
+                }
+            }
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                if (value.has(entry.getKey()) && !value.get(entry.getKey()).isNull()) {
+                    String nested = validateSchema(value.get(entry.getKey()),
+                            (Map<String, Object>) entry.getValue(), join(path, entry.getKey()));
+                    if (nested != null) return nested;
+                }
+            }
+            return null;
+        }
+        if ("array".equals(type)) {
+            if (!value.isArray()) return "INVALID_FIELD_TYPE_" + fieldCode;
+            int maxItems = ((Number) schema.getOrDefault("maxItems", MAX_REASON_COUNT)).intValue();
+            int minItems = ((Number) schema.getOrDefault("minItems", 0)).intValue();
+            if (value.size() < minItems) return "INVALID_FIELD_SIZE_" + fieldCode;
+            if (value.size() > maxItems) return "INVALID_FIELD_SIZE_" + fieldCode;
+            Map<String, Object> items = (Map<String, Object>) schema.get("items");
+            for (int index = 0; index < value.size(); index++) {
+                String nested = validateSchema(value.get(index), items, path + "[" + index + "]");
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+        if ("string".equals(type)) {
+            if (!value.isTextual()) return "INVALID_FIELD_TYPE_" + fieldCode;
+            String text = value.asText();
+            if (text.isBlank()) return "INVALID_FIELD_VALUE_" + fieldCode;
+            int maxLength = ((Number) schema.getOrDefault("maxLength", MAX_TEXT_CHARS)).intValue();
+            if (text.length() > maxLength) return "INVALID_FIELD_SIZE_" + fieldCode;
+            if (schema.get("enum") instanceof List<?> allowed
+                    && allowed.stream().map(String::valueOf).noneMatch(item -> item.equalsIgnoreCase(text.trim()))) {
+                return "INVALID_FIELD_VALUE_" + fieldCode;
+            }
+            return null;
+        }
+        if ("boolean".equals(type)) {
+            return value.isBoolean() ? null : "INVALID_FIELD_TYPE_" + fieldCode;
+        }
+        if ("number".equals(type)) {
+            if (!value.isNumber()) return "INVALID_FIELD_TYPE_" + fieldCode;
+            double number = value.asDouble();
+            if (schema.get("minimum") instanceof Number minimum && number < minimum.doubleValue()) {
+                return "INVALID_FIELD_VALUE_" + fieldCode;
+            }
+            if (schema.get("maximum") instanceof Number maximum && number > maximum.doubleValue()) {
+                return "INVALID_FIELD_VALUE_" + fieldCode;
+            }
+            return null;
+        }
+        return "INVALID_SCHEMA_TYPE_" + fieldCode;
+    }
+
+    private static String validateCollectionStates(AiDecisionChainRole role, JsonNode root) {
+        return switch (role) {
+            case GPT_FINAL -> firstError(
+                    collectionState(root, "supportingEvidenceState", "supportingEvidence", false),
+                    collectionState(root, "opposingEvidenceState", "opposingEvidence", false));
+            case GEMINI_REVIEW -> firstError(
+                    collectionState(root, "evidenceGapsState", "evidenceGaps", false),
+                    collectionState(root, "logicConflictsState", "logicConflicts", false),
+                    collectionState(root, "underestimatedRisksState", "underestimatedRisks", false));
+            case GROK_CHALLENGE -> firstError(
+                    collectionState(root, "failurePathState", "failurePaths", true),
+                    collectionState(root, "opposingScenariosState", "opposingScenarios", false),
+                    collectionState(root, "externalEventRisksState", "externalEventRisks", false),
+                    collectionState(root, "microstructureRisksState", "microstructureRisks", false),
+                    collectionState(root, "watchIndicatorsState", "watchIndicators", false));
+        };
+    }
+
+    private static String collectionState(JsonNode root, String stateField, String collectionField,
+                                          boolean grokFailurePath) {
+        String state = root.path(stateField).asText("").trim().toUpperCase(Locale.ROOT);
+        JsonNode collection = root.path(collectionField);
+        if ("FOUND".equals(state) && collection.isEmpty()) {
+            return "INVALID_COLLECTION_STATE_" + code(collectionField);
+        }
+        if (!"FOUND".equals(state) && !collection.isEmpty()) {
+            return "INVALID_COLLECTION_STATE_" + code(collectionField);
+        }
+        if ("NO_VERIFIABLE_FAILURE_PATH".equals(state) && !grokFailurePath) {
+            return "INVALID_COLLECTION_STATE_" + code(stateField);
         }
         return null;
+    }
+
+    private static String firstError(String... errors) {
+        for (String error : errors) if (error != null) return error;
+        return null;
+    }
+
+    private static String join(String path, String field) {
+        return path == null || path.isBlank() ? field : path + "." + field;
     }
 
     private static String findForbidden(JsonNode node) {

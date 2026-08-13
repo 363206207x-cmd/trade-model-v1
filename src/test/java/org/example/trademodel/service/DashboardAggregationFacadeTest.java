@@ -88,7 +88,7 @@ class DashboardAggregationFacadeTest {
 
         DashboardAggregationFacade facade = facade(jdbcTemplate(), traceService, scheduler(Map.of()));
 
-        Map<String, Object> summary = facade.traceSummary("ana-complete", null, null);
+        Map<String, Object> summary = facade.traceSummary(7L, "ana-complete", null, null);
         Map<String, Object> chain = castMap(summary.get("chain"));
 
         assertThat(summary).containsEntry("traceStatus", "COMPLETE");
@@ -108,7 +108,7 @@ class DashboardAggregationFacadeTest {
 
         DashboardAggregationFacade facade = facade(jdbcTemplate(), traceService, scheduler(Map.of()));
 
-        Map<String, Object> summary = facade.traceSummary(null, "trace-partial", null);
+        Map<String, Object> summary = facade.traceSummary(7L, null, "trace-partial", null);
         Map<String, Object> chain = castMap(summary.get("chain"));
         Map<String, Object> inputSnapshot = castMap(chain.get("inputSnapshot"));
 
@@ -222,6 +222,21 @@ class DashboardAggregationFacadeTest {
 
         @Override
         public AnalysisTraceSnapshot byRequestId(String requestId) {
+            return byRequestId.get(requestId);
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byAnalysisIdForUser(String analysisId, Long userId) {
+            return byAnalysisId.get(analysisId);
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byTraceIdForUser(String traceId, Long userId) {
+            return byTraceId.get(traceId);
+        }
+
+        @Override
+        public AnalysisTraceSnapshot byRequestIdForUser(String requestId, Long userId) {
             return byRequestId.get(requestId);
         }
     }

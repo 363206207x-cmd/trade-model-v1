@@ -7,8 +7,11 @@ import org.example.trademodel.analysisrun.AnalysisRunProperties;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.service.watchlistsource.AssetPoolScanTarget;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class AnalysisSchedulerService {
@@ -30,27 +34,37 @@ public class AnalysisSchedulerService {
     private final Clock clock;
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
     private final AssetPoolService assetPoolService;
+    private final AssetStateMapper assetStateMapper;
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties) {
-        this(analysisRunOrchestrator, properties, Clock.systemUTC(), null);
+        this(analysisRunOrchestrator, properties, Clock.systemUTC(), null, null);
     }
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties,
                                     Clock analysisRunClock) {
-        this(analysisRunOrchestrator, properties, analysisRunClock, null);
+        this(analysisRunOrchestrator, properties, analysisRunClock, null, null);
+    }
+
+    public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
+                                    AnalysisRunProperties properties,
+                                    Clock analysisRunClock,
+                                    AssetPoolService assetPoolService) {
+        this(analysisRunOrchestrator, properties, analysisRunClock, assetPoolService, null);
     }
 
     @Autowired
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties,
                                     Clock analysisRunClock,
-                                    AssetPoolService assetPoolService) {
+                                    AssetPoolService assetPoolService,
+                                    AssetStateMapper assetStateMapper) {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.properties = properties;
         this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
         this.assetPoolService = assetPoolService;
+        this.assetStateMapper = assetStateMapper;
     }
 
     @Autowired(required = false)
@@ -89,8 +103,16 @@ public class AnalysisSchedulerService {
 
     public AnalysisRunResult runHotResetRebuild(String symbol, String timeframe, String eventId,
                                                 String parentAnalysisId, String parentTraceId) {
+        return runHotResetRebuild("SYSTEM", 0L, null, symbol, timeframe, eventId,
+                parentAnalysisId, parentTraceId);
+    }
+
+    public AnalysisRunResult runHotResetRebuild(String ownerType, Long ownerId, Long assetId,
+                                                String symbol, String timeframe, String eventId,
+                                                String parentAnalysisId, String parentTraceId) {
         return analysisRunOrchestrator.run(AnalysisRunCommand.hotResetRebuild(
-                symbol, timeframe, eventId, RequestIdSupport.generate(), parentAnalysisId, parentTraceId));
+                ownerType, ownerId, assetId, symbol, timeframe, eventId,
+                RequestIdSupport.generate(), parentAnalysisId, parentTraceId));
     }
 
     public List<AnalysisRunResult> runScheduledCycle() {
@@ -102,13 +124,18 @@ public class AnalysisSchedulerService {
         }
         String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
         List<AnalysisRunResult> results = new ArrayList<>();
-        for (String symbol : scanSymbols()) {
-            if (!marketDataReady(symbol)) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (AssetPoolScanTarget target : scanTargets()) {
+            if (!marketDataReady(target.symbol())) {
                 continue;
             }
             for (String timeframe : properties.getScheduler().getTimeframes()) {
+                if (!scanDue(target, timeframe, now)) {
+                    continue;
+                }
                 results.add(analysisRunOrchestrator.run(AnalysisRunCommand.scheduled(
-                        symbol, timeframe, RequestIdSupport.generate(), reference)));
+                        target.ownerType(), target.ownerId(), target.assetId(), target.symbol(), timeframe,
+                        RequestIdSupport.generate(), reference)));
             }
         }
         return results;
@@ -137,6 +164,7 @@ public class AnalysisSchedulerService {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("enabled", properties.getScheduler().isEnabled());
         status.put("symbols", scanSymbols());
+        status.put("targetCount", scanTargets().size());
         status.put("assetPoolOnly", true);
         status.put("timeframes", properties.getScheduler().getTimeframes());
         status.put("leaseSeconds", properties.getIdempotency().getLeaseSeconds());
@@ -152,6 +180,7 @@ public class AnalysisSchedulerService {
         status.put("supportedTimeframes", AnalysisTimePolicy.supportedTimeframes());
         status.put("requiredMarketTimeframes", properties.getScheduler().getRequiredMarketTimeframes());
         status.put("requiredClosedBars", properties.getScheduler().getRequiredClosedBars());
+        status.put("stateCadenceConfigured", properties.getScheduler().cadenceConfigured());
         status.put("configValid", schedulerConfigValid());
         return status;
     }
@@ -168,18 +197,21 @@ public class AnalysisSchedulerService {
 
     private boolean schedulerConfigValid() {
         try {
-            List<String> symbols = scanSymbols();
-            if (symbols.isEmpty()
+            List<AssetPoolScanTarget> targets = scanTargets();
+            if (targets.isEmpty()
                     || properties.getScheduler().getTimeframes() == null || properties.getScheduler().getTimeframes().isEmpty()) {
                 return false;
             }
-            for (String symbol : symbols) {
-                validateSymbol(symbol);
+            for (AssetPoolScanTarget target : targets) {
+                validateSymbol(target.symbol());
             }
-            for (String timeframe : properties.getScheduler().getTimeframes()) {
+            List<String> timeframes = properties.getScheduler().getTimeframes();
+            for (String timeframe : timeframes) {
                 AnalysisTimePolicy.requireSupportedTimeframe(timeframe);
             }
-            return true;
+            return timeframes.size() == 4
+                    && new java.util.HashSet<>(timeframes).equals(Set.of("5m", "15m", "1h", "4h"))
+                    && properties.getScheduler().cadenceConfigured();
         } catch (AnalysisRunInputException ex) {
             return false;
         }
@@ -187,11 +219,39 @@ public class AnalysisSchedulerService {
 
     private List<String> scanSymbols() {
         if (assetPoolService == null) {
-            // Compatibility for direct unit construction; Spring runtime always injects AssetPoolService.
-            return properties.getScheduler().getSymbols();
+            return List.of();
         }
         List<String> symbols = assetPoolService.listScanSymbols();
         return symbols == null ? List.of() : symbols;
+    }
+
+    private List<AssetPoolScanTarget> scanTargets() {
+        if (assetPoolService == null) {
+            return List.of();
+        }
+        List<AssetPoolScanTarget> targets = assetPoolService.listScanTargets();
+        if (targets != null && !targets.isEmpty()) {
+            return targets;
+        }
+        return scanSymbols().stream().map(AssetPoolScanTarget::system).toList();
+    }
+
+    private boolean scanDue(AssetPoolScanTarget target, String timeframe, LocalDateTime now) {
+        if (assetStateMapper == null) {
+            return true;
+        }
+        try {
+            AssetStateDO state = assetStateMapper.selectByIdentity(
+                    target.ownerType(), target.ownerId(), target.symbol(), timeframe);
+            if (state == null || state.getLastUpdateTime() == null) {
+                return true;
+            }
+            long intervalSeconds = properties.getScheduler().intervalSeconds(
+                    state.getState() == null ? null : state.getState().name());
+            return !state.getLastUpdateTime().plusSeconds(intervalSeconds).isAfter(now);
+        } catch (RuntimeException stateReadFailure) {
+            return false;
+        }
     }
 
     private static void validateInput(String symbol, String timeframe) {

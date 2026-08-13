@@ -8,6 +8,7 @@ import org.example.trademodel.analysistrace.AnalysisTraceService;
 import org.example.trademodel.analysistrace.AnalysisTraceSnapshot;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.requestcontext.RequestIdSupport;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.AnalysisSchedulerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,13 +25,16 @@ public class AnalysisRunController {
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final AnalysisTraceService analysisTraceService;
     private final AnalysisSchedulerService analysisSchedulerService;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
     public AnalysisRunController(AnalysisRunOrchestrator analysisRunOrchestrator,
                                  AnalysisTraceService analysisTraceService,
-                                 AnalysisSchedulerService analysisSchedulerService) {
+                                 AnalysisSchedulerService analysisSchedulerService,
+                                 AuthenticatedUserIdResolver userIdResolver) {
         this.analysisRunOrchestrator = analysisRunOrchestrator;
         this.analysisTraceService = analysisTraceService;
         this.analysisSchedulerService = analysisSchedulerService;
+        this.userIdResolver = userIdResolver;
     }
 
     @PostMapping("/runs")
@@ -42,8 +46,9 @@ public class AnalysisRunController {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest("timeframe is required"));
         }
         try {
-            AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.manual(
-                    request.getSymbol(), request.getTimeframe(), RequestIdSupport.currentOrNew(), request.getAnalysisTime()));
+            AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.manualForUser(
+                    userIdResolver.requireCurrentUserId(), request.getSymbol(), request.getTimeframe(),
+                    RequestIdSupport.currentOrNew(), request.getAnalysisTime()));
             HttpStatus status = result.isConcurrentTriggerBlocked()
                     || result.isPartialStateRecoveryBlocked()
                     || result.isMaxRecoveryAttemptsExceeded()
@@ -56,7 +61,8 @@ public class AnalysisRunController {
 
     @GetMapping("/runs/{analysisId}")
     public ResponseEntity<ApiResponse<AnalysisTraceSnapshot>> runTrace(@PathVariable String analysisId) {
-        AnalysisTraceSnapshot snapshot = analysisTraceService.byAnalysisId(analysisId);
+        AnalysisTraceSnapshot snapshot = analysisTraceService.byAnalysisIdForUser(
+                analysisId, userIdResolver.requireCurrentUserId());
         if (snapshot == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis run not found"));
         }
@@ -65,7 +71,8 @@ public class AnalysisRunController {
 
     @GetMapping("/runs/by-request/{requestId}")
     public ResponseEntity<ApiResponse<AnalysisTraceSnapshot>> runTraceByRequest(@PathVariable String requestId) {
-        AnalysisTraceSnapshot snapshot = analysisTraceService.byRequestId(requestId);
+        AnalysisTraceSnapshot snapshot = analysisTraceService.byRequestIdForUser(
+                requestId, userIdResolver.requireCurrentUserId());
         if (snapshot == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis request not found"));
         }
@@ -74,7 +81,8 @@ public class AnalysisRunController {
 
     @GetMapping("/traces/{traceId}")
     public ResponseEntity<ApiResponse<AnalysisTraceSnapshot>> trace(@PathVariable String traceId) {
-        AnalysisTraceSnapshot snapshot = analysisTraceService.byTraceId(traceId);
+        AnalysisTraceSnapshot snapshot = analysisTraceService.byTraceIdForUser(
+                traceId, userIdResolver.requireCurrentUserId());
         if (snapshot == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound("analysis trace not found"));
         }

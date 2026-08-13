@@ -10,6 +10,10 @@ public class EvidenceItemDO {
     private Double strength;
     private Double confidence;
     private String source;
+    private String currentValue;
+    private String changeFromBaseline;
+    private LocalDateTime observedAt;
+    private String freshness;
     private String sourceProvider;
     private String sourceReference;
     private String sourceTraceId;
@@ -37,6 +41,14 @@ public class EvidenceItemDO {
     public void setConfidence(Double confidence) { this.confidence = confidence; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+    public String getCurrentValue() { return currentValue; }
+    public void setCurrentValue(String value) { this.currentValue = value; }
+    public String getChangeFromBaseline() { return changeFromBaseline; }
+    public void setChangeFromBaseline(String value) { this.changeFromBaseline = value; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime value) { this.observedAt = value; }
+    public String getFreshness() { return freshness; }
+    public void setFreshness(String value) { this.freshness = value; }
     public String getSourceProvider() { return sourceProvider; }
     public void setSourceProvider(String sourceProvider) { this.sourceProvider = sourceProvider; }
     public String getSourceReference() { return sourceReference; }

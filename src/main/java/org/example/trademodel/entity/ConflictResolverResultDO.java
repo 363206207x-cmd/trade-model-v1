@@ -10,6 +10,11 @@ public class ConflictResolverResultDO {
     private String ruleDirection;
     private String ruleConfidence;
     private String ruleRisk;
+    private String rulePlanMode;
+    private Boolean ruleCanExecute;
+    private Integer dataQualityScore;
+    private Integer confusedScore;
+    private String accountRiskState;
     private String geminiReviewJson;
     private String grokChallengeJson;
     private String conflictLevel;
@@ -20,7 +25,11 @@ public class ConflictResolverResultDO {
     private String confidenceAfter;
     private String riskBefore;
     private String riskAfter;
+    private String biasBefore;
+    private String biasAfter;
+    private String adjustmentReason;
     private String downgradeReason;
+    private String recoveryCondition;
     private Boolean confusedDecision;
     private String ruleVetoReason;
     private Boolean ruleDirectionPreserved = true;
@@ -40,6 +49,16 @@ public class ConflictResolverResultDO {
     public void setRuleConfidence(String value) { this.ruleConfidence = value; }
     public String getRuleRisk() { return ruleRisk; }
     public void setRuleRisk(String value) { this.ruleRisk = value; }
+    public String getRulePlanMode() { return rulePlanMode; }
+    public void setRulePlanMode(String value) { this.rulePlanMode = value; }
+    public Boolean getRuleCanExecute() { return ruleCanExecute; }
+    public void setRuleCanExecute(Boolean value) { this.ruleCanExecute = value; }
+    public Integer getDataQualityScore() { return dataQualityScore; }
+    public void setDataQualityScore(Integer value) { this.dataQualityScore = value; }
+    public Integer getConfusedScore() { return confusedScore; }
+    public void setConfusedScore(Integer value) { this.confusedScore = value; }
+    public String getAccountRiskState() { return accountRiskState; }
+    public void setAccountRiskState(String value) { this.accountRiskState = value; }
     public String getGeminiReviewJson() { return geminiReviewJson; }
     public void setGeminiReviewJson(String value) { this.geminiReviewJson = value; }
     public String getGrokChallengeJson() { return grokChallengeJson; }
@@ -60,8 +79,16 @@ public class ConflictResolverResultDO {
     public void setRiskBefore(String value) { this.riskBefore = value; }
     public String getRiskAfter() { return riskAfter; }
     public void setRiskAfter(String value) { this.riskAfter = value; }
+    public String getBiasBefore() { return biasBefore; }
+    public void setBiasBefore(String value) { this.biasBefore = value; }
+    public String getBiasAfter() { return biasAfter; }
+    public void setBiasAfter(String value) { this.biasAfter = value; }
+    public String getAdjustmentReason() { return adjustmentReason; }
+    public void setAdjustmentReason(String value) { this.adjustmentReason = value; }
     public String getDowngradeReason() { return downgradeReason; }
     public void setDowngradeReason(String value) { this.downgradeReason = value; }
+    public String getRecoveryCondition() { return recoveryCondition; }
+    public void setRecoveryCondition(String value) { this.recoveryCondition = value; }
     public Boolean getConfusedDecision() { return confusedDecision; }
     public void setConfusedDecision(Boolean value) { this.confusedDecision = value; }
     public String getRuleVetoReason() { return ruleVetoReason; }

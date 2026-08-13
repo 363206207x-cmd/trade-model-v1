@@ -10,6 +10,10 @@ public class MarketQuoteSnapshot {
     private String provider;
     private String symbolNormalized;
     private BigDecimal lastPrice;
+    private BigDecimal bidPrice;
+    private BigDecimal bidQuantity;
+    private BigDecimal askPrice;
+    private BigDecimal askQuantity;
     private BigDecimal highPrice;
     private BigDecimal lowPrice;
     private BigDecimal priceChangePercent24h;
@@ -38,6 +42,15 @@ public class MarketQuoteSnapshot {
     public void setLastPrice(BigDecimal lastPrice) {
         this.lastPrice = lastPrice;
     }
+
+    public BigDecimal getBidPrice() { return bidPrice; }
+    public void setBidPrice(BigDecimal bidPrice) { this.bidPrice = bidPrice; }
+    public BigDecimal getBidQuantity() { return bidQuantity; }
+    public void setBidQuantity(BigDecimal bidQuantity) { this.bidQuantity = bidQuantity; }
+    public BigDecimal getAskPrice() { return askPrice; }
+    public void setAskPrice(BigDecimal askPrice) { this.askPrice = askPrice; }
+    public BigDecimal getAskQuantity() { return askQuantity; }
+    public void setAskQuantity(BigDecimal askQuantity) { this.askQuantity = askQuantity; }
 
     public BigDecimal getHighPrice() {
         return highPrice;

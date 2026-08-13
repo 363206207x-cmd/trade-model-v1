@@ -220,24 +220,24 @@ class AnalysisAssemblerServiceImplTest {
     }
 
     @Test
-    void fallback_caps85_to55_whenTwoOrMoreEvidence() {
-        assertEquals(55, AnalysisAssemblerServiceImpl.estimateDataQualityScore(twoEvidences(), Collections.emptyList(), FALLBACK));
+    void fallback_isZero_whenTwoOrMoreEvidence() {
+        assertEquals(0, AnalysisAssemblerServiceImpl.estimateDataQualityScore(twoEvidences(), Collections.emptyList(), FALLBACK));
     }
 
     @Test
-    void fallback_stays55_whenDefaultPlusSecondDimensionVolatility() {
+    void fallback_isZero_whenDefaultPlusSecondDimensionVolatility() {
         List<EvidenceItemVO> list = List.of(defaultPriceStructureEvidence(), secondDimensionVolatilityEvidence());
-        assertEquals(55, AnalysisAssemblerServiceImpl.estimateDataQualityScore(list, Collections.emptyList(), FALLBACK));
+        assertEquals(0, AnalysisAssemblerServiceImpl.estimateDataQualityScore(list, Collections.emptyList(), FALLBACK));
     }
 
     @Test
-    void fallback_keeps35_whenBothListsEmpty() {
-        assertEquals(35, AnalysisAssemblerServiceImpl.estimateDataQualityScore(Collections.emptyList(), Collections.emptyList(), FALLBACK));
+    void fallback_isZero_whenBothListsEmpty() {
+        assertEquals(0, AnalysisAssemblerServiceImpl.estimateDataQualityScore(Collections.emptyList(), Collections.emptyList(), FALLBACK));
     }
 
     @Test
-    void fallback_keeps55_whenSingleEvidence() {
-        assertEquals(55, AnalysisAssemblerServiceImpl.estimateDataQualityScore(List.of(new EvidenceItemVO()), Collections.emptyList(), FALLBACK));
+    void fallback_isZero_whenSingleEvidence() {
+        assertEquals(0, AnalysisAssemblerServiceImpl.estimateDataQualityScore(List.of(new EvidenceItemVO()), Collections.emptyList(), FALLBACK));
     }
 
     @Test
@@ -299,11 +299,11 @@ class AnalysisAssemblerServiceImplTest {
         assertEquals(SPOT_PERP_MIN, AnalysisAssemblerServiceImpl.marketEnvSourceTypeForSuccessfulQuote(vo));
     }
 
-    /** ev=0 且 sc&gt;0 时条数档为 55（非 85）；封顶不改变 55。 */
+    /** Placeholder fallback is never treated as decision-grade data, regardless of score count. */
     @Test
-    void fallback_unchanged55_whenTwoScoresNoEvidence() {
+    void fallback_isZero_whenTwoScoresNoEvidence() {
         List<ScoreItemVO> twoScores = List.of(new ScoreItemVO(), new ScoreItemVO());
-        assertEquals(55, AnalysisAssemblerServiceImpl.estimateDataQualityScore(Collections.emptyList(), twoScores, FALLBACK));
+        assertEquals(0, AnalysisAssemblerServiceImpl.estimateDataQualityScore(Collections.emptyList(), twoScores, FALLBACK));
     }
 
     @Test

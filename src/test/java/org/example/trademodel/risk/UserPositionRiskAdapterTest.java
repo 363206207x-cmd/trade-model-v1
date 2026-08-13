@@ -224,7 +224,7 @@ class UserPositionRiskAdapterTest {
         row.setQuantity(new BigDecimal(quantity));
         row.setLeverage(new BigDecimal(leverage));
         row.setStopLoss(new BigDecimal(stopLoss));
-        row.setSourceType("MANUAL_POSITION");
+        row.setSourceType("MANUAL_INDEPENDENT");
         return row;
     }
 }

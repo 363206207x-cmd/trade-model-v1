@@ -2,14 +2,15 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.entity.ConflictResolverResultDO;
 import org.example.trademodel.entity.ExecutionPlanCandidateDO;
 import org.example.trademodel.enums.AiConflictLevelEnum;
+import org.example.trademodel.enums.MarketBiasEnum;
+import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.service.AiConflictResolverService;
 import org.example.trademodel.service.AiConflictResult;
-import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionContext;
-import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,11 @@ import java.util.UUID;
 public class AiConflictResolverServiceImpl implements AiConflictResolverService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final FundamentalAiV41Properties v41Properties;
+
+    public AiConflictResolverServiceImpl(FundamentalAiV41Properties v41Properties) {
+        this.v41Properties = v41Properties;
+    }
 
     @Override
     public AiConflictResult resolve(DecisionContext context) {
@@ -55,16 +61,16 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
 
         if (aiConflictScore <= 20 && objectionCount == 0) {
             return result(context, AiConflictLevelEnum.LEVEL_1_CONSISTENT, context.getRuleConfidenceLevel(),
-                    "UNCHANGED", "CONFIRM", aiConflictScore, objectionCount, 0);
+                    "UNCHANGED", PlanModeEnum.CONFIRMATION.name(), aiConflictScore, objectionCount, 0);
         } else if (aiConflictScore <= 45) {
             return result(context, AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT, downgradeConfidence(context, 1),
-                    "SLIGHTLY_RAISED", "REDUCED", aiConflictScore, objectionCount, aiConflictScore);
+                    "SLIGHTLY_RAISED", PlanModeEnum.REDUCED.name(), aiConflictScore, objectionCount, aiConflictScore);
         } else if (aiConflictScore <= 70) {
             return result(context, AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT, downgradeConfidence(context, 2),
-                    "RAISED", "PREPARE_ONLY", aiConflictScore, objectionCount, aiConflictScore);
+                    "RAISED", PlanModeEnum.OBSERVATION.name(), aiConflictScore, objectionCount, aiConflictScore);
         } else {
             return result(context, AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, downgradeConfidence(context, 2),
-                    "HIGH", "CONFUSED", aiConflictScore, objectionCount, aiConflictScore);
+                    "HIGH", PlanModeEnum.BLOCKED.name(), aiConflictScore, objectionCount, aiConflictScore);
         }
     }
 
@@ -88,10 +94,11 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         boolean requestedBlock = false;
         List<String> reasons = new ArrayList<>();
 
-        if (available(gemini, "verdict")) {
-            String geminiVerdict = upperText(gemini, "verdict", "APPROVE");
+        if (availableAny(gemini, "reviewResult", "verdict")) {
+            String geminiVerdict = upperText(gemini, gemini.hasNonNull("reviewResult")
+                    ? "reviewResult" : "verdict", "APPROVE");
             int verdictContribution = switch (geminiVerdict) {
-                case "REJECT" -> 45;
+                case "REJECT", "REJECT_CANDIDATE" -> 45;
                 case "DOWNGRADE" -> 25;
                 case "RISK_WARNING" -> 10;
                 default -> 0;
@@ -105,16 +112,23 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             requestedRiskRaise = adjustmentLevels(
                     upperText(gemini, "riskAdjustment", "UNCHANGED"), "RAISE");
             String planAdjustment = upperText(gemini, "planModeAdjustment", "UNCHANGED");
-            requestedPlanDowngrade = adjustmentLevels(planAdjustment, "DOWNGRADE");
+            if (gemini.has("downgradeSuggestion") && gemini.path("downgradeSuggestion").isObject()) {
+                String after = upperText(gemini.path("downgradeSuggestion"), "after", candidate.getPlanMode());
+                requestedPlanDowngrade = Math.max(requestedPlanDowngrade,
+                        modeDistance(candidate.getPlanMode(), after));
+            }
+            requestedPlanDowngrade = Math.max(requestedPlanDowngrade,
+                    adjustmentLevels(planAdjustment, "DOWNGRADE"));
             requestedBlock = "BLOCKED".equals(planAdjustment);
             if (!"APPROVE".equals(geminiVerdict)) reasons.add("GEMINI_" + geminiVerdict);
         } else {
             reasons.add("GEMINI_UNAVAILABLE_RULE_FALLBACK");
         }
 
-        if (available(grok, "challengeLevel")) {
+        if (availableAny(grok, "conflictLevel", "challengeLevel")) {
             String challenge = upperText(
-                    grok, "challengeLevel", AiConflictLevelEnum.LEVEL_1_CONSISTENT.name());
+                    grok, grok.hasNonNull("conflictLevel") ? "conflictLevel" : "challengeLevel",
+                    AiConflictLevelEnum.LEVEL_1_CONSISTENT.name());
             int challengeContribution = conflictContribution(challenge);
             score += challengeContribution;
             aiConflictScore += challengeContribution;
@@ -127,12 +141,13 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             requestedPlanDowngrade = Math.max(requestedPlanDowngrade,
                     adjustmentLevels(grokPlanImpact, "DOWNGRADE"));
             requestedBlock = requestedBlock || "BLOCKED".equals(grokPlanImpact);
-            int riskDelta = riskDistance(candidate.getRiskLevel(), upperText(grok, "riskLevel", candidate.getRiskLevel()));
-            requestedRiskRaise = Math.max(requestedRiskRaise, riskDelta);
+            requestedRiskRaise = Math.max(requestedRiskRaise,
+                    adjustmentLevels(upperText(grok, "riskAdjustment", "UNCHANGED"), "RAISE"));
         } else {
             reasons.add("GROK_UNAVAILABLE_RULE_FALLBACK");
         }
-        if (!DataQualityCircuitBreakerPolicy.passes(dataQualityScore)) {
+        if (dataQualityScore == null
+                || dataQualityScore < v41Properties.getAiGate().getCircuitBreakerScore()) {
             score += 20;
             reasons.add("DATA_QUALITY_BLOCKED");
         }
@@ -140,31 +155,41 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
             score += 20;
             reasons.add("ACCOUNT_RISK_BLOCKED");
         }
-        boolean confused = (confusedScore != null
-                && confusedScore >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD)
-                || aiConflictScore >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD;
-        if (confused) {
-            score = Math.max(score, 80);
-            reasons.add("CONFUSED_THRESHOLD");
-        }
+        boolean independentConfused = confusedScore != null
+                && confusedScore >= v41Properties.getOpportunityState().getConfusedEnterThreshold();
+        if (independentConfused) reasons.add("INDEPENDENT_CONFUSED_THRESHOLD");
         score = Math.max(0, Math.min(100, score));
 
-        String ruleVeto = sameDirection(candidate.getRuleDirection(), candidate.getCandidateDirection())
-                ? null : "CANDIDATE_DIRECTION_DIFFERS_FROM_RULE";
+        String ruleVeto = permittedBiasAdjustment(candidate.getRuleDirection(), candidate.getCandidateDirection())
+                ? null : "CANDIDATE_DIRECTION_CROSSES_RULE_FAMILY";
         if (ruleVeto != null) {
             score = Math.max(score, 90);
             reasons.add(ruleVeto);
         }
         AiConflictLevelEnum conflictLevel = conflictLevel(score);
-        if (conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT) {
-            confused = true;
-        }
+        boolean confused = independentConfused
+                || conflictLevel == AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT;
         int scoreDowngrades = score <= 15 ? 0 : score <= 40 ? 1 : score <= 70 ? 2 : 4;
         int confidenceDowngrades = Math.max(scoreDowngrades, requestedConfidenceDowngrade);
         int riskRaises = Math.max(scoreDowngrades, requestedRiskRaise);
         int planDowngrades = Math.max(scoreDowngrades, requestedPlanDowngrade);
         String planModeAfter = downgradeMode(candidate.getPlanMode(), planDowngrades);
-        if (confused || requestedBlock || ruleVeto != null) planModeAfter = "BLOCKED";
+        if (conflictLevel == AiConflictLevelEnum.LEVEL_2_MINOR_DISAGREEMENT) {
+            planModeAfter = downgradeToAtLeast(planModeAfter, PlanModeEnum.PREPARATION);
+        }
+        if (conflictLevel == AiConflictLevelEnum.LEVEL_3_SIGNIFICANT_DISAGREEMENT) {
+            planModeAfter = downgradeToAtLeast(planModeAfter, PlanModeEnum.OBSERVATION);
+        }
+        if (requestedBlock && !confused && ruleVeto == null) {
+            planModeAfter = downgradeToAtLeast(planModeAfter, PlanModeEnum.OBSERVATION);
+            reasons.add("AI_BLOCK_REQUEST_PRESERVED_AS_OBSERVATION");
+        }
+        if (confused || ruleVeto != null) planModeAfter = PlanModeEnum.BLOCKED.name();
+
+        String biasBefore = normalize(candidate.getRuleDirection());
+        String biasAfter = ruleVeto == null ? normalize(candidate.getCandidateDirection()) : biasBefore;
+        String adjustmentReason = biasBefore.equals(biasAfter) ? null
+                : defaultText(candidate.getBiasAdjustmentReason(), "GPT_SAME_FAMILY_INTENSITY_DOWNGRADE");
 
         ConflictResolverResultDO result = new ConflictResolverResultDO();
         result.setResolverResultId("resolver-" + UUID.randomUUID());
@@ -174,6 +199,11 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         result.setRuleDirection(candidate.getRuleDirection());
         result.setRuleConfidence(candidate.getRuleConfidence());
         result.setRuleRisk(candidate.getRuleRisk());
+        result.setRulePlanMode(candidate.getRulePlanMode());
+        result.setRuleCanExecute(candidate.getRuleCanExecute());
+        result.setDataQualityScore(dataQualityScore);
+        result.setConfusedScore(confusedScore);
+        result.setAccountRiskState(accountRiskState);
         result.setGeminiReviewJson(nonBlankJson(geminiReviewJson));
         result.setGrokChallengeJson(nonBlankJson(grokChallengeJson));
         result.setConflictLevel(conflictLevel.name());
@@ -184,9 +214,15 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         result.setConfidenceAfter(downgradeConfidence(candidate.getConfidenceLevel(), confidenceDowngrades));
         result.setRiskBefore(candidate.getRiskLevel());
         result.setRiskAfter(raiseRisk(candidate.getRiskLevel(), riskRaises));
+        result.setBiasBefore(biasBefore);
+        result.setBiasAfter(biasAfter);
+        result.setAdjustmentReason(adjustmentReason);
         result.setDowngradeReason(reasons.isEmpty() ? null : String.join(";", reasons));
+        result.setRecoveryCondition(recoveryCondition(gemini, grok, conflictLevel));
         result.setConfusedDecision(confused);
         result.setRuleVetoReason(ruleVeto);
+        // A cross-family Candidate is vetoed and the resolver restores the rule-layer bias.
+        // The audit flag describes the persisted resolver outcome, not the rejected AI attempt.
         result.setRuleDirectionPreserved(true);
         result.setCreatedAt(LocalDateTime.now());
         return result;
@@ -290,6 +326,14 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
                 && node.hasNonNull(requiredField) && !node.path(requiredField).asText("").isBlank();
     }
 
+    private static boolean availableAny(JsonNode node, String... requiredFields) {
+        if (node == null || !node.isObject() || node.path("fallback").asBoolean(false)) return false;
+        for (String field : requiredFields) {
+            if (node.hasNonNull(field) && !node.path(field).asText("").isBlank()) return true;
+        }
+        return false;
+    }
+
     private static int conflictContribution(String level) {
         return switch (normalize(level)) {
             case "LEVEL_4_EXTREME_CONFLICT" -> 45;
@@ -326,8 +370,14 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
         return value == null || value.isBlank() ? fallback : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private static boolean sameDirection(String left, String right) {
-        return normalize(left).equals(normalize(right));
+    private static boolean permittedBiasAdjustment(String ruleBias, String candidateBias) {
+        try {
+            MarketBiasEnum before = MarketBiasEnum.valueOf(normalize(ruleBias));
+            MarketBiasEnum after = MarketBiasEnum.valueOf(normalize(candidateBias));
+            return after.isSameFamilyDowngradeFrom(before);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private static String normalize(String value) {
@@ -335,10 +385,45 @@ public class AiConflictResolverServiceImpl implements AiConflictResolverService 
     }
 
     private static String downgradeMode(String mode, int levels) {
-        List<String> modes = List.of("CONFIRM", "PREPARE", "REDUCE", "WATCH", "BLOCKED");
-        int index = modes.indexOf(normalize(mode));
-        if (index < 0) index = 3;
-        return modes.get(Math.min(modes.size() - 1, index + Math.max(0, levels)));
+        try {
+            return PlanModeEnum.require(mode).downgrade(levels).name();
+        } catch (RuntimeException ignored) {
+            return PlanModeEnum.BLOCKED.name();
+        }
+    }
+
+    private static int modeDistance(String before, String after) {
+        try {
+            PlanModeEnum from = PlanModeEnum.require(before);
+            PlanModeEnum to = PlanModeEnum.require(after);
+            return Math.max(0, to.ordinal() - from.ordinal());
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
+    }
+
+    private static String downgradeToAtLeast(String value, PlanModeEnum minimum) {
+        try {
+            PlanModeEnum current = PlanModeEnum.require(value);
+            return (current.ordinal() < minimum.ordinal() ? minimum : current).name();
+        } catch (RuntimeException ignored) {
+            return PlanModeEnum.BLOCKED.name();
+        }
+    }
+
+    private static String recoveryCondition(JsonNode gemini, JsonNode grok,
+                                            AiConflictLevelEnum conflictLevel) {
+        String geminiRecovery = gemini == null ? null
+                : gemini.path("downgradeSuggestion").path("recoveryCondition").asText(null);
+        if (geminiRecovery != null && !geminiRecovery.isBlank()) return geminiRecovery.trim();
+        String grokRecovery = grok == null ? null : grok.path("recoveryCondition").asText(null);
+        if (grokRecovery != null && !grokRecovery.isBlank()) return grokRecovery.trim();
+        return conflictLevel == AiConflictLevelEnum.LEVEL_1_CONSISTENT
+                ? null : "REQUIRES_NEW_VERIFIED_ANALYSIS_AND_RULE_REVALIDATION";
+    }
+
+    private static String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private static String downgradeConfidence(String confidence, int levels) {

@@ -4654,7 +4654,7 @@
 
         <div class="module-status-note" id="marketQuoteStatusPanel" aria-label="MarketQuote freshness review-only status" style="margin:0 0 12px 0;max-width:64rem;">
             <div class="kv"><span class="k">MarketQuote 只读状态</span><span class="v" id="marketQuoteRuntimeStatusValue">MARKETQUOTE_MISSING_FAIL_CLOSED / 行情状态待确认</span></div>
-            <div class="kv"><span class="k">样本标的</span><span class="v" id="marketQuoteSampleSymbolValue">BTCUSDT</span></div>
+            <div class="kv"><span class="k">样本标的</span><span class="v" id="marketQuoteSampleSymbolValue">暂无</span></div>
             <div class="kv"><span class="k">quote source / source type</span><span class="v"><span id="marketQuoteSourceValue">UNKNOWN</span> · <span id="marketQuoteSourceTypeValue">MISSING</span></span></div>
             <div class="kv"><span class="k">freshness / fallback</span><span class="v"><span id="marketQuoteFreshnessValue">missing</span> · fallback <span id="marketQuoteFallbackValue">是</span></span></div>
             <div class="kv"><span class="k">source health / last update</span><span class="v"><span id="marketQuoteSourceHealthValue">MISSING</span> · <span id="marketQuoteLastUpdatedValue">—</span></span></div>
@@ -5243,7 +5243,6 @@
     var detailMarketEnvironmentMiniMap = {};
     var detailEvidenceTopItemsMap = {};
     var detailScoreTopItemsMap = {};
-    var DEFAULT_DISPLAY_SLOT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"];
     var CONFLICT_STATE_THRESHOLD = 70;
     var DIRECTIONAL_PUSH_BLOCK_THRESHOLD = 85;
     var WATCHLIST_STATUS_READY = "WATCHLIST_REVIEW_ONLY_READY";
@@ -5524,7 +5523,7 @@
     };
     var marketQuoteRuntimeStatus = {
         status: MARKETQUOTE_STATUS_MISSING,
-        sampleSymbol: "BTCUSDT",
+        sampleSymbol: null,
         source: "UNKNOWN",
         sourceType: "MISSING",
         fresh: false,
@@ -7078,10 +7077,13 @@
     function aiConflictLevelLabel(raw) {
         var labels = {
             LEVEL_1_CONSISTENT: "无显著分歧",
+            LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
             LEVEL_2_LIGHT_DIVERGENCE: "轻微分歧",
             LEVEL_2_REVIEW: "轻微分歧",
+            LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧",
             LEVEL_3_SIGNIFICANT_DIVERGENCE: "显著分歧",
             LEVEL_3_DIVERGENCE: "显著分歧",
+            LEVEL_4_EXTREME_CONFLICT: "极端分歧",
             LEVEL_4_EXTREME_DIVERGENCE: "极端分歧"
         };
         var key = String(raw || "").trim().toUpperCase();
@@ -7090,15 +7092,10 @@
 
     function planModeLabel(raw) {
         var labels = {
-            FULL: "完整计划复核",
-            CONFIRM: "确认复核",
-            PREPARE_ONLY: "仅准备复核",
-            ADVISORY: "人工复核建议",
-            REVIEW_ONLY: "仅供人工复核",
-            DOWNGRADED: "已降级复核",
+            CONFIRMATION: "确认型",
+            PREPARATION: "预备型",
             REDUCED: "降级复核",
-            CONFUSED: "冲突阻断",
-            WAIT: "等待更多证据",
+            OBSERVATION: "观察",
             BLOCKED: "已阻断",
             NO_PLAN: "暂无计划"
         };
@@ -7690,45 +7687,6 @@
         return rows.join("");
     }
 
-    function readAiRolePayload(d) {
-        if (!d) return {};
-        var raw = d.aiRoleResults != null ? d.aiRoleResults : d.ai_role_results;
-        if (raw && typeof raw === "object") return raw;
-        var parsed = parseJsonObjectSafe(raw);
-        if (parsed) return parsed;
-        return { RAW: raw != null ? String(raw) : "" };
-    }
-
-    function aiRoleTextForTab(payload, tab) {
-        var keys = tab === "GPT_FINAL"
-            ? ["GPT_FINAL", "gptFinal", "gpt_final", "GPT", "gpt", "final", "RAW"]
-            : (tab === "GEMINI_REVIEW"
-                ? ["GEMINI_REVIEW", "geminiReview", "gemini_review", "GEMINI", "gemini", "RAW"]
-                : ["GROK_CHALLENGE", "grokChallenge", "grok_challenge", "GROK", "grok", "RAW"]);
-        for (var i = 0; i < keys.length; i++) {
-            var v = payload && payload[keys[i]];
-            if (v == null || String(v).trim() === "") continue;
-            if (typeof v === "object") return JSON.stringify(v, null, 2);
-            return String(v);
-        }
-        return "暂无 AI 原始输出";
-    }
-
-    function aiRoleObjectForTab(payload, tab) {
-        var keys = tab === "GPT_FINAL"
-            ? ["GPT_FINAL", "gptFinal", "gpt_final", "GPT", "gpt", "final"]
-            : (tab === "GEMINI_REVIEW"
-                ? ["GEMINI_REVIEW", "geminiReview", "gemini_review", "GEMINI", "gemini"]
-                : ["GROK_CHALLENGE", "grokChallenge", "grok_challenge", "GROK", "grok"]);
-        for (var i = 0; i < keys.length; i++) {
-            var v = payload && payload[keys[i]];
-            if (v && typeof v === "object" && !Array.isArray(v)) return v;
-            var parsed = parseJsonObjectSafe(v);
-            if (parsed) return parsed;
-        }
-        return null;
-    }
-
     function compactAiText(text, maxLen) {
         var t = String(text || "").replace(/\s+/g, " ").trim();
         if (!t) return "暂无 AI 原始输出";
@@ -7742,29 +7700,6 @@
         return "反方挑战官";
     }
 
-    function hasAiRoleRaw(text) {
-        return !!(text && text !== "暂无 AI 原始输出");
-    }
-
-    function aiEvidenceDefaultValue(label, value) {
-        var text = cleanBlankValue(value);
-        if (text) {
-            text = String(text)
-                .replace(/暂无证据\s*[\n；,， ]*等待同步/g, "暂无证据")
-                .replace(/等待同步\s*[\n；,， ]*等待同步/g, "等待同步")
-                .trim();
-        }
-        if (text) return text;
-        if (label === "方向判断" || label === "置信度") return "暂无";
-        if (label && label.indexOf("证据") >= 0) return "暂无证据";
-        return "等待同步";
-    }
-
-    function aiEvidenceRow(rows, label) {
-        var found = (rows || []).find(function (r) { return r && r[0] === label; });
-        return aiEvidenceDefaultValue(label, found ? found[1] : "");
-    }
-
     function aiSummaryItem(label, value) {
         return '<div class="ai-summary-item"><span class="ai-summary-label">' + escapeHtml(label) + '</span><span class="ai-summary-value">' + escapeHtml(value) + '</span></div>';
     }
@@ -7773,53 +7708,31 @@
         return '<div class="ai-evidence-item"><span class="ai-evidence-label">' + escapeHtml(label) + '</span><span class="ai-evidence-value">' + escapeHtml(value) + '</span></div>';
     }
 
-    function aiReviewEvidencePanel(rows) {
-        var direction = aiEvidenceRow(rows, "方向判断");
-        var confidence = aiEvidenceRow(rows, "置信度");
-        var conclusion = aiEvidenceRow(rows, "复核结论");
-        var support = aiEvidenceRow(rows, "支持证据");
-        var against = aiEvidenceRow(rows, "反对证据");
-        var risk = aiEvidenceRow(rows, "风险点");
-        var downgrade = aiEvidenceRow(rows, "降级 / 阻断原因");
-        return '<div class="ai-summary-strip">'
-            + aiSummaryItem("方向判断", direction)
-            + aiSummaryItem("置信度", confidence)
-            + aiSummaryItem("复核结论", conclusion)
-            + '</div>'
-            + '<div class="ai-evidence-list">'
-            + aiEvidenceColumn("支持证据", support)
-            + aiEvidenceColumn("反对证据", against)
-            + aiEvidenceColumn("风险点", risk)
-            + '</div>'
-            + '<div class="ai-downgrade-row"><span class="ai-downgrade-label">降级 / 阻断原因</span><span class="ai-downgrade-value">' + escapeHtml(downgrade) + '</span></div>';
-    }
-
     function aiRoleValue(value) {
         var text = evidenceValueText(value);
         if (!text || text === "暂无 AI 原始输出") return "";
         return text;
     }
 
-    function aiRoleFallbackValue(value, fallback) {
-        var text = aiRoleValue(value);
-        return text || fallback;
+    function formalContractValue(value) {
+        return aiRoleValue(value) || "--";
     }
 
     function aiRoleSummaryStrip(items) {
         return '<div class="ai-summary-strip">' + (items || []).map(function (item) {
-            return aiSummaryItem(item[0], aiRoleFallbackValue(item[1], item[2] || "等待同步"));
+            return aiSummaryItem(item[0], formalContractValue(item[1]));
         }).join("") + '</div>';
     }
 
     function aiRoleEvidenceList(items) {
         return '<div class="ai-evidence-list">' + (items || []).map(function (item) {
-            return aiEvidenceColumn(item[0], aiRoleFallbackValue(item[1], item[2] || "暂无证据"));
+            return aiEvidenceColumn(item[0], formalContractValue(item[1]));
         }).join("") + '</div>';
     }
 
-    function aiRoleFooter(label, value, fallback) {
+    function aiRoleFooter(label, value) {
         return '<div class="ai-downgrade-row"><span class="ai-downgrade-label">' + escapeHtml(label)
-            + '</span><span class="ai-downgrade-value">' + escapeHtml(aiRoleFallbackValue(value, fallback || "等待同步"))
+            + '</span><span class="ai-downgrade-value">' + escapeHtml(formalContractValue(value))
             + '</span></div>';
     }
 
@@ -7836,107 +7749,198 @@
         return "等待同步";
     }
 
-    function consistencyRow(label, value, fallback) {
+    function consistencyRow(label, value) {
         return '<div class="consistency-row"><span>' + escapeHtml(label) + '</span><span class="value">'
-            + escapeHtml(aiRoleFallbackValue(value, fallback || "等待同步"))
+            + escapeHtml(formalContractValue(value))
             + '</span></div>';
     }
 
     function renderHomeConsistencyCard(options) {
         options = options || {};
-        var aiApplicable = options.aiApplicable !== false;
-        var status = consistencyStatusText(options.level, options.confused, aiApplicable);
-        var summary = aiRoleFallbackValue(options.summary, "等待 AI 三角色结果同步后生成一致性结论");
+        var recoveryConditionRequired = String(options.rawFinalPlanMode || options.finalPlanMode || "").toUpperCase() !== "CONFIRMATION"
+            || String(options.rawConflictLevel || options.conflictLevel || "").toUpperCase() !== "LEVEL_1_CONSISTENT";
+        var ready = String(options.dataState || "").toUpperCase() === "READY"
+            && !!cleanBlankValue(options.conflictLevel)
+            && !!cleanBlankValue(options.finalMarketBias)
+            && !!cleanBlankValue(options.finalPlanMode)
+            && !!cleanBlankValue(options.mainReason)
+            && (!recoveryConditionRequired || !!cleanBlankValue(options.recoveryCondition));
+        if (!ready) {
+            return '<div class="consistency-topline"><span class="consistency-status-pill">暂无一致性数据</span></div>';
+        }
+        var status = consistencyStatusText(options.conflictLevel, false, true);
         return '<div class="consistency-topline">'
             + '<span class="consistency-status-pill">' + escapeHtml(status) + '</span>'
             + '</div>'
             + '<div class="consistency-list">'
-            + consistencyRow("一致性等级", status, "等待同步")
-            + consistencyRow("冲突等级", aiApplicable ? options.conflictLevel : "不适用", aiApplicable ? "等待同步" : "不适用")
-            + consistencyRow("AI 一致性阻断", aiApplicable && options.confused ? "是" : "否", "否")
+            + consistencyRow("冲突等级", options.conflictLevel)
+            + consistencyRow("最终方向", options.finalMarketBias)
+            + consistencyRow("最终计划模式", options.finalPlanMode)
             + '</div>'
-            + '<div class="consistency-summary"><span>一句话摘要</span><p>' + escapeHtml(summary) + '</p></div>';
+            + '<div class="consistency-summary"><span>主要原因</span><p>'
+            + escapeHtml(formalContractValue(options.mainReason)) + '</p></div>'
+            + (cleanBlankValue(options.recoveryCondition)
+                ? '<div class="consistency-summary"><span>恢复条件</span><p>'
+                    + escapeHtml(formalContractValue(options.recoveryCondition)) + '</p></div>'
+                : '');
+    }
+
+    function roleMetadata(role) {
+        return aiRoleSummaryStrip([
+            ["角色状态", role.roleState],
+            ["数据状态", role.dataState],
+            ["Analysis", role.analysisId],
+            ["Trace", role.traceId],
+            ["生成时间", role.generatedAt]
+        ]);
+    }
+
+    function evidenceItemText(item) {
+        item = item || {};
+        return [
+            item.evidenceId,
+            item.type,
+            item.source,
+            item.currentValue,
+            item.change,
+            item.direction,
+            item.strength,
+            item.confidence,
+            item.observedAt,
+            item.freshness,
+            item.analysisId
+        ].map(cleanBlankValue).filter(Boolean).join(" · ");
+    }
+
+    function findingItemText(item) {
+        item = item || {};
+        return [
+            item.findingId,
+            item.category,
+            item.text,
+            item.impact,
+            item.triggerCondition,
+            item.observationWindow,
+            evidenceValueText(item.validationIndicators),
+            item.source,
+            item.observedAt,
+            item.eventWindow,
+            item.phenomenon,
+            item.timeframe,
+            item.metric,
+            item.currentState,
+            evidenceValueText(item.evidenceRefs)
+        ]
+            .map(cleanBlankValue).filter(Boolean).join(" · ");
+    }
+
+    function failurePathItemText(item) {
+        item = item || {};
+        var path = [item.hypothesis, item.triggerCondition, item.causalPath,
+            item.observationWindow, evidenceValueText(item.validationIndicators),
+            evidenceValueText(item.sourceRefs), item.invalidatingEvidence]
+            .map(cleanBlankValue).filter(Boolean).join(" · ");
+        return [item.failurePathId, path].map(cleanBlankValue).filter(Boolean).join(" · ");
+    }
+
+    function renderFormalCollection(label, state, values, formatter) {
+        var rows = Array.isArray(values) ? values : [];
+        var items = rows.map(function (value) { return formatter(value); }).filter(Boolean);
+        return aiRoleFooter(label + "状态", state)
+            + (items.length ? aiRoleEvidenceList(items.map(function (value, index) {
+                return [label + " " + (index + 1), value];
+            })) : "");
     }
 
     function renderGptFinalHomeRole(role) {
         role = role || {};
-        var finalBias = role.finalMarketBias || role.direction;
-        var confidence = role.finalConfidence || role.confidenceLevel;
-        var conclusion = role.finalConclusion || role.reviewConclusion;
+        var judgment = role.coreJudgment || {};
+        var candidate = role.candidateSummary || {};
+        var multi = role.multiTimeframeExplanation || {};
+        var adjustment = role.biasAdjustment || {};
         return '<div class="ai-evidence-grid">'
+            + roleMetadata(role)
             + aiRoleSummaryStrip([
-                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
-                ["最终倾向", biasText(finalBias) !== "—" ? biasText(finalBias) : finalBias, "暂无"],
-                ["置信度", confidenceLabelText(confidence), "暂无"],
-                ["最终结论", conclusion, "等待同步"]
+                ["Market Bias", judgment.marketBias],
+                ["Opportunity State", judgment.opportunityState],
+                ["Plan Mode", candidate.planMode],
+                ["置信度", candidate.confidence],
+                ["风险", candidate.riskLevel],
+                ["是否值得开仓", candidate.worthOpening]
             ])
             + aiRoleEvidenceList([
-                ["风险等级", riskLevelLabel(role.finalRiskLevel), "暂无"],
-                ["AI 计划模式", planModeLabel(role.finalPlanMode), "暂无"],
-                ["是否值得开仓", role.worthOpening, "等待同步"],
-                ["裁决摘要", role.decisionSummary || conclusion, "等待同步"],
-                ["最终采纳的核心支持证据", role.coreSupportingEvidence || role.supportEvidence, "暂无该角色证据"],
-                ["最终考虑的核心反证", role.coreCounterEvidence || role.againstEvidence, "暂无该角色证据"]
+                ["核心判断", judgment.text],
+                ["4h", multi["4h"] || multi.fourHour],
+                ["1h", multi["1h"] || multi.oneHour],
+                ["15m", multi["15m"] || multi.fifteenMinute],
+                ["5m", multi["5m"] || multi.fiveMinute],
+                ["Candidate形成摘要", candidate.summary]
             ])
-            + aiRoleFooter("降级 / 阻断原因", role.downgradeReason, "暂无该角色证据")
+            + aiRoleFooter("方向调整", [adjustment.before, adjustment.after, adjustment.reason]
+                .map(cleanBlankValue).filter(Boolean).join(" · "))
+            + renderFormalCollection("支持证据", role.supportingEvidenceState,
+                role.supportingEvidence, evidenceItemText)
+            + renderFormalCollection("反对证据", role.opposingEvidenceState,
+                role.opposingEvidence, evidenceItemText)
             + '</div>';
     }
 
     function renderGeminiReviewHomeRole(role) {
         role = role || {};
+        var downgrade = role.downgradeSuggestion || {};
         return '<div class="ai-evidence-grid">'
+            + roleMetadata(role)
             + aiRoleSummaryStrip([
-                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
-                ["复核结论", role.reviewConclusion, "等待同步"],
-                ["复核意见", role.reviewVerdict, "等待同步"],
-                ["是否需要人工复核", role.manualReviewRequired, "等待同步"]
+                ["复核结论", role.reviewResult],
+                ["方向影响", role.finalDirectionImpact],
+                ["置信度调整", role.confidenceAdjustment],
+                ["风险调整", role.riskAdjustment],
+                ["计划模式调整", role.planModeAdjustment]
             ])
-            + aiRoleEvidenceList([
-                ["发现的冲突", role.detectedContradictions, "暂无该角色证据"],
-                ["证据不足点", role.weakEvidence, "暂无该角色证据"],
-                ["逻辑漏洞", role.logicGaps, "暂无该角色证据"],
-                ["是否建议降级", role.downgradeRecommendation, "等待同步"],
-                ["风险调整建议", role.riskAdjustmentSuggestion, "等待同步"],
-                ["复核摘要", role.reviewConclusion || role.reviewVerdict, "等待同步"]
-            ])
+            + aiRoleFooter("降级建议", [downgrade.before, downgrade.after,
+                downgrade.reason, downgrade.recoveryCondition]
+                .map(cleanBlankValue).filter(Boolean).join(" · "))
+            + aiRoleFooter("恢复条件", role.recoveryCondition)
+            + renderFormalCollection("证据缺口", role.evidenceGapsState,
+                role.evidenceGaps, findingItemText)
+            + renderFormalCollection("逻辑冲突", role.logicConflictsState,
+                role.logicConflicts, findingItemText)
+            + renderFormalCollection("风险低估", role.underestimatedRisksState,
+                role.underestimatedRisks, findingItemText)
             + '</div>';
     }
 
     function renderGrokChallengeHomeRole(role) {
         role = role || {};
         return '<div class="ai-evidence-grid">'
+            + roleMetadata(role)
             + aiRoleSummaryStrip([
-                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
-                ["反方论点", role.challengeThesis, "等待同步"],
-                ["反方挑战结论", role.challengeConclusion, "等待同步"],
-                ["风险提示摘要", role.challengeConclusion || role.challengeThesis, "等待同步"]
+                ["挑战摘要", role.challengeSummary],
+                ["当前方向挑战", role.currentDirectionChallenge],
+                ["重大反证", role.majorCounterEvidence],
+                ["风险调整", role.riskAdjustment],
+                ["计划模式影响", role.planModeImpact]
             ])
-            + aiRoleEvidenceList([
-                ["突发新闻 / 事件风险", role.eventRisks, "暂无该角色证据"],
-                ["情绪反转风险", role.sentimentReversalRisks, "暂无该角色证据"],
-                ["微观结构陷阱", role.microstructureTraps, "暂无该角色证据"],
-                ["流动性 / 插针 / 挤仓风险", role.liquidityRisks, "暂无该角色证据"],
-                ["反向证据", role.counterEvidence, "暂无该角色证据"]
-            ])
+            + renderFormalCollection("失败路径", role.failurePathState,
+                role.failurePaths, failurePathItemText)
+            + renderFormalCollection("反向情景", role.opposingScenariosState,
+                role.opposingScenarios, findingItemText)
+            + renderFormalCollection("外部事件风险", role.externalEventRisksState,
+                role.externalEventRisks, findingItemText)
+            + renderFormalCollection("微观结构风险", role.microstructureRisksState,
+                role.microstructureRisks, findingItemText)
+            + renderFormalCollection("观察指标", role.watchIndicatorsState,
+                role.watchIndicators, findingItemText)
             + '</div>';
     }
 
     function renderUnavailableAiRole(role) {
         role = role || {};
         return '<div class="ai-evidence-grid">'
+            + roleMetadata(role)
             + aiRoleSummaryStrip([
-                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "未调用"],
-                ["状态说明", role.statusMessage, "本轮未调用该角色"]
-            ])
-            + '</div>';
-    }
-
-    function renderAbstainedAiRole(role) {
-        role = role || {};
-        return '<div class="ai-evidence-grid">'
-            + aiRoleSummaryStrip([
-                ["运行状态", role.runStatusLabel || aiRunStatusLabel(role.runStatus), "复核成功"],
-                ["角色结论", role.reviewConclusion, "证据不足，暂不判断"]
+                ["调用状态", role.runStatus],
+                ["状态说明", role.statusMessage]
             ])
             + '</div>';
     }
@@ -7945,23 +7949,10 @@
         role = role || {};
         var roleHtml;
         if (role.resultAvailable !== true) roleHtml = renderUnavailableAiRole(role);
-        else if (String(role.stance || "").toUpperCase() === "ABSTAIN") roleHtml = renderAbstainedAiRole(role);
         else if (tab === "GPT_FINAL") roleHtml = renderGptFinalHomeRole(role);
         else if (tab === "GEMINI_REVIEW") roleHtml = renderGeminiReviewHomeRole(role);
         else roleHtml = renderGrokChallengeHomeRole(role);
-        return roleHtml
-            + '<p class="ai-provenance-note">当前角色观点 · 完整证据关联尚未提供</p>';
-    }
-
-    function aiEvidenceTable(rows) {
-        return '<div class="ai-evidence-list">' + rows.map(function (r, idx) {
-            var wide = idx === 4 ? ' wide' : '';
-            return '<div class="ai-evidence-item' + wide + '"><span class="ai-evidence-label">' + escapeHtml(r[0]) + '</span><span class="ai-evidence-value">' + escapeHtml(aiEvidenceDefaultValue(r[0], r[1])) + '</span></div>';
-        }).join("") + '</div>';
-    }
-
-    function aiEvidenceFallback() {
-        return "暂无证据";
+        return roleHtml;
     }
 
     function evidenceValueText(value) {
@@ -7971,117 +7962,6 @@
         }
         if (typeof value === "object") return compactAiText(JSON.stringify(value), 180);
         return compactAiText(String(value), 180);
-    }
-
-    function pickEvidenceText(obj, keys) {
-        obj = obj || {};
-        for (var i = 0; i < keys.length; i++) {
-            var text = evidenceValueText(obj[keys[i]]);
-            if (text) return text;
-        }
-        return "";
-    }
-
-    function aiSupportEvidence(d) {
-        var text = pickEvidenceText(d, [
-            "supportEvidences", "support_evidences",
-            "supportingEvidences", "supporting_evidences",
-            "positiveEvidences", "positive_evidences",
-            "mainSupportEvidence", "main_support_evidence",
-            "evidenceSummary", "evidence_summary"
-        ]);
-        return text || aiEvidenceFallback();
-    }
-
-    function aiOpposingEvidence(d) {
-        var text = pickEvidenceText(d, [
-            "opposingEvidences", "opposing_evidences",
-            "againstEvidences", "against_evidences",
-            "negativeEvidences", "negative_evidences",
-            "mainOpposingEvidence", "main_opposing_evidence",
-            "againstEvidence", "against_evidence"
-        ]);
-        return text || aiEvidenceFallback();
-    }
-
-    function roleSupportEvidence(roleObj) {
-        return pickEvidenceText(roleObj, ["supportEvidences", "support_evidences", "supportingEvidences", "supporting_evidences", "positiveEvidences", "positive_evidences", "supportEvidence", "support_evidence"]) || aiEvidenceFallback();
-    }
-
-    function roleOpposingEvidence(roleObj) {
-        return pickEvidenceText(roleObj, ["opposingEvidences", "opposing_evidences", "againstEvidences", "against_evidences", "negativeEvidences", "negative_evidences", "againstEvidence", "against_evidence"]) || aiEvidenceFallback();
-    }
-
-    function aiRiskPointText(d, conflict) {
-        if (!d) return "等待同步";
-        var risk = cleanBlankValue(decisionRiskText(d));
-        var conflictText = conflict && conflict.source === "backend" ? cleanBlankValue(conflict.label) : "";
-        var parts = [];
-        if (risk) parts.push("风险等级：" + risk);
-        if (conflictText) parts.push("冲突等级：" + conflictText);
-        parts.push("进入冲突状态：" + (resolveIsConfused(d) ? "是" : "否"));
-        parts.push("资产方向阻断：" + (resolveDirectionalBlock(d) ? "是" : "否"));
-        return parts.join("；");
-    }
-
-    function aiDowngradeReason(d) {
-        if (!d) return "等待同步";
-        if (resolveDirectionalBlock(d)) return "资产方向阻断";
-        if (resolveIsConfused(d)) return "已进入冲突状态";
-        if (isHighRisk(d)) return "高风险观察";
-        var reasons = parseReviewReasons(d.reviewReasons != null ? d.reviewReasons : d.review_reasons);
-        if (reasons.length) return reasons.slice(0, 2).join("；");
-        return "等待同步";
-    }
-
-    function renderAiDecisionOverview(d, payload) {
-        var c = d ? resolveAiConflict(d) : { label: "—", score: null, source: "fallback" };
-        var scoreText = d ? decisionScoreText(d) : "—";
-        var confidence = d ? decisionConfidenceText(d) : "—";
-        var risk = d ? decisionRiskText(d) : "—";
-        var planMode = d ? displayPlanCell(pickField(d, ["aiPlanMode", "ai_plan_mode"])) : "—";
-        var consistency = d ? formatWithSource(c.label, c.source) : "—";
-        var state = d ? assetStateText(d) : "—";
-        var opinion = d ? assetWorthOpenText(d) : "—";
-        var rows = [
-            ["最终方向", d ? assetDirectionText(d) : "—"],
-            ["综合评分", scoreText],
-            ["置信度", confidence],
-            ["风险等级", risk],
-            ["计划模式", planMode],
-            ["一致性等级", consistency],
-            ["主要支持证据", d ? aiSupportEvidence(d) : aiEvidenceFallback()],
-            ["主要反对证据", d ? aiOpposingEvidence(d) : aiEvidenceFallback()],
-            ["人工复核点", d ? aiRiskPointText(d, c) : "等待同步"],
-            ["恢复条件 / 降级原因", d ? aiDowngradeReason(d) : "等待同步"]
-        ];
-        return '<div class="ai-evidence-grid">'
-            + '<div class="ai-evidence-summary"><p class="main">' + escapeHtml(d ? assetDirectionText(d) : "等待裁决同步") + '</p>'
-            + '<p class="sub">状态 / 观点：' + escapeHtml(state !== "—" ? state : opinion) + '<br></p></div>'
-            + aiEvidenceTable(rows)
-            + '</div>';
-    }
-
-    function renderAiRoleEvidencePanel(d, payload, tab) {
-        var raw = aiRoleTextForTab(payload, tab);
-        var roleObj = aiRoleObjectForTab(payload, tab);
-        if (!roleObj || roleObj.resultAvailable !== true) {
-            return renderUnavailableAiRole(roleObj);
-        }
-        var c = d ? resolveAiConflict(d) : { label: "—", score: null, source: "fallback" };
-        var hasRaw = hasAiRoleRaw(raw);
-        var rows = [
-            ["方向判断", d ? assetDirectionText(d) : ""],
-            ["置信度", d ? decisionConfidenceText(d) : ""],
-            ["支持证据", roleSupportEvidence(roleObj)],
-            ["反对证据", roleOpposingEvidence(roleObj)],
-            ["风险点", d ? aiRiskPointText(d, c) : "等待同步"],
-            ["降级 / 阻断原因", d ? aiDowngradeReason(d) : "等待同步"],
-            ["复核结论", hasRaw ? compactAiText(raw, 170) : "等待同步"]
-        ];
-        return '<div class="ai-evidence-grid">'
-            + aiReviewEvidencePanel(rows)
-            + '</div>';
     }
 
     function homeCardValue(card) {
@@ -8189,15 +8069,18 @@
             return cleanBlankValue(tab.statusMessage) || "当前角色观点不可用";
         }
         if (tab.role === "GPT_FINAL") {
-            return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
-                || "当前观点待同步";
+            return cleanBlankValue(tab.coreJudgment && tab.coreJudgment.text)
+                || cleanBlankValue(tab.candidateSummary && tab.candidateSummary.summary)
+                || "--";
         }
         if (tab.role === "GEMINI_REVIEW") {
-            return cleanBlankValue(tab.reviewConclusion || tab.reviewVerdict || tab.statusMessage)
-                || "当前复核待同步";
+            return cleanBlankValue(tab.downgradeSuggestion && tab.downgradeSuggestion.reason)
+                || cleanBlankValue(tab.reviewResult)
+                || "--";
         }
-        return cleanBlankValue(tab.challengeConclusion || tab.challengeThesis || tab.statusMessage)
-            || "当前挑战待同步";
+        return cleanBlankValue(tab.challengeSummary)
+            || cleanBlankValue(tab.currentDirectionChallenge)
+            || "--";
     }
 
     function setActiveDesktopAiRole(role, focusTab) {
@@ -8299,11 +8182,13 @@
         var consistency = analysisState === "partial" ? (ai.consistency || {}) : {};
         setText(
             "desktopAiConsistencyLevel",
-            cleanBlankValue(consistency.consistencyLevel) || stateView.consistencyLevel
+            cleanBlankValue(consistency.conflictLevel)
+                ? aiConflictLevelLabel(consistency.conflictLevel)
+                : stateView.consistencyLevel
         );
         setText(
             "desktopAiConsistencySummary",
-            cleanBlankValue(consistency.consistencySummary)
+            cleanBlankValue(consistency.mainReason)
                 || stateView.consistencySummary
         );
         setText("desktopAiDetailStatus", stateView.detailStatus);
@@ -8332,10 +8217,10 @@
             var direction = panel.querySelector("[data-desktop-ai-role-direction]");
             var confidence = panel.querySelector("[data-desktop-ai-role-confidence]");
             if (direction) direction.textContent = resultAvailable
-                ? cleanBlankValue(tab.finalMarketBias) || "--"
+                ? cleanBlankValue(tab.coreJudgment && tab.coreJudgment.marketBias) || "--"
                 : "";
             if (confidence) confidence.textContent = resultAvailable
-                ? cleanBlankValue(tab.finalConfidence) || "--"
+                ? cleanBlankValue(tab.candidateSummary && tab.candidateSummary.confidence) || "--"
                 : "";
         });
     }
@@ -8600,8 +8485,8 @@
             return cleaned || fallback || "--";
         }
         box.dataset.exactPlanVisible = String(access.visible);
-        var worthOpening = access.visible && selectedAsset && selectedAsset.worthOpening === true
-            ? "是" : (access.visible && selectedAsset && selectedAsset.worthOpening === false ? "否" : "--");
+        var worthOpening = access.visible && s.worthOpening === true
+            ? "是" : (access.visible && s.worthOpening === false ? "否" : "--");
         setText("homeExecutionStatus", "是否值得开仓 · " + (worthOpening === "--" ? "待同步" : worthOpening));
         function verified(value) {
             return access.visible ? value : "--";
@@ -8641,21 +8526,6 @@
         var cards = document.getElementById("homeAiSummaryCards");
         var ai = aiDecision || {};
         var tabList = frontendContract.normalizeAiTabs(ai.tabs);
-        function summary(tab) {
-            if (tab.resultAvailable !== true) {
-                return cleanBlankValue(tab.statusMessage) || "当前角色观点不可用";
-            }
-            if (tab.role === "GPT_FINAL") {
-                return cleanBlankValue(tab.finalConclusion || tab.decisionSummary || tab.statusMessage)
-                    || "当前观点待同步";
-            }
-            if (tab.role === "GEMINI_REVIEW") {
-                return cleanBlankValue(tab.reviewConclusion || tab.reviewVerdict || tab.statusMessage)
-                    || "当前复核待同步";
-            }
-            return cleanBlankValue(tab.challengeConclusion || tab.challengeThesis || tab.statusMessage)
-                || "当前挑战待同步";
-        }
         if (cards) {
             cards.innerHTML = '<div class="home-ai-role-tabs" role="tablist" aria-label="AI 三角色">'
                 + tabList.map(function (tab, index) {
@@ -8677,7 +8547,7 @@
                     + '><div class="home-ai-summary-head"><strong>' + escapeHtml(tab.role) + '</strong><span> · '
                     + escapeHtml(aiTabLabel(tab.role)) + '</span><em>'
                     + escapeHtml(tab.runStatusLabel || "待同步") + '</em></div>'
-                    + '<p>' + escapeHtml(summary(tab)) + '</p></article>';
+                    + renderHomeAiRoleTab(tab, tab.role) + '</article>';
             }).join("") + '</div>';
             var roleTabs = Array.prototype.slice.call(cards.querySelectorAll("[data-home-ai-tab]"));
             function activate(role, focus) {
@@ -8708,16 +8578,20 @@
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
             var c = ai.consistency || {};
-            var aiApplicable = c.aiApplicable !== false && c.ai_applicable !== false;
             consistency.innerHTML = renderHomeConsistencyCard({
-                level: c.consistencyLevel || c.consistency_level || "",
-                conflictLevel: aiApplicable ? aiConflictLevelLabel(c.level) : "不适用",
-                aiApplicable: aiApplicable,
-                confused: !!c.confused,
-                summary: c.consistencySummary || c.consistency_summary || c.summary || c.conclusion || c.oneSentenceSummary || ""
+                dataState: c.dataState || c.data_state || "SOURCE_UNAVAILABLE",
+                rawConflictLevel: c.conflictLevel || c.conflict_level,
+                rawFinalPlanMode: c.finalPlanMode || c.final_plan_mode,
+                conflictLevel: aiConflictLevelLabel(c.conflictLevel || c.conflict_level),
+                finalMarketBias: biasText(c.finalMarketBias || c.final_market_bias),
+                finalPlanMode: planModeLabel(c.finalPlanMode || c.final_plan_mode),
+                mainReason: c.mainReason || c.main_reason || "",
+                recoveryCondition: c.recoveryCondition || c.recovery_condition || ""
             });
             setText("homeAiConsistencyStatus", "AI 一致性 · "
-                + (cleanBlankValue(c.consistencyLevel || c.consistency_level) || "等待同步"));
+                + (String(c.dataState || c.data_state || "").toUpperCase() === "READY"
+                    ? aiConflictLevelLabel(c.conflictLevel || c.conflict_level)
+                    : "暂无一致性数据"));
         }
         renderDesktopAiAnalysis(ai, asset || null);
     }
@@ -8777,7 +8651,7 @@
         renderHomeAiDecisionFromPayload({
             runStatus: "LOADING",
             runStatusLabel: "正在同步",
-            consistency: { aiApplicable: false, consistencySummary: "正在同步当前资产一致性摘要" },
+            consistency: { dataState: "SOURCE_UNAVAILABLE" },
             tabs: []
         }, null);
         document.getElementById("lastUpdatedText").textContent = "正在同步";
@@ -8855,12 +8729,12 @@
         renderHomeAiDecisionFromPayload({
             runStatus: "LOAD_FAILED",
             runStatusLabel: "当前不可查看",
-            consistency: { aiApplicable: false },
+            consistency: { dataState: "SOURCE_UNAVAILABLE" },
             tabs: []
         }, null);
         var consistency = document.getElementById("homeConsistencyContent");
         if (consistency) {
-            consistency.innerHTML = renderHomeConsistencyCard({ aiApplicable: false, summary: "首页数据暂不可用，等待重新同步" });
+            consistency.innerHTML = renderHomeConsistencyCard({ dataState: "SOURCE_UNAVAILABLE" });
         }
         renderHomePushInboxFromPayload({});
         setHomeRetryVisible(true, false);
@@ -8913,10 +8787,7 @@
             runStatus: "LOAD_FAILED",
             runStatusLabel: "当前不可查看",
             consistency: {
-                aiApplicable: false,
-                consistencySummary: missing
-                    ? "当前资产不存在或不可访问，无法生成一致性摘要"
-                    : "当前资产同步失败，无法生成一致性摘要"
+                dataState: "SOURCE_UNAVAILABLE"
             },
             tabs: []
         }, null);
@@ -9251,7 +9122,7 @@
     }
 
     function structuredWorkbenchEmptyState() {
-        var symbol = DEFAULT_DISPLAY_SLOT_SYMBOLS[0];
+        var symbol = "暂无";
         return '<div class="workbench-grid">'
             + '<div class="workbench-panel"><h4>结构化空态</h4><p class="workbench-lead">等待首轮分析生成后显示当前标的结论。</p>'
             + workbenchReviewStrip("Manual Review Focus", "等待首轮分析；不展示价格、评分、机会或 AI 结果。")
@@ -10062,14 +9933,15 @@
     }
 
     function normalizeMarketQuoteSampleSymbol(symbol) {
-        var raw = (symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0] || "BTCUSDT").toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-        if (!raw) return "BTCUSDT";
+        var raw = (symbol || "").toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (!raw) return null;
         return raw.indexOf("USDT") === raw.length - 4 ? raw : raw + "USDT";
     }
 
     function resolveMarketQuoteRuntimeStatus(payload, requestedSymbol) {
         var p = payload && typeof payload === "object" ? payload : {};
-        var sample = firstNonEmpty(p.sampleSymbol, requestedSymbol, DEFAULT_DISPLAY_SLOT_SYMBOLS[0], "BTCUSDT").toUpperCase();
+        var sampleValue = firstNonEmpty(p.sampleSymbol, requestedSymbol, "");
+        var sample = sampleValue ? sampleValue.toUpperCase() : null;
         return {
             status: firstNonEmpty(p.status, MARKETQUOTE_STATUS_MISSING).toUpperCase(),
             sampleSymbol: sample,
@@ -10096,7 +9968,7 @@
         if (qs.freshnessSeconds != null) freshness += " · " + qs.freshnessSeconds + "s";
         if (qs.staleThresholdSeconds != null) freshness += " / threshold " + qs.staleThresholdSeconds + "s";
         setText("marketQuoteRuntimeStatusValue", (qs.status || MARKETQUOTE_STATUS_MISSING) + " / " + (qs.message || "只读状态"));
-        setText("marketQuoteSampleSymbolValue", qs.sampleSymbol || "BTCUSDT");
+        setText("marketQuoteSampleSymbolValue", qs.sampleSymbol || "暂无");
         setText("marketQuoteSourceValue", qs.source || "UNKNOWN");
         setText("marketQuoteSourceTypeValue", qs.sourceType || "MISSING");
         setText("marketQuoteFreshnessValue", freshness);
@@ -10110,6 +9982,12 @@
 
     function fetchMarketQuoteRuntimeStatus(symbol) {
         var sample = normalizeMarketQuoteSampleSymbol(symbol);
+        if (!sample) {
+            marketQuoteRuntimeStatus = resolveMarketQuoteRuntimeStatus({}, null);
+            window.__marketQuoteReviewStatus = MARKETQUOTE_STATUS_MISSING;
+            updateMarketQuoteRuntimeStatusDisplay();
+            return Promise.resolve(null);
+        }
         return fetch("/api/market/quote-status?symbol=" + encodeURIComponent(sample))
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
             .then(function (payload) {
@@ -11938,7 +11816,7 @@
             .catch(function () {
                 fetchWatchlistRuntimeStatus();
                 fetchRuleConfigAuditRuntimeStatus();
-                fetchMarketQuoteRuntimeStatus(selectedSymbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
+                fetchMarketQuoteRuntimeStatus(selectedSymbol);
                 fetchEvidenceScoreRuntimeStatus(selectedSymbol);
                 fetchDecisionResultRuntimeStatus(selectedSymbol);
                 fetchExecutionPlanBoundaryRuntimeStatus(selectedSymbol);
@@ -11961,7 +11839,7 @@
     function requestDetailForSelectedSymbol() {
         var symbol = selectedSymbol;
         fetchRuntimeReadinessGuardrailStatus();
-        fetchMarketQuoteRuntimeStatus(symbol || DEFAULT_DISPLAY_SLOT_SYMBOLS[0]);
+        fetchMarketQuoteRuntimeStatus(symbol);
         fetchEvidenceScoreRuntimeStatus(symbol);
         fetchDecisionResultRuntimeStatus(symbol);
         fetchExecutionPlanBoundaryRuntimeStatus(symbol);

@@ -111,6 +111,7 @@ public class ExternalContextEvidenceBuilder {
     private static EvidenceItemVO toEvidence(String analysisId, ExternalContextEventDO event, String eventType, String label, String state) {
         EvidenceItemVO ev = new EvidenceItemVO();
         ev.setEvidenceId("ev-ext-" + Integer.toHexString((String.valueOf(analysisId) + eventType + event.getEventId()).hashCode()));
+        ev.setAnalysisId(analysisId);
         ev.setEvidenceType("MACRO".equals(eventType) ? EvidenceTypeConstants.MACRO : EvidenceTypeConstants.NEWS);
         ev.setDirection(EvidenceTypeConstants.normalizeEvidenceDirection(event.getDirection()));
         ev.setSource(EvidenceTypeConstants.EVIDENCE_SOURCE_EXTERNAL_CONTEXT);
@@ -125,6 +126,10 @@ public class ExternalContextEvidenceBuilder {
         ev.setSeverity(event.getSeverity());
         ev.setStrength(event.getImpactScore() == null ? null : event.getImpactScore().doubleValue());
         ev.setConfidence(80.0);
+        ev.setCurrentValue(state);
+        ev.setChangeFromBaseline("EVENT_IMPACT_SCORE=" + event.getImpactScore());
+        ev.setObservedAt(event.getSourcePublishedAt() != null ? event.getSourcePublishedAt() : event.getEventTime());
+        ev.setFreshness("FRESH");
         ev.setDescription(String.format(Locale.ROOT, "External context %s event [%s] provider=%s impactScore=%s severity=%s windowState=%s sourceTraceId=%s", eventType, label, event.getProvider(), event.getImpactScore(), event.getSeverity(), state, event.getSourceTraceId()));
         return ev;
     }

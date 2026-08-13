@@ -1,5 +1,6 @@
 package org.example.trademodel.service;
 
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,12 +13,30 @@ class MarketBiasPolicyTest {
     void coversAllEightFormalMarketBiasLevels() {
         assertThat(classify(up(), up(), up(), up())).isEqualTo("STRONG_BULLISH");
         assertThat(classify(up(), up(), down(), up())).isEqualTo("BULLISH");
-        assertThat(classify(up(), flat(), flat(), down())).isEqualTo("RANGE");
+        assertThat(classify(flat(), flat(), flat(), flat())).isEqualTo("RANGE");
         assertThat(classify(up(), flat(), flat(), up())).isEqualTo("WEAK_BULLISH");
         assertThat(classify(down(), flat(), flat(), down())).isEqualTo("WEAK_BEARISH");
         assertThat(classify(down(), down(), up(), down())).isEqualTo("BEARISH");
         assertThat(classify(down(), down(), down(), down())).isEqualTo("STRONG_BEARISH");
         assertThat(classify(List.of(), up(), up(), up())).isEqualTo("WAIT");
+    }
+
+    @Test
+    void usesFrozenWeightsSoFourHourAndOneHourOutweighLowerTimeframes() {
+        assertThat(classify(down(), down(), up(), up())).isEqualTo("WEAK_BULLISH");
+        assertThat(classify(up(), up(), down(), down())).isEqualTo("WEAK_BEARISH");
+    }
+
+    @Test
+    void missingWeightConfigurationFailsClosed() {
+        FundamentalAiV41Properties.MultiTimeframe config =
+                FundamentalAiV41Properties.contractFixture().getMultiTimeframe();
+        config.setFourHourWeight(null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        MarketBiasPolicy.classify(up(), up(), up(), up(), config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("configuration is required");
     }
 
     @Test

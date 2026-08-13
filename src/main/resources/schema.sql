@@ -6,6 +6,10 @@ CREATE TABLE IF NOT EXISTS tm_analysis_run (
     timeframe VARCHAR(10) NOT NULL,
     analysis_time TIMESTAMP NOT NULL,
     rule_version VARCHAR(32),
+    owner_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+    owner_id BIGINT NOT NULL DEFAULT 0,
+    asset_id BIGINT,
+    preview BOOLEAN NOT NULL DEFAULT FALSE,
     data_quality_score INT,
     trace_id VARCHAR(128),
     status VARCHAR(20),
@@ -27,6 +31,10 @@ CREATE TABLE IF NOT EXISTS tm_analysis_run (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     version_no INT NOT NULL DEFAULT 1,
+    CONSTRAINT ck_tm_analysis_run_owner CHECK (
+        (owner_type = 'SYSTEM' AND owner_id = 0)
+        OR (owner_type = 'USER' AND owner_id > 0)
+    ),
     CONSTRAINT ck_tm_analysis_run_status CHECK (
         status IS NULL OR status IN ('STARTED', 'SUCCESS', 'FAILED')
     )
@@ -48,6 +56,10 @@ CREATE TABLE IF NOT EXISTS tm_evidence_item (
     strength DOUBLE,
     confidence DOUBLE,
     source VARCHAR(100),
+    current_value VARCHAR(512),
+    change_from_baseline VARCHAR(512),
+    observed_at TIMESTAMP,
+    freshness VARCHAR(32),
     source_provider VARCHAR(100),
     source_reference VARCHAR(512),
     source_trace_id VARCHAR(128),
@@ -180,13 +192,46 @@ CREATE TABLE IF NOT EXISTS tm_decision_result (
     ai_conflict_level VARCHAR(64),
     ai_conflict_score INT,
     ai_plan_mode VARCHAR(50),
+    rule_market_bias VARCHAR(32),
+    final_market_bias VARCHAR(32),
+    rule_confidence VARCHAR(16),
+    rule_risk VARCHAR(16),
+    rule_plan_mode VARCHAR(32),
+    rule_can_execute BOOLEAN,
+    candidate_plan_mode VARCHAR(32),
+    final_plan_mode VARCHAR(32),
+    bias_adjustment_reason VARCHAR(512),
+    plan_mode_adjustment_reason VARCHAR(512),
+    adjustment_reason VARCHAR(512),
+    downgrade_reason VARCHAR(512),
     confused_score INT,
     asset_state_snapshot VARCHAR(512),
     hot_reset_invalidated BOOLEAN NOT NULL DEFAULT FALSE,
     hot_reset_event_id VARCHAR(64),
     hot_reset_invalidated_at TIMESTAMP,
     hot_reset_reason_code VARCHAR(64),
-    create_time TIMESTAMP
+    create_time TIMESTAMP,
+    CONSTRAINT ck_tm_decision_v41_market_bias CHECK (
+        (rule_market_bias IS NULL OR rule_market_bias IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+        AND (final_market_bias IS NULL OR final_market_bias IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+    ),
+    CONSTRAINT ck_tm_decision_v41_plan_mode CHECK (
+        (rule_plan_mode IS NULL OR rule_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        ))
+        AND (candidate_plan_mode IS NULL OR candidate_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        ))
+        AND (final_plan_mode IS NULL OR final_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        ))
+    )
 );
 
 CREATE TABLE IF NOT EXISTS tm_execution_plan (
@@ -206,7 +251,18 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     leverage_suggestion VARCHAR(50),
     position_suggestion VARCHAR(100),
     account_risk_json TEXT,
+    execution_feasibility_status VARCHAR(32) NOT NULL DEFAULT 'UNAVAILABLE',
+    slippage_status VARCHAR(32) NOT NULL DEFAULT 'UNAVAILABLE',
+    depth_status VARCHAR(32) NOT NULL DEFAULT 'UNAVAILABLE',
+    entry_drift_status VARCHAR(32) NOT NULL DEFAULT 'UNAVAILABLE',
+    trigger_status VARCHAR(32) NOT NULL DEFAULT 'UNAVAILABLE',
+    execution_feasibility_reason CLOB,
+    execution_feasibility_observed_at TIMESTAMP,
+    execution_feasibility_fresh_until TIMESTAMP,
+    execution_feasibility_source_refs_json CLOB,
     invalid_condition TEXT,
+    invalidation_source VARCHAR(256),
+    invalidation_reason CLOB,
     manual_review_required BOOLEAN NOT NULL DEFAULT TRUE,
     not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
     not_executable BOOLEAN NOT NULL DEFAULT TRUE,
@@ -223,9 +279,54 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     trace_id VARCHAR(128),
     chain_status VARCHAR(32) NOT NULL DEFAULT 'LEGACY',
     rule_validation_status VARCHAR(32) NOT NULL DEFAULT 'LEGACY',
-    rule_veto_reason VARCHAR(512),
+    rule_veto_reason CLOB,
     finalized_at TIMESTAMP,
     final_plan BOOLEAN NOT NULL DEFAULT FALSE,
+    asset_id BIGINT,
+    rule_version VARCHAR(32),
+    rule_market_bias VARCHAR(32),
+    final_market_bias VARCHAR(32),
+    candidate_plan_mode VARCHAR(32),
+    final_plan_mode VARCHAR(32),
+    bias_adjustment_reason VARCHAR(512),
+    plan_mode_adjustment_reason VARCHAR(512),
+    adjustment_reason VARCHAR(512),
+    downgrade_reason VARCHAR(512),
+    opportunity_type VARCHAR(64),
+    entry_logic CLOB,
+    entry_source VARCHAR(256),
+    entry_reason CLOB,
+    trigger_condition CLOB,
+    stop_logic CLOB,
+    stop_source VARCHAR(256),
+    stop_reason CLOB,
+    target_logic CLOB,
+    target_source VARCHAR(256),
+    target_reason CLOB,
+    add_position_condition CLOB,
+    reduce_position_condition CLOB,
+    abandon_condition CLOB,
+    risk_explanation CLOB,
+    leverage_limit VARCHAR(50),
+    position_limit VARCHAR(100),
+    risk_limit DECIMAL(20, 8),
+    expected_risk_reward DECIMAL(20, 8),
+    expected_risk_reward_source VARCHAR(256),
+    expected_risk_reward_reason CLOB,
+    account_risk_snapshot_id BIGINT,
+    analysis_timeframes_json CLOB,
+    trigger_timeframe VARCHAR(16),
+    valid_from TIMESTAMP,
+    valid_until TIMESTAMP,
+    holding_horizon VARCHAR(64),
+    revalidation_rule CLOB,
+    data_quality INT,
+    source_refs_json CLOB,
+    evidence_refs_json CLOB,
+    score_refs_json CLOB,
+    validation_result_id VARCHAR(64),
+    validation_reasons CLOB,
+    source_status VARCHAR(32),
     create_time TIMESTAMP,
     CONSTRAINT ck_tm_execution_plan_status CHECK (
         execution_plan_status IN ('VALID', 'INCOMPLETE', 'BLOCKED', 'REVIEW_ONLY', 'INVALID')
@@ -239,6 +340,43 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     CONSTRAINT ck_tm_execution_plan_rule_validation CHECK (
         rule_validation_status IN ('LEGACY', 'PASS', 'BLOCKED')
     ),
+    CONSTRAINT ck_tm_execution_plan_execution_feasibility CHECK (
+        execution_feasibility_status IN ('VERIFIED', 'PENDING', 'UNAVAILABLE', 'INVALID', 'STALE')
+        AND slippage_status IN ('VERIFIED', 'PENDING', 'UNAVAILABLE', 'INVALID', 'STALE')
+        AND depth_status IN ('VERIFIED', 'PENDING', 'UNAVAILABLE', 'INVALID', 'STALE')
+        AND entry_drift_status IN ('VERIFIED', 'PENDING', 'UNAVAILABLE', 'INVALID', 'STALE')
+        AND trigger_status IN ('VERIFIED', 'PENDING', 'UNAVAILABLE', 'INVALID', 'STALE')
+        AND (
+            execution_feasibility_status <> 'VERIFIED'
+            OR (
+                slippage_status = 'VERIFIED'
+                AND depth_status = 'VERIFIED'
+                AND entry_drift_status = 'VERIFIED'
+                AND trigger_status = 'VERIFIED'
+                AND execution_feasibility_observed_at IS NOT NULL
+                AND execution_feasibility_fresh_until > execution_feasibility_observed_at
+                AND execution_feasibility_source_refs_json IS NOT NULL
+            )
+        )
+    ),
+    CONSTRAINT ck_tm_execution_plan_v41_market_bias CHECK (
+        (rule_market_bias IS NULL OR rule_market_bias IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+        AND (final_market_bias IS NULL OR final_market_bias IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+    ),
+    CONSTRAINT ck_tm_execution_plan_v41_plan_mode CHECK (
+        (candidate_plan_mode IS NULL OR candidate_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        ))
+        AND (final_plan_mode IS NULL OR final_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        ))
+    ),
     CONSTRAINT ck_tm_execution_plan_final_boundary CHECK (
         (
             final_plan = TRUE
@@ -246,9 +384,61 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
             AND opportunity_id IS NOT NULL
             AND resolver_result_id IS NOT NULL
             AND trace_id IS NOT NULL
+            AND validation_result_id IS NOT NULL
+            AND analysis_id IS NOT NULL
+            AND asset_id IS NOT NULL
+            AND rule_version IS NOT NULL
+            AND rule_market_bias IS NOT NULL
+            AND final_market_bias IS NOT NULL
+            AND candidate_plan_mode IS NOT NULL
+            AND final_plan_mode IN ('CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION')
+            AND opportunity_type IS NOT NULL
+            AND recommended_action IS NOT NULL
+            AND entry_logic IS NOT NULL
+            AND entry_zone IS NOT NULL AND entry_source IS NOT NULL AND entry_reason IS NOT NULL
+            AND trigger_condition IS NOT NULL
+            AND stop_logic IS NOT NULL
+            AND stop_loss IS NOT NULL AND stop_source IS NOT NULL AND stop_reason IS NOT NULL
+            AND target_logic IS NOT NULL
+            AND take_profit_rules IS NOT NULL AND target_source IS NOT NULL AND target_reason IS NOT NULL
+            AND add_position_condition IS NOT NULL
+            AND reduce_position_condition IS NOT NULL
+            AND abandon_condition IS NOT NULL
+            AND invalid_condition IS NOT NULL
+            AND invalidation_source IS NOT NULL
+            AND invalidation_reason IS NOT NULL
+            AND risk_explanation IS NOT NULL
+            AND leverage_limit IS NOT NULL
+            AND position_limit IS NOT NULL
+            AND risk_limit IS NOT NULL AND risk_limit > 0
+            AND account_risk_snapshot_id IS NOT NULL
+            AND execution_feasibility_status = 'VERIFIED'
+            AND slippage_status = 'VERIFIED'
+            AND depth_status = 'VERIFIED'
+            AND entry_drift_status = 'VERIFIED'
+            AND trigger_status = 'VERIFIED'
+            AND execution_feasibility_observed_at IS NOT NULL
+            AND execution_feasibility_fresh_until > execution_feasibility_observed_at
+            AND execution_feasibility_source_refs_json IS NOT NULL
+            AND expected_risk_reward IS NOT NULL AND expected_risk_reward > 0
+            AND expected_risk_reward_source IS NOT NULL
+            AND expected_risk_reward_reason IS NOT NULL
+            AND analysis_timeframes_json IS NOT NULL
+            AND trigger_timeframe IS NOT NULL
+            AND valid_from IS NOT NULL
+            AND valid_until IS NOT NULL
+            AND valid_until > valid_from
+            AND holding_horizon IS NOT NULL
+            AND revalidation_rule IS NOT NULL
+            AND data_quality BETWEEN 0 AND 100
+            AND source_refs_json IS NOT NULL
+            AND evidence_refs_json IS NOT NULL
+            AND score_refs_json IS NOT NULL
+            AND adjustment_reason IS NOT NULL
+            AND source_status = 'VALID'
             AND finalized_at IS NOT NULL
             AND rule_validation_status = 'PASS'
-            AND chain_status IN ('FINAL_VALIDATED', 'RULE_FALLBACK_VALIDATED')
+            AND chain_status = 'FINAL_VALIDATED'
         )
         OR (
             final_plan = FALSE
@@ -401,7 +591,7 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     closed_at TIMESTAMP,
     close_price DECIMAL(20, 8),
     close_reason VARCHAR(512),
-    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL_POSITION',
+    source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL_INDEPENDENT',
     source_ref_id VARCHAR(128),
     final_plan_id VARCHAR(64),
     manual_review_required BOOLEAN NOT NULL DEFAULT TRUE,
@@ -414,7 +604,7 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     CONSTRAINT ck_tm_user_position_side CHECK (side IN ('LONG', 'SHORT')),
     CONSTRAINT ck_tm_user_position_status CHECK (status IN ('OPEN', 'PARTIALLY_CLOSED', 'CLOSED')),
     CONSTRAINT ck_tm_user_position_source_type CHECK (
-        (source_type = 'MANUAL_POSITION' AND final_plan_id IS NULL)
+        (source_type = 'MANUAL_INDEPENDENT' AND final_plan_id IS NULL)
         OR (source_type = 'SYSTEM_PLAN_POSITION' AND final_plan_id IS NOT NULL)
     ),
     CONSTRAINT ck_tm_user_position_entry_price CHECK (entry_price > 0),
@@ -572,17 +762,37 @@ CREATE TABLE IF NOT EXISTS tm_account_risk_snapshot (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     analysis_id VARCHAR(64) NOT NULL,
     symbol VARCHAR(20),
+    owner_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+    owner_id BIGINT NOT NULL DEFAULT 0,
+    account_risk_status VARCHAR(64),
     risk_level_snapshot VARCHAR(32),
     risk_allowed BOOLEAN NOT NULL,
     risk_reason_code VARCHAR(64),
     risk_reason_text VARCHAR(512),
     position_exposure DECIMAL(10, 4),
     max_allowed_exposure DECIMAL(10, 4),
+    candidate_leverage DECIMAL(10, 4),
+    max_allowed_leverage DECIMAL(10, 4),
+    gross_notional DECIMAL(30, 8),
+    leverage_risk DECIMAL(10, 4),
+    position_size_risk DECIMAL(10, 4),
+    concentration_risk DECIMAL(10, 4),
+    correlation_risk DECIMAL(10, 4),
+    drawdown_or_var_risk DECIMAL(10, 4),
+    aggregate_risk_score DECIMAL(10, 4),
+    source_status VARCHAR(32) NOT NULL DEFAULT 'INVALID',
+    observed_at TIMESTAMP,
+    fresh_until TIMESTAMP,
     snapshot_source VARCHAR(128),
     snapshot_version INT,
     source_note VARCHAR(128),
     trace_id VARCHAR(64),
-    create_time TIMESTAMP
+    create_time TIMESTAMP,
+    CONSTRAINT ck_tm_account_risk_source_status CHECK (source_status IN ('VERIFIED', 'INVALID')),
+    CONSTRAINT ck_tm_account_risk_verified_freshness CHECK (
+        source_status <> 'VERIFIED'
+        OR (observed_at IS NOT NULL AND fresh_until IS NOT NULL AND fresh_until > observed_at)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_tm_account_risk_snapshot_analysis_id ON tm_account_risk_snapshot(analysis_id);
@@ -777,6 +987,17 @@ CREATE TABLE IF NOT EXISTS tm_review_result (
     final_plan_id VARCHAR(64),
     candidate_id VARCHAR(64),
     trace_id VARCHAR(128),
+    opportunity_id VARCHAR(64),
+    resolver_result_id VARCHAR(64),
+    validation_result_id VARCHAR(64),
+    review_type VARCHAR(64),
+    outcome VARCHAR(64),
+    execution_deviation CLOB,
+    ai_assessment CLOB,
+    rule_assessment CLOB,
+    rule_feedback CLOB,
+    metrics_json CLOB,
+    contract_version VARCHAR(32),
     review_scope_key VARCHAR(128) NOT NULL DEFAULT 'SHARED',
     error_type VARCHAR(200),
     actual_outcome VARCHAR(2000),
@@ -820,10 +1041,25 @@ CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_rule_version_time ON tm_rule_
 CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_operator_time ON tm_rule_version_log(operator, created_at);
 CREATE INDEX IF NOT EXISTS idx_tm_rule_version_log_rollback_time ON tm_rule_version_log(rollback_flag, created_at);
 
+CREATE TABLE IF NOT EXISTS tm_asset (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol VARCHAR(32) NOT NULL,
+    asset_name VARCHAR(64),
+    source VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version_no INT NOT NULL DEFAULT 1,
+    ext_json CLOB,
+    CONSTRAINT uk_tm_asset_symbol UNIQUE (symbol),
+    CONSTRAINT ck_tm_asset_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
+);
+
 CREATE TABLE IF NOT EXISTS tm_asset_pool_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     owner_type VARCHAR(16) NOT NULL,
     owner_id BIGINT NOT NULL DEFAULT 0,
+    asset_id BIGINT NOT NULL,
     symbol VARCHAR(32) NOT NULL,
     display_name VARCHAR(64),
     market_type VARCHAR(16) NOT NULL DEFAULT 'SPOT',
@@ -832,6 +1068,9 @@ CREATE TABLE IF NOT EXISTS tm_asset_pool_item (
     focus_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     sort_order INT NOT NULL DEFAULT 0,
     source_type VARCHAR(32) NOT NULL,
+    watch_status VARCHAR(32) NOT NULL DEFAULT 'OBSERVING',
+    version_no INT NOT NULL DEFAULT 1,
+    ext_json CLOB,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_tm_asset_pool_owner_symbol UNIQUE (owner_type, owner_id, symbol),
@@ -839,7 +1078,9 @@ CREATE TABLE IF NOT EXISTS tm_asset_pool_item (
         (owner_type = 'SYSTEM' AND owner_id = 0)
         OR (owner_type = 'USER' AND owner_id > 0)
     ),
-    CONSTRAINT ck_tm_asset_pool_source CHECK (source_type IN ('DEFAULT', 'USER_ADDED', 'USER_OVERRIDE'))
+    CONSTRAINT ck_tm_asset_pool_source CHECK (source_type IN ('DEFAULT', 'USER_ADDED', 'USER_OVERRIDE')),
+    CONSTRAINT ck_tm_asset_pool_watch_status CHECK (watch_status IN ('OBSERVING', 'REMOVED')),
+    CONSTRAINT fk_tm_asset_pool_asset FOREIGN KEY (asset_id) REFERENCES tm_asset(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tm_asset_pool_active_order
@@ -847,21 +1088,38 @@ CREATE INDEX IF NOT EXISTS idx_tm_asset_pool_active_order
 CREATE INDEX IF NOT EXISTS idx_tm_asset_pool_symbol_active
     ON tm_asset_pool_item(symbol, active);
 
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'BTCUSDT', 'BTC', 10, 'DEFAULT');
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'ETHUSDT', 'ETH', 20, 'DEFAULT');
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'SOLUSDT', 'SOL', 30, 'DEFAULT');
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'BNBUSDT', 'BNB', 40, 'DEFAULT');
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'XRPUSDT', 'XRP', 50, 'DEFAULT');
-MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, sort_order, source_type)
-KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, 'ADAUSDT', 'ADA', 60, 'DEFAULT');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('BTCUSDT', 'BTC', 'SYSTEM_DEFAULT', 'ACTIVE');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('ETHUSDT', 'ETH', 'SYSTEM_DEFAULT', 'ACTIVE');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('SOLUSDT', 'SOL', 'SYSTEM_DEFAULT', 'ACTIVE');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('BNBUSDT', 'BNB', 'SYSTEM_DEFAULT', 'ACTIVE');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('XRPUSDT', 'XRP', 'SYSTEM_DEFAULT', 'ACTIVE');
+MERGE INTO tm_asset(symbol, asset_name, source, status)
+KEY(symbol) VALUES ('ADAUSDT', 'ADA', 'SYSTEM_DEFAULT', 'ACTIVE');
+
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='BTCUSDT'), 'BTCUSDT', 'BTC', 10, 'DEFAULT');
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='ETHUSDT'), 'ETHUSDT', 'ETH', 20, 'DEFAULT');
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='SOLUSDT'), 'SOLUSDT', 'SOL', 30, 'DEFAULT');
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='BNBUSDT'), 'BNBUSDT', 'BNB', 40, 'DEFAULT');
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='XRPUSDT'), 'XRPUSDT', 'XRP', 50, 'DEFAULT');
+MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, sort_order, source_type)
+KEY(owner_type, owner_id, symbol) VALUES ('SYSTEM', 0, (SELECT id FROM tm_asset WHERE symbol='ADAUSDT'), 'ADAUSDT', 'ADA', 60, 'DEFAULT');
 
 CREATE TABLE IF NOT EXISTS tm_asset_state (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    owner_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+    owner_id BIGINT NOT NULL DEFAULT 0,
+    asset_id BIGINT,
+    pool_item_id BIGINT,
     symbol VARCHAR(32) NOT NULL,
     timeframe VARCHAR(16) NOT NULL DEFAULT 'global',
     state VARCHAR(32) NOT NULL,
@@ -879,19 +1137,34 @@ CREATE TABLE IF NOT EXISTS tm_asset_state (
     last_transition_reason VARCHAR(512),
     last_trigger_source VARCHAR(64),
     last_analysis_id VARCHAR(64),
+    opportunity_score INT,
+    confidence VARCHAR(16),
+    risk VARCHAR(16),
+    rule_version VARCHAR(32) NOT NULL DEFAULT 'LEGACY_UNAVAILABLE',
     last_update_time TIMESTAMP NOT NULL,
     trace_id VARCHAR(128),
-    CONSTRAINT uk_tm_asset_state_symbol_timeframe UNIQUE (symbol, timeframe),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ext_json CLOB,
+    CONSTRAINT uk_tm_asset_state_owner_symbol_timeframe UNIQUE (owner_type, owner_id, symbol, timeframe),
     CONSTRAINT uk_tm_asset_state_opportunity UNIQUE (opportunity_id),
     CONSTRAINT ck_tm_asset_state_state CHECK (
         state IN ('OBSERVING', 'CANDIDATE', 'WAITING_TRIGGER', 'TRIGGERED',
                   'HIGH_RISK', 'INVALIDATED', 'COOLING', 'CONFUSED')
-    )
+    ),
+    CONSTRAINT ck_tm_asset_state_score CHECK (opportunity_score IS NULL OR opportunity_score BETWEEN 0 AND 100),
+    CONSTRAINT ck_tm_asset_state_confidence CHECK (confidence IS NULL OR confidence IN ('LOW', 'MEDIUM', 'HIGH')),
+    CONSTRAINT ck_tm_asset_state_risk CHECK (risk IS NULL OR risk IN ('LOW', 'MEDIUM', 'HIGH', 'EXTREME')),
+    CONSTRAINT fk_tm_asset_state_asset FOREIGN KEY (asset_id) REFERENCES tm_asset(id),
+    CONSTRAINT fk_tm_asset_state_pool_item FOREIGN KEY (pool_item_id) REFERENCES tm_asset_pool_item(id)
 );
 
 CREATE TABLE IF NOT EXISTS tm_opportunity_state_transition (
     transition_id VARCHAR(64) PRIMARY KEY,
     opportunity_id VARCHAR(64) NOT NULL,
+    owner_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+    owner_id BIGINT NOT NULL DEFAULT 0,
+    asset_id BIGINT,
     symbol VARCHAR(32) NOT NULL,
     timeframe VARCHAR(16) NOT NULL,
     analysis_id VARCHAR(64),
@@ -900,6 +1173,7 @@ CREATE TABLE IF NOT EXISTS tm_opportunity_state_transition (
     to_state VARCHAR(32) NOT NULL,
     reason VARCHAR(512) NOT NULL,
     trigger_source VARCHAR(64) NOT NULL,
+    rule_version VARCHAR(32) NOT NULL,
     transition_priority INT NOT NULL,
     suppressed BOOLEAN NOT NULL DEFAULT FALSE,
     occurred_at TIMESTAMP NOT NULL,
@@ -926,19 +1200,57 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan_candidate (
     rule_direction VARCHAR(32) NOT NULL,
     rule_confidence VARCHAR(16) NOT NULL,
     rule_risk VARCHAR(16) NOT NULL,
+    rule_plan_mode VARCHAR(32),
+    rule_can_execute BOOLEAN,
     candidate_direction VARCHAR(32) NOT NULL,
+    bias_adjustment_reason VARCHAR(512),
     plan_mode VARCHAR(32) NOT NULL,
     confidence_level VARCHAR(16) NOT NULL,
     risk_level VARCHAR(16) NOT NULL,
     worth_opening BOOLEAN NOT NULL,
     recommended_action VARCHAR(128),
+    asset_id BIGINT,
+    rule_version VARCHAR(32),
+    opportunity_type VARCHAR(64),
+    entry_logic CLOB,
     entry_zone VARCHAR(256),
+    entry_source VARCHAR(256),
+    entry_reason CLOB,
+    trigger_condition CLOB,
+    stop_logic CLOB,
     stop_loss VARCHAR(256),
+    stop_source VARCHAR(256),
+    stop_reason CLOB,
+    target_logic CLOB,
     take_profit_rules CLOB,
+    target_source VARCHAR(256),
+    target_reason CLOB,
+    add_position_condition CLOB,
+    reduce_position_condition CLOB,
+    abandon_condition CLOB,
     leverage_suggestion VARCHAR(128),
     position_suggestion VARCHAR(256),
+    risk_explanation CLOB,
     invalid_condition CLOB,
+    invalidation_source VARCHAR(256),
+    invalidation_reason CLOB,
+    expected_risk_reward DECIMAL(20, 8),
+    expected_risk_reward_source VARCHAR(256),
+    expected_risk_reward_reason CLOB,
     validity VARCHAR(128),
+    analysis_timeframes_json CLOB,
+    trigger_timeframe VARCHAR(16),
+    valid_from TIMESTAMP,
+    valid_until TIMESTAMP,
+    holding_horizon VARCHAR(64),
+    revalidation_rule CLOB,
+    source_refs_json CLOB,
+    evidence_refs_json CLOB,
+    score_refs_json CLOB,
+    data_quality INT,
+    confused_score INT,
+    account_risk_snapshot_id BIGINT,
+    version INT NOT NULL DEFAULT 1,
     summary CLOB,
     candidate_source VARCHAR(32) NOT NULL,
     candidate_status VARCHAR(32) NOT NULL,
@@ -953,7 +1265,22 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan_candidate (
         candidate_status IN ('GENERATED', 'FALLBACK', 'REJECTED', 'VALIDATED')
     ),
     CONSTRAINT ck_tm_plan_candidate_mode CHECK (
-        plan_mode IN ('CONFIRM', 'PREPARE', 'REDUCE', 'WATCH', 'BLOCKED')
+        plan_mode IN ('CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED')
+    ),
+    CONSTRAINT ck_tm_plan_candidate_market_bias CHECK (
+        rule_direction IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        )
+        AND candidate_direction IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        )
+    ),
+    CONSTRAINT ck_tm_plan_candidate_rule_mode CHECK (
+        rule_plan_mode IS NULL OR rule_plan_mode IN (
+            'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+        )
     ),
     CONSTRAINT ck_tm_plan_candidate_confidence CHECK (
         rule_confidence IN ('LOW', 'MEDIUM', 'HIGH')
@@ -983,6 +1310,11 @@ CREATE TABLE IF NOT EXISTS tm_conflict_resolver_result (
     rule_direction VARCHAR(32) NOT NULL,
     rule_confidence VARCHAR(16) NOT NULL,
     rule_risk VARCHAR(16) NOT NULL,
+    rule_plan_mode VARCHAR(32),
+    rule_can_execute BOOLEAN,
+    data_quality_score INT,
+    confused_score INT,
+    account_risk_state VARCHAR(64),
     gemini_review_json CLOB NOT NULL,
     grok_challenge_json CLOB NOT NULL,
     conflict_level VARCHAR(32) NOT NULL,
@@ -993,12 +1325,43 @@ CREATE TABLE IF NOT EXISTS tm_conflict_resolver_result (
     confidence_after VARCHAR(16) NOT NULL,
     risk_before VARCHAR(16) NOT NULL,
     risk_after VARCHAR(16) NOT NULL,
+    bias_before VARCHAR(32),
+    bias_after VARCHAR(32),
+    adjustment_reason VARCHAR(512),
     downgrade_reason VARCHAR(512),
+    recovery_condition CLOB,
     confused_decision BOOLEAN NOT NULL DEFAULT FALSE,
-    rule_veto_reason VARCHAR(512),
+    rule_veto_reason CLOB,
     rule_direction_preserved BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_conflict_score CHECK (conflict_score BETWEEN 0 AND 100),
+    CONSTRAINT ck_tm_conflict_rule_mode CHECK (rule_plan_mode IS NULL OR rule_plan_mode IN (
+        'CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED'
+    )),
+    CONSTRAINT ck_tm_conflict_plan_modes CHECK (
+        plan_mode_before IN ('CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED')
+        AND plan_mode_after IN ('CONFIRMATION', 'PREPARATION', 'REDUCED', 'OBSERVATION', 'BLOCKED')
+    ),
+    CONSTRAINT ck_tm_conflict_market_bias CHECK (
+        rule_direction IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        )
+        AND (bias_before IS NULL OR bias_before IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+        AND (bias_after IS NULL OR bias_after IN (
+            'STRONG_BULLISH', 'BULLISH', 'WEAK_BULLISH', 'RANGE',
+            'WEAK_BEARISH', 'BEARISH', 'STRONG_BEARISH', 'WAIT'
+        ))
+    ),
+    CONSTRAINT ck_tm_conflict_data_quality CHECK (
+        data_quality_score IS NULL OR data_quality_score BETWEEN 0 AND 100
+    ),
+    CONSTRAINT ck_tm_conflict_confused_score CHECK (
+        confused_score IS NULL OR confused_score BETWEEN 0 AND 100
+    ),
     CONSTRAINT ck_tm_conflict_level CHECK (conflict_level IN (
         'LEVEL_1_CONSISTENT',
         'LEVEL_2_MINOR_DISAGREEMENT',
@@ -1044,6 +1407,10 @@ CREATE TABLE IF NOT EXISTS tm_hot_reset_event (
     analysis_id VARCHAR(64) NOT NULL,
     rebuild_analysis_id VARCHAR(64),
     trace_id VARCHAR(64),
+    owner_type VARCHAR(16) NOT NULL DEFAULT 'SYSTEM',
+    owner_id BIGINT NOT NULL DEFAULT 0,
+    asset_id BIGINT,
+    rule_version VARCHAR(32) NOT NULL DEFAULT 'LEGACY_UNAVAILABLE',
     symbol VARCHAR(20) NOT NULL,
     timeframe VARCHAR(10),
     trigger_type VARCHAR(64) NOT NULL,
@@ -1075,12 +1442,18 @@ CREATE TABLE IF NOT EXISTS tm_hot_reset_event (
     pre_state VARCHAR(32),
     post_state VARCHAR(32),
     completed_at TIMESTAMP,
-    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_hot_reset_event_owner CHECK (
+        (owner_type = 'SYSTEM' AND owner_id = 0)
+        OR (owner_type = 'USER' AND owner_id > 0)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_analysis_id ON tm_hot_reset_event(analysis_id);
 CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_trace_id ON tm_hot_reset_event(trace_id);
 CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_symbol_event_time ON tm_hot_reset_event(symbol, event_time);
+CREATE INDEX IF NOT EXISTS idx_tm_hot_reset_event_owner_asset_time
+    ON tm_hot_reset_event(owner_type, owner_id, asset_id, event_time);
 
 -- AI Call Log（P2-2）：只读 AI 复核调用审计链。
 -- 本表仅记录 provider review-only 调用、fallback、token/cost/latency 与安全边界；不保存原始密钥、原始 prompt 或可执行交易 payload。
@@ -1117,6 +1490,9 @@ CREATE TABLE IF NOT EXISTS tm_ai_call_log (
     rule_version VARCHAR(32),
     contract_type VARCHAR(64) NOT NULL DEFAULT 'AI_ROLE_RESULTS_SCHEMA_V1',
     candidate_id VARCHAR(64),
+    opportunity_id VARCHAR(64),
+    cache_hit BOOLEAN,
+    observed_at TIMESTAMP,
     output_payload CLOB,
     review_only BOOLEAN NOT NULL DEFAULT TRUE,
     manual_review_only BOOLEAN NOT NULL DEFAULT TRUE,
@@ -1171,6 +1547,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_trace_id ON tm_ai_call_log(trace_i
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_provider_time ON tm_ai_call_log(provider_name, started_at);
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_status_time ON tm_ai_call_log(call_status, started_at);
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_candidate ON tm_ai_call_log(candidate_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_opportunity ON tm_ai_call_log(opportunity_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_role ON tm_ai_call_log(ai_role, started_at);
 
 CREATE TABLE IF NOT EXISTS tm_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

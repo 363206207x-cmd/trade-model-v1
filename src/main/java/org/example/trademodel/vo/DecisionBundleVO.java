@@ -7,11 +7,23 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DecisionBundleVO {
     private String decisionId;
     private String marketBiasHierarchy;
+    private String ruleMarketBias;
+    private String finalMarketBias;
+    private String ruleConfidence;
+    private String ruleRisk;
+    private String rulePlanMode;
+    private Boolean ruleCanExecute;
+    private String candidatePlanMode;
+    private String finalPlanMode;
+    private String biasAdjustmentReason;
+    private String planModeAdjustmentReason;
     private String tradeType;
     private String confidenceLevel;
     private String riskLevel;
@@ -19,6 +31,7 @@ public class DecisionBundleVO {
     private String conclusionSummary;
     private Boolean isWorthOpening;
     private String multiTfConvergence;
+    private Map<String, Map<String, Object>> multiTimeframeDetails = new LinkedHashMap<>();
     private String aiRoleResults;
     private List<String> supportEvidences;
     private List<String> opposeEvidences;
@@ -87,6 +100,26 @@ public class DecisionBundleVO {
     public void setDecisionId(String decisionId) { this.decisionId = decisionId; }
     public String getMarketBiasHierarchy() { return marketBiasHierarchy; }
     public void setMarketBiasHierarchy(String marketBiasHierarchy) { this.marketBiasHierarchy = marketBiasHierarchy; }
+    public String getRuleMarketBias() { return ruleMarketBias; }
+    public void setRuleMarketBias(String value) { this.ruleMarketBias = value; }
+    public String getFinalMarketBias() { return finalMarketBias; }
+    public void setFinalMarketBias(String value) { this.finalMarketBias = value; }
+    public String getRuleConfidence() { return ruleConfidence; }
+    public void setRuleConfidence(String value) { this.ruleConfidence = value; }
+    public String getRuleRisk() { return ruleRisk; }
+    public void setRuleRisk(String value) { this.ruleRisk = value; }
+    public String getRulePlanMode() { return rulePlanMode; }
+    public void setRulePlanMode(String value) { this.rulePlanMode = value; }
+    public Boolean getRuleCanExecute() { return ruleCanExecute; }
+    public void setRuleCanExecute(Boolean value) { this.ruleCanExecute = value; }
+    public String getCandidatePlanMode() { return candidatePlanMode; }
+    public void setCandidatePlanMode(String value) { this.candidatePlanMode = value; }
+    public String getFinalPlanMode() { return finalPlanMode; }
+    public void setFinalPlanMode(String value) { this.finalPlanMode = value; }
+    public String getBiasAdjustmentReason() { return biasAdjustmentReason; }
+    public void setBiasAdjustmentReason(String value) { this.biasAdjustmentReason = value; }
+    public String getPlanModeAdjustmentReason() { return planModeAdjustmentReason; }
+    public void setPlanModeAdjustmentReason(String value) { this.planModeAdjustmentReason = value; }
     public String getTradeType() { return tradeType; }
     public void setTradeType(String tradeType) { this.tradeType = tradeType; }
     public String getConfidenceLevel() { return confidenceLevel; }
@@ -101,6 +134,12 @@ public class DecisionBundleVO {
     public void setIsWorthOpening(Boolean isWorthOpening) { this.isWorthOpening = isWorthOpening; }
     public String getMultiTfConvergence() { return multiTfConvergence; }
     public void setMultiTfConvergence(String multiTfConvergence) { this.multiTfConvergence = multiTfConvergence; }
+    public Map<String, Map<String, Object>> getMultiTimeframeDetails() {
+        return new LinkedHashMap<>(multiTimeframeDetails);
+    }
+    public void setMultiTimeframeDetails(Map<String, Map<String, Object>> value) {
+        this.multiTimeframeDetails = value == null ? new LinkedHashMap<>() : new LinkedHashMap<>(value);
+    }
     public String getAiRoleResults() { return aiRoleResults; }
     public void setAiRoleResults(String aiRoleResults) { this.aiRoleResults = aiRoleResults; }
     public List<String> getSupportEvidences() { return supportEvidences; }

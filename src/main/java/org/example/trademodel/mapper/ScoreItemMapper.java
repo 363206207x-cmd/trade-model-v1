@@ -20,4 +20,7 @@ public interface ScoreItemMapper {
             LIMIT 3
             """)
     List<ScoreBriefVO> selectTop3BriefByAnalysisId(@Param("analysisId") String analysisId);
+
+    @Select("SELECT * FROM tm_score_item WHERE analysis_id = #{analysisId} ORDER BY score_id")
+    List<ScoreItemDO> listByAnalysisId(@Param("analysisId") String analysisId);
 }

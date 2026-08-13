@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,11 +52,22 @@ public class LocalRealReadinessService {
 
     public Map<String, LocalRealAssetReadiness> assets() {
         Map<String, LocalRealAssetReadiness> ordered = new LinkedHashMap<>();
-        for (String symbol : LocalRealDataCoordinator.SYMBOLS) {
-            LocalRealAssetReadiness item = assets.get(symbol);
-            if (item != null) ordered.put(symbol, item);
+        assets.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> ordered.put(entry.getKey(), entry.getValue()));
+        return java.util.Collections.unmodifiableMap(ordered);
+    }
+
+    public void retainAssets(List<String> symbols) {
+        if (symbols == null) {
+            assets.clear();
+            return;
         }
-        return Map.copyOf(ordered);
+        java.util.Set<String> retained = symbols.stream()
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .map(symbol -> symbol.trim().toUpperCase(java.util.Locale.ROOT))
+                .collect(java.util.stream.Collectors.toSet());
+        assets.keySet().removeIf(symbol -> !retained.contains(symbol));
     }
 
     public long readyAssetCount() {

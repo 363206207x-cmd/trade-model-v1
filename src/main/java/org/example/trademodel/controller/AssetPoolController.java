@@ -3,8 +3,10 @@ package org.example.trademodel.controller;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
 import org.example.trademodel.dto.assetpool.AssetPoolScanResultDTO;
+import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.dto.req.AddAssetPoolItemReq;
+import org.example.trademodel.dto.req.AssetPoolBatchReq;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,6 +44,14 @@ public class AssetPoolController {
         return ApiResponse.success(assetPoolService.searchMarket(query, limit));
     }
 
+    @PostMapping("/search/{symbol}/analysis-preview")
+    public ApiResponse<AssetAnalysisPreviewDTO> analyzePreview(
+            @PathVariable String symbol,
+            @RequestParam(defaultValue = "5m") String timeframe) {
+        return ApiResponse.success(assetPoolService.analyzePreviewForUser(
+                userIdResolver.requireCurrentUserId(), symbol, timeframe));
+    }
+
     @PostMapping
     public ApiResponse<AssetPoolAssetDTO> add(@RequestBody AddAssetPoolItemReq request) {
         if (request == null) throw new IllegalArgumentException("request is required");
@@ -51,9 +61,26 @@ public class AssetPoolController {
                 !Boolean.FALSE.equals(request.getFocusEnabled())));
     }
 
+    @PostMapping("/batch-add")
+    public ApiResponse<List<AssetPoolAssetDTO>> batchAdd(@RequestBody AssetPoolBatchReq request) {
+        if (request == null) throw new IllegalArgumentException("request is required");
+        return ApiResponse.success(assetPoolService.addManyForUser(
+                userIdResolver.requireCurrentUserId(),
+                request.getSymbols(),
+                !Boolean.FALSE.equals(request.getFocusEnabled())));
+    }
+
     @DeleteMapping("/{symbol}")
     public ApiResponse<Void> remove(@PathVariable String symbol) {
         assetPoolService.removeForUser(userIdResolver.requireCurrentUserId(), symbol);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/batch-remove")
+    public ApiResponse<Void> batchRemove(@RequestBody AssetPoolBatchReq request) {
+        if (request == null) throw new IllegalArgumentException("request is required");
+        assetPoolService.removeManyForUser(
+                userIdResolver.requireCurrentUserId(), request.getSymbols());
         return ApiResponse.success(null);
     }
 
@@ -66,5 +93,12 @@ public class AssetPoolController {
     public ApiResponse<List<AssetPoolScanResultDTO>> scan(@RequestParam(defaultValue = "5m") String timeframe) {
         return ApiResponse.success(assetPoolService.scanForUser(
                 userIdResolver.requireCurrentUserId(), timeframe));
+    }
+
+    @PostMapping("/batch-scan")
+    public ApiResponse<List<AssetPoolScanResultDTO>> batchScan(@RequestBody AssetPoolBatchReq request) {
+        if (request == null) throw new IllegalArgumentException("request is required");
+        return ApiResponse.success(assetPoolService.scanSelectedForUser(
+                userIdResolver.requireCurrentUserId(), request.getSymbols(), request.getTimeframe()));
     }
 }

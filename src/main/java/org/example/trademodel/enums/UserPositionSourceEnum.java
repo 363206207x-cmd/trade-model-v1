@@ -1,7 +1,7 @@
 package org.example.trademodel.enums;
 
 public enum UserPositionSourceEnum {
-    MANUAL_POSITION,
+    MANUAL_INDEPENDENT,
     SYSTEM_PLAN_POSITION;
 
     public static UserPositionSourceEnum fromSourceType(UserPositionSourceTypeEnum sourceType) {

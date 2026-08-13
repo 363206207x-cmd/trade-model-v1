@@ -8,6 +8,8 @@ import org.example.trademodel.ai.AiProviderReadiness;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.service.AiCallLogService;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,17 +29,28 @@ public class AiOrchestratorController {
     private final AiCallLogService callLogService;
     private final AiOrchestratorProperties properties;
     private final List<AiProviderClient> providerClients;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
     public AiOrchestratorController(AiDecisionOrchestratorService orchestratorService,
                                     AiCallLogService callLogService,
                                     AiOrchestratorProperties properties,
                                     List<AiProviderClient> providerClients) {
+        this(orchestratorService, callLogService, properties, providerClients, null);
+    }
+
+    @Autowired
+    public AiOrchestratorController(AiDecisionOrchestratorService orchestratorService,
+                                    AiCallLogService callLogService,
+                                    AiOrchestratorProperties properties,
+                                    List<AiProviderClient> providerClients,
+                                    AuthenticatedUserIdResolver userIdResolver) {
         this.orchestratorService = orchestratorService;
         this.callLogService = callLogService;
         this.properties = properties;
         this.providerClients = providerClients == null ? List.of() : providerClients.stream()
                 .sorted(Comparator.comparing(client -> client.role().name()))
                 .toList();
+        this.userIdResolver = userIdResolver;
     }
 
     @GetMapping("/orchestrator/status")
@@ -72,6 +85,8 @@ public class AiOrchestratorController {
     @GetMapping("/call-logs")
     public List<Map<String, Object>> callLogs(@RequestParam(required = false) String analysisId,
                                               @RequestParam(required = false) String traceId,
+                                              @RequestParam(required = false) String candidateId,
+                                              @RequestParam(required = false) String role,
                                               @RequestParam(required = false) String providerName,
                                               @RequestParam(required = false) String callStatus,
                                               @RequestParam(required = false)
@@ -79,7 +94,12 @@ public class AiOrchestratorController {
                                               @RequestParam(required = false)
                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
                                               @RequestParam(defaultValue = "100") int limit) {
-        return callLogService.query(analysisId, traceId, normalize(providerName), normalize(callStatus), from, to, limit)
+        if (userIdResolver == null) {
+            throw new IllegalStateException("Authenticated AI trace query is unavailable");
+        }
+        return callLogService.queryOwned(userIdResolver.requireCurrentUserId(), analysisId, traceId,
+                        candidateId, normalize(role), normalize(providerName), normalize(callStatus),
+                        from, to, limit)
                 .stream()
                 .map(AiOrchestratorController::logMap)
                 .toList();
@@ -108,11 +128,24 @@ public class AiOrchestratorController {
     }
 
     private static Map<String, Object> logMap(AiCallLogDO log) {
-        Map<String, Object> map = safetyMap();
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("reviewOnly", log.getReviewOnly());
+        map.put("manualReviewOnly", log.getManualReviewOnly());
+        map.put("notTradeInstruction", log.getNotTradeInstruction());
+        map.put("notExecutable", log.getNotExecutable());
+        map.put("notAutoTrading", log.getNotAutoTrading());
+        map.put("notOrderExecution", log.getNotOrderExecution());
+        map.put("notUserPositionCreation", log.getNotUserPositionCreation());
+        map.put("notPositionMutation", log.getNotPositionMutation());
+        map.put("notStateMachineOverride", log.getNotStateMachineOverride());
+        map.put("notExecutionPlanCreation", log.getNotExecutionPlanCreation());
+        map.put("notFinalExecutionPlanCreation", log.getNotFinalExecutionPlanCreation());
+        map.put("ruleDirectionPreserved", log.getRuleDirectionPreserved());
         map.put("callId", log.getCallId());
         map.put("analysisId", log.getAnalysisId());
         map.put("traceId", log.getTraceId());
         map.put("requestId", log.getRequestId());
+        map.put("opportunityId", log.getOpportunityId());
         map.put("providerName", log.getProviderName());
         map.put("modelName", log.getModelName());
         map.put("aiRole", log.getAiRole());
@@ -139,6 +172,10 @@ public class AiOrchestratorController {
         map.put("responseSummary", log.getResponseSummary());
         map.put("contractType", log.getContractType());
         map.put("candidateId", log.getCandidateId());
+        map.put("cacheHit", log.getCacheHit());
+        map.put("observedAt", log.getObservedAt());
+        map.put("createdAt", log.getCreatedAt());
+        map.put("ruleVersion", log.getRuleVersion());
         map.put("outputPayload", log.getOutputPayload());
         return map;
     }
@@ -155,6 +192,7 @@ public class AiOrchestratorController {
         map.put("notPositionMutation", true);
         map.put("notStateMachineOverride", true);
         map.put("notExecutionPlanCreation", true);
+        map.put("notFinalExecutionPlanCreation", true);
         map.put("ruleDirectionPreserved", true);
         return map;
     }

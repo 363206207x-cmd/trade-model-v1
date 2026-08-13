@@ -23,6 +23,7 @@ import org.example.trademodel.service.HotResetCommand;
 import org.example.trademodel.service.HotResetPolicy;
 import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
+import org.example.trademodel.service.OpportunityStateIdentity;
 import org.example.trademodel.service.OpportunityTriggerSource;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
@@ -149,12 +150,15 @@ public class HotResetServiceImpl implements HotResetService {
 
         String normalizedSymbol = normalizeSymbol(command.getSymbol());
         String normalizedTimeframe = normalizeTimeframe(command.getTimeframe());
+        OpportunityStateIdentity identity = stateIdentity(command, normalizedSymbol, normalizedTimeframe);
         LocalDateTime occurredAt = command.getOccurredAt() != null ? command.getOccurredAt() : nowUtc;
         result.setOccurredAt(occurredAt);
         String eventId = "hre-" + UUID.randomUUID().toString().substring(0, 12);
 
-        AssetStateDO currentState = assetStateMapper.selectBySymbolAndTimeframe(
-                normalizedSymbol, normalizedTimeframe);
+        AssetStateDO currentState = "SYSTEM".equals(identity.ownerType())
+                ? assetStateMapper.selectBySymbolAndTimeframe(normalizedSymbol, normalizedTimeframe)
+                : assetStateMapper.selectByIdentity(
+                        identity.ownerType(), identity.ownerId(), normalizedSymbol, normalizedTimeframe);
         AssetStateEnum preState = currentState != null && currentState.getState() != null
                 ? currentState.getState()
                 : AssetStateEnum.OBSERVING;
@@ -163,8 +167,9 @@ public class HotResetServiceImpl implements HotResetService {
                 : 0;
 
         DecisionContext confusedContext = buildConfusedContext(command);
-        ConfusedResult confusedResult = confusedStateService.calculateConfused(
-                normalizedSymbol, normalizedTimeframe, confusedContext);
+        ConfusedResult confusedResult = "SYSTEM".equals(identity.ownerType())
+                ? confusedStateService.calculateConfused(normalizedSymbol, normalizedTimeframe, confusedContext)
+                : confusedStateService.calculateConfused(identity, confusedContext);
         UserPositionRiskResult riskResult = currentRiskFailClosed();
         AssetStateEnum postState = HotResetPolicy.resolvePostState(command, confusedResult, riskResult.isRiskBlocked());
         if (HotResetPolicy.isUnsafePreState(postState)) {
@@ -173,7 +178,7 @@ public class HotResetServiceImpl implements HotResetService {
 
         int confusedLowStreak = confusedResult != null ? confusedResult.getConfusedLowStreak() : 0;
         int confusedScoreAfter = confusedResult != null ? confusedResult.getConfusedScore() : confusedScoreBefore;
-        persistAssetState(normalizedSymbol, postState, confusedScoreAfter, confusedLowStreak,
+        persistAssetState(identity, postState, confusedScoreAfter, confusedLowStreak,
                 command, occurredAt, nowUtc, preState);
 
         String reasonCode = evaluation.getReasonCode();
@@ -214,6 +219,9 @@ public class HotResetServiceImpl implements HotResetService {
         HotResetCommand command = new HotResetCommand();
         command.setEventKey("legacy-hot-reset-" + (currentResult != null ? currentResult.getDecisionId() : "missing"));
         command.setAnalysisId(currentResult != null ? currentResult.getAnalysisId() : null);
+        command.setOwnerType("SYSTEM");
+        command.setOwnerId(0L);
+        command.setRuleVersion("LEGACY_HOT_RESET");
         command.setSymbol(currentResult != null ? currentResult.getSymbol() : null);
         command.setEventType(HotResetEventTypeEnum.EXTREME_PRICE_MOVE);
         command.setDecisionContext(context);
@@ -279,20 +287,23 @@ public class HotResetServiceImpl implements HotResetService {
         return result;
     }
 
-    private void persistAssetState(String normalizedSymbol, AssetStateEnum postState, int confusedScore,
+    private void persistAssetState(OpportunityStateIdentity identity, AssetStateEnum postState, int confusedScore,
                                    int confusedLowStreak, HotResetCommand command, LocalDateTime occurredAt,
                                    LocalDateTime nowUtc, AssetStateEnum preState) {
         if (assetStateService == null) {
             throw new IllegalStateException("Canonical opportunity transition service is required");
         }
-        String normalizedTimeframe = normalizeTimeframe(command.getTimeframe());
-        assetStateService.transition(normalizedSymbol, normalizedTimeframe, postState, confusedScore,
+        assetStateService.transition(identity, postState, confusedScore,
                 Math.max(0, confusedLowStreak), command.getAnalysisId(), command.getTraceId(),
+                requireRuleVersion(command),
                 "HOT_RESET:" + command.getEventType().name(), OpportunityTriggerSource.HOT_RESET);
 
         AssetStateDO hot = new AssetStateDO();
-        hot.setSymbol(normalizedSymbol);
-        hot.setTimeframe(normalizedTimeframe);
+        hot.setOwnerType(identity.ownerType());
+        hot.setOwnerId(identity.ownerId());
+        hot.setAssetId(identity.assetId());
+        hot.setSymbol(identity.symbol());
+        hot.setTimeframe(identity.timeframe());
         hot.setHotResetFlag(true);
         hot.setHotResetTriggerType(command.getEventType().name());
         hot.setHotResetTriggerValue(command.getEventKey());
@@ -313,6 +324,10 @@ public class HotResetServiceImpl implements HotResetService {
         event.setEventKey(command.getEventKey());
         event.setAnalysisId(command.getAnalysisId());
         event.setTraceId(command.getTraceId());
+        event.setOwnerType(normalizeOwnerType(command.getOwnerType()));
+        event.setOwnerId(normalizeOwnerId(event.getOwnerType(), command.getOwnerId()));
+        event.setAssetId(command.getAssetId());
+        event.setRuleVersion(requireRuleVersion(command));
         event.setSymbol(normalizeSymbol(command.getSymbol()));
         event.setTimeframe(command.getTimeframe());
         event.setTriggerType(command.getEventType().name());
@@ -374,9 +389,14 @@ public class HotResetServiceImpl implements HotResetService {
                         "ANALYSIS_SCHEDULER_UNAVAILABLE",
                         "AnalysisSchedulerService unavailable");
             } else {
-                AnalysisRunResult rebuildResult = scheduler.runHotResetRebuild(
-                        event.getSymbol(), event.getTimeframe(), event.getEventId(),
-                        event.getAnalysisId(), event.getTraceId());
+                AnalysisRunResult rebuildResult = "SYSTEM".equals(event.getOwnerType())
+                        ? scheduler.runHotResetRebuild(
+                                event.getSymbol(), event.getTimeframe(), event.getEventId(),
+                                event.getAnalysisId(), event.getTraceId())
+                        : scheduler.runHotResetRebuild(
+                                event.getOwnerType(), event.getOwnerId(), event.getAssetId(),
+                                event.getSymbol(), event.getTimeframe(), event.getEventId(),
+                                event.getAnalysisId(), event.getTraceId());
                 applyRebuildOutcome(update, result, rebuildResult);
             }
         } catch (Exception e) {
@@ -527,6 +547,29 @@ public class HotResetServiceImpl implements HotResetService {
     private String normalizeTimeframe(String timeframe) {
         return timeframe == null || timeframe.isBlank()
                 ? "global" : timeframe.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private OpportunityStateIdentity stateIdentity(HotResetCommand command,
+                                                   String symbol,
+                                                   String timeframe) {
+        String ownerType = normalizeOwnerType(command.getOwnerType());
+        return new OpportunityStateIdentity(ownerType, normalizeOwnerId(ownerType, command.getOwnerId()),
+                command.getAssetId(), symbol, timeframe);
+    }
+
+    private String normalizeOwnerType(String ownerType) {
+        return hasText(ownerType) ? ownerType.trim().toUpperCase(Locale.ROOT) : "SYSTEM";
+    }
+
+    private Long normalizeOwnerId(String ownerType, Long ownerId) {
+        return "SYSTEM".equals(ownerType) ? 0L : ownerId;
+    }
+
+    private String requireRuleVersion(HotResetCommand command) {
+        if (!hasText(command.getRuleVersion())) {
+            throw new IllegalArgumentException("Hot Reset ruleVersion is required");
+        }
+        return command.getRuleVersion().trim();
     }
 
     private int zero(Integer value) {

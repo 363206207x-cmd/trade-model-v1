@@ -1,12 +1,17 @@
 package org.example.trademodel.service;
 
+import org.example.trademodel.config.FundamentalAiV41Properties;
+
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Provisional four-timeframe market-bias mapping pending a product-owned window/threshold contract.
- * Runtime currently supplies three closed bars per timeframe and compares first open to last close;
- * this is not a validated trend-strength model.
+ * Frozen four-timeframe market-bias mapping. Direction classification, weighted
+ * convergence and trend-score dispersion all fail closed on missing windows.
  */
 public final class MarketBiasPolicy {
 
@@ -17,33 +22,81 @@ public final class MarketBiasPolicy {
                                   List<String[]> bars15m,
                                   List<String[]> bars1h,
                                   List<String[]> bars4h) {
-        List<WindowDirection> directions = List.of(
-                direction(bars5m), direction(bars15m), direction(bars1h), direction(bars4h));
-        if (directions.contains(WindowDirection.MISSING)) {
+        return classify(bars5m, bars15m, bars1h, bars4h,
+                FundamentalAiV41Properties.contractFixture().getMultiTimeframe());
+    }
+
+    public static String classify(List<String[]> bars5m,
+                                  List<String[]> bars15m,
+                                  List<String[]> bars1h,
+                                  List<String[]> bars4h,
+                                  FundamentalAiV41Properties.MultiTimeframe config) {
+        requireConfig(config);
+        List<WindowAssessment> windows = List.of(
+                assessment(bars5m, config.getFiveMinuteWeight()),
+                assessment(bars15m, config.getFifteenMinuteWeight()),
+                assessment(bars1h, config.getOneHourWeight()),
+                assessment(bars4h, config.getFourHourWeight()));
+        if (windows.stream().anyMatch(WindowAssessment::missing)) {
             return "WAIT";
         }
-        long bullish = directions.stream().filter(WindowDirection.BULLISH::equals).count();
-        long bearish = directions.stream().filter(WindowDirection.BEARISH::equals).count();
+        long bullish = windows.stream().filter(window -> window.direction() == WindowDirection.BULLISH).count();
+        long bearish = windows.stream().filter(window -> window.direction() == WindowDirection.BEARISH).count();
+        BigDecimal bullishWeight = directionWeight(windows, WindowDirection.BULLISH);
+        BigDecimal bearishWeight = directionWeight(windows, WindowDirection.BEARISH);
         if (bullish == 4) return "STRONG_BULLISH";
-        if (bullish == 3) return "BULLISH";
         if (bearish == 4) return "STRONG_BEARISH";
-        if (bearish == 3) return "BEARISH";
-        if (bullish > bearish) return "WEAK_BULLISH";
-        if (bearish > bullish) return "WEAK_BEARISH";
+        if (bullish >= config.getMinimumAlignedCount()
+                && bullishWeight.compareTo(config.getMinimumAlignedWeight()) >= 0) return "BULLISH";
+        if (bearish >= config.getMinimumAlignedCount()
+                && bearishWeight.compareTo(config.getMinimumAlignedWeight()) >= 0) return "BEARISH";
+        if (bullishWeight.compareTo(bearishWeight) > 0) return "WEAK_BULLISH";
+        if (bearishWeight.compareTo(bullishWeight) > 0) return "WEAK_BEARISH";
         return "RANGE";
+    }
+
+    public static Map<String, Map<String, Object>> describeTimeframes(
+            List<String[]> bars5m,
+            List<String[]> bars15m,
+            List<String[]> bars1h,
+            List<String[]> bars4h,
+            FundamentalAiV41Properties.MultiTimeframe config) {
+        requireConfig(config);
+        Map<String, Map<String, Object>> details = new LinkedHashMap<>();
+        details.put("4h", describe(bars4h, config.getFourHourWeight()));
+        details.put("1h", describe(bars1h, config.getOneHourWeight()));
+        details.put("15m", describe(bars15m, config.getFifteenMinuteWeight()));
+        details.put("5m", describe(bars5m, config.getFiveMinuteWeight()));
+        return details;
     }
 
     public static boolean converged(List<String[]> bars1h, List<String[]> bars4h,
                                     String marketBias) {
-        WindowDirection oneHour = direction(bars1h);
-        WindowDirection fourHour = direction(bars4h);
-        if (oneHour == WindowDirection.MISSING || fourHour == WindowDirection.MISSING
-                || oneHour == WindowDirection.FLAT || fourHour == WindowDirection.FLAT
-                || oneHour != fourHour) {
-            return false;
-        }
-        return "STRONG_BULLISH".equals(marketBias) || "BULLISH".equals(marketBias)
-                || "STRONG_BEARISH".equals(marketBias) || "BEARISH".equals(marketBias);
+        FundamentalAiV41Properties.MultiTimeframe config =
+                FundamentalAiV41Properties.contractFixture().getMultiTimeframe();
+        WindowAssessment oneHour = assessment(bars1h, config.getOneHourWeight());
+        WindowAssessment fourHour = assessment(bars4h, config.getFourHourWeight());
+        return convergedAssessments(List.of(oneHour, fourHour), marketBias, 2,
+                config.getOneHourWeight().add(config.getFourHourWeight()),
+                config.getMaximumTrendScoreDifference());
+    }
+
+    public static boolean converged(List<String[]> bars5m,
+                                    List<String[]> bars15m,
+                                    List<String[]> bars1h,
+                                    List<String[]> bars4h,
+                                    String marketBias,
+                                    FundamentalAiV41Properties.MultiTimeframe config) {
+        requireConfig(config);
+        return convergedAssessments(List.of(
+                        assessment(bars5m, config.getFiveMinuteWeight()),
+                        assessment(bars15m, config.getFifteenMinuteWeight()),
+                        assessment(bars1h, config.getOneHourWeight()),
+                        assessment(bars4h, config.getFourHourWeight())),
+                marketBias,
+                config.getMinimumAlignedCount(),
+                config.getMinimumAlignedWeight(),
+                config.getMaximumTrendScoreDifference());
     }
 
     public static boolean bullishFamily(String marketBias) {
@@ -70,6 +123,90 @@ public final class MarketBiasPolicy {
             return WindowDirection.FLAT;
         } catch (RuntimeException ignored) {
             return WindowDirection.MISSING;
+        }
+    }
+
+    private static boolean convergedAssessments(List<WindowAssessment> windows,
+                                                String marketBias,
+                                                int minimumAlignedCount,
+                                                BigDecimal minimumAlignedWeight,
+                                                BigDecimal maximumTrendScoreDifference) {
+        WindowDirection expected = bullishFamily(marketBias) ? WindowDirection.BULLISH
+                : bearishFamily(marketBias) ? WindowDirection.BEARISH : null;
+        if (expected == null || windows.stream().anyMatch(WindowAssessment::missing)) return false;
+        List<WindowAssessment> aligned = new ArrayList<>();
+        for (WindowAssessment window : windows) {
+            if (window.direction() == expected) aligned.add(window);
+        }
+        if (aligned.size() < minimumAlignedCount) return false;
+        BigDecimal alignedWeight = aligned.stream().map(WindowAssessment::weight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (alignedWeight.compareTo(minimumAlignedWeight) < 0) return false;
+        BigDecimal min = aligned.stream().map(WindowAssessment::trendScore)
+                .min(BigDecimal::compareTo).orElse(null);
+        BigDecimal max = aligned.stream().map(WindowAssessment::trendScore)
+                .max(BigDecimal::compareTo).orElse(null);
+        return min != null && max != null
+                && max.subtract(min).abs().compareTo(maximumTrendScoreDifference) <= 0;
+    }
+
+    private static WindowAssessment assessment(List<String[]> bars, BigDecimal weight) {
+        WindowDirection direction = direction(bars);
+        BigDecimal score = trendScore(bars);
+        return new WindowAssessment(direction, score, weight);
+    }
+
+    private static Map<String, Object> describe(List<String[]> bars, BigDecimal weight) {
+        WindowAssessment value = assessment(bars, weight);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("state", value.missing() ? "INSUFFICIENT_DATA" : "FOUND");
+        detail.put("direction", value.direction().name());
+        detail.put("trendScore", value.trendScore());
+        detail.put("weight", value.weight());
+        detail.put("barCount", bars == null ? 0 : bars.size());
+        return detail;
+    }
+
+    private static BigDecimal directionWeight(List<WindowAssessment> windows, WindowDirection direction) {
+        return windows.stream()
+                .filter(window -> window.direction() == direction)
+                .map(WindowAssessment::weight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    static BigDecimal trendScore(List<String[]> bars) {
+        if (bars == null || bars.isEmpty()) return null;
+        String[] first = bars.get(0);
+        String[] last = bars.get(bars.size() - 1);
+        if (first == null || last == null || first.length <= 1 || last.length <= 4) return null;
+        try {
+            BigDecimal open = new BigDecimal(first[1]);
+            BigDecimal close = new BigDecimal(last[4]);
+            if (open.signum() == 0) return null;
+            BigDecimal percent = close.subtract(open)
+                    .divide(open, 8, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100));
+            return BigDecimal.valueOf(50).add(percent)
+                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static void requireConfig(FundamentalAiV41Properties.MultiTimeframe config) {
+        if (config == null || config.getFourHourWeight() == null || config.getOneHourWeight() == null
+                || config.getFifteenMinuteWeight() == null || config.getFiveMinuteWeight() == null
+                || config.getMinimumAlignedCount() == null || config.getMinimumAlignedWeight() == null
+                || config.getMaximumTrendScoreDifference() == null) {
+            throw new IllegalStateException("multi-timeframe contract configuration is required");
+        }
+    }
+
+    private record WindowAssessment(WindowDirection direction,
+                                    BigDecimal trendScore,
+                                    BigDecimal weight) {
+        private boolean missing() {
+            return direction == WindowDirection.MISSING || trendScore == null || weight == null;
         }
     }
 

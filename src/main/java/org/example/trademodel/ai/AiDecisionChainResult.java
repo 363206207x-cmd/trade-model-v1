@@ -1,6 +1,7 @@
 package org.example.trademodel.ai;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 public class AiDecisionChainResult {
     private AiProviderName provider;
@@ -19,6 +20,12 @@ public class AiDecisionChainResult {
     private String fallbackReason;
     private String errorCode;
     private String selectedModel;
+    private boolean cacheHit;
+    private String analysisId;
+    private String traceId;
+    private AiRoleState roleState;
+    private AiRoleDataState dataState;
+    private OffsetDateTime generatedAt;
 
     public static AiDecisionChainResult failed(AiProviderName provider, AiDecisionChainRole role,
                                                AiProviderCallStatus status, String reason) {
@@ -69,4 +76,16 @@ public class AiDecisionChainResult {
     public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
     public String getSelectedModel() { return selectedModel; }
     public void setSelectedModel(String selectedModel) { this.selectedModel = selectedModel; }
+    public boolean isCacheHit() { return cacheHit; }
+    public void setCacheHit(boolean cacheHit) { this.cacheHit = cacheHit; }
+    public String getAnalysisId() { return analysisId; }
+    public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
+    public String getTraceId() { return traceId; }
+    public void setTraceId(String traceId) { this.traceId = traceId; }
+    public AiRoleState getRoleState() { return roleState; }
+    public void setRoleState(AiRoleState roleState) { this.roleState = roleState; }
+    public AiRoleDataState getDataState() { return dataState; }
+    public void setDataState(AiRoleDataState dataState) { this.dataState = dataState; }
+    public OffsetDateTime getGeneratedAt() { return generatedAt; }
+    public void setGeneratedAt(OffsetDateTime generatedAt) { this.generatedAt = generatedAt; }
 }

@@ -5,6 +5,7 @@ import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.dto.ohlcv.OhlcvIngestionResult;
 import org.example.trademodel.service.AnalysisSchedulerService;
 import org.example.trademodel.service.PersistedOhlcvIngestionScheduler;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -18,19 +19,19 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Component
 @Profile("local-real")
 public class LocalRealDataCoordinator {
-    public static final List<String> SYMBOLS = List.of(
-            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT");
     public static final List<String> TIMEFRAMES = List.of("5m", "15m", "1h", "4h");
 
     private static final Logger log = LoggerFactory.getLogger(LocalRealDataCoordinator.class);
     private final PersistedOhlcvIngestionScheduler ingestionScheduler;
     private final AnalysisSchedulerService analysisSchedulerService;
+    private final AssetPoolService assetPoolService;
     private final LocalRealReadinessService readiness;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "local-real-bootstrap");
@@ -40,9 +41,11 @@ public class LocalRealDataCoordinator {
 
     public LocalRealDataCoordinator(PersistedOhlcvIngestionScheduler ingestionScheduler,
                                     AnalysisSchedulerService analysisSchedulerService,
+                                    AssetPoolService assetPoolService,
                                     LocalRealReadinessService readiness) {
         this.ingestionScheduler = ingestionScheduler;
         this.analysisSchedulerService = analysisSchedulerService;
+        this.assetPoolService = assetPoolService;
         this.readiness = readiness;
     }
 
@@ -52,9 +55,15 @@ public class LocalRealDataCoordinator {
     }
 
     void bootstrap() {
+        List<String> symbols = trackedSymbols();
+        readiness.retainAssets(symbols);
+        if (symbols.isEmpty()) {
+            readiness.transition(LocalRealReadinessState.DEGRADED, "ASSET_POOL_EMPTY");
+            return;
+        }
         readiness.transition(LocalRealReadinessState.MARKET_BOOTSTRAPPING, "PUBLIC_OHLCV_BOOTSTRAP_RUNNING");
         Map<String, String> failures = new LinkedHashMap<>();
-        for (String symbol : SYMBOLS) {
+        for (String symbol : symbols) {
             readiness.updateAsset(symbol, LocalRealAssetReadinessState.BOOTSTRAPPING, null,
                     "PUBLIC_OHLCV_BOOTSTRAP_RUNNING");
             if (analysisSchedulerService.marketDataReady(symbol)) {
@@ -73,7 +82,7 @@ public class LocalRealDataCoordinator {
             }
         }
 
-        Set<String> marketReady = evaluateMarketReadiness(failures);
+        Set<String> marketReady = evaluateMarketReadiness(symbols, failures);
         if (marketReady.isEmpty()) {
             readiness.transition(LocalRealReadinessState.DEGRADED, "PUBLIC_OHLCV_BOOTSTRAP_DEGRADED");
             return;
@@ -87,15 +96,17 @@ public class LocalRealDataCoordinator {
                 && readiness.state() != LocalRealReadinessState.DASHBOARD_PARTIAL) {
             return;
         }
-        Set<String> marketReady = evaluateMarketReadiness(Map.of());
+        List<String> symbols = trackedSymbols();
+        readiness.retainAssets(symbols);
+        Set<String> marketReady = evaluateMarketReadiness(symbols, Map.of());
         if (!marketReady.isEmpty()) {
             runInitialAnalysis(marketReady);
         }
     }
 
-    private Set<String> evaluateMarketReadiness(Map<String, String> failures) {
+    private Set<String> evaluateMarketReadiness(List<String> symbols, Map<String, String> failures) {
         Set<String> ready = new LinkedHashSet<>();
-        for (String symbol : SYMBOLS) {
+        for (String symbol : symbols) {
             if (analysisSchedulerService.marketDataReady(symbol)) {
                 ready.add(symbol);
                 readiness.updateAsset(symbol, LocalRealAssetReadinessState.BOOTSTRAPPING, null,
@@ -131,7 +142,7 @@ public class LocalRealDataCoordinator {
                         "INITIAL_ANALYSIS_INCOMPLETE");
             }
         }
-        if (completedSymbols.size() >= 5) {
+        if (!marketReady.isEmpty() && completedSymbols.containsAll(marketReady)) {
             readiness.transition(LocalRealReadinessState.DASHBOARD_READY, "REAL_DATA_AVAILABLE");
         } else if (!completedSymbols.isEmpty()) {
             readiness.transition(LocalRealReadinessState.DASHBOARD_PARTIAL, "PARTIAL_REAL_DATA_AVAILABLE");
@@ -144,6 +155,21 @@ public class LocalRealDataCoordinator {
         return reason != null && (reason.contains("PAIR_NOT_SUPPORTED")
                 || reason.contains("GEO_RESTRICTED")
                 || reason.contains("PROVIDER_UNAVAILABLE_FOR_LOCATION"));
+    }
+
+    private List<String> trackedSymbols() {
+        if (assetPoolService == null) {
+            return List.of();
+        }
+        List<String> symbols = assetPoolService.listScanSymbols();
+        if (symbols == null) {
+            return List.of();
+        }
+        return symbols.stream()
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
     }
 
     @PreDestroy

@@ -6,6 +6,7 @@ import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.service.ConfusedResult;
 import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionContext;
+import org.example.trademodel.service.OpportunityStateIdentity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -106,16 +107,39 @@ class ConfusedStateServiceImplTest {
     }
 
     @Test
-    void secondConsecutiveLowCycleExitsToCoolingOnly() {
+    void secondConsecutiveLowCycleWithRecoveredSignalsExitsToCandidateOnly() {
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 1));
 
         ConfusedResult result = service.calculateConfused("BTCUSDT", contextForScore(54, true));
 
         assertThat(result.isShouldExit()).isTrue();
-        assertThat(result.getNextState()).isEqualTo(AssetStateEnum.COOLING.name());
+        assertThat(result.getNextState()).isEqualTo(AssetStateEnum.CANDIDATE.name());
         assertThat(result.getNextState()).isNotEqualTo(AssetStateEnum.TRIGGERED.name());
         assertThat(result.getNextState()).isNotEqualTo(AssetStateEnum.WAITING_TRIGGER.name());
         assertThat(result.getConfusedLowStreak()).isZero();
+    }
+
+    @Test
+    void secondLowCycleWithoutRecoveredDriverSignalsRemainsConfused() {
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 1));
+        DecisionContext context = contextForScore(54, true);
+        context.setMultiTimeframeAligned(false);
+
+        ConfusedResult result = service.calculateConfused("BTCUSDT", context);
+
+        assertThat(result.isShouldExit()).isFalse();
+        assertThat(result.getNextState()).isEqualTo(AssetStateEnum.CONFUSED.name());
+        assertThat(result.getTransitionReason()).isEqualTo("CONFUSED_EXIT_SIGNALS_NOT_RECOVERED");
+    }
+
+    @Test
+    void recoveredSignalsWithoutOpeningValueExitToObserving() {
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row(AssetStateEnum.CONFUSED, 1));
+
+        ConfusedResult result = service.calculateConfused("BTCUSDT", contextForScore(54, false));
+
+        assertThat(result.isShouldExit()).isTrue();
+        assertThat(result.getNextState()).isEqualTo(AssetStateEnum.OBSERVING.name());
     }
 
     @Test
@@ -164,7 +188,7 @@ class ConfusedStateServiceImplTest {
         ConfusedResult second = service.calculateConfused("BTCUSDT", contextForScore(54, true));
 
         assertThat(first.getConfusedLowStreak()).isEqualTo(1);
-        assertThat(second.getNextState()).isEqualTo(AssetStateEnum.COOLING.name());
+        assertThat(second.getNextState()).isEqualTo(AssetStateEnum.CANDIDATE.name());
     }
 
     @Test
@@ -175,10 +199,24 @@ class ConfusedStateServiceImplTest {
         ConfusedResult btc = service.calculateConfused("BTCUSDT", contextForScore(54, true));
         ConfusedResult eth = service.calculateConfused("ETHUSDT", contextForScore(54, true));
 
-        assertThat(btc.getNextState()).isEqualTo(AssetStateEnum.COOLING.name());
+        assertThat(btc.getNextState()).isEqualTo(AssetStateEnum.CANDIDATE.name());
         assertThat(eth.getNextState()).isEqualTo(AssetStateEnum.CONFUSED.name());
         verify(assetStateMapper).selectBySymbol("BTCUSDT");
         verify(assetStateMapper).selectBySymbol("ETHUSDT");
+    }
+
+    @Test
+    void userOwnedOpportunityReadsOnlyItsExactOwnerAndTimeframeIdentity() {
+        OpportunityStateIdentity identity = new OpportunityStateIdentity(
+                "USER", 42L, 9001L, "BTCUSDT", "5m");
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(row(AssetStateEnum.CONFUSED, 1));
+
+        ConfusedResult result = service.calculateConfused(identity, contextForScore(54, true));
+
+        assertThat(result.isShouldExit()).isTrue();
+        assertThat(result.getNextState()).isEqualTo(AssetStateEnum.CANDIDATE.name());
+        verify(assetStateMapper).selectByIdentity("USER", 42L, "BTCUSDT", "5m");
     }
 
     @Test
@@ -215,6 +253,7 @@ class ConfusedStateServiceImplTest {
         context.setCauseEffectDivergenceScore(score);
         context.setAiConflictScore(score);
         context.setWorthOpening(worthOpening);
+        context.setMultiTimeframeAligned(true);
         return context;
     }
 

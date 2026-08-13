@@ -1,14 +1,14 @@
 package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.trademodel.ai.AiOrchestratorResult;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.ai.AiProviderCallStatus;
 import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiProviderRole;
 import org.example.trademodel.ai.AiReviewConflictLevel;
 import org.example.trademodel.ai.AiReviewStance;
-import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.controller.DashboardHomeController;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
@@ -51,6 +51,7 @@ import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.OpportunityPriorityRankingService;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
@@ -150,7 +151,7 @@ class DashboardHomeServiceImplTest {
     private ExecutionPlanMapper executionPlanMapper;
 
     private DashboardHomeServiceImpl service;
-    private final AiRoleResultsCodec aiRoleResultsCodec = new AiRoleResultsCodec(new ObjectMapper());
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -195,6 +196,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                 .containsExactly("LINKUSDT", "AAVEUSDT");
         assertThat(home.getAssets().get(0).getAssetId()).isEqualTo(101L);
+        assertThat(home.getAssets().get(0).getName()).isEqualTo("LINKUSDT");
         assertThat(home.getAssets().get(0).getOpportunityId()).isEqualTo("opportunity-link");
         assertThat(home.getAssets().get(0).getAnalysisId()).isEqualTo("analysis-LINKUSDT");
         assertThat(home.getAssets().get(0).getOpportunityScore()).isEqualTo(94);
@@ -241,7 +243,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("62000"));
         position.setQuantity(new BigDecimal("0.2"));
         position.setLeverage(new BigDecimal("2"));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setUpdatedAt(LocalDateTime.of(2026, 6, 27, 2, 0));
         allowResolvedOriginalPlan(position, btc, "plan-btc-source", "trace-" + btc.getAnalysisId());
 
@@ -282,16 +284,17 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("HIGH");
         assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("选中资产决策风险");
         assertThat(home.getSystemState().getMarketTrend().getValue()).isEqualTo("BULLISH");
-        assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(home.getSystemState().getAiConflict().getValue())
+                .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
-        assertThat(home.getSystemState().getAiConflict().getScore()).isEqualTo(25);
+        assertThat(home.getSystemState().getAiConflict().getScore()).isNull();
 
         assertThat(home.getAssets()).hasSize(4);
         DashboardHomeVO.AssetVO btcAsset = asset(home, "BTC/USDT");
         assertThat(btcAsset.getMarketBias()).isEqualTo("BULLISH");
         assertThat(btcAsset.getConfidenceLevel()).isEqualTo("HIGH");
         assertThat(btcAsset.getRiskLevel()).isEqualTo("HIGH");
-        assertThat(btcAsset.getWorthOpening()).isTrue();
+        assertThat(btcAsset.getWorthOpening()).isNull();
         assertThat(btcAsset.getCompositeScore()).isNull();
         assertThat(btcAsset.getAssetState()).isEqualTo("CANDIDATE");
         assertThat(btcAsset.getAssetStateLabel()).isEqualTo("候选");
@@ -325,13 +328,13 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getMonitorConclusion()).isNull();
         assertThat(homePosition.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
         assertThat(home.getExecutionSuggestion().getPositionMode()).isFalse();
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("RISK_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("PLAN_IDENTITY_MISSING");
         assertThat(home.getExecutionSuggestion().getPositionMonitor()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getAiDecision().getActiveTab()).isEqualTo("GPT_FINAL");
         assertThat(home.getAiDecision().getTabs()).extracting(DashboardHomeVO.AiTabVO::getRole)
                 .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
-        assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v1");
+        assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v2");
         assertThat(home.getAiDecision().getTabs().get(0).getSupportEvidence())
                 .containsExactly("规则方向与 AI 复核一致");
         assertThat(home.getPushInbox().getCounts().getWaiting()).isZero();
@@ -489,7 +492,7 @@ class DashboardHomeServiceImplTest {
         manualPosition.setId(13L);
         manualPosition.setAssetSymbol("BTCUSDT");
         manualPosition.setStatus("OPEN");
-        manualPosition.setSourceType("MANUAL_POSITION");
+        manualPosition.setSourceType("MANUAL_INDEPENDENT");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(manualPosition));
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 13L, 1)).thenReturn(List.of());
@@ -552,7 +555,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("62000"));
         position.setQuantity(new BigDecimal("0.2"));
         position.setLeverage(new BigDecimal("2"));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(9L);
@@ -726,7 +729,7 @@ class DashboardHomeServiceImplTest {
         position.setStopLoss(new BigDecimal("95"));
         position.setTakeProfit(new BigDecimal("115"));
         position.setOpenedAt(LocalDateTime.of(2026, 7, 13, 10, 0));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(19L);
@@ -789,7 +792,7 @@ class DashboardHomeServiceImplTest {
         closedPosition.setId(21L);
         closedPosition.setAssetSymbol("BTCUSDT");
         closedPosition.setStatus("CLOSED");
-        closedPosition.setSourceType("MANUAL_POSITION");
+        closedPosition.setSourceType("MANUAL_INDEPENDENT");
 
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(closedPosition));
 
@@ -803,12 +806,10 @@ class DashboardHomeServiceImplTest {
 
     @Test
     void executionSuggestionDoesNotBecomePosition() {
-        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 85, 10,
-                "LEVEL_1", true, "{\"state\":\"CANDIDATE\"}");
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         decision.setEntryZone("63000-64000");
         decision.setStopLoss("61000");
         decision.setTakeProfitRules("66000 / 69000");
-        decision.setValidPeriod(ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
         allowMatchingSnapshot(decision);
 
@@ -835,7 +836,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(new BigDecimal("2"));
         position.setLeverage(new BigDecimal("3"));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
 
         PositionMonitorLogDTO monitorLog = new PositionMonitorLogDTO();
         monitorLog.setPositionId(10L);
@@ -890,6 +891,51 @@ class DashboardHomeServiceImplTest {
                 .getExecutionSuggestion();
 
         assertAssetExecutionPlan(suggestion, decision, "plan-" + decision.getAnalysisId());
+    }
+
+    @Test
+    void finalPlanModeExclusivelyDeterminesWhetherThePlanIsWorthManualParticipation() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        decision.setIsWorthOpening(false);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO reduced = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(reduced.getWorthOpening()).isTrue();
+
+        plan.setFinalPlanMode("OBSERVATION");
+        DashboardHomeVO.ExecutionSuggestionVO observation = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(observation.getStatus()).isEqualTo("USABLE_REVIEW_PLAN");
+        assertThat(observation.getWorthOpening()).isFalse();
+    }
+
+    @Test
+    void candidatePlanNeverLeaksIntoHomeExecutionSuggestion() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO candidateLookingPlan = allowMatchingSnapshot(decision);
+        candidateLookingPlan.setFinalPlan(false);
+        candidateLookingPlan.setChainStatus("CANDIDATE_GENERATED");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertUnavailableAssetExecutionPlan(suggestion, "PLAN_INCOMPLETE");
+        assertThat(suggestion.getSourceExecutionPlanId()).isNull();
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
     }
 
     @Test
@@ -1661,13 +1707,13 @@ class DashboardHomeServiceImplTest {
         assertThat(gpt.getFinalMarketBias()).isEqualTo("BULLISH");
         assertThat(gpt.getFinalConfidence()).isEqualTo("HIGH");
         assertThat(gpt.getFinalRiskLevel()).isEqualTo("HIGH");
-        assertThat(gpt.getFinalPlanMode()).isEqualTo("PREPARE_ONLY");
+        assertThat(gpt.getFinalPlanMode()).isEqualTo("PREPARATION");
         assertThat(gpt.getWorthOpening()).isEqualTo("是");
         assertThat(gpt.getFinalConclusion()).isEqualTo("AI 复核结果已返回，等待人工复核");
         assertThat(gpt.getCoreSupportingEvidence()).containsExactly("AI 证据已记录，需人工复核");
         assertThat(gpt.getCoreCounterEvidence()).isEmpty();
         assertThat(gpt.getDecisionSummary()).isEqualTo("AI 复核结果已返回，等待人工复核");
-        assertThat(gpt.getDowngradeReason()).isEqualTo("AI 发现证据冲突，需人工复核");
+        assertThat(gpt.getDowngradeReason()).isEqualTo("GEMINI_CONTRADICTION_ONLY");
         assertThat(gpt.getDirection()).isEqualTo("BULLISH");
         assertThat(gpt.getSupportEvidence()).containsExactly("AI 证据已记录，需人工复核");
         assertThat(gpt.getReviewVerdict()).isNull();
@@ -1682,12 +1728,13 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.AiTabVO gemini = aiTab(home, "GEMINI_REVIEW");
-        assertThat(gemini.getReviewVerdict()).isEqualTo("提出反对意见");
+        assertThat(gemini.getReviewVerdict()).isEqualTo("DOWNGRADE");
         assertThat(gemini.getDetectedContradictions()).containsExactly("AI 发现证据冲突");
         assertThat(gemini.getWeakEvidence()).isEmpty();
-        assertThat(gemini.getLogicGaps()).isEmpty();
-        assertThat(gemini.getDowngradeRecommendation()).isNull();
-        assertThat(gemini.getRiskAdjustmentSuggestion()).isNull();
+        assertThat(gemini.getLogicGaps()).containsExactly("AI 发现证据冲突");
+        assertThat(gemini.getDowngradeRecommendation())
+                .isEqualTo("AI 复核结果已返回，等待人工复核");
+        assertThat(gemini.getRiskAdjustmentSuggestion()).isEqualTo("RAISED");
         assertThat(gemini.getManualReviewRequired()).isEqualTo("是");
         assertThat(gemini.getReviewConclusion()).isEqualTo("AI 复核结果已返回，等待人工复核");
         assertThat(gemini.getDirection()).isNull();
@@ -1706,7 +1753,7 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.AiTabVO grok = aiTab(home, "GROK_CHALLENGE");
         assertThat(grok.getChallengeThesis()).isEqualTo("AI 复核结果已返回，等待人工复核");
         assertThat(grok.getEventRisks()).isEmpty();
-        assertThat(grok.getSentimentReversalRisks()).isEmpty();
+        assertThat(grok.getSentimentReversalRisks()).containsExactly("AI 提供反向证据");
         assertThat(grok.getMicrostructureTraps()).isEmpty();
         assertThat(grok.getLiquidityRisks()).isEmpty();
         assertThat(grok.getCounterEvidence()).containsExactly("AI 提供反向证据");
@@ -1870,9 +1917,8 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAiDecision().getDecisionModeLabel()).isEqualTo("AI 复核无可裁决结论");
         assertThat(home.getAiDecision().getTabs()).allSatisfy(tab -> {
             assertThat(tab.getRunStatusLabel()).isEqualTo("复核成功");
-            assertThat(tab.getReviewConclusion()).isEqualTo("证据不足，暂不判断");
+            assertThat(tab.getDataState()).isEqualTo("INSUFFICIENT_DATA");
         });
-        assertThat(home.getAiDecision().getConsistency().getDirectionalPushBlocked()).isTrue();
         assertConsistencyNotApplicable(home);
     }
 
@@ -1887,8 +1933,11 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
-        assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
-        assertThat(home.getSystemState().getAiConflict().getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(home.getAiDecision().getConsistency().getDataState()).isEqualTo("READY");
+        assertThat(home.getAiDecision().getConsistency().getConflictLevel())
+                .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
+        assertThat(home.getSystemState().getAiConflict().getValue())
+                .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(aiTab(home, "GPT_FINAL").getStance()).isEqualTo("SUPPORT");
         assertThat(aiTab(home, "GEMINI_REVIEW").getStance()).isEqualTo("ABSTAIN");
     }
@@ -1904,7 +1953,9 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
-        assertThat(home.getAiDecision().getConsistency().getAiApplicable()).isTrue();
+        assertThat(home.getAiDecision().getConsistency().getDataState()).isEqualTo("READY");
+        assertThat(home.getAiDecision().getConsistency().getConflictLevel())
+                .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
         assertThat(aiTab(home, "GEMINI_REVIEW").getStance()).isEqualTo("CHALLENGE");
         assertThat(aiTab(home, "GROK_CHALLENGE").getStance()).isEqualTo("ABSTAIN");
@@ -1931,7 +1982,7 @@ class DashboardHomeServiceImplTest {
 
         DashboardHomeVO.StatusCardVO card = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getSystemState().getAiConflict();
 
-        assertThat(card.getValue()).isEqualTo("LEVEL_2_REVIEW");
+        assertThat(card.getValue()).isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(card.getValueLabel()).isEqualTo("轻微分歧");
     }
 
@@ -1949,7 +2000,8 @@ class DashboardHomeServiceImplTest {
                         .param("selectedSymbol", "BTCUSDT")
                         .param("limit", "6"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.systemState.aiConflict.value").value("LEVEL_2_REVIEW"))
+                .andExpect(jsonPath("$.data.systemState.aiConflict.value")
+                        .value("LEVEL_2_MINOR_DISAGREEMENT"))
                 .andExpect(jsonPath("$.data.systemState.aiConflict.valueLabel").value("轻微分歧"));
     }
 
@@ -1985,7 +2037,9 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
         DashboardHomeVO defaultHome = service.getHomeForUser(USER_ID, null, 6);
 
-        assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).containsExactly("证据不足");
+        assertThat(aiTab(ethHome, "GPT_FINAL").getSupportEvidence()).isEmpty();
+        assertThat(aiTab(ethHome, "GPT_FINAL").getSupportingEvidenceState())
+                .isEqualTo("INSUFFICIENT_DATA");
         assertThat(aiTab(defaultHome, "GPT_FINAL").getSupportEvidence()).containsExactly("规则方向与 AI 复核一致");
     }
 
@@ -1997,12 +2051,18 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
-        assertThat(consistency.getLevel()).isEqualTo("LEVEL_2_REVIEW");
-        assertThat(consistency.getScore()).isEqualTo(25);
+        assertThat(consistency.getDataState()).isEqualTo("READY");
+        assertThat(consistency.getConflictLevel()).isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
+        assertThat(consistency.getFinalMarketBias()).isEqualTo("BULLISH");
+        assertThat(consistency.getFinalPlanMode()).isEqualTo("PREPARATION");
+        assertThat(consistency.getMainReason()).isEqualTo("GEMINI_CONTRADICTION_ONLY");
+        assertThat(consistency.getRecoveryCondition()).isEqualTo("NEW_VERIFIED_ANALYSIS");
+        assertThat(consistency.getLevel()).isNull();
+        assertThat(consistency.getScore()).isNull();
         assertThat(consistency.getConsistencyScore()).isNull();
-        assertThat(consistency.getConsistencyLevel()).isEqualTo("轻微分歧");
-        assertThat(consistency.getConsistencySummary()).isEqualTo("基于本轮成功返回的 AI 角色形成一致性摘要");
-        assertThat(consistency.getDowngradeReason()).isEqualTo("AI 发现证据冲突，需人工复核");
+        assertThat(consistency.getConsistencyLevel()).isNull();
+        assertThat(consistency.getConsistencySummary()).isNull();
+        assertThat(consistency.getDowngradeReason()).isNull();
     }
 
     @Test
@@ -2019,10 +2079,14 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
 
         DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
-        assertThat(consistency.getScore()).isEqualTo(80);
+        assertThat(consistency.getDataState()).isEqualTo("READY");
+        assertThat(consistency.getConflictLevel()).isEqualTo("LEVEL_4_EXTREME_CONFLICT");
+        assertThat(consistency.getFinalPlanMode()).isEqualTo("BLOCKED");
+        assertThat(consistency.getMainReason()).isEqualTo("CONFLICT_TOO_HIGH");
+        assertThat(consistency.getRecoveryCondition()).isEqualTo("NEW_VERIFIED_ANALYSIS");
+        assertThat(consistency.getScore()).isNull();
         assertThat(consistency.getConsistencyScore()).isNull();
-        assertThat(consistency.getScore()).isNotEqualTo(20);
-        assertThat(consistency.getDowngradeReason()).isEqualTo("冲突程度较高，需人工复核");
+        assertThat(consistency.getDowngradeReason()).isNull();
     }
 
     @Test
@@ -2128,7 +2192,8 @@ class DashboardHomeServiceImplTest {
         assertThat(ai.getDecisionModeLabel()).isEqualTo("仅规则判断");
         assertThat(ai.getConsistency().getLevel()).isNull();
         assertThat(ai.getConsistency().getScore()).isNull();
-        assertThat(ai.getConsistency().getConsistencyLevel()).isEqualTo("不适用");
+        assertThat(ai.getConsistency().getDataState()).isEqualTo("SOURCE_UNAVAILABLE");
+        assertThat(ai.getConsistency().getConflictLevel()).isNull();
         assertThat(ai.getTabs()).allSatisfy(tab -> {
             assertThat(tab.getRunStatus()).isEqualTo("NOT_CALLED");
             assertThat(tab.getRunStatusLabel()).isEqualTo("未调用");
@@ -2151,12 +2216,12 @@ class DashboardHomeServiceImplTest {
             DashboardHomeVO.ConsistencyVO consistency = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                     .getAiDecision().getConsistency();
 
-            assertThat(consistency.getAiApplicable()).isFalse();
-            assertThat(consistency.getConsistencyLevel()).isEqualTo("不适用");
+            assertThat(consistency.getDataState()).isEqualTo("SOURCE_UNAVAILABLE");
+            assertThat(consistency.getConflictLevel()).isNull();
             assertThat(consistency.getLevel()).isNull();
             assertThat(consistency.getScore()).isNull();
-            assertThat(consistency.getConfused()).isFalse();
-            assertThat(consistency.getDirectionalPushBlocked()).isTrue();
+            assertThat(consistency.getConfused()).isNull();
+            assertThat(consistency.getDirectionalPushBlocked()).isNull();
         }
     }
 
@@ -2186,33 +2251,37 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void malformedValidPeriodFailsClosed() {
+    void finalPlanWithoutStructuredValidityFailsClosedEvenWhenDecisionHasMalformedLegacyPeriod() {
         DecisionResultVO decision = completePlanDecision(
                 "BTCUSDT", "2026/07/01 00:00:00 - 2026/07/02 00:00:00");
-        allowMatchingSnapshot(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setValidFrom(null);
+        plan.setValidUntil(null);
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
 
-        assertThat(suggestion.getStatus()).isEqualTo("VALID_PERIOD_INVALID");
-        assertThat(suggestion.getBlockedReason()).isEqualTo("有效期格式异常，等待重新分析");
+        assertThat(suggestion.getStatus()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getBlockedReason()).isEqualTo("执行计划状态、来源或边界信息不完整");
         assertThat(suggestion.getValidFrom()).isNull();
         assertThat(suggestion.getExpiresAt()).isNull();
     }
 
     @Test
-    void legacyNoOffsetPlanFailsClosed() {
+    void decisionOnlyLegacyValidityCannotSubstituteForFinalPlanValidity() {
         DecisionResultVO decision = completePlanDecision(
                 "BTCUSDT", "2026-07-01 00:00:00 ~ 2026-07-02 00:00:00");
-        allowMatchingSnapshot(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setValidFrom(null);
+        plan.setValidUntil(null);
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getExecutionSuggestion();
 
-        assertThat(suggestion.getStatus()).isEqualTo("LEGACY_TIMEZONE_UNVERIFIED");
-        assertThat(suggestion.getBlockedReason()).isEqualTo("历史计划时区不可验证，需重新分析");
+        assertThat(suggestion.getStatus()).isEqualTo("PLAN_INCOMPLETE");
+        assertThat(suggestion.getBlockedReason()).isEqualTo("执行计划状态、来源或边界信息不完整");
         assertThat(suggestion.getDirection()).isNull();
         assertThat(suggestion.getEntryZone()).isNull();
         assertThat(suggestion.getValidFrom()).isNull();
@@ -2344,12 +2413,14 @@ class DashboardHomeServiceImplTest {
 
     private void assertConsistencyNotApplicable(DashboardHomeVO home) {
         DashboardHomeVO.ConsistencyVO consistency = home.getAiDecision().getConsistency();
-        assertThat(consistency.getAiApplicable()).isFalse();
+        assertThat(consistency.getDataState()).isEqualTo("INSUFFICIENT_DATA");
+        assertThat(consistency.getConflictLevel()).isNull();
+        assertThat(consistency.getFinalMarketBias()).isNull();
+        assertThat(consistency.getFinalPlanMode()).isNull();
         assertThat(consistency.getLevel()).isNull();
         assertThat(consistency.getScore()).isNull();
-        assertThat(consistency.getConsistencyLevel()).isEqualTo("不适用");
-        assertThat(consistency.getConsistencySummary())
-                .isEqualTo("AI 成功返回，但所有角色均因证据不足而弃权");
+        assertThat(consistency.getConsistencyLevel()).isNull();
+        assertThat(consistency.getConsistencySummary()).isNull();
         assertThat(home.getSystemState().getAiConflict().getValue()).isNull();
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("不适用");
     }
@@ -2375,6 +2446,8 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getPositionMonitor()).isNull();
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(planId);
+        assertThat(suggestion.getFinalPlanMode()).isEqualTo("CONFIRMATION");
+        assertThat(suggestion.getWorthOpening()).isTrue();
         assertThat(suggestion.getEntryZone()).isEqualTo(decision.getEntryZone());
         assertThat(suggestion.getStopLoss()).isEqualTo(decision.getStopLoss());
         assertThat(suggestion.getTakeProfitRules()).isEqualTo(decision.getTakeProfitRules());
@@ -2443,7 +2516,7 @@ class DashboardHomeServiceImplTest {
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(BigDecimal.ONE);
         position.setLeverage(BigDecimal.ONE);
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setSourceRefId(sourceRefId);
         return position;
     }
@@ -2574,7 +2647,7 @@ class DashboardHomeServiceImplTest {
         position.setLeverage(BigDecimal.ONE);
         position.setStopLoss(new BigDecimal("90"));
         position.setTakeProfit(new BigDecimal("120"));
-        position.setSourceType("MANUAL_POSITION");
+        position.setSourceType("MANUAL_INDEPENDENT");
         position.setSourceRefId(sourceRefId);
         return position;
     }
@@ -2696,23 +2769,30 @@ class DashboardHomeServiceImplTest {
     }
 
     private ExecutionPlanDO validExecutionPlan(String planId, String analysisId) {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(planId);
-        plan.setAnalysisId(analysisId);
-        plan.setExecutionPlanStatus("VALID");
-        plan.setSourceGateStatus("VALID");
-        plan.setSourceGateComplete(true);
-        plan.setNeedsRevalidation(false);
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                planId, analysisId, LocalDateTime.of(2026, 7, 1, 12, 0));
+        plan.setExecutionFeasibilityFreshUntil(LocalDateTime.of(2026, 7, 3, 11, 59));
         return plan;
     }
 
     private void copyExactPlanFields(ExecutionPlanDO plan, DecisionResultVO decision) {
+        plan.setRuleMarketBias(decision.getMarketBiasHierarchy());
+        plan.setFinalMarketBias(decision.getMarketBiasHierarchy());
+        plan.setFinalPlanMode("CONFIRMATION");
         plan.setEntryZone(decision.getEntryZone());
         plan.setStopLoss(decision.getStopLoss());
         plan.setTakeProfitRules(decision.getTakeProfitRules());
         plan.setLeverageSuggestion(decision.getLeverageSuggestion());
+        plan.setLeverageLimit(decision.getLeverageSuggestion());
         plan.setPositionSuggestion(decision.getPositionSuggestion());
+        plan.setPositionLimit(decision.getPositionSuggestion());
         plan.setInvalidCondition(decision.getInvalidCondition());
+        if (decision.getValidFrom() != null) {
+            plan.setValidFrom(decision.getValidFrom().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+        }
+        if (decision.getExpiresAt() != null) {
+            plan.setValidUntil(decision.getExpiresAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+        }
     }
 
     private void assertMonitorDashboardPlanStateAgreement(
@@ -2948,11 +3028,266 @@ class DashboardHomeServiceImplTest {
 
     private String structuredAiRoleResults(List<AiProviderReviewResult> roleResults,
                                            AiRoleResultsPayload.SynthesisPayload synthesis) {
-        AiOrchestratorResult result = new AiOrchestratorResult();
-        result.setAnalysisId("analysis-dashboard-ai");
-        result.setTraceId("trace-dashboard-ai");
-        result.setProviderResults(roleResults);
-        return aiRoleResultsCodec.serialize(result, "v1.0", synthesis);
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("schemaVersion", AiRoleResultsPayload.CURRENT_SCHEMA_VERSION);
+        root.put("analysisId", "analysis-dashboard-ai");
+        root.put("traceId", "trace-dashboard-ai");
+        root.put("ruleVersion", "v4.1-test-fixture");
+        root.put("orchestrationMode", "DECISION_CHAIN_V4_1");
+        root.set("orchestrationReasonCodes", objectMapper.createArrayNode());
+
+        ObjectNode roles = objectMapper.createObjectNode();
+        for (String roleName : List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")) {
+            AiProviderReviewResult source = roleResults == null ? null : roleResults.stream()
+                    .filter(value -> roleName.equals(decisionRoleName(value)))
+                    .findFirst()
+                    .orElse(null);
+            roles.set(roleName, structuredRoleFixture(roleName, source, synthesis));
+        }
+        root.set("roles", roles);
+        root.set("synthesis", objectMapper.valueToTree(synthesis));
+        root.set("safety", objectMapper.valueToTree(AiRoleResultsPayload.SafetyBoundary.decisionChainV41()));
+        try {
+            return objectMapper.writeValueAsString(root);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to create structured AI fixture", exception);
+        }
+    }
+
+    private ObjectNode structuredRoleFixture(String roleName,
+                                             AiProviderReviewResult source,
+                                             AiRoleResultsPayload.SynthesisPayload synthesis) {
+        ObjectNode role = objectMapper.createObjectNode();
+        role.put("role", roleName);
+        role.put("analysisId", "analysis-dashboard-ai");
+        role.put("traceId", "trace-dashboard-ai");
+        role.put("generatedAt", "2026-07-01T12:00:00Z");
+        if (source == null) {
+            role.put("callStatus", "NOT_CALLED");
+            role.put("roleState", "UNAVAILABLE");
+            role.put("dataState", "SOURCE_UNAVAILABLE");
+            role.put("fallback", true);
+            role.put("fallbackReason", "ROLE_RESULT_UNAVAILABLE");
+            initializeRoleCollections(roleName, role, "SOURCE_UNAVAILABLE");
+            return role;
+        }
+
+        String callStatus = source.getCallStatus() == null ? "FAILED" : source.getCallStatus().name();
+        boolean successful = "SUCCESS".equals(callStatus);
+        boolean insufficient = source.getStance() == AiReviewStance.ABSTAIN
+                || source.getReasonCodes().stream().anyMatch("INSUFFICIENT_DATA"::equals);
+        role.put("provider", source.getProvider() == null ? "TEST_FIXTURE" : source.getProvider().name());
+        role.put("sourceRole", roleName);
+        role.put("callStatus", callStatus);
+        role.put("roleState", successful ? "READY" : source.isFallback() ? "FALLBACK" : "ERROR");
+        role.put("dataState", successful
+                ? insufficient ? "INSUFFICIENT_DATA" : "READY"
+                : "TIMEOUT".equals(callStatus) ? "AI_TIMEOUT" : "AI_FAILED");
+        if (successful && source.getStance() != null) role.put("stance", source.getStance().name());
+        role.set("reasonCodes", objectMapper.valueToTree(source.getReasonCodes()));
+        if (source.getSummary() != null) role.put("summary", source.getSummary());
+        if (source.isFallback()) role.put("fallback", true);
+        if (source.getFallbackReason() != null) role.put("fallbackReason", source.getFallbackReason());
+        role.put("manualReviewRequired", true);
+
+        if (!successful) {
+            initializeRoleCollections(roleName, role, "SOURCE_UNAVAILABLE");
+            return role;
+        }
+        switch (roleName) {
+            case "GPT_FINAL" -> populateGptFixture(role, source, synthesis, insufficient);
+            case "GEMINI_REVIEW" -> populateGeminiFixture(role, source, synthesis, insufficient);
+            case "GROK_CHALLENGE" -> populateGrokFixture(role, source, synthesis, insufficient);
+            default -> throw new IllegalArgumentException("Unknown AI role fixture: " + roleName);
+        }
+        return role;
+    }
+
+    private void populateGptFixture(ObjectNode role,
+                                    AiProviderReviewResult source,
+                                    AiRoleResultsPayload.SynthesisPayload synthesis,
+                                    boolean insufficient) {
+        ObjectNode judgment = objectMapper.createObjectNode();
+        if (!insufficient) judgment.put("marketBias", synthesis.finalMarketBias());
+        judgment.put("opportunityState", "CANDIDATE");
+        judgment.put("text", insufficient ? "证据不足，暂不判断" : "AI 复核结果已返回，等待人工复核");
+        role.set("coreJudgment", judgment);
+
+        ArrayNode support = objectMapper.createArrayNode();
+        if (!insufficient) support.add(evidenceFixture(reasonDisplay(source), "SUPPORTING"));
+        role.set("supportingEvidence", support);
+        role.put("supportingEvidenceState", insufficient ? "INSUFFICIENT_DATA" : "FOUND");
+        role.set("opposingEvidence", objectMapper.createArrayNode());
+        role.put("opposingEvidenceState", insufficient ? "INSUFFICIENT_DATA" : "NONE_FOUND");
+
+        ObjectNode timeframes = objectMapper.createObjectNode();
+        timeframes.put("4h", "test fixture 4h");
+        timeframes.put("1h", "test fixture 1h");
+        timeframes.put("15m", "test fixture 15m");
+        timeframes.put("5m", "test fixture 5m");
+        role.set("multiTimeframeExplanation", timeframes);
+
+        if (!insufficient) {
+            ObjectNode adjustment = objectMapper.createObjectNode();
+            adjustment.put("before", synthesis.finalMarketBias());
+            adjustment.put("after", synthesis.finalMarketBias());
+            adjustment.put("reason", synthesis.mainReason() == null ? "UNCHANGED" : synthesis.mainReason());
+            role.set("biasAdjustment", adjustment);
+
+            ObjectNode candidate = objectMapper.createObjectNode();
+            candidate.put("planMode", synthesis.finalPlanMode());
+            candidate.put("confidence", synthesis.finalConfidence());
+            candidate.put("riskLevel", synthesis.finalRiskLevel());
+            candidate.put("worthOpening", Boolean.TRUE.equals(synthesis.worthOpening()));
+            candidate.put("summary", "AI 复核结果已返回，等待人工复核");
+            role.set("candidateSummary", candidate);
+        }
+    }
+
+    private void populateGeminiFixture(ObjectNode role,
+                                       AiProviderReviewResult source,
+                                       AiRoleResultsPayload.SynthesisPayload synthesis,
+                                       boolean insufficient) {
+        boolean challenge = source.getStance() == AiReviewStance.CHALLENGE;
+        role.set("evidenceGaps", objectMapper.createArrayNode());
+        role.put("evidenceGapsState", insufficient ? "INSUFFICIENT_DATA" : "NONE_FOUND");
+        ArrayNode conflicts = objectMapper.createArrayNode();
+        if (challenge) conflicts.add(findingFixture("AI 发现证据冲突", "LOGIC_CONFLICT"));
+        role.set("logicConflicts", conflicts);
+        role.put("logicConflictsState", insufficient ? "INSUFFICIENT_DATA" : challenge ? "FOUND" : "NONE_FOUND");
+        role.set("underestimatedRisks", objectMapper.createArrayNode());
+        role.put("underestimatedRisksState", insufficient ? "INSUFFICIENT_DATA" : "NONE_FOUND");
+        if (!insufficient) {
+            ObjectNode downgrade = objectMapper.createObjectNode();
+            downgrade.put("before", synthesis.finalPlanMode());
+            downgrade.put("after", synthesis.finalPlanMode());
+            downgrade.put("reason", challenge ? "AI 复核结果已返回，等待人工复核" : "UNCHANGED");
+            downgrade.put("recoveryCondition", "NEW_VERIFIED_ANALYSIS");
+            role.set("downgradeSuggestion", downgrade);
+            role.put("reviewResult", challenge ? "DOWNGRADE" : "APPROVE");
+            role.put("finalDirectionImpact", "UNCHANGED");
+            role.put("confidenceAdjustment", challenge ? "DOWNGRADE_ONE" : "UNCHANGED");
+            role.put("riskAdjustment", challenge ? "RAISED" : "UNCHANGED");
+            role.put("planModeAdjustment", challenge ? "DOWNGRADE_ONE" : "UNCHANGED");
+            role.put("recoveryCondition", "NEW_VERIFIED_ANALYSIS");
+        }
+    }
+
+    private void populateGrokFixture(ObjectNode role,
+                                     AiProviderReviewResult source,
+                                     AiRoleResultsPayload.SynthesisPayload synthesis,
+                                     boolean insufficient) {
+        boolean challenge = source.getStance() == AiReviewStance.CHALLENGE;
+        ArrayNode failurePaths = objectMapper.createArrayNode();
+        if (challenge) {
+            ObjectNode path = objectMapper.createObjectNode();
+            path.put("failurePathId", "test-failure-path");
+            path.put("hypothesis", "AI 提供反向证据");
+            path.put("triggerCondition", "test fixture trigger");
+            path.put("causalPath", "test fixture causal path");
+            path.put("observationWindow", "test fixture window");
+            path.set("validationIndicators", objectMapper.valueToTree(List.of("test fixture indicator")));
+            path.set("sourceRefs", objectMapper.valueToTree(List.of("TEST_FIXTURE_ONLY")));
+            path.put("invalidatingEvidence", "test fixture invalidation");
+            failurePaths.add(path);
+        }
+        role.set("failurePaths", failurePaths);
+        role.put("failurePathState", insufficient ? "INSUFFICIENT_DATA"
+                : challenge ? "FOUND" : "NO_VERIFIABLE_FAILURE_PATH");
+
+        ArrayNode scenarios = objectMapper.createArrayNode();
+        if (challenge) scenarios.add(findingFixture("AI 提供反向证据", "OPPOSING_SCENARIO"));
+        role.set("opposingScenarios", scenarios);
+        role.put("opposingScenariosState", insufficient ? "INSUFFICIENT_DATA" : challenge ? "FOUND" : "NONE_FOUND");
+        for (String field : List.of("externalEventRisks", "microstructureRisks", "watchIndicators")) {
+            role.set(field, objectMapper.createArrayNode());
+            role.put(field + "State", insufficient ? "INSUFFICIENT_DATA" : "NONE_FOUND");
+        }
+        if (!insufficient) {
+            role.put("challengeSummary", "AI 复核结果已返回，等待人工复核");
+            role.put("currentDirectionChallenge", "AI 复核结果已返回，等待人工复核");
+            role.put("majorCounterEvidence", challenge);
+            role.put("conflictLevel", challenge
+                    ? "LEVEL_2_MINOR_DISAGREEMENT" : "LEVEL_1_CONSISTENT");
+            role.put("riskAdjustment", challenge ? "RAISED" : "UNCHANGED");
+            role.put("planModeImpact", challenge ? "DOWNGRADE_ONE" : "UNCHANGED");
+        }
+    }
+
+    private void initializeRoleCollections(String roleName, ObjectNode role, String state) {
+        switch (roleName) {
+            case "GPT_FINAL" -> {
+                role.set("supportingEvidence", objectMapper.createArrayNode());
+                role.put("supportingEvidenceState", state);
+                role.set("opposingEvidence", objectMapper.createArrayNode());
+                role.put("opposingEvidenceState", state);
+            }
+            case "GEMINI_REVIEW" -> {
+                role.set("evidenceGaps", objectMapper.createArrayNode());
+                role.put("evidenceGapsState", state);
+                role.set("logicConflicts", objectMapper.createArrayNode());
+                role.put("logicConflictsState", state);
+                role.set("underestimatedRisks", objectMapper.createArrayNode());
+                role.put("underestimatedRisksState", state);
+            }
+            case "GROK_CHALLENGE" -> {
+                role.set("failurePaths", objectMapper.createArrayNode());
+                role.put("failurePathState", state);
+                role.set("opposingScenarios", objectMapper.createArrayNode());
+                role.put("opposingScenariosState", state);
+                role.set("externalEventRisks", objectMapper.createArrayNode());
+                role.put("externalEventRisksState", state);
+                role.set("microstructureRisks", objectMapper.createArrayNode());
+                role.put("microstructureRisksState", state);
+                role.set("watchIndicators", objectMapper.createArrayNode());
+                role.put("watchIndicatorsState", state);
+            }
+            default -> throw new IllegalArgumentException("Unknown AI role fixture: " + roleName);
+        }
+    }
+
+    private ObjectNode evidenceFixture(String value, String type) {
+        ObjectNode evidence = objectMapper.createObjectNode();
+        evidence.put("evidenceId", "test-evidence-1");
+        evidence.put("type", type);
+        evidence.put("source", "TEST_FIXTURE_ONLY");
+        evidence.put("currentValue", value);
+        evidence.put("change", "TEST_FIXTURE_ONLY");
+        evidence.put("direction", "UNCHANGED");
+        evidence.put("strength", 60.0);
+        evidence.put("confidence", 60.0);
+        evidence.put("observedAt", "2026-07-01T12:00:00Z");
+        evidence.put("freshness", "FRESH");
+        evidence.put("analysisId", "analysis-dashboard-ai");
+        return evidence;
+    }
+
+    private ObjectNode findingFixture(String text, String category) {
+        ObjectNode finding = objectMapper.createObjectNode();
+        finding.put("findingId", "test-finding-1");
+        finding.put("category", category);
+        finding.put("text", text);
+        finding.put("impact", "TEST_FIXTURE_ONLY");
+        finding.set("evidenceRefs", objectMapper.valueToTree(List.of("test-evidence-1")));
+        return finding;
+    }
+
+    private String reasonDisplay(AiProviderReviewResult source) {
+        String reason = source.getReasonCodes().isEmpty() ? null : source.getReasonCodes().get(0);
+        return switch (reason == null ? "" : reason) {
+            case "INSUFFICIENT_DATA" -> "证据不足";
+            case "RULE_DIRECTION_ALIGNED" -> "规则方向与 AI 复核一致";
+            default -> "AI 证据已记录，需人工复核";
+        };
+    }
+
+    private static String decisionRoleName(AiProviderReviewResult source) {
+        if (source == null || source.getRole() == null) return null;
+        return switch (source.getRole()) {
+            case GPT_RULE_REVIEW -> "GPT_FINAL";
+            case GEMINI_CONSISTENCY_REVIEW -> "GEMINI_REVIEW";
+            case GROK_ADVERSARIAL_CHALLENGE -> "GROK_CHALLENGE";
+        };
     }
 
     private AiProviderReviewResult role(AiProviderName provider,
@@ -2979,11 +3314,24 @@ class DashboardHomeServiceImplTest {
                                                             String planMode,
                                                             Boolean worthOpening,
                                                             String downgradeReason) {
+        String normalizedPlanMode = switch (planMode == null ? "" : planMode) {
+            case "CONFIRM", "CONFIRMATION" -> "CONFIRMATION";
+            case "PREPARE", "PREPARE_ONLY", "PREPARATION" -> "PREPARATION";
+            case "REDUCE", "REDUCED" -> "REDUCED";
+            case "WATCH", "OBSERVATION" -> "OBSERVATION";
+            case "CONFUSED", "BLOCKED" -> "BLOCKED";
+            default -> "BLOCKED";
+        };
+        boolean extreme = "CONFLICT_TOO_HIGH".equals(downgradeReason) || "BLOCKED".equals(normalizedPlanMode);
         return new AiRoleResultsPayload.SynthesisPayload(
-                direction, confidence, risk, worthOpening,
-                "LEVEL_2_LIGHT_DIVERGENCE", 25,
-                confidence, "SLIGHTLY_RAISED", planMode, false,
-                downgradeReason);
+                direction, confidence, risk, normalizedPlanMode, worthOpening,
+                extreme ? "LEVEL_4_EXTREME_CONFLICT" : "LEVEL_2_MINOR_DISAGREEMENT",
+                extreme ? 80 : 25,
+                "UNCHANGED", extreme ? "RAISED" : "UNCHANGED",
+                extreme ? "BLOCKED" : "UNCHANGED", extreme,
+                downgradeReason,
+                downgradeReason == null ? "ROLE_RELATIONSHIP_VERIFIED" : downgradeReason,
+                "NEW_VERIFIED_ANALYSIS");
     }
 
     private static OpportunityLogPublicDTO publicOpportunity(
@@ -3076,12 +3424,18 @@ class DashboardHomeServiceImplTest {
         return new HomeTopAssetProjection(
                 assetId,
                 decision.getSymbol(),
+                decision.getSymbol(),
                 opportunityScore,
+                decision.getMarketBiasHierarchy(),
                 decision.getConfidenceLevel(),
                 decision.getRiskLevel(),
                 decision.getPlanMode(),
                 decision.getAiConflictLevel(),
                 decision.getDataQualityScore(),
+                "FRESH",
+                0L,
+                0L,
+                opportunityScore,
                 "OPPORTUNITY_SCORE=" + opportunityScore
                         + "|CONFIDENCE=" + decision.getConfidenceLevel()
                         + "|RISK_LEVEL=" + decision.getRiskLevel()
@@ -3091,6 +3445,7 @@ class DashboardHomeServiceImplTest {
                 decision.getAnalysisId(),
                 opportunityId,
                 opportunityState,
+                LocalDateTime.of(2026, 1, 1, 0, 0),
                 decision);
     }
 

@@ -1,6 +1,7 @@
 package org.example.trademodel.derivatives;
 
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 
@@ -53,7 +54,14 @@ public record DerivativesBusinessAssessment(
     }
 
     public boolean blocksConfirmPlan() {
-        return !confirmEligible || "WARNING_ONLY".equals(planMode) || "PREPARE_ONLY".equals(planMode);
+        if (!confirmEligible) {
+            return true;
+        }
+        try {
+            return PlanModeEnum.require(planMode) != PlanModeEnum.CONFIRMATION;
+        } catch (IllegalArgumentException invalidMode) {
+            return true;
+        }
     }
 
     public boolean isHighRisk() {

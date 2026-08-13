@@ -6,4 +6,11 @@ public interface ConfusedStateService {
     default ConfusedResult calculateConfused(String symbol, String timeframe, DecisionContext context) {
         return calculateConfused(symbol, context);
     }
+
+    default ConfusedResult calculateConfused(OpportunityStateIdentity identity, DecisionContext context) {
+        if (identity == null) {
+            throw new IllegalArgumentException("opportunity identity is required");
+        }
+        return calculateConfused(identity.symbol(), identity.timeframe(), context);
+    }
 }

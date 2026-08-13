@@ -41,6 +41,33 @@ public class AnalysisTraceServiceImpl implements AnalysisTraceService {
         return run != null ? snapshot(run) : null;
     }
 
+    @Override
+    public AnalysisTraceSnapshot byAnalysisIdForUser(String analysisId, Long userId) {
+        if (analysisId == null || analysisId.isBlank() || invalidUser(userId)) {
+            return null;
+        }
+        AnalysisRunDO run = analysisRunMapper.selectReadableByUser(analysisId.trim(), userId);
+        return run != null ? snapshot(run) : null;
+    }
+
+    @Override
+    public AnalysisTraceSnapshot byTraceIdForUser(String traceId, Long userId) {
+        if (traceId == null || traceId.isBlank() || invalidUser(userId)) {
+            return null;
+        }
+        AnalysisRunDO run = analysisRunMapper.selectReadableByTraceId(traceId.trim(), userId);
+        return run != null ? snapshot(run) : null;
+    }
+
+    @Override
+    public AnalysisTraceSnapshot byRequestIdForUser(String requestId, Long userId) {
+        if (requestId == null || requestId.isBlank() || invalidUser(userId)) {
+            return null;
+        }
+        AnalysisRunDO run = analysisRunMapper.selectReadableByRequestId(requestId.trim(), userId);
+        return run != null ? snapshot(run) : null;
+    }
+
     private AnalysisTraceSnapshot snapshot(AnalysisRunDO run) {
         String analysisId = run.getAnalysisId();
         String traceId = run.getTraceId();
@@ -60,5 +87,9 @@ public class AnalysisTraceServiceImpl implements AnalysisTraceService {
 
     private static List<String> safeList(List<String> rows) {
         return rows != null ? rows : List.of();
+    }
+
+    private static boolean invalidUser(Long userId) {
+        return userId == null || userId <= 0;
     }
 }

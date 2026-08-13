@@ -75,6 +75,21 @@ class AnalysisTraceServiceImplTest {
         assertThat(service.byAnalysisId("ana-failed").getTraceStatus()).isEqualTo("FAILED");
     }
 
+    @Test
+    void userScopedTraceQueriesUseOwnershipFilteredMapperPaths() {
+        AnalysisRunMapper mapper = mock(AnalysisRunMapper.class);
+        AnalysisRunDO owned = run("ana-owned", "trace-owned", "req-owned", "SUCCESS");
+        when(mapper.selectReadableByUser("ana-owned", 12L)).thenReturn(owned);
+        when(mapper.selectReadableByTraceId("trace-owned", 12L)).thenReturn(owned);
+        when(mapper.selectReadableByRequestId("req-owned", 12L)).thenReturn(owned);
+        AnalysisTraceServiceImpl service = new AnalysisTraceServiceImpl(mapper);
+
+        assertThat(service.byAnalysisIdForUser("ana-owned", 12L).getAnalysisId()).isEqualTo("ana-owned");
+        assertThat(service.byTraceIdForUser("trace-owned", 12L).getTraceId()).isEqualTo("trace-owned");
+        assertThat(service.byRequestIdForUser("req-owned", 12L).getRequestId()).isEqualTo("req-owned");
+        assertThat(service.byAnalysisIdForUser("ana-owned", null)).isNull();
+    }
+
     private static AnalysisRunDO run(String analysisId, String traceId, String requestId, String status) {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(analysisId);

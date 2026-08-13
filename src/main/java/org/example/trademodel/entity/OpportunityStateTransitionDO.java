@@ -16,6 +16,10 @@ public class OpportunityStateTransitionDO {
     private Integer transitionPriority;
     private Boolean suppressed;
     private LocalDateTime occurredAt;
+    private String ownerType;
+    private Long ownerId;
+    private Long assetId;
+    private String ruleVersion;
 
     public String getTransitionId() { return transitionId; }
     public void setTransitionId(String transitionId) { this.transitionId = transitionId; }
@@ -43,4 +47,12 @@ public class OpportunityStateTransitionDO {
     public void setSuppressed(Boolean suppressed) { this.suppressed = suppressed; }
     public LocalDateTime getOccurredAt() { return occurredAt; }
     public void setOccurredAt(LocalDateTime occurredAt) { this.occurredAt = occurredAt; }
+    public String getOwnerType() { return ownerType; }
+    public void setOwnerType(String ownerType) { this.ownerType = ownerType; }
+    public Long getOwnerId() { return ownerId; }
+    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
+    public Long getAssetId() { return assetId; }
+    public void setAssetId(Long assetId) { this.assetId = assetId; }
+    public String getRuleVersion() { return ruleVersion; }
+    public void setRuleVersion(String ruleVersion) { this.ruleVersion = ruleVersion; }
 }

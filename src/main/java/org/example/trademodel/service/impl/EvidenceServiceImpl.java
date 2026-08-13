@@ -66,7 +66,10 @@ public class EvidenceServiceImpl implements EvidenceService {
     @Override
     public List<EvidenceItemVO> buildEvidence(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
         List<EvidenceItemVO> list = new ArrayList<>();
-        list.add(buildPriceStructureEvidence(marketEnv));
+        EvidenceItemVO priceStructure = buildPriceStructureEvidence(marketEnv);
+        if (priceStructure != null) {
+            list.add(priceStructure);
+        }
         appendHotResetEventEvidenceIfExists(list, assetAnalysis);
         populateEventImpactInputFromHotReset(assetAnalysis);
         appendExternalContextEvidenceIfExists(list, assetAnalysis);
@@ -86,6 +89,11 @@ public class EvidenceServiceImpl implements EvidenceService {
             vol.setDescription(String.format(Locale.US,
                     "24h 价格振幅约 %.2f%%（%s）；口径：Binance 24h ticker 启发式。",
                     rp, regime));
+            vol.setCurrentValue(String.format(Locale.US, "%.4f%%", rp));
+            vol.setChangeFromBaseline("HIGH_LOW_RANGE_FROM_LAST_PRICE");
+            vol.setStrength(Math.min(100.0, Math.abs(rp) * 10.0));
+            vol.setConfidence(90.0);
+            applyMarketProvenance(vol, marketEnv);
             list.add(vol);
         }
 
@@ -98,6 +106,11 @@ public class EvidenceServiceImpl implements EvidenceService {
             lev.setSource(
                     EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
             lev.setDescription(buildLeverageEvidenceDescription(marketEnv.getLeverageSuggestion()));
+            lev.setCurrentValue(marketEnv.getLeverageSuggestion());
+            lev.setChangeFromBaseline("VOLATILITY_ADJUSTED_LEVERAGE");
+            lev.setStrength(60.0);
+            lev.setConfidence(85.0);
+            applyMarketProvenance(lev, marketEnv);
             list.add(lev);
         }
 
@@ -111,10 +124,16 @@ public class EvidenceServiceImpl implements EvidenceService {
             fund.setSource(
                     EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
             fund.setDescription(RealMarketEnvironmentService.buildFundingAppendix(marketEnv.getLastFundingRate()).trim());
+            fund.setCurrentValue(marketEnv.getLastFundingRate().toPlainString());
+            fund.setChangeFromBaseline("DELTA_FROM_ZERO=" + marketEnv.getLastFundingRate().toPlainString());
+            fund.setStrength(Math.min(100.0,
+                    marketEnv.getLastFundingRate().abs().multiply(BigDecimal.valueOf(1_000_000)).doubleValue()));
+            fund.setConfidence(90.0);
+            applyDerivativesProvenance(fund, marketEnv);
             list.add(fund);
         }
         if (marketEnv != null && Boolean.TRUE.equals(marketEnv.getOiApplied())
-                && marketEnv.getLastOpenInterest() != null) {
+                && marketEnv.getLastOpenInterest() != null && marketEnv.getOpenInterestDelta() != null) {
             EvidenceItemVO oi = new EvidenceItemVO();
             oi.setEvidenceId("ev-" + System.nanoTime());
             oi.setEvidenceType(EvidenceTypeConstants.normalizeEvidenceType(EvidenceTypeConstants.RISK));
@@ -123,7 +142,19 @@ public class EvidenceServiceImpl implements EvidenceService {
             oi.setSource(
                     EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
             oi.setDescription(RealMarketEnvironmentService.buildOpenInterestAppendix(marketEnv.getLastOpenInterest()).trim());
+            oi.setCurrentValue(marketEnv.getLastOpenInterest().toPlainString());
+            oi.setChangeFromBaseline(marketEnv.getOpenInterestDelta().toPlainString());
+            oi.setStrength(Math.min(100.0, marketEnv.getOpenInterestDelta().abs().doubleValue()));
+            oi.setConfidence(90.0);
+            applyDerivativesProvenance(oi, marketEnv);
             list.add(oi);
+        }
+
+        String analysisId = assetAnalysis == null ? null : assetAnalysis.getAnalysisId();
+        for (EvidenceItemVO item : list) {
+            if (item != null && item.getAnalysisId() == null) {
+                item.setAnalysisId(analysisId);
+            }
         }
 
         return list;
@@ -221,8 +252,13 @@ public class EvidenceServiceImpl implements EvidenceService {
         macro.setDirection(
                 EvidenceTypeConstants.normalizeEvidenceDirection(EvidenceTypeConstants.EVIDENCE_DIRECTION_NEUTRAL));
         macro.setSource(
-                EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_SYSTEM_GENERATED));
+                EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
         macro.setDescription(description);
+        macro.setCurrentValue(normalizedRegime);
+        macro.setChangeFromBaseline(String.format(Locale.US, "24H_RANGE=%.4f%%", marketEnv.getRangePct24h()));
+        macro.setStrength(Math.min(100.0, Math.abs(marketEnv.getRangePct24h()) * 10.0));
+        macro.setConfidence(85.0);
+        applyMarketProvenance(macro, marketEnv);
         list.add(macro);
     }
 
@@ -243,6 +279,15 @@ public class EvidenceServiceImpl implements EvidenceService {
         ev.setDirection(EvidenceTypeConstants.normalizeEvidenceDirection(EvidenceTypeConstants.EVIDENCE_DIRECTION_NEUTRAL));
         ev.setSource(EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_SYSTEM_GENERATED));
         ev.setDescription(buildHotResetEventEvidenceDescription(event));
+        ev.setCurrentValue(event.getTriggerType());
+        ev.setChangeFromBaseline(event.getTriggerReasonCode());
+        ev.setStrength(event.getSeverityScore() == null ? null : event.getSeverityScore().doubleValue());
+        ev.setConfidence(100.0);
+        ev.setSourceProvider("HOT_RESET_EVENT");
+        ev.setSourceReference(event.getEventId());
+        ev.setSourceTraceId(event.getTraceId());
+        ev.setObservedAt(event.getEventTime());
+        ev.setFreshness("FRESH");
         list.add(ev);
     }
 
@@ -257,21 +302,41 @@ public class EvidenceServiceImpl implements EvidenceService {
     }
 
     private EvidenceItemVO buildPriceStructureEvidence(MarketEnvironmentVO marketEnv) {
+        if (marketEnv == null || marketEnv.getPriceChangePercent24h() == null) {
+            return null;
+        }
         EvidenceItemVO e = new EvidenceItemVO();
         e.setEvidenceId("ev-" + System.currentTimeMillis());
         e.setEvidenceType(EvidenceTypeConstants.normalizeEvidenceType(EvidenceTypeConstants.PRICE_STRUCTURE));
-        BigDecimal pct = marketEnv != null ? marketEnv.getPriceChangePercent24h() : null;
-        if (pct != null) {
-            String dir = determinePriceStructureDirection(pct);
-            e.setDirection(EvidenceTypeConstants.normalizeEvidenceDirection(dir));
-            e.setSource(EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
-            e.setDescription(buildPriceStructureDescriptionFromPct(pct));
-        } else {
-            e.setDirection(EvidenceTypeConstants.normalizeEvidenceDirection(EvidenceTypeConstants.EVIDENCE_DIRECTION_NEUTRAL));
-            e.setSource(EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_SYSTEM_GENERATED));
-            e.setDescription(buildPriceStructureDescriptionWhenPctMissing());
-        }
+        BigDecimal pct = marketEnv.getPriceChangePercent24h();
+        String dir = determinePriceStructureDirection(pct);
+        e.setDirection(EvidenceTypeConstants.normalizeEvidenceDirection(dir));
+        e.setSource(EvidenceTypeConstants.normalizeEvidenceSource(EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC));
+        e.setDescription(buildPriceStructureDescriptionFromPct(pct));
+        e.setCurrentValue(pct.toPlainString() + "%");
+        e.setChangeFromBaseline("DELTA_FROM_ZERO=" + pct.toPlainString() + "%");
+        e.setStrength(Math.min(100.0, pct.abs().multiply(BigDecimal.TEN).doubleValue()));
+        e.setConfidence(90.0);
+        applyMarketProvenance(e, marketEnv);
         return e;
+    }
+
+    private static void applyMarketProvenance(EvidenceItemVO evidence, MarketEnvironmentVO environment) {
+        if (evidence == null || environment == null) return;
+        evidence.setSourceProvider(environment.getSourceProvider());
+        evidence.setSourceReference(environment.getSourceReference());
+        evidence.setSourceTraceId(environment.getSourceTraceId());
+        evidence.setObservedAt(environment.getObservedAt());
+        evidence.setFreshness(environment.getFreshness());
+    }
+
+    private static void applyDerivativesProvenance(EvidenceItemVO evidence, MarketEnvironmentVO environment) {
+        if (evidence == null || environment == null) return;
+        evidence.setSourceProvider(environment.getDerivativesSourceProvider());
+        evidence.setSourceReference(environment.getDerivativesSourceReference());
+        evidence.setSourceTraceId(environment.getDerivativesSourceTraceId());
+        evidence.setObservedAt(environment.getDerivativesObservedAt());
+        evidence.setFreshness(environment.getDerivativesFreshness());
     }
 
     /**

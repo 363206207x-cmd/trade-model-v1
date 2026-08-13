@@ -46,6 +46,26 @@ public interface AssetStateService {
                                            String traceId, String reason,
                                            OpportunityTriggerSource triggerSource);
 
+    OpportunityTransitionResult transition(OpportunityStateIdentity identity,
+                                            AssetStateEnum requestedState,
+                                            int confusedScore,
+                                            int confusedLowStreak,
+                                            String analysisId,
+                                            String traceId,
+                                            String ruleVersion,
+                                            String reason,
+                                            OpportunityTriggerSource triggerSource);
+
+    void recordOpportunityProjection(OpportunityStateIdentity identity,
+                                     Long poolItemId,
+                                     String analysisId,
+                                     String traceId,
+                                     String ruleVersion,
+                                     Integer opportunityScore,
+                                     String confidence,
+                                     String risk,
+                                     String extJson);
+
     /**
      * 全库维度「最近一次 Hot Reset」行（按 hot_reset_time 最大），供 systemStatus 展示；无则 null。
      */

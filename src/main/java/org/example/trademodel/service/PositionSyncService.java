@@ -35,7 +35,7 @@ public class PositionSyncService {
     public PositionSyncService(PositionProvider positionProvider,
                                RealPositionMapper realPositionMapper,
                                RuntimeMetricService runtimeMetricService,
-                               @Value("${position.provider.type:SIMULATED}") String configuredProviderType) {
+                               @Value("${position.provider.type:DISABLED}") String configuredProviderType) {
         this.positionProvider = positionProvider;
         this.realPositionMapper = realPositionMapper;
         this.runtimeMetricService = runtimeMetricService;
@@ -52,10 +52,6 @@ public class PositionSyncService {
         log.info("[position-sync] start sync positions");
         try {
             PositionProviderResult result = positionProvider.fetchOpenPositions();
-            List<PositionSnapshot> openPositions = result != null ? result.getOpenPositions() : null;
-            if (openPositions == null) {
-                openPositions = new ArrayList<>();
-            }
             String sourceType = result != null ? safeText(result.getSourceType(), "UNKNOWN") : "UNKNOWN";
             String sourceName = result != null ? safeText(result.getSourceName(), "unknown-provider") : "unknown-provider";
             String configuredType = result != null
@@ -63,6 +59,14 @@ public class PositionSyncService {
                     : this.configuredProviderType;
             boolean fallbackOccurred = result != null && result.isFallbackOccurred();
             String fallbackReason = result != null ? safeText(result.getFallbackReason(), null) : null;
+            if (result == null
+                    || !result.isAuthoritativeSnapshot()
+                    || fallbackOccurred
+                    || result.getOpenPositions() == null) {
+                throw new IllegalStateException("position provider snapshot is not authoritative: "
+                        + safeText(fallbackReason, sourceType));
+            }
+            List<PositionSnapshot> openPositions = result.getOpenPositions();
             log.info("[position-sync] provider={} sourceType={} fetchedOpenCount={}", sourceName, sourceType, openPositions.size());
 
             int upserted = 0;
@@ -175,7 +179,7 @@ public class PositionSyncService {
 
     private String normalizeProviderType(String providerType) {
         if (providerType == null || providerType.trim().isEmpty()) {
-            return "SIMULATED";
+            return "DISABLED";
         }
         return providerType.trim().toUpperCase();
     }

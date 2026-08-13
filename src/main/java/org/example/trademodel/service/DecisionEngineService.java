@@ -9,6 +9,7 @@ import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.service.RuleConfigService;
@@ -52,6 +53,7 @@ public class DecisionEngineService {
     private final AiDecisionOrchestratorService aiDecisionOrchestratorService;
     private final AiRoleResultsCodec aiRoleResultsCodec;
     private Clock decisionClock = Clock.systemUTC();
+    private FundamentalAiV41Properties v41Properties = FundamentalAiV41Properties.contractFixture();
 
     // ========= 最小规则键集合（仅限本阶段允许 keys） =========
     private static final String KEY_WORTH_OPENING_MIN_SCORE = "decision.worth_opening_min_score";
@@ -122,6 +124,11 @@ public class DecisionEngineService {
         this.decisionClock = decisionClock != null ? decisionClock : Clock.systemUTC();
     }
 
+    @Autowired(required = false)
+    void setFundamentalAiV41Properties(FundamentalAiV41Properties properties) {
+        if (properties != null) this.v41Properties = properties;
+    }
+
     public DecisionBundleVO makeDecision(String symbol, String timeframe, String analysisId) {
         return makeDecision(symbol, timeframe, analysisId, null, null);
     }
@@ -156,7 +163,7 @@ public class DecisionEngineService {
                                          DerivativesBusinessAssessment derivativesAssessment,
                                          Integer eightScoreComposite) {
         return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
-                externalContextInput, derivativesAssessment, eightScoreComposite, true);
+                externalContextInput, derivativesAssessment, eightScoreComposite, true, null);
     }
 
     public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
@@ -165,7 +172,17 @@ public class DecisionEngineService {
                                                          DerivativesBusinessAssessment derivativesAssessment,
                                                          Integer eightScoreComposite) {
         return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
-                externalContextInput, derivativesAssessment, eightScoreComposite, false);
+                externalContextInput, derivativesAssessment, eightScoreComposite, false, null);
+    }
+
+    public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
+                                                         Integer dataQualityScore, Integer trendStructureScore,
+                                                         EventImpactInputVO externalContextInput,
+                                                         DerivativesBusinessAssessment derivativesAssessment,
+                                                         Integer eightScoreComposite,
+                                                         OpportunityStateIdentity opportunityIdentity) {
+        return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, derivativesAssessment, eightScoreComposite, false, opportunityIdentity);
     }
 
     private DecisionBundleVO makeDecisionInternal(String symbol, String timeframe, String analysisId,
@@ -173,7 +190,8 @@ public class DecisionEngineService {
                                                   EventImpactInputVO externalContextInput,
                                                   DerivativesBusinessAssessment derivativesAssessment,
                                                   Integer eightScoreComposite,
-                                                  boolean runLegacyAiReview) {
+                                                  boolean runLegacyAiReview,
+                                                  OpportunityStateIdentity opportunityIdentity) {
         String decisionId = AnalysisPersistenceIds.decisionId();
         logger.info("[AI决策] === 开始为 {} {} analysisId={} 生成决策 ===", symbol, timeframe, analysisId);
 
@@ -185,8 +203,9 @@ public class DecisionEngineService {
                     ? ruleConfigService.resolveActiveRuleVersion()
                     : "v1.0";
 
-            // 缺失/禁用/不可解析全部回退默认值，避免配置缺失导致行为崩掉
-            int worthOpeningMinScore = getInt(ruleMap, KEY_WORTH_OPENING_MIN_SCORE, DEFAULT_WORTH_OPENING_MIN_SCORE);
+            int worthOpeningMinScore = runLegacyAiReview
+                    ? getInt(ruleMap, KEY_WORTH_OPENING_MIN_SCORE, DEFAULT_WORTH_OPENING_MIN_SCORE)
+                    : requireCandidatePromotionScore();
             int confidenceHighMinScore = getInt(ruleMap, KEY_CONFIDENCE_HIGH_MIN_SCORE, DEFAULT_CONFIDENCE_HIGH_MIN_SCORE);
             int confidenceMediumMinScore = getInt(ruleMap, KEY_CONFIDENCE_MEDIUM_MIN_SCORE, DEFAULT_CONFIDENCE_MEDIUM_MIN_SCORE);
             int riskTierLowMinScore = getInt(ruleMap, KEY_RISK_TIER_LOW_MIN_SCORE, DEFAULT_RISK_TIER_LOW_MIN_SCORE);
@@ -207,12 +226,17 @@ public class DecisionEngineService {
             List<String[]> klines1h = ohlcvSnapshotSource.readClosedBars(symbol, "1h", 3, marketTraceId);
             List<String[]> klines4h = ohlcvSnapshotSource.readClosedBars(symbol, "4h", 3, marketTraceId);
 
-            String ruleMarketBias = MarketBiasPolicy.classify(klines5m, klines15m, klines1h, klines4h);
+            String ruleMarketBias = MarketBiasPolicy.classify(
+                    klines5m, klines15m, klines1h, klines4h, v41Properties.getMultiTimeframe());
+            Map<String, Map<String, Object>> multiTimeframeDetails = MarketBiasPolicy.describeTimeframes(
+                    klines5m, klines15m, klines1h, klines4h, v41Properties.getMultiTimeframe());
             boolean isBullish5m = MarketBiasPolicy.direction(klines5m)
                     == MarketBiasPolicy.WindowDirection.BULLISH;
             boolean isBullish4h = MarketBiasPolicy.direction(klines4h)
                     == MarketBiasPolicy.WindowDirection.BULLISH;
-            boolean multiTfConvergence = MarketBiasPolicy.converged(klines1h, klines4h, ruleMarketBias);
+            boolean multiTfConvergence = MarketBiasPolicy.converged(
+                    klines5m, klines15m, klines1h, klines4h,
+                    ruleMarketBias, v41Properties.getMultiTimeframe());
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
@@ -227,6 +251,9 @@ public class DecisionEngineService {
 
             String confidenceLevel = finalScore >= confidenceHighMinScore ? "HIGH" :
                     (finalScore >= confidenceMediumMinScore ? "MEDIUM" : "LOW");
+            boolean aiQualityEligible = dataQualityScore != null
+                    && dataQualityScore >= v41Properties.getAiGate().getMinimumDataQuality();
+            if (!aiQualityEligible) confidenceLevel = downgradeConfidenceLevel(confidenceLevel);
             boolean hasUsableMarketStructure = !"WAIT".equals(ruleMarketBias) && !"RANGE".equals(ruleMarketBias);
             boolean dataQualitySufficient = DataQualityCircuitBreakerPolicy.passes(dataQualityScore);
             boolean decisionInputsSufficient = dataQualitySufficient && hasUsableMarketStructure;
@@ -301,7 +328,9 @@ public class DecisionEngineService {
 
             AiConflictResult conflict = aiConflictResolverService.resolve(ctx);
             ctx.setAiConflictScore(conflict.getConfusedContribution());
-            ConfusedResult confused = confusedStateService.calculateConfused(symbol, timeframe, ctx);
+            ConfusedResult confused = opportunityIdentity == null
+                    ? confusedStateService.calculateConfused(symbol, timeframe, ctx)
+                    : confusedStateService.calculateConfused(opportunityIdentity, ctx);
 
             AssetStateEnum previousState = parseAssetState(confused.getPreviousState(), AssetStateEnum.OBSERVING);
             AssetStateEnum syntheticState = parseAssetState(confused.getNextState(),
@@ -388,6 +417,9 @@ public class DecisionEngineService {
             DecisionBundleVO decision = new DecisionBundleVO();
             decision.setDecisionId(decisionId);
             decision.setMarketBiasHierarchy(userMarketBias);
+            decision.setRuleMarketBias(userMarketBias);
+            decision.setRuleConfidence(userConfidenceLevel);
+            decision.setRuleRisk(riskLevelLabel);
             decision.setTradeType("SPOT");
             String effectiveConfidence = decisionInputsSufficient
                     ? conflict.getAdjustedConfidence() != null ? conflict.getAdjustedConfidence() : confidenceLevel
@@ -401,6 +433,7 @@ public class DecisionEngineService {
             decision.setConclusionSummary(conclusion);
             decision.setIsWorthOpening(effectiveWorthOpening && !confused.isDirectionalPushBlocked());
             decision.setMultiTfConvergence(multiTfLabel);
+            decision.setMultiTimeframeDetails(multiTimeframeDetails);
             AiRoleResultsPayload.SynthesisPayload aiSynthesis = new AiRoleResultsPayload.SynthesisPayload(
                     userMarketBias,
                     effectiveConfidence,
@@ -458,6 +491,16 @@ public class DecisionEngineService {
             logger.error("[AI决策] 生成失败: {}", e.getMessage(), e);
             throw e;
         }
+    }
+
+    private int requireCandidatePromotionScore() {
+        Integer value = v41Properties == null || v41Properties.getOpportunityState() == null
+                ? null : v41Properties.getOpportunityState().getCandidatePromotionScore();
+        if (value == null || value < 0 || value > 100) {
+            throw new IllegalStateException(
+                    "trade-model.fundamental-ai-v4-1.opportunity-state.candidate-promotion-score is required");
+        }
+        return value;
     }
 
     private static int getInt(Map<String, RuleConfigDO> cfgMap, String key, int defaultVal) {
@@ -536,6 +579,11 @@ public class DecisionEngineService {
 
     private static int cap100(int value) {
         return Math.max(0, Math.min(100, value));
+    }
+
+    private static String downgradeConfidenceLevel(String confidence) {
+        if ("HIGH".equalsIgnoreCase(confidence)) return "MEDIUM";
+        return "LOW";
     }
 
     private AiOrchestratorResult runAiReview(String symbol, String timeframe, String analysisId, String decisionId,

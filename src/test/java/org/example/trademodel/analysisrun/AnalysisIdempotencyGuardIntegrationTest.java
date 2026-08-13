@@ -231,6 +231,9 @@ class AnalysisIdempotencyGuardIntegrationTest {
         row.setCreatedAt(now);
         row.setUpdatedAt(now);
         row.setVersionNo(version);
+        row.setOwnerType("SYSTEM");
+        row.setOwnerId(0L);
+        row.setPreview(false);
         return row;
     }
 

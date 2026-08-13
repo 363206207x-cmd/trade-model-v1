@@ -9,6 +9,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.market.client.impl.RoutedPublicOhlcvProvider;
+import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -30,6 +31,7 @@ public class LocalRealDataStatusService {
     private final DecisionResultMapper decisionResultMapper;
     private final RoutedPublicOhlcvProvider routedProvider;
     private final PersistedRealMarketEnvironmentService realMarketEnvironmentService;
+    private AssetPoolService assetPoolService;
     private final Clock clock;
     private final long freshnessToleranceMs;
 
@@ -85,14 +87,20 @@ public class LocalRealDataStatusService {
         this.freshnessToleranceMs = Math.max(0L, freshnessToleranceMs);
     }
 
+    @Autowired(required = false)
+    void setAssetPoolService(AssetPoolService assetPoolService) {
+        this.assetPoolService = assetPoolService;
+    }
+
     public Map<String, Object> status() {
         long closedBars = ohlcvMapper.countAllClosedBars();
         PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBar();
         int completedAssets = value(analysisRunMapper.countLocalRealSuccessfulSymbols());
         long readyAssets = readiness.readyAssetCount();
+        int trackedAssetCount = trackedSymbols().size();
         Map<String, Object> providers = providerStatuses();
         ProviderReadinessSnapshot providerReadiness = providerReadinessSnapshot(
-                latest, completedAssets, readyAssets, providers);
+                latest, completedAssets, readyAssets, trackedAssetCount, providers);
         boolean dashboardReady = providerReadiness.dashboardReady();
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -108,7 +116,7 @@ public class LocalRealDataStatusService {
         List<Map<String, Object>> assets = assetStatuses();
         market.put("providers", providers);
         market.put("enabled", true);
-        market.put("assetCount", LocalRealDataCoordinator.SYMBOLS.size());
+        market.put("assetCount", trackedAssetCount);
         market.put("readyAssetCount", readyAssets);
         market.put("degradedAssets", readiness.assets().values().stream()
                 .filter(item -> item.state() != LocalRealAssetReadinessState.READY)
@@ -145,12 +153,14 @@ public class LocalRealDataStatusService {
         PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBar();
         int completedAssets = value(analysisRunMapper.countLocalRealSuccessfulSymbols());
         long readyAssets = readiness.readyAssetCount();
-        return providerReadinessSnapshot(latest, completedAssets, readyAssets, providerStatuses());
+        return providerReadinessSnapshot(
+                latest, completedAssets, readyAssets, trackedSymbols().size(), providerStatuses());
     }
 
     private ProviderReadinessSnapshot providerReadinessSnapshot(PersistedOhlcvBarDO latest,
                                                                  int completedAssets,
                                                                  long readyAssets,
+                                                                 int trackedAssetCount,
                                                                  Map<String, Object> providers) {
         String provider = normalizeProvider(routedProvider.primaryProvider());
         PublicProviderHealthSnapshot providerHealth = providerHealth(providers, provider);
@@ -160,8 +170,9 @@ public class LocalRealDataStatusService {
                 && providerHealth.lastSuccessAt() != null
                 && !providerHealth.circuitOpen();
         boolean dashboardReady = readiness.state() == LocalRealReadinessState.DASHBOARD_READY
-                && readyAssets >= 5
-                && completedAssets >= 5
+                && trackedAssetCount > 0
+                && readyAssets >= trackedAssetCount
+                && completedAssets >= trackedAssetCount
                 && "FRESH".equals(freshness)
                 && providerUp;
         String reason = dashboardReady
@@ -230,7 +241,7 @@ public class LocalRealDataStatusService {
     }
 
     private List<Map<String, Object>> assetStatuses() {
-        return LocalRealDataCoordinator.SYMBOLS.stream().map(symbol -> {
+        return trackedSymbols().stream().map(symbol -> {
             PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySymbol(symbol);
             LocalRealAssetReadiness item = readiness.asset(symbol);
             PersistedRealMarketEnvironmentAssessment marketAssessment =
@@ -251,6 +262,20 @@ public class LocalRealDataStatusService {
                     ? null : java.time.Instant.ofEpochMilli(latest.getCloseTimeMs()));
             return asset;
         }).toList();
+    }
+
+    private List<String> trackedSymbols() {
+        List<String> symbols = assetPoolService == null
+                ? readiness.assets().keySet().stream().toList()
+                : assetPoolService.listScanSymbols();
+        if (symbols == null) {
+            return List.of();
+        }
+        return symbols.stream()
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .map(symbol -> symbol.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .toList();
     }
 
     private Map<String, Object> providerStatuses() {

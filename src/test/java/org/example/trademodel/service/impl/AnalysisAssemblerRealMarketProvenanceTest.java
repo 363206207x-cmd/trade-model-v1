@@ -10,6 +10,7 @@ import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.*;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,6 +56,34 @@ class AnalysisAssemblerRealMarketProvenanceTest {
                 .hasMessage("REAL_MARKET_ENVIRONMENT_REQUIRED");
     }
 
+    @Test
+    void analysisAssemblerFailsClosedWhenV41DecisionChainIsUnavailable() {
+        AnalysisAssemblerServiceImpl assembler = new AnalysisAssemblerServiceImpl(
+                mock(EvidenceService.class),
+                mock(ScoreService.class),
+                mock(PlanService.class),
+                mock(DecisionEngineService.class),
+                mock(RealMarketEnvironmentService.class),
+                mock(AssetStateService.class),
+                mock(RuleConfigService.class),
+                mock(AnalysisRunMapper.class),
+                mock(EvidenceItemMapper.class),
+                mock(ScoreItemMapper.class),
+                mock(DecisionResultMapper.class),
+                mock(ExecutionPlanMapper.class),
+                mock(AccountRiskSnapshotMapper.class),
+                mock(MarketEnvironmentSnapshotMapper.class),
+                mock(PushSnapshotService.class),
+                mock(MonitorAlertWriteService.class),
+                mock(HotResetService.class),
+                mock(MissedOpportunityService.class),
+                mock(OpportunityLogService.class));
+
+        assertThatThrownBy(() -> assembler.assemble(context()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("V4_1_DECISION_CHAIN_REQUIRED");
+    }
+
     private static AnalysisAssemblerServiceImpl assembler(
             EvidenceService evidenceService,
             RealMarketEnvironmentService quoteService,
@@ -81,6 +110,7 @@ class AnalysisAssemblerRealMarketProvenanceTest {
                 mock(OpportunityLogService.class));
         assembler.setRequireRealMarketEnvironment(true);
         assembler.setPersistedRealMarketEnvironmentService(persistedService);
+        ReflectionTestUtils.setField(assembler, "decisionChainService", mock(DecisionChainService.class));
         return assembler;
     }
 

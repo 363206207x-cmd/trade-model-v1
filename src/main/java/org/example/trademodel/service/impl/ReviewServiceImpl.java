@@ -7,12 +7,14 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.RuleVersionLogDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.enums.ReviewTypeEnum;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.RuleVersionLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.ReviewService;
+import org.example.trademodel.service.support.ReviewMetricsContract;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.ReviewStateVO;
@@ -30,6 +32,7 @@ public class ReviewServiceImpl implements ReviewService {
     private static final String OPERATOR_SYSTEM = "SYSTEM";
     private static final String CHANGE_CATEGORY_REVIEW_FEEDBACK_SAVED = "REVIEW_FEEDBACK_SAVED";
     private static final String SHARED_SCOPE = "SHARED";
+    private static final String V41_CONTRACT_VERSION = "FUNDAMENTAL_AI_V4_1";
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ReviewResultMapper reviewResultMapper;
@@ -73,6 +76,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
         if (existing != null) {
             applyContent(existing, content, now);
+            applyDecisionChainTrace(existing, analysisId, null);
             reviewResultMapper.updateContentByAnalysisId(existing);
         }
 
@@ -110,6 +114,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
         if (existing != null) {
             applyContent(existing, content, now);
+            applyDecisionChainTrace(existing, analysisId, ownedPosition);
             reviewResultMapper.updateContentByUserPositionScope(existing);
         }
 
@@ -134,6 +139,17 @@ public class ReviewServiceImpl implements ReviewService {
         vo.setFinalPlanId(row.getFinalPlanId());
         vo.setCandidateId(row.getCandidateId());
         vo.setTraceId(row.getTraceId());
+        vo.setOpportunityId(row.getOpportunityId());
+        vo.setResolverResultId(row.getResolverResultId());
+        vo.setValidationResultId(row.getValidationResultId());
+        vo.setReviewType(row.getReviewType());
+        vo.setOutcome(row.getOutcome());
+        vo.setExecutionDeviation(row.getExecutionDeviation());
+        vo.setAiAssessment(row.getAiAssessment());
+        vo.setRuleAssessment(row.getRuleAssessment());
+        vo.setRuleFeedback(row.getRuleFeedback());
+        vo.setMetricsJson(row.getMetricsJson());
+        vo.setContractVersion(row.getContractVersion());
         vo.setErrorType(row.getErrorType());
         vo.setActualOutcome(row.getActualOutcome());
         vo.setAdjustmentSuggestion(row.getAdjustmentSuggestion());
@@ -163,7 +179,14 @@ public class ReviewServiceImpl implements ReviewService {
         return new ReviewContent(
                 errorType,
                 trimToNull(req.getActualOutcome()),
-                trimToNull(req.getAdjustmentSuggestion()));
+                trimToNull(req.getAdjustmentSuggestion()),
+                ReviewTypeEnum.normalizeNullable(req.getReviewType()),
+                trimToNull(req.getOutcome()),
+                trimToNull(req.getExecutionDeviation()),
+                trimToNull(req.getAiAssessment()),
+                trimToNull(req.getRuleAssessment()),
+                trimToNull(req.getRuleFeedback()),
+                ReviewMetricsContract.normalizeOrThrow(req.getMetricsJson()));
     }
 
     private static ReviewResultDO newRow(String analysisId,
@@ -187,6 +210,14 @@ public class ReviewServiceImpl implements ReviewService {
         row.setErrorType(content.errorType());
         row.setActualOutcome(content.actualOutcome());
         row.setAdjustmentSuggestion(content.adjustmentSuggestion());
+        row.setReviewType(content.reviewType());
+        row.setOutcome(content.outcome());
+        row.setExecutionDeviation(content.executionDeviation());
+        row.setAiAssessment(content.aiAssessment());
+        row.setRuleAssessment(content.ruleAssessment());
+        row.setRuleFeedback(content.ruleFeedback());
+        row.setMetricsJson(content.metricsJson());
+        row.setContractVersion(V41_CONTRACT_VERSION);
         row.setUpdateTime(now);
     }
 
@@ -214,6 +245,9 @@ public class ReviewServiceImpl implements ReviewService {
         row.setFinalPlanId(plan.getPlanId());
         row.setCandidateId(plan.getCandidateId());
         row.setTraceId(plan.getTraceId());
+        row.setOpportunityId(plan.getOpportunityId());
+        row.setResolverResultId(plan.getResolverResultId());
+        row.setValidationResultId(plan.getValidationResultId());
     }
 
     private static void requirePositive(Long value, String fieldName) {
@@ -265,6 +299,13 @@ public class ReviewServiceImpl implements ReviewService {
     private record ReviewContent(
             String errorType,
             String actualOutcome,
-            String adjustmentSuggestion) {
+            String adjustmentSuggestion,
+            String reviewType,
+            String outcome,
+            String executionDeviation,
+            String aiAssessment,
+            String ruleAssessment,
+            String ruleFeedback,
+            String metricsJson) {
     }
 }

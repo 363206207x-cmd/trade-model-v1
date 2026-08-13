@@ -1,7 +1,7 @@
 package org.example.trademodel.enums;
 
 public enum UserPositionSourceTypeEnum {
-    MANUAL_POSITION(false),
+    MANUAL_INDEPENDENT(false),
     SYSTEM_PLAN_POSITION(true);
 
     private final boolean finalPlanRequired;
@@ -19,14 +19,14 @@ public enum UserPositionSourceTypeEnum {
             throw new IllegalArgumentException("UserPosition source_type is required");
         }
         String normalized = value.trim().toUpperCase();
-        if ("MANUAL".equals(normalized)) {
-            return MANUAL_POSITION;
+        if ("MANUAL".equals(normalized) || "MANUAL_POSITION".equals(normalized)) {
+            return MANUAL_INDEPENDENT;
         }
         try {
             return valueOf(normalized);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
-                    "UserPosition source_type must be MANUAL_POSITION or SYSTEM_PLAN_POSITION");
+                    "UserPosition source_type must be MANUAL_INDEPENDENT or SYSTEM_PLAN_POSITION");
         }
     }
 }

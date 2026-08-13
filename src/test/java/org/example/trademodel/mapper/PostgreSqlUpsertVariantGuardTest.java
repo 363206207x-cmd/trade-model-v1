@@ -34,9 +34,10 @@ class PostgreSqlUpsertVariantGuardTest {
         Insert generic = genericInsert(AssetStateMapper.class.getMethod("mergeUpsertCore", AssetStateDO.class));
         Insert postgres = postgresInsert(AssetStateMapper.class.getMethod("mergeUpsertCore", AssetStateDO.class));
 
-        assertThat(sql(generic)).contains("MERGE INTO tm_asset_state").contains("KEY (symbol, timeframe)");
+        assertThat(sql(generic)).contains("MERGE INTO tm_asset_state")
+                .contains("KEY (owner_type, owner_id, symbol, timeframe)");
         assertThat(sql(postgres))
-                .contains("ON CONFLICT (symbol, timeframe) DO UPDATE")
+                .contains("ON CONFLICT (owner_type, owner_id, symbol, timeframe) DO UPDATE")
                 .doesNotContain("MERGE INTO")
                 .doesNotContain("ON DUPLICATE KEY UPDATE")
                 .doesNotContain("hot_reset_");

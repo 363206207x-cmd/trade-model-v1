@@ -76,7 +76,8 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 inputSnapshotJson,
                 inputSnapshotHash,
                 AnalysisRunIds.leaseOwner(),
-                LocalDateTime.now(clock).plusSeconds(properties.getIdempotency().getLeaseSeconds()));
+                LocalDateTime.now(clock).plusSeconds(properties.getIdempotency().getLeaseSeconds()),
+                normalized.ownerType(), normalized.ownerId(), normalized.assetId(), normalized.preview());
 
         AnalysisIdempotencyClaim claim = idempotencyGuard.claim(request);
         if (claim.getStatus() == AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS) {
@@ -132,8 +133,14 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         String requestId = RequestIdSupport.normalizeOrGenerate(command.getRequestId());
         String triggerReference = normalizeTriggerReference(triggerType, command.getTriggerReference(), requestId, canonicalBucket);
         String ruleVersion = ruleConfigService != null ? ruleConfigService.resolveActiveRuleVersion() : "v1.0";
+        String ownerType = normalizeOwnerType(command.getOwnerType());
+        Long ownerId = normalizeOwnerId(ownerType, command.getOwnerId());
+        if (command.isPreview() && triggerType != AnalysisRunTriggerType.ANALYSIS_PREVIEW) {
+            throw new AnalysisRunInputException("PREVIEW_TRIGGER_REQUIRED", "preview requires ANALYSIS_PREVIEW trigger");
+        }
         return new NormalizedCommand(symbol, timeframe, triggerType, triggerReference, requestId, analysisTime,
-                canonicalBucket, ruleVersion, safe(command.getParentAnalysisId()), safe(command.getParentTraceId()));
+                canonicalBucket, ruleVersion, safe(command.getParentAnalysisId()), safe(command.getParentTraceId()),
+                ownerType, ownerId, command.getAssetId(), command.isPreview());
     }
 
     private static String normalizeTriggerReference(AnalysisRunTriggerType triggerType, String raw,
@@ -162,7 +169,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
 
     private static String idempotencyKey(NormalizedCommand command) {
         return canonicalIdempotencyKey(command.symbol(), command.timeframe(), command.canonicalAnalysisTimeBucket(),
-                command.ruleVersion());
+                command.ruleVersion(), command.ownerType(), command.ownerId(), command.preview());
     }
 
     private static String canonicalIdempotencyKey(String symbol, String timeframe,
@@ -171,7 +178,18 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             throw new AnalysisRunInputException("ANALYSIS_TIME_BUCKET_REQUIRED", "canonical analysis time bucket is required");
         }
         String version = ruleVersion == null || ruleVersion.isBlank() ? "v1.0" : ruleVersion.trim();
-        return sha256(symbol + "|" + timeframe + "|" + canonicalBucket + "|" + version);
+        return canonicalIdempotencyKey(symbol, timeframe, canonicalBucket, version, "SYSTEM", 0L, false);
+    }
+
+    private static String canonicalIdempotencyKey(String symbol, String timeframe,
+                                                  LocalDateTime canonicalBucket, String ruleVersion,
+                                                  String ownerType, Long ownerId, boolean preview) {
+        if (canonicalBucket == null) {
+            throw new AnalysisRunInputException("ANALYSIS_TIME_BUCKET_REQUIRED", "canonical analysis time bucket is required");
+        }
+        String version = ruleVersion == null || ruleVersion.isBlank() ? "v1.0" : ruleVersion.trim();
+        return sha256(symbol + "|" + timeframe + "|" + canonicalBucket + "|" + version + "|"
+                + ownerType + "|" + ownerId + "|preview=" + preview);
     }
 
     private static String inputSnapshotJson(NormalizedCommand command, String traceId, String idempotencyKey) {
@@ -190,6 +208,10 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             snapshot.put("parentAnalysisId", command.parentAnalysisId());
             snapshot.put("parentTraceId", command.parentTraceId());
             snapshot.put("idempotencyKey", idempotencyKey);
+            snapshot.put("ownerType", command.ownerType());
+            snapshot.put("ownerId", command.ownerId());
+            snapshot.put("assetId", command.assetId());
+            snapshot.put("preview", command.preview());
             snapshot.put("reviewOnly", true);
             snapshot.put("notAutoTrading", true);
             snapshot.put("notOrderExecution", true);
@@ -224,7 +246,8 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 run.getLeaseOwner(),
                 run.getVersionNo(),
                 run.getAttemptCount(),
-                true);
+                true,
+                run.getOwnerType(), run.getOwnerId(), run.getAssetId(), Boolean.TRUE.equals(run.getPreview()));
     }
 
     static String sha256(String raw) {
@@ -321,10 +344,29 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         return t.isEmpty() ? null : t;
     }
 
+    private static String normalizeOwnerType(String raw) {
+        String value = safe(raw);
+        if (value == null) return "SYSTEM";
+        String normalized = value.toUpperCase(Locale.ROOT);
+        if (!"SYSTEM".equals(normalized) && !"USER".equals(normalized)) {
+            throw new AnalysisRunInputException("ANALYSIS_OWNER_TYPE_INVALID", "ownerType must be SYSTEM or USER");
+        }
+        return normalized;
+    }
+
+    private static Long normalizeOwnerId(String ownerType, Long ownerId) {
+        if ("SYSTEM".equals(ownerType)) return 0L;
+        if (ownerId == null || ownerId <= 0) {
+            throw new AnalysisRunInputException("ANALYSIS_OWNER_REQUIRED", "user-owned analysis requires ownerId");
+        }
+        return ownerId;
+    }
+
     private record NormalizedCommand(String symbol, String timeframe, AnalysisRunTriggerType triggerType,
                                      String triggerReference, String requestId, LocalDateTime analysisTime,
                                      LocalDateTime canonicalAnalysisTimeBucket, String ruleVersion,
-                                     String parentAnalysisId, String parentTraceId) {
+                                     String parentAnalysisId, String parentTraceId,
+                                     String ownerType, Long ownerId, Long assetId, boolean preview) {
     }
 
     record AnalysisPersistenceFailure(String failureCode, String entity, String constraintName) {

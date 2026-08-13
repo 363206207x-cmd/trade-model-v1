@@ -63,7 +63,7 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         if (localRealDataStatusService != null) {
             return localRealMarketDataStatus();
         }
-        String providerType = upper(firstNonBlank(property("position.provider.type"), "SIMULATED"));
+        String providerType = upper(firstNonBlank(property("position.provider.type"), "DISABLED"));
         if ("BINANCE".equals(providerType)) {
             boolean baseUrlConfigured = hasText(firstNonBlank(
                     property("binance.api.base-url"),
@@ -91,6 +91,17 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
                     false,
                     false,
                     "LOCAL_DEV_SIMULATED_FALLBACK_NOT_PRODUCTION_READY"
+            );
+        }
+        if ("DISABLED".equals(providerType)) {
+            return item(
+                    "MARKET_DATA",
+                    "MARKET_PROVIDER_UNAVAILABLE",
+                    STATUS_WAITING_SYNC,
+                    false,
+                    false,
+                    false,
+                    "MARKET_PROVIDER_NOT_CONFIGURED"
             );
         }
         return item(

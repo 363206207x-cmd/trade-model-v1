@@ -1,6 +1,8 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.ExecutionPlanCandidateDO;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -96,6 +98,50 @@ class PushSnapshotServiceTest {
         verify(pushSnapshotMapper, never()).insert(any());
     }
 
+    @Test
+    void missingCandidateExposureFailsAccountRiskClosed() {
+        TmAccountRiskSnapshotDO snapshot = verifiedAccountRisk();
+        ExecutionPlanCandidateDO candidate = candidate(null, "1x");
+
+        var assessment = service.assessCandidate(snapshot, candidate, "MEDIUM", false);
+
+        assertThat(assessment.allowed()).isFalse();
+        assertThat(snapshot.getRiskAllowed()).isFalse();
+        assertThat(snapshot.getRiskReasonCode()).isEqualTo("POSITION_EXPOSURE_UNAVAILABLE");
+        assertThat(snapshot.getPositionExposure()).isNull();
+    }
+
+    @Test
+    void configuredExtremeRiskLimitIsStricterThanHighRiskLimit() {
+        ExecutionPlanCandidateDO eightPercent = candidate("8%", "1x");
+        TmAccountRiskSnapshotDO high = verifiedAccountRisk();
+        TmAccountRiskSnapshotDO extreme = verifiedAccountRisk();
+
+        var highAssessment = service.assessCandidate(high, eightPercent, "HIGH", false);
+        var extremeAssessment = service.assessCandidate(extreme, eightPercent, "EXTREME", false);
+
+        assertThat(highAssessment.maxAllowedExposure()).isEqualByComparingTo("0.10");
+        assertThat(highAssessment.allowed()).isTrue();
+        assertThat(extremeAssessment.maxAllowedExposure()).isEqualByComparingTo("0.05");
+        assertThat(extremeAssessment.allowed()).isFalse();
+        assertThat(extreme.getRiskReasonCode())
+                .isEqualTo("EXPOSURE_LIMIT_EXCEEDED");
+    }
+
+    @Test
+    void legacySnapshotEntryFailsClosedWithoutOwnerScopedRiskFacts() {
+        ArgumentCaptor<TmAccountRiskSnapshotDO> captor =
+                ArgumentCaptor.forClass(TmAccountRiskSnapshotDO.class);
+
+        service.ensureAccountRiskSnapshot(run(), analysis(), decision(true), plan());
+
+        verify(accountRiskSnapshotMapper).insert(captor.capture());
+        assertThat(captor.getValue().getSourceStatus()).isEqualTo("INVALID");
+        assertThat(captor.getValue().getRiskAllowed()).isFalse();
+        assertThat(captor.getValue().getRiskReasonCode())
+                .isEqualTo("LEGACY_ACCOUNT_RISK_CONTEXT_INSUFFICIENT");
+    }
+
     private static AnalysisRunDO run() {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setRuleVersion("v-test");
@@ -125,6 +171,26 @@ class PushSnapshotServiceTest {
         plan.setEntryZone("100-102");
         plan.setStopLoss("98");
         plan.setPositionSuggestion("10%");
+        plan.setFinalPlan(true);
         return plan;
+    }
+
+    private static ExecutionPlanCandidateDO candidate(String exposure, String leverage) {
+        ExecutionPlanCandidateDO candidate = new ExecutionPlanCandidateDO();
+        candidate.setPositionSuggestion(exposure);
+        candidate.setLeverageSuggestion(leverage);
+        return candidate;
+    }
+
+    private static TmAccountRiskSnapshotDO verifiedAccountRisk() {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        TmAccountRiskSnapshotDO snapshot = new TmAccountRiskSnapshotDO();
+        snapshot.setId(101L);
+        snapshot.setSourceStatus("VERIFIED");
+        snapshot.setAccountRiskStatus("RISK_ALLOWED");
+        snapshot.setRiskAllowed(true);
+        snapshot.setObservedAt(now.minusMinutes(1));
+        snapshot.setFreshUntil(now.plusMinutes(5));
+        return snapshot;
     }
 }

@@ -205,10 +205,9 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         if (!isTrue(property(environment, "trade-model.ohlcv.public-provider.external-calls-enabled"))) {
             errors.add("production OHLCV ingestion requires explicit external-call opt-in");
         }
-        String symbols = trim(property(environment, "trade-model.schedulers.ohlcv-ingestion.symbols"));
-        long symbolCount = List.of(symbols.split(",")).stream().map(String::trim).filter(value -> !value.isEmpty()).distinct().count();
-        if (symbolCount < 1 || symbolCount > 2) {
-            errors.add("production OHLCV ingestion symbol allowlist must contain 1-2 symbols");
+        String maxSymbolsValue = property(environment, "trade-model.schedulers.ohlcv-ingestion.max-symbols");
+        if (!isPositiveInteger(maxSymbolsValue) || Integer.parseInt(trim(maxSymbolsValue)) > 20) {
+            errors.add("production OHLCV ingestion Asset Pool batch size must be between 1 and 20");
         }
         Set<String> timeframes = Set.copyOf(Arrays.stream(trim(property(environment,
                         "trade-model.schedulers.ohlcv-ingestion.timeframes")).split(","))

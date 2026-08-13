@@ -1,55 +1,44 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `DYNAMIC_ASSET_RANKING_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
+Status: `NO_KNOWN_CONTRACT_GAP_PENDING_EXTERNAL_GATES`
 
-## Merge-Readiness Evidence Still Required
+## Product And Implementation Gaps
 
-1. The independent Backend Capability Audit must re-audit the four remediated
-   findings and issue a new `APPROVE` or `REQUEST_CHANGES` decision.
-2. Merged-main validation has not run. The candidate is not effective until
-   reviewed, merged, and validated on clean/synced main.
-3. PR CI must run against the remediated head; local validation cannot replace
-   the required PR Merge Gate checks.
-4. Dynamic Top 6 behavior has deterministic unit, H2 integration, API contract,
-   Spring-context, and PostgreSQL query evidence, but has not yet been observed
-   with continuously changing production Opportunity data.
+None are known against chapters 1-20 or Appendices A-D of the final frozen
+contract after the remediation and complete local regression.
 
-PostgreSQL V11 is not an open local validation gap. The complete controlled
-migration test passed against disposable PostgreSQL `16.14`, including the
-historical V8 -> V11 path and the new timeframe, Conflict Level, and
-UserPosition source constraints. The dynamic ranking read queries also executed
-successfully in the same V11 smoke test.
+This statement is bounded to backend capability, schema, API, persistence,
+query and automated-test alignment on the candidate branch. It does not claim
+production effectiveness or merged-main completion.
 
-## Existing Non-Blocking Audit Debt
+## External Gates Still Required
 
-The remediation intentionally did not expand into the independent audit's
-non-blocking findings:
+1. Independent final backend capability re-audit of PR #1177.
+2. PR CI on the final pushed commit.
+3. Review and merge decision.
+4. Clean/synced merged-main validation.
+5. Later live-provider and production-runtime acceptance where separately
+   authorized.
 
-- existing legacy Review rows are not backfilled with new provenance;
-- market-catalog degradation remains silent;
-- the machine-readable authorization projection still needs reconciliation at
-  Merge Gate even though the authorization merge is present in this branch's
-  base and the Product Source/Workflow gates pass.
-- the legacy composite V7 evidence runner does not isolate its historical V7
-  fixtures from V11 schema state; its combined run fails outside the ranking
-  test. The targeted V11 migration/ranking test passes and is the applicable
-  database evidence for this increment.
+## Evidence Boundaries
 
-## Runtime Acceptance Not Claimed
+- PostgreSQL 16.14 V1-to-V12 migration was executed successfully in an isolated
+  disposable local database.
+- No live AI provider call was made and no provider credential was read.
+- Real historical replay without an authorized real fixture remains explicitly
+  unavailable; no local fixture is represented as provider evidence.
+- Full-market catalog fallback remains identified as fallback and cannot bypass
+  Asset Pool membership for persistent Opportunity creation.
+- PR #1177 remains open/draft/unmerged; the current phase is not effective on
+  `main`.
 
-- No live AI provider call was made; provider credentials were not used.
-- Full-market search uses the real Binance exchange-info catalog at runtime;
-  provider unavailability falls back to the existing configured catalog and
-  does not fabricate a full-market success claim.
-- No production database, production server, or production secret was used.
-
-## Intentional Boundaries
+## Intentional Product Boundaries
 
 - Figma: unchanged.
 - Mobile: unchanged.
-- PositionMonitor contract: preserved, not rewritten.
-- Trading execution: absent.
-- Automatic open/close/reverse/order: absent.
+- P2 Position Monitoring: preserved.
+- automatic open/close/add/reduce/reverse/order: absent.
+- exchange order API: absent.
+- Push Recheck: review-only and not trading authorization.
 
-No known local compile, unit, integration, H2 persistence, PostgreSQL V11,
-product-source gate, or workflow-contract failure remains.
+`READY_FOR_INDEPENDENT_FINAL_REAUDIT`

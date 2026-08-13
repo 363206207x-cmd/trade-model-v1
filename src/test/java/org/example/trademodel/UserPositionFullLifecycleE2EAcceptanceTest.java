@@ -54,6 +54,7 @@ import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.UserPositionServiceImpl;
+import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.userpositionreview.DefaultUserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
@@ -111,7 +112,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         currentDecision.setAnalysisId(ANALYSIS_ID);
         currentDecision.setSymbol("BTCUSDT");
         currentDecision.setTimeframe("5m");
-        currentDecision.setMarketBiasHierarchy("RANGE");
+        currentDecision.setMarketBiasHierarchy("BULLISH");
         currentDecision.setMultiTfConvergence("ALIGNED");
         currentDecision.setDataQualityScore(90);
         currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
@@ -147,7 +148,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(opened.getId()).isNotNull();
         assertThat(opened.getAssetSymbol()).isEqualTo("BTCUSDT");
         assertThat(opened.getStatus()).isEqualTo("OPEN");
-        assertThat(opened.getSourceType()).isEqualTo("MANUAL_POSITION");
+        assertThat(opened.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotAutoTrading()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
@@ -301,21 +302,12 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
     }
 
     private static ExecutionPlanDO executionPlan() {
-        ExecutionPlanDO plan = new ExecutionPlanDO();
-        plan.setPlanId(PLAN_ID);
-        plan.setAnalysisId(ANALYSIS_ID);
-        plan.setExecutionPlanStatus("VALID");
-        plan.setSourceGateStatus("VALID");
-        plan.setSourceGateComplete(Boolean.TRUE);
+        ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
+                PLAN_ID, ANALYSIS_ID, LocalDateTime.now(ZoneOffset.UTC));
         plan.setRecommendedAction("OBSERVE_ONLY");
         plan.setEntryZone("110");
         plan.setStopLoss("90");
         plan.setTakeProfitRules("120");
-        plan.setNotTradeInstruction(Boolean.TRUE);
-        plan.setNotExecutable(Boolean.TRUE);
-        plan.setNotAutoTrading(Boolean.TRUE);
-        plan.setNotOrderExecution(Boolean.TRUE);
-        plan.setNotUserPositionCreation(Boolean.TRUE);
         return plan;
     }
 

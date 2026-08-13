@@ -155,6 +155,7 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
         pushSignals.keySet().stream().filter(watchlistSet::contains).forEach(candidates::add);
         autoCandidateRegistry.activeAt(asOf).stream()
                 .map(AutoCandidateRegistry.AutoCandidateSnapshot::canonicalInstrumentId)
+                .filter(watchlistSet::contains)
                 .forEach(candidates::add);
 
         Map<CanonicalInstrumentId, UserPositionDO> positionByInstrument = new LinkedHashMap<>();
@@ -340,6 +341,7 @@ public class DefaultProviderScanUniverseSource implements ProviderScanUniverseSo
     private static boolean validManualPosition(UserPositionDO row) {
         return row != null && ("MANUAL".equalsIgnoreCase(row.getSourceType())
                 || "MANUAL_POSITION".equalsIgnoreCase(row.getSourceType())
+                || "MANUAL_INDEPENDENT".equalsIgnoreCase(row.getSourceType())
                 || "SYSTEM_PLAN_POSITION".equalsIgnoreCase(row.getSourceType()))
                 && ("OPEN".equalsIgnoreCase(row.getStatus())
                 || "PARTIALLY_CLOSED".equalsIgnoreCase(row.getStatus()));

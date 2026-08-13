@@ -95,13 +95,26 @@ class PostgreSqlFlywayMigrationSmokeTest {
         Flyway.configure()
                 .dataSource(target.jdbcUrl(), target.username(), target.password())
                 .locations("classpath:db/migration")
+                .target("11")
                 .load()
                 .migrate();
 
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(32);
+            insertLegacyDecisionChainV11Fixture(connection);
+        }
+
+        Flyway.configure()
+                .dataSource(target.jdbcUrl(), target.username(), target.password())
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+
+        try (Connection connection = DriverManager.getConnection(
+                target.jdbcUrl(), target.username(), target.password())) {
+            assertThat(countTradeModelTables(connection)).isEqualTo(33);
             assertTablesExist(connection, List.of(
+                    "tm_asset",
                     "tm_analysis_run",
                     "tm_decision_result",
                     "tm_execution_plan",
@@ -143,6 +156,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertPositionMonitorV10Contract(connection, legacyMonitorLogId);
             assertPositionMonitorV10NewRowDefaults(connection, legacyPositionId);
             assertDecisionChainV11Contract(connection);
+            assertDecisionChainV12AuditTextRoundTrip(connection);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -168,7 +182,8 @@ class PostgreSqlFlywayMigrationSmokeTest {
 
         try (SqlSession session = sessions.openSession(false)) {
             assertThat(session.getMapper(DecisionResultMapper.class)
-                    .findLatestDecisionResultsForSymbolsJoined(List.of("BTCUSDT"))).isEmpty();
+                    .findLatestDecisionResultsForSymbolsJoined(
+                            List.of("BTCUSDT"), "SYSTEM", 0L)).isEmpty();
             assertThat(session.getMapper(AssetStateMapper.class)
                     .listBySymbols(List.of("BTCUSDT"))).isEmpty();
             session.rollback();
@@ -344,7 +359,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(11);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(12);
             }
         }
     }
@@ -360,32 +375,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
         }
     }
 
-    private static void assertDecisionChainV11Contract(Connection connection) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT COUNT(*) FROM tm_asset_pool_item
-                WHERE owner_type = 'SYSTEM' AND owner_id = 0 AND active = TRUE
-                """)) {
-            try (ResultSet rs = statement.executeQuery()) {
-                assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isEqualTo(6);
-            }
-        }
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT state, timeframe, opportunity_id, state_entered_at,
-                       last_transition_reason, last_trigger_source
-                FROM tm_asset_state WHERE symbol = 'LEGACYV11USDT'
-                """)) {
-            try (ResultSet rs = statement.executeQuery()) {
-                assertThat(rs.next()).isTrue();
-                assertThat(rs.getString("state")).isEqualTo("OBSERVING");
-                assertThat(rs.getString("timeframe")).isEqualTo("global");
-                assertThat(rs.getString("opportunity_id")).isEqualTo("opp-legacyv11usdt-global");
-                assertThat(rs.getObject("state_entered_at")).isNotNull();
-                assertThat(rs.getString("last_transition_reason")).isEqualTo("LEGACY_STATE_ADOPTED");
-                assertThat(rs.getString("last_trigger_source")).isEqualTo("LEGACY_ANALYSIS");
-            }
-        }
-
+    private static void insertLegacyDecisionChainV11Fixture(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement()) {
             assertThat(statement.executeUpdate("""
                     INSERT INTO tm_analysis_run(
@@ -438,17 +428,72 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       'trace-v11-chain', 'FINAL_VALIDATED', 'PASS', CURRENT_TIMESTAMP, TRUE, CURRENT_TIMESTAMP)
                     """)).isEqualTo(1);
         }
+    }
+
+    private static void assertDecisionChainV11Contract(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) FROM tm_asset_pool_item
+                WHERE owner_type = 'SYSTEM' AND owner_id = 0 AND active = TRUE
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).isEqualTo(6);
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT state, timeframe, opportunity_id, state_entered_at,
+                       last_transition_reason, last_trigger_source
+                FROM tm_asset_state WHERE symbol = 'LEGACYV11USDT'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("state")).isEqualTo("OBSERVING");
+                assertThat(rs.getString("timeframe")).isEqualTo("global");
+                assertThat(rs.getString("opportunity_id")).isEqualTo("opp-legacyv11usdt-global");
+                assertThat(rs.getObject("state_entered_at")).isNotNull();
+                assertThat(rs.getString("last_transition_reason")).isEqualTo("LEGACY_STATE_ADOPTED");
+                assertThat(rs.getString("last_trigger_source")).isEqualTo("LEGACY_ANALYSIS");
+            }
+        }
 
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT candidate_id, resolver_result_id, final_plan, rule_validation_status
+                SELECT candidate_id, resolver_result_id, final_plan, rule_validation_status,
+                       chain_status, rule_veto_reason
                 FROM tm_execution_plan WHERE plan_id = 'final-plan-v11-chain'
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getString("candidate_id")).isEqualTo("candidate-v11-chain");
                 assertThat(rs.getString("resolver_result_id")).isEqualTo("resolver-v11-chain");
-                assertThat(rs.getBoolean("final_plan")).isTrue();
-                assertThat(rs.getString("rule_validation_status")).isEqualTo("PASS");
+                assertThat(rs.getBoolean("final_plan")).isFalse();
+                assertThat(rs.getString("rule_validation_status")).isEqualTo("BLOCKED");
+                assertThat(rs.getString("chain_status")).isEqualTo("RULE_VALIDATION_BLOCKED");
+                assertThat(rs.getString("rule_veto_reason"))
+                        .contains("V12_FINAL_CONTRACT_FIELDS_UNAVAILABLE");
+            }
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT plan_mode, rule_direction, candidate_direction
+                FROM tm_execution_plan_candidate WHERE candidate_id = 'candidate-v11-chain'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("plan_mode")).isEqualTo("CONFIRMATION");
+                assertThat(rs.getString("rule_direction")).isEqualTo("BULLISH");
+                assertThat(rs.getString("candidate_direction")).isEqualTo("BULLISH");
+            }
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT plan_mode_before, plan_mode_after, rule_direction
+                FROM tm_conflict_resolver_result WHERE resolver_result_id = 'resolver-v11-chain'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("plan_mode_before")).isEqualTo("CONFIRMATION");
+                assertThat(rs.getString("plan_mode_after")).isEqualTo("CONFIRMATION");
+                assertThat(rs.getString("rule_direction")).isEqualTo("BULLISH");
             }
         }
 
@@ -458,6 +503,21 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       plan_id, analysis_id, chain_status, rule_validation_status, final_plan, create_time
                     ) VALUES ('invalid-final-v11-chain', 'analysis-v11-chain',
                       'FINAL_VALIDATED', 'PASS', TRUE, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    UPDATE tm_execution_plan_candidate SET plan_mode = 'ADVISORY'
+                    WHERE candidate_id = 'candidate-v11-chain'
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    UPDATE tm_execution_plan_candidate SET candidate_direction = 'LONG'
+                    WHERE candidate_id = 'candidate-v11-chain'
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    UPDATE tm_conflict_resolver_result SET plan_mode_after = 'ADVISORY'
+                    WHERE resolver_result_id = 'resolver-v11-chain'
                     """))
                     .isInstanceOf(java.sql.SQLException.class);
             assertThat(statement.executeUpdate("""
@@ -491,6 +551,53 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       CURRENT_TIMESTAMP, 'AUTO', 'final-plan-v11-chain')
                     """))
                     .isInstanceOf(java.sql.SQLException.class);
+        }
+    }
+
+    private static void assertDecisionChainV12AuditTextRoundTrip(Connection connection) throws Exception {
+        for (String table : List.of("tm_execution_plan", "tm_conflict_resolver_result")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = ?
+                      AND column_name = 'rule_veto_reason'
+                    """)) {
+                statement.setString(1, table);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).as("V12 %s.rule_veto_reason", table).isTrue();
+                    assertThat(rs.getString("data_type")).isEqualTo("text");
+                }
+            }
+        }
+
+        String longAuditReason = "V12_ORDERED_RULE_VALIDATION_REASON;".repeat(24);
+        assertThat(longAuditReason.length()).isGreaterThan(512);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE tm_execution_plan
+                SET rule_veto_reason = ?
+                WHERE plan_id = 'final-plan-v11-chain'
+                """)) {
+            statement.setString(1, longAuditReason);
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE tm_conflict_resolver_result
+                SET rule_veto_reason = ?
+                WHERE resolver_result_id = 'resolver-v11-chain'
+                """)) {
+            statement.setString(1, longAuditReason);
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+        }
+        for (String query : List.of(
+                "SELECT rule_veto_reason FROM tm_execution_plan WHERE plan_id = 'final-plan-v11-chain'",
+                "SELECT rule_veto_reason FROM tm_conflict_resolver_result "
+                        + "WHERE resolver_result_id = 'resolver-v11-chain'")) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery(query)) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo(longAuditReason);
+            }
         }
     }
 
@@ -669,7 +776,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 assertThat(rs.getObject("user_id")).isNull();
                 assertThat(rs.getString("asset_symbol")).isEqualTo("LEGACYUSDT");
                 assertThat(rs.getString("status")).isEqualTo("OPEN");
-                assertThat(rs.getString("source_type")).isEqualTo("MANUAL_POSITION");
+                assertThat(rs.getString("source_type")).isEqualTo("MANUAL_INDEPENDENT");
             }
         }
     }
@@ -835,7 +942,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 statement.setBigDecimal(5, new BigDecimal("0.25"));
                 statement.setBigDecimal(6, new BigDecimal("2"));
                 statement.setTimestamp(7, Timestamp.valueOf(now));
-                statement.setString(8, "MANUAL_POSITION");
+                statement.setString(8, "MANUAL_INDEPENDENT");
                 statement.setBoolean(9, true);
                 statement.setBoolean(10, true);
                 statement.setBoolean(11, true);

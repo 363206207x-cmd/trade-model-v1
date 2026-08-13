@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public class MarketEnvironmentVO {
     private String environmentType;
@@ -46,6 +47,16 @@ public class MarketEnvironmentVO {
      * OI/Funding 联合派生的最小离散标签：NEUTRAL / CROWDED_LONG / CROWDED_SHORT。
      */
     private String derivativesCrowdingState;
+    private String sourceProvider;
+    private String sourceReference;
+    private String sourceTraceId;
+    private LocalDateTime observedAt;
+    private String freshness;
+    private String derivativesSourceProvider;
+    private String derivativesSourceReference;
+    private String derivativesSourceTraceId;
+    private LocalDateTime derivativesObservedAt;
+    private String derivativesFreshness;
 
     public void setMacroEnvironment(int value) { this.trendFriendliness = (double) value; }
 
@@ -95,4 +106,24 @@ public class MarketEnvironmentVO {
     public void setDerivativesCrowdingState(String derivativesCrowdingState) {
         this.derivativesCrowdingState = derivativesCrowdingState;
     }
+    public String getSourceProvider() { return sourceProvider; }
+    public void setSourceProvider(String value) { this.sourceProvider = value; }
+    public String getSourceReference() { return sourceReference; }
+    public void setSourceReference(String value) { this.sourceReference = value; }
+    public String getSourceTraceId() { return sourceTraceId; }
+    public void setSourceTraceId(String value) { this.sourceTraceId = value; }
+    public LocalDateTime getObservedAt() { return observedAt; }
+    public void setObservedAt(LocalDateTime value) { this.observedAt = value; }
+    public String getFreshness() { return freshness; }
+    public void setFreshness(String value) { this.freshness = value; }
+    public String getDerivativesSourceProvider() { return derivativesSourceProvider; }
+    public void setDerivativesSourceProvider(String value) { this.derivativesSourceProvider = value; }
+    public String getDerivativesSourceReference() { return derivativesSourceReference; }
+    public void setDerivativesSourceReference(String value) { this.derivativesSourceReference = value; }
+    public String getDerivativesSourceTraceId() { return derivativesSourceTraceId; }
+    public void setDerivativesSourceTraceId(String value) { this.derivativesSourceTraceId = value; }
+    public LocalDateTime getDerivativesObservedAt() { return derivativesObservedAt; }
+    public void setDerivativesObservedAt(LocalDateTime value) { this.derivativesObservedAt = value; }
+    public String getDerivativesFreshness() { return derivativesFreshness; }
+    public void setDerivativesFreshness(String value) { this.derivativesFreshness = value; }
 }

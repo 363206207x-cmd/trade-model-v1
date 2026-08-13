@@ -40,6 +40,13 @@ public interface AiCallLogService {
     List<AiCallLogDO> query(String analysisId, String traceId, String providerName, String callStatus,
                             LocalDateTime from, LocalDateTime to, int limit);
 
+    default List<AiCallLogDO> queryOwned(Long userId, String analysisId, String traceId,
+                                         String candidateId, String role, String providerName,
+                                         String callStatus, LocalDateTime from, LocalDateTime to,
+                                         int limit) {
+        throw new UnsupportedOperationException("Owned AI trace query is not implemented");
+    }
+
     int countProviderAttemptsSince(String providerName, LocalDateTime since);
 
     BigDecimal sumChargeableCostSince(LocalDateTime since);

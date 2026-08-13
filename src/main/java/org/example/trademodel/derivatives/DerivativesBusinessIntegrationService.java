@@ -3,6 +3,7 @@ package org.example.trademodel.derivatives;
 import org.example.trademodel.analysisrun.AnalysisPersistenceIds;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.enums.AssetStateEnum;
+import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -254,9 +257,11 @@ public class DerivativesBusinessIntegrationService {
             reasons.add(!oiReady ? "DERIVATIVES_REQUIRED:OPEN_INTEREST" : "DERIVATIVES_REQUIRED:FUNDING");
         }
         String riskAdjustment = highRisk ? "HIGH" : partial || causeEffectDivergence ? "MEDIUM" : "NONE";
-        String planMode = highRisk && config.highRiskPlanDowngrade ? "WARNING_ONLY"
-                : (!mandatoryReady && config.requiredForConfirm) || stale ? "PREPARE_ONLY"
-                : partial ? "REDUCED" : "CONFIRM";
+        String planMode = highRisk && config.highRiskPlanDowngrade
+                ? PlanModeEnum.REDUCED.name()
+                : (!mandatoryReady && config.requiredForConfirm) || stale
+                ? PlanModeEnum.OBSERVATION.name()
+                : partial ? PlanModeEnum.REDUCED.name() : PlanModeEnum.CONFIRMATION.name();
         AssetStateEnum opportunityState = opportunityState(input, confirmEligible, highRisk, stale, partial);
         String pushMode = highRisk || stale ? "WARNING_PUSH"
                 : opportunityState == AssetStateEnum.TRIGGERED ? "CONFIRM_PUSH"
@@ -285,6 +290,7 @@ public class DerivativesBusinessIntegrationService {
             EvidenceItemVO vo = new EvidenceItemVO();
             vo.setEvidenceId(AnalysisPersistenceIds.derivativesEvidenceId(
                     assessment.analysisId(), item.evidenceType().name(), result.size()));
+            vo.setAnalysisId(assessment.analysisId());
             vo.setEvidenceType(item.evidenceType().name());
             vo.setDirection(item.direction());
             vo.setStrength(item.strength() == null ? null : item.strength().doubleValue());
@@ -295,6 +301,12 @@ public class DerivativesBusinessIntegrationService {
             vo.setSourceReference(sourceReference(item));
             vo.setDescription(item.evidenceType().name() + " | " + item.reasonCode());
             vo.setTimestamp(item.providerDataTime() == null ? null : item.providerDataTime().toString());
+            vo.setCurrentValue(item.currentValue() == null ? null : item.currentValue().toPlainString());
+            vo.setChangeFromBaseline(item.currentValue() == null || item.comparisonValue() == null ? null
+                    : item.currentValue().subtract(item.comparisonValue()).toPlainString());
+            vo.setObservedAt(item.providerDataTime() == null ? null
+                    : LocalDateTime.ofInstant(item.providerDataTime(), ZoneOffset.UTC));
+            vo.setFreshness(item.freshnessStatus() == null ? null : item.freshnessStatus().name());
             result.add(vo);
         }
         return result;
@@ -323,12 +335,19 @@ public class DerivativesBusinessIntegrationService {
         if (decision == null || assessment == null) return;
         String originalDirection = decision.getMarketBiasHierarchy();
         decision.setConfidenceLevel(adjustConfidence(decision.getConfidenceLevel(), assessment.confidenceAdjustment()));
+        if (decision.getRuleConfidence() != null) {
+            decision.setRuleConfidence(adjustConfidence(
+                    decision.getRuleConfidence(), assessment.confidenceAdjustment()));
+        }
         if (assessment.isHighRisk()) {
             decision.setRiskLevel("HIGH");
+            if (decision.getRuleRisk() != null) decision.setRuleRisk("HIGH");
         } else if ("MEDIUM".equals(assessment.riskAdjustment()) && "LOW".equalsIgnoreCase(decision.getRiskLevel())) {
             decision.setRiskLevel("MEDIUM");
+            if (decision.getRuleRisk() != null) decision.setRuleRisk("MEDIUM");
         }
-        if (assessment.blocksConfirmPlan() && "CONFIRM".equalsIgnoreCase(decision.getAiPlanMode())) {
+        if (assessment.blocksConfirmPlan()
+                && PlanModeEnum.CONFIRMATION.name().equalsIgnoreCase(decision.getAiPlanMode())) {
             decision.setAiPlanMode(assessment.planMode());
         } else if (assessment.blocksConfirmPlan() || decision.getAiPlanMode() == null) {
             decision.setAiPlanMode(assessment.planMode());
@@ -351,6 +370,22 @@ public class DerivativesBusinessIntegrationService {
         decision.setDerivativesProviderDataTime(assessment.providerDataTime());
         decision.setDerivativesTraceId(assessment.traceId());
         decision.setMarketBiasHierarchy(originalDirection);
+    }
+
+    /** Copies only rule-owned provenance and revalidation metadata. */
+    public void applyRuleAssessmentMetadata(ExecutionPlanVO assessment,
+                                            DerivativesBusinessAssessment derivatives) {
+        if (assessment == null || derivatives == null) return;
+        assessment.setDerivativesStatus(derivatives.sourceStatus() == null
+                ? null : derivatives.sourceStatus().name());
+        assessment.setDerivativesFreshness(derivatives.freshnessStatus() == null
+                ? null : derivatives.freshnessStatus().name());
+        assessment.setDerivativesReasonCodes(derivatives.reasonCodes());
+        assessment.setDerivativesProviderDataTime(derivatives.providerDataTime());
+        assessment.setDerivativesTraceId(derivatives.traceId());
+        assessment.setNeedsRevalidation(derivatives.needsRevalidation());
+        assessment.setRevalidationReason(derivatives.needsRevalidation()
+                ? String.join(",", derivatives.reasonCodes()) : null);
     }
 
     public void applyPlanAdjustments(ExecutionPlanVO plan, DerivativesBusinessAssessment assessment) {
@@ -404,7 +439,8 @@ public class DerivativesBusinessIntegrationService {
         add(deltas, CREDIBILITY_SCORE, -config.staleConfidencePenalty);
         return new DerivativesBusinessAssessment(input.symbol(), normalizeDirection(input.baseDirection()),
                 UnifiedSourceStatus.WAITING_SYNC, SnapshotFreshnessStatus.UNAVAILABLE, "UNAVAILABLE", null, null,
-                List.of(evidence), deltas, config.staleConfidencePenalty, -2, "MEDIUM", "PREPARE_ONLY",
+                List.of(evidence), deltas, config.staleConfidencePenalty, -2, "MEDIUM",
+                PlanModeEnum.OBSERVATION.name(),
                 AssetStateEnum.OBSERVING, "NONE", false, false, true, false,
                 0, 10, 0, 0, List.of(), List.of(OI_DATASET, FUNDING_DATASET, LIQUIDATION_DATASET, LONG_SHORT_DATASET),
                 List.of(), List.of(reason), config.fallbackReasons, input.traceId(), input.analysisId(),

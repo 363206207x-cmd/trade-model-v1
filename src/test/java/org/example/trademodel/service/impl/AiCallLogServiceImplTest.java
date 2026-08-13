@@ -116,7 +116,10 @@ class AiCallLogServiceImplTest {
         request.setCandidateId("candidate-chain-1");
         request.setSymbol("BTCUSDT");
         request.setTimeframe("5m");
-        request.setInput(Map.of("evidence", "Bearer abcdefghijklmnop"));
+        request.setInput(Map.of(
+                "evidence", "Bearer abcdefghijklmnop",
+                "apiKey", "plain-provider-secret",
+                "nested", Map.of("password", "database-secret")));
 
         AiCallLogDO log = service.startDecisionChainCall(request, client(), new BigDecimal("0.10"));
 
@@ -128,6 +131,9 @@ class AiCallLogServiceImplTest {
         assertThat(started.getValue().getContractType()).isEqualTo("DECISION_CHAIN_V4_1");
         assertThat(started.getValue().getRequestHash()).hasSize(64);
         assertThat(started.getValue().getRequestSummary()).doesNotContain("abcdefghijklmnop");
+        assertThat(started.getValue().getRequestSummary())
+                .doesNotContain("plain-provider-secret", "database-secret")
+                .contains("***");
         assertThat(started.getValue().getReviewOnly()).isFalse();
         assertThat(started.getValue().getNotExecutionPlanCreation()).isFalse();
         assertThat(started.getValue().getNotFinalExecutionPlanCreation()).isTrue();
@@ -138,7 +144,7 @@ class AiCallLogServiceImplTest {
         result.setProvider(AiProviderName.OPENAI);
         result.setRole(AiDecisionChainRole.GPT_FINAL);
         result.setCallStatus(AiProviderCallStatus.SUCCESS);
-        result.setPayloadJson("{\"summary\":\"candidate\"}");
+        result.setPayloadJson("{\"summary\":\"candidate\",\"access_token\":\"output-secret\"}");
         result.setProviderRequestId("provider-request-1");
         result.setLatencyMs(123L);
         result.setInputTokens(100L);
@@ -151,7 +157,9 @@ class AiCallLogServiceImplTest {
 
         ArgumentCaptor<AiCallLogDO> completed = ArgumentCaptor.forClass(AiCallLogDO.class);
         verify(mapper).updateCompletion(completed.capture());
-        assertThat(completed.getValue().getOutputPayload()).isEqualTo("{\"summary\":\"candidate\"}");
+        assertThat(completed.getValue().getOutputPayload())
+                .doesNotContain("output-secret")
+                .contains("\"access_token\":\"***\"");
         assertThat(completed.getValue().getLatencyMs()).isEqualTo(123L);
         assertThat(completed.getValue().getTotalTokens()).isEqualTo(120L);
         assertThat(completed.getValue().getCalculatedCostUsd()).isEqualByComparingTo("0.0012");

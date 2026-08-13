@@ -1,95 +1,114 @@
 # Fundamental AI v4.1 Schema And API Changelog
 
-Status: `DYNAMIC_ASSET_RANKING_COMPLETE_PENDING_REAUDIT`
+Status: `FINAL_CONTRACT_ALIGNMENT_COMPLETE_PENDING_REAUDIT`
 
-## Schema V11
+## Schema
+
+### V11 decision-chain foundation
 
 Migration:
 `src/main/resources/db/migration/V11__fundamental_ai_v4_1_decision_chain.sql`
 
-New tables:
+V11 introduced the authorized Asset Pool item, Opportunity transition,
+ExecutionPlanCandidate and ConflictResolverResult stores and extended the
+existing AssetState, Final Plan, UserPosition, Review and AI call-log owners.
+It preserved legacy rows as non-Final/non-executable evidence.
 
-1. `tm_asset_pool_item`
-2. `tm_opportunity_state_transition`
-3. `tm_execution_plan_candidate`
-4. `tm_conflict_resolver_result`
+### V12 final-contract alignment
 
-Extended tables:
+Migration:
+`src/main/resources/db/migration/V12__fundamental_ai_v4_1_final_contract_alignment.sql`
 
-| Table | Added contract |
+New canonical table:
+
+- `tm_asset`: stable Asset identity used by the existing Pool, Analysis, state
+  and plan owners. It is not a duplicate Opportunity or Analysis stack.
+
+Extended contracts:
+
+| Owner | V12 contract |
 |---|---|
-| `tm_asset_state` | Opportunity identity by symbol+timeframe, state-entry/cooling metadata, last transition reason/source/analysis, exact eight-state constraint |
-| `tm_execution_plan` | Candidate/Opportunity/Resolver/Trace links, chain status, Rule Validation status/veto, Final timestamp and Final marker |
-| `tm_user_position` | explicit manual/system-plan source contract and validated `final_plan_id` association; no automatic position creation |
-| `tm_review_result` | Final/Candidate/Trace links |
-| `tm_ai_call_log` | decision-chain contract type, Candidate link, output payload, explicit no-Final authority |
+| `tm_asset_pool_item` | Asset identity, watch state, version and extension payload |
+| `tm_analysis_run` | system/user owner, Asset identity and preview flag |
+| `tm_hot_reset_event` | owner, Asset and rule-version provenance |
+| `tm_evidence_item` | current value, baseline change, observation time and freshness |
+| `tm_decision_result` | rule/final Bias, rule/candidate/final mode, rule execution permission and adjustment reasons |
+| `tm_asset_state` | owner/Asset/Pool identity, ranking inputs, versioned timestamps and exact owner-scoped identity |
+| `tm_opportunity_state_transition` | owner, Asset and rule-version audit fields |
+| `tm_execution_plan_candidate` | exact five Plan Modes, eight Bias values, complete plan body, source-backed numeric fields, risk/time/validity/reference lineage and version |
+| `tm_conflict_resolver_result` | Bias before/after, adjustments, recovery, complete rule/data/confused/account-risk inputs and exact mode constraints |
+| `tm_execution_plan` | complete Final body, source lineage, resolver/validation ownership, account risk, feasibility trust gate, time contract and strict Final boundary |
+| `tm_account_risk_snapshot` | owner, candidate exposure dimensions, aggregate assessment, source status and freshness |
+| `tm_ai_call_log` | Opportunity identity, cache-hit and observation time |
+| `tm_review_result` | Opportunity, Resolver and Validation identity, review type/outcome, deviation, AI/rule assessment, feedback and metrics |
+| `tm_user_position` | exact `MANUAL_INDEPENDENT` versus `SYSTEM_PLAN_POSITION` source contract |
 
-Safety and compatibility:
+Historical safety:
 
-- six system default Asset Pool entries are seeded idempotently;
-- legacy unknown AssetState values are normalized to `OBSERVING` before the
-  exact-state constraint is applied;
-- historical Opportunity rows receive `timeframe=global`; new state uniqueness
-  is `(symbol, timeframe)`;
-- historical UserPosition source `MANUAL` is normalized to
-  `MANUAL_POSITION`;
-- existing ExecutionPlan rows remain `LEGACY` and are not presented as newly
-  validated Final plans;
-- database checks prevent Candidate authority escalation, invalid Final rows,
-  noncanonical Conflict Levels, invalid UserPosition source/Final pairings, and
-  AI role authority escalation;
-- foreign keys preserve Candidate -> Resolver -> Final and explicit
-  UserPosition/Review provenance.
+- unknown legacy Bias/Plan Mode values fail closed to `WAIT`/`BLOCKED`;
+- V11 Candidate modes are converted only after the legacy constraint is
+  removed;
+- all historical AssetState rows receive conservative timestamps even when no
+  Asset identity can be verified;
+- unmatched Asset and Pool references remain null rather than being invented;
+- all previously marked Finals are downgraded until the complete V12 Final
+  contract is independently satisfied;
+- legacy manual positions become `MANUAL_INDEPENDENT`;
+- resolver/rule veto audit text is not truncated.
 
-`src/main/resources/schema.sql` mirrors the V11 contract for H2/local tests.
+`src/main/resources/schema.sql` mirrors the current contract for local H2 and
+integration tests.
 
-## New Asset Pool API
+## API Changes
 
-Base path: `/api/asset-pool`
+### Asset Pool
 
-| Method | Path | Behavior |
+Base: `/api/asset-pool`
+
+| Method | Path | Contract |
 |---|---|---|
-| `GET` | `/api/asset-pool` | authenticated effective system + user pool |
-| `GET` | `/api/asset-pool/search?query=&limit=` | authenticated full-market/fuzzy catalog search |
-| `POST` | `/api/asset-pool` | explicit authenticated add |
-| `DELETE` | `/api/asset-pool/{symbol}` | explicit authenticated remove/override |
-| `POST` | `/api/asset-pool/restore-default` | remove user overrides and restore defaults |
-| `POST` | `/api/asset-pool/scan?timeframe=` | explicit analysis scan over the effective user pool |
+| GET | `/api/asset-pool` | effective system + user Pool |
+| GET | `/api/asset-pool/search` | full-market/fuzzy catalog search |
+| POST | `/api/asset-pool/search/{symbol}/analysis-preview` | on-demand Analysis + Three-AI preview, no persistent Opportunity/Candidate/Final |
+| POST | `/api/asset-pool` | explicit add |
+| POST | `/api/asset-pool/batch-add` | explicit batch add |
+| DELETE | `/api/asset-pool/{symbol}` | explicit remove while history remains |
+| POST | `/api/asset-pool/batch-remove` | explicit batch remove |
+| POST | `/api/asset-pool/restore-default` | restore default membership |
+| POST | `/api/asset-pool/scan` | explicit Pool scan |
+| POST | `/api/asset-pool/batch-scan` | explicit batch Pool scan |
 
-## Extended Existing API Contracts
+### Opportunity and audit reads
 
-- UserPosition create/read requires an explicit source. A
-  `SYSTEM_PLAN_POSITION` requires a `finalPlanId` for a Rule Validation PASS
-  Final of the same symbol; a `MANUAL_POSITION` explicitly carries no Final
-  plan. UserPosition creation remains an explicit user action.
-- AI trace query responses expose terminal error, Candidate/contract identity,
-  and persisted role output needed to reconstruct success and fallback paths.
-- ExecutionPlan output adds Candidate, Opportunity, Resolver, Trace, chain,
-  Rule Validation, veto, Final timestamp, and Final marker fields.
-- Review output adds Final, Candidate, and Trace provenance.
-- Asset Pool rows expose their persisted `assetId`; pool size remains unbounded
-  by the six Home slots.
-- `GET /api/dashboard/home` focus assets are the current Opportunity-ranked Top
-  6 projection, not the first six Asset Pool rows. Each projected asset exposes
-  `assetId`, `analysisId`, `opportunityId`, `opportunityState`,
-  `opportunityScore`, `planMode`, `aiDecisionResult`, `dataQualityScore`, and
-  `rankingReason`.
-- ranking reads `planMode` only from a Rule Validation PASS Final Plan; a
-  Candidate, legacy, or blocked plan cannot be projected as the Final mode.
-- current decision-chain role output is serialized into the existing Three-AI
-  payload for the selected ranked asset.
+- `GET /api/opportunities`: filtered Opportunity query.
+- `GET /api/opportunities/top`: current ranked Opportunity projection.
+- `GET /api/opportunities/{opportunityId}`: exact Opportunity.
+- `GET /api/opportunities/{opportunityId}/history`: transition history.
+- `GET /api/ai/audit-chain`: ordered Analysis-to-Review aggregate by safe
+  Analysis/Candidate/Trace filters.
+- `GET /api/ai/call-logs`: complete GPT/Gemini/Grok terminal trace query.
 
-No new endpoint was added for ranking. The existing Dashboard Home endpoint is
-the projection boundary.
+### Existing response extensions
+
+- Dashboard Home focus assets now come only from Opportunity ranking and expose
+  Asset, Opportunity, Analysis, score, Bias, mode, confidence, risk, freshness,
+  AI result and ranking reason.
+- Dashboard Three-AI output carries one workspace with three role payloads,
+  exact role/collection states and consistency metadata.
+- Plan APIs return only a Rule-validated Final as an execution plan; Candidate
+  remains separate.
+- Position output preserves independent monitor fields and fail-closed nulls.
+- Review output exposes Candidate/Resolver/Validation/Final provenance and
+  responsibility metrics.
+- Common response envelope is `code`, `msg`, `request_id`, `server_time`.
 
 ## Explicit Non-Changes
 
-- No order API.
-- No automatic open, close, reduce, add, reverse, or position conversion API.
-- No PositionMonitor API or schema rewrite.
-- No new migration or schema change for dynamic ranking; it is a read model over
-  V11 Asset Pool, Analysis, Score, Decision, Plan, and Opportunity data.
 - No Figma or Mobile change.
+- No order or exchange execution endpoint.
+- No automatic open, close, add, reduce, reverse or position conversion.
+- No rewrite of the P2 Position Monitoring owner.
+- No Candidate endpoint can masquerade as Final.
 
 `SCHEMA_CHANGED = YES`
 

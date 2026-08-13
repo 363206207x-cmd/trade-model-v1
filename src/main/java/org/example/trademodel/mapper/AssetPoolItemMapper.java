@@ -22,26 +22,35 @@ public interface AssetPoolItemMapper {
     @Select("SELECT DISTINCT symbol FROM tm_asset_pool_item WHERE active = TRUE ORDER BY symbol")
     List<String> listAllActiveSymbols();
 
-    @Select("SELECT COUNT(*) FROM tm_asset_pool_item WHERE symbol = #{symbol} AND active = TRUE")
-    int countActiveBySymbol(@Param("symbol") String symbol);
+    @Select("SELECT * FROM tm_asset_pool_item WHERE active = TRUE "
+            + "ORDER BY owner_type, owner_id, sort_order, id")
+    List<AssetPoolItemDO> listAllActiveItems();
 
     @Select("SELECT COALESCE(MAX(sort_order), 0) FROM tm_asset_pool_item "
             + "WHERE owner_type = 'USER' AND owner_id = #{userId}")
     int maxUserSortOrder(@Param("userId") Long userId);
 
-    @Insert("MERGE INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, market_type, quote_asset, "
-            + "active, focus_enabled, sort_order, source_type, created_at, updated_at) "
-            + "KEY(owner_type, owner_id, symbol) VALUES(#{ownerType}, #{ownerId}, #{symbol}, #{displayName}, "
+    @Select("SELECT * FROM tm_asset_pool_item WHERE owner_type = #{ownerType} AND owner_id = #{ownerId} "
+            + "AND symbol = #{symbol} LIMIT 1")
+    AssetPoolItemDO selectByOwnerAndSymbol(@Param("ownerType") String ownerType,
+                                           @Param("ownerId") Long ownerId,
+                                           @Param("symbol") String symbol);
+
+    @Insert("MERGE INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, market_type, quote_asset, "
+            + "active, focus_enabled, sort_order, source_type, watch_status, version_no, ext_json, created_at, updated_at) "
+            + "KEY(owner_type, owner_id, symbol) VALUES(#{ownerType}, #{ownerId}, #{assetId}, #{symbol}, #{displayName}, "
             + "#{marketType}, #{quoteAsset}, #{active}, #{focusEnabled}, #{sortOrder}, #{sourceType}, "
-            + "#{createdAt}, #{updatedAt})")
-    @Insert(value = "INSERT INTO tm_asset_pool_item(owner_type, owner_id, symbol, display_name, market_type, "
-            + "quote_asset, active, focus_enabled, sort_order, source_type, created_at, updated_at) "
-            + "VALUES(#{ownerType}, #{ownerId}, #{symbol}, #{displayName}, #{marketType}, #{quoteAsset}, "
-            + "#{active}, #{focusEnabled}, #{sortOrder}, #{sourceType}, #{createdAt}, #{updatedAt}) "
-            + "ON CONFLICT(owner_type, owner_id, symbol) DO UPDATE SET display_name = EXCLUDED.display_name, "
+            + "#{watchStatus}, #{version}, #{extJson}, #{createdAt}, #{updatedAt})")
+    @Insert(value = "INSERT INTO tm_asset_pool_item(owner_type, owner_id, asset_id, symbol, display_name, market_type, "
+            + "quote_asset, active, focus_enabled, sort_order, source_type, watch_status, version_no, ext_json, created_at, updated_at) "
+            + "VALUES(#{ownerType}, #{ownerId}, #{assetId}, #{symbol}, #{displayName}, #{marketType}, #{quoteAsset}, "
+            + "#{active}, #{focusEnabled}, #{sortOrder}, #{sourceType}, #{watchStatus}, #{version}, #{extJson}, "
+            + "#{createdAt}, #{updatedAt}) "
+            + "ON CONFLICT(owner_type, owner_id, symbol) DO UPDATE SET asset_id = EXCLUDED.asset_id, display_name = EXCLUDED.display_name, "
             + "market_type = EXCLUDED.market_type, quote_asset = EXCLUDED.quote_asset, active = EXCLUDED.active, "
             + "focus_enabled = EXCLUDED.focus_enabled, sort_order = EXCLUDED.sort_order, "
-            + "source_type = EXCLUDED.source_type, updated_at = EXCLUDED.updated_at",
+            + "source_type = EXCLUDED.source_type, watch_status = EXCLUDED.watch_status, "
+            + "version_no = EXCLUDED.version_no, ext_json = EXCLUDED.ext_json, updated_at = EXCLUDED.updated_at",
             databaseId = "postgresql")
     int upsert(AssetPoolItemDO row);
 

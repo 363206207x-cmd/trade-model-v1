@@ -15,6 +15,7 @@ import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.messagepush.MessageReadState;
 import org.example.trademodel.messagepush.PublicOpportunityProjectionPolicy;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
@@ -386,11 +387,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private String consistencyModuleState(DashboardHomeVO.AiDecisionVO aiDecision, String aiState) {
         if ("ERROR".equals(aiState)) return "ERROR";
-        if (aiDecision == null || aiDecision.getConsistency() == null
-                || !hasText(aiDecision.getConsistency().getConsistencySummary())) {
+        if (aiDecision == null || aiDecision.getConsistency() == null) {
             return "MISSING";
         }
-        return "READY".equals(aiState) ? "READY" : "PARTIAL";
+        return switch (upper(aiDecision.getConsistency().getDataState())) {
+            case "READY" -> "READY".equals(aiState) ? "READY" : "PARTIAL";
+            case "INSUFFICIENT_DATA", "STALE" -> "PARTIAL";
+            case "SOURCE_UNAVAILABLE", "" -> "MISSING";
+            default -> "ERROR";
+        };
     }
 
     private String normalizedModuleState(String state, String fallback) {
@@ -554,19 +559,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 selectedDataQuality
         ));
         DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
-        boolean aiApplicable = consistency != null && Boolean.TRUE.equals(consistency.getAiApplicable());
-        String conflictLevel = aiApplicable ? trimToNull(consistency.getLevel()) : null;
-        Integer conflictScore = aiApplicable ? consistency.getScore() : null;
+        boolean aiApplicable = consistency != null
+                && "READY".equalsIgnoreCase(trimToNull(consistency.getDataState()));
+        String conflictLevel = aiApplicable ? trimToNull(consistency.getConflictLevel()) : null;
         state.setAiConflict(card(
                 "aiConflict",
                 "AI 冲突等级",
                 conflictLevel,
-                aiApplicable ? consistency.getConsistencyLevel() : "不适用",
+                aiApplicable ? aiConflictLevelLabel(conflictLevel) : "不适用",
                 aiApplicable ? "AI 冲突" : "本轮未形成可裁决 AI 意见",
                 aiApplicable
-                        ? conflictLevel != null || conflictScore != null ? "CONNECTED" : "WAITING_SYNC"
+                        ? conflictLevel != null ? "CONNECTED" : "WAITING_SYNC"
                         : "NOT_APPLICABLE",
-                conflictScore
+                null
         ));
         state.setPendingReview(card(
                 "pendingReview",
@@ -685,6 +690,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
             DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
             asset.setAssetId(projection.assetId());
+            asset.setName(projection.name());
             asset.setAnalysisId(projection.analysisId());
             asset.setOpportunityId(projection.opportunityId());
             asset.setOpportunityState(projection.opportunityState());
@@ -834,7 +840,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } else if (!"ERROR".equals(asset.getFieldSourceStatus().get("updatedAt"))) {
             setFieldSource(asset, "updatedAt", "MISSING");
         }
-        asset.setWorthOpening(decision.getIsWorthOpening());
+        asset.setWorthOpening(finalPlanWorthOpening(decision.getPlanMode()));
         asset.setCurrentConclusion(currentConclusion(decision, assetState));
         asset.setModuleState(assetModuleState(asset));
         return asset;
@@ -1142,6 +1148,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String sourceType = trimToNull(position.getSourceType());
         return "MANUAL".equalsIgnoreCase(sourceType)
                 || "MANUAL_POSITION".equalsIgnoreCase(sourceType)
+                || "MANUAL_INDEPENDENT".equalsIgnoreCase(sourceType)
                 || "SYSTEM_PLAN_POSITION".equalsIgnoreCase(sourceType);
     }
 
@@ -1451,11 +1458,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "状态与计划关联信息不完整，需重新分析");
             return suggestion;
         }
-        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) {
-            blockSuggestion(suggestion, "RISK_BLOCKED", "当前暂无完整执行计划",
-                    "风险门控未通过，等待人工复核");
-            return suggestion;
-        }
         if ("CONFUSED".equals(assetState)
                 || decision.getConfusedScore() != null
                 && decision.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD) {
@@ -1466,11 +1468,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (directionalPushBlocked(decision)) {
             blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前暂无完整执行计划",
                     "方向结论已阻断，等待重新分析");
-            return suggestion;
-        }
-        if (!Boolean.TRUE.equals(decision.getIsWorthOpening())) {
-            blockSuggestion(suggestion, "NOT_WORTH_OPENING", "当前暂无完整执行计划",
-                    "当前条件不足，暂不形成新计划");
             return suggestion;
         }
         if (!hasText(decision.getDecisionId())) {
@@ -1498,12 +1495,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     BOUNDARY_INCOMPLETE_VALID_PERIOD);
             return suggestion;
         }
-        PersistedPlanState planState = ExecutionPlanReviewPolicy.persistedPlanState(executionPlan);
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
+                executionPlan,
+                LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
         if (planState != PersistedPlanState.ACTIVE) {
             blockPersistedAssetPlan(suggestion, executionPlan, planState);
             return suggestion;
         }
-        PlanValidity planValidity = resolvePlanValidity(decision);
+        PlanValidity planValidity = resolvePlanValidity(executionPlan);
         if (planValidity.status() == PlanValidityStatus.INVALID) {
             blockSuggestion(suggestion, "VALID_PERIOD_INVALID", "当前暂无完整执行计划",
                     "有效期格式异常，等待重新分析");
@@ -1531,18 +1530,25 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setSourceAnalysisId(assetPlan.analysisId());
         suggestion.setSourceExecutionPlanId(assetPlan.executionPlanId());
         suggestion.setSourceTraceId(assetPlan.sourceTraceId());
-        suggestion.setDirection(trimToNull(decision.getMarketBiasHierarchy()));
+        suggestion.setDirection(trimToNull(executionPlan.getFinalMarketBias()));
+        suggestion.setFinalMarketBias(trimToNull(executionPlan.getFinalMarketBias()));
+        suggestion.setFinalPlanMode(trimToNull(executionPlan.getFinalPlanMode()));
+        suggestion.setWorthOpening(finalPlanWorthOpening(executionPlan.getFinalPlanMode()));
+        suggestion.setOpportunityType(trimToNull(executionPlan.getOpportunityType()));
+        suggestion.setRecommendedAction(trimToNull(executionPlan.getRecommendedAction()));
         suggestion.setEntryZone(trimPlanValue(executionPlan.getEntryZone()));
+        suggestion.setTriggerCondition(trimPlanValue(executionPlan.getTriggerCondition()));
         suggestion.setStopLoss(trimPlanValue(executionPlan.getStopLoss()));
         suggestion.setTakeProfitRules(trimPlanValue(executionPlan.getTakeProfitRules()));
-        suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageSuggestion()));
-        suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionSuggestion()));
-        suggestion.setValidPeriod(planValidityDisplay(decision, planValidity));
+        suggestion.setLeverageSuggestion(planLeverageLabel(executionPlan.getLeverageLimit()));
+        suggestion.setPositionSuggestion(trimToNull(executionPlan.getPositionLimit()));
+        suggestion.setExecutionFeasibilityStatus(trimToNull(executionPlan.getExecutionFeasibilityStatus()));
+        suggestion.setExecutionFeasibilityReason(trimToNull(executionPlan.getExecutionFeasibilityReason()));
+        suggestion.setValidPeriod(planValidityDisplay(planValidity));
         suggestion.setValidFrom(planValidity.validFrom());
         suggestion.setExpiresAt(planValidity.expiresAt());
-        suggestion.setInvalidCondition(firstNonBlank(
-                trimPlanValue(executionPlan.getInvalidCondition()),
-                trimToNull(decision.getInvalidCondition())));
+        suggestion.setInvalidCondition(trimPlanValue(executionPlan.getInvalidCondition()));
+        suggestion.setNotTradeInstruction(Boolean.TRUE.equals(executionPlan.getNotTradeInstruction()));
         return suggestion;
     }
 
@@ -1778,19 +1784,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         ai.setTabs(tabs);
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
-        consistency.setAiApplicable(aiApplicable);
-        consistency.setLevel(aiApplicable && decision != null
-                ? trimToNull(decision.getAiConflictLevel()) : null);
-        consistency.setScore(aiApplicable && decision != null ? decision.getAiConflictScore() : null);
-        consistency.setConfused(aiApplicable && synthesis != null && Boolean.TRUE.equals(synthesis.confused()));
-        consistency.setDirectionalPushBlocked(directionalPushBlocked(decision));
-        consistency.setConsistencyScore(null);
-        consistency.setConsistencyLevel(aiApplicable
-                ? aiConflictLevelLabel(decision != null ? decision.getAiConflictLevel() : null)
-                : "不适用");
-        consistency.setConsistencySummary(consistencySummary(roleStats));
-        consistency.setDowngradeReason(aiApplicable && synthesis != null
-                ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null);
+        boolean recoveryConditionRequired = synthesis != null
+                && (!"CONFIRMATION".equalsIgnoreCase(trimToNull(synthesis.finalPlanMode()))
+                || !"LEVEL_1_CONSISTENT".equalsIgnoreCase(trimToNull(synthesis.conflictLevel())));
+        boolean consistencyAvailable = aiApplicable && synthesis != null
+                && hasText(synthesis.conflictLevel())
+                && hasText(synthesis.finalMarketBias())
+                && hasText(synthesis.finalPlanMode())
+                && hasText(synthesis.mainReason())
+                && (!recoveryConditionRequired || hasText(synthesis.recoveryCondition()));
+        consistency.setDataState(consistencyAvailable
+                ? "READY"
+                : payload == null || roleStats.successful() == 0
+                ? "SOURCE_UNAVAILABLE"
+                : "INSUFFICIENT_DATA");
+        consistency.setConflictLevel(consistencyAvailable
+                ? trimToNull(synthesis.conflictLevel()) : null);
+        consistency.setFinalMarketBias(consistencyAvailable
+                ? trimToNull(synthesis.finalMarketBias()) : null);
+        consistency.setFinalPlanMode(consistencyAvailable
+                ? trimToNull(synthesis.finalPlanMode()) : null);
+        consistency.setMainReason(consistencyAvailable
+                ? trimToNull(synthesis.mainReason()) : null);
+        consistency.setRecoveryCondition(consistencyAvailable
+                ? trimToNull(synthesis.recoveryCondition()) : null);
         ai.setConsistency(consistency);
         return ai;
     }
@@ -1808,98 +1825,132 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             tab.setStatusMessage(aiRoleStatusMessage("NOT_CALLED"));
             return tab;
         }
+        copyFormalAiContract(tab, rolePayload);
         String callStatus = firstNonBlank(trimToNull(rolePayload.callStatus()), "NOT_CALLED");
         tab.setRunStatus(callStatus);
         tab.setRunStatusLabel(aiRunStatusLabel(callStatus));
-        boolean resultAvailable = "SUCCESS".equalsIgnoreCase(callStatus);
+        boolean resultAvailable = ("READY".equalsIgnoreCase(rolePayload.roleState())
+                || "PARTIAL".equalsIgnoreCase(rolePayload.roleState()))
+                && "SUCCESS".equalsIgnoreCase(callStatus);
         tab.setResultAvailable(resultAvailable);
         tab.setStatusMessage(aiRoleStatusMessage(callStatus));
-        if (!resultAvailable) {
-            return tab;
-        }
         tab.setStance(trimToNull(rolePayload.stance()));
-        if ("ABSTAIN".equalsIgnoreCase(rolePayload.stance())) {
-            tab.setReviewConclusion("证据不足，暂不判断");
-            return tab;
-        }
-        switch (role) {
-            case "GPT_FINAL" -> populateFinalDecisionRole(tab, rolePayload, synthesis);
-            case "GEMINI_REVIEW" -> populateConflictReviewRole(tab, rolePayload);
-            case "GROK_CHALLENGE" -> populateChallengeRole(tab, rolePayload);
-            default -> {
-            }
+        if (resultAvailable) {
+            populateLegacyJavaProjection(tab, role, rolePayload);
         }
         return tab;
     }
 
-    private void populateFinalDecisionRole(DashboardHomeVO.AiTabVO tab,
-                                           AiRoleResultsPayload.RolePayload role,
-                                           AiRoleResultsPayload.SynthesisPayload synthesis) {
-        String finalMarketBias = synthesis != null ? trimToNull(synthesis.finalMarketBias()) : null;
-        String finalConfidence = synthesis != null ? trimToNull(synthesis.finalConfidence()) : null;
-        String finalRiskLevel = synthesis != null ? trimToNull(synthesis.finalRiskLevel()) : null;
-        String finalPlanMode = synthesis != null ? trimToNull(synthesis.planModeAdjustment()) : null;
-        String worthOpening = synthesis != null ? worthOpeningLabel(synthesis.worthOpening()) : null;
-        String finalConclusion = userFacingAiSummary(role.summary());
-        List<String> coreSupportingEvidence = "SUPPORT".equals(role.stance())
-                ? aiReasonLabels(role.reasonCodes())
-                : List.of();
-        List<String> coreCounterEvidence = "CHALLENGE".equals(role.stance())
-                ? aiReasonLabels(role.reasonCodes())
-                : List.of();
-        String decisionSummary = userFacingAiSummary(role.summary());
-        String downgradeReason = synthesis != null ? aiDowngradeReasonLabel(synthesis.downgradeReason()) : null;
-
-        tab.setFinalMarketBias(finalMarketBias);
-        tab.setFinalConfidence(finalConfidence);
-        tab.setFinalRiskLevel(finalRiskLevel);
-        tab.setFinalPlanMode(finalPlanMode);
-        tab.setWorthOpening(worthOpening);
-        tab.setFinalConclusion(finalConclusion);
-        tab.setCoreSupportingEvidence(coreSupportingEvidence);
-        tab.setCoreCounterEvidence(coreCounterEvidence);
-        tab.setDecisionSummary(decisionSummary);
-        tab.setDowngradeReason(downgradeReason);
-
-        tab.setDirection(finalMarketBias);
-        tab.setConfidenceLevel(finalConfidence);
-        tab.setSupportEvidence(coreSupportingEvidence);
-        tab.setAgainstEvidence(coreCounterEvidence);
-        tab.setReviewConclusion(firstNonBlank(finalConclusion, decisionSummary));
+    // Kept only for Java callers compiled against the pre-v4.1 VO. These fields are
+    // JsonIgnored and never participate in the API or frontend semantic contract.
+    private void populateLegacyJavaProjection(DashboardHomeVO.AiTabVO tab,
+                                              String role,
+                                              AiRoleResultsPayload.RolePayload payload) {
+        switch (role) {
+            case "GPT_FINAL" -> {
+                AiRoleResultsPayload.CoreJudgment judgment = payload.coreJudgment();
+                AiRoleResultsPayload.CandidateSummary candidate = payload.candidateSummary();
+                tab.setFinalMarketBias(judgment == null ? null : judgment.marketBias());
+                tab.setDirection(judgment == null ? null : judgment.marketBias());
+                tab.setFinalConclusion(judgment == null ? null : judgment.text());
+                tab.setReviewConclusion(judgment == null ? null : judgment.text());
+                tab.setFinalConfidence(candidate == null ? null : candidate.confidence());
+                tab.setConfidenceLevel(candidate == null ? null : candidate.confidence());
+                tab.setFinalRiskLevel(candidate == null ? null : candidate.riskLevel());
+                tab.setFinalPlanMode(candidate == null ? null : candidate.planMode());
+                tab.setWorthOpening(candidate == null ? null : worthOpeningLabel(candidate.worthOpening()));
+                tab.setDecisionSummary(candidate == null ? null : candidate.summary());
+                tab.setCoreSupportingEvidence(evidenceTexts(payload.supportingEvidence()));
+                tab.setSupportEvidence(evidenceTexts(payload.supportingEvidence()));
+                tab.setCoreCounterEvidence(evidenceTexts(payload.opposingEvidence()));
+                tab.setAgainstEvidence(evidenceTexts(payload.opposingEvidence()));
+                tab.setDowngradeReason(payload.biasAdjustment() == null
+                        ? null : payload.biasAdjustment().reason());
+            }
+            case "GEMINI_REVIEW" -> {
+                tab.setReviewVerdict(trimToNull(payload.reviewResult()));
+                tab.setDetectedContradictions(findingTexts(payload.logicConflicts()));
+                tab.setWeakEvidence(findingTexts(payload.evidenceGaps()));
+                tab.setLogicGaps(findingTexts(payload.logicConflicts()));
+                tab.setDowngradeRecommendation(payload.downgradeSuggestion() == null
+                        ? null : payload.downgradeSuggestion().reason());
+                tab.setReviewConclusion(payload.downgradeSuggestion() == null
+                        ? null : payload.downgradeSuggestion().reason());
+                tab.setRiskAdjustmentSuggestion(trimToNull(payload.riskAdjustment()));
+                tab.setManualReviewRequired(Boolean.TRUE.equals(payload.manualReviewRequired()) ? "是" : null);
+            }
+            case "GROK_CHALLENGE" -> {
+                tab.setChallengeThesis(trimToNull(payload.challengeSummary()));
+                tab.setChallengeConclusion(trimToNull(payload.currentDirectionChallenge()));
+                tab.setReviewConclusion(trimToNull(payload.currentDirectionChallenge()));
+                tab.setEventRisks(findingTexts(payload.externalEventRisks()));
+                tab.setSentimentReversalRisks(findingTexts(payload.opposingScenarios()));
+                tab.setMicrostructureTraps(findingTexts(payload.microstructureRisks()));
+                tab.setCounterEvidence(findingTexts(payload.opposingScenarios()));
+            }
+            default -> {
+            }
+        }
     }
 
-    private void populateConflictReviewRole(DashboardHomeVO.AiTabVO tab,
-                                            AiRoleResultsPayload.RolePayload role) {
-        tab.setReviewVerdict(aiStanceLabel(role.stance()));
-        tab.setDetectedContradictions("CHALLENGE".equals(role.stance())
-                ? aiReasonLabels(role.reasonCodes())
-                : List.of());
-        tab.setWeakEvidence(List.of());
-        tab.setLogicGaps(List.of());
-        tab.setDowngradeRecommendation(null);
-        tab.setRiskAdjustmentSuggestion(null);
-        tab.setManualReviewRequired(Boolean.TRUE.equals(role.manualReviewRequired()) ? "是" : null);
-        tab.setReviewConclusion(userFacingAiSummary(role.summary()));
+    private void copyFormalAiContract(DashboardHomeVO.AiTabVO tab,
+                                      AiRoleResultsPayload.RolePayload role) {
+        tab.setAnalysisId(role.analysisId());
+        tab.setTraceId(role.traceId());
+        tab.setRoleState(role.roleState());
+        tab.setDataState(role.dataState());
+        tab.setGeneratedAt(role.generatedAt());
+        tab.setCoreJudgment(role.coreJudgment());
+        tab.setSupportingEvidence(role.supportingEvidence());
+        tab.setSupportingEvidenceState(role.supportingEvidenceState());
+        tab.setOpposingEvidence(role.opposingEvidence());
+        tab.setOpposingEvidenceState(role.opposingEvidenceState());
+        tab.setMultiTimeframeExplanation(role.multiTimeframeExplanation());
+        tab.setBiasAdjustment(role.biasAdjustment());
+        tab.setCandidateSummary(role.candidateSummary());
+        tab.setEvidenceGaps(role.evidenceGaps());
+        tab.setEvidenceGapsState(role.evidenceGapsState());
+        tab.setLogicConflicts(role.logicConflicts());
+        tab.setLogicConflictsState(role.logicConflictsState());
+        tab.setUnderestimatedRisks(role.underestimatedRisks());
+        tab.setUnderestimatedRisksState(role.underestimatedRisksState());
+        tab.setDowngradeSuggestion(role.downgradeSuggestion());
+        tab.setReviewResult(role.reviewResult());
+        tab.setFinalDirectionImpact(role.finalDirectionImpact());
+        tab.setConfidenceAdjustment(role.confidenceAdjustment());
+        tab.setRiskAdjustment(role.riskAdjustment());
+        tab.setPlanModeAdjustment(role.planModeAdjustment());
+        tab.setRecoveryCondition(role.recoveryCondition());
+        tab.setFailurePaths(role.failurePaths());
+        tab.setFailurePathState(role.failurePathState());
+        tab.setOpposingScenarios(role.opposingScenarios());
+        tab.setOpposingScenariosState(role.opposingScenariosState());
+        tab.setExternalEventRisks(role.externalEventRisks());
+        tab.setExternalEventRisksState(role.externalEventRisksState());
+        tab.setMicrostructureRisks(role.microstructureRisks());
+        tab.setMicrostructureRisksState(role.microstructureRisksState());
+        tab.setWatchIndicators(role.watchIndicators());
+        tab.setWatchIndicatorsState(role.watchIndicatorsState());
+        tab.setChallengeSummary(role.challengeSummary());
+        tab.setCurrentDirectionChallenge(role.currentDirectionChallenge());
+        tab.setMajorCounterEvidence(role.majorCounterEvidence());
+        tab.setPlanModeImpact(role.planModeImpact());
     }
 
-    private void populateChallengeRole(DashboardHomeVO.AiTabVO tab,
-                                       AiRoleResultsPayload.RolePayload role) {
-        tab.setChallengeThesis(userFacingAiSummary(role.summary()));
-        tab.setEventRisks(List.of());
-        tab.setSentimentReversalRisks(List.of());
-        tab.setMicrostructureTraps(List.of());
-        tab.setLiquidityRisks(List.of());
-        tab.setCounterEvidence("CHALLENGE".equals(role.stance())
-                ? aiReasonLabels(role.reasonCodes())
-                : List.of());
-        tab.setChallengeConclusion(userFacingAiSummary(role.summary()));
-        tab.setReviewConclusion(tab.getChallengeConclusion());
+    private static List<String> evidenceTexts(List<AiRoleResultsPayload.EvidencePayload> evidence) {
+        if (evidence == null) return List.of();
+        return evidence.stream().map(item -> item == null ? null : item.currentValue())
+                .filter(Objects::nonNull).filter(value -> !value.isBlank()).toList();
+    }
+
+    private static List<String> findingTexts(List<AiRoleResultsPayload.FindingPayload> findings) {
+        if (findings == null) return List.of();
+        return findings.stream().map(item -> item == null ? null : item.text())
+                .filter(Objects::nonNull).filter(value -> !value.isBlank()).toList();
     }
 
     private String worthOpeningLabel(Boolean worthOpening) {
-        if (worthOpening == null) {
-            return null;
-        }
+        if (worthOpening == null) return null;
         return worthOpening ? "是" : "否";
     }
 
@@ -2382,7 +2433,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private boolean planAllowedAssetState(String state) {
-        return "CANDIDATE".equals(state) || "WAITING_TRIGGER".equals(state) || "TRIGGERED".equals(state);
+        return "CANDIDATE".equals(state) || "WAITING_TRIGGER".equals(state)
+                || "TRIGGERED".equals(state) || "HIGH_RISK".equals(state);
+    }
+
+    private static Boolean finalPlanWorthOpening(String finalPlanMode) {
+        try {
+            return switch (PlanModeEnum.require(finalPlanMode)) {
+                case CONFIRMATION, PREPARATION, REDUCED -> true;
+                case OBSERVATION, BLOCKED -> false;
+            };
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private boolean directionalPushBlocked(DecisionResultVO decision) {
@@ -2429,6 +2492,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private PlanValidity resolvePlanValidity(ExecutionPlanDO executionPlan) {
+        if (executionPlan == null) return PlanValidity.invalid();
+        LocalDateTime validFrom = executionPlan.getValidFrom();
+        LocalDateTime validUntil = executionPlan.getValidUntil();
+        if (validFrom == null || validUntil == null) return PlanValidity.invalid();
+        return evaluatePlanValidity(validFrom.atOffset(ZoneOffset.UTC), validUntil.atOffset(ZoneOffset.UTC));
+    }
+
     private PlanValidity evaluatePlanValidity(OffsetDateTime validFrom, OffsetDateTime expiresAt) {
         if (validFrom == null || expiresAt == null
                 || !validFrom.toInstant().isBefore(expiresAt.toInstant())) {
@@ -2451,6 +2522,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         String display = trimToNull(decision != null ? decision.getValidPeriod() : null);
         return display;
+    }
+
+    private String planValidityDisplay(PlanValidity validity) {
+        if (validity == null || validity.validFrom() == null || validity.expiresAt() == null) {
+            return null;
+        }
+        return OFFSET_PLAN_TIME_FORMAT.format(validity.validFrom())
+                + " ~ " + OFFSET_PLAN_TIME_FORMAT.format(validity.expiresAt());
     }
 
     private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
@@ -2571,7 +2650,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int challenge = 0;
         int abstain = 0;
         for (AiRoleResultsPayload.RolePayload role : payload.roles().values()) {
-            if (role == null || !"SUCCESS".equalsIgnoreCase(role.callStatus())) continue;
+            if (role == null || !"SUCCESS".equalsIgnoreCase(role.callStatus())
+                    || !("READY".equalsIgnoreCase(role.roleState())
+                    || "PARTIAL".equalsIgnoreCase(role.roleState()))) continue;
             successful++;
             switch (upper(role.stance())) {
                 case "SUPPORT" -> support++;

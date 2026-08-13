@@ -64,6 +64,11 @@ public interface PositionMonitorLogMapper {
     List<PositionMonitorLogDO> listByAnalysisId(@Param("analysisId") String analysisId, @Param("limit") int limit);
 
     @Select(OWNER_SCOPED_SELECT
+            + "WHERE l.analysis_id = #{analysisId} ORDER BY l.created_at, l.log_id")
+    List<PositionMonitorLogDO> listByAnalysisIdAndUserId(@Param("analysisId") String analysisId,
+                                                         @Param("userId") Long userId);
+
+    @Select(OWNER_SCOPED_SELECT
             + "WHERE l.log_id = #{logId}")
     PositionMonitorLogDO selectRiskByIdAndUserId(@Param("logId") Long logId,
                                                  @Param("userId") Long userId);
