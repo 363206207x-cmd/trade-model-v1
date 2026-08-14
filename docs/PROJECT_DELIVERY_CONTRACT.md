@@ -1077,3 +1077,35 @@ PR #1004 is unrelated Draft PR evidence for this P0-0 package. It must not be mo
 Codex must use `scripts/v1-pr-complete.sh` when possible and `scripts/v1-merge-sync.sh` for merge plus local main sync. If GitHub auth is unavailable, Codex must stop and print the exact command. Codex must not bypass GitHub permission and must not manually merge with unsafe git commands.
 
 After merge, `main` must be checked out / synced, `scripts/v1-state.sh` must run, and P0-0 is effective only when `COMPLETION_EFFECTIVE_STATE: EFFECTIVE_MERGED_MAIN` and `P0_0_EFFECTIVE: YES` are reported. If PR #1004 remains open, `P0_1_ALLOWED: NO` remains expected.
+
+---
+
+## 16. Fundamental AI v4.1 Final Interaction Authorization
+
+The sole active v4.1 Product Source is
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. The 2026-08-14
+final interaction freeze is merged into that file; route, component and
+ownership matrices are normative annexes rather than competing Product
+Sources. Historical v4.1 authorizations cannot override it.
+
+The only authorized successor package is:
+
+`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`.
+
+It becomes effective only after
+`docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md`
+is merged to clean, synchronized `main` and Product Source, Workflow,
+authorization and duplicate-skeleton gates pass. Before that event,
+implementation and successor PR creation are false.
+
+PR #1179 is a reusable implementation base, not a source of product truth. It
+may be synchronized/rebased only after authorization effectivity and must
+preserve its audited passing capabilities. The package may make the minimum
+frontend, API, schema, persistence and test changes required by the frozen
+Desktop contract. Figma and Mobile remain outside scope.
+
+No package may automatically open, close, add, reduce or reverse a position,
+place an exchange order, let AI bypass Rule Validation, persist Preview as an
+Opportunity/Candidate/Final, expose Candidate as Final, create a UserPosition
+from Final without explicit user confirmation, fabricate data/progress, or
+create duplicate canonical ownership.

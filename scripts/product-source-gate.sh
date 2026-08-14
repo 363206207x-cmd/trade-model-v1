@@ -144,9 +144,20 @@ for required_registry_id in \
   PS-HOME-INTERACTION \
   PS-P2-POSITION-MONITORING-AUTHORIZATION \
   PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN \
-  PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION; do
+  PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION; do
   registry_has_id "$required_registry_id" || block "Required formal product source is not registered: $required_registry_id"
 done
+
+v4_1_canonical_count=0
+v4_1_legacy_authorization_count=0
+for source_id in "${registry_ids[@]}"; do
+  [[ "$source_id" == "PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN" ]] && ((v4_1_canonical_count+=1))
+  [[ "$source_id" == "PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION" ]] && ((v4_1_legacy_authorization_count+=1))
+done
+[[ "$v4_1_canonical_count" == "1" ]] \
+  || block "Exactly one canonical v4.1 Product Source must be active"
+[[ "$v4_1_legacy_authorization_count" == "0" ]] \
+  || block "Superseded v4.1 Decision Chain authorization must not remain in the active registry"
 
 for index in "${!registry_ids[@]}"; do
   source_id="${registry_ids[$index]}"
@@ -258,6 +269,10 @@ else
       push_recheck_trading_authorization \
       fake_data_as_real \
       owner_scope_bypass; do
+      hard_value="$(yaml_nested_scalar "$task_file" hard_boundaries "$hard_boundary")"
+      [[ "$hard_value" == "BLOCKED" ]] || block "hard_boundaries.$hard_boundary must be BLOCKED"
+    done
+    for hard_boundary in preview_business_persistence figma_change mobile_implementation; do
       hard_value="$(yaml_nested_scalar "$task_file" hard_boundaries "$hard_boundary")"
       [[ "$hard_value" == "BLOCKED" ]] || block "hard_boundaries.$hard_boundary must be BLOCKED"
     done

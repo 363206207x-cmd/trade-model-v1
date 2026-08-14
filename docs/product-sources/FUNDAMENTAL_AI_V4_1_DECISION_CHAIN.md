@@ -1,17 +1,30 @@
-# Fundamental AI v4.1 Unified Final Contract
+# Fundamental AI v4.1 Unified Product Source
 
 Status: `PRODUCT_DESIGN_FROZEN`
 
-Original source: `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`
+Original business source: `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`
 
-Original SHA-256: `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`
+Original business-source SHA-256: `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`
 
-Version/date: `v4.1 final freeze / 2026-08-12`
+Final interaction source: `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx`
 
-This file is the canonical repository representation of all twenty chapters
-and Appendices A-D of the Product Owner-approved final source. It supersedes
-the previous v4.1 repository representation. It freezes product semantics; it
-does not claim implementation or runtime acceptance.
+Final interaction-source SHA-256: `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3`
+
+Version/date: `v4.1 unified final freeze / 2026-08-14`
+
+This file is the sole ACTIVE and AUTHORITATIVE v4.1 Product Source. It merges
+all twenty chapters and Appendices A-D of the Product Owner-approved business
+source with the final interaction, page, route, state and component contract.
+It supersedes every earlier v4.1 interpretation while preserving historical
+documents as evidence only. It freezes product semantics; it does not claim
+implementation or runtime acceptance.
+
+The following repository documents are normative annexes to this one source,
+not competing Product Sources:
+
+- `docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md`;
+- `docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md`;
+- `docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md`.
 
 ## 1. Product Position and Principles
 
@@ -66,17 +79,38 @@ opportunity path bypassing the Pool violate the contract.
 ### 3.2 Pool capabilities
 
 - full-market search and fuzzy symbol/name/alias search;
-- explicit add, remove and restore default;
+- explicit add, remove, top-up missing defaults and reset to defaults;
 - manual and scheduled scan through the same Analysis Run chain;
 - batch add, remove and scan;
 - removing a Pool item retains historical analysis and review.
 
-### 3.3 Search preview
+`Top up defaults` adds only missing default assets and preserves every custom
+asset. `Reset to defaults` requires confirmation and replaces the continuing
+observation set with defaults without deleting history or stopping existing
+position monitoring. Removing an asset stops future continuous scans,
+Opportunity Promotion, Top6 eligibility and new opportunity messages. Existing
+Analysis, Opportunity, Candidate, Final and Review records remain. The current
+Final becomes `TRACKING_STOPPED` with `needsRevalidation=true`; any existing
+UserPosition continues independent monitoring.
 
-A searched asset may start an on-demand Analysis Run and Three-AI explanation.
-This is `Analysis Preview`: it does not add the asset to the Pool, create a
-persistent Opportunity or Candidate, or enter Home Top6. Only explicit add
-enables observing, scheduled scans, Opportunity Discovery and ranking.
+### 3.3 Search preview and analysis mode
+
+Every AnalysisRun has an explicit `analysisMode`:
+
+- `ANALYSIS_PREVIEW` is for an asset not yet in the Pool. It may create an
+  AnalysisRun, data-quality result, Evidence, Eight Scores, Multi-Timeframe
+  result and Three-AI explanation. It must not create Opportunity, Candidate,
+  Conflict Resolver, Rule Validation or Final records, and must not expose
+  `candidateId`, Candidate Plan Mode, `finalPlanId`, Final Plan Mode, entry,
+  stop or target fields. GPT synthesizes evidence and a direction hypothesis;
+  Gemini reviews evidence quality and logic; Grok challenges blind spots and
+  failure scenarios. Preview never changes the selected Home asset.
+- `OPPORTUNITY_DECISION` is valid only when a real Opportunity exists. It may
+  run the Candidate, Review, Challenge, Resolver, Rule Validation and Final
+  chain.
+
+Only explicit Pool add enables observing, scheduled scans, Opportunity
+Discovery, ranking and opportunity messaging.
 
 ### 3.4 Dynamic ranking
 
@@ -93,6 +127,17 @@ Each projection includes `assetId`, `symbol`, `name`, `opportunityScore`,
 `finalMarketBias`, `finalPlanMode`, `confidence`, `riskLevel`,
 `opportunityState`, `analysisId` and `rankingReason`.
 
+Top6 is deduplicated by asset, not by Opportunity. Each slot additionally
+includes `primaryOpportunityId`, `primaryTimeframe`, `primaryPlanMode`,
+`secondaryOpportunityCount` and `timeframeConflictState`. Opposing timeframes
+are never silently averaged; they produce a conflict penalty or Confused
+evaluation.
+
+The selected Home asset is written to `?asset={symbol}`. Refresh, browser
+history and cross-page return restore it. Ranking changes never auto-switch a
+user-selected asset. If it exits Top6, the reading context remains with an
+explicit exit reason until the user selects another asset.
+
 ## 4. Data, Evidence, Scores and Timeframes
 
 Sources include market/candles/volume, liquidity/orders, OI/Funding/liquidation,
@@ -104,10 +149,22 @@ The eight scores are trend structure, capital momentum, leverage risk,
 liquidity quality, sentiment temperature, event impact, macro environment and
 overall confidence.
 
-`data_quality_score` is 0-100. Below 85 downgrades confidence at least one
-level. Below 70 is a circuit breaker and cannot produce a confirmation plan.
-Three AI is normally called only at quality >=85 plus material change. All
-thresholds are configuration. Missing configuration fails closed.
+`data_quality_score` is 0-100:
+
+- `85-100`: the data gate passes and the complete decision chain is allowed;
+  this never guarantees an Opportunity or plan;
+- `70-84`: confidence is downgraded at least once; Opportunity, Evidence,
+  Conflict, Risk and Rule Validation determine Plan Mode;
+- `<70`: `CONFIRMATION` is forbidden, but the complete chain may produce
+  `PREPARATION`, `REDUCED`, `OBSERVATION` or `BLOCKED`. `REDUCED` is legal only
+  when its key source and safety gates are complete; low quality is not a
+  mechanical global pause;
+- `STALE` or `SOURCE_UNAVAILABLE`: the response names affected sources and
+  modules plus the exact revalidation condition.
+
+Three AI is normally called only at quality >=85 plus material change, except
+the fail-closed/degraded paths explicitly permitted above. All thresholds are
+configuration. Missing configuration fails closed.
 
 Timeframe responsibilities are separate: 4h direction, 1h structure, 15m
 trigger, 5m microstructure/liquidity filter. Weights and convergence threshold
@@ -147,12 +204,20 @@ owner/user, asset or symbol, and timeframe. Every transition records
 `opportunityId`, `analysisId`, timeframe, from/to state, reason, trigger source,
 rule version, timestamp and trace ID.
 
-The minimum flow is:
+The minimum flow and output timing are:
 
 - observing -> candidate when configured promotion criteria pass;
+- candidate provides opportunity analysis and non-directional `OBSERVATION`;
+  it may not produce an untriggered `CONFIRMATION`;
 - candidate -> waiting_trigger when direction exists but trigger is pending;
+- waiting_trigger may run GPT Candidate -> Gemini -> Grok -> Resolver -> Rule
+  Validation and persist a Final `PREPARATION`; `PREPARATION` is not `NO_PLAN`;
 - waiting_trigger -> triggered when trigger, quality, risk, execution
   feasibility and confused checks pass;
+- triggered revalidates the existing Final `PREPARATION` and may produce
+  `CONFIRMATION`, `REDUCED`, `PREPARATION`, `OBSERVATION`, `BLOCKED` or an
+  invalidated lifecycle result; it does not start the first Candidate merely
+  because the trigger fired;
 - triggered -> high_risk when risk rises without complete invalidation;
 - any planned state -> invalidated on a formal invalidation condition;
 - invalidated/high_risk -> cooling;
@@ -178,6 +243,11 @@ AITrace and rule fallback, never a successful Candidate.
 Gemini_REVIEW reviews the Candidate only and returns `approve`, `downgrade`,
 `reject_candidate` or `risk_warning`. Grok_CHALLENGE supplies adversarial
 failure paths and risk only. Neither may generate a plan or mutate state.
+
+In `ANALYSIS_PREVIEW`, the same role identities operate under the reduced
+authority in Section 3.3 and cannot emit Candidate or Final semantics. In
+`OPPORTUNITY_DECISION`, the frozen Candidate/Review/Challenge permissions
+apply. The mode is persisted and queryable; UI labels never infer it.
 
 Calls use configurable cache, quota, concurrency, token budget and timeout.
 Success, failure, timeout, missing provider, fallback and cache hit all create
@@ -296,16 +366,32 @@ Final contains:
 - analysis/trigger timeframes, valid-from/until and holding horizon;
 - validation, veto, downgrade, data-quality and source status.
 
+Plan lifecycle is independent from Plan Mode and is exactly `CURRENT`,
+`NEEDS_REVALIDATION`, `SUPERSEDED`, `TRACKING_STOPPED`, `INVALIDATED` or
+`EXPIRED`. A new Final never silently overwrites an old Final. Versions and
+supersession links remain queryable.
+
 Candidate and Final have distinct objects, storage and identifiers. Final
 references Candidate and Analysis. No API exposes an unvalidated Candidate as
 Final.
 
-## 12. Push Recheck and Validity
+## 12. Push Recheck, Plan Revalidation and Hot Reset
 
-Push/Recheck is a reminder and revalidation result, never trading
-authorization. It records snapshot, recheck state, reason, current plan
-validity and `notTradeInstruction=true`. It cannot open, close, add, reduce,
-reverse or order.
+Push Recheck is owned by a `PushSnapshot`, starts when the user opens a
+message, and preserves the original snapshot beside the current result. It is
+a reminder/recheck result, never trading authorization, and always carries
+`notTradeInstruction=true`.
+
+Plan Revalidation is owned by `planId` and is triggered by exactly
+`HOT_RESET`, `EVENT_WINDOW`, `DATA_REFRESH`, `EVIDENCE_CHANGED` or
+`MANUAL_REVALIDATION`. It records `triggerType`, source plan/version and result
+plan/version. Push Recheck and Plan Revalidation are distinct identities and
+must never share a generic record as their owner.
+
+Hot Reset scope is exactly `GLOBAL`, `MARKET`, `ASSET` or
+`PROVIDER_DEPENDENCY`. It affects only its scope, never freezes every asset by
+default, and does not stop Position Monitoring; affected positions receive
+higher monitoring priority.
 
 ## 13. UserPosition and Position Monitoring
 
@@ -320,11 +406,22 @@ are independent. Only VERIFIED + FRESH results enter Home success state;
 Pending, Stale and Invalid fail closed without fake values. Closed positions
 leave Home and enter history/Review.
 
+Only `CONFIRMATION` and `REDUCED` Finals expose a plan-linked `record actual
+position` action. Plan values may prefill the form, but actual entry price,
+quantity, leverage, actual stop/target and time require user confirmation.
+Submission creates `SYSTEM_PLAN_POSITION`. An unplanned position is explicitly
+`MANUAL_INDEPENDENT`. A UserPosition keeps the `finalPlanId` used at opening;
+newer Finals are compared separately and never replace its monitoring
+baseline.
+
 ## 14. Review and Rule Iteration
 
 Review covers executed valid/invalid, missed valid/invalid,
-pushed-not-filled, blocked-by-risk and user-deviation outcomes. The mandatory
-chain is:
+pushed-not-filled, blocked-by-risk and user-deviation outcomes. Missed review
+separates `missedReason` (`NOT_TRIGGERED`, `BLOCKED_BY_SYSTEM`,
+`PUSHED_NOT_FILLED`, `USER_SKIPPED`) from `laterOutcome` (`VALID`, `INVALID`,
+`INCONCLUSIVE`). At-time evidence and later results are independent. The
+mandatory chain is:
 
 `input snapshot -> evidence/scores/decision -> GPT input hash/Candidate -> Gemini -> Grok -> Resolver before/after -> Rule Validation/veto -> Final -> Push/Recheck -> UserPosition/Monitoring -> Outcome/Review/Rule feedback`.
 
@@ -335,7 +432,7 @@ conclusion rate (target 0), fabricated-fill rate (target 0), confidence
 calibration, false positive/negative, Plan Mode effectiveness, downgrade
 effectiveness, failure-path hit rate and missed-opportunity quality.
 
-## 15. Home and Interaction Freeze
+## 15. Page, Interaction and Runtime Freeze
 
 Home order is system status, alert/event, dynamic Top6, Position Monitoring
 (about 70%) plus Final Execution Plan (about 30%), then single Three-AI
@@ -350,6 +447,70 @@ reason and recovery condition. Three-AI is one workspace with three tabs and
 one active role. Asset Pool lists all assets and supports search/add/remove/
 restore/batch scan; preview precedes add and never creates persistent
 opportunity.
+
+### 15.1 State scopes and action glossary
+
+State scopes are System, Macro/BTC environment, AnalysisRun, Opportunity,
+Final Plan, UserPosition and Message/PushSnapshot. The global header label is
+`Macro/BTC Environment` (Chinese: `大盘环境` or `BTC / 宏观环境`), never an
+asset-level `finalMarketBias`.
+
+Actions have one meaning each: Pool Scan, On-demand Analysis, Re-analysis,
+Plan Revalidation, Push Recheck, Manual Review, Refresh Page Data, Retry,
+Record Actual Position and Record Close. Labels, APIs and audit records may
+not cross-map these actions.
+
+### 15.2 Message and Telegram
+
+One persisted Message is the sole business fact source for in-app read state,
+dedupe, cooldown, expiry, current Recheck and channel-delivery status.
+Telegram is a delivery channel, not a second message owner. Only these
+high-value categories are eligible:
+
+1. an Opportunity reaches `CONFIRMATION` or configured high-quality `REDUCED`;
+2. major Opportunity/plan safety change: Confused, liquidity trap, scoped Hot
+   Reset impact, invalidation, veto, drift, expiry or execution pause;
+3. major active-position logic/risk change: entry logic weakened/invalidated,
+   strong reversal, HIGH/EXTREME, material riskTrend increase, or proximity to
+   the actual stop/target.
+
+Ordinary price movement, minor confidence changes, ordinary `OBSERVATION`,
+Preview, non-Final Candidate and duplicate noise are forbidden notifications.
+
+### 15.3 Account risk and asynchronous work
+
+Account-risk coverage is exactly `COMPLETE`, `PARTIAL` or `UNKNOWN`. If only
+recorded positions are included, the UI explicitly displays that coverage.
+
+Pool Scan, Preview, Re-analysis, Three AI, Plan Revalidation and Hot Reset
+recalculation use one async-task contract: `taskId`, `taskType`, `targetId`,
+`state` (`QUEUED`, `RUNNING`, `PARTIAL`, `SUCCEEDED`, `FAILED`, `CANCELLED`),
+`stage`, `failureReason` and `retryAllowed`. Fake percentages are forbidden.
+
+### 15.4 Frozen routed surfaces
+
+The Desktop product has exactly fourteen routed responsibilities:
+
+1. `/login` Login / Session Recovery;
+2. `/dashboard?asset={symbol}` Home Dashboard;
+3. `/asset-pool` Asset Pool;
+4. `/positions` Position Center;
+5. `/positions/{positionId}` Position Detail;
+6. `/reviews` Review Center;
+7. `/reviews/{reviewId}` Review Detail;
+8. `/analysis` and `/analysis/{analysisId}` AI Analysis Preview/Decision;
+9. `/messages` Message Center;
+10. `/recheck/{pushSnapshotId}` Push Recheck;
+11. `/plans/{planId}` Final Plan Detail;
+12. `/calendar` Event Calendar;
+13. `/audit/{traceId}` Full Audit Chain;
+14. `/me` My / Settings.
+
+Eleven shared overlays are frozen: Status/Recovery Drawer, Quick Asset Search,
+Pool Asset Detail, Pool Batch Management, FinalPlanDetail Drawer, Actual
+Position Modal, Close Position Modal, Audit Detail Drawer, Async Task Center,
+Telegram Binding/Test and Event Detail. Their exact state inventory, data
+owners and tests are in the normative page matrix annex.
 
 ## 16. Canonical Object Ownership and Persistence
 
@@ -373,6 +534,14 @@ Minimum identifiers and relations:
 - Monitor: position/analysis/mark source/time/logic/reversal/risk/trend/reason/conclusion/action/trust/time;
 - Review: review/analysis/plan/position/opportunity/outcome/deviation/AI-rule assessment/feedback/time.
 
+Required extensions are `analysisMode`, `planLifecycleState`,
+`revalidationTriggerType`, Home primary/secondary timeframe aggregation,
+`timeframeConflictState`, Message channel status, account-risk coverage,
+async-task state and Review `missedReason`/`laterOutcome`. New ownership is
+legal only for genuinely independent Plan Revalidation, channel-delivery or
+cross-domain AsyncTask records; it may not create a second Plan, Message,
+Analysis, Opportunity, Position, Monitoring, Review, Home or Asset Pool stack.
+
 Query-critical ID/state/enum/time/version/source/ranking fields are normalized.
 Snapshots and raw structured content may use versioned JSON with traceable IDs.
 AnalysisRun is the chain anchor. Critical writes use transactions or explicit
@@ -384,9 +553,10 @@ Responses use `code`, `msg`, `requestId`, `serverTime`, `data`; ISO-8601 zoned
 time; `[]` for empty arrays; fixed enums; idempotent writes; analysis/rule/trace
 metadata.
 
-Required API groups cover Pool, Opportunity/Top6/state history, on-demand
+Required API groups cover Session, Pool, Opportunity/Top6/state history, on-demand
 Analysis Preview, Three-AI/Trace, Candidate/Resolver/Validation/Final,
-Position/Monitoring, Push/Recheck and Review.
+Position/Monitoring, Message/channel delivery, Push/Recheck, Plan
+Revalidation, Event Calendar, Review, Audit and My/Settings.
 
 Home Top6 has Opportunity/ranking lineage. Execution Plan returns Final or an
 explicit non-Final state. Three-AI fields never fallback across roles or
@@ -427,6 +597,11 @@ The final regression includes:
   closed removal;
 - executed/missed/blocked review and full AI/rule/user responsibility chain;
 - Push Recheck non-authorization;
+- all 14 routes, 11 overlays, 70 route states and 81 Desktop acceptance frames;
+- selected-asset URL persistence and no auto-switch after ranking changes;
+- separate Push Recheck and Plan Revalidation ownership;
+- Message sole ownership plus exact Telegram filtering;
+- account-risk coverage and async task state without fake percentage;
 - zero automatic trading capability.
 
 Implementation is followed by one unified independent capability audit and
@@ -441,6 +616,10 @@ owners. Add an owner only for a genuinely independent semantic object. Do not
 create a second stack. Fixed opportunity sources, generic one-field AI output,
 AI-direct Final, Candidate-as-plan and semantic fallback must leave production
 paths. Existing code is not deleted without dead-code evidence.
+
+The previous v4.1 authorization and ownership documents remain
+`HISTORICAL_REFERENCE_ONLY / SUPERSEDED`. They are not active Product Sources
+and cannot authorize or narrow this unified interaction implementation.
 
 ## Appendix A. Market Bias x Plan Mode
 
@@ -462,9 +641,9 @@ Common legal combinations (not mechanical defaults):
 | State | Allowed | Forbidden |
 |---|---|---|
 | observing | observation summary | directional plan |
-| candidate | candidate opportunity and AI explanation | untriggered confirmation plan |
-| waiting_trigger | PREPARATION plus trigger/recovery condition | fake triggered state |
-| triggered | Candidate generation and Final validation | bypass Resolver/Validation |
+| candidate | opportunity analysis plus non-directional OBSERVATION | Candidate/Final CONFIRMATION before trigger readiness |
+| waiting_trigger | Candidate -> reviews -> resolver -> validation -> Final PREPARATION | fake triggered state or PREPARATION-as-NO_PLAN |
+| triggered | Plan Revalidation of existing PREPARATION into a validated current outcome | first-time Candidate shortcut or bypass Resolver/Validation |
 | high_risk | warning plus REDUCED/OBSERVATION/BLOCKED | normal high-intensity participation |
 | invalidated | invalidation reason and Review | retaining old valid plan |
 | cooling | cooling reason and remaining time | candidate/waiting/triggered |
@@ -491,5 +670,52 @@ Score, Rule or source. `notTradeInstruction=true` is mandatory on advice.
 - [ ] Final plan and manual UserPosition remain separate.
 - [ ] Position Monitoring trust/semantic contract is unchanged and fail closed.
 - [ ] Push Recheck is not trading authorization.
+- [ ] Push Recheck and Plan Revalidation are separate records and triggers.
+- [ ] Fourteen routes, eleven overlays, fifty-four component families and
+      eighty-one Desktop acceptance frames match the normative page matrix.
+- [ ] Selected asset, plan lifecycle/version, Message ownership, Telegram
+      filtering, account-risk coverage and async-task fail-closed rules hold.
 - [ ] Review attributes GPT, Gemini, Grok, Resolver, Rule and user actions.
 - [ ] Automatic open/close/add/reduce/reverse/order capability count is zero.
+
+## Appendix E. Component Families and Desktop Acceptance Inventory
+
+The fifty-four frozen component families are grouped as follows:
+
+- Global (10): `AppShell`, `SideNav`, `PageHeader`, `SystemStatusBar`,
+  `StateBadge`, `EmptyState`, `AsyncTaskIndicator`, `Drawer`, `Modal`,
+  `AuditMetaDisclosure`;
+- Asset/Opportunity (9): `AssetSearch`, `SearchResultItem`,
+  `AssetPoolToolbar`, `AssetPoolTable`, `PoolScanStatus`, `OpportunityGrid`,
+  `OpportunityCard`, `MultiTimeframeSummary`, `DataQualityGate`;
+- Plan (8): `PlanSummaryCard`, `PlanModeHeader`, `PlanLifecycleBadge`,
+  `EntryTriggerSection`, `InvalidationStopSection`, `TargetTrendSection`,
+  `RiskLimitSection`, `FinalPlanDetail`;
+- AI (8): `AnalysisModeBanner`, `AIWorkspace`, `AIRoleTabs`, `EvidenceList`,
+  `MultiTimeframeMatrix`, `BeforeAfterDiff`, `FailurePathList`,
+  `ConflictSummary`;
+- Position/Review (8): `PositionRiskAggregate`, `PositionCard`,
+  `PositionActualForm`, `PlanActualComparison`, `MonitorTimeline`, `ReviewCard`,
+  `AtTimeLaterCompare`, `ResponsibilityChain`;
+- Message/Recheck (5): `MessageListItem`, `ChannelDeliveryStatus`,
+  `OriginalSnapshotCard`, `RecheckResultHero`, `RecheckActionBar`;
+- Event/Settings/Audit (6): `EventCalendar`, `EventWindowBadge`,
+  `TelegramBindingPanel`, `RiskPreferenceForm`, `ProviderStatusPanel`,
+  `AuditChainStepper`.
+
+Desktop acceptance consists of 70 routed states plus 11 overlay states, for 81
+named frames. Route-state counts are R01 3, R02 8, R03 5, R04 4, R05 5, R06
+3, R07 4, R08 6, R09 4, R10 10, R11 7, R12 4, R13 3 and R14 4. Mobile has
+sixteen reserved adaptation scenarios only and is outside the current
+implementation authorization.
+
+## Appendix F. Prototype and End-to-End Flows
+
+The frozen flows are: first use/session recovery; daily dynamic-opportunity
+review; Preview then explicit Pool add; Final Plan then manual UserPosition;
+Message then Push Recheck; scoped abnormal recovery; and manual close then
+Review. Acceptance scenarios cover a ten-asset Pool with changing Top6,
+multi-timeframe conflict, both analysis modes, waiting-trigger Preparation,
+triggered revalidation, all five Plan Modes, Pool removal with continuing
+position monitoring, three high-value message categories with dedupe, seven
+Recheck result classes, Hot Reset/Confused recovery and close-to-review.
