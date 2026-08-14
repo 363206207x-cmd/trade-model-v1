@@ -1,5 +1,12 @@
 # Fundamental AI v4.1 Decision Chain Implementation Authorization
 
+Status: `HISTORICAL_REFERENCE_ONLY / SUPERSEDED`
+
+Superseded on `2026-08-14` by
+`docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md`.
+This document records the already-delivered backend authorization and is not
+an ACTIVE Product Source or current implementation permission.
+
 AUTHORIZATION_STATUS: `AUTHORIZED_PENDING_MERGED_MAIN`
 
 AUTHORIZED_PACKAGE: `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`

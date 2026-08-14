@@ -290,7 +290,11 @@ require_file "docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md"
 require_file "docs/P2_POSITION_MONITORING_AUTHORIZATION_VALIDATION.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_OBJECT_OWNERSHIP_MAP.md"
-require_file "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION_VALIDATION.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION_VALIDATION.md"
 require_file "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 require_contains "docs/P1A_HOME_ALIGNMENT_AUDIT.md" "P1A_COMPLETION_STATUS: COMPLETED"
 require_contains "docs/P1B_AUTHORIZATION_SCOPE.md" "HOME_READ_PROJECTION_ONLY"
@@ -300,10 +304,11 @@ require_contains "docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md" "Four-Field Secondar
 require_contains "docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md" "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION"
 require_contains "docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md" "automatic open, close"
 require_contains "scripts/v1-state.sh" "P2_POSITION_MONITORING_AUTHORIZATION_STATUS"
-require_contains "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md" "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
-require_contains "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md" "automatic open, close"
-require_contains "docs/FUNDAMENTAL_AI_V4_1_OBJECT_OWNERSHIP_MAP.md" "Duplicate-Skeleton Decision"
-require_contains "scripts/v1-state.sh" "V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md" "HISTORICAL_REFERENCE_ONLY / SUPERSEDED"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md" "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md" "automatically open, close"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
+require_contains "scripts/v1-state.sh" "V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS"
 require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
@@ -360,9 +365,9 @@ p2_matrix_status="$(matrix_field "Product P2" 5)"
 p2_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p2_position_monitoring_authorization_status)"
 p2_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml p2_position_monitoring_implementation_status)"
 v4_1_matrix_authorization="$(matrix_field "Product v4.1" 5)"
-v4_1_design_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_decision_chain_design_status)"
-v4_1_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_decision_chain_authorization_status)"
-v4_1_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_decision_chain_implementation_status)"
+v4_1_design_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_design_status)"
+v4_1_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_authorization_status)"
+v4_1_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_implementation_status)"
 current_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_phase)"
 current_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_mode)"
 current_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_status)"
@@ -404,27 +409,27 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$v4_1_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "v4.1 authorization must remain pending merged-main effectivity"
 [[ "$v4_1_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "v4.1 Decision Chain authorization declaration mismatch"
+[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "v4.1 Final Interaction authorization declaration mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]] || fail "authorized next package phase mismatch"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
 [[ "$authorized_next_package_pr" == "true" ]] || fail "authorized v4.1 PR creation must be true"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V4_1_DECISION_CHAIN_BACKEND_ONLY" ]] || fail "v4.1 scope must remain V4_1_DECISION_CHAIN_BACKEND_ONLY"
+[[ "$p1b_scope" == "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]] || fail "v4.1 scope must remain V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
-  V4_1_PRODUCT_DESIGN_FROZEN \
-  V4_1_DECISION_CHAIN_SCOPE_APPROVED \
-  V4_1_DECISION_CHAIN_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
+  UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE \
+  FINAL_INTERACTION_SPEC_FROZEN \
+  FINAL_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   LOCAL_ORIGIN_MAIN_MATCH \
   PRODUCT_SOURCE_GATE_PASS \
   CLEAN_WORKTREE \
-  NO_ACTIVE_CONFLICTING_PR; do
+  NO_ACTIVE_CONFLICTING_PR_EXCEPT_EXACT_AUTHORIZED_SUCCESSOR; do
   printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
     || fail "missing v4.1 authorization transition condition: $transition_condition"
 done
@@ -468,13 +473,13 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_DECISION_CHAIN_AUTHORIZATION_REVIEW" \
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_REVIEW" \
   || fail "authorization remediation stage mismatch"
 printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_DECISION_CHAIN_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "ready authorization did not resolve final merge path"
 
 assert_handoff_blocked predecessor_incomplete BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN
@@ -487,9 +492,9 @@ for v4_1_expected in \
   "CURRENT_PACKAGE: $current_package_phase" \
   "REQUESTED_PACKAGE: $authorized_next_package_phase" \
   "AUTHORIZATION_STATUS: APPROVED" \
-  "V4_1_DECISION_CHAIN_DESIGN_STATUS: FROZEN" \
-  "V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
-  "V4_1_DECISION_CHAIN_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "V4_1_FINAL_INTERACTION_DESIGN_STATUS: FROZEN" \
+  "V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "RESOLVED_PACKAGE: $authorized_next_package_phase" \
   "RESOLVED_MODE: IMPLEMENTATION" \
   "RESOLVED_EDIT_PERMISSION: true" \
@@ -503,7 +508,7 @@ done
 assert_handoff_blocked v4_1_unauthorized BLOCKED_V4_1_SCOPE_NOT_AUTHORIZED
 assert_handoff_blocked v4_1_permission_missing BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
-  --request-package FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION_WRONG
+  --request-package FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION_WRONG
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package FUNDAMENTAL_AI_V4_1_AUTO_TRADING
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -585,7 +590,7 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_DECISION_CHAIN_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "authorization final gate stage mismatch"
 assert_chain_blocked V4_1_DESIGN_NOT_FROZEN predecessor_incomplete BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN \
   --request-package "$authorized_next_package_phase"

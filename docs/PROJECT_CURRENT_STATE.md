@@ -8,41 +8,46 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Decision Chain Authorization
-Product Phase Status: PRODUCT_DESIGN_FROZEN_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register and merge the bounded Fundamental AI v4.1 Decision Chain implementation authorization; no business implementation is included
-Next Business Phase: FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after authorization is independently reviewed, merged, and validated on clean/synced main
+Product Phase: Fundamental AI v4.1 Final Interaction Authorization
+Product Phase Status: FINAL_INTERACTION_FROZEN_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Reconcile the sole v4.1 Product Source, register PR #1179 reuse and ownership, and merge the exact final-interaction implementation authorization; no business implementation is included
+Next Business Phase: FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION
+Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## Fundamental AI v4.1 Decision Chain Authorization Candidate
+## Fundamental AI v4.1 Final Interaction Authorization Candidate
 
-The Product Owner has frozen the v4.1 decision-chain source represented by
-`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` and explicitly
-authorized one successor package:
-`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION`.
+The Product Owner has frozen the 2026-08-14 final interaction source. Its
+fourteen routes, eleven overlays, fifty-four component families, seventy route
+states, eleven overlay states and eighteen disambiguation contracts are merged
+into the existing canonical path
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. That file is the
+sole ACTIVE/AUTHORITATIVE v4.1 Product Source; companion matrices are normative
+annexes, not competing sources.
 
-This candidate records only product source, AI authority, canonical object
-ownership, delivery authorization, and fail-closed machine state. It contains
-no application code, API, schema, migration, business test, Figma, or Mobile
-change. Before merged-main effectivity, implementation and successor PR
-creation remain false. After exact-source review, merge, clean/synced main
-validation, Product Source Gate PASS, and no active conflicting PR, only the
-exact named successor may resolve those permissions to true.
+The earlier backend decision-chain implementation is effective on merged main
+through PR #1177. Its old authorization is historical and superseded for
+current task selection. PR #1179 remains `OPEN / DRAFT / UNMERGED` at audited
+Head `198fc0ff545240a1b89dbbbfb1a3e642648d4f45` and is registered as
+`REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE`.
 
-The v4.1 package reuses existing AnalysisRun, EvidenceItem, ScoreItem,
-DecisionBundle, ExecutionPlan, UserPosition, PositionMonitorLog, Review,
-AiCallLog, AssetState/OpportunityLog, and AI conflict-resolver ownership. It
-does not authorize duplicate object families. It preserves manual
-UserPosition, rule-layer Final confirmation, Candidate/Final separation, and
-the permanent no-automatic-trading boundary.
+This candidate authorizes exactly
+`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION` after
+merged-main validation. It permits reuse and bounded extension of canonical
+frontend, API, schema and runtime ownership required by the frozen Desktop
+contract. It forbids Figma changes, Mobile implementation, duplicate business
+stacks, fake data, AI rule bypass and every automatic trading or position
+mutation capability.
 
-Product P2 remains `FUNCTIONAL_UNVALIDATED`, and full Product P3 remains
-`NOT_STARTED`. This version-scoped backend authorization does not claim either
-phase complete and does not authorize Mobile, Figma, or a P3 UI package.
+The authorization diff contains only Product Source, contract, ownership,
+reuse, state, gate and validation documentation/scripts. Before merged-main
+effectivity, implementation and successor PR creation remain false. After
+clean/synced merged-main effectivity, the exact successor may resolve both to
+true while PR #1179 is recognized as that authorized successor rather than an
+unrelated conflict.
 
 ---
 

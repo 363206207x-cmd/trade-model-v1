@@ -47,12 +47,14 @@ emit_resolved_task_state() {
   printf 'CURRENT_PACKAGE_BLOCK_REASON: %s\n' "${current_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'CURRENT_EFFECTIVE_STATUS: %s\n' "${completion_effective_state:-UNKNOWN}"
   printf 'AUTHORIZED_NEXT_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
+  printf 'AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
   printf 'AUTHORIZED_NEXT_TASK_MODE: %s\n' "${authorized_next_package_mode:-UNDECLARED}"
   printf 'NEXT_PACKAGE_ALLOWED: %s\n' "${next_package_allowed:-NO}"
   printf 'NEXT_PACKAGE_BLOCK_REASON: %s\n' "${next_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'OPEN_PR_EVIDENCE_SOURCE: %s\n' "${open_pr_evidence_source:-UNAVAILABLE}"
   printf 'OPEN_PR_NONE_CONFIRMED: %s\n' "${open_pr_none_confirmed:-NO}"
   printf 'ACTIVE_CONFLICTING_PRS: %s\n' "${active_conflicting_pr_count:-UNKNOWN}"
+  printf 'AUTHORIZED_SUCCESSOR_PRS: %s\n' "${authorized_successor_pr_count:-UNKNOWN}"
   printf 'REQUEST_CLASS: %s\n' "${request_class:-UNKNOWN}"
   printf 'REPOSITORY_EDITS_ALLOWED: %s\n' "${resolved_edit_permission:-false}"
   printf 'IMPLEMENTATION_ALLOWED: %s\n' "${resolved_implementation_permission:-false}"
@@ -70,6 +72,9 @@ emit_resolved_task_state() {
   printf 'V4_1_DECISION_CHAIN_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
   printf 'V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_DECISION_CHAIN_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
+  printf 'V4_1_FINAL_INTERACTION_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
+  printf 'V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -197,8 +202,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
       resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_REVIEW"
-    elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]]; then
-      resolved_handoff_stage="V4_1_DECISION_CHAIN_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -210,8 +215,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="P1B_HOME_CORE_DATA_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
         resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_FINAL_MERGE_PATH"
-      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]]; then
-        resolved_handoff_stage="V4_1_DECISION_CHAIN_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -258,8 +263,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="P1B_HOME_CORE_DATA_IMPLEMENTATION"
   elif [[ "$authorized_next_package_phase" == "P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION" ]]; then
     resolved_handoff_stage="P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION"
-  elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION" ]]; then
-    resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
+  elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
+    resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -577,7 +582,7 @@ evaluate_p2_position_monitoring_transition() {
   p2_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
-evaluate_v4_1_decision_chain_transition() {
+evaluate_v4_1_final_interaction_transition() {
   local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
   local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
   local merged_main_validation_status="$9" repository_edits_allowed="${10}"
@@ -592,9 +597,9 @@ evaluate_v4_1_decision_chain_transition() {
   next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
   v4_1_authorization_runtime_status="BLOCKED"
 
-  [[ "$current_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]] || return 0
+  [[ "$current_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]] || return 0
   [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
-  [[ "$next_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION" ]] || return 0
+  [[ "$next_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]] || return 0
   [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
 
   if [[ "$design_status" != "FROZEN" ]]; then
@@ -641,9 +646,9 @@ evaluate_v4_1_decision_chain_transition() {
 }
 
 evaluate_runtime_transition() {
-  if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" \
-    && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION" ]]; then
-    evaluate_v4_1_decision_chain_transition \
+  if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
+    evaluate_v4_1_final_interaction_transition \
       "$current_package_phase" \
       "$current_package_status" \
       "$current_task_mode" \
@@ -983,9 +988,9 @@ load_task_package_contract() {
   product_p1b_declared_status="$(yaml_value "$TASK_FILE" product_p1b_status)"
   p2_authorization_declared_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_authorization_status)"
   p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_implementation_status)"
-  v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_design_status)"
-  v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_authorization_status)"
-  v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_implementation_status)"
+  v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_design_status)"
+  v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_authorization_status)"
+  v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_implementation_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -1030,7 +1035,7 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
         v4_1_design_status="IN_REVIEW"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
         product_p1b_declared_status="IN_PROGRESS"
@@ -1119,7 +1124,7 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
         v4_1_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="V4_1_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
@@ -1361,9 +1366,9 @@ home_core_data_implementation_status="$(yaml_value "$TASK_FILE" p1b_home_core_da
 product_p1b_declared_status="$(yaml_value "$TASK_FILE" product_p1b_status)"
 p2_authorization_declared_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_authorization_status)"
 p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_implementation_status)"
-v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_design_status)"
-v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_authorization_status)"
-v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_decision_chain_implementation_status)"
+v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_design_status)"
+v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_authorization_status)"
+v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_implementation_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1437,16 +1442,16 @@ if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; the
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
-if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
   if [[ "$current_package_status" != "COMPLETED" \
     || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
-    || "$authorized_next_package_phase" != "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION" \
+    || "$authorized_next_package_phase" != "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" \
     || "$authorized_next_package_mode" != "IMPLEMENTATION" \
     || "$v4_1_design_status" != "FROZEN" \
     || "$product_v4_1_matrix_authorization" != "AUTHORIZED_TO_IMPLEMENT" \
     || "$v4_1_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
     || "$v4_1_implementation_status" != "NOT_STARTED" \
-    || "$p1b_scope" != "V4_1_DECISION_CHAIN_BACKEND_ONLY" ]]; then
+    || "$p1b_scope" != "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
@@ -1553,9 +1558,11 @@ open_prs="none"
 current_package_pr="none"
 unrelated_open_prs="none"
 active_conflicting_open_prs="none"
+authorized_successor_prs="none"
 current_package_pr_count="0"
 current_package_pr_draft="NONE"
 active_conflicting_pr_count="0"
+authorized_successor_pr_count="0"
 block_next_business_phase_only="NO"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   open_pr_check_source="gh CLI"
@@ -1591,6 +1598,7 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     current_package_pr_lines=()
     unrelated_open_pr_lines=()
     active_conflicting_open_pr_lines=()
+    authorized_successor_pr_lines=()
     while IFS=$'\t' read -r pr_number pr_head pr_oid pr_title pr_draft; do
       [[ -z "${pr_number:-}" ]] && continue
       ((open_pr_count+=1))
@@ -1600,6 +1608,9 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
         current_package_pr_lines+=("$pr_line")
         ((current_package_pr_count+=1))
         current_package_pr_draft="$pr_draft"
+      elif [[ "$pr_head" == "$authorized_next_package_branch" ]]; then
+        authorized_successor_pr_lines+=("$pr_line status=AUTHORIZED_SUCCESSOR_PR")
+        ((authorized_successor_pr_count+=1))
       else
         unrelated_open_pr_lines+=("$pr_line")
         block_next_business_phase_only="YES"
@@ -1617,6 +1628,9 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     fi
     if (( ${#active_conflicting_open_pr_lines[@]} > 0 )); then
       active_conflicting_open_prs="$(printf '%s\n' "${active_conflicting_open_pr_lines[@]}")"
+    fi
+    if (( ${#authorized_successor_pr_lines[@]} > 0 )); then
+      authorized_successor_prs="$(printf '%s\n' "${authorized_successor_pr_lines[@]}")"
     fi
   fi
 else
@@ -1729,6 +1743,7 @@ printf 'CURRENT_PACKAGE_PR: %s\n' "$current_package_pr"
 printf 'CURRENT_PACKAGE_PR_DRAFT: %s\n' "$current_package_pr_draft"
 printf 'UNRELATED_OPEN_PRS: %s\n' "$unrelated_open_prs"
 printf 'ACTIVE_CONFLICTING_OPEN_PRS: %s\n' "$active_conflicting_open_prs"
+printf 'AUTHORIZED_SUCCESSOR_PRS: %s\n' "$authorized_successor_prs"
 printf 'CLOSED_TECHNICAL_DEBT_PR: %s\n' "${closed_technical_debt_pr:-UNDECLARED}"
 printf 'CLOSED_TECHNICAL_DEBT_STATUS: %s\n' "${closed_technical_debt_status:-UNDECLARED}"
 printf 'CLOSED_TECHNICAL_DEBT_MERGED_STATUS: %s\n' "${closed_technical_debt_merged_status:-UNDECLARED}"
