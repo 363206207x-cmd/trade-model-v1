@@ -1,5 +1,49 @@
 # Fundamental AI v4.1 Scenario Validation Report
 
+Current OneShot status: `33/33 CONTRACT SCENARIOS MAPPED`; target-provider
+evidence remains explicitly separate from controlled runtime evidence.
+
+## Final Interaction Required Scenarios
+
+| # | Scenario | Evidence owner | Result |
+|---:|---|---|---|
+| 1 | First use / empty Pool | Asset Pool empty state + route QA | PASS |
+| 2 | Top-up defaults and first scan | Pool service/controller + async state | PASS |
+| 3 | Pool over 10 assets | persistent Pool tests | PASS |
+| 4 | Dynamic Top6 six assets | ranking/Home tests | PASS |
+| 5 | Dynamic Top6 fewer than six | ranking/Home fail-closed tests | PASS |
+| 6 | Same-asset multi-timeframe aggregation | ranking aggregation test | PASS |
+| 7 | Selected asset exits Top6 | URL/context contract test | PASS |
+| 8 | Preview asset not in Pool | Preview source-gate test | PASS |
+| 9 | Preview to explicit Pool add | controller/Pool tests | PASS |
+| 10 | waiting_trigger to Final PREPARATION | decision-chain tests | PASS |
+| 11 | triggered to Plan Revalidation | revalidation service tests | PASS |
+| 12 | Five Plan Modes | resolver/validator/frontend tests | PASS |
+| 13 | Six Plan lifecycle states | migration/mapper/UI contracts | PASS |
+| 14 | GPT Preview mode | structured role contract | PASS |
+| 15 | GPT Opportunity mode | orchestrator contract | PASS |
+| 16 | Gemini structured review | structured role contract | PASS |
+| 17 | Grok no-verifiable-failure-path | anti-hallucination contract | PASS |
+| 18 | AI partial/fallback/unavailable | orchestrator/UI fail-closed tests | PASS |
+| 19 | Valid Final to manual actual position | UserPosition boundary tests | PASS |
+| 20 | Manual independent position | UserPosition source tests | PASS |
+| 21 | Plan version changes, opening plan retained | lifecycle/position tests | PASS |
+| 22 | Position risk escalation | Position Monitoring tests | PASS |
+| 23 | Manual close to Review | position/review tests | PASS |
+| 24 | Missed opportunity at-time/later split | review tests + V13 columns | PASS |
+| 25 | Message Center and Telegram delivery | message/channel tests | PASS |
+| 26 | Push Recheck seven results | existing Push Recheck tests + route | PASS |
+| 27 | Hot Reset scoped revalidation | Hot Reset/revalidation tests | PASS |
+| 28 | Event-window revalidation | event/revalidation contract tests | PASS |
+| 29 | Account risk COMPLETE/PARTIAL/UNKNOWN | mapper/UI contract tests | PASS |
+| 30 | AsyncTask partial/failure/retry | async service tests | PASS |
+| 31 | Full Audit Chain partial/complete | audit query/route tests | PASS |
+| 32 | No fake data | source/UI/browser gates | PASS |
+| 33 | Automatic trading capability count | forbidden-capability scans | `0` |
+
+The PASS labels above are product-contract and controlled-runtime results. They
+do not convert local empty states into live provider evidence.
+
 ## Evidence Classes
 
 - `BROWSER_CONTROLLED`: deterministic current-code fixture, suitable for UI and state-contract evidence only.

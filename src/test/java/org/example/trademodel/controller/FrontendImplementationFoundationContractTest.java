@@ -95,7 +95,10 @@ class FrontendImplementationFoundationContractTest {
         assertThat(desktop)
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
-                .contains("data-desktop-unavailable-nav")
+                .contains(
+                        "href=\"/dashboard\"", "href=\"/positions\"",
+                        "href=\"/analysis\"", "href=\"/messages\"", "href=\"/me\"")
+                .doesNotContain("data-desktop-unavailable-nav")
                 .contains("function refreshAssetContext()")
                 .contains("fetchDashboardHome(true)");
     }

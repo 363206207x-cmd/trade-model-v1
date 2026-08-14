@@ -8,6 +8,8 @@ import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.RuleVersionLogDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.enums.ReviewTypeEnum;
+import org.example.trademodel.enums.ReviewMissedReasonEnum;
+import org.example.trademodel.enums.ReviewLaterOutcomeEnum;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
@@ -153,6 +155,8 @@ public class ReviewServiceImpl implements ReviewService {
         vo.setErrorType(row.getErrorType());
         vo.setActualOutcome(row.getActualOutcome());
         vo.setAdjustmentSuggestion(row.getAdjustmentSuggestion());
+        vo.setMissedReason(row.getMissedReason());
+        vo.setLaterOutcome(row.getLaterOutcome());
         vo.setCreateTime(row.getCreateTime());
         vo.setUpdateTime(row.getUpdateTime());
         return vo;
@@ -186,7 +190,9 @@ public class ReviewServiceImpl implements ReviewService {
                 trimToNull(req.getAiAssessment()),
                 trimToNull(req.getRuleAssessment()),
                 trimToNull(req.getRuleFeedback()),
-                ReviewMetricsContract.normalizeOrThrow(req.getMetricsJson()));
+                ReviewMetricsContract.normalizeOrThrow(req.getMetricsJson()),
+                enumValue(req.getMissedReason(), ReviewMissedReasonEnum.class, "missedReason"),
+                enumValue(req.getLaterOutcome(), ReviewLaterOutcomeEnum.class, "laterOutcome"));
     }
 
     private static ReviewResultDO newRow(String analysisId,
@@ -217,6 +223,8 @@ public class ReviewServiceImpl implements ReviewService {
         row.setRuleAssessment(content.ruleAssessment());
         row.setRuleFeedback(content.ruleFeedback());
         row.setMetricsJson(content.metricsJson());
+        row.setMissedReason(content.missedReason());
+        row.setLaterOutcome(content.laterOutcome());
         row.setContractVersion(V41_CONTRACT_VERSION);
         row.setUpdateTime(now);
     }
@@ -296,6 +304,16 @@ public class ReviewServiceImpl implements ReviewService {
         return s == null ? "NULL" : s;
     }
 
+    private static <E extends Enum<E>> String enumValue(String raw, Class<E> type, String field) {
+        String value = trimToNull(raw);
+        if (value == null) return null;
+        try {
+            return Enum.valueOf(type, value.toUpperCase(java.util.Locale.ROOT)).name();
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("unsupported " + field);
+        }
+    }
+
     private record ReviewContent(
             String errorType,
             String actualOutcome,
@@ -306,6 +324,8 @@ public class ReviewServiceImpl implements ReviewService {
             String aiAssessment,
             String ruleAssessment,
             String ruleFeedback,
-            String metricsJson) {
+            String metricsJson,
+            String missedReason,
+            String laterOutcome) {
     }
 }

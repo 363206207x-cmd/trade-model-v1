@@ -72,6 +72,7 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
         run.setOwnerId(request.getOwnerId());
         run.setAssetId(request.getAssetId());
         run.setPreview(request.isPreview());
+        run.setAnalysisMode(request.isPreview() ? "ANALYSIS_PREVIEW" : "OPPORTUNITY_DECISION");
         try {
             analysisRunMapper.insertStarted(run);
             return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.CLAIMED_NEW, run,

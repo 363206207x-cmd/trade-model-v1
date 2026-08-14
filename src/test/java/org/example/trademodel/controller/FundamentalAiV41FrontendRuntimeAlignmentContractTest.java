@@ -23,7 +23,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
     private static final Path HOME_SERVICE = Path.of(
             "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java");
     private static final Path LATEST_EVIDENCE = Path.of(
-            "docs/evidence/v4_1_execution_plan_semantics");
+            "docs/evidence/v4_1_final_interaction");
 
     @Test
     void desktopHomeKeepsTheFrozenModuleOrder() throws Exception {
@@ -39,7 +39,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 "id=\"homeConsistencyContent\"");
         assertThat(html)
                 .contains(
-                        "data-position-execution-ratio=\"70:30\"",
+                        "data-position-execution-ratio=\"60:40\"",
                         "class=\"latest-ai-grid\"",
                         "data-latest-approved-home",
                         "data-figma-contract=\"28:154 31:23 520:212 523:748 35:97\"")
@@ -105,7 +105,10 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                         "asset.marketBias",
                         "asset.opportunityState",
                         "asset.planMode",
-                        "priceTrusted")
+                        "asset.primaryTimeframe",
+                        "asset.primaryPlanMode",
+                        "asset.secondaryOpportunityCount",
+                        "asset.timeframeConflictState")
                 .doesNotContain("rankedAssetCandidates", "DEFAULT_SLOT");
     }
 
@@ -435,7 +438,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 "\"consoleErrors\": 0",
                 "\"consoleWarnings\": 0",
                 "\"visibleAiRoleCount\": 1",
-                "\"positionExecutionWidthRatio\": 2.3333",
+                "\"positionExecutionWidthRatio\": 1.5",
                 "\"candidateVisibleAsFinal\": false",
                 "\"visibleDisclaimerCopyCount\": 0",
                 "\"rawEnumPrimaryDisplayCount\": 0",

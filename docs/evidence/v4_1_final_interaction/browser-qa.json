@@ -1,0 +1,59 @@
+{
+  "status": "PASS",
+  "browserStatus": "PASS",
+  "canonicalFigmaFileKey": "rdMYmsAvZYkXHJX8hdl7UN",
+  "canonicalHomeNode": "573:20",
+  "runtimeUrl": "http://127.0.0.1:18080/dashboard",
+  "sourceHashes": {
+    "dashboardHtml": "1ad287ccd22a6bd53accd90f56e5079989f1397e735c0165aa7249d8dd09c125",
+    "dashboardLatestCss": "625c9fb07d051e595d56bd265bfab1ce5ec76bfc71d02ef21e7a1ce026ccba69",
+    "frontendContractJs": "dd02c4aaed2f05923fa47e258ddc41c8b6d679dda8bd4653c495ba5250ad4a5b",
+    "visualFixture": "7bb2bcf8fed2761c2d40ae7d79d2e0084010476332886842eb3b877afc7c7785"
+  },
+  "counts": {
+    "routedPages": 14,
+    "overlays": 11,
+    "componentFamilies": 54,
+    "desktopAcceptanceStates": 81,
+    "visibleAiRoleCount": 1,
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "topLevelOverlap": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "unhandledRejections": 0,
+    "staleAssetContentCount": 0,
+    "rawEnumPrimaryDisplayCount": 0,
+    "fakeRuntimeValueCount": 0,
+    "visibleDisclaimerCopyCount": 0
+  },
+  "home": {
+    "positionExecutionWidthRatio": 1.5,
+    "topSixColumns": 3,
+    "topSixRows": 2,
+    "candidateVisibleAsFinal": false,
+    "systemStatusUnchanged": true,
+    "alertsAndEventsUnchanged": true,
+    "positionsUnchanged": true
+  },
+  "viewports": [
+    {"width": 1280, "height": 800, "documentWidth": 1280, "horizontalOverflow": 0},
+    {"width": 1440, "height": 900, "documentWidth": 1440, "documentHeight": 1252, "horizontalOverflow": 0},
+    {"width": 1600, "height": 1000, "documentWidth": 1600, "horizontalOverflow": 0},
+    {"width": 1728, "height": 1117, "documentWidth": 1728, "horizontalOverflow": 0}
+  ],
+  "routeSweep": {
+    "routesChecked": 14,
+    "stableNavigation": true,
+    "whitelabelErrors": 0,
+    "horizontalOverflow": 0
+  },
+  "interactionChecks": {
+    "singleAiWorkspace": true,
+    "threeRoleTabs": true,
+    "oneVisibleRole": true,
+    "nativeDialogCount": 11,
+    "dialogFocusRestored": true,
+    "selectedAssetUrlPersistence": true
+  }
+}

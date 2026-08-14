@@ -15,6 +15,10 @@ public class UserConfigDO {
     private LocalDateTime scanManualOverrideUntil;
     private String scanUpdateReason;
     private LocalDateTime scanUpdatedAt;
+    private String telegramChatId;
+    private String telegramBindingStatus = "UNBOUND";
+    private String notificationFiltersJson;
+    private String defaultPoolMode = "SYSTEM_DEFAULT";
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
@@ -40,4 +44,12 @@ public class UserConfigDO {
     public void setScanUpdateReason(String scanUpdateReason) { this.scanUpdateReason = scanUpdateReason; }
     public LocalDateTime getScanUpdatedAt() { return scanUpdatedAt; }
     public void setScanUpdatedAt(LocalDateTime scanUpdatedAt) { this.scanUpdatedAt = scanUpdatedAt; }
+    public String getTelegramChatId() { return telegramChatId; }
+    public void setTelegramChatId(String value) { this.telegramChatId = value; }
+    public String getTelegramBindingStatus() { return telegramBindingStatus; }
+    public void setTelegramBindingStatus(String value) { this.telegramBindingStatus = value; }
+    public String getNotificationFiltersJson() { return notificationFiltersJson; }
+    public void setNotificationFiltersJson(String value) { this.notificationFiltersJson = value; }
+    public String getDefaultPoolMode() { return defaultPoolMode; }
+    public void setDefaultPoolMode(String value) { this.defaultPoolMode = value; }
 }

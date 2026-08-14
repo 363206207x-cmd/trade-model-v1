@@ -4645,14 +4645,14 @@
                     </span>
                 </div>
                 <nav class="product-navigation" aria-label="产品页面">
-                    <a href="/dashboard" class="product-nav-item active" aria-current="page" data-desktop-home-nav>首页</a>
-                    <a href="/dashboard/positions" class="product-nav-item">持仓</a>
-                    <a href="/dashboard?view=ai" class="product-nav-item" data-desktop-ai-nav>AI分析</a>
-                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">消息</button>
-                    <button type="button" class="product-nav-item" data-desktop-unavailable-nav aria-disabled="true">我的</button>
+                    <a href="/dashboard" class="product-nav-item active" aria-current="page">首页</a>
+                    <a href="/positions" class="product-nav-item">持仓</a>
+                    <a href="/analysis" class="product-nav-item">AI分析</a>
+                    <a href="/messages" class="product-nav-item">消息</a>
+                    <a href="/me" class="product-nav-item">我的</a>
                 </nav>
                 <div class="sidebar-slot-list" id="sidebarSlotList" hidden></div>
-                <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">消息与个人页暂未开放</p>
+                <p class="sidebar-nav-status" data-desktop-nav-status aria-live="polite">决策工作区</p>
                 <div class="sidebar-divider" aria-hidden="true"></div>
             </aside>
             <main class="dashboard-main">
@@ -4673,12 +4673,12 @@
             <article class="latest-signal-row latest-alert-row" aria-label="实时告警">
                 <header><span class="latest-signal-dot" aria-hidden="true"></span><h2>实时告警</h2></header>
                 <div class="latest-compact-list" id="homeAlertList"><p class="empty-hint">暂无告警</p></div>
-                <button type="button" class="latest-signal-link" data-desktop-unavailable-nav aria-disabled="true">查看全部</button>
+                <a class="latest-signal-link" href="/messages">查看全部</a>
             </article>
             <article class="latest-signal-row latest-event-row" aria-label="事件日历">
                 <header><span class="latest-signal-dot" aria-hidden="true"></span><h2>事件日历</h2></header>
                 <div class="latest-compact-list" id="homeEventList"><p class="empty-hint">暂无关键事件</p></div>
-                <button type="button" class="latest-signal-link" data-desktop-unavailable-nav aria-disabled="true">查看日历</button>
+                <a class="latest-signal-link" href="/calendar">查看日历</a>
             </article>
         </section>
 
@@ -4704,6 +4704,7 @@
                     <details class="latest-overflow-menu">
                         <summary aria-label="更多资产池操作" title="更多资产池操作">•••</summary>
                         <div class="latest-overflow-menu-content">
+                            <a href="/asset-pool">资产池管理</a>
                             <button type="button" id="btnReset">恢复默认</button>
                             <a id="assetDetailLink" aria-disabled="true" tabindex="-1">查看当前资产分析</a>
                         </div>
@@ -4771,7 +4772,7 @@
             </div>
         </section>
 
-        <section class="latest-decision-grid" data-position-execution-ratio="70:30" aria-label="持仓监控与执行计划">
+        <section class="latest-decision-grid" data-position-execution-ratio="60:40" aria-label="持仓监控与执行计划">
             <article class="latest-module latest-position-module" id="homePositionCard" aria-label="持仓监控">
                 <header class="latest-module-head">
                     <div>
@@ -4780,7 +4781,7 @@
                     </div>
                     <div class="latest-module-actions">
                         <button type="button" class="latest-button latest-button-secondary" id="manualPositionBtn">录入持仓</button>
-                        <a href="/dashboard/positions" class="latest-text-link">查看全部</a>
+                        <a href="/positions" class="latest-text-link">查看全部</a>
                     </div>
                 </header>
                 <div class="position-flow-message" id="positionFlowMessage" role="status"></div>
@@ -8043,13 +8044,16 @@
     }
 
     function syncDashboardSelectionUrl() {
-        frontendContract.replaceUrlParam("selectedSymbol", selectedSymbol);
+        frontendContract.replaceUrlParam("asset", selectedSymbol);
+        frontendContract.replaceUrlParam("selectedSymbol", null);
         frontendContract.replaceUrlParam("positionId", selectedPositionId);
     }
 
     function restoreDashboardSelectionFromUrl() {
         selectedSymbol = normalizeDisplaySymbol(
-            frontendContract.readUrlParam("selectedSymbol") || selectedSymbol
+            frontendContract.readUrlParam("asset")
+                || frontendContract.readUrlParam("selectedSymbol")
+                || selectedSymbol
         );
         selectedPositionId = normalizePositionId(
             frontendContract.readUrlParam("positionId") || selectedPositionId
@@ -8932,24 +8936,26 @@
             var riskText = cleanBlankValue(asset.riskLabel || riskLevelLabel(asset.riskLevel));
             var confidenceText = cleanBlankValue(asset.confidenceLabel || confidenceLabel(asset.confidenceLevel));
             var opportunityState = frontendContract.assetStateView(asset.opportunityState, asset.opportunityState);
-            var planMode = frontendContract.planModeLabel(asset.planMode);
+            var planMode = frontendContract.planModeLabel(asset.primaryPlanMode || asset.planMode);
             var analysisId = cleanBlankValue(asset.analysisId);
-            var priceSource = String(asset.fieldSourceStatus && asset.fieldSourceStatus.latestPrice || "MISSING").toUpperCase();
-            var priceFreshness = String(asset.timeframeFreshness && (asset.timeframeFreshness["5m"] || asset.timeframeFreshness["5M"]) || "").toUpperCase();
-            var priceTrusted = priceSource === "REAL" && priceFreshness === "FRESH";
-            var priceText = priceTrusted && asset.latestPrice != null ? formatPrice(asset.latestPrice) : "当前不可查看";
-            if (!priceText || priceText === "—") priceText = "当前不可查看";
             var scoreText = asset.opportunityScore != null ? String(asset.opportunityScore) : "当前不可查看";
             var assetName = cleanBlankValue(asset.name || asset.baseAsset)
                 || rawSymbol.replace(/USDT$/, "") || formatSymbolPair(rawSymbol);
             var rankingReason = cleanBlankValue(asset.rankingReason) || "排名原因当前不可查看";
+            var secondaryCount = Number(asset.secondaryOpportunityCount || 0);
+            var timeframeSummary = cleanBlankValue(asset.primaryTimeframe)
+                ? (asset.primaryTimeframe + (secondaryCount > 0 ? (" + " + secondaryCount + " 个次级周期") : ""))
+                : "周期当前不可查看";
+            var conflictState = String(asset.timeframeConflictState || "").toUpperCase();
+            if (conflictState === "OPPOSING") timeframeSummary += " · 周期方向冲突";
             var assetModuleState = frontendContract.normalizeModuleState(asset.moduleState, "MISSING").toLowerCase();
             return '<article class="latest-asset-card' + selected + '" role="button" tabindex="0"'
                 + ' data-symbol="' + escapeHtml(rawSymbol) + '" data-idx="' + idx + '"'
                 + ' data-analysis-id="' + escapeHtml(analysisId) + '"'
+                + ' data-primary-opportunity-id="' + escapeHtml(cleanBlankValue(asset.primaryOpportunityId)) + '"'
                 + ' data-module-state="' + escapeHtml(assetModuleState) + '"'
                 + ' data-opportunity-state="' + escapeHtml(opportunityState.code) + '"'
-                + ' data-plan-mode="' + escapeHtml(String(asset.planMode || "")) + '"'
+                + ' data-plan-mode="' + escapeHtml(String(asset.primaryPlanMode || asset.planMode || "")) + '"'
                 + ' aria-label="切换到 ' + escapeHtml(formatSymbolPair(rawSymbol)) + ' 决策上下文">'
                 + '<div class="latest-asset-head"><div class="latest-asset-identity"><strong>'
                 + escapeHtml(assetName) + '</strong><span>' + escapeHtml(formatSymbolPair(rawSymbol) || asset.symbol || "")
@@ -8957,16 +8963,14 @@
                 + '<button type="button" class="latest-asset-remove" data-home-asset-remove="'
                 + escapeHtml(rawSymbol) + '" aria-label="从资产池移除 ' + escapeHtml(formatSymbolPair(rawSymbol))
                 + '" title="移除观察资产">×</button>'
-                + '<div class="latest-asset-price"><span>可信价格</span><strong>' + escapeHtml(priceText) + '</strong></div>'
                 + '<dl class="latest-asset-fields" aria-label="资产决策上下文">'
                 + '<div><dt>市场方向</dt><dd class="' + escapeHtml(bcls) + '">' + escapeHtml(bias || "当前不可查看") + '</dd></div>'
                 + '<div><dt>机会评分</dt><dd>' + escapeHtml(scoreText) + '</dd></div>'
                 + '<div><dt>置信度</dt><dd>' + escapeHtml(confidenceText || "当前不可查看") + '</dd></div>'
                 + '<div><dt>风险</dt><dd>' + escapeHtml(riskText || "当前不可查看") + '</dd></div>'
                 + '<div><dt>计划模式</dt><dd>' + escapeHtml(planMode) + '</dd></div>'
-                + '<div><dt>分析状态</dt><dd>' + escapeHtml(analysisId ? "已关联" : "当前不可查看") + '</dd></div></dl>'
-                + '<p class="latest-asset-reason" title="' + escapeHtml(rankingReason) + '">排名依据 · '
-                + escapeHtml(rankingReason) + '</p></article>';
+                + '<div><dt>周期摘要</dt><dd title="' + escapeHtml(timeframeSummary) + '">' + escapeHtml(timeframeSummary) + '</dd></div></dl>'
+                + '<p class="latest-asset-reason" title="' + escapeHtml(rankingReason) + '">查看排名依据</p></article>';
         }).join("");
         Array.prototype.forEach.call(box.querySelectorAll(".latest-asset-card"), function (el) {
             function selectAsset() {
@@ -9008,7 +9012,7 @@
                 + '<strong>暂无活动持仓</strong>'
                 + '<span>录入真实持仓后查看风险变化与监控结论。</span>'
                 + '<div class="latest-empty-actions"><button type="button" data-position-empty-action="open">录入持仓</button>'
-                + '<a href="/dashboard/positions">查看历史</a></div></div>';
+                + '<a href="/reviews">查看历史</a></div></div>';
             var open = box.querySelector('[data-position-empty-action="open"]');
             if (open) open.addEventListener("click", showManualPositionDrawer);
             return;
@@ -9433,6 +9437,7 @@
     }
 
     function selectedHomeAsset(home) {
+        if (home && home.selectedAssetContext) return home.selectedAssetContext;
         var assets = home && Array.isArray(home.assets) ? home.assets : [];
         return assets.find(function (asset) {
             return normalizeDisplaySymbol(asset.rawSymbol || asset.symbol) === selectedSymbol;
@@ -13460,73 +13465,8 @@
     var settingsButton = document.getElementById("settingsBtn");
     if (settingsButton) {
         settingsButton.addEventListener("click", function () {
-            alert("系统设置占位：后续可接用户偏好。");
+            window.location.assign("/me");
         });
-    }
-
-    function setDesktopProductView(view, focusHeading) {
-        var showAi = view === "ai";
-        var homeView = document.querySelector("[data-desktop-home-view]");
-        var aiView = document.querySelector("[data-desktop-ai-view]");
-        var homeControl = document.querySelector("[data-desktop-home-nav]");
-        var aiControl = document.querySelector("[data-desktop-ai-nav]");
-        if (!homeView || !aiView) return;
-        homeView.hidden = showAi;
-        aiView.hidden = !showAi;
-        if (homeControl) {
-            homeControl.classList.toggle("active", !showAi);
-            if (showAi) homeControl.removeAttribute("aria-current");
-            else homeControl.setAttribute("aria-current", "page");
-        }
-        if (aiControl) {
-            aiControl.classList.toggle("active", showAi);
-            if (showAi) aiControl.setAttribute("aria-current", "page");
-            else aiControl.removeAttribute("aria-current");
-        }
-        var pageTitle = document.querySelector("[data-desktop-page-title]");
-        if (pageTitle) pageTitle.textContent = showAi ? "AI分析" : "首页总览";
-        frontendContract.replaceUrlParam("view", showAi ? "ai" : null);
-        if (focusHeading) {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-            window.setTimeout(function () {
-                var heading = showAi
-                    ? document.getElementById("desktopAiAnalysisTitle")
-                    : document.querySelector("[data-desktop-page-title]");
-                if (heading) heading.focus({ preventScroll: true });
-            }, 240);
-        }
-    }
-
-    function bindDesktopProductNavigation() {
-        var status = document.querySelector("[data-desktop-nav-status]");
-        var homeControl = document.querySelector("[data-desktop-home-nav]");
-        var aiControl = document.querySelector("[data-desktop-ai-nav]");
-        if (homeControl) {
-            homeControl.addEventListener("click", function (event) {
-                event.preventDefault();
-                setDesktopProductView("home", true);
-                if (status) status.textContent = "首页";
-            });
-        }
-        if (aiControl) {
-            aiControl.addEventListener("click", function (event) {
-                event.preventDefault();
-                setDesktopProductView("ai", true);
-                if (status) status.textContent = "AI分析";
-            });
-        }
-        Array.prototype.forEach.call(
-            document.querySelectorAll("[data-desktop-unavailable-nav]"),
-            function (control) {
-                control.addEventListener("click", function () {
-                    if (status) status.textContent = (control.textContent || "该页面") + " 暂未开放";
-                });
-            }
-        );
-        setDesktopProductView(
-            frontendContract.readUrlParam("view") === "ai" ? "ai" : "home",
-            false
-        );
     }
 
     function toggleTheme() {
@@ -13554,7 +13494,6 @@
         }
         restoreDashboardSelectionFromUrl();
         bindDesktopAiRoleTabs();
-        bindDesktopProductNavigation();
         modeValue = "system";
         updateModeHint();
         renderModuleStatusBoard();

@@ -207,7 +207,7 @@ public class DecisionChainAuditQueryServiceImpl implements DecisionChainAuditQue
     private static DecisionChainAuditVO.AnalysisStage toAnalysis(AnalysisRunDO row) {
         return new DecisionChainAuditVO.AnalysisStage(row.getAnalysisId(), row.getRequestId(), row.getTraceId(),
                 row.getSymbol(), row.getTimeframe(), row.getRuleVersion(), row.getDataQualityScore(), row.getStatus(),
-                row.getPreview(), row.getAnalysisTime(), row.getCompletedAt());
+                row.getAnalysisMode(), row.getPreview(), row.getAnalysisTime(), row.getCompletedAt());
     }
 
     private static DecisionChainAuditVO.OpportunityStage toOpportunity(AssetStateDO row) {

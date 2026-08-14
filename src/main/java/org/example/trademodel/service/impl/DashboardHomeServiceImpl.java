@@ -27,6 +27,7 @@ import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -61,6 +62,7 @@ import org.example.trademodel.vo.HomeTopAssetProjection;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
+import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
@@ -119,6 +121,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private AssetStateMapper assetStateMapper;
     private AssetPoolService assetPoolService;
     private OpportunityPriorityRankingService opportunityPriorityRankingService;
+    private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -195,6 +198,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     @Autowired(required = false)
+    void setAccountRiskSnapshotMapper(AccountRiskSnapshotMapper accountRiskSnapshotMapper) {
+        this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
+    }
+
+    @Autowired(required = false)
     void setOriginalPlanSources(DecisionResultMapper decisionResultMapper,
                                 ExecutionPlanMapper executionPlanMapper,
                                 AnalysisRunMapper analysisRunMapper) {
@@ -240,10 +248,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 : focusSymbols(userId, effectiveLimit);
 
         String normalizedRequest = normalizeSymbol(selectedSymbol);
-        if ((rankingEnabled || assetPoolService != null)
-                && normalizedRequest != null && !focusSymbols.contains(normalizedRequest)) {
-            normalizedRequest = null;
-        }
         String normalizedSelected = normalizedRequest;
         if (normalizedSelected == null) {
             normalizedSelected = focusSymbols.stream().findFirst().orElse(null);
@@ -257,7 +261,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 ? selectedProjection == null ? null : selectedProjection.sourceDecision()
                 : findDecision(decisions, normalizedSelected);
         boolean selectedDecisionReadFailed = false;
-        if (!rankingEnabled && selectedDecision == null) {
+        if (selectedDecision == null && normalizedSelected != null) {
             DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
             selectedDecision = lookup.decision();
             selectedDecisionReadFailed = lookup.failed();
@@ -293,6 +297,15 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setPositions(positionRowsResult.topRows());
         home.setPositionMonitoringState(positionRowsResult.monitoringState());
         home.setSelectedSymbol(normalizedSelected);
+        DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
+        DashboardHomeVO.AssetVO selectedContext = selectedAsset != null
+                ? selectedAsset
+                : selectedDecision == null ? null : assetFromDecision(0, selectedDecision);
+        home.setSelectedAssetContext(selectedContext);
+        home.setSelectedContextState(selectedAsset != null ? "RANKED"
+                : selectedContext != null ? "EXITED_TOP6" : "NO_ACTIVE_CONTEXT");
+        home.setSelectedContextExitReason(selectedAsset != null ? null
+                : selectedContext != null ? "NO_LONGER_IN_CURRENT_TOP6" : "NO_TRUSTED_DECISION_CONTEXT");
         PositionSelectionResult positionSelection = resolveSelectedPosition(positionRowsResult.allRows(), selectedPositionId);
         DashboardHomeVO.PositionVO activePosition = positionSelection.selectedPosition();
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
@@ -306,13 +319,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
                 pushInboxContext, providerReadiness));
         home.setSafety(new DashboardHomeVO.SafetyVO());
-        DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
         DashboardHomeVO.ModuleStatesVO moduleStates = buildModuleStates(
-                selectedAsset, executionSuggestion, positionRowsResult, aiDecision,
+                selectedContext, executionSuggestion, positionRowsResult, aiDecision,
                 decisionRead.failed() || selectedDecisionReadFailed || rankingRead.failed(), positionRead.failed());
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
-        home.getHeader().setUpdatedAt(selectedAsset != null ? selectedAsset.getUpdatedAt() : null);
+        home.getHeader().setUpdatedAt(selectedContext != null ? selectedContext.getUpdatedAt() : null);
         return home;
     }
 
@@ -694,6 +706,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             asset.setAnalysisId(projection.analysisId());
             asset.setOpportunityId(projection.opportunityId());
             asset.setOpportunityState(projection.opportunityState());
+            asset.setPrimaryOpportunityId(projection.primaryOpportunityId());
+            asset.setPrimaryTimeframe(projection.primaryTimeframe());
+            asset.setPrimaryPlanMode(projection.primaryPlanMode());
+            asset.setSecondaryOpportunityCount(projection.secondaryOpportunityCount());
+            asset.setTimeframeConflictState(projection.timeframeConflictState());
             asset.setOpportunityScore(projection.opportunityScore());
             asset.setPlanMode(projection.planMode());
             asset.setAiDecisionResult(projection.aiDecisionResult());
@@ -2081,8 +2098,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setExternalContextProvider(firstNonBlank(
                 providerReadiness != null ? providerReadiness.getExternalContextProviderStatus() : null,
                 "WAITING_SYNC"));
+        diagnostics.setAccountRiskCoverageState(safeAccountRiskCoverage(selectedDecision));
         diagnostics.setProviderReadiness(providerReadiness);
         return diagnostics;
+    }
+
+    private String safeAccountRiskCoverage(DecisionResultVO decision) {
+        if (accountRiskSnapshotMapper == null || decision == null || !hasText(decision.getAnalysisId())) {
+            return "UNKNOWN";
+        }
+        try {
+            TmAccountRiskSnapshotDO snapshot = accountRiskSnapshotMapper
+                    .selectLatestByAnalysisId(decision.getAnalysisId());
+            return snapshot == null || !hasText(snapshot.getAccountRiskCoverageState())
+                    ? "UNKNOWN" : upper(snapshot.getAccountRiskCoverageState());
+        } catch (RuntimeException ignored) {
+            return "UNKNOWN";
+        }
     }
 
     private DashboardHomeVO.StatusCardVO card(String key,

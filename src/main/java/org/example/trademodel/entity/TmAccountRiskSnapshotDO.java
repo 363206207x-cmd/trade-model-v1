@@ -30,6 +30,7 @@ public class TmAccountRiskSnapshotDO {
     private BigDecimal drawdownOrVarRisk;
     private BigDecimal aggregateRiskScore;
     private String sourceStatus;
+    private String accountRiskCoverageState = "UNKNOWN";
     private LocalDateTime observedAt;
     private LocalDateTime freshUntil;
     private String snapshotSource;
@@ -146,6 +147,8 @@ public class TmAccountRiskSnapshotDO {
     public void setAggregateRiskScore(BigDecimal aggregateRiskScore) { this.aggregateRiskScore = aggregateRiskScore; }
     public String getSourceStatus() { return sourceStatus; }
     public void setSourceStatus(String sourceStatus) { this.sourceStatus = sourceStatus; }
+    public String getAccountRiskCoverageState() { return accountRiskCoverageState; }
+    public void setAccountRiskCoverageState(String value) { this.accountRiskCoverageState = value; }
     public LocalDateTime getObservedAt() { return observedAt; }
     public void setObservedAt(LocalDateTime observedAt) { this.observedAt = observedAt; }
     public LocalDateTime getFreshUntil() { return freshUntil; }

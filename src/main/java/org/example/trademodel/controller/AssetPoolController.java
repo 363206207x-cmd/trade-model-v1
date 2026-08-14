@@ -8,6 +8,8 @@ import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.dto.req.AddAssetPoolItemReq;
 import org.example.trademodel.dto.req.AssetPoolBatchReq;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.entity.AsyncTaskDO;
+import org.example.trademodel.service.AsyncTaskService;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,11 +27,14 @@ import java.util.List;
 public class AssetPoolController {
     private final AssetPoolService assetPoolService;
     private final AuthenticatedUserIdResolver userIdResolver;
+    private final AsyncTaskService asyncTaskService;
 
     public AssetPoolController(AssetPoolService assetPoolService,
-                               AuthenticatedUserIdResolver userIdResolver) {
+                               AuthenticatedUserIdResolver userIdResolver,
+                               AsyncTaskService asyncTaskService) {
         this.assetPoolService = assetPoolService;
         this.userIdResolver = userIdResolver;
+        this.asyncTaskService = asyncTaskService;
     }
 
     @GetMapping
@@ -48,8 +53,18 @@ public class AssetPoolController {
     public ApiResponse<AssetAnalysisPreviewDTO> analyzePreview(
             @PathVariable String symbol,
             @RequestParam(defaultValue = "5m") String timeframe) {
-        return ApiResponse.success(assetPoolService.analyzePreviewForUser(
-                userIdResolver.requireCurrentUserId(), symbol, timeframe));
+        Long userId = userIdResolver.requireCurrentUserId();
+        AsyncTaskDO task = asyncTaskService.queueForUser(
+                userId, "ANALYSIS_PREVIEW", "ASSET", symbol, null);
+        asyncTaskService.markRunning(task, "ANALYSIS");
+        try {
+            AssetAnalysisPreviewDTO result = assetPoolService.analyzePreviewForUser(userId, symbol, timeframe);
+            asyncTaskService.complete(task, result == null || !"SUCCESS".equalsIgnoreCase(result.status()), "COMPLETE");
+            return ApiResponse.success(result);
+        } catch (RuntimeException exception) {
+            asyncTaskService.fail(task, "ANALYSIS_PREVIEW_FAILED", exception.getMessage());
+            throw exception;
+        }
     }
 
     @PostMapping
@@ -91,14 +106,32 @@ public class AssetPoolController {
 
     @PostMapping("/scan")
     public ApiResponse<List<AssetPoolScanResultDTO>> scan(@RequestParam(defaultValue = "5m") String timeframe) {
-        return ApiResponse.success(assetPoolService.scanForUser(
-                userIdResolver.requireCurrentUserId(), timeframe));
+        Long userId = userIdResolver.requireCurrentUserId();
+        return ApiResponse.success(runScanTask(userId, "POOL", timeframe,
+                () -> assetPoolService.scanForUser(userId, timeframe)));
     }
 
     @PostMapping("/batch-scan")
     public ApiResponse<List<AssetPoolScanResultDTO>> batchScan(@RequestBody AssetPoolBatchReq request) {
         if (request == null) throw new IllegalArgumentException("request is required");
-        return ApiResponse.success(assetPoolService.scanSelectedForUser(
-                userIdResolver.requireCurrentUserId(), request.getSymbols(), request.getTimeframe()));
+        Long userId = userIdResolver.requireCurrentUserId();
+        return ApiResponse.success(runScanTask(userId, "ASSET_SELECTION", request.getTimeframe(),
+                () -> assetPoolService.scanSelectedForUser(userId, request.getSymbols(), request.getTimeframe())));
+    }
+
+    private List<AssetPoolScanResultDTO> runScanTask(Long userId, String resourceType, String resourceId,
+                                                     java.util.function.Supplier<List<AssetPoolScanResultDTO>> scan) {
+        AsyncTaskDO task = asyncTaskService.queueForUser(userId, "POOL_SCAN", resourceType, resourceId, null);
+        asyncTaskService.markRunning(task, "SCANNING");
+        try {
+            List<AssetPoolScanResultDTO> result = scan.get();
+            boolean partial = result == null || result.stream()
+                    .anyMatch(row -> row == null || !"SUCCESS".equalsIgnoreCase(row.status()));
+            asyncTaskService.complete(task, partial, "COMPLETE");
+            return result == null ? List.of() : result;
+        } catch (RuntimeException exception) {
+            asyncTaskService.fail(task, "POOL_SCAN_FAILED", exception.getMessage());
+            throw exception;
+        }
     }
 }

@@ -204,7 +204,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("<a href=\"/dashboard/mobile/positions\" data-position-nav>持仓</a>")
                 .doesNotContain("data-position-nav data-unavailable-nav");
         assertThat(desktop)
-                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">持仓</a>")
+                .contains("<a href=\"/positions\" class=\"product-nav-item\">持仓</a>")
                 .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">持仓");
     }
 
@@ -265,9 +265,10 @@ class Fe04ShellHomeDashboardContractTest {
                         "renderDesktopAiAnalysis(ai, asset || null)",
                         "analysisState === \"partial\" ? ai.tabs : []",
                         "/dashboard/analysis-detail?analysisId=",
-                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                        "<a href=\"/analysis\" class=\"product-nav-item\">AI分析</a>")
                 .doesNotContain(
-                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))")
+                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
                 .doesNotContain("latestAnalysisId");
         assertThat(mobileStyles)
                 .contains(
@@ -518,8 +519,10 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(desktop)
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
-                .contains("data-desktop-unavailable-nav")
-                .contains("消息与个人页暂未开放");
+                .contains(
+                        "href=\"/dashboard\"", "href=\"/positions\"",
+                        "href=\"/analysis\"", "href=\"/messages\"", "href=\"/me\"")
+                .doesNotContain("data-desktop-unavailable-nav", "消息与个人页暂未开放");
     }
 
     private String slice(String source, String start, String end) {

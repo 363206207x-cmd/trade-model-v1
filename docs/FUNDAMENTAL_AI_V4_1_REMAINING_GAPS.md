@@ -1,6 +1,14 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `NO_KNOWN_CONTRACT_GAP_PENDING_EXTERNAL_GATES`
+Status: `NO_KNOWN_IMPLEMENTATION_GAP_PENDING_INDEPENDENT_PRODUCT_AUDIT_AND_TARGET_RUNTIME_EVIDENCE`
+
+## OneShot Boundary
+
+Canonical Figma, Desktop routes, runtime bindings and V13 persistence are
+implemented. The remaining gates are independent product review, PR CI and
+target-environment provider evidence. No local screenshot or controlled test is
+reported as live market/AI proof. Mobile and automatic trading remain outside
+scope.
 
 ## Product And Implementation Gaps
 
@@ -13,7 +21,7 @@ production effectiveness or merged-main completion.
 
 ## External Gates Still Required
 
-1. Independent final backend capability re-audit of PR #1177.
+1. Independent product-level design and runtime audit of PR #1179.
 2. PR CI on the final pushed commit.
 3. Review and merge decision.
 4. Clean/synced merged-main validation.
@@ -22,19 +30,20 @@ production effectiveness or merged-main completion.
 
 ## Evidence Boundaries
 
-- PostgreSQL 16.14 V1-to-V12 migration was executed successfully in an isolated
+- PostgreSQL 16.14 V1-to-V13 migration was executed successfully in an isolated
   disposable local database.
 - No live AI provider call was made and no provider credential was read.
 - Real historical replay without an authorized real fixture remains explicitly
   unavailable; no local fixture is represented as provider evidence.
 - Full-market catalog fallback remains identified as fallback and cannot bypass
   Asset Pool membership for persistent Opportunity creation.
-- PR #1177 remains open/draft/unmerged; the current phase is not effective on
+- PR #1179 remains open/draft/unmerged; the current phase is not effective on
   `main`.
 
 ## Intentional Product Boundaries
 
-- Figma: unchanged.
+- Canonical Figma: updated in the registered file
+  `rdMYmsAvZYkXHJX8hdl7UN`; no second Figma file was created.
 - Mobile: unchanged.
 - P2 Position Monitoring: preserved.
 - automatic open/close/add/reduce/reverse/order: absent.

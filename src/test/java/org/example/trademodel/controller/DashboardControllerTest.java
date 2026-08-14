@@ -464,12 +464,14 @@ public class DashboardControllerTest {
                 "marketBiasLabel", "confidenceLabel", "riskLevelLabel",
                 "opportunityScore", "rankingReason", "analysisId");
         assertThat(renderer).contains(
-                "可信价格", "市场方向", "机会评分", "置信度", "风险",
-                "data-opportunity-state", "data-plan-mode");
+                "市场方向", "机会评分", "置信度", "风险", "计划模式", "周期摘要",
+                "primaryOpportunityId", "primaryTimeframe", "secondaryOpportunityCount",
+                "timeframeConflictState", "data-opportunity-state", "data-plan-mode");
         assertThat(renderer).doesNotContain(
                 "一句话结论", "是否值得开仓", "数据来源", "数据状态",
                 "四周期新鲜度", "证据数", "分析时间",
-                "数据质量", "多周期", "Confused", "fieldSourceBadge");
+                "数据质量", "Confused", "fieldSourceBadge",
+                "可信价格", "latestPrice", "priceTrusted");
     }
 
     @Test
@@ -481,10 +483,12 @@ public class DashboardControllerTest {
         String retry = functionBody("bindHomeRetry");
 
         assertThat(assets).contains(
-                "可信价格", "机会评分", "市场方向", "置信度", "风险",
-                "data-opportunity-state", "data-plan-mode", "data-analysis-id")
+                "机会评分", "市场方向", "置信度", "风险", "计划模式", "周期摘要",
+                "primaryOpportunityId", "primaryTimeframe", "secondaryOpportunityCount",
+                "timeframeConflictState", "data-opportunity-state", "data-plan-mode",
+                "data-analysis-id")
                 .doesNotContain(
-                        "数据质量", "多周期", "Confused", "<dt>更新</dt>",
+                        "数据质量", "Confused", "<dt>更新</dt>", "可信价格", "latestPrice",
                         "fieldSourceBadge(\"价格\"", "fieldSourceBadge(\"评分\"",
                         "fieldSourceBadge(\"置信\"");
         assertThat(html).contains("data-home-retry", "homeRetryButton");
@@ -575,7 +579,9 @@ public class DashboardControllerTest {
                 "currentConclusion",
                 "evidenceCount");
         assertThat(renderer).contains(
-                "timeframeFreshness", "priceTrusted", "当前不可查看");
+                "primaryTimeframe", "secondaryOpportunityCount",
+                "timeframeConflictState", "当前不可查看")
+                .doesNotContain("timeframeFreshness", "priceTrusted", "latestPrice");
     }
 
     @Test

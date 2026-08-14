@@ -112,7 +112,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
 
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(33);
+            assertThat(countTradeModelTables(connection)).isEqualTo(38);
             assertTablesExist(connection, List.of(
                     "tm_asset",
                     "tm_analysis_run",
@@ -130,7 +130,12 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "tm_asset_pool_item",
                     "tm_opportunity_state_transition",
                     "tm_execution_plan_candidate",
-                    "tm_conflict_resolver_result"));
+                    "tm_conflict_resolver_result",
+                    "tm_plan_revalidation_record",
+                    "tm_message",
+                    "tm_channel_delivery",
+                    "tm_async_task",
+                    "tm_event_asset_relation"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_user_position_user_status_opened_at",
@@ -143,6 +148,12 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "idx_tm_opportunity_transition_opportunity_time",
                     "uk_tm_plan_candidate_analysis",
                     "uk_tm_conflict_resolver_candidate",
+                    "idx_tm_execution_plan_lifecycle",
+                    "idx_tm_plan_revalidation_plan",
+                    "idx_tm_message_user_time",
+                    "idx_tm_channel_delivery_message",
+                    "idx_tm_async_task_owner_time",
+                    "idx_tm_event_asset_symbol_time",
                     "uk_tm_review_result_analysis_scope",
                     "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
@@ -157,6 +168,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertPositionMonitorV10NewRowDefaults(connection, legacyPositionId);
             assertDecisionChainV11Contract(connection);
             assertDecisionChainV12AuditTextRoundTrip(connection);
+            assertFinalInteractionV13Contract(connection);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -359,8 +371,60 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(12);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(13);
             }
+        }
+    }
+
+    private static void assertFinalInteractionV13Contract(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT analysis_mode FROM tm_analysis_run WHERE analysis_id = 'analysis-v11-chain'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("analysis_mode")).isEqualTo("OPPORTUNITY_DECISION");
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT plan_lifecycle_state, plan_version
+                FROM tm_execution_plan WHERE plan_id = 'final-plan-v11-chain'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("plan_lifecycle_state")).isEqualTo("INVALIDATED");
+                assertThat(rs.getInt("plan_version")).isEqualTo(1);
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT account_risk_coverage_state
+                FROM tm_account_risk_snapshot
+                ORDER BY create_time DESC, id DESC LIMIT 1
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    assertThat(rs.getString("account_risk_coverage_state")).isEqualTo("UNKNOWN");
+                }
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_async_task(
+                      task_id, owner_type, owner_id, task_type, state, retry_count, max_retries,
+                      created_at, updated_at
+                    ) VALUES ('invalid-success-task', 'SYSTEM', 0, 'POOL_SCAN', 'SUCCESS', 0, 0,
+                      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
+                    INSERT INTO tm_message(
+                      message_id, user_id, category, source_type, source_id, title,
+                      business_state, read_state, dedupe_key, not_trade_instruction,
+                      not_order_execution, created_at, updated_at
+                    ) VALUES ('unsafe-message', 1, 'HIGH_PERMISSION_OPPORTUNITY', 'OPPORTUNITY', 'opp-1',
+                      'unsafe', 'ACTIVE', 'UNREAD', 'unsafe-message', FALSE, FALSE,
+                      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class);
         }
     }
 

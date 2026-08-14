@@ -22,6 +22,9 @@ public class DashboardHomeVO {
     private List<PositionVO> positions = new ArrayList<>();
     private ModuleStatesVO states = new ModuleStatesVO();
     private String selectedSymbol;
+    private AssetVO selectedAssetContext;
+    private String selectedContextState;
+    private String selectedContextExitReason;
     private Long selectedPositionId;
     private String positionSelectionStatus;
     private Integer matchingPositionCount;
@@ -96,6 +99,13 @@ public class DashboardHomeVO {
     public void setSelectedSymbol(String selectedSymbol) {
         this.selectedSymbol = selectedSymbol;
     }
+
+    public AssetVO getSelectedAssetContext() { return selectedAssetContext; }
+    public void setSelectedAssetContext(AssetVO value) { this.selectedAssetContext = value; }
+    public String getSelectedContextState() { return selectedContextState; }
+    public void setSelectedContextState(String value) { this.selectedContextState = value; }
+    public String getSelectedContextExitReason() { return selectedContextExitReason; }
+    public void setSelectedContextExitReason(String value) { this.selectedContextExitReason = value; }
 
     @JsonSerialize(using = ToStringSerializer.class)
     public Long getSelectedPositionId() {
@@ -478,6 +488,11 @@ public class DashboardHomeVO {
         private String analysisId;
         private String opportunityId;
         private String opportunityState;
+        private String primaryOpportunityId;
+        private String primaryTimeframe;
+        private String primaryPlanMode;
+        private Integer secondaryOpportunityCount;
+        private String timeframeConflictState;
         private Integer opportunityScore;
         private String planMode;
         private String aiDecisionResult;
@@ -569,6 +584,16 @@ public class DashboardHomeVO {
         public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
         public String getOpportunityState() { return opportunityState; }
         public void setOpportunityState(String opportunityState) { this.opportunityState = opportunityState; }
+        public String getPrimaryOpportunityId() { return primaryOpportunityId; }
+        public void setPrimaryOpportunityId(String value) { this.primaryOpportunityId = value; }
+        public String getPrimaryTimeframe() { return primaryTimeframe; }
+        public void setPrimaryTimeframe(String value) { this.primaryTimeframe = value; }
+        public String getPrimaryPlanMode() { return primaryPlanMode; }
+        public void setPrimaryPlanMode(String value) { this.primaryPlanMode = value; }
+        public Integer getSecondaryOpportunityCount() { return secondaryOpportunityCount; }
+        public void setSecondaryOpportunityCount(Integer value) { this.secondaryOpportunityCount = value; }
+        public String getTimeframeConflictState() { return timeframeConflictState; }
+        public void setTimeframeConflictState(String value) { this.timeframeConflictState = value; }
         public Integer getOpportunityScore() { return opportunityScore; }
         public void setOpportunityScore(Integer opportunityScore) { this.opportunityScore = opportunityScore; }
         public String getPlanMode() { return planMode; }
@@ -2061,6 +2086,7 @@ public class DashboardHomeVO {
         private String marketDataProvider = "WAITING_SYNC";
         private String aiProvider = "WAITING_SYNC";
         private String externalContextProvider = "WAITING_SYNC";
+        private String accountRiskCoverageState = "UNKNOWN";
         private ProviderReadinessVO providerReadiness = new ProviderReadinessVO();
 
         public String getDataIngestion() {
@@ -2157,6 +2183,11 @@ public class DashboardHomeVO {
 
         public void setExternalContextProvider(String externalContextProvider) {
             this.externalContextProvider = externalContextProvider;
+        }
+
+        public String getAccountRiskCoverageState() { return accountRiskCoverageState; }
+        public void setAccountRiskCoverageState(String value) {
+            this.accountRiskCoverageState = value == null ? "UNKNOWN" : value;
         }
 
         public ProviderReadinessVO getProviderReadiness() {

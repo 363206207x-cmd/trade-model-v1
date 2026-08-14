@@ -118,6 +118,10 @@ public class ExecutionPlanVO {
     private String scoreRefsJson;
     private String validationResultId;
     private String sourceStatus;
+    private String planLifecycleState = "INVALIDATED";
+    private Integer planVersion = 1;
+    private String supersedesPlanId;
+    private String supersededByPlanId;
     private List<String> validationReasons = new ArrayList<>();
 
     public String getPlanId() { return planId; }
@@ -326,6 +330,14 @@ public class ExecutionPlanVO {
     public void setValidationResultId(String value) { this.validationResultId = value; }
     public String getSourceStatus() { return sourceStatus; }
     public void setSourceStatus(String value) { this.sourceStatus = value; }
+    public String getPlanLifecycleState() { return planLifecycleState; }
+    public void setPlanLifecycleState(String value) { this.planLifecycleState = value; }
+    public Integer getPlanVersion() { return planVersion; }
+    public void setPlanVersion(Integer value) { this.planVersion = value; }
+    public String getSupersedesPlanId() { return supersedesPlanId; }
+    public void setSupersedesPlanId(String value) { this.supersedesPlanId = value; }
+    public String getSupersededByPlanId() { return supersededByPlanId; }
+    public void setSupersededByPlanId(String value) { this.supersededByPlanId = value; }
     public String getStopZone() { return stopLoss; }
     public String getTargetZones() { return takeProfitRules; }
     public BigDecimal getExpectedRR() { return expectedRiskReward; }

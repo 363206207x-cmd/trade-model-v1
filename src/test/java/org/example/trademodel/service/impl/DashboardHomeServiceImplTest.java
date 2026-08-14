@@ -3530,6 +3530,11 @@ class DashboardHomeServiceImplTest {
                 decision.getAnalysisId(),
                 opportunityId,
                 opportunityState,
+                opportunityId,
+                decision.getTimeframe(),
+                decision.getPlanMode(),
+                0,
+                "ALIGNED",
                 LocalDateTime.of(2026, 1, 1, 0, 0),
                 decision);
     }

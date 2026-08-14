@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
+    <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
+    <meta name="description" content="Fundamental AI 专业金融决策工作区">
+    <title th:text="${pageTitle + ' · Fundamental AI'}">Fundamental AI</title>
+    <link rel="stylesheet" th:href="@{/css/workspace.css}" href="/css/workspace.css">
+</head>
+<body data-component-family="AppShell"
+      th:attr="data-page-key=${pageKey},data-resource-id=${resourceId == null ? '' : resourceId}">
+<aside class="workspace-sidebar" data-component-family="SideNav" aria-label="主要导航">
+    <a class="workspace-brand" href="/dashboard" aria-label="Fundamental AI 首页">
+        <span class="workspace-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fundamental AI</strong><small>Decision Workspace</small></span>
+    </a>
+    <nav class="workspace-navigation" aria-label="产品页面">
+        <a href="/dashboard" th:classappend="${activeNavigation == 'home'} ? ' is-active'">首页</a>
+        <a href="/positions" th:classappend="${activeNavigation == 'positions'} ? ' is-active'">持仓</a>
+        <a href="/analysis" th:classappend="${activeNavigation == 'analysis'} ? ' is-active'">AI分析</a>
+        <a href="/messages" th:classappend="${activeNavigation == 'messages'} ? ' is-active'">消息</a>
+        <a href="/me" th:classappend="${activeNavigation == 'me'} ? ' is-active'">我的</a>
+    </nav>
+    <div class="workspace-sidebar-footer">
+        <a href="/asset-pool">资产池</a>
+        <a href="/calendar">事件日历</a>
+        <button type="button" data-open-overlay="status-recovery">系统状态</button>
+    </div>
+</aside>
+
+<div class="workspace-stage">
+    <header class="workspace-page-header" data-component-family="PageHeader">
+        <div>
+            <h1 th:text="${pageTitle}">页面</h1>
+            <p th:text="${pageSubtitle}">页面说明</p>
+        </div>
+        <div class="workspace-header-actions">
+            <div class="workspace-system-status" data-component-family="SystemStatusBar" role="status">
+                <span><small>数据状态</small><strong id="workspaceDataStatus">等待同步</strong></span>
+                <span><small>AI 服务</small><strong id="workspaceAiStatus">等待同步</strong></span>
+                <button type="button" class="task-indicator" data-component-family="AsyncTaskIndicator"
+                        data-open-overlay="async-task-center">任务 <b id="workspaceTaskCount">0</b></button>
+            </div>
+            <form th:action="@{/logout}" method="post"><button class="button button-quiet" type="submit">退出</button></form>
+        </div>
+    </header>
+
+    <main class="workspace-main" id="workspaceMain" tabindex="-1">
+        <div class="workspace-live-region" id="workspaceLiveRegion" aria-live="polite"></div>
+
+        <section class="workspace-page" th:if="${pageKey == 'asset-pool'}" aria-labelledby="assetPoolHeading">
+            <header class="section-header" data-component-family="AssetPoolToolbar">
+                <div><h2 id="assetPoolHeading">观察资产</h2><p>资产池是机会发现的唯一入口。</p></div>
+                <div class="toolbar-actions">
+                    <button class="button button-secondary" type="button" data-open-overlay="pool-batch-management">批量管理</button>
+                    <button class="button button-secondary" type="button" id="restoreDefaultAssets">恢复默认</button>
+                    <button class="button button-primary" type="button" id="scanAssetPool">扫描资产池</button>
+                </div>
+            </header>
+            <div class="workspace-search" data-component-family="AssetSearch">
+                <label for="assetPoolSearch">搜索市场资产</label>
+                <div class="search-control"><input id="assetPoolSearch" type="search" autocomplete="off" placeholder="输入名称或交易对"><button class="button button-secondary" id="openQuickSearch" type="button" data-open-overlay="quick-asset-search">搜索</button></div>
+                <div id="assetSearchResults" class="search-results" role="listbox"></div>
+            </div>
+            <div class="pool-scan-status" id="poolScanStatus" data-component-family="PoolScanStatus" role="status">尚未开始扫描</div>
+            <div class="table-shell" data-component-family="AssetPoolTable">
+                <table><thead><tr><th>资产</th><th>市场</th><th>观察状态</th><th>来源</th><th class="align-right">操作</th></tr></thead><tbody id="assetPoolRows"></tbody></table>
+                <div class="empty-state" id="assetPoolEmpty" data-component-family="EmptyState" hidden><strong>资产池为空</strong><span>可恢复默认资产，或搜索后显式加入。</span></div>
+            </div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'positions'}" aria-labelledby="positionsHeading">
+            <header class="section-header"><div><h2 id="positionsHeading">真实持仓</h2><p>计划不会自动变成持仓，所有仓位均来自用户确认。</p></div><button class="button button-primary" type="button" data-open-overlay="actual-position">录入持仓</button></header>
+            <div class="risk-aggregate" data-component-family="PositionRiskAggregate"><span>账户风险覆盖</span><strong id="accountRiskCoverage">等待评估</strong><small>仅在数据完整时显示完整覆盖。</small></div>
+            <div class="position-grid" id="positionGrid"></div>
+            <div class="empty-state" id="positionEmpty" data-component-family="EmptyState" hidden><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span></div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'position-detail'}" aria-labelledby="positionDetailHeading">
+            <header class="section-header"><div><h2 id="positionDetailHeading">持仓详情</h2><p>实际持仓与开仓时最终计划分别保留。</p></div><button class="button button-secondary" type="button" data-open-overlay="close-position">记录平仓</button></header>
+            <article class="surface position-detail-card" data-component-family="PositionCard" id="positionDetailCard"></article>
+            <section class="surface comparison-grid" data-component-family="PlanActualComparison"><div><h3>开仓计划基线</h3><div id="openingPlanBaseline" class="content-state">等待数据</div></div><div><h3>当前实际持仓</h3><div id="actualPositionFacts" class="content-state">等待数据</div></div></section>
+            <section class="surface" data-component-family="MonitorTimeline"><header class="surface-header"><h3>监控时间线</h3></header><div id="monitorTimeline" class="timeline-list"><p class="muted">暂无监控记录</p></div></section>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'reviews'}" aria-labelledby="reviewsHeading">
+            <header class="section-header"><div><h2 id="reviewsHeading">复盘记录</h2><p>分别保留已平仓复盘与错过机会复盘。</p></div></header>
+            <div class="filter-tabs" role="tablist"><button class="is-active" type="button" role="tab" aria-selected="true">全部</button><button type="button" role="tab" aria-selected="false">持仓复盘</button><button type="button" role="tab" aria-selected="false">错过机会</button></div>
+            <div class="review-list" id="reviewList"></div>
+            <div class="empty-state" id="reviewEmpty" data-component-family="EmptyState" hidden><strong>暂无复盘记录</strong><span>持仓平仓或机会结束后，复盘记录会在此出现。</span></div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'review-detail'}" aria-labelledby="reviewDetailHeading">
+            <header class="section-header"><div><h2 id="reviewDetailHeading">复盘详情</h2><p>当时事实不会被后续结果覆盖。</p></div></header>
+            <section class="surface" data-component-family="AtTimeLaterCompare"><div class="comparison-grid"><div><h3>当时事实</h3><div id="reviewAtTime" class="content-state">等待数据</div></div><div><h3>后续结果</h3><div id="reviewLater" class="content-state">等待数据</div></div></div></section>
+            <section class="surface" data-component-family="ResponsibilityChain"><header class="surface-header"><h3>责任链</h3></header><div id="responsibilityChain" class="audit-steps"></div></section>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'analysis'}" aria-labelledby="analysisHeading">
+            <header class="section-header"><div><h2 id="analysisHeading">结构化分析</h2><p>Preview 不创建机会；正式决策才进入候选、冲突处理与规则校验。</p></div><button class="button button-primary" type="button" id="startAnalysisPreview">开始预览</button></header>
+            <div class="mode-banner" data-component-family="AnalysisModeBanner"><span>分析模式</span><strong id="analysisMode">等待选择</strong><small id="analysisModeBoundary">请选择资产或分析记录。</small></div>
+            <section class="surface ai-workspace" data-component-family="AIWorkspace">
+                <div class="role-tabs" data-component-family="AIRoleTabs" role="tablist">
+                    <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL">最终裁决</button>
+                    <button type="button" role="tab" aria-selected="false" data-ai-role="GEMINI_REVIEW">冲突复核</button>
+                    <button type="button" role="tab" aria-selected="false" data-ai-role="GROK_CHALLENGE">反方挑战</button>
+                </div>
+                <article class="ai-role-content" id="analysisRoleContent"><div class="empty-state" data-component-family="EmptyState"><strong>暂无分析数据</strong><span>输入真实资产或打开已有分析记录。</span></div></article>
+            </section>
+            <div class="analysis-grid">
+                <section class="surface" data-component-family="EvidenceList"><header class="surface-header"><h3>证据</h3></header><div id="analysisEvidence"><p class="muted">暂无数据</p></div></section>
+                <section class="surface" data-component-family="MultiTimeframeMatrix"><header class="surface-header"><h3>多周期状态</h3></header><div id="analysisTimeframes"><p class="muted">暂无数据</p></div></section>
+                <section class="surface" data-component-family="BeforeAfterDiff"><header class="surface-header"><h3>冲突处理前后</h3></header><div id="analysisDiff"><p class="muted">暂无数据</p></div></section>
+                <section class="surface" data-component-family="FailurePathList"><header class="surface-header"><h3>失败路径</h3></header><div id="analysisFailures"><p class="muted">暂无数据</p></div></section>
+            </div>
+            <aside class="surface conflict-summary" data-component-family="ConflictSummary"><h3>冲突摘要</h3><div id="analysisConflict">暂无冲突数据</div></aside>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'messages'}" aria-labelledby="messagesHeading">
+            <header class="section-header"><div><h2 id="messagesHeading">消息中心</h2><p>业务消息与 Telegram 投递状态分别记录。</p></div><button class="button button-secondary" type="button" data-open-overlay="telegram-binding">Telegram 设置</button></header>
+            <div class="message-list" id="messageList"></div>
+            <div class="empty-state" id="messageEmpty" data-component-family="EmptyState" hidden><strong>暂无消息</strong><span>仅保存符合冻结消息类别的真实业务事实。</span></div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'recheck'}" aria-labelledby="recheckHeading">
+            <header class="section-header"><div><h2 id="recheckHeading">推送复核</h2><p>复核不会产生交易授权，也不替代计划重验证。</p></div></header>
+            <section class="surface" data-component-family="OriginalSnapshotCard"><header class="surface-header"><h3>原始推送快照</h3></header><div id="originalSnapshot" class="content-state">等待数据</div></section>
+            <section class="recheck-hero" data-component-family="RecheckResultHero"><span>当前复核结果</span><strong id="recheckResult">当前不可查看</strong><p id="recheckReason">等待可信数据</p></section>
+            <div class="recheck-actions" data-component-family="RecheckActionBar"><a class="button button-secondary" href="/messages">返回消息</a><button class="button button-primary" type="button" id="requestPushRecheck">刷新当前对比</button></div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'plan'}" aria-labelledby="planHeading">
+            <header class="section-header"><div><h2 id="planHeading">最终执行计划</h2><p>仅展示通过 Rule Validation 的 Final。</p></div><button class="button button-primary" type="button" id="requestPlanRevalidation">重新校验</button></header>
+            <div class="plan-header" data-component-family="PlanModeHeader"><span>计划模式</span><strong id="planMode">当前不可查看</strong><span class="state-badge" data-component-family="PlanLifecycleBadge" id="planLifecycle">当前不可查看</span></div>
+            <section class="surface plan-detail" data-component-family="FinalPlanDetail" id="finalPlanDetail">
+                <div class="plan-section" data-component-family="PlanSummaryCard"><h3>决策摘要</h3><div id="planSummary" class="content-state">等待数据</div></div>
+                <div class="plan-section" data-component-family="EntryTriggerSection"><h3>入场与触发</h3><div id="planEntry" class="content-state">等待数据</div></div>
+                <div class="plan-section" data-component-family="InvalidationStopSection"><h3>失效与止损</h3><div id="planInvalidation" class="content-state">等待数据</div></div>
+                <div class="plan-section" data-component-family="TargetTrendSection"><h3>目标与趋势跟踪</h3><div id="planTargets" class="content-state">等待数据</div></div>
+                <div class="plan-section" data-component-family="RiskLimitSection"><h3>风险限制</h3><div id="planRisk" class="content-state">等待数据</div></div>
+            </section>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'calendar'}" aria-labelledby="calendarHeading">
+            <header class="section-header"><div><h2 id="calendarHeading">事件窗口</h2><p>宏观、行业与项目事件保留来源与资产关联。</p></div></header>
+            <div class="calendar-layout" data-component-family="EventCalendar"><div class="event-list" id="eventList"></div><aside class="surface"><h3>关联资产</h3><div id="eventRelations" class="content-state">选择事件后查看</div></aside></div>
+            <template id="eventWindowTemplate" data-component-family="EventWindowBadge"><span class="state-badge"></span></template>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'audit'}" aria-labelledby="auditHeading">
+            <header class="section-header"><div><h2 id="auditHeading">完整审计链</h2><p>以 analysisId、candidateId 与 traceId 聚合，不创建第二套审计事实。</p></div><button class="button button-secondary" type="button" data-open-overlay="audit-detail">查看元数据</button></header>
+            <div class="audit-steps" id="auditChain" data-component-family="AuditChainStepper"></div>
+            <details class="audit-disclosure" data-component-family="AuditMetaDisclosure"><summary>审计元数据</summary><pre id="auditMetadata">暂无数据</pre></details>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'me'}" aria-labelledby="settingsHeading">
+            <header class="section-header"><div><h2 id="settingsHeading">个人设置</h2><p>通知渠道不改变业务消息事实，风险偏好不绕过规则层。</p></div><button class="button button-primary" type="button" id="saveSettings">保存设置</button></header>
+            <div class="settings-grid">
+                <form class="surface settings-form" data-component-family="RiskPreferenceForm" id="riskPreferenceForm"><h3>风险偏好</h3><label>风险偏好<select name="riskPreference"><option value="CONSERVATIVE">保守</option><option value="BALANCED">平衡</option><option value="AGGRESSIVE">积极</option></select></label><label>默认资产池<select name="defaultPoolMode"><option value="SYSTEM_DEFAULT">系统默认</option><option value="USER_CUSTOM">用户自定义</option></select></label></form>
+                <section class="surface" data-component-family="TelegramBindingPanel"><header class="surface-header"><h3>Telegram</h3><button class="button button-secondary" type="button" data-open-overlay="telegram-binding">绑定 / 测试</button></header><div id="telegramBindingState" class="content-state">未绑定</div></section>
+                <section class="surface provider-panel" data-component-family="ProviderStatusPanel"><header class="surface-header"><h3>数据源状态</h3></header><div id="providerStatus" class="content-state">等待可信状态</div></section>
+            </div>
+        </section>
+    </main>
+</div>
+
+<template id="searchResultTemplate" data-component-family="SearchResultItem"><button class="search-result" type="button"><span><strong></strong><small></small></span><em>加入</em></button></template>
+<template id="opportunityCardTemplate" data-component-family="OpportunityCard"><article class="opportunity-card"><header><strong></strong><span class="state-badge" data-component-family="StateBadge"></span></header><dl><div><dt>机会模式</dt><dd></dd></div><div><dt>风险</dt><dd></dd></div></dl><p data-component-family="MultiTimeframeSummary"></p><button type="button" class="text-action">查看分析</button></article></template>
+<div data-component-family="OpportunityGrid" hidden></div>
+<div data-component-family="DataQualityGate" hidden></div>
+<template id="positionCardTemplate" data-component-family="PositionCard"><article class="position-card"><header><div><strong></strong><span></span></div><a class="text-action">查看详情</a></header><dl></dl></article></template>
+<template id="reviewCardTemplate" data-component-family="ReviewCard"><article class="review-card"><header><strong></strong><span class="state-badge"></span></header><p></p><a class="text-action">查看复盘</a></article></template>
+<template id="messageItemTemplate" data-component-family="MessageListItem"><article class="message-item"><div><strong></strong><p></p><small></small></div><div data-component-family="ChannelDeliveryStatus"><span class="state-badge"></span><a class="text-action">查看</a></div></article></template>
+
+<dialog class="overlay drawer" id="overlay-status-recovery" data-overlay-code="O01" data-component-family="Drawer"><div class="overlay-header"><h2>状态与恢复</h2><button type="button" data-close-overlay aria-label="关闭">关闭</button></div><div id="statusRecoveryContent" class="overlay-content"><p class="muted">等待系统状态</p></div></dialog>
+<dialog class="overlay modal" id="overlay-quick-asset-search" data-overlay-code="O02" data-component-family="Modal"><div class="overlay-header"><h2>快速搜索资产</h2><button type="button" data-close-overlay aria-label="关闭">关闭</button></div><div class="overlay-content"><label>资产<input type="search" id="quickAssetSearch" autocomplete="off"></label><div id="quickAssetResults" class="search-results"></div></div></dialog>
+<dialog class="overlay drawer" id="overlay-pool-asset-detail" data-overlay-code="O03" data-component-family="Drawer"><div class="overlay-header"><h2>资产池详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="poolAssetDetailContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
+<dialog class="overlay modal" id="overlay-pool-batch-management" data-overlay-code="O04" data-component-family="Modal"><div class="overlay-header"><h2>批量管理</h2><button type="button" data-close-overlay>关闭</button></div><div class="overlay-content"><p>选择资产后可批量删除或扫描。历史分析不会被删除。</p><div id="poolBatchList"></div></div></dialog>
+<dialog class="overlay drawer" id="overlay-final-plan-detail" data-overlay-code="O05" data-component-family="Drawer"><div class="overlay-header"><h2>最终计划详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="planDrawerContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
+<dialog class="overlay modal" id="overlay-actual-position" data-overlay-code="O06" data-component-family="Modal"><form id="actualPositionForm" class="overlay-content" data-component-family="PositionActualForm"><div class="overlay-header"><h2>录入实际持仓</h2><button type="button" data-close-overlay>关闭</button></div><div class="form-grid"><label>资产<input name="assetSymbol" required></label><label>方向<select name="side"><option value="LONG">做多</option><option value="SHORT">做空</option></select></label><label>开仓价<input name="entryPrice" type="number" step="any" required></label><label>数量<input name="quantity" type="number" step="any" required></label><label>杠杆<input name="leverage" type="number" step="any" required></label><label>止损<input name="stopLoss" type="number" step="any"></label><label>目标<input name="takeProfit" type="number" step="any"></label></div><input name="finalPlanId" type="hidden"><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认录入</button></div></form></dialog>
+<dialog class="overlay modal" id="overlay-close-position" data-overlay-code="O07" data-component-family="Modal"><form id="closePositionForm" class="overlay-content"><div class="overlay-header"><h2>记录平仓</h2><button type="button" data-close-overlay>关闭</button></div><label>平仓价格<input name="closePrice" type="number" step="any" required></label><label>原因<textarea name="closeReason" rows="3" required></textarea></label><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认记录</button></div></form></dialog>
+<dialog class="overlay drawer" id="overlay-audit-detail" data-overlay-code="O08" data-component-family="Drawer"><div class="overlay-header"><h2>审计元数据</h2><button type="button" data-close-overlay>关闭</button></div><pre id="auditDrawerContent" class="overlay-content">暂无数据</pre></dialog>
+<dialog class="overlay drawer" id="overlay-async-task-center" data-overlay-code="O09" data-component-family="Drawer"><div class="overlay-header"><h2>任务中心</h2><button type="button" data-close-overlay>关闭</button></div><div id="asyncTaskList" class="overlay-content"><p class="muted">暂无任务</p></div></dialog>
+<dialog class="overlay modal" id="overlay-telegram-binding" data-overlay-code="O10" data-component-family="Modal"><form id="telegramBindingForm" class="overlay-content"><div class="overlay-header"><h2>Telegram 绑定</h2><button type="button" data-close-overlay>关闭</button></div><label>Chat ID<input name="telegramChatId" autocomplete="off"></label><p class="muted">提交后进入待验证状态；投递状态不会改变业务消息。</p><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">保存绑定</button></div></form></dialog>
+<dialog class="overlay drawer" id="overlay-event-detail" data-overlay-code="O11" data-component-family="Drawer"><div class="overlay-header"><h2>事件详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="eventDetailContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
+
+<script th:src="@{/js/workspace.js}" src="/js/workspace.js" defer></script>
+</body>
+</html>
