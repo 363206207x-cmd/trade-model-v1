@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,6 +46,7 @@ public class PushRecheckScheduler {
     private final boolean schedulersEnabled;
     private final boolean pushRecheckSchedulerEnabled;
     private Clock clock = Clock.systemUTC();
+    private volatile SchedulerExecution lastExecution = SchedulerExecution.notRun();
 
     public PushRecheckScheduler(
             PushSnapshotMapper pushSnapshotMapper,
@@ -80,6 +82,7 @@ public class PushRecheckScheduler {
         if (!scheduledExecutionEnabled()) {
             return;
         }
+        String batchId = "SCH-" + UUID.randomUUID().toString().replace("-", "");
         try {
             refreshRuntimeConfigFromStore();
             if (!PushRecheckStatusContract.isPendingPushStatusForScheduler(PENDING_PUSH_STATUS_CAPTURED)
@@ -89,19 +92,20 @@ public class PushRecheckScheduler {
                         PENDING_PUSH_STATUS_CAPTURED, PENDING_PUSH_STATUS_WAITING, PENDING_PUSH_STATUS_LEGACY_WAITING);
                 return;
             }
+            LocalDateTime referenceAt = UtcLocalTimePolicy.now(clock);
+            LocalDateTime cutoffAt = referenceAt.minusMinutes(minRetryMinutes);
             List<TmPushSnapshotDO> pending = pushSnapshotMapper.listPendingRecheckNext(
                     PENDING_PUSH_STATUS_CAPTURED,
                     PENDING_PUSH_STATUS_WAITING,
                     PENDING_PUSH_STATUS_LEGACY_WAITING,
                     maxAttempts,
-                    minRetryMinutes,
-                    UtcLocalTimePolicy.now(clock),
+                    referenceAt,
+                    cutoffAt,
                     defaultLimit);
             if (pending == null || pending.isEmpty()) {
+                lastExecution = SchedulerExecution.succeeded(batchId, referenceAt, 0, 0);
                 return;
             }
-
-            String batchId = "SCH-" + UUID.randomUUID().toString().replace("-", "");
 
             log.info("[push-recheck-scheduler] pendingPushes={} (statuses={}/{}/{}, maxAttempts={}, minRetryMinutes={})",
                     pending.size(),
@@ -110,23 +114,29 @@ public class PushRecheckScheduler {
                     PENDING_PUSH_STATUS_LEGACY_WAITING,
                     maxAttempts,
                     minRetryMinutes);
+            int failures = 0;
             for (TmPushSnapshotDO push : pending) {
-                handleOne(batchId, push);
+                if (!handleOne(batchId, push)) failures++;
             }
+            lastExecution = failures == 0
+                    ? SchedulerExecution.succeeded(batchId, referenceAt, pending.size(), 0)
+                    : SchedulerExecution.partial(batchId, referenceAt, pending.size(), failures);
         } catch (Exception e) {
-            // 理论上不会到这里；但最小化风险：让下一轮继续执行
-            log.warn("[push-recheck-scheduler] batch failed: {}", e.getMessage());
+            LocalDateTime failedAt = UtcLocalTimePolicy.now(clock);
+            lastExecution = SchedulerExecution.failed(batchId, failedAt, e);
+            log.error("[push-recheck-scheduler] traceId={} schedulerState=FAILED errorClass={} errorMessage={}",
+                    batchId, e.getClass().getName(), e.getMessage(), e);
         }
     }
 
-    private void handleOne(String batchId, TmPushSnapshotDO push) {
+    private boolean handleOne(String batchId, TmPushSnapshotDO push) {
         if (push == null) {
-            return;
+            return false;
         }
         Long pushId = push.getPushId();
         String symbol = push.getSymbol();
         if (pushId == null || symbol == null || symbol.isBlank()) {
-            return;
+            return false;
         }
 
         try {
@@ -136,10 +146,17 @@ public class PushRecheckScheduler {
                     pushId,
                     null,
                     RecheckExecutionCommand.scheduled(batchId, instructionId, attempt, maxAttempts, minRetryMinutes));
+            return true;
         } catch (Exception e) {
-            // 单条失败不要拖垮整轮
-            log.warn("[push-recheck-scheduler] skip pushId={} due to err={}", pushId, e.getMessage());
+            log.error("[push-recheck-scheduler] traceId={} schedulerState=ITEM_FAILED pushId={} "
+                            + "errorClass={} errorMessage={}",
+                    batchId, pushId, e.getClass().getName(), e.getMessage(), e);
+            return false;
         }
+    }
+
+    public SchedulerExecution getLastExecution() {
+        return lastExecution;
     }
 
     public Map<String, Integer> getDispatchConfig() {
@@ -188,5 +205,34 @@ public class PushRecheckScheduler {
 
     private boolean scheduledExecutionEnabled() {
         return schedulersEnabled && pushRecheckSchedulerEnabled;
+    }
+
+    public record SchedulerExecution(String traceId,
+                                     String state,
+                                     LocalDateTime occurredAt,
+                                     int selectedCount,
+                                     int failureCount,
+                                     String errorClass,
+                                     String errorMessage) {
+        private static SchedulerExecution notRun() {
+            return new SchedulerExecution(null, "NOT_RUN", null, 0, 0, null, null);
+        }
+
+        private static SchedulerExecution succeeded(String traceId, LocalDateTime at,
+                                                    int selectedCount, int failureCount) {
+            return new SchedulerExecution(traceId, "SUCCEEDED", at,
+                    selectedCount, failureCount, null, null);
+        }
+
+        private static SchedulerExecution partial(String traceId, LocalDateTime at,
+                                                  int selectedCount, int failureCount) {
+            return new SchedulerExecution(traceId, "PARTIAL", at,
+                    selectedCount, failureCount, null, null);
+        }
+
+        private static SchedulerExecution failed(String traceId, LocalDateTime at, Exception failure) {
+            return new SchedulerExecution(traceId, "FAILED", at, 0, 1,
+                    failure.getClass().getName(), failure.getMessage());
+        }
     }
 }

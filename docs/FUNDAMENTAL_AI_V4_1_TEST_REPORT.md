@@ -1,147 +1,90 @@
-# Fundamental AI v4.1 Test Report
+# Fundamental AI v4.1 Final P1 Remediation Test Report
 
-Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_REAUDIT`
 
-## V13 OneShot Validation Addendum
-
-The final run covers canonical route/overlay/component contracts, dynamic
-multi-timeframe Top6, plan revalidation, Message/Channel ownership, AsyncTask,
-Review semantic extensions, Desktop browser QA and V13 migration parity.
-
-## Full Maven Validation
+## Full Maven
 
 Command: `./mvnw test -q`
 
-Regular isolated result:
-
-- tests: `4544`
-- passed: `4530`
+- tests: `4556`
+- passed: `4542`
 - failures: `0`
 - errors: `0`
 - skipped: `14`
-- suites: `416`
+- suites: `422`
+- exit code: `0`
 
-The regular sandbox run conditionally skipped the Docker-backed PostgreSQL
-migration test. That exact test was then run against a fresh controlled
-PostgreSQL instance and replaced one skip with one pass.
+The conditional external PostgreSQL test is one of the isolated-run skips. It
+was then executed separately against a fresh disposable PostgreSQL instance.
 
-Combined validation evidence after the isolated PostgreSQL rerun:
+## Java 17 Release Artifact
 
-- tests: `4544`
-- passed: `4531`
-- failures: `0`
-- errors: `0`
-- skipped: `13`
-- suites: `416`
+Command: `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./mvnw -q -DskipTests package`
 
-## PostgreSQL V13 Migration
+- Java release build: PASS;
+- exit code: `0`;
+- static resources and templates packaged with the application artifact.
 
-Test: `PostgreSqlFlywayMigrationSmokeTest`
+## Focused Remediation
 
-Controlled target:
+The focused ten-class run completed with `40` tests, `0` failures, `0` errors
+and `0` skipped. It covers:
 
-- PostgreSQL `16.14` in a disposable local container;
-- fixed non-production database `trade_model_v1_test`;
-- migrations validated: `13`;
-- path: empty -> V8 historical fixture -> V9/V10/V11 fixture -> V12/V13;
-- result: tests `1`, passed `1`, failures `0`, errors `0`, skipped `0`;
-- container cleanup: `PASS`.
+- canonical Home structure and Desktop interaction contracts;
+- Java-computed Push Recheck cutoff and real H2 mapper execution;
+- scheduler success/failure visibility;
+- Analysis Preview persistence isolation;
+- Asset Pool top-up/reset/`TRACKING_STOPPED` semantics;
+- V13 contract and database-dialect guards.
 
-The real run verified historical UserPosition/Monitor migrations, V11 decision
-chain data, V12 contract alignment, V13 final-interaction ownership, exact
-Market Bias and Plan Mode constraints, Candidate/Resolver/Final audit text,
-dynamic ranking reads and Flyway history.
+## PostgreSQL 16.15
 
-The controlled run also caught and corrected a PostgreSQL-only validation
-defect before handoff:
+Controlled target: fresh disposable database `trade_model_v1_test` on a local
+PostgreSQL 16.15 container. Credentials were redacted from all output.
 
-1. the V13 account-risk coverage assertion ordered the existing
-   `tm_account_risk_snapshot` owner by `created_at` instead of its canonical
-   `create_time` column.
+- empty schema -> Flyway V1 through V13: PASS;
+- migrations validated/applied: `13/13`;
+- `tm_*` base tables: `38`;
+- V11/V12/V13 core tables and V13 constraints: PASS;
+- Push Recheck cutoff SQL executed with `cutoffAt`: PASS;
+- recent retry excluded; older and first-attempt snapshots selected: PASS;
+- failures/errors/skips: `0/0/0`.
 
-The migration itself had already reached V13; the corrected assertion and the
-final clean rerun both passed.
+The first controlled run exposed a stale smoke assertion that still expected
+the V9 table/version totals. The test guard was corrected to the current V13
+contract, numeric Flyway-version ordering was fixed, and a new empty-database
+run passed.
 
-## Final Contract Coverage
+## Browser And Visual Contract
 
-| Requirement | Result | Principal suites |
-|---|---|---|
-| Asset Pool search/fuzzy/add/remove/restore/batch/scan | PASS | `PersistentAssetPoolServiceTest` and controller tests |
-| Asset Pool is the sole persistent Opportunity source | PASS | `DecisionChainSourceGateTest`, `AssetPoolBackedUniverseSourceTest` |
-| Search preview isolation and on-demand Three-AI | PASS | pool/controller and decision-chain tests |
-| Dynamic eligible/fresh/configured Top 6 | PASS | `OpportunityPriorityRankingServiceImplTest`, `DashboardHomeServiceImplTest` |
-| Eight Market Bias values | PASS | `MarketBiasPolicyTest`, validator and migration tests |
-| Eight Opportunity states | PASS | `AssetStateServiceImplTest` |
-| Five Plan Modes | PASS | resolver, validator, ranking and migration tests |
-| One canonical state writer, audit, debounce, cooling, precedence | PASS | state service and mapper integration tests |
-| GPT/Gemini/Grok authority isolation | PASS | AI contract and orchestrator tests |
-| Complete structured role semantics | PASS | schema, codec, orchestrator and Dashboard tests |
-| Role and collection state separation | PASS | AI contract/codec tests |
-| Evidence/source anti-hallucination | PASS | orchestrator provenance/state tests |
-| Success/failure/timeout/fallback/cache trace | PASS | orchestrator and call-log tests |
-| Candidate/Final isolation | PASS | persistence and controller source-gate tests |
-| Conflict Level 1-4 and opportunity preservation | PASS | conflict resolver and decision-chain tests |
-| Rule Validation and numeric source gate | PASS | rule validator tests |
-| Push Recheck is not trading permission | PASS | push snapshot/message tests |
-| UserPosition is separate from Plan | PASS | lifecycle, controller and ownership tests |
-| Existing P2 Position Monitoring preserved | PASS | monitor, risk and Dashboard suites |
-| Review responsibility chain and metrics | PASS | review policy/ownership/metrics tests |
-| Fourteen Desktop routes, eleven overlays, 54 component families | PASS | `FundamentalAiV41CanonicalDesktopInteractionContractTest` and browser route sweep |
-| Plan lifecycle and revalidation | PASS | `PlanRevalidationServiceTest`, mapper/controller contracts |
-| Message single owner and Telegram delivery filter | PASS | `MessageFactServiceTest`, channel/runtime contracts |
-| AsyncTask six-state contract with no fake percentage | PASS | `AsyncTaskServiceTest`, route/component contracts |
-| Common API envelope | PASS | `ApiResponseContractTest` |
-| Zero automatic trading capability | PASS | safety tests and static scan |
+- authenticated canonical Home captures at 1280, 1440, 1600 and wide Desktop;
+- 1440 full page and zero-opportunity state;
+- authenticated Analysis Preview and Asset Pool operation states;
+- horizontal overflow: 0;
+- one visible AI role: PASS;
+- legacy Home active structure: 0;
+- raw enum/component taxonomy primary copy: 0.
 
-## Focused Contract Suites
-
-The final targeted contract runs covered canonical Figma mapping,
-route/overlay/component contracts, AI schema/codec/orchestration,
-Candidate/Resolver/Validation/Final, audit aggregation, Dynamic Top 6, state
-machine, Asset Pool, Review, Position Monitoring and Dashboard contracts and
-completed with exit code `0`.
+These browser states use controlled data and are not live-provider evidence.
 
 ## Governance Gates
 
-- `bash scripts/product-source-gate.sh`: `PASS`.
-- `bash scripts/check-workflow-contract.sh`: `PASS`,
-  `WORKFLOW_CONTRACT_OK`.
-- `bash scripts/validate-v4-1-final-interaction-authorization.sh`: `PASS`,
-  including `DUPLICATE_SKELETON_STATUS: PASS`.
-- `git diff --check`: `PASS`.
-- `bash scripts/v1-state.sh`: diagnostic completed; the dirty candidate branch
-  is correctly not treated as merged-main completion.
+The following are required again immediately before push:
 
-## Environment Notes
+- Product Source Gate;
+- Workflow Contract;
+- final-interaction authorization validation;
+- duplicate skeleton guard;
+- `git diff --check`;
+- secret scan;
+- exact-head PR CI.
 
-- External AI live smoke remained disabled; no credentials were read and no
-  provider success was fabricated.
-- Real historical replay without a provider fixture remained explicitly
-  blocked rather than simulated.
-- Controlled PostgreSQL tests use a fixed target and must run in isolated
-  database instances; sharing that target among unrelated controlled suites is
-  intentionally not used as a valid combined test mode.
+CI run IDs and the exact pushed head are recorded in the PR handoff after push.
 
-`TEST_STATUS = PASS`
+`MAVEN_FULL = PASS`
 
-`READY_FOR_INDEPENDENT_FINAL_REAUDIT`
+`POSTGRESQL_V1_V13 = PASS`
 
-## Post-Authorization Main Sync Validation
+`PUSH_RECHECK_H2_SCHEDULER = PASS`
 
-Validated application base:
-`d3744e1707eef046355174ff3c95ca5634c9e948`.
-
-- Product Source Gate: `PASS`;
-- Workflow Contract: `PASS` (`WORKFLOW_CONTRACT_OK`);
-- exact authorization package validation: `PASS`;
-- focused v4.1 / Home / Three-AI / Candidate-Final / Position suites: `PASS`;
-- full Maven: `4544` tests, `4530` passed, `0` failures, `0` errors,
-  `14` skipped;
-- isolated PostgreSQL migration replacement: `1` passed, `0` skipped;
-- combined evidence: `4544` tests, `4531` passed, `13` skipped;
-- PostgreSQL empty-to-V13 migration: `PASS`;
-- browser route and viewport QA: `PASS`;
-- `git diff --check`: `PASS`.
-
-The exact final pushed PR head is reported in the PR handoff because this file
-cannot safely self-reference the commit that contains it.
+`PUSH_RECHECK_POSTGRESQL = PASS`

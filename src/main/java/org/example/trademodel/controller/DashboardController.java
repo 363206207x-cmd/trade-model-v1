@@ -285,27 +285,12 @@ public class DashboardController {
 
     @GetMapping("/dashboard")
     public String dashboard(Model model) {
-        long controllerStart = System.currentTimeMillis();
-        long systemStatusStart = System.currentTimeMillis();
-        model.addAttribute("systemStatus", decisionService.getLightSystemStatus());
-        long systemStatusCostMs = System.currentTimeMillis() - systemStatusStart;
-        System.out.println("[PERF] dashboard_system_status=" + systemStatusCostMs + " ms");
-
-        long alertsStart = System.currentTimeMillis();
-        model.addAttribute("alerts", monitorService.getRecentAlerts(3));
-        long alertsCostMs = System.currentTimeMillis() - alertsStart;
-        System.out.println("[PERF] dashboard_alerts=" + alertsCostMs + " ms");
-
-        long decisionsStart = System.currentTimeMillis();
-        model.addAttribute("decisions", decisionService.getLatestDecisionResults(DEFAULT_DASHBOARD_SUMMARY_LIMIT));
-        long decisionsCostMs = System.currentTimeMillis() - decisionsStart;
-        System.out.println("[PERF] dashboard_decisions=" + decisionsCostMs + " ms");
-
-        model.addAttribute("title", "TRINE LOGIC (V1)");
-
-        long controllerCostMs = System.currentTimeMillis() - controllerStart;
-        System.out.println("[PERF] dashboard_controller=" + controllerCostMs + " ms");
-        return "dashboard";
+        model.addAttribute("pageKey", "home");
+        model.addAttribute("pageTitle", "首页总览");
+        model.addAttribute("pageSubtitle", "查看当前重点机会、执行建议与真实持仓");
+        model.addAttribute("activeNavigation", "home");
+        model.addAttribute("resourceId", null);
+        return "workspace";
     }
 
     @GetMapping("/api/dashboard/refresh")

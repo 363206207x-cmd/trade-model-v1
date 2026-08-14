@@ -192,7 +192,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
         row.setFocusEnabled(false);
         row.setSortOrder(mapper.maxUserSortOrder(userId) + 10);
         row.setSourceType("USER_OVERRIDE");
-        row.setWatchStatus("REMOVED");
+        row.setWatchStatus("TRACKING_STOPPED");
         row.setVersion(nextVersion(existing));
         row.setExtJson(existing == null ? null : existing.getExtJson());
         row.setCreatedAt(existing == null || existing.getCreatedAt() == null ? now : existing.getCreatedAt());
@@ -209,9 +209,40 @@ public class PersistentAssetPoolService implements AssetPoolService {
 
     @Override
     @Transactional
-    public List<AssetPoolAssetDTO> restoreDefaults(Long userId) {
+    public List<AssetPoolAssetDTO> topUpDefaults(Long userId) {
         requireUserId(userId);
-        mapper.deleteUserOverrides(userId);
+        Map<String, AssetPoolItemDO> overrides = safe(mapper.listUserOverrides(userId)).stream()
+                .collect(Collectors.toMap(row -> normalizeSymbol(row.getSymbol()), row -> row,
+                        (left, right) -> right, LinkedHashMap::new));
+        LocalDateTime now = LocalDateTime.now();
+        for (AssetPoolItemDO systemDefault : safe(mapper.listSystemDefaults())) {
+            String symbol = normalizeSymbol(systemDefault.getSymbol());
+            AssetPoolItemDO existing = overrides.get(symbol);
+            if (existing == null || Boolean.TRUE.equals(existing.getActive())) {
+                continue;
+            }
+            mapper.upsert(defaultOverride(userId, systemDefault, existing, true, "OBSERVING", now));
+        }
+        return listForUser(userId);
+    }
+
+    @Override
+    @Transactional
+    public List<AssetPoolAssetDTO> resetDefaults(Long userId) {
+        requireUserId(userId);
+        Set<String> defaultSymbols = safe(mapper.listSystemDefaults()).stream()
+                .map(row -> normalizeSymbol(row.getSymbol()))
+                .collect(Collectors.toSet());
+        LocalDateTime now = LocalDateTime.now();
+        for (AssetPoolItemDO override : safe(mapper.listUserOverrides(userId))) {
+            String symbol = normalizeSymbol(override.getSymbol());
+            if (defaultSymbols.contains(symbol)) {
+                mapper.deleteUserOverride(userId, symbol);
+            } else if (Boolean.TRUE.equals(override.getActive())) {
+                mapper.upsert(defaultOverride(
+                        userId, override, override, false, "TRACKING_STOPPED", now));
+            }
+        }
         return listForUser(userId);
     }
 
@@ -354,6 +385,32 @@ public class PersistentAssetPoolService implements AssetPoolService {
 
     private static int nextVersion(AssetPoolItemDO existing) {
         return existing == null || existing.getVersion() == null ? 1 : existing.getVersion() + 1;
+    }
+
+    private static AssetPoolItemDO defaultOverride(Long userId,
+                                                   AssetPoolItemDO source,
+                                                   AssetPoolItemDO existing,
+                                                   boolean active,
+                                                   String watchStatus,
+                                                   LocalDateTime now) {
+        AssetPoolItemDO row = new AssetPoolItemDO();
+        row.setOwnerType("USER");
+        row.setOwnerId(userId);
+        row.setAssetId(source.getAssetId());
+        row.setSymbol(normalizeSymbol(source.getSymbol()));
+        row.setDisplayName(source.getDisplayName());
+        row.setMarketType(source.getMarketType());
+        row.setQuoteAsset(source.getQuoteAsset());
+        row.setActive(active);
+        row.setFocusEnabled(active && Boolean.TRUE.equals(source.getFocusEnabled()));
+        row.setSortOrder(sortOrder(source));
+        row.setSourceType("USER_OVERRIDE");
+        row.setWatchStatus(watchStatus);
+        row.setVersion(nextVersion(existing));
+        row.setExtJson(existing == null ? source.getExtJson() : existing.getExtJson());
+        row.setCreatedAt(existing == null || existing.getCreatedAt() == null ? now : existing.getCreatedAt());
+        row.setUpdatedAt(now);
+        return row;
     }
 
     private static String defaultWatchStatus(AssetPoolItemDO row) {

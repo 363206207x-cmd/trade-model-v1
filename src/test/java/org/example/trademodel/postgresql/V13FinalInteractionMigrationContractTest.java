@@ -21,6 +21,8 @@ class V13FinalInteractionMigrationContractTest {
         assertThat(sql).contains(
                 "ADD COLUMN analysis_mode VARCHAR(32)",
                 "'ANALYSIS_PREVIEW'", "'OPPORTUNITY_DECISION'",
+                "SET watch_status = 'TRACKING_STOPPED'",
+                "watch_status IN ('OBSERVING', 'TRACKING_STOPPED')",
                 "ADD COLUMN plan_lifecycle_state VARCHAR(32)",
                 "'CURRENT', 'NEEDS_REVALIDATION', 'SUPERSEDED'",
                 "'TRACKING_STOPPED', 'INVALIDATED', 'EXPIRED'",
@@ -48,7 +50,7 @@ class V13FinalInteractionMigrationContractTest {
         assertThat(sql).contains(
                 "tm_plan_revalidation_record", "tm_message", "tm_channel_delivery",
                 "tm_async_task", "tm_event_asset_relation", "analysis_mode",
-                "plan_lifecycle_state", "account_risk_coverage_state",
+                "plan_lifecycle_state", "account_risk_coverage_state", "TRACKING_STOPPED",
                 "not_trade_instruction", "not_order_execution");
     }
 }

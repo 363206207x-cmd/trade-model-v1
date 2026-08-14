@@ -1,5 +1,17 @@
 -- Canonical Desktop interaction runtime owners. Historical data remains fail closed.
 
+ALTER TABLE tm_asset_pool_item
+    DROP CONSTRAINT IF EXISTS ck_tm_asset_pool_watch_status;
+
+UPDATE tm_asset_pool_item
+SET watch_status = 'TRACKING_STOPPED'
+WHERE watch_status = 'REMOVED';
+
+ALTER TABLE tm_asset_pool_item
+    ADD CONSTRAINT ck_tm_asset_pool_watch_status CHECK (
+        watch_status IN ('OBSERVING', 'TRACKING_STOPPED')
+    );
+
 ALTER TABLE tm_analysis_run
     ADD COLUMN analysis_mode VARCHAR(32);
 

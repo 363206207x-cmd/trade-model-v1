@@ -1,63 +1,52 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_REAUDIT`
 
-Implementation gap result:
-`NO_KNOWN_IMPLEMENTATION_GAP_PENDING_TARGET_RUNTIME_EVIDENCE`.
+## P0
 
-## OneShot Boundary
+No known P0 implementation gap was found in this remediation.
 
-Canonical Figma, Desktop routes, runtime bindings and V13 persistence are
-implemented. The remaining gates are independent product review, PR CI and
-target-environment provider evidence. No local screenshot or controlled test is
-reported as live market/AI proof. Mobile and automatic trading remain outside
-scope.
+## P1
 
-## Product And Implementation Gaps
+### Target Runtime Provider-To-Review Evidence
 
-None are known against chapters 1-20 or Appendices A-D of the final frozen
-contract after the remediation and complete local regression.
+`TARGET_RUNTIME_EXTERNAL_CONFIGURATION_BLOCKED`
 
-This statement is bounded to backend capability, schema, API, persistence,
-query and automated-test alignment on the candidate branch. It does not claim
-production effectiveness or merged-main completion.
+The current environment lacks the external market/AI/auth/controlled-
+PostgreSQL variables listed in
+`docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_CHAIN_EVIDENCE.md`. Therefore the full
+Provider -> Final Plan -> UI manual position -> monitoring -> UI close ->
+Review trace cannot honestly be marked PASS.
 
-## External Gates Still Required
+No controlled fixture, screenshot or direct database row is promoted as live
+evidence. O05, O07 and O11 target-runtime acceptance remain part of this same
+blocked trace.
 
-1. Independent product-level design and runtime audit of PR #1179.
-2. PR CI on the final pushed commit.
-3. Review and merge decision.
-4. Clean/synced merged-main validation.
-5. Later live-provider and production-runtime acceptance where separately
-   authorized.
+## External Merge Gates
 
-## Evidence Boundaries
+1. Independent re-audit of the new exact PR head.
+2. Required GitHub checks on that exact head.
+3. Review/merge decision; PR remains Draft/Open/Unmerged.
+4. Clean merged-main regression and PostgreSQL validation.
+5. Target-runtime acceptance after the missing configuration is supplied.
 
-- PostgreSQL 16.14 V1-to-V13 migration was executed successfully in an isolated
-  disposable local database.
-- No live AI provider call was made and no provider credential was read.
-- Real historical replay without an authorized real fixture remains explicitly
-  unavailable; no local fixture is represented as provider evidence.
-- Full-market catalog fallback remains identified as fallback and cannot bypass
-  Asset Pool membership for persistent Opportunity creation.
-- PR #1179 remains open/draft/unmerged; the current phase is not effective on
-  `main`.
+## Deployment Boundary
 
-## Intentional Product Boundaries
+The runbook, environment/secret contract, backup/rollback plan, smoke contract
+and release checklist are complete. The highest possible state before merge is
+`READY_AFTER_MERGED_MAIN_VALIDATION`; the system is not claimed deployed or
+production-effective.
 
-- Canonical Figma: updated in the registered file
-  `rdMYmsAvZYkXHJX8hdl7UN`; no second Figma file was created.
-- Mobile: unchanged.
-- P2 Position Monitoring: preserved.
-- automatic open/close/add/reduce/reverse/order: absent.
-- exchange order API: absent.
-- Push Recheck: review-only and not trading authorization.
+## Post-Launch Backlog
 
-## Post-Authorization Candidate State
+Minor visual polish that does not affect the frozen contract belongs after
+launch. Mobile, additional product modules and any automatic trading behavior
+remain out of scope.
 
-- authorization main merged into the candidate without rewriting history;
-- implementation/Figma/runtime contracts remained unchanged;
-- local gates, full Maven, PostgreSQL V1-to-V13 and Browser QA passed;
-- PR status must remain Draft/Open/Unmerged until independent product audit.
+## Preserved Safety
 
-`IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+- Mobile changed: NO.
+- duplicate business skeleton: none added.
+- automatic trading capability: zero.
+- Push Recheck: review-only, not trading permission.
+- fake market/AI data: zero.

@@ -34,7 +34,7 @@ class BinanceMarketAssetCatalogTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void marketSearchIsCaseInsensitiveAndFuzzyAcrossSymbolAndBaseAsset() throws Exception {
+    void marketSearchIsCaseInsensitiveAndFuzzyAcrossSymbolNameAndAlias() throws Exception {
         HttpClient httpClient = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
@@ -49,6 +49,10 @@ class BinanceMarketAssetCatalogTest {
                 new ObjectMapper(), mock(ProviderSymbolMappingRegistry.class), httpClient);
 
         assertThat(catalog.search("bt", 10)).extracting(MarketAssetDTO::symbol)
+                .containsExactly("BTCUSDT");
+        assertThat(catalog.search("ether", 10)).extracting(MarketAssetDTO::symbol)
+                .containsExactly("ETHUSDT");
+        assertThat(catalog.search("比特", 10)).extracting(MarketAssetDTO::symbol)
                 .containsExactly("BTCUSDT");
         assertThat(catalog.requireTradable("eth/usdt").symbol()).isEqualTo("ETHUSDT");
     }

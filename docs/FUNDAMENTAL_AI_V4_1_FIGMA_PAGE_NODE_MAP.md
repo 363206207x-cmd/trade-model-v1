@@ -1,10 +1,8 @@
 # Fundamental AI v4.1 Canonical Figma Page And Node Map
 
-Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_REAUDIT`
 
-File key: `rdMYmsAvZYkXHJX8hdl7UN`
-
-No second Figma file was created.
+File key: `rdMYmsAvZYkXHJX8hdl7UN`. No second Figma file was created.
 
 ## Canonical Pages
 
@@ -39,58 +37,62 @@ No second Figma file was created.
 | R13 Full Audit Chain | `584:3089` |
 | R14 My / Settings | `584:3154` |
 
-## Shared Overlay Frames
+## Canonical Home Nodes
 
-`O01 568:2`, `O02 568:25`, `O03 568:55`, `O04 568:78`,
+- final SideNav: `615:712`
+- primary nav rows: `615:715` through `615:719`
+- primary nav labels: `616:3`, `616:5`, `616:7`, `616:9`, `616:11`
+- secondary navigation: `616:13`
+- safety footer: `616:17`
+- six-segment status strip: `611:716`
+- status cells: `611:717` through `611:722`
+- compact Top6 empty state: `612:712`
+
+Superseded SideNav/System Status nodes are hidden. Component taxonomy labels
+are hidden on the final Home and state product frames.
+
+## Required Eighteen Desktop States
+
+| State | Node |
+|---|---|
+| READY_WITH_TOP6 | `618:842` |
+| ZERO_OPPORTUNITY | `618:1024` |
+| FEWER_THAN_SIX | `618:1110` |
+| WAITING_DATA | `618:1304` |
+| SOURCE_UNAVAILABLE | `618:1390` |
+| SELECTED_ASSET_EXITED_TOP6 | `618:1476` |
+| CONFIRMATION | `619:1150` |
+| PREPARATION | `619:1264` |
+| REDUCED | `619:1378` |
+| OBSERVATION | `619:1492` |
+| BLOCKED | `619:1606` |
+| CONFUSED | `619:1720` |
+| HOT_RESET | `619:1862` |
+| POSITION_TOP3 | `619:5442` |
+| NO_POSITION | `619:5548` |
+| AI_READY | `619:5654` |
+| AI_PARTIAL | `619:5790` |
+| AI_UNAVAILABLE | `619:5926` |
+
+State count: `18/18`; detached instances: `0`; missing state names: `0`.
+
+## Shared Overlays And Components
+
+Overlays: `O01 568:2`, `O02 568:25`, `O03 568:55`, `O04 568:78`,
 `O05 568:108`, `O06 568:131`, `O07 568:154`, `O08 568:177`,
 `O09 568:200`, `O10 568:223`, `O11 568:246`.
 
-## Component Sets
+The existing 54 component families on page `559:4` remain the owners. No
+production instance named `TMV1/...` was detached or replaced with an ad-hoc
+frame during the remediation.
 
-Global: `561:33`, `561:62`, `561:91`, `561:120`, `561:149`,
-`561:178`, `561:207`, `561:236`, `561:265`, `561:294`.
+## Acceptance Evidence
 
-Asset/Opportunity: `562:33`, `562:62`, `562:91`, `562:120`,
-`562:149`, `562:178`, `562:207`, `562:236`, `562:265`.
+- Acceptance group: `599:4307`
+- controlled acceptance instances: `599:4308`, `599:4315`, `599:4322`
+- Scenario: `SCN-V41-04`
+- provenance: `BROWSER_CONTROLLED`
+- statement: controlled fixture, not production/live provider evidence
 
-Plan: `562:297`, `562:326`, `562:355`, `562:384`, `562:413`,
-`562:442`, `562:471`, `562:500`.
-
-AI: `562:532`, `562:561`, `562:590`, `562:619`, `562:648`,
-`562:677`, `562:706`, `562:735`.
-
-Position/Review: `562:767`, `562:796`, `562:825`, `562:854`,
-`562:883`, `562:912`, `562:941`, `562:970`.
-
-Message/Recheck: `562:1002`, `562:1031`, `562:1060`, `562:1089`,
-`562:1118`.
-
-Event/Settings/Audit: `562:1150`, `562:1179`, `562:1208`,
-`562:1237`, `562:1266`, `562:1295`.
-
-## Structural Verification
-
-- Routed pages: `14/14`
-- Overlays: `11/11`
-- Component families: `54/54`
-- Route state frames: `70`
-- Desktop acceptance states: `81/81`
-- Production instances inspected: `307`
-- Detached production instances: `0`
-- Placeholder text nodes: `0`
-- Text overflow findings: `0`
-- Acceptance evidence: `599:4307` (`PASS`)
-
-## Post-Authorization Main Sync Revalidation
-
-- Pre-sync main: `d8ff50e78dace96c292ea1429f42c6d5a6a631d0`
-- Pre-sync PR head: `62ba9702e54b268ef27158bcff7e33422e23015e`
-- Post-sync application base: `d3744e1707eef046355174ff3c95ca5634c9e948`
-- Canonical file key: `rdMYmsAvZYkXHJX8hdl7UN`
-- Figma content changed by this revalidation: `NO`
-- Pages / routes / overlays / component families: `9 / 14 / 11 / 54`
-- Production instances / detached-like instances / placeholders: `307 / 0 / 0`
-
-The post-authorization pass was read-only. It verified the exact existing node
-map and acceptance node without creating a second file, page, component set or
-Mobile frame.
+The READY cards contain controlled scenario values only. No controlled value
+is the production default and no simulated chart exists.

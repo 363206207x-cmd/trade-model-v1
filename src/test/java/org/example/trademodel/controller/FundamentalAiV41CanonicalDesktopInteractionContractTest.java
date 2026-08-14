@@ -16,8 +16,6 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
     private static final Path WORKSPACE = Path.of("src/main/resources/templates/workspace.html");
     private static final Path WORKSPACE_JS = Path.of("src/main/resources/static/js/workspace.js");
     private static final Path WORKSPACE_CSS = Path.of("src/main/resources/static/css/workspace.css");
-    private static final Path DASHBOARD = Path.of("src/main/resources/templates/dashboard.html");
-    private static final Path DASHBOARD_CSS = Path.of("src/main/resources/static/css/dashboard-latest.css");
     private static final Path ROUTES = Path.of(
             "src/main/java/org/example/trademodel/controller/DesktopWorkspaceController.java");
 
@@ -92,22 +90,24 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
 
     @Test
     void desktopHomeUsesFrozenProportionsAndDynamicTopSixWithoutFakeMarketVisuals() throws Exception {
-        String html = Files.readString(DASHBOARD);
-        String css = Files.readString(DASHBOARD_CSS);
+        String html = Files.readString(WORKSPACE);
+        String script = Files.readString(WORKSPACE_JS);
+        String css = Files.readString(WORKSPACE_CSS);
 
         assertThat(css).contains(
-                "--tmv1-sidebar-width: 224px",
                 "grid-template-columns: repeat(3, minmax(0, 1fr))",
-                "grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr)",
+                "grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr)",
                 "grid-template-columns: minmax(0, 19fr) minmax(240px, 6fr)");
         assertThat(html).contains(
                 "data-position-execution-ratio=\"60:40\"",
-                "asset.primaryOpportunityId",
-                "asset.primaryTimeframe",
-                "asset.primaryPlanMode",
-                "asset.secondaryOpportunityCount",
-                "asset.timeframeConflictState",
-                "restoreDashboardSelectionFromUrl()",
+                "id=\"homeOpportunityGrid\"",
+                "id=\"homePositionList\"",
+                "id=\"homePlanSummary\"",
+                "id=\"homeAiRoleContent\"");
+        assertThat(script).contains(
+                "asset?.primaryTimeframe",
+                "asset?.secondaryOpportunityCount",
+                "asset?.timeframeConflictState",
                 "frontendContract.replaceUrlParam(\"asset\"")
                 .doesNotContain("模拟K线", "模拟走势", "mini-chart", "sparkline");
     }
@@ -119,14 +119,16 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String css = Files.readString(WORKSPACE_CSS);
 
         assertThat(script).contains(
-                "/api/asset-pool", "/api/dashboard/home?limit=6", "/api/user-positions/open",
+                "/api/asset-pool", "/api/dashboard/home?", "new URLSearchParams({ limit: \"6\" })",
+                "/api/user-positions/open",
                 "/api/review/center", "/api/ai/audit-chain", "/api/workspace/messages",
                 "/api/workspace/rechecks/", "/api/workspace/plans/", "/api/workspace/events",
                 "/api/user-config", "等待监控数据", "当前不可查看", "暂无数据",
                 "notTradeInstruction")
                 .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER");
         assertThat(html).contains(
-                "录入实际持仓", "记录平仓", "Preview 不创建机会")
+                "录入实际持仓", "记录平仓", "开始分析", "加入资产池持续跟踪")
+                .doesNotContain("Preview 不创建机会")
                 .doesNotContain("自动开仓", "自动平仓", "自动反手", "自动下单");
         assertThat(css).contains("overflow-x: hidden", ":focus-visible");
     }

@@ -1079,7 +1079,7 @@ CREATE TABLE IF NOT EXISTS tm_asset_pool_item (
         OR (owner_type = 'USER' AND owner_id > 0)
     ),
     CONSTRAINT ck_tm_asset_pool_source CHECK (source_type IN ('DEFAULT', 'USER_ADDED', 'USER_OVERRIDE')),
-    CONSTRAINT ck_tm_asset_pool_watch_status CHECK (watch_status IN ('OBSERVING', 'REMOVED')),
+    CONSTRAINT ck_tm_asset_pool_watch_status CHECK (watch_status IN ('OBSERVING', 'TRACKING_STOPPED')),
     CONSTRAINT fk_tm_asset_pool_asset FOREIGN KEY (asset_id) REFERENCES tm_asset(id)
 );
 
@@ -1647,6 +1647,13 @@ MERGE INTO tm_rule_config KEY(rule_key) VALUES
 -- 不是按 analysis_id 归档的事件流水；review 仅做当前行解释展示。
 
 -- Fundamental AI v4.1 final interaction runtime owners (H2/local parity for V13).
+ALTER TABLE tm_asset_pool_item DROP CONSTRAINT IF EXISTS ck_tm_asset_pool_watch_status;
+UPDATE tm_asset_pool_item
+SET watch_status = 'TRACKING_STOPPED'
+WHERE watch_status = 'REMOVED';
+ALTER TABLE tm_asset_pool_item ADD CONSTRAINT IF NOT EXISTS ck_tm_asset_pool_watch_status
+    CHECK (watch_status IN ('OBSERVING', 'TRACKING_STOPPED'));
+
 ALTER TABLE tm_analysis_run ADD COLUMN IF NOT EXISTS analysis_mode VARCHAR(32);
 UPDATE tm_analysis_run
 SET analysis_mode = CASE WHEN preview = TRUE THEN 'ANALYSIS_PREVIEW' ELSE 'OPPORTUNITY_DECISION' END

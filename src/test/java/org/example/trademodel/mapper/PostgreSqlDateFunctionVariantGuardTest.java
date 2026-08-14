@@ -28,11 +28,15 @@ class PostgreSqlDateFunctionVariantGuardTest {
     }
 
     @Test
-    void pushSnapshotMapperKeepsH2DateaddFallbackAndAddsPostgreSqlIntervalVariant() throws Exception {
+    void pushSnapshotMapperUsesDialectNeutralJavaComputedCutoff() throws Exception {
         Method method = PushSnapshotMapper.class.getMethod("listPendingRecheckNext",
-                String.class, String.class, String.class, int.class, int.class, LocalDateTime.class, int.class);
+                String.class, String.class, String.class, int.class,
+                LocalDateTime.class, LocalDateTime.class, int.class);
         assertThat(method.getReturnType()).isAssignableFrom(List.class);
-        assertDateaddVariant(method);
+        assertThat(sql(genericSelect(method)))
+                .contains("r.last_recheck_time <= #{cutoffAt}")
+                .doesNotContain("DATEADD")
+                .doesNotContain("INTERVAL");
     }
 
     @Test

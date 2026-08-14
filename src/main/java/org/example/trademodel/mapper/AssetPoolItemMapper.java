@@ -56,4 +56,8 @@ public interface AssetPoolItemMapper {
 
     @Delete("DELETE FROM tm_asset_pool_item WHERE owner_type = 'USER' AND owner_id = #{userId}")
     int deleteUserOverrides(@Param("userId") Long userId);
+
+    @Delete("DELETE FROM tm_asset_pool_item WHERE owner_type = 'USER' AND owner_id = #{userId} "
+            + "AND symbol = #{symbol}")
+    int deleteUserOverride(@Param("userId") Long userId, @Param("symbol") String symbol);
 }

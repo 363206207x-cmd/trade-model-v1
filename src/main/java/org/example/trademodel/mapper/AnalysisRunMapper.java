@@ -41,7 +41,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "LIMIT 1")
     AnalysisRunDO selectReadableByUser(@Param("analysisId") String analysisId,
                                        @Param("userId") Long userId);
@@ -53,7 +53,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "ORDER BY ar.created_at DESC, ar.analysis_id DESC LIMIT 1")
     AnalysisRunDO selectReadableByTraceId(@Param("traceId") String traceId,
                                           @Param("userId") Long userId);
@@ -65,7 +65,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "ORDER BY ar.created_at DESC, ar.analysis_id DESC LIMIT 1")
     AnalysisRunDO selectReadableByRequestId(@Param("requestId") String requestId,
                                             @Param("userId") Long userId);

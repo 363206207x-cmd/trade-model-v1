@@ -101,7 +101,17 @@ public class AssetPoolController {
 
     @PostMapping("/restore-default")
     public ApiResponse<List<AssetPoolAssetDTO>> restoreDefault() {
-        return ApiResponse.success(assetPoolService.restoreDefaults(userIdResolver.requireCurrentUserId()));
+        return ApiResponse.success(assetPoolService.topUpDefaults(userIdResolver.requireCurrentUserId()));
+    }
+
+    @PostMapping("/defaults/top-up")
+    public ApiResponse<List<AssetPoolAssetDTO>> topUpDefaults() {
+        return ApiResponse.success(assetPoolService.topUpDefaults(userIdResolver.requireCurrentUserId()));
+    }
+
+    @PostMapping("/defaults/reset")
+    public ApiResponse<List<AssetPoolAssetDTO>> resetDefaults() {
+        return ApiResponse.success(assetPoolService.resetDefaults(userIdResolver.requireCurrentUserId()));
     }
 
     @PostMapping("/scan")
