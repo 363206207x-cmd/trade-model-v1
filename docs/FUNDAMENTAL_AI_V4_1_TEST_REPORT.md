@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Test Report
 
-Status: `ONESHOT_IMPLEMENTATION_COMPLETE_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
 
 ## V13 OneShot Validation Addendum
 
@@ -125,3 +125,23 @@ completed with exit code `0`.
 `TEST_STATUS = PASS`
 
 `READY_FOR_INDEPENDENT_FINAL_REAUDIT`
+
+## Post-Authorization Main Sync Validation
+
+Validated application base:
+`d3744e1707eef046355174ff3c95ca5634c9e948`.
+
+- Product Source Gate: `PASS`;
+- Workflow Contract: `PASS` (`WORKFLOW_CONTRACT_OK`);
+- exact authorization package validation: `PASS`;
+- focused v4.1 / Home / Three-AI / Candidate-Final / Position suites: `PASS`;
+- full Maven: `4544` tests, `4530` passed, `0` failures, `0` errors,
+  `14` skipped;
+- isolated PostgreSQL migration replacement: `1` passed, `0` skipped;
+- combined evidence: `4544` tests, `4531` passed, `13` skipped;
+- PostgreSQL empty-to-V13 migration: `PASS`;
+- browser route and viewport QA: `PASS`;
+- `git diff --check`: `PASS`.
+
+The exact final pushed PR head is reported in the PR handoff because this file
+cannot safely self-reference the commit that contains it.

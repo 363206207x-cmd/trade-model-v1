@@ -1,6 +1,9 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `NO_KNOWN_IMPLEMENTATION_GAP_PENDING_INDEPENDENT_PRODUCT_AUDIT_AND_TARGET_RUNTIME_EVIDENCE`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+
+Implementation gap result:
+`NO_KNOWN_IMPLEMENTATION_GAP_PENDING_TARGET_RUNTIME_EVIDENCE`.
 
 ## OneShot Boundary
 
@@ -50,4 +53,11 @@ production effectiveness or merged-main completion.
 - exchange order API: absent.
 - Push Recheck: review-only and not trading authorization.
 
-`READY_FOR_INDEPENDENT_FINAL_REAUDIT`
+## Post-Authorization Candidate State
+
+- authorization main merged into the candidate without rewriting history;
+- implementation/Figma/runtime contracts remained unchanged;
+- local gates, full Maven, PostgreSQL V1-to-V13 and Browser QA passed;
+- PR status must remain Draft/Open/Unmerged until independent product audit.
+
+`IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`

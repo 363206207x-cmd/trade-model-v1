@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Final Interaction Evidence
 
-Status: `ONESHOT_IMPLEMENTATION_COMPLETE_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
 
 Canonical Figma: `rdMYmsAvZYkXHJX8hdl7UN`
 
@@ -43,6 +43,12 @@ is not a runtime target.
 - `plan-unavailable-1440x900.jpg`
 - `settings-1440x900.jpg`
 - `postgresql-v1-v13-validation.txt`
+
+Post-authorization exact-head captures use PNG and include both viewport and
+full-page evidence at `1280x800`, `1440x900`, `1600x1000` and `1728x1117`.
+The 1440 route sweep also refreshes Asset Pool, Position empty, Analysis empty,
+Message empty, Final unavailable and Settings evidence. The legacy JPG files
+remain historical evidence and are not used as the exact-head browser result.
 
 `runtime-state-contact-sheet.png` combines the routed-state captures. The
 browser run used the authenticated local application with production endpoints;

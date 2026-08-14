@@ -1,5 +1,7 @@
 # Fundamental AI v4.1 Scenario Validation Report
 
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+
 Current OneShot status: `33/33 CONTRACT SCENARIOS MAPPED`; target-provider
 evidence remains explicitly separate from controlled runtime evidence.
 
@@ -85,7 +87,7 @@ Latest visual evidence: `v4_1_latest_ui/runtime/08-position-no-position.png` and
 
 | Scenario | Observed result | Result |
 |---|---|---|
-| First viewport | System Status, alert/event, Dynamic Top6 and entry into the 70/30 decision region are present at `1440 x 900` | PASS |
+| First viewport | System Status, alert/event, Dynamic Top6 and entry into the 60/40 decision region are present at `1440 x 900` | PASS |
 | Latest Figma baseline | Nodes `28:154`, `31:23`, `520:212`, `523:748`, `35:97`, `35:4`, `35:35`, `35:66` captured; old node `519:3` rejected | PASS |
 | Asset context switch | BTC to ETH changes Final Plan and all role analysis IDs; System Status, alerts/events and positions remain unchanged | PASS |
 | Single AI workspace | GPT, Gemini and Grok each render alone when selected | PASS |
@@ -115,3 +117,14 @@ REAL_SCENARIO_STATUS=PARTIAL
 ```
 
 This remaining evidence does not block frontend contract alignment. It does block any claim that the screenshots prove live provider accuracy or production acceptance.
+
+## Post-Authorization Revalidation
+
+All `33/33` controlled contract scenarios were rerun or re-bound to the exact
+post-sync application hashes. The four Desktop widths and 14-route sweep used
+the authenticated application, not the visual fixture. Dynamic opportunity,
+Final-only, structured Three-AI, manual position, fail-closed and zero-auto-
+trading assertions remained PASS. Target-provider evidence remains a separate
+acceptance class and was not fabricated by this package.
+
+`POST_AUTH_SCENARIO_STATUS = 33/33 PASS`
