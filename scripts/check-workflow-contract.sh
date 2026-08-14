@@ -295,6 +295,8 @@ require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md
 require_file "docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION_VALIDATION.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_CANONICAL_FIGMA_AUTHORIZATION_SCOPE_RECONCILIATION.md"
 require_file "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 require_contains "docs/P1A_HOME_ALIGNMENT_AUDIT.md" "P1A_COMPLETION_STATUS: COMPLETED"
 require_contains "docs/P1B_AUTHORIZATION_SCOPE.md" "HOME_READ_PROJECTION_ONLY"
@@ -307,6 +309,10 @@ require_contains "scripts/v1-state.sh" "P2_POSITION_MONITORING_AUTHORIZATION_STA
 require_contains "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md" "HISTORICAL_REFERENCE_ONLY / SUPERSEDED"
 require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md" "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md" "automatically open, close"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md" "rdMYmsAvZYkXHJX8hdl7UN"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md" '70:30'
+require_contains "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md" '`SUPERSEDED`'
+require_contains "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md" '| Position Monitoring | 60% | 58-62% |'
 require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
 require_contains "scripts/v1-state.sh" "V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS"
 require_contains "scripts/v1-auto.sh" "complete-pr"
@@ -377,6 +383,9 @@ authorized_next_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_n
 authorized_next_package_edits="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_repository_edits_allowed)"
 authorized_next_package_implementation="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_allowed)"
 authorized_next_package_pr="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_pr_allowed)"
+authorized_next_package_canonical_figma="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_canonical_figma_desktop_implementation_allowed)"
+authorized_next_package_mobile="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_mobile_implementation_allowed)"
+authorized_next_package_canonical_figma_key="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_canonical_figma_file_key)"
 blocked_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml blocked_package_phase)"
 blocked_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml blocked_package_status)"
 p1b_scope="$(yaml_value docs/CODEX_NEXT_TASK.yml scope)"
@@ -417,6 +426,9 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
 [[ "$authorized_next_package_pr" == "true" ]] || fail "authorized v4.1 PR creation must be true"
+[[ "$authorized_next_package_canonical_figma" == "true" ]] || fail "authorized v4.1 Canonical Figma Desktop permission must be true"
+[[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
+[[ "$authorized_next_package_canonical_figma_key" == "rdMYmsAvZYkXHJX8hdl7UN" ]] || fail "authorized v4.1 Canonical Figma key mismatch"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
 [[ "$p1b_scope" == "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]] || fail "v4.1 scope must remain V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
@@ -500,6 +512,9 @@ for v4_1_expected in \
   "RESOLVED_EDIT_PERMISSION: true" \
   "RESOLVED_IMPLEMENTATION_PERMISSION: true" \
   "RESOLVED_PR_CREATION_PERMISSION: true" \
+  "CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: true" \
+  "MOBILE_IMPLEMENTATION_ALLOWED: false" \
+  "CANONICAL_FIGMA_FILE_KEY: rdMYmsAvZYkXHJX8hdl7UN" \
   "GENERATED_PACKAGE: $authorized_next_package_phase"; do
   printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_expected" \
     || fail "v4.1 handoff omitted: $v4_1_expected"
@@ -738,6 +753,9 @@ fi
 if grep -Eiq 'review-only slice count.*(complete|progress|next)|completed review-only.*next business' scripts/v1-auto.sh scripts/v1-state.sh scripts/codex-next-task.sh docs/CODEX_NEXT_TASK.yml docs/ACTIVE_MAINLINE_STATUS.yml 2>/dev/null; then
   fail "workflow must not use completed review-only slice count as next-task or delivery-completion basis"
 fi
+
+bash scripts/validate-v4-1-final-interaction-authorization.sh >/dev/null \
+  || fail "v4.1 Canonical Figma authorization validation failed"
 
 changed_files="$({ git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git diff --name-only origin/main...HEAD 2>/dev/null || true; git diff --name-only HEAD~1..HEAD 2>/dev/null || true; } | sort -u)"
 if echo "$changed_files" | grep -Eq 'src/main/java|src/test/java'; then

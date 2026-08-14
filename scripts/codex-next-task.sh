@@ -129,6 +129,9 @@ validate_contract_task() {
   authorized_next_edits="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
   authorized_next_implementation="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_allowed)"
   authorized_next_pr="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
+  authorized_next_canonical_figma="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_desktop_implementation_allowed)"
+  authorized_next_mobile="$(yaml_value "$TASK_FILE" authorized_next_package_mobile_implementation_allowed)"
+  authorized_next_canonical_figma_key="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_file_key)"
   blocked_package="$(yaml_value "$TASK_FILE" blocked_package_phase)"
   blocked_status="$(yaml_value "$TASK_FILE" blocked_package_status)"
   p1b_1_status="$(yaml_value "$TASK_FILE" p1b_1_status)"
@@ -155,7 +158,7 @@ validate_contract_task() {
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
   [[ "$authorized_next_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized v4.1 final interaction package mismatch" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" ]] || { echo "TASK_VALIDATION_FAILED bounded v4.1 permissions are incomplete" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "true" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "rdMYmsAvZYkXHJX8hdl7UN" ]] || { echo "TASK_VALIDATION_FAILED bounded v4.1 permissions are incomplete" >&2; failed=1; }
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   [[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || { echo "TASK_VALIDATION_FAILED P1B-1 predecessor is not effective" >&2; failed=1; }
   [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED Product P1B predecessor boundary mismatch" >&2; failed=1; }
@@ -163,7 +166,7 @@ validate_contract_task() {
   [[ "$p2_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$p2_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED merged P2 compatibility evidence mismatch" >&2; failed=1; }
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$v4_1_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction authorization boundary mismatch" >&2; failed=1; }
-  [[ -f docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md && -f docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED v4.1 final interaction artifacts are missing" >&2; failed=1; }
+  [[ -f docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md && -f docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md && -f docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md && -f docs/FUNDAMENTAL_AI_V4_1_CANONICAL_FIGMA_AUTHORIZATION_SCOPE_RECONCILIATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED v4.1 final interaction artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -258,6 +261,9 @@ resolved_handoff_stage="$(state_value "$state_text" RESOLVED_HANDOFF_STAGE)"
 resolved_edit_permission="$(state_value "$state_text" RESOLVED_EDIT_PERMISSION)"
 resolved_implementation_permission="$(state_value "$state_text" RESOLVED_IMPLEMENTATION_PERMISSION)"
 resolved_pr_creation_permission="$(state_value "$state_text" RESOLVED_PR_CREATION_PERMISSION)"
+canonical_figma_desktop_implementation_allowed="$(state_value "$state_text" CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED)"
+mobile_implementation_allowed="$(state_value "$state_text" MOBILE_IMPLEMENTATION_ALLOWED)"
+canonical_figma_file_key="$(state_value "$state_text" CANONICAL_FIGMA_FILE_KEY)"
 resolved_next_action="$(state_value "$state_text" RESOLVED_NEXT_ACTION)"
 
 if [[ "$resolved_from_state" != "YES" || "$resolution_status" != "ALLOWED" ]]; then
@@ -297,6 +303,11 @@ case "$resolved_scope_profile" in
         [[ "$resolved_edit_permission" == "true" ]] || { echo "STOP: implementation resolved without repository edit permission." >&2; exit 1; }
         [[ "$resolved_implementation_permission" == "true" ]] || { echo "STOP: implementation resolved without implementation permission." >&2; exit 1; }
         [[ "$resolved_pr_creation_permission" == "true" ]] || { echo "STOP: implementation resolved without PR creation permission." >&2; exit 1; }
+        if [[ "$resolved_package" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
+          [[ "$canonical_figma_desktop_implementation_allowed" == "true" ]] || { echo "STOP: exact v4.1 package resolved without Canonical Figma Desktop permission." >&2; exit 1; }
+          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: exact v4.1 package resolved with forbidden Mobile permission." >&2; exit 1; }
+          [[ "$canonical_figma_file_key" == "rdMYmsAvZYkXHJX8hdl7UN" ]] || { echo "STOP: exact v4.1 package resolved the wrong Canonical Figma file." >&2; exit 1; }
+        fi
         ;;
       *)
         echo "STOP: unsupported authorized successor mode (${resolved_mode:-UNKNOWN})." >&2
@@ -340,6 +351,9 @@ RESOLVED_MODE: $resolved_mode
 RESOLVED_EDIT_PERMISSION: $resolved_edit_permission
 RESOLVED_IMPLEMENTATION_PERMISSION: $resolved_implementation_permission
 RESOLVED_PR_CREATION_PERMISSION: $resolved_pr_creation_permission
+CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: $canonical_figma_desktop_implementation_allowed
+MOBILE_IMPLEMENTATION_ALLOWED: $mobile_implementation_allowed
+CANONICAL_FIGMA_FILE_KEY: $canonical_figma_file_key
 RESOLVED_BRANCH: $resolved_branch
 RESOLVED_HANDOFF_STAGE: $resolved_handoff_stage
 REQUEST_CLASS: $request_class

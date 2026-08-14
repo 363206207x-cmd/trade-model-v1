@@ -1,11 +1,11 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI v4.1 Final Interaction Product Source and implementation authorization"
+active_block: "Fundamental AI v4.1 Canonical Figma authorization scope reconciliation"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI v4.1 Final Interaction Authorization"
-branch: "codex/v4-1-final-interaction-authorization"
+module: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation"
+branch: "codex/v4-1-canonical-figma-authorization-reconciliation"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
@@ -13,19 +13,20 @@ current_effective_status: "PENDING_MERGED_MAIN"
 authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 
 current_package_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION"
-current_package_name: "Fundamental AI v4.1 Final Interaction Product Source and Implementation Authorization"
-current_package_active_block: "Final Interaction Product Source Reconciliation And Exact Implementation Permission Gate"
+current_package_name: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation"
+current_package_active_block: "Exact-Package Canonical Figma Desktop Permission And Visual Contract Gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-final-interaction-authorization"
+current_package_branch: "codex/v4-1-canonical-figma-authorization-reconciliation"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this Product Source and authorization package; do not modify PR #1179 application code before merged-main effectivity"
+current_package_next_action: "Review and merge only this Canonical Figma authorization amendment; do not modify or synchronize PR #1179 in this task"
 current_package_allowed_scope:
-  - "Merge the 2026-08-14 interaction freeze into the sole canonical v4.1 Product Source"
-  - "Register the page/route/component matrix, object ownership map, PR #1179 reuse map, reconciliation report, authorization, delivery state, and gates"
+  - "Register the Canonical Figma Desktop permission in the existing exact implementation package"
+  - "Register the visual density/proportion contract and explicit 70:30 supersession by 60:40"
+  - "Update Product Source references, page matrix status, PR #1179 historical disposition, delivery state, machine permissions, gates, and reconciliation report"
   - "Validate exact-package fail-closed behavior without application, API, schema, Figma, Mobile, or business-test changes"
 current_package_blocked_scope:
   - "Application code, API, schema, migration, HTML, CSS, JavaScript, business test, Figma, or Mobile changes"
@@ -41,7 +42,10 @@ authorized_next_package_risk: "C"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
-authorized_next_package_next_action: "Synchronize PR #1179 with latest main, reuse its protected assets, implement the complete frozen Desktop interaction/runtime contract once, then stop for independent product-level audit"
+authorized_next_package_canonical_figma_desktop_implementation_allowed: true
+authorized_next_package_mobile_implementation_allowed: false
+authorized_next_package_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
+authorized_next_package_next_action: "Synchronize PR #1179 with amended main, preserve its protected assets, rerun all validations on a new exact Head, then stop for independent product-level audit"
 
 blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_OR_MOBILE_IMPLEMENTATION"
 blocked_package_status: "BLOCKED_OUTSIDE_FINAL_INTERACTION_CONTRACT"
@@ -83,12 +87,12 @@ risk: "A-risk Product Source and authorization package; successor is C-risk beca
 
 pr_1179_number: "1179"
 pr_1179_status: "OPEN_DRAFT_UNMERGED"
-pr_1179_head: "198fc0ff545240a1b89dbbbfb1a3e642648d4f45"
+pr_1179_head: "62ba9702e54b268ef27158bcff7e33422e23015e"
 pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
-pr_1179_disposition: "REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE"
+pr_1179_disposition: "REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION"
 
-current_pr: "Fundamental AI v4.1 Final Interaction Product Source And Implementation Authorization / PENDING_REVIEW"
-current_package_pr: "Fundamental AI v4.1 Final Interaction Authorization Package"
+current_pr: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation / PENDING_REVIEW"
+current_package_pr: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
@@ -97,7 +101,7 @@ production_deployment_readiness: "BLOCKED"
 next_business_phase: "Fundamental AI v4.1 Final Interaction And Page OneShot Implementation"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+next_allowed_action: "Merge this authorization amendment; only then synchronize PR #1179 and request FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 
 product_phase: "Fundamental AI v4.1 Final Interaction"
 product_direction: "PRODUCT_FIRST"
@@ -109,6 +113,7 @@ audit_scope_modules:
   - "PAGE_ROUTE_COMPONENT_MATRIX"
   - "OBJECT_OWNERSHIP"
   - "PR_1179_REUSE"
+  - "VISUAL_DENSITY_AND_PROPORTION"
   - "AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
@@ -117,6 +122,7 @@ audit_scope_paths:
   - "docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md"
   - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md"
   - "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md"
   - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md"
   - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_RECONCILIATION_REPORT.md"
 
@@ -124,6 +130,8 @@ audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
   - "FINAL_INTERACTION_DISAMBIGUATION"
   - "DESKTOP_ROUTE_AND_STATE_FREEZE"
+  - "CANONICAL_FIGMA_DESKTOP_PERMISSION"
+  - "VISUAL_DENSITY_AND_PROPORTION"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -143,7 +151,7 @@ product_contract_mapping: |
   The single v4.1 source now owns the business chain and final Desktop interaction contract. Fourteen routes, eleven overlays, fifty-four component families, seventy route states, eleven overlay states, eighteen disambiguation contracts and protected PR #1179 capabilities are frozen together.
 
 design_interaction_mapping: |
-  Desktop only. Reuse approved PR #1179 components and visual language. Figma remains unchanged and Mobile implementation remains forbidden. Missing, stale, unavailable and failed states are first-class; no fake data or fake progress.
+  Desktop only. Reuse approved PR #1179 components and visual language. The exact package may modify only Canonical Figma file rdMYmsAvZYkXHJX8hdl7UN under the frozen 14-route/11-overlay/54-family/81-state and visual-density contracts. Mobile implementation remains forbidden. Missing, stale, unavailable and failed states are first-class; no fake data or fake progress.
 
 data_source_mapping: |
   Reuse canonical Pool, Analysis, Evidence, Score, Decision, Opportunity, Candidate, Resolver, Final, AITrace, UserPosition, Monitor, Review, Push/Recheck, Event, UserConfig and provider owners. Extend those owners and add only the independent records approved by the current ownership map.
@@ -156,13 +164,14 @@ allowed_scope:
 
 authorized_next_allowed_scope:
   - "Implement all frozen Desktop routes, overlays, components and states by reusing PR #1179"
+  - "Modify only Canonical Figma file rdMYmsAvZYkXHJX8hdl7UN using approved components/variants, Auto Layout and Variables, with node-ID and runtime-comparison evidence"
   - "Extend the minimum canonical View Model, API, schema, persistence and runtime owners required by the Product Source"
   - "Add full contract, migration, browser and runtime scenario validation"
 
 authorized_next_blocked_scope:
   - "Automatic trading or automatic position mutation"
   - "AI rule bypass, Preview persistence of Opportunity/Candidate/Final, Candidate-as-Final, or Final-as-Position"
-  - "Duplicate business ownership, fake data, fake AI output, fake progress, Figma changes or Mobile implementation"
+  - "Duplicate business ownership, fake data, fake AI output, fake progress, a second/non-canonical Figma file or Design System, or Mobile implementation"
 
 blocked_scope:
   - "Any implementation inside this authorization package"
@@ -183,18 +192,21 @@ hard_boundaries:
   fake_data_as_real: "BLOCKED"
   owner_scope_bypass: "BLOCKED"
   figma_change: "BLOCKED"
+  canonical_figma_desktop_implementation: "ALLOWED_EXACT_PACKAGE_SINGLE_FILE"
+  noncanonical_figma_change: "BLOCKED"
   mobile_implementation: "BLOCKED"
 
 checks:
   - "Unique active v4.1 Product Source and hashes pass"
   - "Authorization is blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "Canonical Figma Desktop permission is true only for the exact package and Mobile permission is always false"
   - "PR #1179 is recognized as the exact authorized successor, not an unrelated conflict"
   - "Wrong package names fail closed"
   - "Workflow, authorization, duplicate-skeleton, Markdown/YAML, Maven and diff checks pass"
 
 stop_conditions:
   - "A Product Source conflict or duplicate owner remains"
-  - "PR #1179 Head changes during authorization"
+  - "PR #1179 Head changes from 62ba9702e54b268ef27158bcff7e33422e23015e during authorization"
   - "The diff includes application, API, schema, migration, business-test, Figma or Mobile changes"
   - "The exact successor is not the only implementation package permitted after merged-main effectivity"
 

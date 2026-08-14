@@ -1102,7 +1102,11 @@ PR #1179 is a reusable implementation base, not a source of product truth. It
 may be synchronized/rebased only after authorization effectivity and must
 preserve its audited passing capabilities. The package may make the minimum
 frontend, API, schema, persistence and test changes required by the frozen
-Desktop contract. Figma and Mobile remain outside scope.
+Desktop contract. It may also modify only Canonical Figma file
+`rdMYmsAvZYkXHJX8hdl7UN` for the same frozen Desktop routes, overlays,
+components and states. A second Figma file, a second Design System,
+non-canonical Figma changes and all Mobile implementation remain outside
+scope.
 
 No package may automatically open, close, add, reduce or reverse a position,
 place an exchange order, let AI bypass Rule Validation, persist Preview as an
