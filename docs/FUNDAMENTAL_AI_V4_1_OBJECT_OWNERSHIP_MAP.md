@@ -1,5 +1,12 @@
 # Fundamental AI v4.1 Object Ownership Map
 
+Status: `HISTORICAL_IMPLEMENTATION_EVIDENCE / SUPERSEDED_FOR_CURRENT_INTERACTION`
+
+Current interaction ownership is frozen in
+`docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md`. This file
+remains evidence of the earlier backend implementation and cannot authorize a
+parallel owner.
+
 Status: `IMPLEMENTED_AND_FROZEN_PENDING_MERGE`
 
 Authority: `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`

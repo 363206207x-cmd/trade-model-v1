@@ -1,64 +1,60 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI v4.1 Decision Chain implementation authorization"
+active_block: "Fundamental AI v4.1 Final Interaction Product Source and implementation authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI v4.1 Decision Chain Authorization"
-branch: "codex/v4-1-decision-chain-authorization"
+module: "Fundamental AI v4.1 Final Interaction Authorization"
+branch: "codex/v4-1-final-interaction-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
+authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 
-# Runtime selection is owned by scripts/v1-state.sh. This authorization may be
-# reviewed and merged, but successor permissions remain ineffective until the
-# authorization is present on clean, synced merged main.
-current_package_phase: "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION"
-current_package_name: "Fundamental AI v4.1 Decision Chain Implementation Authorization"
-current_package_active_block: "v4.1 Decision Chain Implementation Permission Gate"
+current_package_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION"
+current_package_name: "Fundamental AI v4.1 Final Interaction Product Source and Implementation Authorization"
+current_package_active_block: "Final Interaction Product Source Reconciliation And Exact Implementation Permission Gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-decision-chain-authorization"
+current_package_branch: "codex/v4-1-final-interaction-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this authorization package; do not start v4.1 business implementation before merged-main effectivity"
+current_package_next_action: "Review and merge only this Product Source and authorization package; do not modify PR #1179 application code before merged-main effectivity"
 current_package_allowed_scope:
-  - "Register and hash the frozen Fundamental AI v4.1 Decision Chain Product Source"
-  - "Freeze AI role authority, Candidate/Final separation, and canonical object ownership"
-  - "Update the Delivery Matrix, roadmap, current state, and exact machine-readable authorization handoff"
-  - "Add minimal deterministic authorization tests without changing application code, API, schema, Mobile, or Figma"
+  - "Merge the 2026-08-14 interaction freeze into the sole canonical v4.1 Product Source"
+  - "Register the page/route/component matrix, object ownership map, PR #1179 reuse map, reconciliation report, authorization, delivery state, and gates"
+  - "Validate exact-package fail-closed behavior without application, API, schema, Figma, Mobile, or business-test changes"
 current_package_blocked_scope:
-  - "Application code, business tests, API contract, schema, migration, HTML, CSS, JavaScript, Mobile, or Figma"
-  - "Any v4.1 implementation staging, commit, push, or PR before authorization is effective on merged main"
-  - "Automatic open, close, reduce, add, reverse, order, or executable trading behavior"
-  - "Any differently named, broader, duplicate-object, or unrelated implementation package"
+  - "Application code, API, schema, migration, HTML, CSS, JavaScript, business test, Figma, or Mobile changes"
+  - "Any modification, close, merge, commit, push, or rebase of PR #1179"
+  - "Any implementation before the authorization is effective on clean, synchronized merged main"
 
-authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
-authorized_next_package_name: "Fundamental AI v4.1 OneShot Backend Implementation"
-authorized_next_package_active_block: "Asset Pool To Review Decision Chain Backend Capability"
+authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+authorized_next_package_name: "Fundamental AI v4.1 Final Interaction And Page OneShot Implementation"
+authorized_next_package_active_block: "Fourteen Desktop Routes, Eleven Overlays, Runtime Data Chain And Independent Acceptance"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/fundamental-ai-v4-1-decision-chain-implementation"
-authorized_next_package_risk: "B"
+authorized_next_package_branch: "codex/v4-1-frontend-runtime-alignment"
+authorized_next_package_risk: "C"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
-authorized_next_package_next_action: "Implement the exact frozen v4.1 backend chain, validate it, commit it, and create a Draft PR; stop for Backend Capability Audit"
+authorized_next_package_next_action: "Synchronize PR #1179 with latest main, reuse its protected assets, implement the complete frozen Desktop interaction/runtime contract once, then stop for independent product-level audit"
 
-blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_IMPLEMENTATION"
-blocked_package_status: "BLOCKED_OUTSIDE_V4_1_DECISION_CHAIN_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_V4_1_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_OR_MOBILE_IMPLEMENTATION"
+blocked_package_status: "BLOCKED_OUTSIDE_FINAL_INTERACTION_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_FINAL_INTERACTION_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
-  - "V4_1_PRODUCT_DESIGN_FROZEN"
-  - "V4_1_DECISION_CHAIN_SCOPE_APPROVED"
-  - "V4_1_DECISION_CHAIN_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
+  - "FINAL_INTERACTION_SPEC_FROZEN"
+  - "FINAL_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
+  - "WORKFLOW_CONTRACT_PASS"
   - "CLEAN_WORKTREE"
-  - "NO_ACTIVE_CONFLICTING_PR"
+  - "NO_ACTIVE_CONFLICTING_PR_EXCEPT_EXACT_AUTHORIZED_SUCCESSOR"
 
 # Historical predecessor fields remain compatibility evidence only.
 p1a_repository_edits_allowed: false
@@ -74,70 +70,62 @@ product_p1b_status: "COMPLETE"
 p2_position_monitoring_authorization_status: "EFFECTIVE_MERGED_MAIN"
 p2_position_monitoring_implementation_status: "COMPLETE"
 v4_1_decision_chain_design_status: "FROZEN"
-v4_1_decision_chain_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_decision_chain_implementation_status: "NOT_STARTED"
-# Compatibility fields above preserve the historical authorization handoff.
-# The active package below is independently machine-readable and must not be
-# interpreted as merged-main effectivity before its Draft PR is reviewed.
-v4_1_backend_effective_main: "edc3615c03c9b71763c32574f1d811c1d9a8954d"
-v4_1_frontend_runtime_alignment_status: "IMPLEMENTED_PENDING_MERGE"
-authorized_next_package: "FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
-scope: "V4_1_DECISION_CHAIN_BACKEND_ONLY"
+v4_1_decision_chain_authorization_status: "HISTORICAL_SUPERSEDED"
+v4_1_decision_chain_implementation_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_final_interaction_design_status: "FROZEN"
+v4_1_final_interaction_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_final_interaction_implementation_status: "NOT_STARTED"
+authorized_next_package: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+scope: "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk bounded v4.1 authorization and deterministic runtime handoff; no application code, API, schema, UI, Mobile, Figma, business test, notification, or trading capability"
-current_pr: "Fundamental AI v4.1 Decision Chain Authorization / PENDING_REVIEW"
-current_package_pr: "Fundamental AI v4.1 Decision Chain Authorization Package"
+risk: "A-risk Product Source and authorization package; successor is C-risk because its frozen scope may require API/schema/runtime changes"
+
+pr_1179_number: "1179"
+pr_1179_status: "OPEN_DRAFT_UNMERGED"
+pr_1179_head: "198fc0ff545240a1b89dbbbfb1a3e642648d4f45"
+pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
+pr_1179_disposition: "REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE"
+
+current_pr: "Fundamental AI v4.1 Final Interaction Product Source And Implementation Authorization / PENDING_REVIEW"
+current_package_pr: "Fundamental AI v4.1 Final Interaction Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
-a_risk_auto_merge_rule: "not applicable before independent exact-Head review and an explicit merge gate"
+a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only package after all gates pass"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "Fundamental AI v4.1 OneShot Backend Implementation"
+next_business_phase: "Fundamental AI v4.1 Final Interaction And Page OneShot Implementation"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Review and merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
+next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 
-product_phase: "Fundamental AI v4.1 Decision Chain"
+product_phase: "Fundamental AI v4.1 Final Interaction"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Fundamental AI v4.1 Decision Chain authorization"
+product_module: "v4.1 final interaction Product Source reconciliation and authorization"
 
 audit_scope_modules:
-  - "ASSET_POOL"
-  - "OPPORTUNITY"
-  - "ANALYSIS_EVIDENCE_SCORE_DECISION"
-  - "THREE_AI_DECISION_CHAIN"
-  - "EXECUTION_PLAN_CANDIDATE_AND_FINAL"
-  - "AI_TRACE"
-  - "REVIEW_EXTENSION"
   - "PRODUCT_SOURCE"
+  - "PAGE_ROUTE_COMPONENT_MATRIX"
+  - "OBJECT_OWNERSHIP"
+  - "PR_1179_REUSE"
+  - "AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
-  - "src/main/java/org/example/trademodel/providercall/universe"
-  - "src/main/java/org/example/trademodel/service/watchlistsource"
-  - "src/main/java/org/example/trademodel/service/watchlistscan"
-  - "src/main/java/org/example/trademodel/analysisrun"
-  - "src/main/java/org/example/trademodel/entity"
-  - "src/main/java/org/example/trademodel/service"
-  - "src/main/java/org/example/trademodel/vo/DecisionBundleVO.java"
-  - "src/main/resources/db/migration"
-  - "src/test/java/org/example/trademodel"
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_OBJECT_OWNERSHIP_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_RECONCILIATION_REPORT.md"
 
 audit_scope_source_domains:
-  - "ASSET_POOL_ONLY_OPPORTUNITY_SOURCE"
-  - "OPPORTUNITY_STATE_AND_TRANSITION_AUDIT"
-  - "RULE_LED_THREE_AI_AUTHORITY"
-  - "CANDIDATE_FINAL_SEPARATION"
-  - "CONFLICT_AND_RULE_VALIDATION"
-  - "MANUAL_USER_POSITION_BOUNDARY"
-  - "TRACE_AND_REVIEW"
-  - "PRODUCT_SOURCE"
-  - "PRODUCT_WORKFLOW"
+  - "UNIQUE_V4_1_PRODUCT_SOURCE"
+  - "FINAL_INTERACTION_DISAMBIGUATION"
+  - "DESKTOP_ROUTE_AND_STATE_FREEZE"
+  - "DUPLICATE_SKELETON_PREVENTION"
+  - "EXACT_PACKAGE_AUTHORIZATION"
 
 product_source_gate:
   required: true
@@ -148,78 +136,67 @@ required_product_sources:
   - PS-POSITION-MONITORING
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN-AUTHORIZATION
+  - PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  Asset Pool is the only opportunity source. The frozen chain is Asset Pool through Opportunity, Analysis, Evidence, Score, Decision, GPT Candidate, Gemini Review, Grok Challenge, Conflict Resolver, Rule Validation, FinalExecutionPlan, explicit manual UserPosition, Position Monitoring, and Review. Opportunity state remains separate from execution permission and UserPosition.
+  The single v4.1 source now owns the business chain and final Desktop interaction contract. Fourteen routes, eleven overlays, fifty-four component families, seventy route states, eleven overlay states, eighteen disambiguation contracts and protected PR #1179 capabilities are frozen together.
 
 design_interaction_mapping: |
-  Figma and Mobile do not change. This package authorizes backend capability only. ExecutionPlan remains a system decision artifact; only an authenticated explicit manual action creates UserPosition. No generated output may imply automatic trading.
+  Desktop only. Reuse approved PR #1179 components and visual language. Figma remains unchanged and Mobile implementation remains forbidden. Missing, stale, unavailable and failed states are first-class; no fake data or fake progress.
 
 data_source_mapping: |
-  Reuse the existing watchlist/asset source, AssetState and OpportunityLog, AnalysisRun, EvidenceItem, ScoreItem, DecisionBundle/DecisionResult, ExecutionPlan, AiCallLog, conflict resolver, UserPosition, PositionMonitorLog, and Review owners. Introduce one canonical persisted ExecutionPlanCandidate boundary only after reconciling existing candidate assets. All critical writes carry traceId and exact analysis/opportunity/candidate/final links.
+  Reuse canonical Pool, Analysis, Evidence, Score, Decision, Opportunity, Candidate, Resolver, Final, AITrace, UserPosition, Monitor, Review, Push/Recheck, Event, UserConfig and provider owners. Extend those owners and add only the independent records approved by the current ownership map.
 
 current_implementation_gap: |
-  Product design is frozen but the repository does not yet prove one production chain with Asset Pool-only sourcing, unified opportunity transitions, strict three-role authority, persisted Candidate/Final separation, complete conflict/rule validation, complete AI trace, and end-to-end review linkage. Existing partial and review-only skeletons require reconciliation rather than duplication.
+  PR #1179 is a reusable base but lacks complete dual-mode Preview, all routed pages/overlays, message/Telegram, plan lifecycle/revalidation, multi-timeframe projection/context, review/settings/calendar/audit and full runtime scenarios. Its passing contracts must be preserved.
 
 allowed_scope:
-  - "Create and register the v4.1 Product Source, authorization, ownership, and validation records"
-  - "Update Delivery Matrix, Product Roadmap, Product Source, Current State, contract log, and task declaration"
-  - "Add the minimal exact-package runtime transition and deterministic authorization tests"
-  - "Verify no application/API/schema/Mobile/Figma/business-test diff enters this authorization package"
+  - "Product Source, contract, ownership, reuse, authorization, status, gate, validation, and reconciliation documents only"
 
 authorized_next_allowed_scope:
-  - "Complete Asset Pool search/add/remove/restore/scan and enforce it as the sole opportunity source"
-  - "Complete the eight-state Opportunity state machine, one transition entry point, audit, debounce, cooling, and precedence"
-  - "Reuse and connect AnalysisRun, EvidenceItem, ScoreItem, DecisionBundle, UserPosition, PositionMonitorLog, and Review"
-  - "Implement GPT Candidate generation, Gemini Candidate review, Grok risk challenge, Conflict Resolver, Rule Validation, and Final plan"
-  - "Persist separate Candidate and Final identities with complete analysis, trace, reason, fallback, and review linkage"
-  - "Make only schema and API changes required by the frozen backend chain and add its complete tests"
+  - "Implement all frozen Desktop routes, overlays, components and states by reusing PR #1179"
+  - "Extend the minimum canonical View Model, API, schema, persistence and runtime owners required by the Product Source"
+  - "Add full contract, migration, browser and runtime scenario validation"
 
 authorized_next_blocked_scope:
-  - "Automatic open, close, partial close, reduce, add, reverse, order, or any executable trading behavior"
-  - "AI state mutation, AI rule bypass, Candidate exposed as Final, or Final plan converted to UserPosition"
-  - "Opportunity generation outside Asset Pool or a fixed BTC/ETH/SOL-only source"
-  - "Duplicate Analysis, Evidence, Score, Decision, Plan, Position, Monitor, Review, AI trace, resolver, pool, or state stack"
-  - "Mobile, Figma, frontend redesign, unrelated notification/external delivery, or next-stage expansion"
+  - "Automatic trading or automatic position mutation"
+  - "AI rule bypass, Preview persistence of Opportunity/Candidate/Final, Candidate-as-Final, or Final-as-Position"
+  - "Duplicate business ownership, fake data, fake AI output, fake progress, Figma changes or Mobile implementation"
 
 blocked_scope:
-  - "Application code, business API, schema, migration, business tests, Mobile, or Figma in this authorization package"
-  - "v4.1 implementation before authorization is effective on clean, synced merged main"
-  - "Any package except FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION"
-  - "Any automatic trading, position mutation, AI rule bypass, or duplicate canonical ownership"
+  - "Any implementation inside this authorization package"
+  - "Any package except FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 
 forbidden_scope:
-  - "Business implementation inside the authorization package"
-  - "Automatic trading or automatic position mutation"
-  - "Mobile or Figma change"
-  - "Implementation before merged-main authorization effectivity or outside V4_1_DECISION_CHAIN_BACKEND_ONLY"
+  - "Application code, API, schema, migration, business tests, Figma or Mobile in the authorization diff"
+  - "Changing PR #1179 Head during authorization"
 
 real_scenario_requirement: |
-  This authorization package executes no business scenario. It must prove that the exact implementation request is blocked before merge, allowed only after clean/synced merged-main effectivity, and that wrong-package requests fail closed. End-to-end real scenarios remain mandatory for the implementation capability audit.
+  This authorization task performs no business scenario. The successor must complete the frozen Desktop/browser/runtime scenarios and stop for independent product-level audit.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
   automatic_position_mutation: "BLOCKED"
   push_recheck_trading_authorization: "BLOCKED"
+  preview_business_persistence: "BLOCKED"
   fake_data_as_real: "BLOCKED"
   owner_scope_bypass: "BLOCKED"
+  figma_change: "BLOCKED"
+  mobile_implementation: "BLOCKED"
 
 checks:
-  - "All registered Product Sources exist, are non-empty, and match SHA-256"
-  - "Unmerged authorization keeps exact v4.1 implementation and PR creation blocked"
-  - "Merged-main authorization permits only the exact v4.1 implementation package"
-  - "Wrong package, missing design freeze, unauthorized scope, missing permission, conflict, dirty worktree, and source-gate failure remain blocked"
-  - "Workflow Contract, authorization validation, Markdown/YAML, diff scope, and Maven tests pass"
-  - "No application, API, schema, migration, UI, Mobile, Figma, or business-test file enters the authorization diff"
+  - "Unique active v4.1 Product Source and hashes pass"
+  - "Authorization is blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "PR #1179 is recognized as the exact authorized successor, not an unrelated conflict"
+  - "Wrong package names fail closed"
+  - "Workflow, authorization, duplicate-skeleton, Markdown/YAML, Maven and diff checks pass"
 
 stop_conditions:
-  - "A required product source is missing, empty, hash-mismatched, or conflicting"
-  - "The Product Owner design freeze, AI authority, ownership map, or exact package cannot be verified"
-  - "The authorization is not effective on clean, synced merged main"
-  - "The change would include business code, API, schema, migration, Mobile, Figma, or business tests"
-  - "The package would authorize automatic trading, AI rule bypass, duplicate ownership, or unrelated capability"
+  - "A Product Source conflict or duplicate owner remains"
+  - "PR #1179 Head changes during authorization"
+  - "The diff includes application, API, schema, migration, business-test, Figma or Mobile changes"
+  - "The exact successor is not the only implementation package permitted after merged-main effectivity"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"
@@ -232,5 +209,5 @@ paused_governance_base: "2552dd24b1b756d5eb517e640baa772e1c5bcab6"
 paused_governance_head: "75d04e95bc7aa5eb761299b0192dfbc2caec3792"
 paused_governance_stash_object: "b168819d38e46f4fb90131ca92294cb45b5abbf6"
 paused_governance_patch_sha256: "440a2a7f038bb4d2086bb7b0fabba1ca02cc81632a58c99b39283de38550bc0a"
-paused_governance_reason: "Closed without merge because the unfinished governance parser overlaps shared FE-04 contracts and workflow dependencies; it is not effective content"
+paused_governance_reason: "Closed without merge; not current product or runtime truth"
 paused_governance_resume_condition: "Only resume when a real product regression proves the missing governance capability is necessary"

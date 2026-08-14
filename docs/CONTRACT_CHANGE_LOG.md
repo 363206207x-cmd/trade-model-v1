@@ -502,3 +502,27 @@ duplicate object family, Mobile, or Figma change is authorized.
 Human confirmation required: Already explicitly supplied for this
 authorization candidate. Independent exact-Head review, merge, and merged-main
 validation remain required before implementation permission becomes effective.
+## v4.1-final-interaction-product-source-and-authorization
+
+- Date: `2026-08-14`
+- Change type: Product Source reconciliation and bounded implementation authorization.
+- Product Owner source:
+  `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx`
+  (`SHA-256 43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3`).
+- Canonical action: merged the interaction freeze into the existing sole v4.1
+  source at `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`.
+- Registered annexes: page/route/component matrix, final-interaction object
+  ownership map, PR #1179 reuse/supersession map and reconciliation report.
+- Superseded active authorization:
+  `FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION`; retained only as
+  historical implementation evidence.
+- Exact authorized successor:
+  `FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`.
+- PR #1179 disposition:
+  `REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE`; audited Head
+  remains `198fc0ff545240a1b89dbbbfb1a3e642648d4f45`.
+- Capability movement: none. This package changes no application code, API,
+  Schema, Figma, Mobile or business tests.
+- Safety: no automatic trading or position mutation, no AI rule bypass, no
+  Preview persistence, no Candidate-as-Final, no fake data and no duplicate
+  ownership.

@@ -220,44 +220,40 @@ Mobile, Figma, Three AI, and unrelated product expansion.
 
 **Exit criteria:** list/detail agree on authoritative latest monitor; every change is traceable; no automatic mutation; merged main effective.
 
-## Fundamental AI v4.1 — Authorized Decision Chain Backend Package
+## Fundamental AI v4.1 — Final Interaction Page and Runtime Package
 
-**Product design status:** `FROZEN` by the explicitly approved
-`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN` source.
+**Product design status:** `FROZEN` in the sole unified source
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. The earlier
+decision-chain backend package is effective on merged main through PR #1177.
 
-**Implementation authorization:**
-`FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_IMPLEMENTATION` is the only authorized
-successor after `docs/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN_AUTHORIZATION.md` is
-reviewed, merged, and validated on clean/synced main. The authorization does
-not mark Product P2 or full Product P3 complete and does not authorize their UI
-or acceptance gaps by implication.
+**Implementation authorization:** only
+`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`, after
+`docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md`
+is reviewed, merged and validated on clean/synced main.
 
-**Input:** Asset Pool, existing AnalysisRun/Evidence/Score/Decision owners,
-rule-base direction, data-quality/confused/risk state, existing ExecutionPlan,
-AI call log, conflict resolver, UserPosition, PositionMonitorLog, and Review.
+**Input:** the merged backend chain, PR #1179 reusable Desktop assets, the
+fourteen-route/eighty-one-state matrix, canonical ownership map and all
+eighteen final interaction disambiguation contracts.
 
-**Deliverables:** Asset Pool as the only opportunity source; eight-state
-Opportunity state machine with unified transition audit/debounce/cooling;
-ExecutionPlanCandidate; GPT Candidate generation; Gemini Candidate review;
-Grok risk challenge; Conflict Resolver; Rule Validation; separate Final plan;
-complete AI trace; Review extension; required schema/API changes and tests.
+**Deliverables:** complete Desktop routes/overlays/components; strict Preview
+and Opportunity Decision modes; Asset Pool and multi-timeframe dynamic Top6;
+selected context; plan lifecycle/version/revalidation; Message/Telegram and
+Push Recheck; Position original/latest plan comparison; Review, Calendar,
+Settings and Full Audit; required canonical API/schema/runtime extensions;
+browser and real-scenario evidence.
 
-**Ownership boundary:** reuse the existing canonical object families described
-in `docs/FUNDAMENTAL_AI_V4_1_OBJECT_OWNERSHIP_MAP.md`. A second Analysis,
-Evidence, Score, Decision, ExecutionPlan, UserPosition, PositionMonitorLog,
-Review, AI trace, conflict-resolver, Asset Pool, or Opportunity-state stack is
-forbidden.
+**Ownership boundary:** reuse the canonical objects in
+`docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md`. No second
+Analysis, Opportunity, Plan, AI Workspace, Position, Monitoring, Review,
+Message, Home or Asset Pool stack is permitted.
 
-**Safety boundary:** no automatic open, close, reduce, add, reverse, order, or
-plan-to-position conversion. AI cannot mutate state or bypass Rule Validation.
-Mobile, Figma, frontend redesign, and unrelated notification/delivery work are
-outside the package.
+**Safety boundary:** no automatic open, close, reduce, add, reverse, order or
+plan-to-position conversion; no AI rule bypass; no Preview persistence; no
+fake data/progress; no Figma change; no Mobile implementation.
 
-**Exit criteria:** implementation and capability audit prove the complete
-chain, Candidate/Final isolation, traceability, fallback, state precedence,
-Asset Pool-only source, manual UserPosition boundary, and safety tests on the
-exact reviewed implementation Head. Authorization alone satisfies none of
-these implementation criteria.
+**Exit criteria:** one independent product-level audit proves the complete
+route/state/runtime contract and all protected PR #1179 capabilities after
+implementation. Authorization alone satisfies none of these criteria.
 
 ## P3 — AI Analysis
 

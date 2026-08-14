@@ -8,35 +8,46 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Frontend Runtime Alignment
-Product Phase Status: IMPLEMENTED_PENDING_MERGE
-Current Work Package: FUNDAMENTAL_AI_V4_1_FRONTEND_RUNTIME_ALIGNMENT candidate on top of merged-main backend PR #1177
-Next Business Phase: Independent Frontend Contract And Runtime Capability Audit
-Next Business Phase Allowed: NO until this exact frontend candidate is independently audited, merged, and validated on clean/synced main
+Product Phase: Fundamental AI v4.1 Final Interaction Authorization
+Product Phase Status: FINAL_INTERACTION_FROZEN_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Reconcile the sole v4.1 Product Source, register PR #1179 reuse and ownership, and merge the exact final-interaction implementation authorization; no business implementation is included
+Next Business Phase: FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION
+Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## Fundamental AI v4.1 Frontend Runtime Alignment Candidate
+## Fundamental AI v4.1 Final Interaction Authorization Candidate
 
-The v4.1 backend decision chain is effective on merged main through PR #1177
-at `edc3615c03c9b71763c32574f1d811c1d9a8954d`. The Product Owner separately
-authorized the exact package `FUNDAMENTAL_AI_V4_1_FRONTEND_RUNTIME_ALIGNMENT`
-to align the existing Desktop Home and existing Analysis Detail with that
-merged contract.
+The Product Owner has frozen the 2026-08-14 final interaction source. Its
+fourteen routes, eleven overlays, fifty-four component families, seventy route
+states, eleven overlay states and eighteen disambiguation contracts are merged
+into the existing canonical path
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. That file is the
+sole ACTIVE/AUTHORITATIVE v4.1 Product Source; companion matrices are normative
+annexes, not competing sources.
 
-The current candidate consumes existing owners and endpoints for Asset Pool,
-authoritative dynamic Top6 ranking, FinalExecutionPlan, structured GPT / Gemini
-/ Grok results, resolver and rule-validation audit data, UserPosition, and
-Position Monitoring. It adds no schema, parallel API, duplicate Home, duplicate
-analysis page, automatic-trading action, Figma change, or Mobile change.
+The earlier backend decision-chain implementation is effective on merged main
+through PR #1177. Its old authorization is historical and superseded for
+current task selection. PR #1179 remains `OPEN / DRAFT / UNMERGED` at audited
+Head `198fc0ff545240a1b89dbbbfb1a3e642648d4f45` and is registered as
+`REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE`.
 
-Package state is `IMPLEMENTED_PENDING_MERGE`. It is not `COMPLETE`,
-`EFFECTIVE`, or `FUNCTIONALLY_ACCEPTED`. Deterministic fixtures may prove UI
-contracts and browser behavior, but do not prove live-provider opportunity
-accuracy. The only next action is an independent frontend contract and runtime
-capability audit of the exact candidate Head.
+This candidate authorizes exactly
+`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION` after
+merged-main validation. It permits reuse and bounded extension of canonical
+frontend, API, schema and runtime ownership required by the frozen Desktop
+contract. It forbids Figma changes, Mobile implementation, duplicate business
+stacks, fake data, AI rule bypass and every automatic trading or position
+mutation capability.
+
+The authorization diff contains only Product Source, contract, ownership,
+reuse, state, gate and validation documentation/scripts. Before merged-main
+effectivity, implementation and successor PR creation remain false. After
+clean/synced merged-main effectivity, the exact successor may resolve both to
+true while PR #1179 is recognized as that authorized successor rather than an
+unrelated conflict.
 
 ---
 

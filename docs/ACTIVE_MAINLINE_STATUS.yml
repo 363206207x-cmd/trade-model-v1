@@ -13,28 +13,38 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "P0 Product Foundation Freeze"
-product_phase_status: "CANDIDATE_PENDING_REVIEW_AND_MERGED_MAIN"
+product_phase: "Fundamental AI v4.1 Final Interaction Authorization"
+product_phase_status: "FINAL_INTERACTION_FROZEN_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "P0 Product Foundation Freeze candidate; business implementation is stopped"
-active_block_cn: "P0 产品基础冻结候选；业务实现已停止"
+active_block: "v4.1 final interaction Product Source reconciliation and exact implementation authorization; implementation is stopped"
+active_block_cn: "v4.1 最终交互产品源对齐与精确实施授权；实现已停止"
 
-next_required_action: "Create the P0 Draft Product Foundation PR if absent; otherwise keep it Draft and stop for independent review."
-next_business_phase: "P1 Home Alignment Readiness and Gap Audit"
+next_required_action: "Review and merge the docs-only final-interaction authorization package, then validate the exact successor on clean synchronized main."
+next_business_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize a later phase. P1 begins only after P0 is independently reviewed and merged to clean/synced main; P1 implementation still requires a separate bounded authorization."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact successor is allowed only after the authorization commit is merged to clean/synced main and all gates pass."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "P0 DRAFT PR; derive exact number and state from GitHub"
-current_branch: "codex/product-foundation-freeze-p0"
-current_package_pr: "P0 Product Foundation Freeze Draft PR; derive exact number and state from GitHub"
+current_pr: "v4.1 Final Interaction Authorization PR; derive exact number and state from GitHub"
+current_branch: "codex/v4-1-final-interaction-authorization"
+current_package_pr: "v4.1 Final Interaction Product Source and Authorization PR"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
 pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, reopen, or include its code"
+
+v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
+v4_1_final_interaction_design_status: "FROZEN"
+v4_1_final_interaction_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_final_interaction_implementation_status: "NOT_STARTED"
+v4_1_authorized_package: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+v4_1_authorized_successor_branch: "codex/v4-1-frontend-runtime-alignment"
+pr_1179_status: "OPEN_DRAFT_UNMERGED"
+pr_1179_head: "198fc0ff545240a1b89dbbbfb1a3e642648d4f45"
+pr_1179_disposition: "REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"
