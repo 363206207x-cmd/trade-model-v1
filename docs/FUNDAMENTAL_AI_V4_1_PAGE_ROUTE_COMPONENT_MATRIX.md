@@ -11,6 +11,11 @@ Interaction source SHA-256:
 This matrix is a normative annex of the single v4.1 Product Source. It does
 not create a second Product Source and does not claim implementation.
 
+Canonical Figma binding: file key `rdMYmsAvZYkXHJX8hdl7UN`. The exact
+`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`
+package may implement this matrix only in that file. This registration does
+not authorize Mobile frames, a second Figma file, or a second Design System.
+
 ## 1. Routed Page Matrix
 
 | ID | Page / Route | Responsibility | Data Owner | Reused Asset | New / Extended | Required States | Contract Tests |
@@ -89,3 +94,9 @@ No page, overlay or component may fabricate market, AI, progress, opportunity,
 plan, position, message or audit data for visual completeness. Missing,
 pending, stale, unavailable and failed states are first-class acceptance
 frames. A visual fixture is test evidence only and cannot prove runtime data.
+
+The 14 routed pages, 11 overlays, 54 component families and 81 Desktop states
+must remain editable Figma layers using approved components/variants, Auto
+Layout and Variables. Node IDs are implementation evidence. Final acceptance
+requires route/state/data-provenance-matched comparison with the running
+Desktop product; neither screenshots nor Figma alone prove runtime behavior.

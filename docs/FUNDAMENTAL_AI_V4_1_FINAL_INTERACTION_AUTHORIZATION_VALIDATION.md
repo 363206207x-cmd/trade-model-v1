@@ -19,7 +19,10 @@ The deterministic validation checks:
 6. implementation and PR creation allowed for the exact package after
    simulated merged-main validation;
 7. a differently named package fails closed;
-8. PR #1179 audited Head remains registered.
+8. Canonical Figma Desktop permission is true only for the exact package;
+9. Mobile implementation remains false for exact and wrong packages;
+10. the visual contract and its Product Source hash binding are valid;
+11. PR #1179 pre-amendment candidate Head remains registered.
 
 Expected result:
 
@@ -28,7 +31,11 @@ UNIQUE_ACTIVE_PRODUCT_SOURCE: PASS
 PREMERGE_EXACT_PACKAGE_BLOCKED: PASS
 MERGED_MAIN_EXACT_PACKAGE_ALLOWED: PASS
 WRONG_PACKAGE_FAIL_CLOSED: PASS
-PR_1179_AUDITED_HEAD_REGISTERED: PASS
+EXACT_PACKAGE_CANONICAL_FIGMA_ALLOWED: PASS
+MOBILE_IMPLEMENTATION_FORBIDDEN: PASS
+VISUAL_CONTRACT_REGISTERED: PASS
+OLD_70_30_SUPERSEDED: PASS
+PR_1179_CANDIDATE_HEAD_REGISTERED: PASS
 PAGE_ROUTE_COMPONENT_LINKS: PASS
 DUPLICATE_SKELETON_STATUS: PASS
 AUTHORIZATION_VALIDATION: PASS
@@ -37,6 +44,7 @@ AUTHORIZATION_VALIDATION: PASS
 This script is a package-state assertion only. It does not implement or prove
 the final Desktop/runtime capability.
 
-Recorded result on the authorization branch: all six lines above PASS. The
-pre-merge simulation keeps both permissions false; the merged-main simulation
-allows only the exact package; the wrong-package simulation keeps both false.
+The pre-merge simulation keeps implementation, PR creation and Canonical Figma
+permissions false. The merged-main simulation allows all three only for the
+exact package, while Mobile remains false. Wrong-package simulation keeps all
+positive permissions false.

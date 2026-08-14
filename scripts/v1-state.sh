@@ -59,6 +59,9 @@ emit_resolved_task_state() {
   printf 'REPOSITORY_EDITS_ALLOWED: %s\n' "${resolved_edit_permission:-false}"
   printf 'IMPLEMENTATION_ALLOWED: %s\n' "${resolved_implementation_permission:-false}"
   printf 'PR_CREATION_ALLOWED: %s\n' "${resolved_pr_creation_permission:-false}"
+  printf 'CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: %s\n' "${resolved_canonical_figma_desktop_permission:-false}"
+  printf 'MOBILE_IMPLEMENTATION_ALLOWED: %s\n' "${resolved_mobile_implementation_permission:-false}"
+  printf 'CANONICAL_FIGMA_FILE_KEY: %s\n' "${resolved_canonical_figma_file_key:-NONE}"
   # Compatibility alias for older consumers. New launchers consume PR_CREATION_ALLOWED.
   printf 'IMPLEMENTATION_PR_ALLOWED: %s\n' "${resolved_pr_creation_permission:-false}"
   printf 'P1B_AUTHORIZATION_STATUS: %s\n' "${p1b_authorization_declared_status:-UNDECLARED}"
@@ -132,6 +135,9 @@ resolve_task_handoff() {
   resolved_edit_permission="false"
   resolved_implementation_permission="false"
   resolved_pr_creation_permission="false"
+  resolved_canonical_figma_desktop_permission="false"
+  resolved_mobile_implementation_permission="false"
+  resolved_canonical_figma_file_key="NONE"
   resolved_next_action="No task is authorized until runtime state resolution succeeds"
 
   classify_package_request
@@ -269,6 +275,9 @@ resolve_task_handoff() {
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
   resolved_pr_creation_permission="$authorized_next_implementation_pr_allowed"
+  resolved_canonical_figma_desktop_permission="$authorized_next_canonical_figma_desktop_implementation_allowed"
+  resolved_mobile_implementation_permission="$authorized_next_mobile_implementation_allowed"
+  resolved_canonical_figma_file_key="$authorized_next_canonical_figma_file_key"
   resolved_next_action="$authorized_next_package_next_action"
 }
 
@@ -616,7 +625,10 @@ evaluate_v4_1_final_interaction_transition() {
   fi
   if ! is_true_flag "$repository_edits_allowed" \
     || ! is_true_flag "$implementation_allowed" \
-    || ! is_true_flag "$implementation_pr_allowed"; then
+    || ! is_true_flag "$implementation_pr_allowed" \
+    || ! is_true_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "rdMYmsAvZYkXHJX8hdl7UN" ]]; then
     next_task_authorization_status="BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE"
     return 0
   fi
@@ -978,6 +990,9 @@ load_task_package_contract() {
   authorized_next_repository_edits_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
   authorized_next_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_allowed)"
   authorized_next_implementation_pr_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
+  authorized_next_canonical_figma_desktop_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_desktop_implementation_allowed)"
+  authorized_next_mobile_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_mobile_implementation_allowed)"
+  authorized_next_canonical_figma_file_key="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_file_key)"
   authorized_next_package_next_action="$(yaml_value "$TASK_FILE" authorized_next_package_next_action)"
   blocked_package_phase="$(yaml_value "$TASK_FILE" blocked_package_phase)"
   blocked_package_status="$(yaml_value "$TASK_FILE" blocked_package_status)"
@@ -1455,7 +1470,10 @@ if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORI
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
-    || ! is_true_flag "$authorized_next_implementation_pr_allowed"; then
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
+    || ! is_true_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "rdMYmsAvZYkXHJX8hdl7UN" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi

@@ -43,8 +43,8 @@ For Fundamental AI v4.1 specifically,
 ACTIVE/AUTHORITATIVE source. Earlier V1, Home, AI, Figma, authorization,
 implementation and audit documents are historical/supporting evidence for
 v4.1 and cannot override the unified source. Its page/route/component,
-ownership and PR-reuse annexes are part of the same authority, not additional
-Product Sources.
+ownership, PR-reuse and visual-density/proportion annexes are part of the same
+authority, not additional Product Sources.
 
 ## 3. Registered Product Sources
 
@@ -56,10 +56,10 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|3a170db9070d31e29e3921711ba28367067719ba042bd58650e6bd34a1c0c7e9|V4_1_UNIFIED_PRODUCT_SOURCE -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|87446509ef00e3ed81829b9e8993c82862af9d73261594a4e5bbd862ae78d0fa|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
-<!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|0298501c608dbb6b6995f51365e6d476acc536b37ce7d42eef6b12971a881fb2|DELIVERY_AND_SAFETY -->
+<!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|1d6e748da2603fa301ee3e8980199d7024ec63a8fe9d31e0455414d98c6880ba|DELIVERY_AND_SAFETY -->
 
 ### PS-V1-ARCHITECTURE
 
@@ -176,12 +176,18 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `3a170db9070d31e29e3921711ba28367067719ba042bd58650e6bd34a1c0c7e9` |
+| Repository SHA-256 | `220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09` |
 | Version/date | v4.1 unified final freeze; registered `2026-08-14` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
-| Required concepts | all original decision-chain concepts plus 18 final disambiguation contracts, dual analysis modes, plan lifecycle/revalidation, Message/Telegram ownership, selected context and complete routed interaction |
-| Forbidden reinterpretations | no competing v4.1 source; no fake data/progress; no automatic trading; no AI rule bypass; no Preview persistence; no Candidate as Final; no plan as position; no duplicate owner; no Mobile implementation in current package |
+| Required concepts | all original decision-chain concepts plus 18 final disambiguation contracts, dual analysis modes, plan lifecycle/revalidation, Message/Telegram ownership, selected context, complete routed interaction and the frozen Canonical Figma visual-density/proportion contract |
+| Forbidden reinterpretations | no competing v4.1 source; no fake data/progress; no automatic trading; no AI rule bypass; no Preview persistence; no Candidate as Final; no plan as position; no duplicate owner; no second/non-canonical Figma or Design System; no Mobile implementation in current package |
+
+Normative annex registration:
+
+| Repository path | SHA-256 | Role |
+|---|---|---|
+| `docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md` | `4d3e937be4534d69e07d34fcf3fe08c4cd5a63ed0bda58b4961ffe6249d26d61` | Canonical Desktop visual measurements and ratio supersession |
 
 ### PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
 
@@ -189,17 +195,22 @@ separate local candidate diff authoritative by existence.
 |---|---|
 | Document name | Fundamental AI v4.1 Final Interaction Page and Runtime Authorization |
 | Repository path | `docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md` |
-| Repository SHA-256 | `87446509ef00e3ed81829b9e8993c82862af9d73261594a4e5bbd862ae78d0fa` |
+| Repository SHA-256 | `a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a` |
 | Version/date | Authorization candidate; effective only after merged-main validation |
 | Authority | Exact implementation permission for one bounded final-interaction Desktop/runtime package |
 | Applicable modules | The exact `FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION` package only |
-| Required concepts | PR #1179 reuse, canonical ownership, exact package match, pre-merge block, post-merge permission and independent final audit |
-| Forbidden reinterpretations | no differently named/broader package, Mobile, Figma, automatic trading, duplicate object stack, fake data, or implementation inside this authorization change |
+| Required concepts | PR #1179 reuse, canonical ownership, exact package match, pre-merge block, post-merge implementation/PR/Canonical-Figma permission, single Canonical Figma key and independent final audit |
+| Forbidden reinterpretations | no differently named/broader package, Mobile, second/non-canonical Figma or Design System, automatic trading, duplicate object stack, fake data, or implementation inside this authorization change |
 
 The earlier Decision Chain authorization is
 `HISTORICAL_REFERENCE_ONLY / SUPERSEDED` and is intentionally absent from the
 active registry. The sole current implementation successor is
 `FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`.
+For that exact package only, Canonical Figma file
+`rdMYmsAvZYkXHJX8hdl7UN` is the sole editable Desktop design source after the
+authorization amendment is effective on merged main. Historical FE-04 Figma
+records remain supporting evidence and are not an alternate editable v4.1
+source.
 
 ### PS-FIGMA-BASELINE
 
