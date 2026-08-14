@@ -4,14 +4,14 @@ Status: `FROZEN_IMPLEMENTATION_HANDOFF`
 
 PR: `#1179`
 
-Audited Head: `198fc0ff545240a1b89dbbbfb1a3e642648d4f45`
+Existing candidate Head: `62ba9702e54b268ef27158bcff7e33422e23015e`
 
 Audited Base: `edc3615c03c9b71763c32574f1d811c1d9a8954d`
 
 PR state at reconciliation: `OPEN / DRAFT / UNMERGED`
 
 Registered disposition:
-`REUSABLE_IMPLEMENTATION_BASE_PENDING_AUTHORIZATION_AND_REBASE`
+`REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION`
 
 This map preserves validated work in PR #1179 while aligning its remaining
 scope with the unified v4.1 Product Source. It does not modify, merge or close
@@ -67,7 +67,7 @@ The implementation package must preserve these already-audited capabilities:
 | `docs/FUNDAMENTAL_AI_V4_1_*` reports in PR #1179 | EVIDENCE_ONLY | retain as implementation/audit history; none can override the unified Product Source |
 | `docs/evidence/v4_1_execution_plan_semantics/**` | EVIDENCE_ONLY | preserve Final/Plan Mode evidence and comparison images |
 | `docs/evidence/v4_1_frontend_runtime_alignment/**` | EVIDENCE_ONLY | preserve controlled states while clearly distinguishing fixture/runtime provenance |
-| `docs/evidence/v4_1_latest_ui/**` | EVIDENCE_ONLY | preserve approved Figma-to-runtime visual evidence; Figma remains unchanged |
+| `docs/evidence/v4_1_latest_ui/**` | EVIDENCE_ONLY | preserve existing Figma-to-runtime visual evidence; rerun it only after synchronization with the amended authorization |
 | `docs/evidence/v4_1_productized_ui/**` | EVIDENCE_ONLY | preserve visual history and rerun against current main after implementation |
 | `scripts/v1-state.sh` in PR #1179 | REPLACE_BY_FINAL_SPEC | rebase onto the merged exact-package resolver; do not restore stale package names |
 
@@ -108,9 +108,13 @@ No code deletion is authorized without dead-code evidence.
 
 ## 7. Rebase and Immutability Contract
 
-The authorization task leaves PR #1179 and its audited Head unchanged. After
-the authorization PR is merged, the implementation package may synchronize or
-rebase branch `codex/v4-1-frontend-runtime-alignment` onto latest `main`, then
-continue in that branch. The rebase may change its future Head, but it must
-preserve the protected passing capabilities and record the pre-rebase audited
+This authorization-reconciliation task leaves PR #1179 and existing candidate
+Head `62ba9702e54b268ef27158bcff7e33422e23015e` unchanged. That Head predates
+the Canonical Figma permission amendment and is reusable evidence, not an
+approvable or mergeable final Head. After the authorization PR is merged, the
+implementation package may synchronize or rebase branch
+`codex/v4-1-frontend-runtime-alignment` onto latest `main`, then rerun all
+contract, Figma mapping, browser, migration and runtime validations on the new
+exact Head. The synchronization may change its future Head, but it must
+preserve the protected passing capabilities and record the pre-sync candidate
 Head above.

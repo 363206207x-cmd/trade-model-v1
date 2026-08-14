@@ -24,7 +24,9 @@ not competing Product Sources:
 
 - `docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md`;
 - `docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md`;
-- `docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md`.
+- `docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md`;
+- `docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md`
+  (`SHA-256 4d3e937be4534d69e07d34fcf3fe08c4cd5a63ed0bda58b4961ffe6249d26d61`).
 
 ## 1. Product Position and Principles
 
@@ -435,8 +437,10 @@ effectiveness, failure-path hit rate and missed-opportunity quality.
 ## 15. Page, Interaction and Runtime Freeze
 
 Home order is system status, alert/event, dynamic Top6, Position Monitoring
-(about 70%) plus Final Execution Plan (about 30%), then single Three-AI
-workspace plus AI Consistency.
+plus Final Execution Plan, then single Three-AI workspace plus AI Consistency.
+The historical Position Monitoring / Final Execution Plan ratio `70:30` is
+`SUPERSEDED`. The frozen replacement is `60:40`, with an allowed range of
+`58:42-62:38`, as defined by the normative visual-density contract.
 
 Top6 cards show trusted price, final bias, opportunity score, confidence, risk,
 opportunity state and Plan Mode. Clicking updates Final plan and Three-AI only.

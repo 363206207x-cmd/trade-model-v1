@@ -233,7 +233,8 @@ is reviewed, merged and validated on clean/synced main.
 
 **Input:** the merged backend chain, PR #1179 reusable Desktop assets, the
 fourteen-route/eighty-one-state matrix, canonical ownership map and all
-eighteen final interaction disambiguation contracts.
+eighteen final interaction disambiguation contracts. Canonical Figma file
+`rdMYmsAvZYkXHJX8hdl7UN` is the only editable design source in this package.
 
 **Deliverables:** complete Desktop routes/overlays/components; strict Preview
 and Opportunity Decision modes; Asset Pool and multi-timeframe dynamic Top6;
@@ -249,7 +250,9 @@ Message, Home or Asset Pool stack is permitted.
 
 **Safety boundary:** no automatic open, close, reduce, add, reverse, order or
 plan-to-position conversion; no AI rule bypass; no Preview persistence; no
-fake data/progress; no Figma change; no Mobile implementation.
+fake data/progress; no second/non-canonical Figma file or Design System; no
+Mobile implementation. Static screenshots cannot replace editable Figma and
+Figma cannot replace runtime implementation.
 
 **Exit criteria:** one independent product-level audit proves the complete
 route/state/runtime contract and all protected PR #1179 capabilities after

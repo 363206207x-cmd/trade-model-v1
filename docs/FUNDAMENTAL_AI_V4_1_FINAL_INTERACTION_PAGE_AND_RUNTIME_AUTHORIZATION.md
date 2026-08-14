@@ -19,7 +19,8 @@ Normative annexes:
 
 - `docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md`;
 - `docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md`;
-- `docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md`.
+- `docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md`;
+- `docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md`.
 
 It becomes effective only when this authorization commit is merged into a
 clean, synchronized `main`, the Product Source Gate and Workflow Contract pass,
@@ -53,6 +54,17 @@ The exact package may:
     canonical ownership, never a parallel skeleton;
 12. update application/business tests, browser scenarios, documentation and
     audit evidence needed for independent product-level audit.
+13. modify the single registered Canonical Figma file
+    `rdMYmsAvZYkXHJX8hdl7UN` for the frozen Desktop scope only;
+14. implement the fourteen Desktop routed pages, eleven overlays, fifty-four
+    component families and eighty-one Desktop acceptance states in that file;
+15. extend approved components and variants with Auto Layout and Variables,
+    record resulting Figma node IDs, and produce route/state-matched
+    Figma/runtime visual comparisons.
+
+The Canonical Figma permission is an implementation permission inside this
+exact package. It does not make any pre-amendment Figma mutation retroactively
+authorized and it does not establish runtime acceptance by itself.
 
 ## 3. Required Reuse
 
@@ -78,7 +90,12 @@ The package must not:
 - fabricate market, evidence, AI, plan, position, message, progress or audit data;
 - use fake percentages for asynchronous work;
 - create duplicate business ownership;
-- modify the Figma source;
+- create a second Figma file or a second Design System;
+- modify any Figma file other than Canonical file
+  `rdMYmsAvZYkXHJX8hdl7UN`;
+- create Mobile frames or Mobile screenshots;
+- replace editable Canonical Figma layers with static screenshots;
+- treat a static Figma artifact as a substitute for running code;
 - implement Mobile pages, Mobile CSS/JS, Mobile navigation or Mobile screenshots;
 - start a later product package.
 
@@ -106,15 +123,26 @@ After merged-main effectivity, and only for the exact package:
 AUTHORIZED_PACKAGE: FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION
 IMPLEMENTATION_ALLOWED: true
 PR_CREATION_ALLOWED: true
+CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: true
+MOBILE_IMPLEMENTATION_ALLOWED: false
 IMPLEMENTATION_STATUS: NOT_STARTED
 ```
 
 Any old frontend package, the historical backend package, a typo, an unscoped
-package or a broader package must return both permissions `false`.
+package or a broader package must return implementation, PR creation and
+Canonical Figma Desktop permissions `false`. Mobile implementation remains
+`false` for every package.
 
 ## 7. Current Authorization Task Boundary
 
 This authorization task changes only Product Source, contracts, ownership,
 reuse mapping, delivery/machine state, gates and reports. It changes no
 application code, API, Schema, Figma or Mobile implementation and leaves PR
-#1179 Head `198fc0ff545240a1b89dbbbfb1a3e642648d4f45` unchanged.
+#1179 Head `62ba9702e54b268ef27158bcff7e33422e23015e` unchanged.
+
+That Head is an existing implementation candidate created before this
+Canonical Figma permission amendment became effective. Its disposition is
+`REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION`. After this amendment is
+merged, PR #1179 may be synchronized with amended `main`; all validation and
+independent audit must use the resulting new exact Head. The pre-sync Head
+cannot receive final approval or merge authorization.

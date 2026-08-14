@@ -526,3 +526,29 @@ validation remain required before implementation permission becomes effective.
 - Safety: no automatic trading or position mutation, no AI rule bypass, no
   Preview persistence, no Candidate-as-Final, no fake data and no duplicate
   ownership.
+
+---
+
+## v4.1-canonical-figma-authorization-scope-reconciliation
+
+- Date: `2026-08-14`
+- Change type: exact-package authorization amendment; no implementation.
+- Human decision: permit the frozen Desktop implementation to modify only
+  Canonical Figma file `rdMYmsAvZYkXHJX8hdl7UN`.
+- Visual contract: register
+  `docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md` as a
+  normative annex to the sole v4.1 Product Source.
+- Supersession: historical Position/Plan `70:30` is explicitly superseded by
+  `60:40`, allowed range `58:42-62:38`.
+- Exact package remains
+  `FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`.
+- Machine permission: exact package may resolve implementation, PR creation
+  and Canonical Figma Desktop to true after merged-main validation; Mobile
+  remains false; wrong packages fail closed.
+- PR #1179: Head `62ba9702e54b268ef27158bcff7e33422e23015e` remains unchanged and is
+  `REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION`; it must synchronize with
+  amended main before new exact-Head audit or merge consideration.
+- Capability movement: none. No application code, API, Schema, Figma, Mobile
+  or runtime implementation changes.
+- Safety: no second Figma/Design System, no fake data/AI/progress, no duplicate
+  owner and no automatic trading or position mutation.

@@ -5,6 +5,8 @@ Status: `FROZEN_IMPLEMENTATION_CONTRACT`
 Canonical Product Source:
 `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`
 
+Canonical Figma file key: `rdMYmsAvZYkXHJX8hdl7UN`
+
 This contract records the approved Desktop composition measurements used by
 Canonical Figma and runtime acceptance. It is subordinate to the canonical
 Product Source and does not add business fields, owners, routes, or actions.
@@ -52,6 +54,9 @@ they do not reserve decorative space.
 
 ## 4. Position and Final Plan
 
+The historical Home ratio `Position Monitoring / Final Execution Plan = 70:30`
+is `SUPERSEDED`.
+
 | Region | Target | Allowed |
 |---|---:|---:|
 | Position Monitoring | 60% | 58-62% |
@@ -97,4 +102,6 @@ The following must be zero at every required Desktop viewport:
 - more than one solid primary action per page state.
 
 Canonical Figma and runtime screenshots must use the same route, state,
-viewport, and data provenance before visual delta is evaluated.
+viewport, and data provenance before visual delta is evaluated. Static
+screenshots cannot replace editable Canonical Figma layers, and Canonical
+Figma cannot replace the running product.
