@@ -297,6 +297,10 @@ require_file "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION_VALIDATION.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md"
 require_file "docs/FUNDAMENTAL_AI_V4_1_CANONICAL_FIGMA_AUTHORIZATION_SCOPE_RECONCILIATION.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_SOURCE_MAPPING.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md"
+require_file "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION_VALIDATION.md"
 require_file "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 require_contains "docs/P1A_HOME_ALIGNMENT_AUDIT.md" "P1A_COMPLETION_STATUS: COMPLETED"
 require_contains "docs/P1B_AUTHORIZATION_SCOPE.md" "HOME_READ_PROJECTION_ONLY"
@@ -315,6 +319,10 @@ require_contains "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRAC
 require_contains "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md" '| Position Monitoring | 60% | 58-62% |'
 require_contains "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
 require_contains "scripts/v1-state.sh" "V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS"
+require_contains "scripts/v1-state.sh" "V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md" "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md" "COINGLASS_SECRET_REPOSITORY_WRITE_ALLOWED=false"
+require_contains "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
 require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
@@ -374,6 +382,9 @@ v4_1_matrix_authorization="$(matrix_field "Product v4.1" 5)"
 v4_1_design_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_design_status)"
 v4_1_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_authorization_status)"
 v4_1_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_interaction_implementation_status)"
+v4_1_target_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_target_runtime_remediation_authorization_status)"
+v4_1_target_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_target_runtime_remediation_implementation_status)"
+v4_1_target_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_target_runtime_status)"
 current_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_phase)"
 current_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_mode)"
 current_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_status)"
@@ -415,33 +426,38 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$p2_implementation_status" == "COMPLETE" ]] || fail "P2 backend implementation compatibility evidence must remain complete"
 [[ "$v4_1_matrix_authorization" == "AUTHORIZED_TO_IMPLEMENT" ]] || fail "v4.1 matrix authorization is missing"
 [[ "$v4_1_design_status" == "FROZEN" ]] || fail "v4.1 Product Design must remain frozen"
-[[ "$v4_1_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "v4.1 authorization must remain pending merged-main effectivity"
-[[ "$v4_1_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 implementation must remain not started"
+[[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "v4.1 Final Interaction authorization must remain effective"
+[[ "$v4_1_implementation_status" == "COMPLETE" ]] || fail "v4.1 Final Interaction implementation must remain complete"
+[[ "$v4_1_target_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "v4.1 target-runtime authorization must remain pending merged-main effectivity"
+[[ "$v4_1_target_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 target-runtime remediation must remain not started"
+[[ "$v4_1_target_status" == "BLOCKED_BY_IMPLEMENTATION_DEFECT" ]] || fail "v4.1 target runtime must remain blocked by implementation defects"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "v4.1 Final Interaction authorization declaration mismatch"
+[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "v4.1 target-runtime authorization declaration mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]] || fail "authorized next package phase mismatch"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
 [[ "$authorized_next_package_pr" == "true" ]] || fail "authorized v4.1 PR creation must be true"
-[[ "$authorized_next_package_canonical_figma" == "true" ]] || fail "authorized v4.1 Canonical Figma Desktop permission must be true"
+[[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "target-runtime Canonical Figma Desktop permission must remain false"
 [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
-[[ "$authorized_next_package_canonical_figma_key" == "rdMYmsAvZYkXHJX8hdl7UN" ]] || fail "authorized v4.1 Canonical Figma key mismatch"
+[[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "target-runtime package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]] || fail "v4.1 scope must remain V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY"
+[[ "$p1b_scope" == "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY" ]] || fail "v4.1 scope must remain V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
   UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE \
-  FINAL_INTERACTION_SPEC_FROZEN \
-  FINAL_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
+  TARGET_RUNTIME_ACCEPTANCE_BLOCKERS_MAPPED \
+  V4_1_FINAL_INTERACTION_EFFECTIVE_MERGED_MAIN \
+  TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   LOCAL_ORIGIN_MAIN_MATCH \
   PRODUCT_SOURCE_GATE_PASS \
+  WORKFLOW_CONTRACT_PASS \
   CLEAN_WORKTREE \
-  NO_ACTIVE_CONFLICTING_PR_EXCEPT_EXACT_AUTHORIZED_SUCCESSOR; do
+  NO_ACTIVE_CONFLICTING_PR; do
   printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
     || fail "missing v4.1 authorization transition condition: $transition_condition"
 done
@@ -485,17 +501,17 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_REVIEW" \
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_REVIEW" \
   || fail "authorization remediation stage mismatch"
 printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "ready authorization did not resolve final merge path"
 
-assert_handoff_blocked predecessor_incomplete BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked predecessor_incomplete BLOCKED_V4_1_FINAL_INTERACTION_NOT_COMPLETE
+assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TARGET_RUNTIME_AUTHORIZATION_MERGED_MAIN
 assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
@@ -506,24 +522,27 @@ for v4_1_expected in \
   "AUTHORIZATION_STATUS: APPROVED" \
   "V4_1_FINAL_INTERACTION_DESIGN_STATUS: FROZEN" \
   "V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
-  "V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: COMPLETE" \
+  "V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_TARGET_RUNTIME_REMEDIATION_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "REQUEST_CLASS: AUTHORIZED_IMPLEMENTATION_PACKAGE" \
   "RESOLVED_PACKAGE: $authorized_next_package_phase" \
   "RESOLVED_MODE: IMPLEMENTATION" \
   "RESOLVED_EDIT_PERMISSION: true" \
   "RESOLVED_IMPLEMENTATION_PERMISSION: true" \
   "RESOLVED_PR_CREATION_PERMISSION: true" \
-  "CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: true" \
+  "CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: false" \
   "MOBILE_IMPLEMENTATION_ALLOWED: false" \
-  "CANONICAL_FIGMA_FILE_KEY: rdMYmsAvZYkXHJX8hdl7UN" \
+  "CANONICAL_FIGMA_FILE_KEY: NONE" \
   "GENERATED_PACKAGE: $authorized_next_package_phase"; do
   printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_expected" \
     || fail "v4.1 handoff omitted: $v4_1_expected"
 done
 
-assert_handoff_blocked v4_1_unauthorized BLOCKED_V4_1_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked v4_1_permission_missing BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked v4_1_unauthorized BLOCKED_V4_1_TARGET_RUNTIME_SCOPE_NOT_AUTHORIZED
+assert_handoff_blocked v4_1_permission_missing BLOCKED_V4_1_TARGET_RUNTIME_PERMISSIONS_INCOMPLETE
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
-  --request-package FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION_WRONG
+  --request-package FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATON
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package FUNDAMENTAL_AI_V4_1_AUTO_TRADING
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -605,16 +624,16 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "authorization final gate stage mismatch"
-assert_chain_blocked V4_1_DESIGN_NOT_FROZEN predecessor_incomplete BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN \
+assert_chain_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_FINAL_INTERACTION_NOT_COMPLETE \
   --request-package "$authorized_next_package_phase"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
-  SUCCESSOR_PACKAGE IMPLEMENTATION GH_QUERY --request-package "$authorized_next_package_phase"
+  AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION GH_QUERY --request-package "$authorized_next_package_phase"
 assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
   BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE --request-package "$authorized_next_package_phase"
 assert_chain_allowed MERGED_WITH_EXPLICIT_EVIDENCE merged_gh_unavailable \
-  SUCCESSOR_PACKAGE IMPLEMENTATION EXPLICIT_CONFIRMED --open-pr-none-confirmed \
+  AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION EXPLICIT_CONFIRMED --open-pr-none-confirmed \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked EXPLICIT_EVIDENCE_WITH_CONFLICT explicit_with_conflict \
   BLOCKED_ACTIVE_CONFLICTING_PR --open-pr-none-confirmed --request-package "$authorized_next_package_phase"
@@ -624,11 +643,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_TARGET_RUNTIME_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TARGET_RUNTIME_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_TARGET_RUNTIME_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -666,15 +685,15 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked V4_1_DESIGN_NOT_FROZEN predecessor_incomplete BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN \
+assert_outer_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_FINAL_INTERACTION_NOT_COMPLETE \
   --request-package "$authorized_next_package_phase"
 assert_outer_allowed V4_1_AUTHORIZATION_EFFECTIVE authorization_merged_validated IMPLEMENTATION \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_TARGET_RUNTIME_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TARGET_RUNTIME_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_TARGET_RUNTIME_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \
@@ -754,8 +773,8 @@ if grep -Eiq 'review-only slice count.*(complete|progress|next)|completed review
   fail "workflow must not use completed review-only slice count as next-task or delivery-completion basis"
 fi
 
-bash scripts/validate-v4-1-final-interaction-authorization.sh >/dev/null \
-  || fail "v4.1 Canonical Figma authorization validation failed"
+bash scripts/validate-v4-1-target-runtime-blocker-authorization.sh >/dev/null \
+  || fail "v4.1 target-runtime blocker authorization validation failed"
 
 changed_files="$({ git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git diff --name-only origin/main...HEAD 2>/dev/null || true; git diff --name-only HEAD~1..HEAD 2>/dev/null || true; } | sort -u)"
 if echo "$changed_files" | grep -Eq 'src/main/java|src/test/java'; then

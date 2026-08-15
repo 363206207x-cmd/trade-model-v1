@@ -73,11 +73,14 @@ emit_resolved_task_state() {
   printf 'P2_POSITION_MONITORING_AUTHORIZATION_STATUS: %s\n' "${p2_authorization_runtime_status:-BLOCKED}"
   printf 'P2_POSITION_MONITORING_IMPLEMENTATION_STATUS: %s\n' "${p2_implementation_status:-UNDECLARED}"
   printf 'V4_1_DECISION_CHAIN_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
-  printf 'V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_DECISION_CHAIN_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_declared_status:-UNDECLARED}"
   printf 'V4_1_DECISION_CHAIN_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
   printf 'V4_1_FINAL_INTERACTION_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
-  printf 'V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_FINAL_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_declared_status:-UNDECLARED}"
   printf 'V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
+  printf 'V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS: %s\n' "${v4_1_target_runtime_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_TARGET_RUNTIME_REMEDIATION_IMPLEMENTATION_STATUS: %s\n' "${v4_1_target_runtime_implementation_status:-UNDECLARED}"
+  printf 'V4_1_TARGET_RUNTIME_STATUS: %s\n' "${v4_1_target_runtime_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -101,8 +104,9 @@ classify_package_request() {
   if [[ -n "${requested_package:-}" ]]; then
     if [[ "$requested_package" == "${current_package_phase:-UNDECLARED}" ]]; then
       request_class="CURRENT_PACKAGE_CONTINUATION"
-    elif [[ "$requested_package" == "${authorized_next_package_phase:-UNDECLARED}" \
-      || "$requested_package" == "${blocked_package_phase:-UNDECLARED}" ]]; then
+    elif [[ "$requested_package" == "${authorized_next_package_phase:-UNDECLARED}" ]]; then
+      request_class="AUTHORIZED_IMPLEMENTATION_PACKAGE"
+    elif [[ "$requested_package" == "${blocked_package_phase:-UNDECLARED}" ]]; then
       request_class="SUCCESSOR_PACKAGE"
     fi
     return 0
@@ -113,7 +117,7 @@ classify_package_request() {
       request_class="CURRENT_PACKAGE_CONTINUATION"
       ;;
     EFFECTIVE_MERGED_MAIN)
-      request_class="SUCCESSOR_PACKAGE"
+      request_class="AUTHORIZED_IMPLEMENTATION_PACKAGE"
       ;;
   esac
 }
@@ -210,6 +214,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -223,6 +229,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="P2_POSITION_MONITORING_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -232,7 +240,8 @@ resolve_task_handoff() {
     return 0
   fi
 
-  if [[ "$request_class" != "SUCCESSOR_PACKAGE" ]]; then
+  if [[ "$request_class" != "AUTHORIZED_IMPLEMENTATION_PACKAGE" \
+    && "$request_class" != "SUCCESSOR_PACKAGE" ]]; then
     resolution_block_reason="BLOCKED_UNKNOWN_RESOLVED_STATE"
     return 0
   fi
@@ -271,6 +280,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="P2_POSITION_MONITORING_BACKEND_IMPLEMENTATION"
   elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
     resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+  elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]]; then
+    resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -591,12 +602,12 @@ evaluate_p2_position_monitoring_transition() {
   p2_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
-evaluate_v4_1_final_interaction_transition() {
+evaluate_v4_1_target_runtime_transition() {
   local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
   local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
   local merged_main_validation_status="$9" repository_edits_allowed="${10}"
   local implementation_allowed="${11}" implementation_pr_allowed="${12}"
-  local declared_authorization_status="${13}" design_status="${14}"
+  local declared_authorization_status="${13}" predecessor_status="${14}"
 
   effective_task_mode="$current_mode"
   p1a_transition_allowed="YES"
@@ -604,37 +615,37 @@ evaluate_v4_1_final_interaction_transition() {
   next_transition_allowed="NO"
   authorization_status="BLOCKED"
   next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
-  v4_1_authorization_runtime_status="BLOCKED"
+  v4_1_target_runtime_authorization_runtime_status="BLOCKED"
 
-  [[ "$current_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]] || return 0
+  [[ "$current_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]] || return 0
   [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
-  [[ "$next_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]] || return 0
+  [[ "$next_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]] || return 0
   [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
 
-  if [[ "$design_status" != "FROZEN" ]]; then
-    next_task_authorization_status="BLOCKED_V4_1_PRODUCT_DESIGN_NOT_FROZEN"
+  if [[ "$predecessor_status" != "COMPLETE" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_FINAL_INTERACTION_NOT_COMPLETE"
     return 0
   fi
   if [[ "$current_status" != "COMPLETED" ]]; then
-    next_task_authorization_status="BLOCKED_V4_1_AUTHORIZATION_INCOMPLETE"
+    next_task_authorization_status="BLOCKED_V4_1_TARGET_RUNTIME_AUTHORIZATION_INCOMPLETE"
     return 0
   fi
   if [[ "$declared_authorization_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
-    next_task_authorization_status="BLOCKED_V4_1_SCOPE_NOT_AUTHORIZED"
+    next_task_authorization_status="BLOCKED_V4_1_TARGET_RUNTIME_SCOPE_NOT_AUTHORIZED"
     return 0
   fi
   if ! is_true_flag "$repository_edits_allowed" \
     || ! is_true_flag "$implementation_allowed" \
     || ! is_true_flag "$implementation_pr_allowed" \
-    || ! is_true_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
     || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
-    || [[ "$authorized_next_canonical_figma_file_key" != "rdMYmsAvZYkXHJX8hdl7UN" ]]; then
-    next_task_authorization_status="BLOCKED_V4_1_IMPLEMENTATION_PERMISSIONS_INCOMPLETE"
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TARGET_RUNTIME_PERMISSIONS_INCOMPLETE"
     return 0
   fi
   if [[ "$completion_state" != "EFFECTIVE_MERGED_MAIN" ]]; then
-    next_task_authorization_status="BLOCKED_PENDING_V4_1_AUTHORIZATION_MERGED_MAIN"
-    v4_1_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_V4_1_TARGET_RUNTIME_AUTHORIZATION_MERGED_MAIN"
+    v4_1_target_runtime_authorization_runtime_status="PENDING_MERGED_MAIN"
     return 0
   fi
   if [[ "$synced_main_status" != "YES" ]]; then
@@ -646,7 +657,7 @@ evaluate_v4_1_final_interaction_transition() {
     return 0
   fi
   if [[ "$merged_main_validation_status" != "PASS" ]]; then
-    next_task_authorization_status="BLOCKED_V4_1_AUTHORIZATION_MERGED_MAIN_VALIDATION"
+    next_task_authorization_status="BLOCKED_V4_1_TARGET_RUNTIME_AUTHORIZATION_MERGED_MAIN_VALIDATION"
     return 0
   fi
 
@@ -654,13 +665,13 @@ evaluate_v4_1_final_interaction_transition() {
   next_transition_allowed="YES"
   authorization_status="APPROVED"
   next_task_authorization_status="ALLOWED"
-  v4_1_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_target_runtime_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
 evaluate_runtime_transition() {
-  if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" \
-    && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
-    evaluate_v4_1_final_interaction_transition \
+  if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]]; then
+    evaluate_v4_1_target_runtime_transition \
       "$current_package_phase" \
       "$current_package_status" \
       "$current_task_mode" \
@@ -673,8 +684,8 @@ evaluate_runtime_transition() {
       "$authorized_next_repository_edits_allowed" \
       "$authorized_next_implementation_allowed" \
       "$authorized_next_implementation_pr_allowed" \
-      "$v4_1_authorization_declared_status" \
-      "$v4_1_design_status"
+      "$v4_1_target_runtime_authorization_declared_status" \
+      "$v4_1_implementation_status"
     return 0
   fi
 
@@ -1006,6 +1017,9 @@ load_task_package_contract() {
   v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_design_status)"
   v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_authorization_status)"
   v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_implementation_status)"
+  v4_1_target_runtime_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_authorization_status)"
+  v4_1_target_runtime_implementation_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_implementation_status)"
+  v4_1_target_runtime_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -1050,8 +1064,8 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
-        v4_1_design_status="IN_REVIEW"
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+        v4_1_implementation_status="IN_PROGRESS"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
         product_p1b_declared_status="IN_PROGRESS"
       else
@@ -1139,9 +1153,9 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
-        v4_1_authorization_declared_status="BLOCKED_PENDING_REVIEW"
-        blockers_text="V4_1_NOT_AUTHORIZED"
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+        v4_1_target_runtime_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="V4_1_TARGET_RUNTIME_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
         p2_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="P2_NOT_AUTHORIZED"
@@ -1384,6 +1398,9 @@ p2_implementation_status="$(yaml_value "$TASK_FILE" p2_position_monitoring_imple
 v4_1_design_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_design_status)"
 v4_1_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_authorization_status)"
 v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_implementation_status)"
+v4_1_target_runtime_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_authorization_status)"
+v4_1_target_runtime_implementation_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_implementation_status)"
+v4_1_target_runtime_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1457,23 +1474,26 @@ if [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; the
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
-if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
   if [[ "$current_package_status" != "COMPLETED" \
     || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
-    || "$authorized_next_package_phase" != "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" \
+    || "$authorized_next_package_phase" != "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" \
     || "$authorized_next_package_mode" != "IMPLEMENTATION" \
     || "$v4_1_design_status" != "FROZEN" \
     || "$product_v4_1_matrix_authorization" != "AUTHORIZED_TO_IMPLEMENT" \
-    || "$v4_1_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
-    || "$v4_1_implementation_status" != "NOT_STARTED" \
-    || "$p1b_scope" != "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY" ]]; then
+    || "$v4_1_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_implementation_status" != "COMPLETE" \
+    || "$v4_1_target_runtime_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$v4_1_target_runtime_implementation_status" != "NOT_STARTED" \
+    || "$v4_1_target_runtime_status" != "BLOCKED_BY_IMPLEMENTATION_DEFECT" \
+    || "$p1b_scope" != "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
     || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
-    || ! is_true_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
     || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
-    || [[ "$authorized_next_canonical_figma_file_key" != "rdMYmsAvZYkXHJX8hdl7UN" ]]; then
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
@@ -1803,6 +1823,9 @@ printf 'PRODUCT_V4_1_MATRIX_AUTHORIZATION: %s\n' "${product_v4_1_matrix_authoriz
 printf 'V4_1_DECISION_CHAIN_DECLARED_DESIGN_STATUS: %s\n' "${v4_1_design_status:-UNDECLARED}"
 printf 'V4_1_DECISION_CHAIN_DECLARED_AUTHORIZATION_STATUS: %s\n' "${v4_1_authorization_declared_status:-UNDECLARED}"
 printf 'V4_1_DECISION_CHAIN_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implementation_status:-UNDECLARED}"
+printf 'V4_1_TARGET_RUNTIME_REMEDIATION_DECLARED_AUTHORIZATION_STATUS: %s\n' "${v4_1_target_runtime_authorization_declared_status:-UNDECLARED}"
+printf 'V4_1_TARGET_RUNTIME_REMEDIATION_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_target_runtime_implementation_status:-UNDECLARED}"
+printf 'V4_1_TARGET_RUNTIME_DECLARED_STATUS: %s\n' "${v4_1_target_runtime_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"

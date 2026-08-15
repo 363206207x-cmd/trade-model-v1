@@ -1113,3 +1113,37 @@ place an exchange order, let AI bypass Rule Validation, persist Preview as an
 Opportunity/Candidate/Final, expose Candidate as Final, create a UserPosition
 from Final without explicit user confirmation, fabricate data/progress, or
 create duplicate canonical ownership.
+
+---
+
+## 17. Fundamental AI v4.1 Target Runtime Remediation Authorization
+
+The final-interaction package is complete on merged main
+`3a6f56afaf6fbba3d094d532f7f9555a23ac30a1`. Exact target-runtime acceptance
+identified four implementation blockers, recorded as B01-B04 in
+`docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_SOURCE_MAPPING.md`.
+
+The only authorized successor package is:
+
+`FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION`.
+
+It becomes effective only after
+`docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md`
+is merged to clean, synchronized `main`, and Product Source, Workflow,
+authorization, duplicate-skeleton and validation gates pass. Before that
+event, repository edits, implementation and successor PR creation are false.
+
+The successor may repair only B01 standard release-JAR Flyway packaging, B02
+existing provider capability/instrument mapping and regional failure
+isolation, B03 existing AI readiness/exact-model preflight, and B04 existing
+PasswordPolicy/bootstrap/readiness consistency. It must reuse the ownership
+recorded in
+`docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md` and may not
+create a second build, migration, provider, AI, authentication or readiness
+stack.
+
+The package may use secret-free protocol tests for CoinGlass but may not read,
+print, commit or require a live secret for implementation. Live-provider
+acceptance remains deferred. It may not change Product Source semantics,
+Figma, Desktop UI, Mobile, data-quality or decision contracts, and it may not
+automatically open, close, add, reduce, reverse, order or trade.

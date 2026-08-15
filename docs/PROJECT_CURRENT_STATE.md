@@ -8,52 +8,45 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation
-Product Phase Status: CANONICAL_FIGMA_AUTHORIZATION_RECONCILIATION_PENDING_MERGED_MAIN
-Current Work Package: Amend the existing exact implementation package to authorize only the registered Canonical Figma Desktop source, register the visual contract, and merge the machine-readable permission; no product implementation is included
-Next Business Phase: FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after authorization is merged and validated on clean/synced main
+Product Phase: Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization
+Product Phase Status: TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the accepted B01-B04 runtime blockers, reuse ownership, and exact implementation permission; no blocker remediation is implemented here
+Next Business Phase: FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION
+Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## Fundamental AI v4.1 Canonical Figma Authorization Reconciliation
+## Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization
 
-The Product Owner has frozen the 2026-08-14 final interaction source. Its
-fourteen routes, eleven overlays, fifty-four component families, seventy route
-states, eleven overlay states and eighteen disambiguation contracts are merged
-into the existing canonical path
-`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. That file is the
-sole ACTIVE/AUTHORITATIVE v4.1 Product Source; companion matrices are normative
-annexes, not competing sources.
+PR #1179 is complete and effective on merged main
+`3a6f56afaf6fbba3d094d532f7f9555a23ac30a1`. Target-runtime acceptance then
+reproduced four implementation blockers: B01 standard release-JAR Flyway
+runtime packaging, B02 exact provider/instrument coverage and regional
+failure isolation, B03 truthful AI readiness and exact-model preflight, and
+B04 authentication bootstrap/readiness consistency.
 
-The earlier backend decision-chain implementation is effective on merged main
-through PR #1177. Its old authorization is historical and superseded for
-current task selection. PR #1179 remains `OPEN / DRAFT / UNMERGED` at existing
-candidate Head `62ba9702e54b268ef27158bcff7e33422e23015e` and is registered as
-`REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION`.
+The sole ACTIVE/AUTHORITATIVE v4.1 Product Source remains
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`. The blocker
+source mapping and ownership map do not redefine it; they connect the four
+runtime failures to existing build/Flyway, provider, AI and authentication
+owners. No duplicate business skeleton is authorized.
 
-This candidate authorizes exactly
-`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION` after
-merged-main validation. It permits reuse and bounded extension of canonical
-frontend, API, schema and runtime ownership required by the frozen Desktop
-contract. This amendment additionally permits only Canonical Figma file
-`rdMYmsAvZYkXHJX8hdl7UN` for the same 14 Desktop routes, 11 overlays, 54
-component families and 81 states. It still forbids every other Figma file, a
-second Design System, Mobile implementation, duplicate business stacks, fake
-data, AI rule bypass and every automatic trading or position mutation
-capability.
+This package authorizes exactly
+`FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION` after merged-main
+validation. The successor may repair only B01-B04, with no Figma, Desktop UI,
+Mobile, product-contract, automatic-trading or position-mutation changes.
+CoinGlass protocol support may be tested without a live secret; a live secret
+must never be written to the repository and live acceptance remains deferred.
 
-The authorization diff contains only Product Source, contract, ownership,
-reuse, state, gate and validation documentation/scripts. Before merged-main
-effectivity, implementation, successor PR creation and Canonical Figma
-implementation remain false. After clean/synced merged-main effectivity, the
-exact successor may resolve all three to true while Mobile remains false. PR
-#1179 is recognized as the authorized successor rather than an unrelated
-conflict, but its current pre-amendment Head cannot receive final approval or
-merge authorization. It must first synchronize with amended `main` and be
-revalidated at a new exact Head.
+This authorization diff contains only Product Source registration, contract,
+ownership, delivery state, machine gate, validation and workflow evidence.
+Before merged-main effectivity, implementation and successor PR creation are
+false. After clean/synced merged-main effectivity, only the exact successor may
+resolve repository edits, implementation and PR creation to true.
+Implementation remains `NOT_STARTED`, target-runtime acceptance remains
+`BLOCKED_BY_IMPLEMENTATION_DEFECT`, and capability movement is `NONE`.
 
 ---
 

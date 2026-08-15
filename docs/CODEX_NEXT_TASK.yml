@@ -1,64 +1,65 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI v4.1 Canonical Figma authorization scope reconciliation"
+active_block: "Fundamental AI v4.1 target-runtime blocker remediation authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation"
-branch: "codex/v4-1-canonical-figma-authorization-reconciliation"
+module: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization"
+branch: "codex/v4-1-target-runtime-blocker-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
 
-current_package_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_AUTHORIZATION"
-current_package_name: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation"
-current_package_active_block: "Exact-Package Canonical Figma Desktop Permission And Visual Contract Gate"
+current_package_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION"
+current_package_name: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization"
+current_package_active_block: "B01-B04 Product-Source Mapping, Ownership And Exact Permission Gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-canonical-figma-authorization-reconciliation"
+current_package_branch: "codex/v4-1-target-runtime-blocker-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this Canonical Figma authorization amendment; do not modify or synchronize PR #1179 in this task"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement B01-B04 in this task"
 current_package_allowed_scope:
-  - "Register the Canonical Figma Desktop permission in the existing exact implementation package"
-  - "Register the visual density/proportion contract and explicit 70:30 supersession by 60:40"
-  - "Update Product Source references, page matrix status, PR #1179 historical disposition, delivery state, machine permissions, gates, and reconciliation report"
-  - "Validate exact-package fail-closed behavior without application, API, schema, Figma, Mobile, or business-test changes"
+  - "Register the four accepted target-runtime blockers against the canonical Product Source"
+  - "Register existing object ownership and exact remediation authorization"
+  - "Update delivery state, exact-package machine permissions, gate validation and authorization evidence"
+  - "Validate fail-closed package denial without changing application, API, schema, Figma or Mobile"
 current_package_blocked_scope:
-  - "Application code, API, schema, migration, HTML, CSS, JavaScript, business test, Figma, or Mobile changes"
-  - "Any modification, close, merge, commit, push, or rebase of PR #1179"
-  - "Any implementation before the authorization is effective on clean, synchronized merged main"
+  - "pom.xml, application configuration, Java, API, schema, provider, PasswordPolicy, Figma, Desktop or Mobile changes"
+  - "Implementation of B01-B04 or target-runtime deployment"
+  - "Secret reading, injection, logging or repository writes"
 
-authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
-authorized_next_package_name: "Fundamental AI v4.1 Final Interaction And Page OneShot Implementation"
-authorized_next_package_active_block: "Fourteen Desktop Routes, Eleven Overlays, Runtime Data Chain And Independent Acceptance"
+authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+authorized_next_package_name: "Fundamental AI v4.1 Target Runtime Deployment Blocker Remediation"
+authorized_next_package_active_block: "B01 Standard JAR Flyway, B02 Provider Capability, B03 AI Readiness, B04 Auth Bootstrap"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-frontend-runtime-alignment"
-authorized_next_package_risk: "C"
+authorized_next_package_branch: "codex/v4-1-target-runtime-blocker-remediation"
+authorized_next_package_risk: "B_RISK_TARGET_RUNTIME_REMEDIATION"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
-authorized_next_package_canonical_figma_desktop_implementation_allowed: true
+authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
-authorized_next_package_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
-authorized_next_package_next_action: "Synchronize PR #1179 with amended main, preserve its protected assets, rerun all validations on a new exact Head, then stop for independent product-level audit"
+authorized_next_package_canonical_figma_file_key: "NONE"
+authorized_next_package_next_action: "From authorization-effective merged main, implement only B01-B04 in one Draft PR and stop for independent remediation audit"
 
-blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_OR_MOBILE_IMPLEMENTATION"
-blocked_package_status: "BLOCKED_OUTSIDE_FINAL_INTERACTION_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_FINAL_INTERACTION_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_MOBILE_FIGMA_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_TARGET_RUNTIME_REMEDIATION_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
-  - "FINAL_INTERACTION_SPEC_FROZEN"
-  - "FINAL_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "TARGET_RUNTIME_ACCEPTANCE_BLOCKERS_MAPPED"
+  - "V4_1_FINAL_INTERACTION_EFFECTIVE_MERGED_MAIN"
+  - "TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
   - "CLEAN_WORKTREE"
-  - "NO_ACTIVE_CONFLICTING_PR_EXCEPT_EXACT_AUTHORIZED_SUCCESSOR"
+  - "NO_ACTIVE_CONFLICTING_PR"
 
 # Historical predecessor fields remain compatibility evidence only.
 p1a_repository_edits_allowed: false
@@ -77,61 +78,61 @@ v4_1_decision_chain_design_status: "FROZEN"
 v4_1_decision_chain_authorization_status: "HISTORICAL_SUPERSEDED"
 v4_1_decision_chain_implementation_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_design_status: "FROZEN"
-v4_1_final_interaction_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_final_interaction_implementation_status: "NOT_STARTED"
-authorized_next_package: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
-scope: "V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_ONLY"
+v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_final_interaction_implementation_status: "COMPLETE"
+v4_1_target_runtime_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_target_runtime_remediation_implementation_status: "NOT_STARTED"
+v4_1_target_runtime_status: "BLOCKED_BY_IMPLEMENTATION_DEFECT"
+authorized_next_package: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+scope: "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk Product Source and authorization package; successor is C-risk because its frozen scope may require API/schema/runtime changes"
+risk: "A-risk authorization package; successor is B-risk target-runtime remediation"
 
 pr_1179_number: "1179"
-pr_1179_status: "OPEN_DRAFT_UNMERGED"
-pr_1179_head: "62ba9702e54b268ef27158bcff7e33422e23015e"
+pr_1179_status: "MERGED"
+pr_1179_merge_commit: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
 pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
-pr_1179_disposition: "REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION"
+pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
 
-current_pr: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation / PENDING_REVIEW"
-current_package_pr: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation Package"
+current_pr: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization / PENDING_REVIEW"
+current_package_pr: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
-a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only package after all gates pass"
+a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only authorization package after all gates pass"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "Fundamental AI v4.1 Final Interaction And Page OneShot Implementation"
+next_business_phase: "Fundamental AI v4.1 Target Runtime Deployment Blocker Remediation"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization amendment; only then synchronize PR #1179 and request FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
 
-product_phase: "Fundamental AI v4.1 Final Interaction"
+product_phase: "Fundamental AI v4.1 Target Runtime Remediation Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "v4.1 final interaction Product Source reconciliation and authorization"
+product_module: "v4.1 target-runtime blocker source mapping and exact implementation authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "PAGE_ROUTE_COMPONENT_MATRIX"
+  - "TARGET_RUNTIME_ACCEPTANCE"
+  - "BLOCKER_SOURCE_MAPPING"
   - "OBJECT_OWNERSHIP"
-  - "PR_1179_REUSE"
-  - "VISUAL_DENSITY_AND_PROPORTION"
-  - "AUTHORIZATION"
+  - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_PAGE_ROUTE_COMPONENT_MATRIX.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_OBJECT_OWNERSHIP_MAP.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_PR1179_REUSE_AND_SUPERSESSION_MAP.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_RECONCILIATION_REPORT.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_SOURCE_MAPPING.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "FINAL_INTERACTION_DISAMBIGUATION"
-  - "DESKTOP_ROUTE_AND_STATE_FREEZE"
-  - "CANONICAL_FIGMA_DESKTOP_PERMISSION"
-  - "VISUAL_DENSITY_AND_PROPORTION"
+  - "B01_STANDARD_JAR_FLYWAY"
+  - "B02_PROVIDER_CAPABILITY_AND_INSTRUMENT"
+  - "B03_AI_PROVIDER_READINESS"
+  - "B04_AUTH_BOOTSTRAP"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -144,45 +145,46 @@ required_product_sources:
   - PS-POSITION-MONITORING
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
+  - PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  The single v4.1 source now owns the business chain and final Desktop interaction contract. Fourteen routes, eleven overlays, fifty-four component families, seventy route states, eleven overlay states, eighteen disambiguation contracts and protected PR #1179 capabilities are frozen together.
+  The sole v4.1 Product Source remains unchanged. The four reproduced blockers prevent its fail-closed target-runtime chain from starting or obtaining truthful provider/AI/auth readiness. This package records only the exact repair permission.
 
 design_interaction_mapping: |
-  Desktop only. Reuse approved PR #1179 components and visual language. The exact package may modify only Canonical Figma file rdMYmsAvZYkXHJX8hdl7UN under the frozen 14-route/11-overlay/54-family/81-state and visual-density contracts. Mobile implementation remains forbidden. Missing, stale, unavailable and failed states are first-class; no fake data or fake progress.
+  No design implementation is authorized. Canonical Figma, Desktop and Mobile remain unchanged. The later package may repair runtime state mapping only where an existing status field is incorrect; it may not redesign a page or component.
 
 data_source_mapping: |
-  Reuse canonical Pool, Analysis, Evidence, Score, Decision, Opportunity, Candidate, Resolver, Final, AITrace, UserPosition, Monitor, Review, Push/Recheck, Event, UserConfig and provider owners. Extend those owners and add only the independent records approved by the current ownership map.
+  Reuse the existing build/Flyway, canonical asset and instrument mapping, provider adapters/health, Asset Pool scan/AnalysisRun, AI Orchestrator/AITrace/cost gate, PasswordPolicy/PersonalUser/auth Session and readiness owners. No second owner is authorized.
 
 current_implementation_gap: |
-  PR #1179 is a reusable base but lacks complete dual-mode Preview, all routed pages/overlays, message/Telegram, plan lifecycle/revalidation, multi-timeframe projection/context, review/settings/calendar/audit and full runtime scenarios. Its passing contracts must be preserved.
+  Exact merged-main acceptance found a standard-JAR Flyway packaging defect, exact-provider/instrument and HTTP 451 gaps, application AI readiness configuration/verification gaps, and password bootstrap/readiness inconsistency. Data Quality 55 remains truthful and is not a defect authorized for change.
 
 allowed_scope:
-  - "Product Source, contract, ownership, reuse, authorization, status, gate, validation, and reconciliation documents only"
+  - "Blocker source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "Implement all frozen Desktop routes, overlays, components and states by reusing PR #1179"
-  - "Modify only Canonical Figma file rdMYmsAvZYkXHJX8hdl7UN using approved components/variants, Auto Layout and Variables, with node-ID and runtime-comparison evidence"
-  - "Extend the minimum canonical View Model, API, schema, persistence and runtime owners required by the Product Source"
-  - "Add full contract, migration, browser and runtime scenario validation"
+  - "B01 standard release JAR Flyway runtime and packaged PostgreSQL V1-V13 validation"
+  - "B02 existing provider capability/instrument mapping, HTTP 451 classification and per-asset failure isolation"
+  - "B03 existing AI readiness, configurable cost/RPM/budget and exact-model preflight"
+  - "B04 existing PasswordPolicy/bootstrap/readiness alignment and secure password helper"
+  - "Secret-free tests, deployment docs and independent remediation audit handoff"
 
 authorized_next_blocked_scope:
-  - "Automatic trading or automatic position mutation"
-  - "AI rule bypass, Preview persistence of Opportunity/Candidate/Final, Candidate-as-Final, or Final-as-Position"
-  - "Duplicate business ownership, fake data, fake AI output, fake progress, a second/non-canonical Figma file or Design System, or Mobile implementation"
+  - "Product, Figma, Desktop UI or Mobile changes"
+  - "Data Quality, Eight Scores, Market Bias, Opportunity State, Plan Mode, Candidate/Final or Position boundary changes"
+  - "Fake data, fake AI, quote substitution, automatic position mutation, order or trading"
 
 blocked_scope:
-  - "Any implementation inside this authorization package"
-  - "Any package except FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+  - "Any B01-B04 implementation inside this authorization package"
+  - "Any package except FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
 
 forbidden_scope:
-  - "Application code, API, schema, migration, business tests, Figma or Mobile in the authorization diff"
-  - "Changing PR #1179 Head during authorization"
+  - "pom.xml, application configuration, Java, API, schema, provider, PasswordPolicy, Figma or Mobile changes in the authorization diff"
+  - "Reading, injecting or committing real secrets, or deploying a runtime"
 
 real_scenario_requirement: |
-  This authorization task performs no business scenario. The successor must complete the frozen Desktop/browser/runtime scenarios and stop for independent product-level audit.
+  This authorization performs no business scenario. The successor must run the exact standard-JAR, PostgreSQL, provider, AI and auth scenarios and stop for independent audit without lowering gates or manufacturing Final output.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -192,23 +194,22 @@ hard_boundaries:
   fake_data_as_real: "BLOCKED"
   owner_scope_bypass: "BLOCKED"
   figma_change: "BLOCKED"
-  canonical_figma_desktop_implementation: "ALLOWED_EXACT_PACKAGE_SINGLE_FILE"
+  canonical_figma_desktop_implementation: "BLOCKED"
   noncanonical_figma_change: "BLOCKED"
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and hashes pass"
-  - "Authorization is blocked before merge and exact successor is allowed only after clean/synced merged main"
-  - "Canonical Figma Desktop permission is true only for the exact package and Mobile permission is always false"
-  - "PR #1179 is recognized as the exact authorized successor, not an unrelated conflict"
-  - "Wrong package names fail closed"
-  - "Workflow, authorization, duplicate-skeleton, Markdown/YAML, Maven and diff checks pass"
+  - "Unique active v4.1 Product Source and registered authorization hashes pass"
+  - "Authorization remains blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "Old, typo, expanded, auto-trading, Mobile and Figma packages fail closed"
+  - "Application/API/Schema/Figma/Mobile changed-file count is zero"
+  - "Workflow, authorization, duplicate-skeleton, Maven, secret and diff checks pass"
 
 stop_conditions:
-  - "A Product Source conflict or duplicate owner remains"
-  - "PR #1179 Head changes from 62ba9702e54b268ef27158bcff7e33422e23015e during authorization"
-  - "The diff includes application, API, schema, migration, business-test, Figma or Mobile changes"
-  - "The exact successor is not the only implementation package permitted after merged-main effectivity"
+  - "Main differs from 3a6f56afaf6fbba3d094d532f7f9555a23ac30a1 before authorization branch creation"
+  - "A Product Source conflict, secret exposure or duplicate owner is found"
+  - "The diff includes application, API, schema, provider, business-test, Figma or Mobile changes"
+  - "The exact successor is not the only package permitted after merged-main effectivity"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"
