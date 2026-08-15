@@ -11,6 +11,9 @@ import java.util.Optional;
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.util.BinanceUsdtSymbol;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.ProviderAdapterResponse;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.instrument.MarketType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,21 +34,31 @@ public class BinanceMarketQuoteClient implements MarketQuoteClient {
     private static final String FUTURES_BOOK_URL = "https://fapi.binance.com/fapi/v1/ticker/bookTicker";
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    private final HttpClient httpClient;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public BinanceMarketQuoteClient(ObjectMapper objectMapper) {
+        this(objectMapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+    }
+
+    BinanceMarketQuoteClient(ObjectMapper objectMapper, HttpClient httpClient) {
         this.objectMapper = objectMapper;
+        this.httpClient = httpClient;
     }
 
     @Override
     public Optional<MarketQuoteSnapshot> fetch24hTicker(String assetSymbol) {
-        return fetch24hTicker(assetSymbol, MarketType.SPOT);
+        return Optional.ofNullable(fetch24hTickerResult(assetSymbol, MarketType.SPOT).payload());
     }
 
     @Override
     public Optional<MarketQuoteSnapshot> fetch24hTicker(String assetSymbol, MarketType marketType) {
+        return Optional.ofNullable(fetch24hTickerResult(assetSymbol, marketType).payload());
+    }
+
+    @Override
+    public ProviderAdapterResponse<MarketQuoteSnapshot> fetch24hTickerResult(
+            String assetSymbol, MarketType marketType) {
         String symbol = BinanceUsdtSymbol.toUsdtPair(assetSymbol);
         MarketType effectiveMarket = marketType == null ? MarketType.SPOT : marketType;
         String tickerUrl = (effectiveMarket == MarketType.PERPETUAL
@@ -55,27 +68,35 @@ public class BinanceMarketQuoteClient implements MarketQuoteClient {
             if (response.statusCode() != 200) {
                 log.warn("[market-quote] Binance HTTP {} for symbol={} bodySnippet={}",
                         response.statusCode(), symbol, truncate(response.body(), 200));
-                return Optional.empty();
+                return ProviderFailureClassifier.httpFailure(response.statusCode(),
+                        "BINANCE_QUOTE_HTTP_" + response.statusCode(), null);
             }
             JsonNode root = objectMapper.readTree(response.body());
             Optional<MarketQuoteSnapshot> parsed = parseBinance24hrJson(root, symbol);
             if (parsed.isEmpty()) {
                 log.warn("[market-quote] Binance parse missing fields symbol={}", symbol);
-                return Optional.empty();
+                return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 200,
+                        "BINANCE_QUOTE_MALFORMED", null);
             }
             MarketQuoteSnapshot snap = parsed.get();
             if (effectiveMarket == MarketType.PERPETUAL) {
                 HttpResponse<String> book = get(FUTURES_BOOK_URL + "?symbol=" + symbol);
-                if (book.statusCode() != 200
-                        || !applyBookTicker(snap, objectMapper.readTree(book.body()))) {
+                if (ProviderFailureClassifier.isRegionRestricted(book.statusCode(),
+                        "BINANCE_BOOK_TICKER_HTTP_" + book.statusCode())) {
+                    return ProviderFailureClassifier.httpFailure(book.statusCode(),
+                            "BINANCE_BOOK_TICKER_HTTP_" + book.statusCode(), null);
+                }
+                if (book.statusCode() != 200 || !applyBookTicker(snap, objectMapper.readTree(book.body()))) {
                     log.warn("[market-quote] Binance futures book ticker unavailable symbol={}", symbol);
                 }
             }
             snap.setFetchedAtEpochMillis(System.currentTimeMillis());
-            return Optional.of(snap);
+            return ProviderAdapterResponse.ready(snap,
+                    java.time.Instant.ofEpochMilli(snap.getFetchedAtEpochMillis()));
         } catch (Exception e) {
             log.warn("[market-quote] Binance fetch failed symbol={} err={}", symbol, e.getMessage());
-            return Optional.empty();
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0,
+                    "PROVIDER_TRANSPORT_FAILED", null);
         }
     }
 

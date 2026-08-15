@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Target Runtime Blocker Remediation
 
-Status: `FINAL_ONESHOT_CLOSURE_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
+Status: `FINAL_HTTP451_CLOSURE_COMPLETE_PENDING_ONE_EXACT_REAUDIT`
 
 Authorized package:
 `FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION`
@@ -45,7 +45,37 @@ OHLCV provider.
   enablement before its directory request and otherwise uses only the existing
   configured local catalog.
 
-## API Delta
+## Final HTTP 451 Propagation Closure
+
+- `ProviderFailureClassifier` is the single HTTP/provider failure classifier.
+  HTTP 451 and the existing region-restriction aliases normalize only to
+  `REGION_RESTRICTED`; they are never reported as empty success, no data, 5xx,
+  or a retryable timeout.
+- `ProviderCapabilityRegistry` remains the single capability-state owner. Each
+  runtime observation is keyed by exact provider, canonical instrument,
+  market, contract, dataset and timeframe, and carries its request key and
+  trace identifier.
+- The current-price, Binance funding, Binance open-interest, CoinGlass open-
+  interest, funding, liquidation and long/short paths all write the normalized
+  observation before returning a structured fail-closed result.
+- The first exact request performs one external call and one registry write.
+  A later exact request reads `REGION_RESTRICTED` before the adapter and makes
+  zero external calls. Region restriction can expire only to
+  `STALE_CAPABILITY`; revalidation remains directory-only.
+- Dataset scope is isolated. A funding restriction does not authorize or block
+  open interest, price or OHLCV, and generic quote support cannot authorize a
+  derivative dataset.
+- A primary 451 permits a fallback call only after the fallback independently
+  returns `SUPPORTED` for the same canonical instrument and dataset. No
+  supported fallback means fail closed.
+- The aggregate Binance derivatives snapshot returns no payload when either
+  required component is region restricted. Missing funding/open interest is
+  never converted to numeric zero or Evidence.
+
+The complete production-path inventory and executable evidence are recorded in
+`docs/FUNDAMENTAL_AI_V4_1_PR1187_HTTP451_FINAL_CLOSURE.md`.
+
+## Existing PR API Delta
 
 Additive authenticated endpoints only:
 
@@ -57,6 +87,11 @@ Additive authenticated endpoints only:
 `GET /api/ai/orchestrator/status` adds sanitized configuration-presence and
 canonical readiness fields. No secret value, authorization header or full
 prompt is returned.
+
+The final HTTP 451 closure adds no HTTP endpoint or external product API. The
+three existing internal market-client interfaces gained backward-compatible
+typed-result methods so callers can preserve `REGION_RESTRICTED` instead of
+collapsing it into `Optional.empty()`.
 
 ## Persistence And Product Boundaries
 
@@ -81,7 +116,8 @@ prompt is returned.
 
 ## Independent Audit Boundary
 
-The independent audit must use the exact implementation Head and rerun the
+The independent audit must use the exact implementation Head produced from
+baseline `e82ba8888da596ac67c871b4cb4b03b2ec5191b3` and rerun the
 standard packaged-JAR PostgreSQL smoke, focused contracts, full Maven suite,
 Product Source Gate, Workflow Contract and authorization validator. This
 implementation does not self-approve, merge, deploy or perform live-secret

@@ -104,6 +104,9 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             case PRICE -> refreshPrice(item, traceId, attemptedAt);
             case OHLCV -> refreshOhlcv(item, traceId, attemptedAt);
             case DERIVATIVES -> refreshDerivatives(item, traceId, attemptedAt);
+            case FUNDING, OPEN_INTEREST -> unavailable(item, datasetType,
+                    UnifiedSourceStatus.NOT_CONFIGURED, "DIRECT_SUBDATASET_REFRESH_NOT_SUPPORTED",
+                    traceId, attemptedAt);
             case COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING, COINGLASS_LIQUIDATION,
                     COINGLASS_LONG_SHORT_RATIO -> unavailable(item, datasetType, UnifiedSourceStatus.DISABLED,
                     "COINGLASS_COMPONENT_DATASET_INTERNAL_ONLY", traceId, attemptedAt);

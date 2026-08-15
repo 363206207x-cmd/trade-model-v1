@@ -284,6 +284,8 @@ class PersistentAssetPoolServiceTest {
                 .containsExactly("ADAUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT");
         assertThat(batch.perAssetResults().get(0).state()).isEqualTo("FAILED");
         assertThat(batch.perAssetResults().get(0).failureReason()).isEqualTo("REGION_RESTRICTED");
+        assertThat(batch.perAssetResults().get(0).analysisId()).isNull();
+        assertThat(batch.perAssetResults().get(0).dataQuality()).isNull();
         assertThat(batch.perAssetResults().get(1).state()).isEqualTo("SUCCESS");
         assertThat(batch.perAssetResults().get(1).analysisId()).isEqualTo("analysis-btc");
         assertThat(batch.perAssetResults().get(1).dataQuality()).isEqualTo(55);

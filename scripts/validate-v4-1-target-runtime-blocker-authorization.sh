@@ -117,8 +117,12 @@ if [[ "$effective_branch" == "codex/v4-1-target-runtime-blocker-remediation" ]];
       docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_SMOKE_TEST.md | \
       docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_ROOT_CAUSE_MATRIX.md | \
       docs/FUNDAMENTAL_AI_V4_1_PR1187_FINAL_TARGET_RUNTIME_CLOSURE.md | \
+      docs/FUNDAMENTAL_AI_V4_1_PR1187_HTTP451_FINAL_CLOSURE.md | \
       docs/FUNDAMENTAL_AI_V4_1_PR1187_FINAL_REAUDIT_HANDOFF.md | \
       docs/COINGLASS_V4_ENDPOINT_CAPABILITY_MATRIX.md | \
+      src/main/java/org/example/trademodel/market/client/MarketQuoteClient.java | \
+      src/main/java/org/example/trademodel/market/client/OpenInterestClient.java | \
+      src/main/java/org/example/trademodel/market/client/PerpFundingRateClient.java | \
       src/main/resources/application.yml | \
       src/main/resources/application-prod.yml)
         return 0

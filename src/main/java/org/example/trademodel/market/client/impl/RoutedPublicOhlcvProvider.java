@@ -4,6 +4,7 @@ import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.ProviderDatasetType;
 import org.example.trademodel.providercall.instrument.ContractType;
 import org.example.trademodel.providercall.instrument.MarketType;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
@@ -71,7 +72,7 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
                 ? call(primaryCapability, symbol, timeframe, limit, ingestionRunId)
                 : blocked(primaryCapability);
         if (primaryCapability.usableFor(timeframe)) {
-            record(primaryCapability, symbol, timeframe, primaryResult);
+            record(primaryCapability, symbol, timeframe, primaryResult, ingestionRunId);
         }
         if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)
                 || (primaryCapability.usableFor(timeframe) && !fallbackAllowed(primary, primaryResult))) {
@@ -84,13 +85,14 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         }
         PublicOhlcvProviderResult fallbackResult = call(
                 fallbackCapability, symbol, timeframe, limit, ingestionRunId);
-        record(fallbackCapability, symbol, timeframe, fallbackResult);
+        record(fallbackCapability, symbol, timeframe, fallbackResult, ingestionRunId);
         return fallbackResult;
     }
 
     public ProviderInstrumentCapability authorize(String provider, String symbol, String timeframe) {
         if (capabilityRegistry == null) return null;
-        return capabilityRegistry.authorize(provider, symbol, timeframe, MarketType.SPOT, ContractType.NONE);
+        return capabilityRegistry.authorize(provider, symbol, timeframe, MarketType.SPOT, ContractType.NONE,
+                ProviderDatasetType.OHLCV);
     }
 
     public ProviderInstrumentCapability preferredCapability(String symbol, String timeframe) {
@@ -137,7 +139,8 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
     private void record(ProviderInstrumentCapability capability,
                         String symbol,
                         String timeframe,
-                        PublicOhlcvProviderResult result) {
+                        PublicOhlcvProviderResult result,
+                        String traceId) {
         String provider = normalizeProvider(capability.provider());
         MutableHealth item = health.computeIfAbsent(provider, MutableHealth::new);
         if (ready(result)) item.success();
@@ -145,7 +148,8 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         if (capabilityRegistry != null) {
             String sourceVersion = result != null && result.batch() != null
                     ? result.batch().provenanceVersion() : capability.sourceVersion();
-            capabilityRegistry.recordOhlcv(provider, symbol, timeframe, capability.providerSymbol(), sourceVersion, result);
+            capabilityRegistry.recordOhlcv(provider, symbol, timeframe, capability.providerSymbol(),
+                    sourceVersion, result, traceId);
         }
     }
 

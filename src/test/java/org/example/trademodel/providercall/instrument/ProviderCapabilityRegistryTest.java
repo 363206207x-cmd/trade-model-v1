@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -53,6 +55,32 @@ class ProviderCapabilityRegistryTest {
     }
 
     @Test
+    void regionRestrictionExpiresOnlyToReverificationRequiredState() {
+        MutableClock clock = new MutableClock(NOW);
+        ProviderSymbolMapping mapping = new ProviderSymbolMapping(
+                "BINANCE",
+                new CanonicalInstrumentId("ADA", "USDT", MarketType.SPOT, "BINANCE", ContractType.NONE),
+                "ADAUSDT", true, "BINANCE_SPOT_EXCHANGE_INFO_V1",
+                List.of("5m"), NOW.minusSeconds(1));
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("trade-model.ohlcv.binance.enabled", "true")
+                .withProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+        ProviderCapabilityRegistry registry = new ProviderCapabilityRegistry(
+                new ProviderSymbolMappingRegistry(List.of(mapping)), environment, 2, clock);
+        registry.recordOhlcv("BINANCE", "ADAUSDT", "5m", "ADAUSDT", "RUNTIME",
+                new PublicOhlcvProviderResult(OhlcvSourceState.ERROR, "REGION_RESTRICTED", null));
+
+        clock.advance(Duration.ofSeconds(3));
+
+        assertThat(registry.inspect("BINANCE", "ADAUSDT", "5m", MarketType.SPOT,
+                ContractType.NONE, org.example.trademodel.providercall.ProviderDatasetType.OHLCV)
+                .capabilityState()).isEqualTo(ProviderCapabilityState.STALE_CAPABILITY);
+        assertThat(registry.authorize("BINANCE", "ADAUSDT", "5m", MarketType.SPOT,
+                ContractType.NONE, org.example.trademodel.providercall.ProviderDatasetType.OHLCV)
+                .capabilityState()).isEqualTo(ProviderCapabilityState.STALE_CAPABILITY);
+    }
+
+    @Test
     void missingExactMappingIsUnsupportedRatherThanSynthesized() {
         ProviderCapabilityRegistry registry = registry(NOW.minusSeconds(60), 300, "true");
 
@@ -77,5 +105,21 @@ class ProviderCapabilityRegistryTest {
                 .withProperty("trade-model.ohlcv.binance.external-calls-enabled", enabled);
         return new ProviderCapabilityRegistry(mappings, environment, freshnessSeconds,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        private MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
     }
 }

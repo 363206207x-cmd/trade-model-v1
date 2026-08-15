@@ -47,7 +47,8 @@ class ProviderCapabilityPreCallGateTest {
 
         assertThat(result.batch()).isNull();
         assertThat(result.reasonCode()).isIn("NO_EXACT_PROVIDER_MAPPING", "BINANCE_SYMBOL_NOT_TRADABLE");
-        verify(registry).authorize("BINANCE", "AAVEUSDT", "5m", MarketType.SPOT, ContractType.NONE);
+        verify(registry).authorize("BINANCE", "AAVEUSDT", "5m", MarketType.SPOT, ContractType.NONE,
+                org.example.trademodel.providercall.ProviderDatasetType.OHLCV);
         verify(binance, never()).fetchClosedBars(any(), any(), anyInt(), any());
         verify(kraken, never()).fetchClosedBars(any(), any(), anyInt(), any());
     }
@@ -65,7 +66,8 @@ class ProviderCapabilityPreCallGateTest {
 
         assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.READY);
         InOrder order = inOrder(registry, kraken);
-        order.verify(registry).authorize("KRAKEN", "BTCUSDT", "5m", MarketType.SPOT, ContractType.NONE);
+        order.verify(registry).authorize("KRAKEN", "BTCUSDT", "5m", MarketType.SPOT, ContractType.NONE,
+                org.example.trademodel.providercall.ProviderDatasetType.OHLCV);
         order.verify(kraken).fetchClosedBars("BTCUSDT", "5m", 100, "run");
         verify(binance, never()).fetchClosedBars(any(), any(), anyInt(), any());
     }
@@ -86,6 +88,51 @@ class ProviderCapabilityPreCallGateTest {
 
         verify(kraken, times(1)).fetchClosedBars("BTCUSDT", "5m", 100, "run");
         verify(binance, times(1)).fetchClosedBars("BTCUSDT", "5m", 100, "run");
+    }
+
+    @Test
+    void primary451UsesOnlyIndependentlySupportedFallback() {
+        ProviderCapabilityRegistry registry = spy(registry(List.of(
+                mapping("KRAKEN", "BTCUSDT", "XBTUSDT"),
+                mapping("BINANCE", "BTCUSDT", "BTCUSDT")), enabledEnvironment(), List.of(), 3600));
+        KrakenPublicOhlcvProvider kraken = mock(KrakenPublicOhlcvProvider.class);
+        BinancePublicOhlcvProvider binance = mock(BinancePublicOhlcvProvider.class);
+        when(kraken.fetchClosedBars("BTCUSDT", "5m", 100, "run"))
+                .thenReturn(failed("REGION_RESTRICTED"));
+        when(binance.fetchClosedBars("BTCUSDT", "5m", 100, "run"))
+                .thenReturn(ready("BINANCE_PUBLIC"));
+        RoutedPublicOhlcvProvider router = router(kraken, binance, registry, "kraken", "binance", true);
+
+        PublicOhlcvProviderResult result = router.fetchClosedBars("BTCUSDT", "5m", 100, "run");
+
+        assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.READY);
+        assertThat(registry.inspect("KRAKEN", "BTCUSDT", "5m", MarketType.SPOT, ContractType.NONE,
+                org.example.trademodel.providercall.ProviderDatasetType.OHLCV).capabilityState())
+                .isEqualTo(ProviderCapabilityState.REGION_RESTRICTED);
+        verify(kraken, times(1)).fetchClosedBars("BTCUSDT", "5m", 100, "run");
+        verify(registry, times(1)).authorize("BINANCE", "BTCUSDT", "5m", MarketType.SPOT,
+                ContractType.NONE, org.example.trademodel.providercall.ProviderDatasetType.OHLCV);
+        verify(binance, times(1)).fetchClosedBars("BTCUSDT", "5m", 100, "run");
+    }
+
+    @Test
+    void primary451DoesNotCallUnsupportedFallback() {
+        ProviderCapabilityRegistry registry = spy(registry(
+                List.of(mapping("KRAKEN", "BTCUSDT", "XBTUSDT")),
+                enabledEnvironment(), List.of(), 3600));
+        KrakenPublicOhlcvProvider kraken = mock(KrakenPublicOhlcvProvider.class);
+        BinancePublicOhlcvProvider binance = mock(BinancePublicOhlcvProvider.class);
+        when(kraken.fetchClosedBars("BTCUSDT", "5m", 100, "run"))
+                .thenReturn(failed("REGION_RESTRICTED"));
+        RoutedPublicOhlcvProvider router = router(kraken, binance, registry, "kraken", "binance", true);
+
+        PublicOhlcvProviderResult result = router.fetchClosedBars("BTCUSDT", "5m", 100, "run");
+
+        assertThat(result.batch()).isNull();
+        assertThat(result.reasonCode()).isEqualTo("REGION_RESTRICTED");
+        verify(registry, times(1)).authorize("BINANCE", "BTCUSDT", "5m", MarketType.SPOT,
+                ContractType.NONE, org.example.trademodel.providercall.ProviderDatasetType.OHLCV);
+        verify(binance, never()).fetchClosedBars(any(), any(), anyInt(), any());
     }
 
     @Test

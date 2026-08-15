@@ -38,7 +38,8 @@ class ProviderConsumerCapabilityGateTest {
     @Test
     void priceRefreshCannotReachQuoteClientWhenCapabilityIsRejected() {
         ProviderCapabilityRegistry gate = mock(ProviderCapabilityRegistry.class);
-        when(gate.authorize("BINANCE", "AAVEUSDT", "GLOBAL", MarketType.SPOT, ContractType.NONE))
+        when(gate.authorize("BINANCE", "AAVEUSDT", "GLOBAL", MarketType.SPOT, ContractType.NONE,
+                ProviderDatasetType.PRICE))
                 .thenReturn(blocked(MarketType.SPOT, ContractType.NONE, ProviderCapabilityState.UNSUPPORTED_SYMBOL));
         MarketQuoteClient client = mock(MarketQuoteClient.class);
         ProviderSnapshotRefreshService refresh = mock(ProviderSnapshotRefreshService.class);
@@ -58,7 +59,8 @@ class ProviderConsumerCapabilityGateTest {
     @Test
     void derivativesRefreshCannotReachFundingOrOpenInterestWhenExactPerpetualCapabilityIsRejected() {
         ProviderCapabilityRegistry gate = mock(ProviderCapabilityRegistry.class);
-        when(gate.authorize("BINANCE", "BTCUSDT", "GLOBAL", MarketType.PERPETUAL, ContractType.LINEAR))
+        when(gate.authorize("BINANCE", "BTCUSDT", "GLOBAL", MarketType.PERPETUAL, ContractType.LINEAR,
+                ProviderDatasetType.DERIVATIVES))
                 .thenReturn(blocked(MarketType.PERPETUAL, ContractType.LINEAR,
                         ProviderCapabilityState.REGION_RESTRICTED));
         PerpFundingRateClient funding = mock(PerpFundingRateClient.class);
@@ -79,7 +81,8 @@ class ProviderConsumerCapabilityGateTest {
     @Test
     void coordinatedOhlcvRefreshCannotReachProviderOrWriterWhenGateRejects() {
         ProviderCapabilityRegistry gate = mock(ProviderCapabilityRegistry.class);
-        when(gate.authorize("BINANCE", "AAVE/USDT", "5m", MarketType.SPOT, ContractType.NONE))
+        when(gate.authorize("BINANCE", "AAVE/USDT", "5m", MarketType.SPOT, ContractType.NONE,
+                ProviderDatasetType.OHLCV))
                 .thenReturn(blocked(MarketType.SPOT, ContractType.NONE, ProviderCapabilityState.SOURCE_UNAVAILABLE));
         PublicOhlcvProvider provider = mock(PublicOhlcvProvider.class);
         PersistedOhlcvIngestionService writer = mock(PersistedOhlcvIngestionService.class);

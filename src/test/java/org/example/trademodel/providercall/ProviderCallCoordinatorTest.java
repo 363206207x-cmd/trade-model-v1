@@ -225,6 +225,26 @@ class ProviderCallCoordinatorTest {
     }
 
     @Test
+    void http451IsNotRetriedAndCannotReturnStaleFallback() {
+        TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 10);
+        AtomicInteger calls = new AtomicInteger();
+        ProviderRequestKey key = key(ProviderDatasetType.PRICE);
+        ProviderCallRequest<String> ready = request(key, AssetPriority.P0_POSITION,
+                () -> ProviderAdapterResponse.ready("65000", context.clock.instant()), calls);
+        context.coordinator.execute(ready);
+        context.clock.advance(Duration.ofSeconds(11));
+        ProviderCallRequest<String> restricted = request(key, AssetPriority.P0_POSITION,
+                () -> ProviderFailureClassifier.httpFailure(451, "HTTP_451", null), calls);
+
+        ProviderCallResult<String> result = context.coordinator.execute(restricted);
+
+        assertThat(result.payload()).isNull();
+        assertThat(result.metadata().errorCode()).isEqualTo("REGION_RESTRICTED");
+        assertThat(result.metadata().fallbackUsed()).isFalse();
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
     void eventRefreshUsesCacheInsideMinimumGap() {
         TestContext context = context(Instant.parse("2026-07-10T10:00:00Z"), 40);
         AtomicInteger calls = new AtomicInteger();

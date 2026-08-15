@@ -169,7 +169,7 @@ public class CoordinatedOhlcvSnapshotService {
             return routed.preferredCapability(symbol, timeframe);
         }
         return capabilityRegistry.authorize("BINANCE", symbol, timeframe,
-                MarketType.SPOT, ContractType.NONE);
+                MarketType.SPOT, ContractType.NONE, ProviderDatasetType.OHLCV);
     }
 
     private ProviderAdapterResponse<OhlcvIngestionResult> fetchAndPersist(

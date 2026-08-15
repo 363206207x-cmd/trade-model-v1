@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
@@ -153,10 +154,13 @@ public class RealMarketDataFetcherService {
     }
 
     private static PublicProviderErrorCode httpReason(int status) {
+        if ("REGION_RESTRICTED".equals(
+                ProviderFailureClassifier.canonicalReason(status, "HTTP_" + status))) {
+            return PublicProviderErrorCode.REGION_RESTRICTED;
+        }
         if (status == 401) return PublicProviderErrorCode.HTTP_401;
         if (status == 403) return PublicProviderErrorCode.HTTP_403;
         if (status == 429) return PublicProviderErrorCode.HTTP_429;
-        if (status == 451) return PublicProviderErrorCode.REGION_RESTRICTED;
         if (status >= 500) return PublicProviderErrorCode.HTTP_5XX;
         return PublicProviderErrorCode.INVALID_RESPONSE;
     }

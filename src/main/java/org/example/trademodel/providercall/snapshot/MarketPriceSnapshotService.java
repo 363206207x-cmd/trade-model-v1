@@ -134,7 +134,7 @@ public class MarketPriceSnapshotService {
                 mapping, "GLOBAL", freshTtl, clock.instant());
         ProviderCallResult<MarketPriceSnapshot> result = refreshService.refresh(new ProviderCallRequest<>(key, priority, freshTtl,
                 Duration.ofMinutes(2), Duration.ofSeconds(3), traceId,
-                () -> fetch(mapping.providerSymbol(), mapping.canonicalInstrumentId().marketType())));
+                () -> fetch(mapping.providerSymbol(), mapping.canonicalInstrumentId().marketType(), key, traceId)));
         if (result == null) {
             return unavailable(mapping, freshTtl, traceId, "PROVIDER_RESULT_MISSING");
         }
@@ -200,22 +200,42 @@ public class MarketPriceSnapshotService {
                 payload.sourceFetchedAt(), result.metadata()), result.metadata(), result.budgetState());
     }
 
-    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol, MarketType marketType) {
-        Optional<MarketQuoteSnapshot> quote = marketType == MarketType.SPOT
-                ? marketQuoteClient.fetch24hTicker(symbol)
-                : marketQuoteClient.fetch24hTicker(symbol, marketType);
-        if (quote.isEmpty()) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol,
+                                                               MarketType marketType,
+                                                               ProviderRequestKey key,
+                                                               String traceId) {
+        ProviderAdapterResponse<MarketQuoteSnapshot> quoteResult =
+                marketQuoteClient.fetch24hTickerResult(symbol, marketType);
+        if (quoteResult == null) {
+            Optional<MarketQuoteSnapshot> legacy = marketType == MarketType.SPOT
+                    ? marketQuoteClient.fetch24hTicker(symbol)
+                    : marketQuoteClient.fetch24hTicker(symbol, marketType);
+            quoteResult = legacy == null || legacy.isEmpty()
+                    ? ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null)
+                    : ProviderAdapterResponse.ready(legacy.get(), clock.instant());
         }
-        if (quote.get().getLastPrice() == null) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+        if (!quoteResult.ready()) {
+            record(key, quoteResult, traceId);
+            return ProviderAdapterResponse.failed(
+                    quoteResult.sourceStatus() == null ? UnifiedSourceStatus.ERROR : quoteResult.sourceStatus(),
+                    quoteResult.httpStatus(), quoteResult.reasonCode(), quoteResult.retryAfterSeconds());
         }
-        if (!positive(quote.get().getLastPrice())) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "INVALID_MARKET_PRICE", null);
+        MarketQuoteSnapshot raw = quoteResult.payload();
+        if (raw == null || raw.getLastPrice() == null) {
+            ProviderAdapterResponse<MarketPriceSnapshot> failed = ProviderAdapterResponse.failed(
+                    UnifiedSourceStatus.ERROR, quoteResult.httpStatus(), "QUOTE_UNAVAILABLE", null);
+            record(key, failed, traceId);
+            return failed;
         }
-        MarketQuoteSnapshot raw = quote.get();
+        if (!positive(raw.getLastPrice())) {
+            ProviderAdapterResponse<MarketPriceSnapshot> failed = ProviderAdapterResponse.failed(
+                    UnifiedSourceStatus.ERROR, quoteResult.httpStatus(), "INVALID_MARKET_PRICE", null);
+            record(key, failed, traceId);
+            return failed;
+        }
         Instant fetchedAt = raw.getFetchedAtEpochMillis() > 0
-                ? Instant.ofEpochMilli(raw.getFetchedAtEpochMillis()) : clock.instant();
+                ? Instant.ofEpochMilli(raw.getFetchedAtEpochMillis())
+                : quoteResult.providerDataTime() == null ? clock.instant() : quoteResult.providerDataTime();
         BigDecimal spread = positive(raw.getBidPrice()) && positive(raw.getAskPrice())
                 && raw.getAskPrice().compareTo(raw.getBidPrice()) >= 0
                 ? raw.getAskPrice().subtract(raw.getBidPrice()) : null;
@@ -223,7 +243,9 @@ public class MarketPriceSnapshotService {
                 raw.getBidPrice(), raw.getBidQuantity(), raw.getAskPrice(), raw.getAskQuantity(), spread,
                 raw.getHighPrice(), raw.getLowPrice(), raw.getPriceChangePercent24h(),
                 raw.getProvider(), fetchedAt, null);
-        return ProviderAdapterResponse.ready(snapshot, fetchedAt);
+        ProviderAdapterResponse<MarketPriceSnapshot> ready = ProviderAdapterResponse.ready(snapshot, fetchedAt);
+        record(key, ready, traceId);
+        return ready;
     }
 
     private ProviderCallResult<MarketPriceSnapshot> unavailable(
@@ -247,8 +269,14 @@ public class MarketPriceSnapshotService {
                                                    boolean externalRefresh) {
         if (capabilityRegistry == null) return null;
         return externalRefresh
-                ? capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL", marketType, contractType)
-                : capabilityRegistry.inspect("BINANCE", symbol, "GLOBAL", marketType, contractType);
+                ? capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL", marketType, contractType,
+                ProviderDatasetType.PRICE)
+                : capabilityRegistry.inspect("BINANCE", symbol, "GLOBAL", marketType, contractType,
+                ProviderDatasetType.PRICE);
+    }
+
+    private void record(ProviderRequestKey key, ProviderAdapterResponse<?> response, String traceId) {
+        if (capabilityRegistry != null) capabilityRegistry.record(key, response, traceId);
     }
 
     private ProviderCallResult<MarketPriceSnapshot> unavailable(ProviderInstrumentCapability capability,

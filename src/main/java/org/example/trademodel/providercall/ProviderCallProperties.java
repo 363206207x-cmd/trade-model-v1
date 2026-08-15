@@ -70,7 +70,7 @@ public class ProviderCallProperties {
         return switch (datasetType) {
             case PRICE -> cadence.price.forPriority(priority);
             case OHLCV -> cadence.ohlcv.forPriority(priority);
-            case DERIVATIVES, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
+            case DERIVATIVES, FUNDING, OPEN_INTEREST, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
                     COINGLASS_LIQUIDATION, COINGLASS_LONG_SHORT_RATIO -> cadence.derivatives.forPriority(priority);
             case EXTERNAL_CONTEXT -> cadence.externalContextSeconds;
             case AI_REVIEW -> cadence.aiCheckpointDebounceSeconds;

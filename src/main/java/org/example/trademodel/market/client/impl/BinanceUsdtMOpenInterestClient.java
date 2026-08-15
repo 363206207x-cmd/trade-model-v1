@@ -10,6 +10,9 @@ import java.util.Optional;
 
 import org.example.trademodel.market.client.OpenInterestClient;
 import org.example.trademodel.market.util.BinanceUsdtSymbol;
+import org.example.trademodel.providercall.ProviderAdapterResponse;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -31,16 +34,25 @@ public class BinanceUsdtMOpenInterestClient implements OpenInterestClient {
     private static final String OPEN_INTEREST_URL = "https://fapi.binance.com/fapi/v1/openInterest";
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    private final HttpClient httpClient;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public BinanceUsdtMOpenInterestClient(ObjectMapper objectMapper) {
+        this(objectMapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
+    }
+
+    BinanceUsdtMOpenInterestClient(ObjectMapper objectMapper, HttpClient httpClient) {
         this.objectMapper = objectMapper;
+        this.httpClient = httpClient;
     }
 
     @Override
     public Optional<BigDecimal> fetchOpenInterest(String assetSymbol) {
+        return Optional.ofNullable(fetchOpenInterestResult(assetSymbol).payload());
+    }
+
+    @Override
+    public ProviderAdapterResponse<BigDecimal> fetchOpenInterestResult(String assetSymbol) {
         String symbol = BinanceUsdtSymbol.toUsdtPair(assetSymbol);
         String url = OPEN_INTEREST_URL + "?symbol=" + symbol;
         try {
@@ -53,13 +65,19 @@ public class BinanceUsdtMOpenInterestClient implements OpenInterestClient {
             if (response.statusCode() != 200) {
                 log.info("[open-interest] Binance HTTP {} symbol={} snippet={}",
                         response.statusCode(), symbol, truncate(response.body(), 160));
-                return Optional.empty();
+                return ProviderFailureClassifier.httpFailure(response.statusCode(),
+                        "BINANCE_OPEN_INTEREST_HTTP_" + response.statusCode(), null);
             }
             JsonNode root = objectMapper.readTree(response.body());
-            return parseOpenInterestNode(root, symbol);
+            Optional<BigDecimal> parsed = parseOpenInterestNode(root, symbol);
+            return parsed.isPresent()
+                    ? ProviderAdapterResponse.ready(parsed.get(), java.time.Instant.now())
+                    : ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 200,
+                    "BINANCE_OPEN_INTEREST_MALFORMED", null);
         } catch (Exception e) {
             log.info("[open-interest] fetch failed symbol={} err={}", symbol, e.getMessage());
-            return Optional.empty();
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0,
+                    "PROVIDER_TRANSPORT_FAILED", null);
         }
     }
 

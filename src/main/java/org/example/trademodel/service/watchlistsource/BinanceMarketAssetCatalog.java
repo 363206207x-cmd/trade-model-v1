@@ -11,6 +11,7 @@ import org.example.trademodel.providercall.instrument.MarketType;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityDirectory;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
 import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -119,11 +120,16 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
             if (existing != null && now.isBefore(existing.loadedAt().plus(CACHE_TTL))) {
                 return existing.assets();
             }
-            List<MarketAssetDTO> loaded = providerEnabled && externalCallsEnabled
-                    ? fetchExchangeInfo() : List.of();
-            boolean directoryVerified = !loaded.isEmpty();
+            CatalogFetchResult fetched = providerEnabled && externalCallsEnabled
+                    ? fetchExchangeInfo()
+                    : new CatalogFetchResult(List.of(), ProviderCapabilityState.NOT_CONFIGURED,
+                    "BINANCE_EXCHANGE_INFO_NOT_CONFIGURED");
+            List<MarketAssetDTO> loaded = fetched.assets();
+            boolean directoryVerified = fetched.capabilityState() == ProviderCapabilityState.SUPPORTED
+                    && !loaded.isEmpty();
             if (!directoryVerified) loaded = configuredFallback();
-            cache = new CatalogSnapshot(List.copyOf(loaded), now, directoryVerified);
+            cache = new CatalogSnapshot(List.copyOf(loaded), now, directoryVerified,
+                    fetched.capabilityState(), fetched.failureReason());
             return cache.assets();
         }
     }
@@ -147,8 +153,12 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
         List<MarketAssetDTO> assets = currentCatalog();
         CatalogSnapshot snapshot = cache;
         if (snapshot == null || !snapshot.directoryVerified()) {
-            return capability(exact, timeframe, null, ProviderCapabilityState.SOURCE_UNAVAILABLE,
-                    "BINANCE_EXCHANGE_INFO_UNAVAILABLE", now, null);
+            ProviderCapabilityState state = snapshot == null
+                    ? ProviderCapabilityState.SOURCE_UNAVAILABLE : snapshot.capabilityState();
+            String reason = snapshot == null || snapshot.failureReason() == null
+                    ? "BINANCE_EXCHANGE_INFO_UNAVAILABLE" : snapshot.failureReason();
+            return capability(exact, timeframe, null, state, reason, now,
+                    state == ProviderCapabilityState.REGION_RESTRICTED ? now : null);
         }
         String symbol = exact.baseAsset() + exact.quoteAsset();
         MarketAssetDTO match = assets.stream().filter(value -> symbol.equals(normalizeSymbol(value.symbol())))
@@ -179,17 +189,28 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
                 state, "BINANCE_SPOT_EXCHANGE_INFO_RUNTIME_V1", verifiedAt, reason, observedAt);
     }
 
-    private List<MarketAssetDTO> fetchExchangeInfo() {
+    private CatalogFetchResult fetchExchangeInfo() {
         try {
             HttpRequest request = HttpRequest.newBuilder(EXCHANGE_INFO)
                     .timeout(Duration.ofSeconds(8)).GET().build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                return List.of();
+                String reason = ProviderFailureClassifier.canonicalReason(response.statusCode(),
+                        "BINANCE_EXCHANGE_INFO_HTTP_" + response.statusCode());
+                ProviderCapabilityState state = ProviderFailureClassifier.isRegionRestricted(
+                        response.statusCode(), reason)
+                        ? ProviderCapabilityState.REGION_RESTRICTED
+                        : ProviderCapabilityState.SOURCE_UNAVAILABLE;
+                return new CatalogFetchResult(List.of(), state, reason);
             }
-            return parseExchangeInfo(objectMapper.readTree(response.body()));
+            List<MarketAssetDTO> assets = parseExchangeInfo(objectMapper.readTree(response.body()));
+            return assets.isEmpty()
+                    ? new CatalogFetchResult(List.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
+                    "BINANCE_EXCHANGE_INFO_EMPTY")
+                    : new CatalogFetchResult(assets, ProviderCapabilityState.SUPPORTED, null);
         } catch (Exception ignored) {
-            return List.of();
+            return new CatalogFetchResult(List.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
+                    "BINANCE_EXCHANGE_INFO_UNAVAILABLE");
         }
     }
 
@@ -251,6 +272,15 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
                 .anyMatch(alias -> alias.contains(normalizedQuery));
     }
 
-    private record CatalogSnapshot(List<MarketAssetDTO> assets, Instant loadedAt, boolean directoryVerified) {
+    private record CatalogSnapshot(List<MarketAssetDTO> assets,
+                                   Instant loadedAt,
+                                   boolean directoryVerified,
+                                   ProviderCapabilityState capabilityState,
+                                   String failureReason) {
+    }
+
+    private record CatalogFetchResult(List<MarketAssetDTO> assets,
+                                      ProviderCapabilityState capabilityState,
+                                      String failureReason) {
     }
 }

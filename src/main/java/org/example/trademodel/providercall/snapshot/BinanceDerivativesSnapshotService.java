@@ -77,18 +77,30 @@ public class BinanceDerivativesSnapshotService {
                                                                Duration freshTtl, String traceId) {
         ProviderInstrumentCapability capability = capabilityRegistry == null ? null
                 : capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL",
-                MarketType.PERPETUAL, ContractType.LINEAR);
+                MarketType.PERPETUAL, ContractType.LINEAR, ProviderDatasetType.DERIVATIVES);
         if (capability != null && !capability.usableFor("GLOBAL")) {
             return unavailable(capability, traceId);
         }
         ProviderSymbolMapping mapping = capability == null
                 ? mappingRegistry.resolve("BINANCE", symbol, MarketType.PERPETUAL)
                 : capability.mapping();
+        ProviderInstrumentCapability fundingCapability = authorize(symbol, ProviderDatasetType.FUNDING);
+        if (fundingCapability != null && !fundingCapability.usableFor("GLOBAL")) {
+            return unavailable(fundingCapability, traceId);
+        }
+        ProviderInstrumentCapability openInterestCapability = authorize(symbol, ProviderDatasetType.OPEN_INTEREST);
+        if (openInterestCapability != null && !openInterestCapability.usableFor("GLOBAL")) {
+            return unavailable(openInterestCapability, traceId);
+        }
         ProviderRequestKey key = keyFactory.create("BINANCE", ProviderDatasetType.DERIVATIVES,
+                mapping, "GLOBAL", freshTtl, clock.instant());
+        ProviderRequestKey fundingKey = keyFactory.create("BINANCE", ProviderDatasetType.FUNDING,
+                mapping, "GLOBAL", freshTtl, clock.instant());
+        ProviderRequestKey openInterestKey = keyFactory.create("BINANCE", ProviderDatasetType.OPEN_INTEREST,
                 mapping, "GLOBAL", freshTtl, clock.instant());
         ProviderCallResult<MinimalDerivativesSnapshot> result = coordinator.execute(new ProviderCallRequest<>(key,
                 priority, freshTtl, freshTtl.multipliedBy(4), Duration.ofSeconds(3), traceId,
-                () -> fetch(mapping.providerSymbol())));
+                () -> fetch(mapping.providerSymbol(), fundingKey, openInterestKey, traceId)));
         if (result.payload() == null) return result;
         MinimalDerivativesSnapshot payload = result.payload();
         return new ProviderCallResult<>(new MinimalDerivativesSnapshot(payload.symbol(), payload.lastFundingRate(),
@@ -96,11 +108,26 @@ public class BinanceDerivativesSnapshotService {
                 result.metadata(), result.budgetState());
     }
 
-    private ProviderAdapterResponse<MinimalDerivativesSnapshot> fetch(String symbol) {
-        Optional<BigDecimal> funding = fundingClient == null ? Optional.empty()
-                : fundingClient.fetchLastFundingRate(symbol);
-        Optional<BigDecimal> oi = openInterestClient == null ? Optional.empty()
-                : openInterestClient.fetchOpenInterest(symbol);
+    private ProviderAdapterResponse<MinimalDerivativesSnapshot> fetch(String symbol,
+                                                                      ProviderRequestKey fundingKey,
+                                                                      ProviderRequestKey openInterestKey,
+                                                                      String traceId) {
+        ProviderAdapterResponse<BigDecimal> fundingResult = fundingResult(symbol);
+        record(fundingKey, fundingResult, traceId);
+        if (org.example.trademodel.providercall.ProviderFailureClassifier.isRegionRestricted(fundingResult)) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, fundingResult.httpStatus(),
+                    fundingResult.reasonCode(), fundingResult.retryAfterSeconds());
+        }
+        ProviderAdapterResponse<BigDecimal> openInterestResult = openInterestResult(symbol);
+        record(openInterestKey, openInterestResult, traceId);
+        if (org.example.trademodel.providercall.ProviderFailureClassifier.isRegionRestricted(openInterestResult)) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, openInterestResult.httpStatus(),
+                    openInterestResult.reasonCode(), openInterestResult.retryAfterSeconds());
+        }
+        Optional<BigDecimal> funding = fundingResult != null && fundingResult.ready()
+                ? Optional.of(fundingResult.payload()) : Optional.empty();
+        Optional<BigDecimal> oi = openInterestResult != null && openInterestResult.ready()
+                ? Optional.of(openInterestResult.payload()) : Optional.empty();
         if (funding.isEmpty() && oi.isEmpty()) {
             return ProviderAdapterResponse.failed(UnifiedSourceStatus.NOT_CONFIGURED, 0,
                     "BINANCE_DERIVATIVES_MINIMAL_UNAVAILABLE", null);
@@ -109,6 +136,42 @@ public class BinanceDerivativesSnapshotService {
                 : funding.isPresent() ? "FUNDING_ONLY" : "OPEN_INTEREST_ONLY";
         return ProviderAdapterResponse.ready(new MinimalDerivativesSnapshot(symbol, funding.orElse(null),
                 oi.orElse(null), availability, null), clock.instant());
+    }
+
+    private ProviderAdapterResponse<BigDecimal> fundingResult(String symbol) {
+        if (fundingClient == null) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.NOT_CONFIGURED, 0,
+                    "BINANCE_FUNDING_NOT_CONFIGURED", null);
+        }
+        ProviderAdapterResponse<BigDecimal> result = fundingClient.fetchLastFundingRateResult(symbol);
+        if (result != null) return result;
+        Optional<BigDecimal> legacy = fundingClient.fetchLastFundingRate(symbol);
+        return legacy == null || legacy.isEmpty()
+                ? ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "FUNDING_UNAVAILABLE", null)
+                : ProviderAdapterResponse.ready(legacy.get(), clock.instant());
+    }
+
+    private ProviderAdapterResponse<BigDecimal> openInterestResult(String symbol) {
+        if (openInterestClient == null) {
+            return ProviderAdapterResponse.failed(UnifiedSourceStatus.NOT_CONFIGURED, 0,
+                    "BINANCE_OPEN_INTEREST_NOT_CONFIGURED", null);
+        }
+        ProviderAdapterResponse<BigDecimal> result = openInterestClient.fetchOpenInterestResult(symbol);
+        if (result != null) return result;
+        Optional<BigDecimal> legacy = openInterestClient.fetchOpenInterest(symbol);
+        return legacy == null || legacy.isEmpty()
+                ? ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0,
+                "OPEN_INTEREST_UNAVAILABLE", null)
+                : ProviderAdapterResponse.ready(legacy.get(), clock.instant());
+    }
+
+    private ProviderInstrumentCapability authorize(String symbol, ProviderDatasetType datasetType) {
+        return capabilityRegistry == null ? null : capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL",
+                MarketType.PERPETUAL, ContractType.LINEAR, datasetType);
+    }
+
+    private void record(ProviderRequestKey key, ProviderAdapterResponse<?> response, String traceId) {
+        if (capabilityRegistry != null) capabilityRegistry.record(key, response, traceId);
     }
 
     private ProviderCallResult<MinimalDerivativesSnapshot> unavailable(ProviderInstrumentCapability capability,

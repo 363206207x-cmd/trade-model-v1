@@ -2,6 +2,11 @@ package org.example.trademodel.providercall.instrument;
 
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
+import org.example.trademodel.providercall.ProviderAdapterResponse;
+import org.example.trademodel.providercall.ProviderDatasetType;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
+import org.example.trademodel.providercall.ProviderRequestKey;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +31,7 @@ public class ProviderCapabilityRegistry {
     private final long freshnessSeconds;
     private final Clock clock;
     private final ObjectProvider<ProviderCapabilityDirectory> directories;
-    private final Map<Key, ProviderInstrumentCapability> observations = new ConcurrentHashMap<>();
+    private final Map<Key, CapabilityObservation> observations = new ConcurrentHashMap<>();
 
     @Autowired
     public ProviderCapabilityRegistry(ProviderSymbolMappingRegistry mappingRegistry,
@@ -62,7 +67,8 @@ public class ProviderCapabilityRegistry {
         Instant now = clock.instant();
         List<ProviderInstrumentCapability> result = new ArrayList<>();
         for (String provider : PROVIDER_ORDER) {
-            result.add(inspect(provider, normalized, effectiveTimeframe, MarketType.SPOT, ContractType.NONE));
+            result.add(inspect(provider, normalized, effectiveTimeframe, MarketType.SPOT, ContractType.NONE,
+                    ProviderDatasetType.OHLCV));
         }
         return result.stream()
                 .sorted(Comparator.comparingInt(value -> providerRank(value.provider())))
@@ -82,17 +88,30 @@ public class ProviderCapabilityRegistry {
                                                 String timeframe,
                                                 MarketType marketType,
                                                 ContractType contractType) {
+        return inspect(provider, symbol, timeframe, marketType, contractType,
+                defaultDataset(timeframe, marketType));
+    }
+
+    public ProviderInstrumentCapability inspect(String provider,
+                                                String symbol,
+                                                String timeframe,
+                                                MarketType marketType,
+                                                ContractType contractType,
+                                                ProviderDatasetType datasetType) {
         String normalizedProvider = normalizeProvider(provider);
         String normalizedSymbol = normalizeSymbol(symbol);
         String normalizedTimeframe = normalizeTimeframe(timeframe);
+        ProviderDatasetType normalizedDataset = java.util.Objects.requireNonNull(datasetType, "datasetType");
         Instant now = clock.instant();
-        Key key = new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe, marketType, contractType);
-        ProviderInstrumentCapability observed = observations.get(key);
+        Key key = new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe, marketType, contractType,
+                normalizedDataset);
+        CapabilityObservation observation = observations.get(key);
+        ProviderInstrumentCapability observed = observation == null ? null : observation.capability();
         if (observed != null) {
             return applyFreshness(observed, now);
         }
         return configured(normalizedProvider, normalizedSymbol, normalizedTimeframe,
-                marketType, contractType, now).orElseGet(() -> unsupported(
+                marketType, contractType, normalizedDataset, now).orElseGet(() -> unsupported(
                 normalizedProvider, normalizedSymbol, normalizedTimeframe, marketType, contractType, now));
     }
 
@@ -106,25 +125,37 @@ public class ProviderCapabilityRegistry {
                                                   String timeframe,
                                                   MarketType marketType,
                                                   ContractType contractType) {
+        return authorize(provider, symbol, timeframe, marketType, contractType,
+                defaultDataset(timeframe, marketType));
+    }
+
+    public ProviderInstrumentCapability authorize(String provider,
+                                                  String symbol,
+                                                  String timeframe,
+                                                  MarketType marketType,
+                                                  ContractType contractType,
+                                                  ProviderDatasetType datasetType) {
         String normalizedProvider = normalizeProvider(provider);
         String normalizedSymbol = normalizeSymbol(symbol);
         String normalizedTimeframe = normalizeTimeframe(timeframe);
+        ProviderDatasetType normalizedDataset = java.util.Objects.requireNonNull(datasetType, "datasetType");
         Instant now = clock.instant();
         CanonicalInstrumentId requested = requestedInstrument(normalizedProvider, normalizedSymbol,
                 marketType, contractType);
-        if (!providerEnabled(normalizedProvider, normalizedTimeframe)) {
+        if (!providerEnabled(normalizedProvider, normalizedTimeframe, normalizedDataset)) {
             return blocked(requested, normalizedTimeframe, ProviderCapabilityState.PROVIDER_DISABLED,
                     "PROVIDER_DISABLED", now);
         }
-        if (!providerExternalCallsEnabled(normalizedProvider, normalizedTimeframe)) {
+        if (!providerExternalCallsEnabled(normalizedProvider, normalizedTimeframe, normalizedDataset)) {
             return blocked(requested, normalizedTimeframe, ProviderCapabilityState.NOT_CONFIGURED,
                     "PROVIDER_EXTERNAL_CALLS_NOT_CONFIGURED", now);
         }
 
-        Key key = new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe, marketType, contractType);
+        Key key = new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe, marketType, contractType,
+                normalizedDataset);
         boolean observedBefore = observations.containsKey(key);
         ProviderInstrumentCapability current = inspect(normalizedProvider, normalizedSymbol,
-                normalizedTimeframe, marketType, contractType);
+                normalizedTimeframe, marketType, contractType, normalizedDataset);
         if (current.capabilityState() == ProviderCapabilityState.SUPPORTED
                 || current.capabilityState() == ProviderCapabilityState.UNSUPPORTED_TIMEFRAME
                 || current.capabilityState() == ProviderCapabilityState.REGION_RESTRICTED
@@ -148,8 +179,9 @@ public class ProviderCapabilityRegistry {
             verified = blocked(requested, normalizedTimeframe, ProviderCapabilityState.SOURCE_UNAVAILABLE,
                     "CAPABILITY_DIRECTORY_UNAVAILABLE", now);
         }
-        ProviderInstrumentCapability exact = exactOrBlocked(requested, normalizedTimeframe, verified, now);
-        observations.put(key, exact);
+        ProviderInstrumentCapability exact = exactOrBlocked(requested, normalizedTimeframe,
+                normalizedDataset, verified, now);
+        observations.put(key, new CapabilityObservation(exact, null, now.plusSeconds(freshnessSeconds)));
         return exact;
     }
 
@@ -159,6 +191,16 @@ public class ProviderCapabilityRegistry {
                             String providerSymbol,
                             String sourceVersion,
                             PublicOhlcvProviderResult result) {
+        recordOhlcv(provider, symbol, timeframe, providerSymbol, sourceVersion, result, null);
+    }
+
+    public void recordOhlcv(String provider,
+                            String symbol,
+                            String timeframe,
+                            String providerSymbol,
+                            String sourceVersion,
+                            PublicOhlcvProviderResult result,
+                            String traceId) {
         String normalizedProvider = normalizeProvider(provider);
         String normalizedSymbol = normalizeSymbol(symbol);
         String normalizedTimeframe = normalizeTimeframe(timeframe);
@@ -170,9 +212,7 @@ public class ProviderCapabilityRegistry {
                 ? null : providerSymbol.trim().toUpperCase(Locale.ROOT);
         String exactSourceVersion = sourceVersion == null || sourceVersion.isBlank()
                 ? normalizedProvider + "_RUNTIME_CAPABILITY_V1" : sourceVersion;
-        observations.put(new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe,
-                        MarketType.SPOT, ContractType.NONE),
-                new ProviderInstrumentCapability(
+        ProviderInstrumentCapability capability = new ProviderInstrumentCapability(
                         normalizedProvider,
                         instrument.canonical(),
                         instrument.baseAsset(),
@@ -185,7 +225,33 @@ public class ProviderCapabilityRegistry {
                         exactSourceVersion,
                         conclusive(state) ? now : null,
                         state == ProviderCapabilityState.SUPPORTED ? null : reason,
-                        now));
+                        now);
+        observations.put(new Key(normalizedProvider, normalizedSymbol, normalizedTimeframe,
+                        MarketType.SPOT, ContractType.NONE, ProviderDatasetType.OHLCV),
+                new CapabilityObservation(capability, traceId, now.plusSeconds(freshnessSeconds)));
+    }
+
+    public void record(ProviderRequestKey requestKey,
+                       ProviderAdapterResponse<?> response,
+                       String traceId) {
+        if (requestKey == null) throw new IllegalArgumentException("requestKey is required");
+        String provider = normalizeProvider(requestKey.provider());
+        CanonicalInstrumentId instrument = requestKey.canonicalInstrumentId();
+        String symbol = normalizeSymbol(instrument.baseAsset() + instrument.quoteAsset());
+        String timeframe = normalizeTimeframe(requestKey.timeframe());
+        ProviderCapabilityState state = classify(response);
+        String reason = response == null ? "PROVIDER_RESULT_MISSING"
+                : ProviderFailureClassifier.canonicalReason(response.httpStatus(), response.reasonCode());
+        Instant now = clock.instant();
+        ProviderInstrumentCapability capability = new ProviderInstrumentCapability(
+                provider, instrument.canonical(), instrument.baseAsset(), instrument.quoteAsset(),
+                instrument.marketType(), instrument.contractType(), requestKey.providerSymbol(),
+                "GLOBAL".equals(timeframe) ? List.of("GLOBAL") : List.of(timeframe), state,
+                requestKey.sourceVersion(), conclusive(state) ? now : null,
+                state == ProviderCapabilityState.SUPPORTED ? null : reason, now);
+        observations.put(new Key(provider, symbol, timeframe, instrument.marketType(),
+                        instrument.contractType(), requestKey.datasetType()),
+                new CapabilityObservation(capability, traceId, now.plusSeconds(freshnessSeconds)));
     }
 
     private java.util.Optional<ProviderInstrumentCapability> configured(String provider,
@@ -193,6 +259,7 @@ public class ProviderCapabilityRegistry {
                                                                          String timeframe,
                                                                          MarketType marketType,
                                                                          ContractType contractType,
+                                                                         ProviderDatasetType datasetType,
                                                                          Instant now) {
         java.util.Optional<ProviderSymbolMapping> configured = mappingRegistry.findExact(
                 provider, symbol, marketType, contractType);
@@ -200,13 +267,14 @@ public class ProviderCapabilityRegistry {
         ProviderSymbolMapping mapping = configured.get();
         ProviderCapabilityState state;
         String reason = null;
-        if (!providerEnabled(provider, timeframe)) {
+        if (!providerEnabled(provider, timeframe, datasetType)) {
             state = ProviderCapabilityState.PROVIDER_DISABLED;
             reason = "PROVIDER_DISABLED";
-        } else if (!providerExternalCallsEnabled(provider, timeframe)) {
+        } else if (!providerExternalCallsEnabled(provider, timeframe, datasetType)) {
             state = ProviderCapabilityState.NOT_CONFIGURED;
             reason = "PROVIDER_EXTERNAL_CALLS_NOT_CONFIGURED";
-        } else if (!"GLOBAL".equals(timeframe) && !mapping.supportedTimeframes().contains(timeframe)) {
+        } else if (datasetType == ProviderDatasetType.OHLCV
+                && !"GLOBAL".equals(timeframe) && !mapping.supportedTimeframes().contains(timeframe)) {
             state = ProviderCapabilityState.UNSUPPORTED_TIMEFRAME;
             reason = "UNSUPPORTED_TIMEFRAME";
         } else if (mapping.verifiedAt() == null
@@ -220,12 +288,15 @@ public class ProviderCapabilityRegistry {
         return java.util.Optional.of(new ProviderInstrumentCapability(
                 mapping.provider(), instrument.canonical(), instrument.baseAsset(), instrument.quoteAsset(),
                 instrument.marketType(), instrument.contractType(), mapping.providerSymbol(),
-                mapping.supportedTimeframes(), state, mapping.sourceVersion(), mapping.verifiedAt(), reason, now));
+                datasetType == ProviderDatasetType.OHLCV
+                        ? mapping.supportedTimeframes() : List.of(timeframe),
+                state, mapping.sourceVersion(), mapping.verifiedAt(), reason, now));
     }
 
     private ProviderInstrumentCapability applyFreshness(ProviderInstrumentCapability capability, Instant now) {
         if (capability.verifiedAt() == null
-                || capability.capabilityState() != ProviderCapabilityState.SUPPORTED
+                || (capability.capabilityState() != ProviderCapabilityState.SUPPORTED
+                && capability.capabilityState() != ProviderCapabilityState.REGION_RESTRICTED)
                 || !now.isAfter(capability.verifiedAt().plusSeconds(freshnessSeconds))) {
             return capability;
         }
@@ -251,7 +322,7 @@ public class ProviderCapabilityRegistry {
                 "NO_EXACT_PROVIDER_MAPPING", now);
     }
 
-    private boolean providerEnabled(String provider, String timeframe) {
+    private boolean providerEnabled(String provider, String timeframe, ProviderDatasetType datasetType) {
         return switch (provider) {
             case "KRAKEN" -> booleanProperty("trade-model.ohlcv.kraken.enabled");
             case "BINANCE" -> "GLOBAL".equals(timeframe)
@@ -263,7 +334,7 @@ public class ProviderCapabilityRegistry {
         };
     }
 
-    private boolean providerExternalCallsEnabled(String provider, String timeframe) {
+    private boolean providerExternalCallsEnabled(String provider, String timeframe, ProviderDatasetType datasetType) {
         return switch (provider) {
             case "KRAKEN" -> booleanProperty("trade-model.ohlcv.kraken.external-calls-enabled");
             case "BINANCE" -> "GLOBAL".equals(timeframe)
@@ -281,7 +352,7 @@ public class ProviderCapabilityRegistry {
 
     private static ProviderCapabilityState classify(PublicOhlcvProviderResult result) {
         if (result == null) return ProviderCapabilityState.SOURCE_UNAVAILABLE;
-        String reason = result.reasonCode() == null ? "" : result.reasonCode().toUpperCase(Locale.ROOT);
+        String reason = ProviderFailureClassifier.canonicalReason(0, result.reasonCode());
         if (result.sourceState() == OhlcvSourceState.READY && result.batch() != null) {
             return ProviderCapabilityState.SUPPORTED;
         }
@@ -298,6 +369,31 @@ public class ProviderCapabilityRegistry {
             return ProviderCapabilityState.PROVIDER_DISABLED;
         }
         if (result.sourceState() == OhlcvSourceState.NOT_CONFIGURED) {
+            return ProviderCapabilityState.NOT_CONFIGURED;
+        }
+        return ProviderCapabilityState.SOURCE_UNAVAILABLE;
+    }
+
+    private static ProviderCapabilityState classify(ProviderAdapterResponse<?> result) {
+        if (result == null) return ProviderCapabilityState.SOURCE_UNAVAILABLE;
+        String reason = ProviderFailureClassifier.canonicalReason(result.httpStatus(), result.reasonCode());
+        if (result.ready() || result.sourceStatus() == UnifiedSourceStatus.EMPTY_CONFIRMED) {
+            return ProviderCapabilityState.SUPPORTED;
+        }
+        if (ProviderFailureClassifier.isRegionRestricted(result)) {
+            return ProviderCapabilityState.REGION_RESTRICTED;
+        }
+        if (reason.contains("PAIR_NOT_SUPPORTED") || reason.contains("UNKNOWN_PAIR")
+                || reason.contains("SYMBOL_UNSUPPORTED")) {
+            return ProviderCapabilityState.UNSUPPORTED_SYMBOL;
+        }
+        if (reason.contains("TIMEFRAME") || reason.contains("INTERVAL")) {
+            return ProviderCapabilityState.UNSUPPORTED_TIMEFRAME;
+        }
+        if (result.sourceStatus() == UnifiedSourceStatus.DISABLED) {
+            return ProviderCapabilityState.PROVIDER_DISABLED;
+        }
+        if (result.sourceStatus() == UnifiedSourceStatus.NOT_CONFIGURED) {
             return ProviderCapabilityState.NOT_CONFIGURED;
         }
         return ProviderCapabilityState.SOURCE_UNAVAILABLE;
@@ -327,6 +423,7 @@ public class ProviderCapabilityRegistry {
 
     private static ProviderInstrumentCapability exactOrBlocked(CanonicalInstrumentId requested,
                                                                String timeframe,
+                                                               ProviderDatasetType datasetType,
                                                                ProviderInstrumentCapability verified,
                                                                Instant now) {
         if (verified == null) {
@@ -343,7 +440,8 @@ public class ProviderCapabilityRegistry {
             return blocked(requested, timeframe, ProviderCapabilityState.UNSUPPORTED_SYMBOL,
                     "CAPABILITY_EXACT_IDENTITY_MISMATCH", now);
         }
-        if (verified.capabilityState() == ProviderCapabilityState.SUPPORTED
+        if (datasetType == ProviderDatasetType.OHLCV
+                && verified.capabilityState() == ProviderCapabilityState.SUPPORTED
                 && !"GLOBAL".equals(timeframe)
                 && !verified.supportedTimeframes().contains(timeframe)) {
             return blocked(requested, timeframe, ProviderCapabilityState.UNSUPPORTED_TIMEFRAME,
@@ -408,7 +506,20 @@ public class ProviderCapabilityRegistry {
         return value == null || value.isBlank() ? "5m" : value.trim();
     }
 
+    private static ProviderDatasetType defaultDataset(String timeframe, MarketType marketType) {
+        if (timeframe != null && !"GLOBAL".equalsIgnoreCase(timeframe.trim())) {
+            return ProviderDatasetType.OHLCV;
+        }
+        return marketType == MarketType.PERPETUAL
+                ? ProviderDatasetType.DERIVATIVES : ProviderDatasetType.PRICE;
+    }
+
     private record Key(String provider, String symbol, String timeframe,
-                       MarketType marketType, ContractType contractType) {
+                       MarketType marketType, ContractType contractType, ProviderDatasetType datasetType) {
+    }
+
+    private record CapabilityObservation(ProviderInstrumentCapability capability,
+                                         String traceId,
+                                         Instant reverifyAfter) {
     }
 }

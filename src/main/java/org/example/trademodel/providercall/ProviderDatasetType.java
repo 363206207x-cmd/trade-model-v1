@@ -4,6 +4,8 @@ public enum ProviderDatasetType {
     PRICE,
     OHLCV,
     DERIVATIVES,
+    FUNDING,
+    OPEN_INTEREST,
     COINGLASS_OPEN_INTEREST,
     COINGLASS_FUNDING,
     COINGLASS_LIQUIDATION,
