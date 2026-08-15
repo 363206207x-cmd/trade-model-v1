@@ -13,24 +13,24 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "Fundamental AI v4.1 Canonical Figma Authorization Scope Reconciliation"
-product_phase_status: "CANONICAL_FIGMA_AUTHORIZATION_RECONCILIATION_PENDING_MERGED_MAIN"
+product_phase: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization"
+product_phase_status: "TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "v4.1 exact-package Canonical Figma Desktop permission reconciliation; implementation is stopped"
-active_block_cn: "v4.1 精确实施包的唯一 Figma Desktop 权限对齐；实现已停止"
+active_block: "v4.1 B01-B04 target-runtime blocker source mapping and exact-package permission; remediation is not started"
+active_block_cn: "v4.1 B01-B04 目标运行阻塞映射与精确包授权；修复尚未开始"
 
-next_required_action: "Review and merge the docs-only Canonical Figma authorization amendment, then validate the exact successor permissions on clean synchronized main."
-next_business_phase: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+next_required_action: "Review and merge the docs/gate-only target-runtime remediation authorization, then validate the exact successor permissions on clean synchronized main."
+next_business_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact successor is allowed only after the authorization commit is merged to clean/synced main and all gates pass."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "v4.1 Canonical Figma Authorization Scope Reconciliation PR; derive exact number and state from GitHub"
-current_branch: "codex/v4-1-canonical-figma-authorization-reconciliation"
-current_package_pr: "v4.1 Canonical Figma Authorization Scope Reconciliation PR"
+current_pr: "v4.1 Target Runtime Blocker Remediation Authorization PR; derive exact number and state from GitHub"
+current_branch: "codex/v4-1-target-runtime-blocker-authorization"
+current_package_pr: "v4.1 Target Runtime Blocker Remediation Authorization PR"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -38,16 +38,22 @@ pr_1004_boundary: "closed unrelated Draft dashboard PR; do not merge, modify, re
 
 v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 v4_1_final_interaction_design_status: "FROZEN"
-v4_1_final_interaction_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_final_interaction_implementation_status: "NOT_STARTED"
-v4_1_authorized_package: "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
+v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_final_interaction_implementation_status: "COMPLETE"
+v4_1_authorized_package: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
-v4_1_canonical_figma_desktop_implementation_allowed: true
+v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-frontend-runtime-alignment"
-pr_1179_status: "OPEN_DRAFT_UNMERGED"
-pr_1179_head: "62ba9702e54b268ef27158bcff7e33422e23015e"
-pr_1179_disposition: "REUSABLE_PENDING_AUTHORIZATION_RECONCILIATION"
+v4_1_authorized_successor_branch: "codex/v4-1-target-runtime-blocker-remediation"
+v4_1_target_runtime_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_target_runtime_remediation_implementation_status: "NOT_STARTED"
+v4_1_target_runtime_status: "BLOCKED_BY_IMPLEMENTATION_DEFECT"
+v4_1_target_runtime_remediation_canonical_figma_desktop_allowed: false
+v4_1_target_runtime_remediation_mobile_allowed: false
+v4_1_target_runtime_remediation_capability_movement: "NONE"
+pr_1179_status: "MERGED"
+pr_1179_head: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
+pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"

@@ -144,7 +144,8 @@ for required_registry_id in \
   PS-HOME-INTERACTION \
   PS-P2-POSITION-MONITORING-AUTHORIZATION \
   PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN \
-  PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION; do
+  PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION \
+  PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION; do
   registry_has_id "$required_registry_id" || block "Required formal product source is not registered: $required_registry_id"
 done
 

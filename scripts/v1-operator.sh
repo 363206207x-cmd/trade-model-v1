@@ -64,7 +64,7 @@ subject_from_task() {
     A)
       printf 'docs(workflow): %s' "$active_block" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9/:._ -]+##g; s#[[:space:]]+# #g'
       ;;
-    B)
+    B|B_*)
       printf 'feat(workflow): %s' "$active_block" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9/:._ -]+##g; s#[[:space:]]+# #g'
       ;;
     *)
@@ -128,7 +128,7 @@ confirm_reviewed() {
   [[ "$resolved_from" == "YES" && "$resolution_status" == "ALLOWED" ]] || stop "无法从 v1-state 解析可执行任务。"
   [[ "$resolved_mode" != "READ_ONLY_PRODUCT_AUDIT" ]] || stop "只读审计禁止 PR merge 操作。"
   subject="$(subject_from_task "${risk:-B}" "$task_branch" "$active_block")" || stop "无法安全生成合并 subject。"
-  [[ "$risk" == "B" ]] || stop "--confirm-reviewed 仅用于 B-risk；当前 risk: ${risk:-UNKNOWN}"
+  [[ "$risk" == "B" || "$risk" == B_* ]] || stop "--confirm-reviewed 仅用于 B-risk；当前 risk: ${risk:-UNKNOWN}"
   bash scripts/v1-pr-complete.sh "$pr_number" B "$subject" --confirm-reviewed
 }
 
@@ -248,7 +248,7 @@ main() {
     exit 0
   fi
 
-  [[ "$request_class" == "SUCCESSOR_PACKAGE" ]] || stop "未知 request class: ${request_class:-UNKNOWN}."
+  [[ "$request_class" == "AUTHORIZED_IMPLEMENTATION_PACKAGE" ]] || stop "未知 request class: ${request_class:-UNKNOWN}."
   [[ "$next_package_allowed" == "YES" ]] || stop "Successor package 未获 resolver 授权: ${block_reason:-UNKNOWN}."
 
   if [[ "$resolved_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then

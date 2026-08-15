@@ -58,8 +58,9 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
-<!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|1d6e748da2603fa301ee3e8980199d7024ec63a8fe9d31e0455414d98c6880ba|DELIVERY_AND_SAFETY -->
+<!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|2330e29151336d95f881929cd908b050961557dd57aa2e0cb22c2b8e44e29a64|DELIVERY_AND_SAFETY -->
 
 ### PS-V1-ARCHITECTURE
 
@@ -204,13 +205,30 @@ Normative annex registration:
 
 The earlier Decision Chain authorization is
 `HISTORICAL_REFERENCE_ONLY / SUPERSEDED` and is intentionally absent from the
-active registry. The sole current implementation successor is
-`FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION`.
-For that exact package only, Canonical Figma file
-`rdMYmsAvZYkXHJX8hdl7UN` is the sole editable Desktop design source after the
-authorization amendment is effective on merged main. Historical FE-04 Figma
-records remain supporting evidence and are not an alternate editable v4.1
-source.
+active registry. The Final Interaction authorization and implementation are
+effective historical delivery evidence through merged main
+`3a6f56afaf6fbba3d094d532f7f9555a23ac30a1`; they do not authorize another
+implementation package. Historical FE-04 and Canonical Figma records remain
+supporting evidence and are not editable by the current runtime-remediation
+authorization.
+
+### PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization |
+| Repository path | `docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md` |
+| Repository SHA-256 | `fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f` |
+| Version/date | Authorization candidate `2026-08-15`; effective only after merged-main validation |
+| Authority | Exact implementation permission for one bounded B01-B04 target-runtime remediation package |
+| Applicable modules | The exact `FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION` package only |
+| Required concepts | accepted blocker evidence, existing-owner reuse, exact package match, pre-merge block, post-merge repository/implementation/PR permission, secret-free provider protocol validation, and independent remediation audit |
+| Forbidden reinterpretations | no differently named or broader package, Product Source change, Figma/Desktop/Mobile change, live-secret repository write, duplicate owner, fake readiness/data, automatic trading, position mutation, or B01-B04 implementation inside this authorization change |
+
+This subordinate authorization does not create a second v4.1 Product Source.
+It maps reproduced target-runtime failures to the sole canonical source and
+existing owners. Its exact successor remains blocked until this record is
+effective on clean, synchronized merged main.
 
 ### PS-FIGMA-BASELINE
 

@@ -552,3 +552,28 @@ validation remain required before implementation permission becomes effective.
   or runtime implementation changes.
 - Safety: no second Figma/Design System, no fake data/AI/progress, no duplicate
   owner and no automatic trading or position mutation.
+
+---
+
+## v4.1-target-runtime-blocker-remediation-authorization
+
+- Date: `2026-08-15`
+- Change type: Product-Source mapping and exact-package implementation
+  authorization; no blocker remediation.
+- Runtime evidence: merged main
+  `3a6f56afaf6fbba3d094d532f7f9555a23ac30a1` reproduces B01 standard-JAR
+  Flyway packaging, B02 provider/instrument coverage, B03 AI readiness, and
+  B04 auth bootstrap/readiness blockers.
+- Exact successor:
+  `FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION`.
+- Effectivity: repository edits, implementation and successor PR creation
+  remain false before this authorization is merged to clean/synced main; only
+  the exact package may resolve them true afterward.
+- Ownership: reuse existing build/Flyway, provider, AI and authentication
+  owners; no duplicate skeleton is authorized.
+- CoinGlass: secret-free protocol implementation is allowed, a live secret is
+  not required or repository-writable, and live acceptance remains deferred.
+- Capability movement: none. Implementation remains `NOT_STARTED`; no
+  application/API/Schema/Figma/Desktop/Mobile change is included.
+- Safety: Product Source semantics, fail-closed behavior and all no-automatic-
+  trading/position-mutation boundaries remain frozen.
