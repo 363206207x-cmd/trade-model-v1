@@ -5,7 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityDirectory;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -22,7 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
-public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
+public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCapabilityDirectory {
     private static final URI EXCHANGE_INFO = URI.create("https://api.binance.com/api/v3/exchangeInfo");
     private static final Duration CACHE_TTL = Duration.ofMinutes(15);
     private static final Map<String, List<String>> IDENTITY_ALIASES = Map.ofEntries(
@@ -43,21 +50,43 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
     private final ObjectMapper objectMapper;
     private final ProviderSymbolMappingRegistry mappingRegistry;
     private final HttpClient httpClient;
+    private final boolean providerEnabled;
+    private final boolean externalCallsEnabled;
     private volatile CatalogSnapshot cache;
 
     @Autowired
     public BinanceMarketAssetCatalog(ObjectMapper objectMapper,
-                                     ProviderSymbolMappingRegistry mappingRegistry) {
+                                     ProviderSymbolMappingRegistry mappingRegistry,
+                                     @Value("${trade-model.ohlcv.binance.enabled:${trade-model.ohlcv.public-provider.enabled:false}}")
+                                     boolean providerEnabled,
+                                     @Value("${trade-model.ohlcv.binance.external-calls-enabled:${trade-model.ohlcv.public-provider.external-calls-enabled:false}}")
+                                     boolean ohlcvExternalCallsEnabled,
+                                     @Value("${trade-model.provider-call.enabled:false}")
+                                     boolean providerCallEnabled,
+                                     @Value("${trade-model.provider-call.external-calls-enabled:false}")
+                                     boolean providerCallExternalCallsEnabled) {
         this(objectMapper, mappingRegistry, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5)).build());
+                .connectTimeout(Duration.ofSeconds(5)).build(),
+                providerEnabled || providerCallEnabled,
+                ohlcvExternalCallsEnabled || providerCallExternalCallsEnabled);
     }
 
     BinanceMarketAssetCatalog(ObjectMapper objectMapper,
                               ProviderSymbolMappingRegistry mappingRegistry,
                               HttpClient httpClient) {
+        this(objectMapper, mappingRegistry, httpClient, true, true);
+    }
+
+    BinanceMarketAssetCatalog(ObjectMapper objectMapper,
+                              ProviderSymbolMappingRegistry mappingRegistry,
+                              HttpClient httpClient,
+                              boolean providerEnabled,
+                              boolean externalCallsEnabled) {
         this.objectMapper = objectMapper;
         this.mappingRegistry = mappingRegistry;
         this.httpClient = httpClient;
+        this.providerEnabled = providerEnabled;
+        this.externalCallsEnabled = externalCallsEnabled;
     }
 
     @Override
@@ -90,13 +119,64 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
             if (existing != null && now.isBefore(existing.loadedAt().plus(CACHE_TTL))) {
                 return existing.assets();
             }
-            List<MarketAssetDTO> loaded = fetchExchangeInfo();
-            if (loaded.isEmpty()) {
-                loaded = configuredFallback();
-            }
-            cache = new CatalogSnapshot(List.copyOf(loaded), now);
+            List<MarketAssetDTO> loaded = providerEnabled && externalCallsEnabled
+                    ? fetchExchangeInfo() : List.of();
+            boolean directoryVerified = !loaded.isEmpty();
+            if (!directoryVerified) loaded = configuredFallback();
+            cache = new CatalogSnapshot(List.copyOf(loaded), now, directoryVerified);
             return cache.assets();
         }
+    }
+
+    @Override
+    public String provider() {
+        return "BINANCE";
+    }
+
+    @Override
+    public ProviderInstrumentCapability verify(CanonicalInstrumentId requested,
+                                               String timeframe,
+                                               Instant observedAt) {
+        Instant now = observedAt == null ? Instant.now() : observedAt;
+        CanonicalInstrumentId exact = requested == null ? null : requested.withVenue("BINANCE");
+        if (exact == null || exact.marketType() != MarketType.SPOT
+                || exact.contractType() != ContractType.NONE || !"USDT".equals(exact.quoteAsset())) {
+            return capability(exact, timeframe, null, ProviderCapabilityState.UNSUPPORTED_SYMBOL,
+                    "BINANCE_EXACT_SPOT_USDT_REQUIRED", now, now);
+        }
+        List<MarketAssetDTO> assets = currentCatalog();
+        CatalogSnapshot snapshot = cache;
+        if (snapshot == null || !snapshot.directoryVerified()) {
+            return capability(exact, timeframe, null, ProviderCapabilityState.SOURCE_UNAVAILABLE,
+                    "BINANCE_EXCHANGE_INFO_UNAVAILABLE", now, null);
+        }
+        String symbol = exact.baseAsset() + exact.quoteAsset();
+        MarketAssetDTO match = assets.stream().filter(value -> symbol.equals(normalizeSymbol(value.symbol())))
+                .findFirst().orElse(null);
+        if (match == null) {
+            return capability(exact, timeframe, null, ProviderCapabilityState.UNSUPPORTED_SYMBOL,
+                    "BINANCE_SYMBOL_NOT_TRADABLE", now, now);
+        }
+        if (!"GLOBAL".equals(timeframe) && !List.of("5m", "15m", "1h", "4h").contains(timeframe)) {
+            return capability(exact, timeframe, null, ProviderCapabilityState.UNSUPPORTED_TIMEFRAME,
+                    "UNSUPPORTED_TIMEFRAME", now, now);
+        }
+        return capability(exact, timeframe, symbol, ProviderCapabilityState.SUPPORTED, null, now, now);
+    }
+
+    private static ProviderInstrumentCapability capability(CanonicalInstrumentId instrument,
+                                                           String timeframe,
+                                                           String providerSymbol,
+                                                           ProviderCapabilityState state,
+                                                           String reason,
+                                                           Instant observedAt,
+                                                           Instant verifiedAt) {
+        CanonicalInstrumentId exact = instrument == null
+                ? new CanonicalInstrumentId("UNKNOWN", "USDT", MarketType.SPOT, "BINANCE", ContractType.NONE)
+                : instrument;
+        return new ProviderInstrumentCapability("BINANCE", exact.canonical(), exact.baseAsset(), exact.quoteAsset(),
+                exact.marketType(), exact.contractType(), providerSymbol, List.of("5m", "15m", "1h", "4h"),
+                state, "BINANCE_SPOT_EXCHANGE_INFO_RUNTIME_V1", verifiedAt, reason, observedAt);
     }
 
     private List<MarketAssetDTO> fetchExchangeInfo() {
@@ -171,6 +251,6 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
                 .anyMatch(alias -> alias.contains(normalizedQuery));
     }
 
-    private record CatalogSnapshot(List<MarketAssetDTO> assets, Instant loadedAt) {
+    private record CatalogSnapshot(List<MarketAssetDTO> assets, Instant loadedAt, boolean directoryVerified) {
     }
 }

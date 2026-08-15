@@ -73,7 +73,8 @@ class ProviderCapabilityRegistryTest {
                 verifiedAt);
         ProviderSymbolMappingRegistry mappings = new ProviderSymbolMappingRegistry(List.of(mapping));
         MockEnvironment environment = new MockEnvironment()
-                .withProperty("trade-model.ohlcv.binance.enabled", enabled);
+                .withProperty("trade-model.ohlcv.binance.enabled", enabled)
+                .withProperty("trade-model.ohlcv.binance.external-calls-enabled", enabled);
         return new ProviderCapabilityRegistry(mappings, environment, freshnessSeconds,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }

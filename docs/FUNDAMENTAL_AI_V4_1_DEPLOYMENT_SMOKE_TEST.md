@@ -9,7 +9,8 @@ document does not claim a production deployment occurred.
 - PostgreSQL backup confirmed and Flyway at V13.
 - Standard `clean package` artifact passed
   `scripts/standard-release-postgresql-smoke.sh`; no special Flyway profile was
-  used.
+  used. The same script also verifies packaged-JAR login, CSRF Session, logout,
+  old-Session invalidation, existing V13 restart and checksum fail closed.
 - `TRADE_MODEL_SMOKE_USERNAME` and `TRADE_MODEL_SMOKE_PASSWORD` injected from a
   secret store.
 - `APP_URL` points to the trusted local endpoint or the HTTPS reverse-proxy
@@ -45,8 +46,13 @@ temporary responses with restricted permissions and removes them on exit.
 10. Logs contain no key, password, Session cookie or unhandled exception.
 11. AI readiness is `AUTHORIZED` only for the exact frozen model after an
     explicit cached verification; fallback output is not Ready.
-12. CoinGlass without an enabled configured key is `NOT_CONFIGURED`, never
-    connected and never zero-valued evidence.
+12. CoinGlass disabled is `NOT_CONFIGURED`. Enabled external CoinGlass with a
+    missing key, missing RPM, or non-positive RPM is respectively
+    `KEY_MISSING`, `RPM_NOT_CONFIGURED`, or `INVALID_RPM`; none may be connected
+    or emit zero-valued evidence.
+13. Unsupported/disabled/region-restricted provider identities produce no
+    market-data invocation. A fallback is used only with its own exact
+    `SUPPORTED` capability.
 
 ## Result Rules
 

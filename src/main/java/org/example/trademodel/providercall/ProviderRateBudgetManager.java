@@ -23,7 +23,8 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
         this(properties, Clock.systemUTC());
         register("BINANCE", properties.getProviderBudgets().getBinancePublicAdvertisedRpm());
         register("BINANCE_PUBLIC", properties.getProviderBudgets().getBinancePublicAdvertisedRpm());
-        register("COINGLASS", properties.getProviderBudgets().getCoinglassAdvertisedRpm());
+        register("KRAKEN", properties.getProviderBudgets().getBinancePublicAdvertisedRpm());
+        registerIfPositive("COINGLASS", properties.getProviderBudgets().getCoinglassAdvertisedRpm());
         register("AI", properties.getProviderBudgets().getAiAdvertisedRpm());
         register("EXTERNAL_CONTEXT", properties.getProviderBudgets().getExternalContextAdvertisedRpm());
     }
@@ -34,7 +35,12 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
     }
 
     public void register(String provider, int advertisedRpm) {
-        advertised.put(normalize(provider), Math.max(1, advertisedRpm));
+        if (advertisedRpm <= 0) throw new IllegalArgumentException("advertised RPM must be positive");
+        advertised.put(normalize(provider), advertisedRpm);
+    }
+
+    private void registerIfPositive(String provider, Integer advertisedRpm) {
+        if (advertisedRpm != null && advertisedRpm > 0) register(provider, advertisedRpm);
     }
 
     @Override
@@ -68,6 +74,11 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
         Instant now = clock.instant();
         Window providerWindow = currentWindow(providerKey, now);
         Window globalWindow = currentWindow(GLOBAL, now);
+        Integer configuredRpm = advertised.get(providerKey);
+        if (configuredRpm == null || configuredRpm <= 0) {
+            reject(providerWindow, priority, "PROVIDER_RPM_NOT_CONFIGURED");
+            return false;
+        }
         if (providerWindow.retryAfter != null && now.isBefore(providerWindow.retryAfter)) {
             reject(providerWindow, priority, "PROVIDER_SUSPENDED_RETRY_AFTER");
             return false;
@@ -84,7 +95,7 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
             }
         }
 
-        int providerAdvertised = advertised.getOrDefault(providerKey, 60);
+        int providerAdvertised = configuredRpm;
         int globalAdvertised = properties.getGlobalAdvertisedRequestsPerMinute();
         boolean emergency = profile == RuntimeScanProfile.EMERGENCY;
         int providerLimit = emergency
@@ -129,7 +140,7 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
     @Override
     public synchronized ProviderBudgetState state(String provider, ProviderCircuitState circuitState) {
         String key = normalize(provider);
-        int advertisedRpm = advertised.getOrDefault(key, 60);
+        int advertisedRpm = advertised.getOrDefault(key, 0);
         int regularLimit = regularLimit(advertisedRpm);
         int emergencyLimit = emergencyLimit(advertisedRpm);
         Window window = currentWindow(key, clock.instant());
@@ -144,11 +155,13 @@ public class ProviderRateBudgetManager implements ProviderRateBudget {
     }
 
     private int regularLimit(int advertisedRpm) {
-        return Math.max(1, (int) Math.floor(advertisedRpm * properties.getInternalBudgetRatio()));
+        return advertisedRpm <= 0 ? 0
+                : Math.max(1, (int) Math.floor(advertisedRpm * properties.getInternalBudgetRatio()));
     }
 
     private int emergencyLimit(int advertisedRpm) {
-        return Math.max(1, (int) Math.floor(advertisedRpm * properties.getEmergencyReserveRatio()));
+        return advertisedRpm <= 0 ? 0
+                : Math.max(1, (int) Math.floor(advertisedRpm * properties.getEmergencyReserveRatio()));
     }
 
     private static int priorityLimit(int regularLimit, AssetPriority priority) {

@@ -7,10 +7,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -22,7 +25,7 @@ class MarketControllerTest {
     void quoteStatusEndpointReturnsReviewOnlyReadyForFreshQuote() throws Exception {
         MockMvc mockMvc = mockMvcWith(symbol -> Optional.of(snapshot(System.currentTimeMillis())));
 
-        mockMvc.perform(get("/api/market/quote-status").param("symbol", "btc"))
+        mockMvc.perform(get("/api/market/quote-status").param("symbol", "BTCUSDT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("MARKETQUOTE_REVIEW_ONLY_READY"))
                 .andExpect(jsonPath("$.sampleSymbol").value("BTCUSDT"))
@@ -84,8 +87,9 @@ class MarketControllerTest {
     }
 
     private static MockMvc mockMvcWith(MarketQuoteClient marketQuoteClient) {
+        MarketPriceSnapshotService snapshotService = MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient);
         return MockMvcBuilders.standaloneSetup(
-                new MarketController(mock(RealMarketDataFetcherService.class), marketQuoteClient)
+                new MarketController(mock(RealMarketDataFetcherService.class), snapshotService)
         ).build();
     }
 
@@ -93,6 +97,7 @@ class MarketControllerTest {
         MarketQuoteSnapshot snapshot = new MarketQuoteSnapshot();
         snapshot.setProvider("binance");
         snapshot.setSymbolNormalized("BTCUSDT");
+        snapshot.setLastPrice(BigDecimal.ONE);
         snapshot.setFetchedAtEpochMillis(fetchedAtEpochMillis);
         return snapshot;
     }

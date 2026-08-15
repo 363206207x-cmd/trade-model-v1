@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class ProviderSymbolMappingRegistry {
@@ -51,6 +52,29 @@ public class ProviderSymbolMappingRegistry {
         ProviderSymbolMapping mapping = byCanonical.get(new CanonicalLookupKey(provider, canonicalInstrumentId));
         if (mapping == null) throw new IllegalArgumentException("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
         return mapping;
+    }
+
+    /**
+     * Resolves a canonical symbol without treating it as a provider symbol. Market and contract identity
+     * are part of the lookup so a spot mapping can never satisfy a perpetual request (or vice versa).
+     */
+    public Optional<ProviderSymbolMapping> findExact(String provider,
+                                                     String canonicalSymbol,
+                                                     MarketType marketType,
+                                                     ContractType contractType) {
+        String compact = normalizeSymbol(canonicalSymbol);
+        String normalizedProvider = provider == null ? "" : provider.trim().toUpperCase(Locale.ROOT);
+        List<ProviderSymbolMapping> matches = mappings.stream()
+                .filter(mapping -> mapping.provider().equals(normalizedProvider))
+                .filter(mapping -> mapping.canonicalInstrumentId().marketType() == marketType)
+                .filter(mapping -> mapping.canonicalInstrumentId().contractType() == contractType)
+                .filter(mapping -> (mapping.canonicalInstrumentId().baseAsset()
+                        + mapping.canonicalInstrumentId().quoteAsset()).equals(compact))
+                .toList();
+        if (matches.size() > 1) {
+            throw new IllegalArgumentException("CANONICAL_PROVIDER_MAPPING_NOT_UNIQUE");
+        }
+        return matches.stream().findFirst();
     }
 
     public CanonicalInstrumentId resolveConfiguredInstrument(String configuredSymbol,

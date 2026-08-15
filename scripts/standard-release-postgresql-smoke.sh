@@ -158,6 +158,12 @@ if ! wait_ready; then
   printf '%s\n' "STANDARD_JAR_EMPTY_DATABASE_START=FAILED"
   exit 1
 fi
+APP_URL="http://127.0.0.1:${app_port}" \
+TRADE_MODEL_SMOKE_USERNAME="${TRADE_MODEL_INITIAL_USERNAME}" \
+TRADE_MODEL_SMOKE_PASSWORD="${TRADE_MODEL_INITIAL_PASSWORD}" \
+SMOKE_ALLOW_EXTERNAL_CALLS=false \
+  bash scripts/prod-smoke.sh
+printf '%s\n' "PACKAGED_JAR_LOGIN_SESSION_LOGOUT=PASS"
 migration_count="$(docker exec "${container}" psql -U "${db_user}" -d "${database}" -Atc \
   "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL")"
 if [[ "${migration_count}" != "13" ]]; then

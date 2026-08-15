@@ -67,7 +67,14 @@ can authorize. It does not mean `DEPLOYED` or `PRODUCTION_EFFECTIVE`.
 Before any live release, independently run
 `bash scripts/standard-release-postgresql-smoke.sh` against its disposable
 PostgreSQL 16 container. It validates empty V1-V13 migration, existing V13
-restart and checksum fail-closed behavior using the packaged JAR.
+restart, form login/CSRF Session/logout invalidation, and checksum fail-closed
+behavior using the packaged JAR.
+
+CoinGlass may remain disabled. If enabled for external calls, both
+`COINGLASS_API_KEY` and an explicit positive `COINGLASS_ADVERTISED_RPM` are
+required; there is no Standard-plan RPM fallback. Provider capability failures
+must be resolved through the capability directory or provider configuration,
+never by probing a market-data endpoint.
 
 ## Runtime Operations
 

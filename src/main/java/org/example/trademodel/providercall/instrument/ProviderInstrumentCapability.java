@@ -24,7 +24,16 @@ public record ProviderInstrumentCapability(
 
     public boolean usableFor(String timeframe) {
         return capabilityState == ProviderCapabilityState.SUPPORTED
-                && timeframe != null
-                && supportedTimeframes.contains(timeframe);
+                && ("GLOBAL".equals(timeframe)
+                || (timeframe != null && supportedTimeframes.contains(timeframe)));
+    }
+
+    public CanonicalInstrumentId canonicalInstrumentId() {
+        return new CanonicalInstrumentId(baseAsset, quoteAsset, marketType, provider, contractType);
+    }
+
+    public ProviderSymbolMapping mapping() {
+        return new ProviderSymbolMapping(provider, canonicalInstrumentId(), providerSymbol, true,
+                sourceVersion, supportedTimeframes, verifiedAt);
     }
 }

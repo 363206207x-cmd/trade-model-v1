@@ -44,7 +44,7 @@ The selected long/short source is only `BINANCE_GLOBAL_ACCOUNT_RATIO`. Taker flo
 An HTTP 200 response is not automatically healthy. The client also requires API-level `code="0"`, a `data` node of the documented type, valid timestamps, valid numeric ranges, and a verified symbol mapping.
 
 - Missing key: `NOT_CONFIGURED`.
-- Provider or external-call gate disabled: `DISABLED`.
+- Provider or external-call gate disabled: `NOT_CONFIGURED`.
 - Successful empty array: `EMPTY_CONFIRMED`; values remain null.
 - 401/403: `ERROR` with sanitized `AUTHENTICATION_FAILED`, no retry.
 - 429: `DEGRADED` with `RATE_LIMITED`; `Retry-After` is honored.
@@ -53,7 +53,7 @@ An HTTP 200 response is not automatically healthy. The client also requires API-
 - Partial dataset success: aggregate `DEGRADED`, while successful fields remain available.
 - Expired provider time or stale fallback: `STALE`.
 
-Official response headers `API-KEY-MAX-LIMIT` and `API-KEY-USE-LIMIT` are parsed into in-memory health metadata. If absent, `ProviderRateBudgetManager` uses the configured local fixed-minute accounting. `COINGLASS_ADVERTISED_RPM` defaults to 300 for the declared Standard-plan policy but is environment-overridable; no account entitlement is inferred without a controlled authenticated run.
+Official response headers `API-KEY-MAX-LIMIT` and `API-KEY-USE-LIMIT` are parsed into in-memory health metadata. If absent, `ProviderRateBudgetManager` uses the explicitly configured local fixed-minute accounting. `COINGLASS_ADVERTISED_RPM` has no default: missing is `RPM_NOT_CONFIGURED`, zero/negative is `INVALID_RPM`, and only an explicit positive value enables the budget. Values 80 and 300 are tested examples rather than inferred account entitlement.
 
 ## Not Used
 

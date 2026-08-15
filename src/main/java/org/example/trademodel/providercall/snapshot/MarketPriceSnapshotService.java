@@ -21,6 +21,10 @@ import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
 import org.example.trademodel.providercall.instrument.MarketType;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -36,6 +40,7 @@ public class MarketPriceSnapshotService {
     private final MarketQuoteClient marketQuoteClient;
     private final ProviderSymbolMappingRegistry mappingRegistry;
     private final ProviderRequestKeyFactory keyFactory;
+    private final ProviderCapabilityRegistry capabilityRegistry;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -43,8 +48,10 @@ public class MarketPriceSnapshotService {
                                       ProviderSnapshotRefreshService refreshService,
                                       MarketQuoteClient marketQuoteClient,
                                       ProviderSymbolMappingRegistry mappingRegistry,
-                                      ProviderRequestKeyFactory keyFactory) {
-        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory, Clock.systemUTC());
+                                      ProviderRequestKeyFactory keyFactory,
+                                      ProviderCapabilityRegistry capabilityRegistry) {
+        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory,
+                capabilityRegistry, Clock.systemUTC());
     }
 
     /** Compatibility constructor for focused unit tests. */
@@ -56,7 +63,7 @@ public class MarketPriceSnapshotService {
             Clock clock) {
         this(new CoordinatedProviderSnapshotQueryService(coordinator),
                 new CoordinatedProviderSnapshotRefreshService(coordinator), marketQuoteClient,
-                mappingRegistry, keyFactory, clock);
+                mappingRegistry, keyFactory, null, clock);
     }
 
     public MarketPriceSnapshotService(
@@ -66,11 +73,23 @@ public class MarketPriceSnapshotService {
             ProviderSymbolMappingRegistry mappingRegistry,
             ProviderRequestKeyFactory keyFactory,
             Clock clock) {
+        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory, null, clock);
+    }
+
+    public MarketPriceSnapshotService(
+            ProviderSnapshotQueryService queryService,
+            ProviderSnapshotRefreshService refreshService,
+            MarketQuoteClient marketQuoteClient,
+            ProviderSymbolMappingRegistry mappingRegistry,
+            ProviderRequestKeyFactory keyFactory,
+            ProviderCapabilityRegistry capabilityRegistry,
+            Clock clock) {
         this.queryService = queryService;
         this.refreshService = refreshService;
         this.marketQuoteClient = marketQuoteClient;
         this.mappingRegistry = mappingRegistry;
         this.keyFactory = keyFactory;
+        this.capabilityRegistry = capabilityRegistry;
         this.clock = clock;
     }
 
@@ -79,7 +98,12 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        ProviderInstrumentCapability capability = authorize(symbol, MarketType.SPOT, ContractType.NONE, true);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT) : capability.mapping();
         return get(mapping, priority, freshTtl, traceId);
     }
 
@@ -88,7 +112,13 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        ProviderInstrumentCapability capability = authorize(canonicalInstrumentId.displaySymbol(),
+                canonicalInstrumentId.marketType(), canonicalInstrumentId.contractType(), true);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", canonicalInstrumentId) : capability.mapping();
         return get(mapping, priority, freshTtl, traceId);
     }
 
@@ -123,7 +153,12 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        ProviderInstrumentCapability capability = authorize(symbol, MarketType.SPOT, ContractType.NONE, false);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT) : capability.mapping();
         return peek(mapping, priority, freshTtl, traceId);
     }
 
@@ -132,7 +167,13 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        ProviderInstrumentCapability capability = authorize(canonicalInstrumentId.displaySymbol(),
+                canonicalInstrumentId.marketType(), canonicalInstrumentId.contractType(), false);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", canonicalInstrumentId) : capability.mapping();
         return peek(mapping, priority, freshTtl, traceId);
     }
 
@@ -197,6 +238,38 @@ public class MarketPriceSnapshotService {
                 mapping.canonicalInstrumentId(), mapping.providerSymbol(), "GLOBAL", null, now, now, 0L,
                 UnifiedSourceStatus.NOT_CONFIGURED, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
                 key.canonical(), mapping.sourceVersion(), false, false, reason, java.util.List.of(reason));
+        return new ProviderCallResult<>(null, metadata, null);
+    }
+
+    private ProviderInstrumentCapability authorize(String symbol,
+                                                   MarketType marketType,
+                                                   ContractType contractType,
+                                                   boolean externalRefresh) {
+        if (capabilityRegistry == null) return null;
+        return externalRefresh
+                ? capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL", marketType, contractType)
+                : capabilityRegistry.inspect("BINANCE", symbol, "GLOBAL", marketType, contractType);
+    }
+
+    private ProviderCallResult<MarketPriceSnapshot> unavailable(ProviderInstrumentCapability capability,
+                                                                Duration freshTtl,
+                                                                String traceId) {
+        Instant now = clock.instant();
+        String reason = capability.failureReason() == null
+                ? capability.capabilityState().name() : capability.failureReason();
+        UnifiedSourceStatus status = switch (capability.capabilityState()) {
+            case PROVIDER_DISABLED -> UnifiedSourceStatus.DISABLED;
+            case STALE_CAPABILITY -> UnifiedSourceStatus.STALE;
+            case SOURCE_UNAVAILABLE, REGION_RESTRICTED -> UnifiedSourceStatus.ERROR;
+            case SUPPORTED -> UnifiedSourceStatus.ERROR;
+            default -> UnifiedSourceStatus.NOT_CONFIGURED;
+        };
+        String providerSymbol = capability.providerSymbol() == null ? "UNMAPPED" : capability.providerSymbol();
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata(capability.provider(),
+                ProviderDatasetType.PRICE, capability.canonicalInstrumentId(), providerSymbol, "GLOBAL",
+                null, now, now, 0L, status, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
+                capability.provider() + "|PRICE|" + capability.canonicalAssetId() + "|GLOBAL",
+                capability.sourceVersion(), false, false, reason, java.util.List.of(reason));
         return new ProviderCallResult<>(null, metadata, null);
     }
 

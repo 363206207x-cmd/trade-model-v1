@@ -55,6 +55,26 @@ are `gpt-5.6-sol`, `gemini-3.5-flash`, and `grok-4.5`; a fallback model never
 counts as Ready. `TRADE_MODEL_AI_READINESS_VERIFICATION_TTL_SECONDS` controls
 the cached explicit verification window.
 
+## CoinGlass Configuration Presence
+
+`COINGLASS_ADVERTISED_RPM` has no production default. It must be an explicit
+positive integer when CoinGlass and its external calls are enabled. Any
+positive provider-plan value is accepted by the local budget contract; `80`
+and `300` are tested examples, not implicit defaults.
+
+| Configuration | Runtime state |
+|---|---|
+| provider disabled or external calls disabled | `NOT_CONFIGURED` |
+| enabled + external + key missing | `KEY_MISSING` |
+| key present + RPM missing | `RPM_NOT_CONFIGURED` |
+| RPM zero or negative | `INVALID_RPM` |
+| key present + explicit positive RPM | `CONFIGURED` (other gates still apply) |
+
+An enabled external CoinGlass configuration with missing/invalid RPM blocks
+target-runtime preflight. A disabled CoinGlass provider does not block the
+overall preflight, but its own state remains `NOT_CONFIGURED`. Missing config
+never becomes zero-valued OI, funding, liquidation, or long/short evidence.
+
 ## Scheduler Controls
 
 Production schedulers default off. Enable only the required scheduler and its

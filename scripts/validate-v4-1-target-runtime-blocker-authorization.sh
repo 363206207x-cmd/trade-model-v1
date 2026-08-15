@@ -96,6 +96,7 @@ if [[ "$effective_branch" == "codex/v4-1-target-runtime-blocker-remediation" ]];
   implementation_path_allowed() {
     local file="$1"
     case "$file" in
+      .env.example | \
       pom.xml | \
       scripts/generate-runtime-password.sh | \
       scripts/standard-release-postgresql-smoke.sh | \
@@ -114,6 +115,10 @@ if [[ "$effective_branch" == "codex/v4-1-target-runtime-blocker-remediation" ]];
       docs/FUNDAMENTAL_AI_V4_1_ENVIRONMENT_VARIABLES.md | \
       docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_RUNBOOK.md | \
       docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_SMOKE_TEST.md | \
+      docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_ROOT_CAUSE_MATRIX.md | \
+      docs/FUNDAMENTAL_AI_V4_1_PR1187_FINAL_TARGET_RUNTIME_CLOSURE.md | \
+      docs/FUNDAMENTAL_AI_V4_1_PR1187_FINAL_REAUDIT_HANDOFF.md | \
+      docs/COINGLASS_V4_ENDPOINT_CAPABILITY_MATRIX.md | \
       src/main/resources/application.yml | \
       src/main/resources/application-prod.yml)
         return 0
@@ -123,12 +128,16 @@ if [[ "$effective_branch" == "codex/v4-1-target-runtime-blocker-remediation" ]];
       src/main/java/org/example/trademodel/config/TargetRuntimePreflight.java | \
       src/main/java/org/example/trademodel/controller/AiOrchestratorController.java | \
       src/main/java/org/example/trademodel/controller/AssetPoolController.java | \
+      src/main/java/org/example/trademodel/controller/MarketController.java | \
       src/main/java/org/example/trademodel/dto/assetpool/*.java | \
       src/main/java/org/example/trademodel/dto/ohlcv/PublicProviderErrorCode.java | \
       src/main/java/org/example/trademodel/localreal/LocalRealDataCoordinator.java | \
       src/main/java/org/example/trademodel/market/client/impl/*.java | \
+      src/main/java/org/example/trademodel/providercall/*.java | \
       src/main/java/org/example/trademodel/providercall/coinglass/*.java | \
       src/main/java/org/example/trademodel/providercall/instrument/*.java | \
+      src/main/java/org/example/trademodel/providercall/scan/*.java | \
+      src/main/java/org/example/trademodel/providercall/snapshot/*.java | \
       src/main/java/org/example/trademodel/security/*.java | \
       src/main/java/org/example/trademodel/service/RealMarketDataFetcherService.java | \
       src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java | \

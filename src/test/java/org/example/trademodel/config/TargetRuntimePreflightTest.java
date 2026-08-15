@@ -50,6 +50,42 @@ class TargetRuntimePreflightTest {
                 "PREFLIGHT=BLOCKED");
     }
 
+    @Test
+    void enabledCoinGlassRequiresKeyAndExplicitPositiveRpm() {
+        Map<String, String> environment = completeEnvironment();
+        environment.put("TRADE_MODEL_COINGLASS_ENABLED", "true");
+        environment.put("TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED", "true");
+
+        TargetRuntimePreflight.Result keyMissing = TargetRuntimePreflight.evaluate(environment);
+        environment.put("COINGLASS_API_KEY", "fixture-key");
+        TargetRuntimePreflight.Result rpmMissing = TargetRuntimePreflight.evaluate(environment);
+        environment.put("COINGLASS_ADVERTISED_RPM", "0");
+        TargetRuntimePreflight.Result invalidRpm = TargetRuntimePreflight.evaluate(environment);
+        environment.put("COINGLASS_ADVERTISED_RPM", "17");
+        TargetRuntimePreflight.Result configured = TargetRuntimePreflight.evaluate(environment);
+
+        assertThat(keyMissing.passed()).isFalse();
+        assertThat(keyMissing.lines()).contains("COINGLASS=KEY_MISSING", "PREFLIGHT=BLOCKED");
+        assertThat(rpmMissing.passed()).isFalse();
+        assertThat(rpmMissing.lines()).contains("COINGLASS=RPM_NOT_CONFIGURED", "PREFLIGHT=BLOCKED");
+        assertThat(invalidRpm.passed()).isFalse();
+        assertThat(invalidRpm.lines()).contains("COINGLASS=INVALID_RPM", "PREFLIGHT=BLOCKED");
+        assertThat(configured.passed()).isTrue();
+        assertThat(configured.lines()).contains("COINGLASS=CONFIGURED", "PREFLIGHT=PASS");
+    }
+
+    @Test
+    void enabledButExternalCallsDisabledRemainsExplicitlyNotConfigured() {
+        Map<String, String> environment = completeEnvironment();
+        environment.put("TRADE_MODEL_COINGLASS_ENABLED", "true");
+        environment.put("TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED", "false");
+
+        TargetRuntimePreflight.Result result = TargetRuntimePreflight.evaluate(environment);
+
+        assertThat(result.passed()).isTrue();
+        assertThat(result.lines()).contains("COINGLASS=NOT_CONFIGURED", "PREFLIGHT=PASS");
+    }
+
     private static Map<String, String> completeEnvironment() {
         Map<String, String> environment = new HashMap<>();
         environment.put("TRADE_MODEL_AUTH_ENABLED", "true");

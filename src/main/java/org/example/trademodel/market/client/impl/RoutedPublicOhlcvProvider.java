@@ -4,6 +4,10 @@ import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,14 +63,42 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
     @Override
     public PublicOhlcvProviderResult fetchClosedBars(String symbol, String timeframe, int limit,
                                                      String ingestionRunId) {
-        PublicOhlcvProviderResult primaryResult = call(primary, symbol, timeframe, limit, ingestionRunId);
-        record(primary, symbol, timeframe, primaryResult);
+        if (capabilityRegistry == null) {
+            return legacyFetch(symbol, timeframe, limit, ingestionRunId);
+        }
+        ProviderInstrumentCapability primaryCapability = authorize(primary, symbol, timeframe);
+        PublicOhlcvProviderResult primaryResult = primaryCapability.usableFor(timeframe)
+                ? call(primaryCapability, symbol, timeframe, limit, ingestionRunId)
+                : blocked(primaryCapability);
+        if (primaryCapability.usableFor(timeframe)) {
+            record(primaryCapability, symbol, timeframe, primaryResult);
+        }
         if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)
-                || !fallbackAllowed(primary, primaryResult)) return primaryResult;
+                || (primaryCapability.usableFor(timeframe) && !fallbackAllowed(primary, primaryResult))) {
+            return primaryResult;
+        }
 
-        PublicOhlcvProviderResult fallbackResult = call(fallback, symbol, timeframe, limit, ingestionRunId);
-        record(fallback, symbol, timeframe, fallbackResult);
+        ProviderInstrumentCapability fallbackCapability = authorize(fallback, symbol, timeframe);
+        if (!fallbackCapability.usableFor(timeframe)) {
+            return primaryCapability.usableFor(timeframe) ? primaryResult : blocked(fallbackCapability);
+        }
+        PublicOhlcvProviderResult fallbackResult = call(
+                fallbackCapability, symbol, timeframe, limit, ingestionRunId);
+        record(fallbackCapability, symbol, timeframe, fallbackResult);
         return fallbackResult;
+    }
+
+    public ProviderInstrumentCapability authorize(String provider, String symbol, String timeframe) {
+        if (capabilityRegistry == null) return null;
+        return capabilityRegistry.authorize(provider, symbol, timeframe, MarketType.SPOT, ContractType.NONE);
+    }
+
+    public ProviderInstrumentCapability preferredCapability(String symbol, String timeframe) {
+        ProviderInstrumentCapability first = authorize(primary, symbol, timeframe);
+        if (first != null && first.usableFor(timeframe)) return first;
+        if (!fallbackEnabled || primary.equals(fallback)) return first;
+        ProviderInstrumentCapability second = authorize(fallback, symbol, timeframe);
+        return second != null && second.usableFor(timeframe) ? second : first;
     }
 
     public String primaryProvider() {
@@ -88,7 +120,44 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         return kraken.pairCacheState();
     }
 
-    private PublicOhlcvProviderResult call(String provider, String symbol, String timeframe, int limit, String runId) {
+    private PublicOhlcvProviderResult call(ProviderInstrumentCapability capability,
+                                          String canonicalSymbol,
+                                          String timeframe,
+                                          int limit,
+                                          String runId) {
+        String provider = normalizeProvider(capability.provider());
+        String exactProviderSymbol = capability.providerSymbol();
+        return switch (provider) {
+            case "KRAKEN" -> kraken.fetchClosedBars(normalizeCanonicalSymbol(canonicalSymbol), timeframe, limit, runId);
+            case "BINANCE" -> binance.fetchClosedBars(exactProviderSymbol, timeframe, limit, runId);
+            default -> new PublicOhlcvProviderResult(OhlcvSourceState.ERROR, "PROVIDER_UNAVAILABLE", null);
+        };
+    }
+
+    private void record(ProviderInstrumentCapability capability,
+                        String symbol,
+                        String timeframe,
+                        PublicOhlcvProviderResult result) {
+        String provider = normalizeProvider(capability.provider());
+        MutableHealth item = health.computeIfAbsent(provider, MutableHealth::new);
+        if (ready(result)) item.success();
+        else item.failure(result == null ? "PROVIDER_UNAVAILABLE" : result.reasonCode());
+        if (capabilityRegistry != null) {
+            String sourceVersion = result != null && result.batch() != null
+                    ? result.batch().provenanceVersion() : capability.sourceVersion();
+            capabilityRegistry.recordOhlcv(provider, symbol, timeframe, capability.providerSymbol(), sourceVersion, result);
+        }
+    }
+
+    private PublicOhlcvProviderResult legacyFetch(String symbol, String timeframe, int limit, String ingestionRunId) {
+        PublicOhlcvProviderResult primaryResult = legacyCall(primary, symbol, timeframe, limit, ingestionRunId);
+        if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)
+                || !fallbackAllowed(primary, primaryResult)) return primaryResult;
+        return legacyCall(fallback, symbol, timeframe, limit, ingestionRunId);
+    }
+
+    private PublicOhlcvProviderResult legacyCall(String provider, String symbol,
+                                                 String timeframe, int limit, String runId) {
         return switch (provider) {
             case "KRAKEN" -> kraken.fetchClosedBars(symbol, timeframe, limit, runId);
             case "BINANCE" -> binance.fetchClosedBars(symbol, timeframe, limit, runId);
@@ -96,16 +165,21 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         };
     }
 
-    private void record(String provider, String symbol, String timeframe, PublicOhlcvProviderResult result) {
-        MutableHealth item = health.computeIfAbsent(provider, MutableHealth::new);
-        if (ready(result)) item.success();
-        else item.failure(result == null ? "PROVIDER_UNAVAILABLE" : result.reasonCode());
-        if (capabilityRegistry != null) {
-            String providerSymbol = "KRAKEN".equals(provider) ? kraken.cachedRequestPair(symbol) : symbol;
-            String sourceVersion = result != null && result.batch() != null
-                    ? result.batch().provenanceVersion() : provider + "_RUNTIME_CAPABILITY_V1";
-            capabilityRegistry.recordOhlcv(provider, symbol, timeframe, providerSymbol, sourceVersion, result);
+    private static PublicOhlcvProviderResult blocked(ProviderInstrumentCapability capability) {
+        if (capability == null) {
+            return new PublicOhlcvProviderResult(OhlcvSourceState.ERROR, "PROVIDER_UNAVAILABLE", null);
         }
+        OhlcvSourceState state = switch (capability.capabilityState()) {
+            case PROVIDER_DISABLED -> OhlcvSourceState.DISABLED;
+            case NOT_CONFIGURED -> OhlcvSourceState.NOT_CONFIGURED;
+            case STALE_CAPABILITY -> OhlcvSourceState.STALE;
+            case UNSUPPORTED_SYMBOL, UNSUPPORTED_TIMEFRAME -> OhlcvSourceState.DEGRADED;
+            case REGION_RESTRICTED, SOURCE_UNAVAILABLE -> OhlcvSourceState.ERROR;
+            case SUPPORTED -> OhlcvSourceState.ERROR;
+        };
+        String reason = capability.failureReason() == null
+                ? capability.capabilityState().name() : capability.failureReason();
+        return new PublicOhlcvProviderResult(state, reason, null);
     }
 
     private static boolean ready(PublicOhlcvProviderResult result) {
@@ -120,6 +194,11 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
 
     private static String normalizeProvider(String value) {
         return value == null ? "KRAKEN" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizeCanonicalSymbol(String value) {
+        return value == null ? null : value.trim().toUpperCase(Locale.ROOT)
+                .replace("/", "").replace("-", "").replace("_", "");
     }
 
     private static final class MutableHealth {

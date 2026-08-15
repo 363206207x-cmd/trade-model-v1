@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Target Runtime Blocker Remediation
 
-Status: `IMPLEMENTATION_COMPLETE_PENDING_INDEPENDENT_AUDIT`
+Status: `FINAL_ONESHOT_CLOSURE_COMPLETE_PENDING_INDEPENDENT_REAUDIT`
 
 Authorized package:
 `FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION`
@@ -19,6 +19,31 @@ Base main: `b1b49a0de4090fd93a12b14e18c1c980669d0162`
 CoinGlass remains the existing evidence provider. Missing key or disabled state is
 `NOT_CONFIGURED`; it neither fabricates derivatives evidence nor replaces the
 OHLCV provider.
+
+## Final OneShot Closure
+
+- `ProviderCapabilityRegistry` is the single pre-call capability owner for
+  routed OHLCV, coordinated OHLCV refresh, current price, Binance derivatives,
+  provider scan, and every analysis/Push Recheck/Position Monitoring path that
+  converges on those adapters.
+- The order is canonical identity, exact provider/market/contract/timeframe
+  decision, external invocation, response validation, then an independently
+  authorized fallback. A blocked primary never grants fallback permission.
+- Unsupported symbol/timeframe, region restriction, provider disabled,
+  source unavailable, not configured, and failed stale-directory revalidation
+  all produce zero market-data calls.
+- Stale capability is revalidated only through Kraken `AssetPairs` or Binance
+  `exchangeInfo`; neither directory path probes an OHLCV, quote, funding, open
+  interest, account, position, or order endpoint.
+- Direct production dependencies on public quote/OHLCV clients are restricted
+  to the existing router, snapshot adapters, and directory owners by an
+  architecture test. `DIRECT_PROVIDER_BYPASS_COUNT=0`.
+- CoinGlass RPM is nullable and explicit. Missing, zero/negative, and positive
+  values remain distinct; no production source, config, script, or example
+  environment contains an implicit 300 RPM fallback.
+- The Binance market catalog also honors explicit provider/external-call
+  enablement before its directory request and otherwise uses only the existing
+  configured local catalog.
 
 ## API Delta
 
@@ -61,3 +86,8 @@ standard packaged-JAR PostgreSQL smoke, focused contracts, full Maven suite,
 Product Source Gate, Workflow Contract and authorization validator. This
 implementation does not self-approve, merge, deploy or perform live-secret
 acceptance.
+
+Local closure evidence is recorded in
+`docs/FUNDAMENTAL_AI_V4_1_PR1187_FINAL_TARGET_RUNTIME_CLOSURE.md`. PR #1187
+remains Draft and unmerged; this phase is not DONE until the independent
+re-audit and later merge gates complete.

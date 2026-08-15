@@ -61,15 +61,16 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
         } catch (IllegalArgumentException invalid) {
             return unavailable(symbol, traceId, UnifiedSourceStatus.ERROR, "COINGLASS_SYMBOL_UNSUPPORTED");
         }
-        if (!properties.isEnabled()) {
-            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED, "COINGLASS_PROVIDER_NOT_CONFIGURED");
-        }
-        if (!properties.hasApiKey()) {
-            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED, "COINGLASS_API_KEY_MISSING");
-        }
-        if (!properties.isExternalCallsEnabled()) {
-            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED,
-                    "COINGLASS_EXTERNAL_CALLS_NOT_CONFIGURED");
+        CoinGlassConfigurationState configuration = properties.configurationState();
+        if (configuration != CoinGlassConfigurationState.CONFIGURED) {
+            String reason = switch (configuration) {
+                case NOT_CONFIGURED -> "COINGLASS_PROVIDER_NOT_CONFIGURED";
+                case KEY_MISSING -> "COINGLASS_API_KEY_MISSING";
+                case RPM_NOT_CONFIGURED -> "COINGLASS_RPM_NOT_CONFIGURED";
+                case INVALID_RPM -> "COINGLASS_RPM_INVALID";
+                case CONFIGURED -> throw new IllegalStateException("unreachable");
+            };
+            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED, reason);
         }
         Duration minimum = Duration.ofSeconds(Math.max(1, properties.getEmergencyMinRefreshGapSeconds()));
         Duration freshTtl = requestedFreshTtl == null || requestedFreshTtl.compareTo(minimum) < 0

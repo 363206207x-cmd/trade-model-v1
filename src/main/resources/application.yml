@@ -84,7 +84,7 @@ trade-model:
     circuit-open-seconds: 60
     provider-budgets:
       binance-public-advertised-rpm: 1200
-      coinglass-advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
+      coinglass-advertised-rpm: ${COINGLASS_ADVERTISED_RPM:}
       ai-advertised-rpm: 60
       external-context-advertised-rpm: 60
     profiles:
@@ -217,7 +217,7 @@ trade-model:
       api-key: ${COINGLASS_API_KEY:}
       base-url: ${COINGLASS_API_BASE_URL:https://open-api-v4.coinglass.com}
       auth-header-name: ${COINGLASS_API_AUTH_HEADER:CG-API-KEY}
-      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
+      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:}
       internal-budget-ratio: 0.80
       request-timeout-ms: 5000
       fresh-ttl-seconds: 60

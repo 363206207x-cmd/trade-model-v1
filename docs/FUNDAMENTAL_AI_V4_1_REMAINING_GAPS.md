@@ -1,8 +1,9 @@
 # Fundamental AI v4.1 Target Runtime Remediation Remaining Gaps
 
-Status: `IMPLEMENTATION_COMPLETE_PENDING_INDEPENDENT_AUDIT`
+Status: `FINAL_ONESHOT_CLOSURE_PENDING_ONE_INDEPENDENT_REAUDIT`
 
-No known in-scope code blocker remains before independent audit.
+No known B01-B04 implementation blocker or same-class provider/CoinGlass
+bypass remains before the one independent final re-audit.
 
 The following acceptance evidence is intentionally deferred and is not hidden
 by mock or fallback data:

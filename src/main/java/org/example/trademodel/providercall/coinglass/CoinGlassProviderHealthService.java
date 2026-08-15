@@ -27,8 +27,11 @@ public class CoinGlassProviderHealthService {
     }
 
     public UnifiedSourceStatus configurationStatus(CoinGlassProperties properties) {
-        if (!properties.isEnabled() || !properties.hasApiKey()) return UnifiedSourceStatus.NOT_CONFIGURED;
-        if (!properties.isExternalCallsEnabled()) return UnifiedSourceStatus.NOT_CONFIGURED;
+        CoinGlassConfigurationState configuration = configurationState(properties);
+        if (configuration != CoinGlassConfigurationState.CONFIGURED) {
+            return configuration == CoinGlassConfigurationState.INVALID_RPM
+                    ? UnifiedSourceStatus.ERROR : UnifiedSourceStatus.NOT_CONFIGURED;
+        }
         if (health.isEmpty()) return UnifiedSourceStatus.WAITING_SYNC;
         long ready = health.values().stream()
                 .filter(value -> value.status() == UnifiedSourceStatus.READY).count();
@@ -38,6 +41,10 @@ public class CoinGlassProviderHealthService {
             return UnifiedSourceStatus.ERROR;
         }
         return UnifiedSourceStatus.DEGRADED;
+    }
+
+    public CoinGlassConfigurationState configurationState(CoinGlassProperties properties) {
+        return properties == null ? CoinGlassConfigurationState.NOT_CONFIGURED : properties.configurationState();
     }
 
     public record CoinGlassEndpointHealth(

@@ -65,8 +65,9 @@ public class CoinGlassV4Client {
     }
 
     private void validateRuntimeConfiguration(String path) {
-        if (!properties.isEnabled() || !properties.isExternalCallsEnabled() || !properties.hasApiKey()) {
-            throw new IllegalArgumentException("CoinGlass external call is not configured");
+        if (properties.configurationState() != CoinGlassConfigurationState.CONFIGURED) {
+            throw new IllegalArgumentException("CoinGlass external call is not configured: "
+                    + properties.configurationState());
         }
         URI base = URI.create(properties.getBaseUrl());
         if (!"https".equalsIgnoreCase(base.getScheme())

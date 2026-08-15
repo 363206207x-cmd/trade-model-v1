@@ -2,6 +2,7 @@ package org.example.trademodel.config;
 
 import org.example.trademodel.ai.AiConfigurationPresence;
 import org.example.trademodel.security.InitialPasswordPolicy;
+import org.example.trademodel.providercall.coinglass.CoinGlassConfigurationState;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -62,9 +63,13 @@ public final class TargetRuntimePreflight {
         lines.add("BINANCE_OHLCV=" + (binanceReady ? "ENABLED" : "DISABLED"));
         lines.add("MARKET_PROVIDER_PATH=" + (krakenReady || binanceReady ? "PASS" : "MISSING"));
         passed &= krakenReady || binanceReady;
-        boolean coinGlassConfigured = enabled(environment, "TRADE_MODEL_COINGLASS_ENABLED")
-                && trim(environment.get("COINGLASS_API_KEY")) != null;
-        lines.add("COINGLASS=" + (coinGlassConfigured ? "CONFIGURED" : "NOT_CONFIGURED"));
+        CoinGlassConfigurationState coinGlassState = coinGlassState(environment);
+        lines.add("COINGLASS=" + coinGlassState.name());
+        if (enabled(environment, "TRADE_MODEL_COINGLASS_ENABLED")
+                && enabled(environment, "TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED")
+                && coinGlassState != CoinGlassConfigurationState.CONFIGURED) {
+            passed = false;
+        }
         lines.add("PREFLIGHT=" + (passed ? "PASS" : "BLOCKED"));
         return new Result(passed, List.copyOf(lines));
     }
@@ -130,6 +135,24 @@ public final class TargetRuntimePreflight {
 
     private static boolean enabled(Map<String, String> environment, String key) {
         return Boolean.parseBoolean(trim(environment.get(key)));
+    }
+
+    private static CoinGlassConfigurationState coinGlassState(Map<String, String> environment) {
+        boolean enabled = enabled(environment, "TRADE_MODEL_COINGLASS_ENABLED");
+        boolean external = enabled(environment, "TRADE_MODEL_COINGLASS_EXTERNAL_CALLS_ENABLED");
+        boolean keyPresent = trim(environment.get("COINGLASS_API_KEY")) != null;
+        String rawRpm = trim(environment.get("COINGLASS_ADVERTISED_RPM"));
+        Integer rpm = null;
+        if (rawRpm != null) {
+            try {
+                rpm = Integer.valueOf(rawRpm);
+            } catch (NumberFormatException invalid) {
+                return enabled && external && keyPresent
+                        ? CoinGlassConfigurationState.INVALID_RPM
+                        : CoinGlassConfigurationState.NOT_CONFIGURED;
+            }
+        }
+        return CoinGlassConfigurationState.evaluate(enabled, external, keyPresent, rpm);
     }
 
     private static String trim(String value) {
