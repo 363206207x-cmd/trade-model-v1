@@ -30,13 +30,13 @@ class SecurityObservabilityGuardTest {
 
     @Test
     void accessLogExistsAndDoesNotPrintSensitiveHeaderValues(CapturedOutput output) throws Exception {
-        mockMvc.perform(get("/actuator/health?api_key=secret-value")
+        mockMvc.perform(get("/actuator/health/liveness?api_key=secret-value")
                         .header("X-Api-Key", "secret-value")
                         .header("Cookie", "SESSION=secret-cookie"))
                 .andExpect(status().isOk());
 
         assertThat(output).contains("ACCESS_LOG");
-        assertThat(output).contains("path=/actuator/health");
+        assertThat(output).contains("path=/actuator/health/liveness");
         assertThat(output).doesNotContain("secret-value");
         assertThat(output).doesNotContain("secret-cookie");
     }
