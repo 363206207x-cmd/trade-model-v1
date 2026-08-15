@@ -8,9 +8,9 @@ public class AiProviderProperties {
     private String model = "";
     private GptFinalModelRoutingProperties gptFinal = new GptFinalModelRoutingProperties();
     private String baseUrl = "";
-    private int requestsPerMinute;
-    private BigDecimal inputCostPerMillionUsd = BigDecimal.ZERO;
-    private BigDecimal outputCostPerMillionUsd = BigDecimal.ZERO;
+    private Integer requestsPerMinute;
+    private BigDecimal inputCostPerMillionUsd;
+    private BigDecimal outputCostPerMillionUsd;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -29,15 +29,34 @@ public class AiProviderProperties {
     public String getEffectiveModel() { return getConfiguredModel(); }
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-    public int getRequestsPerMinute() { return requestsPerMinute; }
-    public void setRequestsPerMinute(int requestsPerMinute) { this.requestsPerMinute = requestsPerMinute; }
-    public BigDecimal getInputCostPerMillionUsd() { return inputCostPerMillionUsd; }
-    public void setInputCostPerMillionUsd(BigDecimal inputCostPerMillionUsd) {
-        this.inputCostPerMillionUsd = inputCostPerMillionUsd == null ? BigDecimal.ZERO : inputCostPerMillionUsd;
+    public int getRequestsPerMinute() { return requestsPerMinute == null ? 0 : requestsPerMinute; }
+    public Integer getConfiguredRequestsPerMinute() { return requestsPerMinute; }
+    public void setRequestsPerMinute(Integer requestsPerMinute) { this.requestsPerMinute = requestsPerMinute; }
+    public BigDecimal getInputCostPerMillionUsd() {
+        return inputCostPerMillionUsd == null ? BigDecimal.ZERO : inputCostPerMillionUsd;
     }
-    public BigDecimal getOutputCostPerMillionUsd() { return outputCostPerMillionUsd; }
+    public BigDecimal getConfiguredInputCostPerMillionUsd() { return inputCostPerMillionUsd; }
+    public void setInputCostPerMillionUsd(BigDecimal inputCostPerMillionUsd) {
+        this.inputCostPerMillionUsd = inputCostPerMillionUsd;
+    }
+    public BigDecimal getOutputCostPerMillionUsd() {
+        return outputCostPerMillionUsd == null ? BigDecimal.ZERO : outputCostPerMillionUsd;
+    }
+    public BigDecimal getConfiguredOutputCostPerMillionUsd() { return outputCostPerMillionUsd; }
     public void setOutputCostPerMillionUsd(BigDecimal outputCostPerMillionUsd) {
-        this.outputCostPerMillionUsd = outputCostPerMillionUsd == null ? BigDecimal.ZERO : outputCostPerMillionUsd;
+        this.outputCostPerMillionUsd = outputCostPerMillionUsd;
+    }
+
+    public AiConfigurationPresence requestsPerMinutePresence() {
+        return AiConfigurationPresence.of(requestsPerMinute);
+    }
+
+    public AiConfigurationPresence inputCostPresence() {
+        return AiConfigurationPresence.of(inputCostPerMillionUsd);
+    }
+
+    public AiConfigurationPresence outputCostPresence() {
+        return AiConfigurationPresence.of(outputCostPerMillionUsd);
     }
 
     public boolean hasKeyAndModel() {

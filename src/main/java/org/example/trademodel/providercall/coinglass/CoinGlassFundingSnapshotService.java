@@ -4,6 +4,7 @@ import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallCoordinator;
 import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.ProviderDatasetType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -12,6 +13,15 @@ import java.time.Duration;
 public class CoinGlassFundingSnapshotService
         extends AbstractCoinGlassDatasetSnapshotService<CoinGlassFundingSnapshot> {
     private final CoinGlassV4ProviderAdapter adapter;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CoinGlassFundingSnapshotService(ProviderCallCoordinator coordinator, CoinGlassProperties properties,
+                                            CoinGlassSymbolMapper symbolMapper, CoinGlassV4ProviderAdapter adapter,
+                                            ProviderCapabilityRegistry capabilityRegistry) {
+        super(ProviderDatasetType.COINGLASS_FUNDING, "1M", coordinator, properties, symbolMapper,
+                capabilityRegistry);
+        this.adapter = adapter;
+    }
 
     public CoinGlassFundingSnapshotService(ProviderCallCoordinator coordinator, CoinGlassProperties properties,
                                             CoinGlassSymbolMapper symbolMapper, CoinGlassV4ProviderAdapter adapter) {

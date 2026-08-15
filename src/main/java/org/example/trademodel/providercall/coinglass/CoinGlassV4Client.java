@@ -2,6 +2,7 @@ package org.example.trademodel.providercall.coinglass;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -65,8 +66,9 @@ public class CoinGlassV4Client {
     }
 
     private void validateRuntimeConfiguration(String path) {
-        if (!properties.isEnabled() || !properties.isExternalCallsEnabled() || !properties.hasApiKey()) {
-            throw new IllegalArgumentException("CoinGlass external call is not configured");
+        if (properties.configurationState() != CoinGlassConfigurationState.CONFIGURED) {
+            throw new IllegalArgumentException("CoinGlass external call is not configured: "
+                    + properties.configurationState());
         }
         URI base = URI.create(properties.getBaseUrl());
         if (!"https".equalsIgnoreCase(base.getScheme())
@@ -111,6 +113,9 @@ public class CoinGlassV4Client {
     }
 
     private static String classify(int httpStatus, String providerCode, JsonNode data) {
+        if (ProviderFailureClassifier.isRegionRestricted(httpStatus, "HTTP_" + httpStatus)) {
+            return "REGION_RESTRICTED";
+        }
         if (httpStatus == 401 || httpStatus == 403) return "AUTHENTICATION_FAILED";
         if (httpStatus == 429) return "RATE_LIMITED";
         if (httpStatus >= 500) return "UPSTREAM_UNAVAILABLE";

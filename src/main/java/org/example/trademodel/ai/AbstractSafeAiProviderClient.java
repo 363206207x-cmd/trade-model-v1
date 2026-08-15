@@ -90,6 +90,17 @@ public abstract class AbstractSafeAiProviderClient implements AiProviderClient {
         return reviewWithModel(request, timeoutOverrideMs, providerProperties().getEffectiveModel());
     }
 
+    @Override
+    public AiProviderReviewResult verifyExactModel(String model, long timeoutOverrideMs) {
+        if (blank(model)) {
+            return failure(AiProviderCallStatus.FAILED, "EXACT_MODEL_MISSING", 0L);
+        }
+        AiProviderRequest request = provider() == AiProviderName.GEMINI
+                ? AiProviderControlledSmoke.fixedGeminiReviewRequest()
+                : AiProviderControlledSmoke.fixedSchemaOnlyRequest();
+        return reviewWithModel(request, timeoutOverrideMs, model);
+    }
+
     protected AiProviderReviewResult reviewWithModel(AiProviderRequest request, long timeoutOverrideMs,
                                                      String selectedModel) {
         long started = System.nanoTime();

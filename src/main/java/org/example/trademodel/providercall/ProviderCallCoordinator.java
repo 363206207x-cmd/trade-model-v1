@@ -697,7 +697,10 @@ public class ProviderCallCoordinator {
             SnapshotCacheService.SnapshotLookup<T> stale,
             UnifiedSourceStatus status,
             String reason) {
-        if (stale != null && stale.staleReadable()) return cached(request, stale, true);
+        if (!ProviderFailureClassifier.isRegionRestricted(0, reason)
+                && stale != null && stale.staleReadable()) {
+            return cached(request, stale, true);
+        }
         Instant now = clock.instant();
         ProviderSnapshotMetadata metadata = metadata(request, null, now, now, status,
                 SnapshotFreshnessStatus.UNAVAILABLE, false, false, reason, List.of(reason));

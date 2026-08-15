@@ -18,13 +18,13 @@ class RoutedPublicOhlcvProviderTest {
         when(kraken.fetchClosedBars("BNBUSDT", "5m", 100, "run-1"))
                 .thenReturn(failed("PAIR_NOT_SUPPORTED"));
         when(binance.fetchClosedBars("BNBUSDT", "5m", 100, "run-1"))
-                .thenReturn(failed("GEO_RESTRICTED"));
+                .thenReturn(failed("REGION_RESTRICTED"));
         RoutedPublicOhlcvProvider routed = new RoutedPublicOhlcvProvider(
                 kraken, binance, "kraken", "binance", true);
 
         PublicOhlcvProviderResult result = routed.fetchClosedBars("BNBUSDT", "5m", 100, "run-1");
 
-        assertThat(result.reasonCode()).isEqualTo("PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED");
+        assertThat(result.reasonCode()).isEqualTo("REGION_RESTRICTED");
         verify(kraken).fetchClosedBars("BNBUSDT", "5m", 100, "run-1");
         verify(binance).fetchClosedBars("BNBUSDT", "5m", 100, "run-1");
         assertThat(routed.primaryProvider()).isEqualTo("KRAKEN");
@@ -69,12 +69,12 @@ class RoutedPublicOhlcvProviderTest {
         KrakenPublicOhlcvProvider kraken = mock(KrakenPublicOhlcvProvider.class);
         BinancePublicOhlcvProvider binance = mock(BinancePublicOhlcvProvider.class);
         when(kraken.fetchClosedBars("BTCUSDT", "5m", 100, "run-1")).thenReturn(failed("TIMEOUT"));
-        when(binance.fetchClosedBars("BTCUSDT", "5m", 100, "run-1")).thenReturn(failed("GEO_RESTRICTED"));
+        when(binance.fetchClosedBars("BTCUSDT", "5m", 100, "run-1")).thenReturn(failed("REGION_RESTRICTED"));
         RoutedPublicOhlcvProvider routed = new RoutedPublicOhlcvProvider(
                 kraken, binance, "kraken", "binance", true);
 
         assertThat(routed.fetchClosedBars("BTCUSDT", "5m", 100, "run-1").reasonCode())
-                .isEqualTo("GEO_RESTRICTED");
+                .isEqualTo("REGION_RESTRICTED");
         verify(binance).fetchClosedBars("BTCUSDT", "5m", 100, "run-1");
     }
 

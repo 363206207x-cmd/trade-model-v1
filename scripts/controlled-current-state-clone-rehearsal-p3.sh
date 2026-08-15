@@ -916,7 +916,7 @@ export TRADE_MODEL_AI_OPENAI_ENABLED=false
 export TRADE_MODEL_AI_GEMINI_ENABLED=false
 export TRADE_MODEL_AI_XAI_ENABLED=false
 
-./mvnw -q -Pflyway-migration \
+./mvnw -q \
   -Dspring-boot.run.arguments="--server.address=127.0.0.1 --server.port=${APP_PORT}" \
   spring-boot:run >"${TMP_DIR}/application.log" 2>&1 &
 APP_PID=$!

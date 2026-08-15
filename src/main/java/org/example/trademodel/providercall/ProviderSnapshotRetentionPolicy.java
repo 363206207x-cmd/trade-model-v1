@@ -13,7 +13,7 @@ public class ProviderSnapshotRetentionPolicy {
         return switch (datasetType) {
             case PRICE -> Duration.ofMinutes(2);
             case OHLCV -> Duration.ofMinutes(10);
-            case DERIVATIVES, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
+            case DERIVATIVES, FUNDING, OPEN_INTEREST, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
                     COINGLASS_LIQUIDATION, COINGLASS_LONG_SHORT_RATIO -> Duration.ofMinutes(3);
             case EXTERNAL_CONTEXT -> Duration.ofMinutes(30);
             case AI_REVIEW -> Duration.ofMinutes(10);

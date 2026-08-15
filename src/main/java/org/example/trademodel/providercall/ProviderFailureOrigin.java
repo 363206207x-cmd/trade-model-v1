@@ -9,6 +9,7 @@ public enum ProviderFailureOrigin {
     LOCAL_CONFIGURATION(false, false),
     REMOTE_RATE_LIMIT(false, true),
     REMOTE_AUTH(false, true),
+    REMOTE_CAPABILITY(false, true),
     REMOTE_TRANSPORT(true, true),
     REMOTE_SERVER(true, true),
     REMOTE_PAYLOAD(true, true),

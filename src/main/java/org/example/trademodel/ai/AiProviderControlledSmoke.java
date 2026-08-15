@@ -155,7 +155,7 @@ public class AiProviderControlledSmoke {
         };
     }
 
-    private static AiProviderRequest fixedSchemaOnlyRequest() {
+    static AiProviderRequest fixedSchemaOnlyRequest() {
         AiProviderRequest request = new AiProviderRequest();
         request.setAnalysisId("controlled-ai-schema-smoke");
         request.setTraceId("controlled-ai-schema-smoke");

@@ -16,16 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class KrakenPairResolver {
     static final String ASSET_PAIRS_ENDPOINT = "/0/public/AssetPairs";
     private static final Logger log = LoggerFactory.getLogger(KrakenPairResolver.class);
-    private static final Map<String, Set<String>> DISPLAY_ALIASES = Map.of(
-            "BTCUSDT", Set.of("BTC/USD", "XBT/USD"),
-            "ETHUSDT", Set.of("ETH/USD"),
-            "SOLUSDT", Set.of("SOL/USD"),
-            "BNBUSDT", Set.of("BNB/USD"),
-            "XRPUSDT", Set.of("XRP/USD"),
-            "DOGEUSDT", Set.of("DOGE/USD", "XDG/USD"));
     private static final Set<String> RETRYABLE = Set.of("HTTP_5XX", "TIMEOUT");
-    private static final Set<String> CORE_REQUEST_PAIRS = Set.of(
-            "XBTUSD", "BTCUSD", "ETHUSD", "SOLUSD", "BNBUSD", "XRPUSD", "XDGUSD", "DOGEUSD");
 
     private final RealMarketDataFetcherService fetcher;
     private final String assetPairsUrl;
@@ -41,7 +32,7 @@ public final class KrakenPairResolver {
 
     KrakenPairResolution resolve(String internalSymbol) {
         String normalized = normalize(internalSymbol);
-        if (!DISPLAY_ALIASES.containsKey(normalized)) {
+        if (normalized == null || !normalized.endsWith("USDT") || normalized.length() <= 4) {
             return KrakenPairResolution.failed(OhlcvSourceState.ERROR, "INVALID_SYMBOL_MAPPING");
         }
         ensureLoaded();
@@ -108,31 +99,22 @@ public final class KrakenPairResolver {
             return null;
         }
         Map<String, KrakenPairMetadata> resolved = new LinkedHashMap<>();
-        boolean knownPairMalformed = false;
         var fields = payload.path("result").fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
             JsonNode pair = entry.getValue();
             if (!pair.isObject()) continue;
             String wsname = text(pair, "wsname");
-            String internal = internalForDisplay(wsname);
-            if (internal == null && isMalformedCorePair(pair)) {
-                knownPairMalformed = true;
-                continue;
-            }
+            String internal = exactUsdtInternalSymbol(wsname);
             if (internal == null) continue;
             String altname = text(pair, "altname");
             String requestPair = altname == null ? blankToNull(entry.getKey()) : altname;
             String status = text(pair, "status");
-            if (requestPair == null || wsname == null) {
-                knownPairMalformed = true;
-                continue;
-            }
+            if (requestPair == null || wsname == null) continue;
             if (status != null && !"online".equalsIgnoreCase(status)) continue;
             resolved.putIfAbsent(internal, new KrakenPairMetadata(
                     internal, requestPair, wsname, entry.getKey(), status));
         }
-        if (knownPairMalformed) return null;
         return resolved;
     }
 
@@ -142,22 +124,14 @@ public final class KrakenPairResolver {
         state = KrakenPairCacheState.FAILED;
     }
 
-    private static String internalForDisplay(String wsname) {
+    private static String exactUsdtInternalSymbol(String wsname) {
         if (wsname == null) return null;
         String normalized = wsname.trim().toUpperCase(Locale.ROOT);
-        for (Map.Entry<String, Set<String>> aliases : DISPLAY_ALIASES.entrySet()) {
-            if (aliases.getValue().contains(normalized)) return aliases.getKey();
-        }
-        return null;
-    }
-
-    private static boolean isMalformedCorePair(JsonNode pair) {
-        String quote = canonicalAsset(text(pair, "quote"));
-        String base = canonicalAsset(text(pair, "base"));
-        if (!"USD".equals(quote) || base == null) return false;
-        String altname = text(pair, "altname");
-        return Set.of("BTC", "ETH", "SOL", "BNB", "XRP", "DOGE").contains(base)
-                && altname != null && CORE_REQUEST_PAIRS.contains(altname.toUpperCase(Locale.ROOT));
+        int separator = normalized.indexOf('/');
+        if (separator <= 0 || separator == normalized.length() - 1) return null;
+        String base = canonicalAsset(normalized.substring(0, separator));
+        String quote = canonicalAsset(normalized.substring(separator + 1));
+        return base == null || !"USDT".equals(quote) ? null : base + "USDT";
     }
 
     private static String canonicalAsset(String raw) {
@@ -168,7 +142,7 @@ public final class KrakenPairResolver {
             case "XXDG", "XDG", "DOGE" -> "DOGE";
             case "XETH", "ETH" -> "ETH";
             case "XXRP", "XRP" -> "XRP";
-            case "ZUSD", "USD" -> "USD";
+            case "USDT" -> "USDT";
             default -> value;
         };
     }

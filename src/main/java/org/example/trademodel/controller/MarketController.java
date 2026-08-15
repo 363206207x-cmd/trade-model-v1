@@ -1,8 +1,11 @@
 package org.example.trademodel.controller;
 
-import org.example.trademodel.market.client.MarketQuoteClient;
-import org.example.trademodel.market.dto.MarketQuoteSnapshot;
-import org.example.trademodel.market.util.BinanceUsdtSymbol;
+import org.example.trademodel.providercall.AssetPriority;
+import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
+import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.service.RealMarketDataFetcherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +14,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.time.Duration;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/market")
@@ -20,13 +24,13 @@ public class MarketController {
     private static final long QUOTE_STALE_THRESHOLD_SECONDS = 60L;
 
     private final RealMarketDataFetcherService realMarketDataFetcherService;
-    private final MarketQuoteClient marketQuoteClient;
+    private final MarketPriceSnapshotService marketPriceSnapshotService;
 
     @Autowired
     public MarketController(RealMarketDataFetcherService realMarketDataFetcherService,
-                            MarketQuoteClient marketQuoteClient) {
+                            MarketPriceSnapshotService marketPriceSnapshotService) {
         this.realMarketDataFetcherService = realMarketDataFetcherService;
-        this.marketQuoteClient = marketQuoteClient;
+        this.marketPriceSnapshotService = marketPriceSnapshotService;
     }
 
     @GetMapping("/real-fetch")
@@ -47,16 +51,18 @@ public class MarketController {
 
     @GetMapping("/quote-status")
     public Map<String, Object> quoteStatus(@RequestParam(defaultValue = "BTCUSDT") String symbol) {
-        String normalizedSymbol = BinanceUsdtSymbol.toUsdtPair(symbol);
+        String normalizedSymbol = exactSymbol(symbol);
         Map<String, Object> status = baseQuoteStatus(normalizedSymbol);
         try {
-            Optional<MarketQuoteSnapshot> snapshotOpt = marketQuoteClient.fetch24hTicker(normalizedSymbol);
-            if (snapshotOpt.isEmpty()) {
+            ProviderCallResult<MarketPriceSnapshot> result = marketPriceSnapshotService.get(normalizedSymbol,
+                    AssetPriority.P1_WATCHLIST, Duration.ofSeconds(QUOTE_STALE_THRESHOLD_SECONDS),
+                    RequestIdSupport.generate());
+            if (!MarketPriceSnapshotPolicy.isFresh(result)) {
                 applyUnavailable(status, "MARKETQUOTE_MISSING_FAIL_CLOSED", "QUOTE_UNAVAILABLE",
                         "行情缺失；只读状态，不是交易信号，不进入候选/推送/点位。");
                 return status;
             }
-            applySnapshotStatus(status, snapshotOpt.get());
+            applySnapshotStatus(status, result.payload());
         } catch (Exception e) {
             applyUnavailable(status, "MARKETQUOTE_BLOCKED_FAIL_CLOSED", "QUOTE_STATUS_EXCEPTION",
                     "行情状态读取异常；保持 fail-closed，只读展示，不进入候选/推送/点位。");
@@ -88,9 +94,9 @@ public class MarketController {
         return status;
     }
 
-    private static void applySnapshotStatus(Map<String, Object> status, MarketQuoteSnapshot snapshot) {
-        String provider = normalizeProvider(snapshot.getProvider());
-        long fetchedAt = snapshot.getFetchedAtEpochMillis();
+    private static void applySnapshotStatus(Map<String, Object> status, MarketPriceSnapshot snapshot) {
+        String provider = normalizeProvider(snapshot.sourceProvider());
+        long fetchedAt = snapshot.sourceFetchedAt() == null ? 0L : snapshot.sourceFetchedAt().toEpochMilli();
         status.put("source", provider);
         status.put("sourceType", provider + "_24H_TICKER");
         status.put("fallbackActive", false);
@@ -139,5 +145,11 @@ public class MarketController {
             return "UNKNOWN";
         }
         return provider.trim().toUpperCase();
+    }
+
+    private static String exactSymbol(String symbol) {
+        if (symbol == null || symbol.isBlank()) throw new IllegalArgumentException("symbol is required");
+        return symbol.trim().toUpperCase(Locale.ROOT)
+                .replace("/", "").replace("-", "").replace("_", "");
     }
 }

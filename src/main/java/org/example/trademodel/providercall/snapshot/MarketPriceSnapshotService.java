@@ -21,6 +21,10 @@ import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
 import org.example.trademodel.providercall.instrument.MarketType;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -36,6 +40,7 @@ public class MarketPriceSnapshotService {
     private final MarketQuoteClient marketQuoteClient;
     private final ProviderSymbolMappingRegistry mappingRegistry;
     private final ProviderRequestKeyFactory keyFactory;
+    private final ProviderCapabilityRegistry capabilityRegistry;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -43,8 +48,10 @@ public class MarketPriceSnapshotService {
                                       ProviderSnapshotRefreshService refreshService,
                                       MarketQuoteClient marketQuoteClient,
                                       ProviderSymbolMappingRegistry mappingRegistry,
-                                      ProviderRequestKeyFactory keyFactory) {
-        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory, Clock.systemUTC());
+                                      ProviderRequestKeyFactory keyFactory,
+                                      ProviderCapabilityRegistry capabilityRegistry) {
+        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory,
+                capabilityRegistry, Clock.systemUTC());
     }
 
     /** Compatibility constructor for focused unit tests. */
@@ -56,7 +63,7 @@ public class MarketPriceSnapshotService {
             Clock clock) {
         this(new CoordinatedProviderSnapshotQueryService(coordinator),
                 new CoordinatedProviderSnapshotRefreshService(coordinator), marketQuoteClient,
-                mappingRegistry, keyFactory, clock);
+                mappingRegistry, keyFactory, null, clock);
     }
 
     public MarketPriceSnapshotService(
@@ -66,11 +73,23 @@ public class MarketPriceSnapshotService {
             ProviderSymbolMappingRegistry mappingRegistry,
             ProviderRequestKeyFactory keyFactory,
             Clock clock) {
+        this(queryService, refreshService, marketQuoteClient, mappingRegistry, keyFactory, null, clock);
+    }
+
+    public MarketPriceSnapshotService(
+            ProviderSnapshotQueryService queryService,
+            ProviderSnapshotRefreshService refreshService,
+            MarketQuoteClient marketQuoteClient,
+            ProviderSymbolMappingRegistry mappingRegistry,
+            ProviderRequestKeyFactory keyFactory,
+            ProviderCapabilityRegistry capabilityRegistry,
+            Clock clock) {
         this.queryService = queryService;
         this.refreshService = refreshService;
         this.marketQuoteClient = marketQuoteClient;
         this.mappingRegistry = mappingRegistry;
         this.keyFactory = keyFactory;
+        this.capabilityRegistry = capabilityRegistry;
         this.clock = clock;
     }
 
@@ -79,7 +98,12 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        ProviderInstrumentCapability capability = authorize(symbol, MarketType.SPOT, ContractType.NONE, true);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT) : capability.mapping();
         return get(mapping, priority, freshTtl, traceId);
     }
 
@@ -88,7 +112,13 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        ProviderInstrumentCapability capability = authorize(canonicalInstrumentId.displaySymbol(),
+                canonicalInstrumentId.marketType(), canonicalInstrumentId.contractType(), true);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", canonicalInstrumentId) : capability.mapping();
         return get(mapping, priority, freshTtl, traceId);
     }
 
@@ -104,7 +134,7 @@ public class MarketPriceSnapshotService {
                 mapping, "GLOBAL", freshTtl, clock.instant());
         ProviderCallResult<MarketPriceSnapshot> result = refreshService.refresh(new ProviderCallRequest<>(key, priority, freshTtl,
                 Duration.ofMinutes(2), Duration.ofSeconds(3), traceId,
-                () -> fetch(mapping.providerSymbol(), mapping.canonicalInstrumentId().marketType())));
+                () -> fetch(mapping.providerSymbol(), mapping.canonicalInstrumentId().marketType(), key, traceId)));
         if (result == null) {
             return unavailable(mapping, freshTtl, traceId, "PROVIDER_RESULT_MISSING");
         }
@@ -123,7 +153,12 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT);
+        ProviderInstrumentCapability capability = authorize(symbol, MarketType.SPOT, ContractType.NONE, false);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", symbol, MarketType.SPOT) : capability.mapping();
         return peek(mapping, priority, freshTtl, traceId);
     }
 
@@ -132,7 +167,13 @@ public class MarketPriceSnapshotService {
             AssetPriority priority,
             Duration freshTtl,
             String traceId) {
-        ProviderSymbolMapping mapping = mappingRegistry.resolve("BINANCE", canonicalInstrumentId);
+        ProviderInstrumentCapability capability = authorize(canonicalInstrumentId.displaySymbol(),
+                canonicalInstrumentId.marketType(), canonicalInstrumentId.contractType(), false);
+        if (capability != null && !capability.usableFor("GLOBAL")) {
+            return unavailable(capability, freshTtl, traceId);
+        }
+        ProviderSymbolMapping mapping = capability == null
+                ? mappingRegistry.resolve("BINANCE", canonicalInstrumentId) : capability.mapping();
         return peek(mapping, priority, freshTtl, traceId);
     }
 
@@ -159,22 +200,42 @@ public class MarketPriceSnapshotService {
                 payload.sourceFetchedAt(), result.metadata()), result.metadata(), result.budgetState());
     }
 
-    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol, MarketType marketType) {
-        Optional<MarketQuoteSnapshot> quote = marketType == MarketType.SPOT
-                ? marketQuoteClient.fetch24hTicker(symbol)
-                : marketQuoteClient.fetch24hTicker(symbol, marketType);
-        if (quote.isEmpty()) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+    private ProviderAdapterResponse<MarketPriceSnapshot> fetch(String symbol,
+                                                               MarketType marketType,
+                                                               ProviderRequestKey key,
+                                                               String traceId) {
+        ProviderAdapterResponse<MarketQuoteSnapshot> quoteResult =
+                marketQuoteClient.fetch24hTickerResult(symbol, marketType);
+        if (quoteResult == null) {
+            Optional<MarketQuoteSnapshot> legacy = marketType == MarketType.SPOT
+                    ? marketQuoteClient.fetch24hTicker(symbol)
+                    : marketQuoteClient.fetch24hTicker(symbol, marketType);
+            quoteResult = legacy == null || legacy.isEmpty()
+                    ? ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null)
+                    : ProviderAdapterResponse.ready(legacy.get(), clock.instant());
         }
-        if (quote.get().getLastPrice() == null) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "QUOTE_UNAVAILABLE", null);
+        if (!quoteResult.ready()) {
+            record(key, quoteResult, traceId);
+            return ProviderAdapterResponse.failed(
+                    quoteResult.sourceStatus() == null ? UnifiedSourceStatus.ERROR : quoteResult.sourceStatus(),
+                    quoteResult.httpStatus(), quoteResult.reasonCode(), quoteResult.retryAfterSeconds());
         }
-        if (!positive(quote.get().getLastPrice())) {
-            return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, 0, "INVALID_MARKET_PRICE", null);
+        MarketQuoteSnapshot raw = quoteResult.payload();
+        if (raw == null || raw.getLastPrice() == null) {
+            ProviderAdapterResponse<MarketPriceSnapshot> failed = ProviderAdapterResponse.failed(
+                    UnifiedSourceStatus.ERROR, quoteResult.httpStatus(), "QUOTE_UNAVAILABLE", null);
+            record(key, failed, traceId);
+            return failed;
         }
-        MarketQuoteSnapshot raw = quote.get();
+        if (!positive(raw.getLastPrice())) {
+            ProviderAdapterResponse<MarketPriceSnapshot> failed = ProviderAdapterResponse.failed(
+                    UnifiedSourceStatus.ERROR, quoteResult.httpStatus(), "INVALID_MARKET_PRICE", null);
+            record(key, failed, traceId);
+            return failed;
+        }
         Instant fetchedAt = raw.getFetchedAtEpochMillis() > 0
-                ? Instant.ofEpochMilli(raw.getFetchedAtEpochMillis()) : clock.instant();
+                ? Instant.ofEpochMilli(raw.getFetchedAtEpochMillis())
+                : quoteResult.providerDataTime() == null ? clock.instant() : quoteResult.providerDataTime();
         BigDecimal spread = positive(raw.getBidPrice()) && positive(raw.getAskPrice())
                 && raw.getAskPrice().compareTo(raw.getBidPrice()) >= 0
                 ? raw.getAskPrice().subtract(raw.getBidPrice()) : null;
@@ -182,7 +243,9 @@ public class MarketPriceSnapshotService {
                 raw.getBidPrice(), raw.getBidQuantity(), raw.getAskPrice(), raw.getAskQuantity(), spread,
                 raw.getHighPrice(), raw.getLowPrice(), raw.getPriceChangePercent24h(),
                 raw.getProvider(), fetchedAt, null);
-        return ProviderAdapterResponse.ready(snapshot, fetchedAt);
+        ProviderAdapterResponse<MarketPriceSnapshot> ready = ProviderAdapterResponse.ready(snapshot, fetchedAt);
+        record(key, ready, traceId);
+        return ready;
     }
 
     private ProviderCallResult<MarketPriceSnapshot> unavailable(
@@ -197,6 +260,44 @@ public class MarketPriceSnapshotService {
                 mapping.canonicalInstrumentId(), mapping.providerSymbol(), "GLOBAL", null, now, now, 0L,
                 UnifiedSourceStatus.NOT_CONFIGURED, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
                 key.canonical(), mapping.sourceVersion(), false, false, reason, java.util.List.of(reason));
+        return new ProviderCallResult<>(null, metadata, null);
+    }
+
+    private ProviderInstrumentCapability authorize(String symbol,
+                                                   MarketType marketType,
+                                                   ContractType contractType,
+                                                   boolean externalRefresh) {
+        if (capabilityRegistry == null) return null;
+        return externalRefresh
+                ? capabilityRegistry.authorize("BINANCE", symbol, "GLOBAL", marketType, contractType,
+                ProviderDatasetType.PRICE)
+                : capabilityRegistry.inspect("BINANCE", symbol, "GLOBAL", marketType, contractType,
+                ProviderDatasetType.PRICE);
+    }
+
+    private void record(ProviderRequestKey key, ProviderAdapterResponse<?> response, String traceId) {
+        if (capabilityRegistry != null) capabilityRegistry.record(key, response, traceId);
+    }
+
+    private ProviderCallResult<MarketPriceSnapshot> unavailable(ProviderInstrumentCapability capability,
+                                                                Duration freshTtl,
+                                                                String traceId) {
+        Instant now = clock.instant();
+        String reason = capability.failureReason() == null
+                ? capability.capabilityState().name() : capability.failureReason();
+        UnifiedSourceStatus status = switch (capability.capabilityState()) {
+            case PROVIDER_DISABLED -> UnifiedSourceStatus.DISABLED;
+            case STALE_CAPABILITY -> UnifiedSourceStatus.STALE;
+            case SOURCE_UNAVAILABLE, REGION_RESTRICTED -> UnifiedSourceStatus.ERROR;
+            case SUPPORTED -> UnifiedSourceStatus.ERROR;
+            default -> UnifiedSourceStatus.NOT_CONFIGURED;
+        };
+        String providerSymbol = capability.providerSymbol() == null ? "UNMAPPED" : capability.providerSymbol();
+        ProviderSnapshotMetadata metadata = new ProviderSnapshotMetadata(capability.provider(),
+                ProviderDatasetType.PRICE, capability.canonicalInstrumentId(), providerSymbol, "GLOBAL",
+                null, now, now, 0L, status, SnapshotFreshnessStatus.UNAVAILABLE, traceId,
+                capability.provider() + "|PRICE|" + capability.canonicalAssetId() + "|GLOBAL",
+                capability.sourceVersion(), false, false, reason, java.util.List.of(reason));
         return new ProviderCallResult<>(null, metadata, null);
     }
 

@@ -6,6 +6,7 @@ import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
 import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
+import org.example.trademodel.dto.assetpool.AssetPoolScanBatchResultDTO;
 import org.example.trademodel.dto.assetpool.AssetPoolScanResultDTO;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.entity.AnalysisRunDO;
@@ -253,6 +254,42 @@ class PersistentAssetPoolServiceTest {
             assertThat(command.getTimeframe()).isEqualTo("15m");
             assertThat(command.getTriggerReference()).startsWith("asset-pool-scan-");
         });
+    }
+
+    @Test
+    void oneAssetFailureDoesNotEraseFiveSuccessfulAnalysesAndBatchRemainsTruthfullyPartial() {
+        when(mapper.listSystemDefaults()).thenReturn(List.of(
+                row("SYSTEM", 0L, "ADAUSDT", true, true, 10, "DEFAULT"),
+                row("SYSTEM", 0L, "BTCUSDT", true, true, 20, "DEFAULT"),
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 30, "DEFAULT"),
+                row("SYSTEM", 0L, "SOLUSDT", true, true, 40, "DEFAULT"),
+                row("SYSTEM", 0L, "BNBUSDT", true, true, 50, "DEFAULT"),
+                row("SYSTEM", 0L, "XRPUSDT", true, true, 60, "DEFAULT")));
+        when(mapper.listUserOverrides(42L)).thenReturn(List.of());
+        AnalysisRunDO btcRun = new AnalysisRunDO();
+        btcRun.setAnalysisId("analysis-btc");
+        btcRun.setStatus("SUCCESS");
+        AssetAnalysisVO btcAnalysis = new AssetAnalysisVO();
+        btcAnalysis.setDataQualityScore(55);
+        when(analysisRunOrchestrator.run(any()))
+                .thenThrow(new IllegalStateException("REGION_RESTRICTED"))
+                .thenReturn(AnalysisRunResult.executed(btcRun, btcAnalysis, false, false));
+
+        AssetPoolScanBatchResultDTO batch = service.scanSummaryForUser(42L, "5m");
+
+        assertThat(batch.overallState()).isEqualTo("PARTIAL");
+        assertThat(batch.successCount()).isEqualTo(5);
+        assertThat(batch.failedCount()).isEqualTo(1);
+        assertThat(batch.perAssetResults()).extracting(AssetPoolScanResultDTO::symbol)
+                .containsExactly("ADAUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT");
+        assertThat(batch.perAssetResults().get(0).state()).isEqualTo("FAILED");
+        assertThat(batch.perAssetResults().get(0).failureReason()).isEqualTo("REGION_RESTRICTED");
+        assertThat(batch.perAssetResults().get(0).analysisId()).isNull();
+        assertThat(batch.perAssetResults().get(0).dataQuality()).isNull();
+        assertThat(batch.perAssetResults().get(1).state()).isEqualTo("SUCCESS");
+        assertThat(batch.perAssetResults().get(1).analysisId()).isEqualTo("analysis-btc");
+        assertThat(batch.perAssetResults().get(1).dataQuality()).isEqualTo(55);
+        verify(analysisRunOrchestrator, org.mockito.Mockito.times(6)).run(any());
     }
 
     @Test

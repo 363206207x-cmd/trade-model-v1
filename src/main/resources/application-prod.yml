@@ -7,10 +7,19 @@ server:
         secure: ${TRADE_MODEL_SESSION_COOKIE_SECURE:true}
 
 spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  sql:
+    init:
+      mode: never
+
   datasource:
     url: ${PROD_DATASOURCE_URL}
     username: ${PROD_DATASOURCE_USERNAME}
     password: ${PROD_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   h2:
     console:
@@ -64,7 +73,7 @@ trade-model:
       api-key: ${COINGLASS_API_KEY:}
       base-url: ${COINGLASS_API_BASE_URL:https://open-api-v4.coinglass.com}
       auth-header-name: ${COINGLASS_API_AUTH_HEADER:CG-API-KEY}
-      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:300}
+      advertised-rpm: ${COINGLASS_ADVERTISED_RPM:}
   schedulers:
     enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:false}
     push-recheck:
@@ -87,6 +96,17 @@ trade-model:
     scheduler:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
   ohlcv:
+    provider:
+      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}
+      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:binance}
+      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:true}
+    kraken:
+      enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:false}
+      base-url: ${TRADE_MODEL_KRAKEN_OHLCV_BASE_URL:https://api.kraken.com}
+    binance:
+      enabled: ${TRADE_MODEL_BINANCE_OHLCV_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}}
+      external-calls-enabled: ${TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}}
     public-provider:
       enabled: ${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}

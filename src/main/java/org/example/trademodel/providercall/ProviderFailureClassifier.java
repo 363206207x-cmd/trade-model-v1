@@ -37,8 +37,9 @@ public final class ProviderFailureClassifier {
     public static ProviderFailureOrigin classify(ProviderAdapterResponse<?> response) {
         if (response == null) return ProviderFailureOrigin.REMOTE_PAYLOAD;
         int status = response.httpStatus();
-        String reason = normalize(response.reasonCode());
+        String reason = canonicalReason(status, response.reasonCode());
 
+        if (isRegionRestricted(status, reason)) return ProviderFailureOrigin.REMOTE_CAPABILITY;
         if (status == 429 || reason.contains("RATE_LIMIT")) {
             return ProviderFailureOrigin.REMOTE_RATE_LIMIT;
         }
@@ -66,6 +67,32 @@ public final class ProviderFailureClassifier {
         }
         if (status >= 400 && status <= 499) return ProviderFailureOrigin.LOCAL_CONFIGURATION;
         return ProviderFailureOrigin.REMOTE_PAYLOAD;
+    }
+
+    public static String canonicalReason(int httpStatus, String reason) {
+        String normalized = normalize(reason);
+        if (isRegionRestricted(httpStatus, normalized)) return "REGION_RESTRICTED";
+        if (!normalized.isBlank()) return normalized;
+        return httpStatus > 0 ? "HTTP_" + httpStatus : "PROVIDER_CALL_FAILED";
+    }
+
+    public static boolean isRegionRestricted(ProviderAdapterResponse<?> response) {
+        return response != null && isRegionRestricted(response.httpStatus(), response.reasonCode());
+    }
+
+    public static boolean isRegionRestricted(int httpStatus, String reason) {
+        String normalized = normalize(reason);
+        return httpStatus == 451
+                || normalized.contains("REGION_RESTRICTED")
+                || normalized.contains("GEO_RESTRICTED")
+                || normalized.contains("ELIGIBILITY_RESTRICTED")
+                || normalized.contains("HTTP_451");
+    }
+
+    public static <T> ProviderAdapterResponse<T> httpFailure(
+            int httpStatus, String reasonCode, Long retryAfterSeconds) {
+        return ProviderAdapterResponse.failed(UnifiedSourceStatus.ERROR, httpStatus,
+                canonicalReason(httpStatus, reasonCode), retryAfterSeconds);
     }
 
     private static String normalize(String reason) {

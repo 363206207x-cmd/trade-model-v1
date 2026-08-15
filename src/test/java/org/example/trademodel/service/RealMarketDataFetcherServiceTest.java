@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 
 class RealMarketDataFetcherServiceTest {
     @Test
-    void binance451IsClassifiedAsGeoRestrictedWithoutResponseExposure() {
+    void binance451IsClassifiedAsRegionRestrictedWithoutResponseExposure() {
         RestOperations transport = mock(RestOperations.class);
         when(transport.exchange(anyString(), any(), any(), (Class<String>) any()))
                 .thenThrow(HttpClientErrorException.create(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS,
@@ -27,7 +27,7 @@ class RealMarketDataFetcherServiceTest {
         PublicKlineFetchResult result = service.fetchKlinesDetailed("BTCUSDT", "5m", 100);
 
         assertThat(result.httpStatus()).isEqualTo(451);
-        assertThat(result.reasonCode()).isEqualTo("GEO_RESTRICTED");
+        assertThat(result.reasonCode()).isEqualTo("REGION_RESTRICTED");
         assertThat(result.rows()).isEmpty();
     }
 }

@@ -1,0 +1,16 @@
+package org.example.trademodel.ai;
+
+public enum AiProviderReadinessState {
+    DISABLED,
+    KEY_MISSING,
+    COST_NOT_CONFIGURED,
+    RPM_NOT_CONFIGURED,
+    BUDGET_NOT_CONFIGURED,
+    MODEL_NOT_VERIFIED,
+    AUTHORIZED,
+    RATE_LIMITED,
+    BUDGET_BLOCKED,
+    AUTH_FAILED,
+    MODEL_UNAVAILABLE,
+    PROVIDER_UNAVAILABLE
+}

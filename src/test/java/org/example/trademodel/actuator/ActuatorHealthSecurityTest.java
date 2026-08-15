@@ -18,6 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "trade-model.auth.enabled=true",
+        "trade-model.auth.initial-username=health-operator",
+        "trade-model.auth.initial-password=Health-operator-secret-2026!",
         "management.endpoints.web.exposure.include=health",
         "management.endpoint.health.probes.enabled=true",
         "management.endpoint.health.show-details=never",

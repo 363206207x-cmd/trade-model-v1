@@ -11,11 +11,14 @@ import org.example.trademodel.entity.AssetPoolItemDO;
 import org.example.trademodel.entity.AssetDO;
 import org.example.trademodel.mapper.AssetMapper;
 import org.example.trademodel.mapper.AssetPoolItemMapper;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.annotation.Lazy;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,15 +34,26 @@ public class PersistentAssetPoolService implements AssetPoolService {
     private final AssetMapper assetMapper;
     private final MarketAssetCatalog marketAssetCatalog;
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
+    private final ProviderCapabilityRegistry providerCapabilityRegistry;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PersistentAssetPoolService(AssetPoolItemMapper mapper,
                                       AssetMapper assetMapper,
                                       MarketAssetCatalog marketAssetCatalog,
-                                      @Lazy AnalysisRunOrchestrator analysisRunOrchestrator) {
+                                      @Lazy AnalysisRunOrchestrator analysisRunOrchestrator,
+                                      ProviderCapabilityRegistry providerCapabilityRegistry) {
         this.mapper = mapper;
         this.assetMapper = assetMapper;
         this.marketAssetCatalog = marketAssetCatalog;
         this.analysisRunOrchestrator = analysisRunOrchestrator;
+        this.providerCapabilityRegistry = providerCapabilityRegistry;
+    }
+
+    PersistentAssetPoolService(AssetPoolItemMapper mapper,
+                               AssetMapper assetMapper,
+                               MarketAssetCatalog marketAssetCatalog,
+                               AnalysisRunOrchestrator analysisRunOrchestrator) {
+        this(mapper, assetMapper, marketAssetCatalog, analysisRunOrchestrator, null);
     }
 
     @Override
@@ -317,16 +331,76 @@ public class PersistentAssetPoolService implements AssetPoolService {
         List<AssetPoolScanResultDTO> results = new ArrayList<>();
         String scanId = "asset-pool-scan-" + RequestIdSupport.generate();
         for (AssetPoolAssetDTO asset : assets) {
-            AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.assetPoolScan(
-                    userId, asset.assetId(), asset.symbol(), effectiveTimeframe,
-                    RequestIdSupport.generate(), scanId));
-            results.add(new AssetPoolScanResultDTO(
-                    asset.symbol(),
-                    result == null ? null : result.getAnalysisId(),
-                    result == null ? "FAILED" : result.getStatus(),
-                    result == null ? "ANALYSIS_RESULT_MISSING" : result.getReasonCode()));
+            Instant observedAt = Instant.now();
+            try {
+                AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.assetPoolScan(
+                        userId, asset.assetId(), asset.symbol(), effectiveTimeframe,
+                        RequestIdSupport.generate(), scanId));
+                String state = scanState(result);
+                String reason = result == null ? "ANALYSIS_RESULT_MISSING" : result.getReasonCode();
+                results.add(new AssetPoolScanResultDTO(
+                        asset.symbol(),
+                        result == null ? null : result.getAnalysisId(),
+                        state,
+                        reason,
+                        asset.assetId(),
+                        provider(result, asset.symbol(), effectiveTimeframe),
+                        state,
+                        dataQuality(result),
+                        "SUCCESS".equals(state) ? null : reason,
+                        observedAt));
+            } catch (RuntimeException failure) {
+                String failureReason = scanFailureReason(failure);
+                results.add(new AssetPoolScanResultDTO(
+                        asset.symbol(), null, "FAILED", failureReason,
+                        asset.assetId(), provider(null, asset.symbol(), effectiveTimeframe),
+                        "FAILED", null, failureReason, observedAt));
+            }
         }
         return results;
+    }
+
+    private static String scanState(AnalysisRunResult result) {
+        if (result == null) return "FAILED";
+        if (result.isSuccessfulAnalysisAvailable()) return "SUCCESS";
+        return result.hasAnalysisId() ? "PARTIAL" : "FAILED";
+    }
+
+    private static Integer dataQuality(AnalysisRunResult result) {
+        return result == null || result.getAnalysis() == null
+                ? null : result.getAnalysis().getDataQualityScore();
+    }
+
+    private static String scanFailureReason(RuntimeException failure) {
+        String message = failure == null || failure.getMessage() == null
+                ? "" : failure.getMessage().toUpperCase(Locale.ROOT);
+        if (message.contains("REGION_RESTRICTED") || message.contains("HTTP_451")) {
+            return "REGION_RESTRICTED";
+        }
+        if (message.contains("UNSUPPORTED_SYMBOL") || message.contains("PAIR_NOT_SUPPORTED")) {
+            return "UNSUPPORTED_SYMBOL";
+        }
+        if (message.contains("UNSUPPORTED_TIMEFRAME")) {
+            return "UNSUPPORTED_TIMEFRAME";
+        }
+        if (message.contains("PROVIDER_DISABLED")) {
+            return "PROVIDER_DISABLED";
+        }
+        if (message.contains("NOT_CONFIGURED")) {
+            return "NOT_CONFIGURED";
+        }
+        return "ASSET_SCAN_EXCEPTION";
+    }
+
+    private String provider(AnalysisRunResult result, String symbol, String timeframe) {
+        if (result != null && result.getAnalysis() != null
+                && result.getAnalysis().getMarketEnvironment() != null
+                && result.getAnalysis().getMarketEnvironment().getSourceProvider() != null) {
+            return result.getAnalysis().getMarketEnvironment().getSourceProvider();
+        }
+        if (providerCapabilityRegistry == null) return null;
+        ProviderInstrumentCapability capability = providerCapabilityRegistry.best(symbol, timeframe);
+        return capability == null ? null : capability.provider();
     }
 
     private static List<String> requireSymbols(List<String> symbols) {

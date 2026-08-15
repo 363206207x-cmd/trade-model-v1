@@ -45,10 +45,11 @@ class CanonicalInstrumentAndProfileContractTest {
     }
 
     @Test
-    void dynamicBinanceUsdtSymbolGetsCanonicalIdentityButUnsupportedQuoteFailsClosed() {
+    void onlyRegistryVerifiedSymbolsResolveAndUnknownMappingsFailClosed() {
         ProviderSymbolMappingRegistry registry = ProviderCallTestFixtures.binanceRegistry("BTCUSDT");
-        assertThat(registry.resolve("BINANCE", "AAVEUSDT", MarketType.PERPETUAL)
-                .canonicalInstrumentId().displaySymbol()).isEqualTo("AAVE/USDT");
+        assertThatThrownBy(() -> registry.resolve("BINANCE", "AAVEUSDT", MarketType.PERPETUAL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");
         assertThatThrownBy(() -> registry.resolve("BINANCE", "UNKNOWNBTC", MarketType.PERPETUAL))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("PROVIDER_SYMBOL_MAPPING_NOT_FOUND");

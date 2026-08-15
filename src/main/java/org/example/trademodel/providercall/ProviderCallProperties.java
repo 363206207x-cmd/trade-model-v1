@@ -70,7 +70,7 @@ public class ProviderCallProperties {
         return switch (datasetType) {
             case PRICE -> cadence.price.forPriority(priority);
             case OHLCV -> cadence.ohlcv.forPriority(priority);
-            case DERIVATIVES, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
+            case DERIVATIVES, FUNDING, OPEN_INTEREST, COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING,
                     COINGLASS_LIQUIDATION, COINGLASS_LONG_SHORT_RATIO -> cadence.derivatives.forPriority(priority);
             case EXTERNAL_CONTEXT -> cadence.externalContextSeconds;
             case AI_REVIEW -> cadence.aiCheckpointDebounceSeconds;
@@ -139,19 +139,18 @@ public class ProviderCallProperties {
 
     public static class ProviderBudgets {
         private int binancePublicAdvertisedRpm = 1200;
-        private int coinglassAdvertisedRpm = 300;
+        private Integer coinglassAdvertisedRpm;
         private int aiAdvertisedRpm = 60;
         private int externalContextAdvertisedRpm = 60;
         void validate() {
             positive(binancePublicAdvertisedRpm, "provider-budgets.binance-public-advertised-rpm");
-            positive(coinglassAdvertisedRpm, "provider-budgets.coinglass-advertised-rpm");
             positive(aiAdvertisedRpm, "provider-budgets.ai-advertised-rpm");
             positive(externalContextAdvertisedRpm, "provider-budgets.external-context-advertised-rpm");
         }
         public int getBinancePublicAdvertisedRpm() { return binancePublicAdvertisedRpm; }
         public void setBinancePublicAdvertisedRpm(int value) { this.binancePublicAdvertisedRpm = value; }
-        public int getCoinglassAdvertisedRpm() { return coinglassAdvertisedRpm; }
-        public void setCoinglassAdvertisedRpm(int value) { this.coinglassAdvertisedRpm = value; }
+        public Integer getCoinglassAdvertisedRpm() { return coinglassAdvertisedRpm; }
+        public void setCoinglassAdvertisedRpm(Integer value) { this.coinglassAdvertisedRpm = value; }
         public int getAiAdvertisedRpm() { return aiAdvertisedRpm; }
         public void setAiAdvertisedRpm(int value) { this.aiAdvertisedRpm = value; }
         public int getExternalContextAdvertisedRpm() { return externalContextAdvertisedRpm; }

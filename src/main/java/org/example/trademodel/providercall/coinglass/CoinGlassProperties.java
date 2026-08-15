@@ -19,7 +19,7 @@ public class CoinGlassProperties {
     private String apiKey = "";
     private String baseUrl = OFFICIAL_BASE_URL;
     private String authHeaderName = OFFICIAL_AUTH_HEADER;
-    private int advertisedRpm = 300;
+    private Integer advertisedRpm;
     private double internalBudgetRatio = 0.80d;
     private int requestTimeoutMs = 5000;
     private int freshTtlSeconds = 60;
@@ -42,8 +42,8 @@ public class CoinGlassProperties {
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
     public String getAuthHeaderName() { return authHeaderName; }
     public void setAuthHeaderName(String authHeaderName) { this.authHeaderName = authHeaderName; }
-    public int getAdvertisedRpm() { return advertisedRpm; }
-    public void setAdvertisedRpm(int advertisedRpm) { this.advertisedRpm = advertisedRpm; }
+    public Integer getAdvertisedRpm() { return advertisedRpm; }
+    public void setAdvertisedRpm(Integer advertisedRpm) { this.advertisedRpm = advertisedRpm; }
     public double getInternalBudgetRatio() { return internalBudgetRatio; }
     public void setInternalBudgetRatio(double internalBudgetRatio) { this.internalBudgetRatio = internalBudgetRatio; }
     public int getRequestTimeoutMs() { return requestTimeoutMs; }
@@ -66,6 +66,10 @@ public class CoinGlassProperties {
 
     public boolean hasApiKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public CoinGlassConfigurationState configurationState() {
+        return CoinGlassConfigurationState.evaluate(enabled, externalCallsEnabled, hasApiKey(), advertisedRpm);
     }
 
     public static class Endpoints {

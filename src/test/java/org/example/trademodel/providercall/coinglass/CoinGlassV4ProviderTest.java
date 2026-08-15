@@ -46,14 +46,15 @@ class CoinGlassV4ProviderTest {
     private static final Instant NOW = Instant.parse("2026-07-10T10:00:00Z");
 
     @Test
-    void coinglassDisabledReturnsDisabled() {
+    void coinglassDisabledReturnsNotConfigured() {
         TestContext context = context("open-interest-success.json");
         context.coinGlassProperties.setEnabled(false);
 
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
                 "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-disabled");
 
-        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.DISABLED);
+        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
+        assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_PROVIDER_NOT_CONFIGURED");
         assertThat(context.transport.calls).hasValue(0);
     }
 
@@ -71,6 +72,32 @@ class CoinGlassV4ProviderTest {
     }
 
     @Test
+    void missingRpmReturnsDistinctFailClosedStateWithoutTransportCall() {
+        TestContext context = context("open-interest-success.json");
+        context.coinGlassProperties.setAdvertisedRpm(null);
+
+        ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-no-rpm");
+
+        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
+        assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_RPM_NOT_CONFIGURED");
+        assertThat(context.transport.calls).hasValue(0);
+    }
+
+    @Test
+    void explicitZeroRpmReturnsInvalidFailClosedStateWithoutTransportCall() {
+        TestContext context = context("open-interest-success.json");
+        context.coinGlassProperties.setAdvertisedRpm(0);
+
+        ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-zero-rpm");
+
+        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
+        assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_RPM_INVALID");
+        assertThat(context.transport.calls).hasValue(0);
+    }
+
+    @Test
     void apiKeyIsNeverLoggedOrSerialized() throws Exception {
         TestContext context = context("open-interest-success.json");
         String serialized = new ObjectMapper().writeValueAsString(context.coinGlassProperties);
@@ -79,6 +106,18 @@ class CoinGlassV4ProviderTest {
         assertThat(serialized).doesNotContain("fixture-secret-key");
         assertThat(context.transport.lastUri.toString()).doesNotContain("fixture-secret-key");
         assertThat(context.coinGlassProperties.toString()).doesNotContain("fixture-secret-key");
+    }
+
+    @Test
+    void transportReceivesOfficialAuthHeaderAndExactKeyWithoutQueryLeakage() {
+        TestContext context = context("open-interest-success.json");
+
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST,
+                Duration.ofSeconds(60), "trace-protocol");
+
+        assertThat(context.transport.lastAuthHeaderName).isEqualTo(CoinGlassProperties.OFFICIAL_AUTH_HEADER);
+        assertThat(context.transport.lastApiKey).isEqualTo("fixture-secret-key");
+        assertThat(context.transport.lastUri.toString()).doesNotContain("fixture-secret-key", "api_key");
     }
 
     @Test
@@ -362,6 +401,7 @@ class CoinGlassV4ProviderTest {
         coinGlassProperties.setEnabled(true);
         coinGlassProperties.setExternalCallsEnabled(true);
         coinGlassProperties.setApiKey("fixture-secret-key");
+        coinGlassProperties.setAdvertisedRpm(300);
         FakeTransport transport = new FakeTransport(List.of(responses));
         CoinGlassRateLimitMetadataParser rateParser = new CoinGlassRateLimitMetadataParser();
         CoinGlassV4Client client = new CoinGlassV4Client(coinGlassProperties, transport, rateParser,
@@ -454,6 +494,8 @@ class CoinGlassV4ProviderTest {
         private final Queue<CoinGlassHttpResponse> responses;
         private final AtomicInteger calls = new AtomicInteger();
         private volatile URI lastUri;
+        private volatile String lastAuthHeaderName;
+        private volatile String lastApiKey;
         private volatile long delayMillis;
 
         private FakeTransport(List<CoinGlassHttpResponse> responses) {
@@ -465,6 +507,8 @@ class CoinGlassV4ProviderTest {
                 URI uri, String authHeaderName, String apiKey, Duration timeout) throws Exception {
             calls.incrementAndGet();
             lastUri = uri;
+            lastAuthHeaderName = authHeaderName;
+            lastApiKey = apiKey;
             if (delayMillis > 0) Thread.sleep(delayMillis);
             if (responses.isEmpty()) throw new IllegalStateException("fixture response missing");
             return responses.size() == 1 ? responses.peek() : responses.remove();

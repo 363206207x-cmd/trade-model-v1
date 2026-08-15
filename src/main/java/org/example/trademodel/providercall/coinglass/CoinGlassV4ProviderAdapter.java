@@ -1,6 +1,7 @@
 package org.example.trademodel.providercall.coinglass;
 
 import org.example.trademodel.providercall.ProviderAdapterResponse;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.springframework.stereotype.Component;
 
@@ -87,7 +88,10 @@ public class CoinGlassV4ProviderAdapter {
                     "MALFORMED_RESPONSE", "INVALID_PROVIDER_CONFIGURATION" -> UnifiedSourceStatus.ERROR;
             default -> UnifiedSourceStatus.ERROR;
         };
-        String reason = response.endpointCapabilityId() + ":" + response.errorCode();
+        String canonicalReason = ProviderFailureClassifier.canonicalReason(
+                response.httpStatus(), response.errorCode());
+        String reason = "REGION_RESTRICTED".equals(canonicalReason)
+                ? canonicalReason : response.endpointCapabilityId() + ":" + canonicalReason;
         health.record(response.endpointCapabilityId(), status, response.httpStatus(),
                 response.providerStatusCode(), reason, response.rateLimit(), response.fetchTime());
         return ProviderAdapterResponse.failed(status, response.httpStatus(), reason,

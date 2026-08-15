@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @Tag("core-regression")
@@ -55,5 +56,18 @@ class BinanceMarketAssetCatalogTest {
         assertThat(catalog.search("比特", 10)).extracting(MarketAssetDTO::symbol)
                 .containsExactly("BTCUSDT");
         assertThat(catalog.requireTradable("eth/usdt").symbol()).isEqualTo("ETHUSDT");
+    }
+
+    @Test
+    void disabledCatalogUsesConfiguredDirectoryWithoutExternalCall() {
+        HttpClient httpClient = mock(HttpClient.class);
+        ProviderSymbolMappingRegistry mappings = mock(ProviderSymbolMappingRegistry.class);
+        when(mappings.snapshot()).thenReturn(java.util.List.of());
+        BinanceMarketAssetCatalog catalog = new BinanceMarketAssetCatalog(
+                new ObjectMapper(), mappings, httpClient, false, false);
+
+        assertThat(catalog.search("btc", 10)).isEmpty();
+
+        verifyNoInteractions(httpClient);
     }
 }

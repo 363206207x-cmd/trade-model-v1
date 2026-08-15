@@ -7,6 +7,10 @@ document does not claim a production deployment occurred.
 
 - Approved merged-main artifact running with Java 17.
 - PostgreSQL backup confirmed and Flyway at V13.
+- Standard `clean package` artifact passed
+  `scripts/standard-release-postgresql-smoke.sh`; no special Flyway profile was
+  used. The same script also verifies packaged-JAR login, CSRF Session, logout,
+  old-Session invalidation, existing V13 restart and checksum fail closed.
 - `TRADE_MODEL_SMOKE_USERNAME` and `TRADE_MODEL_SMOKE_PASSWORD` injected from a
   secret store.
 - `APP_URL` points to the trusted local endpoint or the HTTPS reverse-proxy
@@ -31,6 +35,8 @@ temporary responses with restricted permissions and removes them on exit.
 5. Logout invalidates the pre-logout Session.
 6. Provider health values remain truthful. `CONNECTED` is invalid unless real
    external calls are explicitly enabled and a verified source exists.
+   HTTP 451 is `REGION_RESTRICTED`; unavailable ADAUSDT remains unavailable and
+   must not erase successful assets from a truthful `PARTIAL` scan.
 7. Dynamic Top6, Position Monitoring, Final-only Execution Plan and one visible
    AI role render without fake values or raw enum primary copy.
 8. All fourteen product routes return the expected authenticated page and no
@@ -38,6 +44,15 @@ temporary responses with restricted permissions and removes them on exit.
 9. Push Recheck scheduler status is `SUCCEEDED`, `PARTIAL`, or an explicit
    `FAILED` with trace/error evidence; query failures cannot appear successful.
 10. Logs contain no key, password, Session cookie or unhandled exception.
+11. AI readiness is `AUTHORIZED` only for the exact frozen model after an
+    explicit cached verification; fallback output is not Ready.
+12. CoinGlass disabled is `NOT_CONFIGURED`. Enabled external CoinGlass with a
+    missing key, missing RPM, or non-positive RPM is respectively
+    `KEY_MISSING`, `RPM_NOT_CONFIGURED`, or `INVALID_RPM`; none may be connected
+    or emit zero-valued evidence.
+13. Unsupported/disabled/region-restricted provider identities produce no
+    market-data invocation. A fallback is used only with its own exact
+    `SUPPORTED` capability.
 
 ## Result Rules
 

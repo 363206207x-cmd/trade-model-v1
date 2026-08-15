@@ -78,7 +78,7 @@ class AiProviderModelStrategyTest {
         AiProviderReadiness readiness = client.readiness();
         assertThat(readiness.getModelReadinessStatus())
                 .isEqualTo(AiModelReadinessStatus.MODEL_FALLBACK_ACTIVE);
-        assertThat(readiness.isReady()).isTrue();
+        assertThat(readiness.isReady()).isFalse();
         assertThat(readiness.isFallbackUsed()).isTrue();
         assertThat(readiness.getFallbackReason()).isEqualTo("OPENAI_FALLBACK_GPT55");
         assertThat(readiness.getReasonCodes()).containsExactly("OPENAI_FALLBACK_GPT55");

@@ -13,6 +13,7 @@ import org.example.trademodel.providercall.coinglass.CoinGlassDerivativesSnapsho
 import org.example.trademodel.providercall.instrument.MarketType;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
 import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
 import org.example.trademodel.providercall.snapshot.CoordinatedOhlcvSnapshotService;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
@@ -35,6 +36,7 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private final CoinGlassDerivativesSnapshotService derivativesService;
     private final ProviderCallProperties properties;
     private final ProviderRefreshStateRegistry registry;
+    private final ProviderCapabilityRegistry capabilityRegistry;
     private final Clock clock;
 
     @Autowired
@@ -44,9 +46,22 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                                              ProviderSymbolMappingRegistry mappingRegistry,
                                              CoinGlassDerivativesSnapshotService derivativesService,
                                              ProviderCallProperties properties,
+                                             ProviderRefreshStateRegistry registry,
+                                             ProviderCapabilityRegistry capabilityRegistry) {
+        this(priceService, ohlcvService, ohlcvBarMapper, mappingRegistry, derivativesService, properties, registry,
+                capabilityRegistry, Clock.systemUTC());
+    }
+
+    /** Compatibility constructor for focused unit tests that do not build the Spring capability gate. */
+    public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
+                                             CoordinatedOhlcvSnapshotService ohlcvService,
+                                             PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
+                                             CoinGlassDerivativesSnapshotService derivativesService,
+                                             ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry) {
         this(priceService, ohlcvService, ohlcvBarMapper, mappingRegistry, derivativesService, properties, registry,
-                Clock.systemUTC());
+                null, Clock.systemUTC());
     }
 
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
@@ -57,6 +72,19 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                                              ProviderCallProperties properties,
                                              ProviderRefreshStateRegistry registry,
                                              Clock clock) {
+        this(priceService, ohlcvService, ohlcvBarMapper, mappingRegistry, derivativesService, properties, registry,
+                null, clock);
+    }
+
+    public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
+                                             CoordinatedOhlcvSnapshotService ohlcvService,
+                                             PersistedOhlcvBarMapper ohlcvBarMapper,
+                                             ProviderSymbolMappingRegistry mappingRegistry,
+                                             CoinGlassDerivativesSnapshotService derivativesService,
+                                             ProviderCallProperties properties,
+                                             ProviderRefreshStateRegistry registry,
+                                             ProviderCapabilityRegistry capabilityRegistry,
+                                             Clock clock) {
         this.priceService = priceService;
         this.ohlcvService = ohlcvService;
         this.ohlcvBarMapper = ohlcvBarMapper;
@@ -64,6 +92,7 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
         this.derivativesService = derivativesService;
         this.properties = properties;
         this.registry = registry;
+        this.capabilityRegistry = capabilityRegistry;
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
@@ -75,6 +104,9 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             case PRICE -> refreshPrice(item, traceId, attemptedAt);
             case OHLCV -> refreshOhlcv(item, traceId, attemptedAt);
             case DERIVATIVES -> refreshDerivatives(item, traceId, attemptedAt);
+            case FUNDING, OPEN_INTEREST -> unavailable(item, datasetType,
+                    UnifiedSourceStatus.NOT_CONFIGURED, "DIRECT_SUBDATASET_REFRESH_NOT_SUPPORTED",
+                    traceId, attemptedAt);
             case COINGLASS_OPEN_INTEREST, COINGLASS_FUNDING, COINGLASS_LIQUIDATION,
                     COINGLASS_LONG_SHORT_RATIO -> unavailable(item, datasetType, UnifiedSourceStatus.DISABLED,
                     "COINGLASS_COMPONENT_DATASET_INTERNAL_ONLY", traceId, attemptedAt);
@@ -101,6 +133,14 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     }
 
     private void refreshOhlcv(ScanPlanItem item, String traceId, Instant attemptedAt) {
+        if (capabilityRegistry != null) {
+            for (String timeframe : PRIMARY_TIMEFRAMES) {
+                ProviderCallResult<OhlcvIngestionResult> result = ohlcvService.refresh(
+                        item.canonicalInstrumentId(), timeframe, 100, item.effectivePriority(), traceId);
+                recordAuthorizedOhlcv(item, result, attemptedAt, traceId, timeframe);
+            }
+            return;
+        }
         ProviderSymbolMapping mapping;
         try {
             mapping = mappingRegistry.resolve("BINANCE", item.canonicalInstrumentId());
@@ -231,6 +271,27 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
                 result.metadata().errorCode(), attemptedAt, result.metadata().providerDataTime(),
                 result.metadata().traceId(), timeframe, mapping.provider(), sourceIdentity.providerMarketType(),
                 usableSourceVersion(result.metadata().sourceVersion(), mapping.sourceVersion())));
+    }
+
+    private void recordAuthorizedOhlcv(ScanPlanItem item,
+                                       ProviderCallResult<?> result,
+                                       Instant attemptedAt,
+                                       String traceId,
+                                       String timeframe) {
+        if (result == null || result.metadata() == null) {
+            registry.record(new ProviderRefreshObservation(item.canonicalInstrumentId(), item.providerSymbol(),
+                    ProviderDatasetType.OHLCV, UnifiedSourceStatus.ERROR,
+                    SnapshotFreshnessStatus.UNAVAILABLE, "PROVIDER_RESULT_MISSING", attemptedAt, null, traceId,
+                    timeframe));
+            return;
+        }
+        registry.record(new ProviderRefreshObservation(result.metadata().canonicalInstrumentId(),
+                result.metadata().providerSymbol(), ProviderDatasetType.OHLCV,
+                result.metadata().sourceStatus(), result.metadata().freshnessStatus(),
+                result.metadata().errorCode(), attemptedAt, result.metadata().providerDataTime(),
+                result.metadata().traceId(), timeframe, result.metadata().provider(),
+                providerMarketType(result.metadata().canonicalInstrumentId().marketType()),
+                result.metadata().sourceVersion()));
     }
 
     private static String usableSourceVersion(String resultVersion, String mappingVersion) {

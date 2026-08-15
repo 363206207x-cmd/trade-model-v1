@@ -7,6 +7,7 @@ import org.example.trademodel.dto.ohlcv.PublicKlineFetchResult;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.example.trademodel.providercall.ProviderFailureClassifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,7 +50,7 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             String ingestionRunId
     ) {
         if (geoRestrictedCircuitOpen.get()) {
-            return result(OhlcvSourceState.ERROR, "PROVIDER_UNAVAILABLE_FOR_LOCATION", null);
+            return result(OhlcvSourceState.ERROR, "REGION_RESTRICTED", null);
         }
         if (!providerEnabled) {
             return result(OhlcvSourceState.DISABLED, "PUBLIC_OHLCV_PROVIDER_DISABLED", null);
@@ -69,11 +70,10 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             return result(OhlcvSourceState.ERROR, "PUBLIC_OHLCV_PROVIDER_RESULT_MISSING", null);
         }
         if (fetched.sourceState() != OhlcvSourceState.READY) {
-            if (fetched.httpStatus() == 451 || "GEO_RESTRICTED".equals(fetched.reasonCode())
-                    || "ELIGIBILITY_RESTRICTED".equals(fetched.reasonCode())) {
+            if (ProviderFailureClassifier.isRegionRestricted(fetched.httpStatus(), fetched.reasonCode())) {
                 geoRestrictedCircuitOpen.set(true);
-                log.warn("BINANCE_GEO_RESTRICTED symbol={} reasonCode={}", symbol, fetched.reasonCode());
-                return result(OhlcvSourceState.ERROR, "GEO_RESTRICTED", null);
+                log.warn("BINANCE_REGION_RESTRICTED symbol={} reasonCode={}", symbol, fetched.reasonCode());
+                return result(OhlcvSourceState.ERROR, "REGION_RESTRICTED", null);
             }
             return result(fetched.sourceState(), fetched.reasonCode(), null);
         }

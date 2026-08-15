@@ -9,6 +9,12 @@ import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.dto.ohlcv.PublicProviderErrorCode;
 import org.example.trademodel.service.PublicOhlcvProvider;
 import org.example.trademodel.service.RealMarketDataFetcherService;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityDirectory;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityState;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +32,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
-public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
+public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider, ProviderCapabilityDirectory {
     static final String SOURCE_ENDPOINT = "/0/public/OHLC";
     private static final Logger log = LoggerFactory.getLogger(KrakenPublicOhlcvProvider.class);
     private static final Map<String, Integer> INTERVALS = Map.of(
@@ -163,6 +169,53 @@ public class KrakenPublicOhlcvProvider implements PublicOhlcvProvider {
 
     public KrakenPairCacheState pairCacheState() {
         return pairResolver.state();
+    }
+
+    @Override
+    public String provider() {
+        return "KRAKEN";
+    }
+
+    @Override
+    public ProviderInstrumentCapability verify(CanonicalInstrumentId requested,
+                                               String timeframe,
+                                               Instant observedAt) {
+        Instant now = observedAt == null ? Instant.now() : observedAt;
+        if (requested == null || requested.marketType() != MarketType.SPOT
+                || requested.contractType() != ContractType.NONE
+                || !"USDT".equals(requested.quoteAsset())) {
+            return capability(requested, timeframe, null, ProviderCapabilityState.UNSUPPORTED_SYMBOL,
+                    "KRAKEN_EXACT_SPOT_USDT_REQUIRED", now, null);
+        }
+        if (!INTERVALS.containsKey(timeframe) && !"GLOBAL".equals(timeframe)) {
+            return capability(requested, timeframe, null, ProviderCapabilityState.UNSUPPORTED_TIMEFRAME,
+                    "UNSUPPORTED_TIMEFRAME", now, null);
+        }
+        KrakenPairResolution resolution = pairResolver.resolve(requested.baseAsset() + requested.quoteAsset());
+        if (resolution.ready()) {
+            return capability(requested, timeframe, resolution.metadata().requestPair(),
+                    ProviderCapabilityState.SUPPORTED, null, now, now);
+        }
+        ProviderCapabilityState state = "PAIR_NOT_SUPPORTED".equals(resolution.reasonCode())
+                || "INVALID_SYMBOL_MAPPING".equals(resolution.reasonCode())
+                ? ProviderCapabilityState.UNSUPPORTED_SYMBOL : ProviderCapabilityState.SOURCE_UNAVAILABLE;
+        return capability(requested, timeframe, null, state, resolution.reasonCode(), now,
+                state == ProviderCapabilityState.UNSUPPORTED_SYMBOL ? now : null);
+    }
+
+    private static ProviderInstrumentCapability capability(CanonicalInstrumentId requested,
+                                                           String timeframe,
+                                                           String providerSymbol,
+                                                           ProviderCapabilityState state,
+                                                           String reason,
+                                                           Instant observedAt,
+                                                           Instant verifiedAt) {
+        CanonicalInstrumentId exact = requested == null
+                ? new CanonicalInstrumentId("UNKNOWN", "USDT", MarketType.SPOT, "KRAKEN", ContractType.NONE)
+                : requested.withVenue("KRAKEN");
+        return new ProviderInstrumentCapability("KRAKEN", exact.canonical(), exact.baseAsset(), exact.quoteAsset(),
+                exact.marketType(), exact.contractType(), providerSymbol, List.copyOf(INTERVALS.keySet()),
+                state, "KRAKEN_ASSET_PAIRS_V1", verifiedAt, reason, observedAt);
     }
 
     static JsonNode firstCandleArray(JsonNode result, KrakenPairMetadata pair) {

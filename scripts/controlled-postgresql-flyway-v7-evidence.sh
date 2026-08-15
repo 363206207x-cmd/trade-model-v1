@@ -288,7 +288,7 @@ export TRADE_MODEL_AI_GEMINI_ENABLED=false
 export TRADE_MODEL_AI_XAI_ENABLED=false
 
 APP_LOG="${TMP_DIR}/application.log"
-./mvnw -q -Pflyway-migration \
+./mvnw -q \
   -Dspring-boot.run.arguments="--server.address=127.0.0.1 --server.port=${APP_PORT}" \
   spring-boot:run >"${APP_LOG}" 2>&1 &
 APP_PID=$!

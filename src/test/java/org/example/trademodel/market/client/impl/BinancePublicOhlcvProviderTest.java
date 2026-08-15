@@ -75,8 +75,8 @@ class BinancePublicOhlcvProviderTest {
         PublicOhlcvProviderResult first = provider.fetchClosedBars("BNBUSDT", "5m", 100, "run-1");
         PublicOhlcvProviderResult second = provider.fetchClosedBars("BTCUSDT", "5m", 100, "run-2");
 
-        assertThat(first.reasonCode()).isEqualTo("GEO_RESTRICTED");
-        assertThat(second.reasonCode()).isEqualTo("PROVIDER_UNAVAILABLE_FOR_LOCATION");
+        assertThat(first.reasonCode()).isEqualTo("REGION_RESTRICTED");
+        assertThat(second.reasonCode()).isEqualTo("REGION_RESTRICTED");
         assertThat(provider.isGeoRestrictedCircuitOpen()).isTrue();
         verify(fetcher, times(1)).fetchKlinesDetailed("BNBUSDT", "5m", 100);
         verify(fetcher, never()).fetchKlinesDetailed("BTCUSDT", "5m", 100);
