@@ -26,6 +26,11 @@ public record HomeTopAssetProjection(
         String analysisId,
         String opportunityId,
         String opportunityState,
+        String primaryOpportunityId,
+        String primaryTimeframe,
+        String primaryPlanMode,
+        Integer secondaryOpportunityCount,
+        String timeframeConflictState,
         LocalDateTime analysisTime,
         @JsonIgnore DecisionResultVO sourceDecision) {
 

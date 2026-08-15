@@ -666,6 +666,8 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         plan.setRuleVetoReason(null);
         plan.setFinalizedAt(LocalDateTime.now());
         plan.setFinalPlan(true);
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setPlanVersion(1);
         copyFrozenFinalContract(plan, candidate, conflict);
         plan.setValidationResultId("validation-" + UUID.randomUUID());
         plan.setValidationReasons(List.of());
@@ -699,6 +701,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         plan.setValidationResultId("validation-" + UUID.randomUUID());
         plan.setValidationReasons(validation.reasons());
         plan.setFinalPlan(false);
+        plan.setPlanLifecycleState("INVALIDATED");
         plan.setFinalizedAt(null);
         return plan;
     }
@@ -845,6 +848,10 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         target.setValidationResultId(source.getValidationResultId());
         target.setValidationReasons(source.getValidationReasons());
         target.setSourceStatus(source.getSourceStatus());
+        target.setPlanLifecycleState(source.getPlanLifecycleState());
+        target.setPlanVersion(source.getPlanVersion());
+        target.setSupersedesPlanId(source.getSupersedesPlanId());
+        target.setSupersededByPlanId(source.getSupersededByPlanId());
         return target;
     }
 

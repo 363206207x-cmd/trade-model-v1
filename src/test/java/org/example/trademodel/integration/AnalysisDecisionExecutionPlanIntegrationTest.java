@@ -213,7 +213,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
-    void nonFinalAnalysisDoesNotLeakAiCandidateIntoDashboardHome() {
+    void nonFinalAnalysisKeepsAiExplanationSeparateFromFinalPlan() {
         String symbol = "BNBUSDT";
         AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
@@ -225,11 +225,14 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         verifyNoInteractions(decisionChainAiOrchestratorService);
 
         assertThat(home.getAssets()).isEmpty();
-        assertThat(home.getSelectedSymbol()).isNull();
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
-        assertThat(home.getAiDecision().getSchemaVersion()).isNull();
+        assertThat(home.getSelectedSymbol()).isEqualTo(symbol);
+        assertThat(home.getSelectedContextState()).isEqualTo("EXITED_TOP6");
+        assertThat(home.getSelectedAssetContext()).isNotNull();
+        assertThat(home.getSelectedAssetContext().getRawSymbol()).isEqualTo(symbol);
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
+        assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v2");
         assertThat(home.getAiDecision().getTabs()).allSatisfy(tab ->
-                assertThat(tab.getResultAvailable()).isFalse());
+                assertThat(tab.getResultAvailable()).isTrue());
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tm_user_position", Integer.class)).isZero();
         assertThat(home.getSafety().getNotAutoTrading()).isTrue();
         assertThat(home.getSafety().getNotOrderExecution()).isTrue();
@@ -277,7 +280,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getNotUserPositionCreation()).isTrue();
 
         DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -310,7 +313,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getInvalidCondition()).isNull();
 
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -349,7 +352,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getRuleVetoReason()).contains("ANALYSIS_TIMEFRAME_UNSUPPORTED");
 
         DashboardHomeVO home = dashboardHomeService.getHome("ADAUSDT", 6);
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("UNSUPPORTED_TIMEFRAME");
         assertThat(home.getExecutionSuggestion().getValidPeriod()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();

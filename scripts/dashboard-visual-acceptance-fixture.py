@@ -18,18 +18,32 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "src/main/resources/templates/dashboard.html"
 MOBILE_TEMPLATE = ROOT / "src/main/resources/templates/dashboard-mobile.html"
+ANALYSIS_TEMPLATE = ROOT / "src/main/resources/templates/analysis-detail.html"
 FRONTEND_CONTRACT = ROOT / "src/main/resources/static/js/frontend-contract.js"
+LATEST_DESKTOP_STYLE = ROOT / "src/main/resources/static/css/dashboard-latest.css"
 MOBILE_SCRIPT = ROOT / "src/main/resources/static/js/dashboard-mobile.js"
 MOBILE_STYLE = ROOT / "src/main/resources/static/css/dashboard-mobile.css"
+ANALYSIS_SCRIPT = ROOT / "src/main/resources/static/js/analysis-detail.js"
+ANALYSIS_STYLE = ROOT / "src/main/resources/static/css/analysis-detail.css"
 ALERT_EXPLAIN = ROOT / "src/main/resources/static/js/alert-explain.js"
 SCENARIOS = {
     "normal",
+    "unselected",
+    "waiting-analysis",
+    "plan-confirmation",
+    "plan-preparation",
+    "plan-reduced",
+    "plan-observation",
+    "plan-blocked-final",
+    "final-ai-unavailable",
+    "loading",
     "partial",
     "empty",
     "missing",
     "retry",
     "asset-switch-failure",
     "exact-plan",
+    "candidate-only",
     "top3-independent",
     "low-quality",
     "data-quality-60",
@@ -45,11 +59,15 @@ SCENARIOS = {
     "plan-partial",
     "plan-missing",
     "position-monitored",
+    "position-empty",
     "position-waiting",
     "position-high-stable",
     "position-risk-escalated",
     "position-stale",
     "multi-position",
+    "pool-empty",
+    "pool-no-opportunities",
+    "ranking-unavailable",
     "placeholder",
     "home-failure",
     "detail-late",
@@ -60,6 +78,13 @@ REQUEST_LOCK = threading.Lock()
 SCENARIO_LOCK = threading.Lock()
 ACTIVE_SCENARIO = "normal"
 HOME_REQUEST_COUNTS: dict[str, int] = {}
+ALLOW_CONTROLLED_WRITES = False
+POOL_LOCK = threading.Lock()
+DEFAULT_POOL_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT",
+    "AAVEUSDT", "LINKUSDT", "TAOUSDT", "SUIUSDT",
+]
+ACTIVE_POOL_SYMBOLS = list(DEFAULT_POOL_SYMBOLS)
 
 
 def status_card(value: object, helper: str, status: str = "OK") -> dict[str, object]:
@@ -81,6 +106,16 @@ def asset(
     conclusion: str,
     price: str,
 ) -> dict[str, object]:
+    plan_modes = {
+        "OBSERVING": "OBSERVATION",
+        "CANDIDATE": "PREPARATION",
+        "WAITING_TRIGGER": "PREPARATION",
+        "TRIGGERED": "CONFIRMATION",
+        "HIGH_RISK": "REDUCED",
+        "INVALIDATED": "BLOCKED",
+        "COOLING": "OBSERVATION",
+        "CONFUSED": "BLOCKED",
+    }
     return {
         "slot": slot,
         "slotType": "ANALYZED",
@@ -89,6 +124,11 @@ def asset(
         "analysisId": f"analysis-{symbol.removesuffix('USDT').lower()}-asset",
         "assetState": state,
         "assetStateLabel": state_label,
+        "opportunityState": state.lower(),
+        "opportunityScore": 94 - slot * 3,
+        "priorityRank": slot,
+        "planMode": plan_modes.get(state, "OBSERVATION"),
+        "rankingReason": "资产池全量机会排序 · 分数/置信度/风险/计划模式/数据质量",
         "marketBias": bias,
         "marketBiasLabel": bias_label,
         "confidenceLevel": confidence,
@@ -101,6 +141,7 @@ def asset(
         "currentConclusion": conclusion,
         "sourceProvider": "离线视觉验收 fixture",
         "dataFreshness": "FRESH",
+        "timeframeFreshness": {"5m": "FRESH"},
         "dataQuality": "GOOD",
         "multiTimeframeState": "CONFLICTED" if state == "CONFUSED" else "ALIGNED",
         "confused": state == "CONFUSED",
@@ -129,95 +170,191 @@ def assets_fixture() -> list[dict[str, object]]:
         asset(1, "BTCUSDT", "OBSERVING", "观察", "BULLISH", "偏多", "HIGH", "高", "LOW", "低", False,
               "结构仍在观察，等待规则条件进一步确认", "64218.40"),
         asset(2, "ETHUSDT", "CANDIDATE", "候选", "WEAK_BULLISH", "弱偏多", "MEDIUM", "中", "MEDIUM", "中", True,
-              "已进入候选，仍需人工复核关键边界", "3521.18"),
+              "已进入候选，等待关键边界确认", "3521.18"),
         asset(3, "SOLUSDT", "HIGH_RISK", "高风险观察", "WAIT", "观望", "LOW", "低", "HIGH", "高", False,
               "波动与流动性风险偏高，暂不形成执行建议", "148.72"),
-        asset(4, "BNBUSDT", "CONFUSED", "冲突状态", "RANGE", "震荡", "LOW", "低", "HIGH", "高", False,
-              "多周期证据冲突，等待结构重新收敛", "592.36"),
-        asset(5, "XRPUSDT", "COOLING", "冷却", "WEAK_BEARISH", "弱偏空", "MEDIUM", "中", "MEDIUM", "中", False,
-              "冷却窗口内仅保留观察，不形成新计划", "0.5218"),
-        asset(6, "DOGEUSDT", "INVALIDATED", "已失效", "BEARISH", "偏空", "LOW", "低", "HIGH", "高", False,
-              "原结构已经失效，等待重新分析", "0.1284"),
+        asset(4, "BNBUSDT", "WAITING_TRIGGER", "等待触发", "RANGE", "震荡", "LOW", "低", "MEDIUM", "中", False,
+              "机会已保留，等待触发条件满足", "592.36"),
+        asset(5, "XRPUSDT", "TRIGGERED", "条件已触发", "WEAK_BULLISH", "弱偏多", "MEDIUM", "中", "MEDIUM", "中", True,
+              "触发条件已满足，当前进入确认型计划", "0.5218"),
+        asset(6, "DOGEUSDT", "CANDIDATE", "候选", "WEAK_BEARISH", "弱偏空", "LOW", "低", "HIGH", "高", False,
+              "候选机会风险偏高，等待风险复核", "0.1284"),
     ]
 
 
-def ai_role(role: str, label: str) -> dict[str, object]:
-    if role == "GPT_FINAL":
-        return {
-            "role": role,
-            "roleLabel": label,
-            "runStatus": "SUCCESS",
-            "runStatusLabel": "复核成功",
-            "resultAvailable": True,
-            "stance": "SUPPORT",
-            "direction": "BULLISH",
-            "finalMarketBias": "BULLISH",
-            "finalConfidence": "MEDIUM",
-            "finalRiskLevel": "MEDIUM",
-            "finalPlanMode": "REVIEW_ONLY",
-            "worthOpening": "等待人工复核",
-            "finalConclusion": "规则方向可继续观察，但边界确认前不形成执行动作",
-            "decisionSummary": "规则方向与主要证据基本一致，保留人工复核",
-            "coreSupportingEvidence": ["多周期结构未破坏", "风险仍在可复核范围"],
-            "coreCounterEvidence": ["短周期波动仍偏高"],
-            "downgradeReason": "暂无降级原因",
-        }
-    if role == "GEMINI_REVIEW":
-        return {
-            "role": role,
-            "roleLabel": label,
-            "runStatus": "SUCCESS",
-            "runStatusLabel": "复核成功",
-            "resultAvailable": True,
-            "stance": "SUPPORT",
-            "reviewConclusion": "证据链基本一致",
-            "reviewVerdict": "保留人工复核",
-            "manualReviewRequired": "是",
-            "detectedContradictions": ["短周期动量略有分歧"],
-            "weakEvidence": ["外部上下文仅作辅助"],
-            "logicGaps": [],
-            "downgradeRecommendation": "暂不降级",
-            "riskAdjustmentSuggestion": "继续观察风险变化",
-        }
-    return {
+def ai_role(role: str, label: str, symbol: str = "BTCUSDT") -> dict[str, object]:
+    marker = symbol.removesuffix("USDT").lower() or symbol.lower()
+    analysis_id = f"analysis-{marker}-asset"
+    base = {
         "role": role,
         "roleLabel": label,
         "runStatus": "SUCCESS",
-        "runStatusLabel": "复核成功",
+        "runStatusLabel": "结构化结果可用",
         "resultAvailable": True,
-        "stance": "CHALLENGE",
-        "challengeThesis": "短周期流动性变化可能削弱当前结构",
-        "challengeConclusion": "尚未形成足以推翻规则方向的反证",
-        "eventRisks": ["突发事件可能放大波动"],
-        "sentimentReversalRisks": ["情绪快速反转"],
-        "microstructureTraps": ["短周期插针"],
-        "liquidityRisks": ["深度下降"],
-        "counterEvidence": ["成交延续性仍需确认"],
+        "roleState": "READY",
+        "dataState": "READY",
+        "analysisId": analysis_id,
+        "traceId": f"trace-{role.lower()}-{marker}",
+        "provider": "CONTROLLED_VISUAL_FIXTURE",
+        "sourceRole": role,
+        "generatedAt": "2026-07-13T12:00:00Z",
+        "reasonCodes": [],
+        "fallback": False,
+        "fallbackReason": None,
+    }
+    if role == "GPT_FINAL":
+        return base | {
+            "coreJudgment": {
+                "text": "规则方向与主要证据一致，候选计划进入人工复核",
+                "ruleBaseDirection": "BULLISH",
+                "marketBias": "BULLISH",
+                "opportunityState": "triggered",
+            },
+            "candidateSummary": {
+                "summary": "候选方向与主要证据一致，等待后续复核链处理",
+                "direction": "BULLISH",
+                "confidence": "HIGH",
+                "riskLevel": "MEDIUM",
+                "worthOpening": True,
+                "planMode": "CONFIRMATION",
+            },
+            "multiTimeframeExplanation": {
+                "4h": "主结构保持偏多",
+                "1h": "趋势与 4h 一致",
+                "15m": "等待回踩确认",
+                "5m": "触发条件已满足",
+            },
+            "biasAdjustment": {
+                "before": "BULLISH",
+                "after": "BULLISH",
+                "reason": "未发现足以推翻规则方向的证据",
+            },
+            "supportingEvidenceState": "FOUND",
+            "supportingEvidence": [{
+                "evidenceId": "ev-support-1",
+                "type": "STRUCTURE",
+                "source": "CONTROLLED_VISUAL_FIXTURE",
+                "currentValue": "多周期结构一致",
+                "change": "保持",
+                "direction": "BULLISH",
+                "strength": "HIGH",
+                "confidence": "HIGH",
+                "observedAt": "2026-07-13T11:59:00Z",
+                "freshness": "FRESH",
+                "analysisId": analysis_id,
+            }],
+            "opposingEvidenceState": "FOUND",
+            "opposingEvidence": [{
+                "evidenceId": "ev-oppose-1",
+                "type": "LIQUIDITY",
+                "source": "CONTROLLED_VISUAL_FIXTURE",
+                "currentValue": "短周期波动偏高",
+                "change": "上升",
+                "direction": "BEARISH",
+                "strength": "LOW",
+                "confidence": "MEDIUM",
+                "observedAt": "2026-07-13T11:58:00Z",
+                "freshness": "FRESH",
+                "analysisId": analysis_id,
+            }],
+        }
+    if role == "GEMINI_REVIEW":
+        return base | {
+            "reviewResult": "维持 Candidate，保留人工确认边界",
+            "finalDirectionImpact": "不改变 BULLISH",
+            "confidenceAdjustment": "HIGH → HIGH",
+            "riskAdjustment": "MEDIUM → MEDIUM",
+            "planModeAdjustment": "CONFIRMATION → CONFIRMATION",
+            "downgradeSuggestion": {
+                "before": "CONFIRMATION",
+                "after": "CONFIRMATION",
+                "reason": "证据链完整，无需降级",
+                "recoveryCondition": "不适用",
+            },
+            "recoveryCondition": "若短周期结构破坏则重新复核",
+            "evidenceGapsState": "NONE_FOUND",
+            "evidenceGaps": [],
+            "logicConflictsState": "FOUND",
+            "logicConflicts": [{
+                "findingId": "conflict-1",
+                "category": "TIMEFRAME",
+                "text": "短周期波动偏高但未破坏主结构",
+                "impact": "轻微分歧",
+                "source": "CONTROLLED_VISUAL_FIXTURE",
+                "observedAt": "2026-07-13T11:58:00Z",
+            }],
+            "underestimatedRisksState": "NONE_FOUND",
+            "underestimatedRisks": [],
+        }
+    return base | {
+        "challengeSummary": "检验短周期流动性收缩导致计划失效的路径",
+        "currentDirectionChallenge": "当前反证不足以推翻规则方向",
+        "majorCounterEvidence": "未发现重大反证",
+        "riskAdjustment": "维持 MEDIUM",
+        "planModeImpact": "维持 CONFIRMATION",
+        "failurePathState": "FOUND",
+        "failurePaths": [{
+            "failurePathId": "path-1",
+            "hypothesis": "流动性收缩破坏回踩结构",
+            "triggerCondition": "5m 深度持续下降",
+            "causalPath": "深度下降 → 滑点增加 → 入场边界失效",
+            "observationWindow": "30 分钟",
+            "validationIndicators": ["深度", "价差"],
+            "sourceRefs": ["ev-oppose-1"],
+            "invalidatingEvidence": "深度恢复且价差收敛",
+        }],
+        "opposingScenariosState": "FOUND",
+        "opposingScenarios": [{
+            "findingId": "scenario-1",
+            "category": "REVERSAL",
+            "text": "回踩后无法重新站回关键区间",
+            "impact": "计划降级",
+            "triggerCondition": "4h 结构破坏",
+        }],
+        "externalEventRisksState": "NONE_FOUND",
+        "externalEventRisks": [],
+        "microstructureRisksState": "FOUND",
+        "microstructureRisks": [{
+            "findingId": "micro-1",
+            "category": "LIQUIDITY",
+            "text": "短周期价差放大",
+            "impact": "提高入场风险",
+            "timeframe": "5m",
+        }],
+        "watchIndicatorsState": "FOUND",
+        "watchIndicators": [{
+            "findingId": "watch-1",
+            "category": "MONITOR",
+            "text": "持续观察盘口深度与成交延续",
+            "metric": "depth/spread",
+            "currentState": "可复核",
+        }],
     }
 
 
-def ai_decision_success() -> dict[str, object]:
+def ai_decision_success(symbol: str = "BTCUSDT") -> dict[str, object]:
     return {
         "schemaVersion": "AI_ROLE_RESULTS_SCHEMA_V1",
         "runStatus": "SUCCESS",
         "runStatusLabel": "正常",
         "decisionMode": "REVIEW_ONLY",
-        "decisionModeLabel": "仅供人工复核",
+        "decisionModeLabel": "解释链已完成",
         "activeTab": "GPT_FINAL",
         "tabs": [
-            ai_role("GPT_FINAL", "最终裁决官"),
-            ai_role("GEMINI_REVIEW", "冲突复核官"),
-            ai_role("GROK_CHALLENGE", "反方挑战官"),
+            ai_role("GPT_FINAL", "证据综合与候选形成", symbol),
+            ai_role("GEMINI_REVIEW", "证据与风险复核", symbol),
+            ai_role("GROK_CHALLENGE", "失败路径与压力测试", symbol),
         ],
         "consistency": {
-            "level": "LEVEL_2_LIGHT_DIVERGENCE",
-            "consistencyLevel": "轻微分歧",
-            "consistencyScore": 78,
-            "consistencySummary": "三角色结论大体一致，保留短周期风险复核",
+            "dataState": "READY",
+            "conflictLevel": "LEVEL_2_MINOR_DISAGREEMENT",
+            "finalMarketBias": "BULLISH",
+            "finalPlanMode": "CONFIRMATION",
+            "mainReason": "规则方向一致，短周期风险保留复核",
+            "recoveryCondition": "短周期结构恢复并保持数据新鲜",
             "confused": False,
             "aiApplicable": True,
             "directionalPushBlocked": False,
-            "downgradeReason": "暂无降级原因",
         },
     }
 
@@ -225,9 +362,9 @@ def ai_decision_success() -> dict[str, object]:
 def ai_decision_all_abstain() -> dict[str, object]:
     tabs = []
     for role, role_label in (
-        ("GPT_FINAL", "最终裁决官"),
-        ("GEMINI_REVIEW", "冲突复核官"),
-        ("GROK_CHALLENGE", "反方挑战官"),
+        ("GPT_FINAL", "证据综合与候选形成"),
+        ("GEMINI_REVIEW", "证据与风险复核"),
+        ("GROK_CHALLENGE", "失败路径与压力测试"),
     ):
         tabs.append({
             "role": role,
@@ -262,9 +399,9 @@ def ai_decision_all_abstain() -> dict[str, object]:
 def unavailable_ai(status: str, label: str, message: str, directional_blocked: bool = False) -> dict[str, object]:
     tabs = []
     for role, role_label in (
-        ("GPT_FINAL", "最终裁决官"),
-        ("GEMINI_REVIEW", "冲突复核官"),
-        ("GROK_CHALLENGE", "反方挑战官"),
+        ("GPT_FINAL", "证据综合与候选形成"),
+        ("GEMINI_REVIEW", "证据与风险复核"),
+        ("GROK_CHALLENGE", "失败路径与压力测试"),
     ):
         tabs.append({
             "role": role,
@@ -295,7 +432,6 @@ def unavailable_ai(status: str, label: str, message: str, directional_blocked: b
 
 def base_home(selected_symbol: str) -> dict[str, object]:
     assets = assets_fixture()
-    chosen = next((item for item in assets if item["rawSymbol"] == selected_symbol), assets[0])
     return {
         "header": {
             "pageTitle": "首页总览",
@@ -306,10 +442,10 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             "updatedAt": "2026-07-13T12:00:00",
         },
         "systemState": {
-            "marketTrend": status_card(chosen["marketBiasLabel"], "当前选择资产的规则方向"),
-            "riskLevel": status_card(chosen["riskLabel"], "当前风险分层"),
+            "marketTrend": status_card("震荡偏多", "系统级市场趋势，不随资产切换"),
+            "riskLevel": status_card("中", "系统级风险，不随资产切换"),
             "dataQuality": status_card("92", "确定性 fixture 数据完整"),
-            "aiConflict": status_card("轻微分歧", "三角色结果仅供人工复核"),
+            "aiConflict": status_card("轻微分歧", "三角色分析已完成"),
             "pendingReview": status_card("2", "待复核数量"),
             "confused": status_card("否", "未进入冲突阻断"),
             "hotReset": status_card("未触发", "当前无需热重置"),
@@ -334,7 +470,7 @@ def base_home(selected_symbol: str) -> dict[str, object]:
             "positionMode": False,
             "moduleState": "PARTIAL",
         },
-        "aiDecision": ai_decision_success(),
+        "aiDecision": ai_decision_success(selected_symbol),
         "pushInbox": {
             "telegramStatus": "NOT_CONNECTED",
             "hasOpenPosition": True,
@@ -366,6 +502,8 @@ def monitored_position(
         "positionId": position_id,
         "symbol": symbol,
         "direction": "LONG",
+        "sourceType": "SYSTEM_PLAN_POSITION",
+        "finalPlanId": f"final-plan-{position_id}",
         "entryPrice": "63000.00",
         "leverage": "2",
         "positionSize": "1",
@@ -385,6 +523,8 @@ def monitored_position(
         data_state = "RISK_ESCALATED" if risk_escalated else "OPEN_MONITORING"
         position.update({
             "markPrice": "64218.40",
+            "markPriceSource": "CONTROLLED_VISUAL_FIXTURE",
+            "markPriceObservedAt": "2026-07-13T11:58:00Z",
             "markPriceFresh": True,
             "pnlAmount": "1218.40",
             "pnlPercent": "1.93",
@@ -401,6 +541,8 @@ def monitored_position(
     else:
         position.update({
             "markPrice": None,
+            "markPriceSource": None,
+            "markPriceObservedAt": None,
             "markPriceFresh": False,
             "pnlAmount": None,
             "pnlPercent": None,
@@ -433,25 +575,111 @@ def asset_execution_suggestion(symbol: str) -> dict[str, object]:
     )
     return {
         "status": "USABLE_REVIEW_PLAN",
-        "statusLabel": "资产执行计划，仅供人工复核",
+        "statusLabel": "当前资产执行计划",
         "moduleState": "READY",
         "positionMode": False,
         "positionMonitor": None,
         "sourceAnalysisId": f"analysis-{marker.lower()}-asset",
-        "sourceExecutionPlanId": f"plan-{marker.lower()}-asset",
+        "sourceExecutionPlanId": f"final-plan-{marker.lower()}-asset",
         "sourceTraceId": f"trace-{marker.lower()}-asset",
+        "candidateId": f"candidate-{marker.lower()}-asset",
+        "resolverResultId": f"resolver-{marker.lower()}-asset",
+        "validationResultId": f"validation-{marker.lower()}-asset",
+        "finalPlan": True,
+        "validationStatus": "PASS",
+        "validationReasons": ["规则方向一致", "来源与风险边界完整"],
+        "chainStatus": "FINAL_VALIDATED",
+        "sourceStatus": "VALID",
+        "notTradeInstruction": True,
+        "finalMarketBias": "BULLISH",
+        "finalPlanMode": "CONFIRMATION",
         "direction": "BULLISH",
+        "worthOpening": True,
+        "opportunityType": "STRUCTURE_CONFIRMATION",
+        "recommendedAction": "按当前参与条件评估",
+        "entryLogic": "规则方向与多周期结构一致，等待回踩确认",
         "entryZone": entry_zone,
+        "triggerCondition": "5m 回踩区间后重新站稳",
+        "stopLogic": "关键结构失效后退出人工复核计划",
+        "stopZone": stop_loss,
         "stopLoss": stop_loss,
+        "targetLogic": "按结构目标分批跟踪",
+        "targetZones": take_profit,
         "takeProfitRules": take_profit,
+        "addCondition": "数据质量与结构继续确认后重新评估",
+        "reduceCondition": "风险趋势上升或反向证据增加",
+        "abandonCondition": invalid_condition,
+        "expectedRiskReward": risk_reward,
         "riskRewardRatio": risk_reward,
         "leverageSuggestion": "不高于 2 倍",
-        "positionSuggestion": "仅供人工复核",
+        "positionSuggestion": "不高于账户风险上限",
+        "analysisTimeframes": "4h / 1h / 15m / 5m",
+        "triggerTimeframe": "5m",
         "validFrom": "2026-07-13T12:00:00Z",
         "expiresAt": "2026-07-14T12:00:00Z",
         "validPeriod": "2026-07-13 12:00 至 2026-07-14 12:00",
+        "holdingHorizon": "短至中周期",
         "invalidCondition": invalid_condition,
+        "downgradeReason": None,
+        "ruleVetoReason": None,
     }
+
+
+def final_plan_mode_fixture(symbol: str, mode: str) -> dict[str, object]:
+    plan = asset_execution_suggestion(symbol)
+    plan["finalPlanMode"] = mode
+    plan["statusLabel"] = "当前资产执行计划"
+    if mode == "PREPARATION":
+        plan.update({
+            "missingTrigger": "5m 回踩确认尚未完成",
+            "upgradeCondition": "5m 回踩区间后重新站稳并保持数据新鲜",
+            "recommendedAction": "等待触发条件完成",
+        })
+    elif mode == "REDUCED":
+        plan.update({
+            "planModeBefore": "CONFIRMATION",
+            "downgradeReason": "短周期流动性风险与反向证据增加",
+            "riskReason": "盘口深度下降，价差扩大",
+            "recoveryCondition": "流动性恢复且短周期结构重新收敛",
+            "recommendedAction": "降低仓位与杠杆强度",
+            "leverageSuggestion": "不高于 1.5 倍",
+            "positionSuggestion": "不高于常规上限的 50%",
+        })
+    elif mode == "OBSERVATION":
+        plan.update({
+            "finalMarketBias": "WAIT",
+            "direction": "WAIT",
+            "observationReason": "主要证据尚未收敛，当前保留观察价值",
+            "watchIndicators": ["15m 结构收敛", "成交延续", "数据质量"],
+            "upgradeCondition": "多周期方向收敛并形成有效触发",
+            "recommendedAction": "继续观察关键指标",
+            "validPeriod": "未来 6 小时观察窗口",
+        })
+        for key in (
+            "entryLogic", "entryZone", "triggerCondition", "stopLogic", "stopZone",
+            "stopLoss", "targetLogic", "targetZones", "takeProfitRules",
+            "leverageSuggestion", "positionSuggestion", "expectedRiskReward",
+        ):
+            plan.pop(key, None)
+    elif mode == "BLOCKED":
+        plan.update({
+            "finalMarketBias": "WAIT",
+            "direction": "WAIT",
+            "blockedReason": "数据质量与规则状态阻止当前方向性参与",
+            "conflictSource": "多周期证据冲突",
+            "ruleVetoReason": "规则状态仍处于 confused",
+            "riskReason": "数据质量下降且反向证据增加",
+            "recoveryCondition": "数据质量恢复并解除多周期冲突",
+            "revalidationCondition": "重新扫描后完成冲突处理与规则校验",
+            "recommendedAction": "等待重新分析",
+        })
+        for key in (
+            "entryLogic", "entryZone", "triggerCondition", "stopLogic", "stopZone",
+            "stopLoss", "targetLogic", "targetZones", "takeProfitRules",
+            "leverageSuggestion", "positionSuggestion", "expectedRiskReward",
+        ):
+            plan.pop(key, None)
+    return plan
 
 
 def unavailable_asset_execution_suggestion(
@@ -596,7 +824,61 @@ def scenario_home(
     selected_asset = next((item for item in home["assets"] if item["rawSymbol"] == selected_symbol), home["assets"][0])
     home["executionSuggestion"] = asset_execution_suggestion(selected_symbol)
 
-    if scenario == "partial":
+    if scenario == "unselected":
+        home["selectedSymbol"] = ""
+        home["executionSuggestion"] = {
+            "status": "NO_COMPLETE_PLAN",
+            "statusLabel": "尚未选择资产",
+            "positionMode": False,
+            "moduleState": "EMPTY",
+        }
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "等待选择资产", "选择资产后查看分析解释"
+        )
+
+    elif scenario == "waiting-analysis":
+        home["executionSuggestion"] = unavailable_asset_execution_suggestion(
+            selected_symbol,
+            "GENERATING_EVIDENCE",
+            "正在生成证据",
+            "正在生成证据",
+        )
+        home["executionSuggestion"]["analysisStageLabel"] = "正在生成证据"
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "正在分析", "等待证据链完成"
+        )
+
+    elif scenario in {
+        "plan-confirmation", "plan-preparation", "plan-reduced",
+        "plan-observation", "plan-blocked-final",
+    }:
+        mode = {
+            "plan-confirmation": "CONFIRMATION",
+            "plan-preparation": "PREPARATION",
+            "plan-reduced": "REDUCED",
+            "plan-observation": "OBSERVATION",
+            "plan-blocked-final": "BLOCKED",
+        }[scenario]
+        home["executionSuggestion"] = final_plan_mode_fixture(selected_symbol, mode)
+        selected_asset.update({
+            "assetState": {
+                "CONFIRMATION": "TRIGGERED",
+                "PREPARATION": "WAITING_TRIGGER",
+                "REDUCED": "TRIGGERED",
+                "OBSERVATION": "OBSERVING",
+                "BLOCKED": "CONFUSED",
+            }[mode],
+            "planMode": mode,
+        })
+        home["aiDecision"]["consistency"]["finalPlanMode"] = mode
+
+    elif scenario == "final-ai-unavailable":
+        home["executionSuggestion"] = final_plan_mode_fixture(selected_symbol, "CONFIRMATION")
+        home["aiDecision"] = unavailable_ai(
+            "UNAVAILABLE", "当前分析不可用", "AI解释暂不可用"
+        )
+
+    elif scenario == "partial":
         selected_asset.update({
             "compositeScore": 61,
             "confidenceLevel": "LOW",
@@ -616,6 +898,11 @@ def scenario_home(
             "当前暂无完整执行计划",
             "执行计划字段不完整",
         )
+        gpt_role = home["aiDecision"]["tabs"][0]
+        gpt_role["roleState"] = "PARTIAL"
+        gpt_role["supportingEvidenceState"] = "FOUND"
+        gpt_role["opposingEvidenceState"] = "SOURCE_UNAVAILABLE"
+        gpt_role["opposingEvidence"] = []
 
     elif scenario == "empty":
         home["assets"] = []
@@ -645,6 +932,16 @@ def scenario_home(
         marker = selected_symbol.removesuffix("USDT").lower() or selected_symbol.lower()
         home["executionSuggestion"]["sourceExecutionPlanId"] = f"plan-{marker}-exact"
         home["diagnostics"]["decoyLatestExecutionPlanId"] = f"plan-{marker}-latest"
+
+    elif scenario == "candidate-only":
+        home["executionSuggestion"].update({
+            "status": "CANDIDATE_ONLY",
+            "finalPlan": False,
+            "validationStatus": "PENDING",
+            "chainStatus": "CANDIDATE_ONLY",
+            "statusLabel": "等待规则校验",
+            "blockedReason": "候选计划已形成，正在等待规则校验",
+        })
 
     elif scenario in {"low-quality", "data-quality-60", "data-quality-69", "data-quality-70"}:
         score = {
@@ -725,6 +1022,11 @@ def scenario_home(
             "positionMonitor": None,
         }
 
+    elif scenario == "position-empty":
+        home["positions"] = []
+        home["pushInbox"]["hasOpenPosition"] = False
+        home["pushInbox"]["counts"]["positionRisk"] = 0
+
     elif scenario in {
         "position-monitored",
         "position-waiting",
@@ -777,6 +1079,23 @@ def scenario_home(
                 "POSITION_SELECTION_REQUIRED" if selected_position_id is None else "POSITION_NOT_FOUND"
             )
 
+    elif scenario in {"pool-empty", "pool-no-opportunities", "ranking-unavailable"}:
+        home["assets"] = []
+        home["positions"] = []
+        home["executionSuggestion"] = {
+            "status": "NO_COMPLETE_PLAN",
+            "statusLabel": "尚未形成最终计划",
+            "blockedReason": "当前没有可用于生成最终计划的重点机会",
+            "positionMode": False,
+            "moduleState": "MISSING",
+        }
+        home["aiDecision"] = unavailable_ai(
+            "NOT_CALLED", "未调用", "当前没有可供角色解释的重点机会"
+        )
+        home["_assetStateOverride"] = (
+            "ERROR" if scenario == "ranking-unavailable" else "EMPTY"
+        )
+
     elif scenario == "placeholder":
         home["assets"] = home["assets"][:-1]
 
@@ -826,6 +1145,212 @@ def detail_fixture(symbol: str) -> dict[str, object]:
     }
 
 
+def pool_items_fixture() -> list[dict[str, object]]:
+    with POOL_LOCK:
+        symbols = list(ACTIVE_POOL_SYMBOLS)
+    return [{
+        "assetId": index + 1,
+        "symbol": symbol,
+        "displayName": symbol.removesuffix("USDT"),
+        "watchStatus": "OBSERVING",
+        "focusEnabled": True,
+        "source": "CONTROLLED_VISUAL_FIXTURE",
+    } for index, symbol in enumerate(symbols)]
+
+
+def market_search_fixture(query: str, limit: int) -> list[dict[str, object]]:
+    market = list(dict.fromkeys(DEFAULT_POOL_SYMBOLS + [
+        "ARBUSDT", "OPUSDT", "NEARUSDT", "AVAXUSDT", "UNIUSDT", "ATOMUSDT",
+    ]))
+    needle = query.replace("/", "").replace("-", "").upper()
+    rows = [symbol for symbol in market if needle in symbol]
+    return [{
+        "symbol": symbol,
+        "baseAsset": symbol.removesuffix("USDT"),
+        "quoteAsset": "USDT",
+        "source": "CONTROLLED_VISUAL_FIXTURE",
+    } for symbol in rows[:max(1, limit)]]
+
+
+def analysis_preview_fixture(symbol: str) -> dict[str, object]:
+    analysis_id = f"preview-analysis-{symbol.lower()}"
+    roles = {
+        role: ai_role(role, label)
+        for role, label in (
+            ("GPT_FINAL", "证据综合与候选形成"),
+            ("GEMINI_REVIEW", "证据与风险复核"),
+            ("GROK_CHALLENGE", "失败路径与压力测试"),
+        )
+    }
+
+
+def analysis_aggregate_fixture(analysis_id: str, symbol: str) -> dict[str, object]:
+    return {
+        "run": {
+            "analysisId": analysis_id,
+            "symbol": symbol,
+            "status": "SUCCESS",
+        },
+        "decision": {
+            "marketBiasHierarchy": "BULLISH",
+            "confidenceLevel": "HIGH",
+            "conclusionSummary": "规则方向与多源证据一致，等待用户人工复核 Final Plan",
+            "multiTfConvergence": "ALIGNED",
+        },
+        "marketEnvironment": {
+            "environmentType": "TREND",
+            "riskMode": "NORMAL",
+        },
+    }
+
+
+def analysis_audit_fixture(analysis_id: str, symbol: str) -> dict[str, object]:
+    roles = {
+        role: ai_role(role, label)
+        for role, label in (
+            ("GPT_FINAL", "证据综合与候选形成"),
+            ("GEMINI_REVIEW", "证据与风险复核"),
+            ("GROK_CHALLENGE", "失败路径与压力测试"),
+        )
+    }
+    for role, payload in roles.items():
+        payload["analysisId"] = analysis_id
+        payload["traceId"] = f"trace-{role.lower()}-{analysis_id}"
+        for evidence_key in ("supportingEvidence", "opposingEvidence"):
+            for evidence in payload.get(evidence_key, []):
+                evidence["analysisId"] = analysis_id
+    evidence = [{
+        "evidenceId": "ev-detail-1",
+        "evidenceType": "STRUCTURE",
+        "description": "4h 与 1h 主结构保持一致",
+        "direction": "BULLISH",
+        "currentValue": "ALIGNED",
+        "changeFromBaseline": "STABLE",
+        "strength": 86,
+        "confidence": 84,
+        "source": "MULTI_TIMEFRAME_ANALYSIS",
+        "sourceProvider": "CONTROLLED_VISUAL_FIXTURE",
+        "sourceReference": "fixture://analysis/evidence/ev-detail-1",
+        "observedAt": "2026-07-13T11:59:00Z",
+        "freshness": "FRESH",
+    }, {
+        "evidenceId": "ev-detail-2",
+        "evidenceType": "LIQUIDITY",
+        "description": "短周期价差仍需持续复核",
+        "direction": "BEARISH",
+        "currentValue": "ELEVATED",
+        "changeFromBaseline": "INCREASED",
+        "strength": 38,
+        "confidence": 72,
+        "source": "MICROSTRUCTURE_ANALYSIS",
+        "sourceProvider": "CONTROLLED_VISUAL_FIXTURE",
+        "sourceReference": "fixture://analysis/evidence/ev-detail-2",
+        "observedAt": "2026-07-13T11:58:00Z",
+        "freshness": "FRESH",
+    }]
+    score_names = [
+        "趋势结构分", "资金推动分", "杠杆风险分", "流动性质量分",
+        "情绪温度分", "事件冲击分", "宏观环境分", "综合可信度分",
+    ]
+    scores = [{"scoreType": name, "scoreValue": 88 - index * 2}
+              for index, name in enumerate(score_names)]
+    stages = [
+        (1, "Analysis Run", "AnalysisRun", analysis_id),
+        (2, "Evidence + Score", "EvidenceItem / ScoreItem", "ev-detail-1"),
+        (3, "Decision Bundle", "DecisionBundle", f"decision-{analysis_id}"),
+        (4, "GPT Candidate", "ExecutionPlanCandidate", f"candidate-{analysis_id}"),
+        (5, "Gemini Review", "ReviewResult", roles["GEMINI_REVIEW"]["traceId"]),
+        (6, "Grok Challenge", "ChallengeResult", roles["GROK_CHALLENGE"]["traceId"]),
+        (7, "Conflict Resolver", "ConflictResolverResult", f"resolver-{analysis_id}"),
+        (8, "Rule Validation", "RuleValidationResult", f"validation-{analysis_id}"),
+        (9, "Final Execution Plan", "FinalExecutionPlan", f"final-{analysis_id}"),
+    ]
+    return {
+        "analysis": {"analysisId": analysis_id, "symbol": symbol, "status": "SUCCESS"},
+        "decisionBundle": {
+            "marketBiasHierarchy": "BULLISH",
+            "confidenceLevel": "HIGH",
+            "conclusionSummary": "规则方向与证据链一致",
+            "multiTfConvergence": "ALIGNED",
+            "aiRoleResults": {"roles": roles},
+        },
+        "evidence": evidence,
+        "scores": scores,
+        "aiTraces": [{
+            "analysisId": analysis_id,
+            "traceId": payload["traceId"],
+            "role": role,
+            "status": "SUCCESS",
+            "observedAt": "2026-07-13T12:00:00Z",
+            "fallback": False,
+        } for role, payload in roles.items()],
+        "orderedStages": [{
+            "order": order,
+            "stage": stage,
+            "owner": owner,
+            "status": "PASS",
+            "referenceId": reference,
+        } for order, stage, owner, reference in stages],
+        "conflictResolver": {
+            "conflictLevel": "LEVEL_2_MINOR_DISAGREEMENT",
+            "conflictScore": 24,
+            "biasBefore": "BULLISH",
+            "biasAfter": "BULLISH",
+            "planModeBefore": "CONFIRMATION",
+            "planModeAfter": "CONFIRMATION",
+            "confidenceBefore": "HIGH",
+            "confidenceAfter": "HIGH",
+            "riskBefore": "MEDIUM",
+            "riskAfter": "MEDIUM",
+            "downgradeReason": None,
+            "recoveryCondition": "短周期结构保持且数据继续新鲜",
+            "confusedDecision": False,
+            "ruleVetoReason": None,
+        },
+        "ruleValidation": {
+            "validationResultId": f"validation-{analysis_id}",
+            "status": "PASS",
+            "reasons": ["规则方向一致", "来源门禁完整"],
+            "vetoReason": None,
+            "chainStatus": "FINAL_VALIDATED",
+            "sourceGateStatus": "VALID",
+            "sourceGateComplete": True,
+            "finalPlan": True,
+        },
+        "finalExecutionPlan": {
+            "planId": f"final-{analysis_id}",
+            "analysisId": analysis_id,
+            "candidateId": f"candidate-{analysis_id}",
+            "resolverResultId": f"resolver-{analysis_id}",
+            "validationResultId": f"validation-{analysis_id}",
+            "sourceStatus": "VALID",
+            "finalPlan": True,
+            "notTradeInstruction": True,
+        },
+        "candidateFinalIsolated": True,
+    }
+    for role, payload in roles.items():
+        payload["analysisId"] = analysis_id
+        payload["traceId"] = f"preview-trace-{role.lower()}-{symbol.lower()}"
+        for evidence_key in ("supportingEvidence", "opposingEvidence"):
+            for evidence in payload.get(evidence_key, []):
+                evidence["analysisId"] = analysis_id
+    return {
+        "symbol": symbol,
+        "previewOnly": True,
+        "poolMutationPerformed": False,
+        "opportunityPersisted": False,
+        "candidatePersisted": False,
+        "finalPlanPersisted": False,
+        "analysis": {
+            "analysisId": analysis_id,
+            "decisionBundle": {
+                "aiRoleResults": {"roles": roles},
+            },
+        },
+    }
+
+
 def render_static_fixture(scenario: str, output: Path) -> None:
     """Build a self-contained fixture for browser environments that cannot bind localhost."""
     home_payload = {"code": 200, "msg": "success", "data": scenario_home(scenario, "BTCUSDT")}
@@ -862,6 +1387,10 @@ def render_static_fixture(scenario: str, output: Path) -> None:
     html = html.replace(
         '<script src="/js/alert-explain.js"></script>',
         "<script>" + ALERT_EXPLAIN.read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<link rel="stylesheet" th:href="@{/css/dashboard-latest.css}" href="/css/dashboard-latest.css">',
+        "<style>" + LATEST_DESKTOP_STYLE.read_text(encoding="utf-8") + "</style>",
     )
     html = html.replace("</head>", interceptor + "\n</head>", 1)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -900,6 +1429,19 @@ class FixtureHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _read_json(self) -> dict[str, object]:
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length <= 0:
+            return {}
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            return payload if isinstance(payload, dict) else {}
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return {}
 
     def _javascript(self, path: Path) -> None:
         body = path.read_bytes()
@@ -969,6 +1511,16 @@ window.addEventListener("load", function () {{
             self.wfile.write(html)
             return
 
+        if parsed.path == "/dashboard/analysis-detail":
+            html = ANALYSIS_TEMPLATE.read_bytes()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(html)
+            return
+
         if parsed.path == "/js/frontend-contract.js":
             self._javascript(FRONTEND_CONTRACT)
             return
@@ -977,8 +1529,20 @@ window.addEventListener("load", function () {{
             self._javascript(MOBILE_SCRIPT)
             return
 
+        if parsed.path == "/js/analysis-detail.js":
+            self._javascript(ANALYSIS_SCRIPT)
+            return
+
         if parsed.path == "/css/dashboard-mobile.css":
             self._stylesheet(MOBILE_STYLE)
+            return
+
+        if parsed.path == "/css/dashboard-latest.css":
+            self._stylesheet(LATEST_DESKTOP_STYLE)
+            return
+
+        if parsed.path == "/css/analysis-detail.css":
+            self._stylesheet(ANALYSIS_STYLE)
             return
 
         if parsed.path == "/js/alert-explain.js":
@@ -1008,6 +1572,8 @@ window.addEventListener("load", function () {{
 
         if parsed.path == "/api/dashboard/home":
             scenario = self._scenario()
+            if scenario == "loading":
+                time.sleep(2.5)
             if scenario in {"home-failure", "retry"}:
                 with SCENARIO_LOCK:
                     home_request_count = HOME_REQUEST_COUNTS.get(scenario, 0)
@@ -1021,7 +1587,7 @@ window.addEventListener("load", function () {{
                 self._json({"code": 503, "msg": "fixture asset switch failure", "data": None}, HTTPStatus.SERVICE_UNAVAILABLE)
                 return
             home_scenario = "normal" if scenario in {
-                "detail-late", "home-failure", "retry", "asset-switch-failure",
+                "loading", "detail-late", "home-failure", "retry", "asset-switch-failure",
                 "top3-independent"
             } else scenario
             raw_position_id = query.get("positionId", [None])[0]
@@ -1051,6 +1617,41 @@ window.addEventListener("load", function () {{
             self._json({"systemHealth": {"status": "离线视觉验收"}, "decisions": []})
             return
 
+        aggregate_prefix = "/api/review/aggregate/"
+        if parsed.path.startswith(aggregate_prefix):
+            analysis_id = parsed.path[len(aggregate_prefix):]
+            symbol = query.get("symbol", ["BTCUSDT"])[0].upper()
+            self._json({
+                "code": 200,
+                "msg": "success",
+                "data": analysis_aggregate_fixture(analysis_id, symbol),
+            })
+            return
+
+        if parsed.path == "/api/ai/audit-chain":
+            analysis_id = query.get("analysisId", ["analysis-btc-asset"])[0]
+            self._json({
+                "code": 200,
+                "msg": "success",
+                "data": analysis_audit_fixture(analysis_id, "BTCUSDT"),
+            })
+            return
+
+        if parsed.path == "/api/asset-pool/search":
+            raw_limit = query.get("limit", ["12"])[0]
+            try:
+                limit = int(raw_limit)
+            except ValueError:
+                limit = 12
+            rows = market_search_fixture(query.get("query", [""])[0], limit)
+            self._json({"code": 200, "msg": "success", "data": rows})
+            return
+
+        if parsed.path == "/api/asset-pool":
+            data = [] if self._scenario() == "pool-empty" else pool_items_fixture()
+            self._json({"code": 200, "msg": "success", "data": data})
+            return
+
         if parsed.path == "/favicon.ico":
             self._empty(HTTPStatus.NO_CONTENT)
             return
@@ -1070,25 +1671,114 @@ window.addEventListener("load", function () {{
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         self._record(parsed)
+        query = parse_qs(parsed.query)
+
+        preview_prefix = "/api/asset-pool/search/"
+        preview_suffix = "/analysis-preview"
+        if parsed.path.startswith(preview_prefix) and parsed.path.endswith(preview_suffix):
+            symbol = parsed.path[len(preview_prefix):-len(preview_suffix)].upper()
+            self._json({"code": 200, "msg": "success", "data": analysis_preview_fixture(symbol)})
+            return
+
+        if not ALLOW_CONTROLLED_WRITES:
+            self._json(
+                {"success": False, "message": "视觉验收 fixture 拒绝所有持久化写请求"},
+                HTTPStatus.METHOD_NOT_ALLOWED,
+            )
+            return
+
+        payload = self._read_json()
+        if parsed.path == "/api/asset-pool":
+            symbols = [str(payload.get("symbol") or "").upper()]
+        elif parsed.path == "/api/asset-pool/batch-add":
+            symbols = [str(value).upper() for value in payload.get("symbols", [])]
+        else:
+            symbols = []
+        if symbols:
+            with POOL_LOCK:
+                for symbol in symbols:
+                    if symbol and symbol not in ACTIVE_POOL_SYMBOLS:
+                        ACTIVE_POOL_SYMBOLS.append(symbol)
+            self._json({"code": 200, "msg": "success", "data": pool_items_fixture()})
+            return
+
+        if parsed.path == "/api/asset-pool/batch-remove":
+            removals = {str(value).upper() for value in payload.get("symbols", [])}
+            with POOL_LOCK:
+                ACTIVE_POOL_SYMBOLS[:] = [value for value in ACTIVE_POOL_SYMBOLS if value not in removals]
+            self._json({"code": 200, "msg": "success", "data": pool_items_fixture()})
+            return
+
+        if parsed.path == "/api/asset-pool/restore-default":
+            with POOL_LOCK:
+                ACTIVE_POOL_SYMBOLS[:] = DEFAULT_POOL_SYMBOLS
+            self._json({"code": 200, "msg": "success", "data": pool_items_fixture()})
+            return
+
+        if parsed.path in {"/api/asset-pool/scan", "/api/asset-pool/batch-scan"}:
+            selected = payload.get("symbols") if parsed.path.endswith("batch-scan") else None
+            symbols = [str(value).upper() for value in selected] if isinstance(selected, list) else [
+                item["symbol"] for item in pool_items_fixture()
+            ]
+            results = [{
+                "symbol": symbol,
+                "status": "SUCCESS",
+                "analysisId": f"analysis-{symbol.lower()}-scan",
+                "timeframe": query.get("timeframe", ["5m"])[0],
+            } for symbol in symbols]
+            self._json({"code": 200, "msg": "success", "data": results})
+            return
+
         self._json(
-            {"success": False, "message": "视觉验收 fixture 拒绝所有写请求"},
-            HTTPStatus.METHOD_NOT_ALLOWED,
+            {"code": 404, "msg": "controlled fixture endpoint not found", "data": None},
+            HTTPStatus.NOT_FOUND,
         )
+
+    def do_DELETE(self) -> None:
+        parsed = urlparse(self.path)
+        self._record(parsed)
+        if not ALLOW_CONTROLLED_WRITES:
+            self._json(
+                {"success": False, "message": "视觉验收 fixture 拒绝所有持久化写请求"},
+                HTTPStatus.METHOD_NOT_ALLOWED,
+            )
+            return
+        prefix = "/api/asset-pool/"
+        if parsed.path.startswith(prefix):
+            symbol = parsed.path[len(prefix):].upper()
+            with POOL_LOCK:
+                ACTIVE_POOL_SYMBOLS[:] = [value for value in ACTIVE_POOL_SYMBOLS if value != symbol]
+            self._json({"code": 200, "msg": "success", "data": pool_items_fixture()})
+            return
+        self._json({"code": 404, "msg": "not found", "data": None}, HTTPStatus.NOT_FOUND)
 
 
 def main() -> None:
+    global ALLOW_CONTROLLED_WRITES
     parser = argparse.ArgumentParser(description="Offline Dashboard visual acceptance fixture server")
     parser.add_argument("--port", type=int, default=18081)
     parser.add_argument("--scenario", choices=sorted(SCENARIOS), default="normal")
     parser.add_argument("--static-output", type=Path)
+    parser.add_argument(
+        "--interactive-writes",
+        action="store_true",
+        help="Enable deterministic in-memory Asset Pool mutations for browser interaction acceptance.",
+    )
     args = parser.parse_args()
     if args.static_output:
         render_static_fixture(args.scenario, args.static_output)
         return
+    ALLOW_CONTROLLED_WRITES = args.interactive_writes
+    with POOL_LOCK:
+        ACTIVE_POOL_SYMBOLS[:] = DEFAULT_POOL_SYMBOLS
     server = ThreadingHTTPServer(("127.0.0.1", args.port), FixtureHandler)
     print(f"DASHBOARD_VISUAL_FIXTURE_URL: http://127.0.0.1:{args.port}/dashboard?scenario=normal", flush=True)
     print("DASHBOARD_VISUAL_FIXTURE_EXTERNAL_CALLS: 0", flush=True)
-    print("DASHBOARD_VISUAL_FIXTURE_WRITES: REJECTED", flush=True)
+    print(
+        "DASHBOARD_VISUAL_FIXTURE_WRITES: CONTROLLED_IN_MEMORY"
+        if ALLOW_CONTROLLED_WRITES else "DASHBOARD_VISUAL_FIXTURE_WRITES: REJECTED",
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

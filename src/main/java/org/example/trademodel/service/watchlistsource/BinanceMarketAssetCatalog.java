@@ -25,6 +25,20 @@ import java.util.Map;
 public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
     private static final URI EXCHANGE_INFO = URI.create("https://api.binance.com/api/v3/exchangeInfo");
     private static final Duration CACHE_TTL = Duration.ofMinutes(15);
+    private static final Map<String, List<String>> IDENTITY_ALIASES = Map.ofEntries(
+            Map.entry("BTC", List.of("BITCOIN", "XBT", "比特币")),
+            Map.entry("ETH", List.of("ETHEREUM", "ETHER", "以太坊")),
+            Map.entry("SOL", List.of("SOLANA")),
+            Map.entry("BNB", List.of("BINANCECOIN")),
+            Map.entry("XRP", List.of("RIPPLE")),
+            Map.entry("ADA", List.of("CARDANO")),
+            Map.entry("DOGE", List.of("DOGECOIN")),
+            Map.entry("LINK", List.of("CHAINLINK")),
+            Map.entry("AAVE", List.of("AAVE")),
+            Map.entry("TAO", List.of("BITTENSOR")),
+            Map.entry("SUI", List.of("SUI")),
+            Map.entry("ARB", List.of("ARBITRUM"))
+    );
 
     private final ObjectMapper objectMapper;
     private final ProviderSymbolMappingRegistry mappingRegistry;
@@ -50,9 +64,7 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
     public List<MarketAssetDTO> search(String query, int limit) {
         String normalized = normalizeLoose(query);
         return currentCatalog().stream()
-                .filter(asset -> normalized.isEmpty()
-                        || normalizeLoose(asset.symbol()).contains(normalized)
-                        || normalizeLoose(asset.baseAsset()).contains(normalized))
+                .filter(asset -> matchesIdentity(asset, normalized))
                 .sorted(Comparator.comparing(MarketAssetDTO::symbol))
                 .limit(Math.max(1, Math.min(100, limit)))
                 .toList();
@@ -146,6 +158,17 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog {
 
     private static String normalizeLoose(String value) {
         return normalizeSymbol(value);
+    }
+
+    private static boolean matchesIdentity(MarketAssetDTO asset, String normalizedQuery) {
+        if (normalizedQuery.isEmpty()
+                || normalizeLoose(asset.symbol()).contains(normalizedQuery)
+                || normalizeLoose(asset.baseAsset()).contains(normalizedQuery)) {
+            return true;
+        }
+        return IDENTITY_ALIASES.getOrDefault(asset.baseAsset().toUpperCase(Locale.ROOT), List.of()).stream()
+                .map(BinanceMarketAssetCatalog::normalizeLoose)
+                .anyMatch(alias -> alias.contains(normalizedQuery));
     }
 
     private record CatalogSnapshot(List<MarketAssetDTO> assets, Instant loadedAt) {

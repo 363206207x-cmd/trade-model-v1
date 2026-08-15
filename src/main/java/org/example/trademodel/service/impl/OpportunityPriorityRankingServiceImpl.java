@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorityRankingService {
@@ -72,10 +73,15 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
                 .findLatestDecisionResultsForSymbolsJoined(symbols, ownerType, ownerId));
         List<AssetStateDO> states = safe(assetStateMapper.listByOwnerAndSymbols(symbols, ownerType, ownerId));
 
-        return decisions.stream()
+        Map<String, List<HomeTopAssetProjection>> bySymbol = decisions.stream()
                 .filter(Objects::nonNull)
                 .map(decision -> projection(poolBySymbol, states, decision, LocalDateTime.now(clock)))
                 .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(HomeTopAssetProjection::symbol,
+                        LinkedHashMap::new, Collectors.toList()));
+
+        return bySymbol.values().stream()
+                .map(this::aggregateTimeframes)
                 .sorted(priorityOrder())
                 .limit(effectiveLimit)
                 .toList();
@@ -162,8 +168,53 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
                 analysisId,
                 opportunity.getOpportunityId(),
                 opportunityState,
+                opportunity.getOpportunityId(),
+                timeframe,
+                planMode,
+                0,
+                "ALIGNED",
                 analysisTime,
                 decision);
+    }
+
+    private HomeTopAssetProjection aggregateTimeframes(List<HomeTopAssetProjection> rows) {
+        List<HomeTopAssetProjection> ordered = safe(rows).stream()
+                .filter(Objects::nonNull)
+                .sorted(priorityOrder())
+                .toList();
+        HomeTopAssetProjection primary = ordered.get(0);
+        String conflictState = timeframeConflictState(ordered);
+        String reason = primary.rankingReason()
+                + "|PRIMARY_TIMEFRAME=" + value(primary.primaryTimeframe())
+                + "|SECONDARY_OPPORTUNITY_COUNT=" + Math.max(0, ordered.size() - 1)
+                + "|TIMEFRAME_CONFLICT_STATE=" + conflictState;
+        return new HomeTopAssetProjection(
+                primary.assetId(), primary.symbol(), primary.name(), primary.opportunityScore(),
+                primary.finalMarketBias(), primary.confidence(), primary.riskLevel(),
+                primary.finalPlanMode(), primary.aiDecisionResult(), primary.dataQuality(),
+                primary.freshness(), primary.freshnessAgeSeconds(), primary.stabilitySeconds(),
+                primary.priorityScore(), reason, primary.analysisId(), primary.opportunityId(),
+                primary.opportunityState(), primary.opportunityId(), primary.primaryTimeframe(),
+                primary.finalPlanMode(), Math.max(0, ordered.size() - 1), conflictState,
+                primary.analysisTime(), primary.sourceDecision());
+    }
+
+    private String timeframeConflictState(List<HomeTopAssetProjection> rows) {
+        boolean bullish = rows.stream().map(HomeTopAssetProjection::finalMarketBias)
+                .map(this::directionFamily).anyMatch("BULLISH"::equals);
+        boolean bearish = rows.stream().map(HomeTopAssetProjection::finalMarketBias)
+                .map(this::directionFamily).anyMatch("BEARISH"::equals);
+        if (bullish && bearish) return "OPPOSING";
+        long directionalFamilies = rows.stream().map(HomeTopAssetProjection::finalMarketBias)
+                .map(this::directionFamily).filter(value -> !"NEUTRAL".equals(value)).distinct().count();
+        return directionalFamilies == 1 ? "ALIGNED" : "MIXED_NEUTRAL";
+    }
+
+    private String directionFamily(String value) {
+        String normalized = upperOrEmpty(value);
+        if (normalized.endsWith("BULLISH")) return "BULLISH";
+        if (normalized.endsWith("BEARISH")) return "BEARISH";
+        return "NEUTRAL";
     }
 
     private static Comparator<HomeTopAssetProjection> priorityOrder() {

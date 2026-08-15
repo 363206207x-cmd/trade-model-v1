@@ -13,12 +13,12 @@ public interface AccountRiskSnapshotMapper {
     @Insert("INSERT INTO tm_account_risk_snapshot(analysis_id, symbol, owner_type, owner_id, account_risk_status, "
             + "risk_level_snapshot, risk_allowed, risk_reason_code, risk_reason_text, position_exposure, "
             + "max_allowed_exposure, candidate_leverage, max_allowed_leverage, gross_notional, leverage_risk, position_size_risk, concentration_risk, "
-            + "correlation_risk, drawdown_or_var_risk, aggregate_risk_score, source_status, observed_at, fresh_until, "
+            + "correlation_risk, drawdown_or_var_risk, aggregate_risk_score, source_status, account_risk_coverage_state, observed_at, fresh_until, "
             + "snapshot_source, snapshot_version, source_note, trace_id, create_time) "
             + "VALUES(#{analysisId}, #{symbol}, #{ownerType}, #{ownerId}, #{accountRiskStatus}, "
             + "#{riskLevelSnapshot}, #{riskAllowed}, #{riskReasonCode}, #{riskReasonText}, #{positionExposure}, "
             + "#{maxAllowedExposure}, #{candidateLeverage}, #{maxAllowedLeverage}, #{grossNotional}, #{leverageRisk}, #{positionSizeRisk}, #{concentrationRisk}, "
-            + "#{correlationRisk}, #{drawdownOrVarRisk}, #{aggregateRiskScore}, #{sourceStatus}, #{observedAt}, #{freshUntil}, "
+            + "#{correlationRisk}, #{drawdownOrVarRisk}, #{aggregateRiskScore}, #{sourceStatus}, #{accountRiskCoverageState}, #{observedAt}, #{freshUntil}, "
             + "#{snapshotSource}, #{snapshotVersion}, #{sourceNote}, #{traceId}, #{createTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(TmAccountRiskSnapshotDO row);

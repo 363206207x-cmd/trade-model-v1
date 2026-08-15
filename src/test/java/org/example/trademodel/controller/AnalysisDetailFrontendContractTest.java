@@ -17,7 +17,7 @@ class AnalysisDetailFrontendContractTest {
     private static final Path ASSET_SCRIPT = Path.of("src/main/resources/static/js/asset-detail.js");
 
     @Test
-    void pageMatchesTheFrozenFourModuleFigmaBaseline() throws Exception {
+    void pageMatchesTheFrozenDecisionChainDetailContract() throws Exception {
         String html = Files.readString(TEMPLATE);
 
         assertThat(html)
@@ -28,21 +28,27 @@ class AnalysisDetailFrontendContractTest {
                 .contains("证据与评分")
                 .contains("多周期摘要")
                 .contains("AI 分析状态")
+                .contains("决策责任链")
+                .contains("Conflict Resolver")
+                .contains("Rule Validation")
+                .contains("Final Plan 来源链")
                 .contains("当前权威分析")
-                .contains("只展示当前分析实际返回的 Top 3")
-                .contains("不创建“查看全部”假入口")
+                .contains("仅展示当前 analysisId 实际持久化证据")
+                .contains("八项评分逐项绑定；缺失不是 0")
                 .doesNotContain("class=\"sync-status\"")
                 .doesNotContain("class=\"run-meta\"")
                 .doesNotContain("data-analysis-field=\"analysisTime\"");
     }
 
     @Test
-    void exactAnalysisReadUsesOneExistingApiAndRejectsIdentityFallbacks() throws Exception {
+    void exactAnalysisReadAggregatesExistingReviewAndAuditApisWithoutIdentityFallbacks() throws Exception {
         String script = Files.readString(SCRIPT);
 
-        assertThat(count(script, "fetch(")).isEqualTo(1);
+        assertThat(count(script, "fetch(")).isEqualTo(2);
         assertThat(script)
                 .contains("\"/api/review/aggregate/\" + encodeURIComponent(analysisId)")
+                .contains("\"/api/ai/audit-chain?analysisId=\" + encodeURIComponent(analysisId)")
+                .contains("var responses = await Promise.all([")
                 .contains("String(run.analysisId || \"\") !== requestedAnalysisId")
                 .contains("normalizeSymbol(run.symbol) !== requestedSymbol")
                 .contains("\"ANALYSIS_ID_MISMATCH\"")
@@ -55,7 +61,6 @@ class AnalysisDetailFrontendContractTest {
                 .doesNotContain("/api/dashboard/detail")
                 .doesNotContain("/api/evidence")
                 .doesNotContain("/api/score")
-                .doesNotContain("/api/ai")
                 .doesNotContain("latestBySymbol")
                 .doesNotContain("localStorage");
     }
@@ -117,13 +122,15 @@ class AnalysisDetailFrontendContractTest {
                 .contains("renderMarketJudgment(null, null)")
                 .contains("renderEvidence([])")
                 .contains("renderScores([])")
-                .contains("renderTimeframes(null)")
-                .contains("renderAiStatus(null)")
+                .contains("renderTimeframes(null, {})")
+                .contains("renderAiStatus(audit || {}, roleContract(audit || {}))")
+                .contains("renderAuditChain(audit || {})")
+                .contains("renderFinalSource(audit || {})")
                 .contains("setPageStatus(\"分析处理中\", \"partial\")");
     }
 
     @Test
-    void evidenceAndScoresRenderOnlyReturnedTopThreeWithoutClientCompletion() throws Exception {
+    void evidenceAndScoresRenderAllPersistedValuesWithoutClientCompletion() throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
 
@@ -137,21 +144,25 @@ class AnalysisDetailFrontendContractTest {
                 .contains("data-score-type=\"事件冲击分\"")
                 .contains("data-score-type=\"宏观环境分\"")
                 .contains("data-score-type=\"综合可信度分\"")
-                .contains("完整证据、支持/反对关系、强度与置信度尚未提供")
-                .contains("评分不可用；不合成、不平均、不排序");
+                .contains("支持与反对证据均保留来源、观测时间和新鲜度")
+                .contains("评分不可用；不合成、不平均、不用默认值补齐");
         assertThat(script)
-                .contains("}).slice(0, 3)")
-                .contains("证据强度\", \"未提供\"")
-                .contains("置信度\", \"未提供\"")
-                .contains("缺失维度不是 0，不补齐八项")
+                .contains("function aggregateConfidenceScore(items)")
+                .contains("String(item.scoreType || \"\").trim() === \"综合可信度分\"")
+                .contains("item.scoreValue !== null && item.scoreValue !== undefined")
+                .contains("contract.displayNumber(aggregateScore) + \" / \"")
+                .contains("appendDefinition(fields, \"证据强度\", contract.displayNumber(item.strength))")
+                .contains("appendDefinition(fields, \"置信度\", contract.displayNumber(item.confidence))")
+                .contains("appendDefinition(fields, \"观测时间\", displayText(item.observedAt, \"当前不可查看\"))")
+                .contains("appendDefinition(fields, \"Freshness\", displayText(item.freshness, \"当前不可查看\"))")
+                .contains("缺失维度不是 0，不补齐")
+                .doesNotContain(".slice(0, 3)")
                 .doesNotContain(".reduce(")
-                .doesNotContain("evidence.direction === decision")
-                .doesNotContain("supportingEvidence")
-                .doesNotContain("opposingEvidence");
+                .doesNotContain("evidence.direction === decision");
     }
 
     @Test
-    void timeframeAndAiRemainBoundedToCurrentApiCoverage() throws Exception {
+    void timeframeAndThreeAiUseStructuredRoleAndCollectionStateContracts() throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
 
@@ -161,31 +172,34 @@ class AnalysisDetailFrontendContractTest {
                 .contains("data-timeframe=\"15M\">待同步")
                 .contains("data-timeframe=\"5M\">待同步")
                 .contains("5M 仅作为短期风险过滤，不作为主趋势方向")
-                .contains("GPT_FINAL / 最终裁决官")
-                .contains("GEMINI_REVIEW / 冲突复核官")
-                .contains("GROK_CHALLENGE / 反方挑战官")
+                .contains("证据综合与候选形成 <small>GPT_FINAL</small>")
+                .contains("证据与风险复核 <small>GEMINI_REVIEW</small>")
+                .contains("失败路径与压力测试 <small>GROK_CHALLENGE</small>")
                 .contains("不从其他 analysis 或当前首页补全")
                 .contains("不生成独立交易方向")
                 .contains("不补写外部事件或技术证据");
         assertThat(count(html, "data-role-tab=")).isEqualTo(3);
         assertThat(script)
                 .contains("var ROLE_ORDER = [\"GPT_FINAL\", \"GEMINI_REVIEW\", \"GROK_CHALLENGE\"]")
-                .contains("decision && decision.multiTfConvergence")
-                .contains("当前分析角色结果不可用")
+                .contains("var encoded = decision && decision.aiRoleResults")
+                .contains("role.roleState = contract.normalizeRoleState")
+                .contains("renderStructuredCollection(content, \"支持证据\", role.supportingEvidenceState")
+                .contains("renderStructuredCollection(content, \"Evidence Gaps\", role.evidenceGapsState")
+                .contains("renderStructuredCollection(content, \"Failure Paths\", role.failurePathState")
+                .contains("集合为空；以集合状态区分未发现、数据不足、来源不可用或过期")
                 .contains("ArrowLeft")
                 .contains("ArrowRight")
-                .doesNotContain("aiRoleResults")
                 .doesNotContain("winner")
                 .doesNotContain("vote");
     }
 
     @Test
-    void analysisDetailHasNoExecutionPositionOrTradingCapability() throws Exception {
+    void analysisDetailShowsValidatedFinalSourceWithoutPositionOrTradingCapability() throws Exception {
         String html = Files.readString(TEMPLATE);
         String script = Files.readString(SCRIPT);
 
         assertThat(html)
-                .doesNotContain("Execution Plan")
+                .contains("Final Plan 来源链")
                 .doesNotContain("User Position")
                 .doesNotContain("Position Monitoring")
                 .doesNotContain("买入")
@@ -196,6 +210,9 @@ class AnalysisDetailFrontendContractTest {
                 .doesNotContain("executionSuggestion")
                 .doesNotContain("userPosition")
                 .doesNotContain("positionMonitor")
+                .contains("plan.finalPlan === true")
+                .contains("validation.status === \"PASS\"")
+                .contains("plan.notTradeInstruction === true")
                 .doesNotContain("trade");
     }
 

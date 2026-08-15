@@ -82,6 +82,7 @@ public class DecisionChainAuditVO {
             String ruleVersion,
             Integer dataQualityScore,
             String status,
+            String analysisMode,
             Boolean preview,
             LocalDateTime analysisTime,
             LocalDateTime completedAt) { }

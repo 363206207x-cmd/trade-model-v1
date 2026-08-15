@@ -210,6 +210,38 @@ class OpportunityPriorityRankingServiceImplTest {
                 .containsExactly("AUSDT", "BUSDT");
     }
 
+    @Test
+    void sameAssetTimeframesAggregateWithoutSilentlyAveragingOpposingDirections() {
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(List.of("BTCUSDT")));
+        DecisionResultVO fiveMinute = decision("BTCUSDT", 94, "HIGH", "LOW", "CONFIRMATION",
+                "LEVEL_1_CONSISTENT", 95);
+        fiveMinute.setAnalysisId("analysis-BTC-5m");
+        fiveMinute.setTimeframe("5m");
+        fiveMinute.setFinalMarketBias("BULLISH");
+        DecisionResultVO oneHour = decision("BTCUSDT", 82, "MEDIUM", "MEDIUM", "PREPARATION",
+                "LEVEL_2_MINOR_DISAGREEMENT", 88);
+        oneHour.setAnalysisId("analysis-BTC-1h");
+        oneHour.setTimeframe("1h");
+        oneHour.setFinalMarketBias("BEARISH");
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(
+                anyList(), eq("USER"), eq(USER_ID))).thenReturn(List.of(fiveMinute, oneHour));
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(List.of(
+                        stateForTimeframe("BTCUSDT", "5m", "analysis-BTC-5m", "opportunity-BTC-5m", 94),
+                        stateForTimeframe("BTCUSDT", "1h", "analysis-BTC-1h", "opportunity-BTC-1h", 82)));
+
+        assertThat(service.rankForHome(USER_ID, 6)).singleElement().satisfies(asset -> {
+            assertThat(asset.primaryOpportunityId()).isEqualTo("opportunity-BTC-5m");
+            assertThat(asset.primaryTimeframe()).isEqualTo("5m");
+            assertThat(asset.primaryPlanMode()).isEqualTo("CONFIRMATION");
+            assertThat(asset.secondaryOpportunityCount()).isEqualTo(1);
+            assertThat(asset.timeframeConflictState()).isEqualTo("OPPOSING");
+            assertThat(asset.rankingReason()).contains(
+                    "PRIMARY_TIMEFRAME=5m", "SECONDARY_OPPORTUNITY_COUNT=1",
+                    "TIMEFRAME_CONFLICT_STATE=OPPOSING");
+        });
+    }
+
     private void assertWinner(DecisionResultVO first, DecisionResultVO second, String expected) {
         List<String> symbols = List.of(first.getSymbol(), second.getSymbol());
         when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(symbols));
@@ -293,6 +325,15 @@ class OpportunityPriorityRankingServiceImplTest {
         state.setOpportunityScore(score);
         state.setConfidence(confidence);
         state.setRisk(risk);
+        return state;
+    }
+
+    private static AssetStateDO stateForTimeframe(String symbol, String timeframe,
+                                                   String analysisId, String opportunityId, int score) {
+        AssetStateDO state = state(symbol, score, "HIGH", "LOW");
+        state.setTimeframe(timeframe);
+        state.setLastAnalysisId(analysisId);
+        state.setOpportunityId(opportunityId);
         return state;
     }
 }

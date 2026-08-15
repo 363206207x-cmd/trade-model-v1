@@ -19,6 +19,8 @@ public class WriteReviewResultReq {
     private String ruleAssessment;
     private String ruleFeedback;
     private String metricsJson;
+    private String missedReason;
+    private String laterOutcome;
 
     public String getAnalysisId() {
         return analysisId;
@@ -66,4 +68,8 @@ public class WriteReviewResultReq {
     public void setRuleFeedback(String ruleFeedback) { this.ruleFeedback = ruleFeedback; }
     public String getMetricsJson() { return metricsJson; }
     public void setMetricsJson(String metricsJson) { this.metricsJson = metricsJson; }
+    public String getMissedReason() { return missedReason; }
+    public void setMissedReason(String value) { this.missedReason = value; }
+    public String getLaterOutcome() { return laterOutcome; }
+    public void setLaterOutcome(String value) { this.laterOutcome = value; }
 }

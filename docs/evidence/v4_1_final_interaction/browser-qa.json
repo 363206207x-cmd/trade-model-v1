@@ -1,0 +1,96 @@
+{
+  "status": "PASS",
+  "browserStatus": "PASS",
+  "candidateStatus": "IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT",
+  "validatedAt": "2026-08-14T22:06:00+08:00",
+  "preSyncMainHead": "d8ff50e78dace96c292ea1429f42c6d5a6a631d0",
+  "preSyncPrHead": "62ba9702e54b268ef27158bcff7e33422e23015e",
+  "postSyncApplicationHead": "d3744e1707eef046355174ff3c95ca5634c9e948",
+  "canonicalFigmaFileKey": "rdMYmsAvZYkXHJX8hdl7UN",
+  "canonicalHomeNode": "573:20",
+  "runtimeUrl": "http://127.0.0.1:18081/dashboard",
+  "sourceHashes": {
+    "dashboardHtml": "1ad287ccd22a6bd53accd90f56e5079989f1397e735c0165aa7249d8dd09c125",
+    "dashboardLatestCss": "625c9fb07d051e595d56bd265bfab1ce5ec76bfc71d02ef21e7a1ce026ccba69",
+    "frontendContractJs": "45ac09ce6d2dc116f8f7e3b44afb6de2f9ded269df70d9e215ef7f0f873af5a5",
+    "visualFixture": "7bb2bcf8fed2761c2d40ae7d79d2e0084010476332886842eb3b877afc7c7785"
+  },
+  "counts": {
+    "routedPages": 14,
+    "overlays": 11,
+    "componentFamilies": 54,
+    "desktopAcceptanceStates": 81,
+    "visibleAiRoleCount": 1,
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "topLevelOverlap": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "unhandledRejections": 0,
+    "staleAssetContentCount": 0,
+    "rawEnumPrimaryDisplayCount": 0,
+    "fakeRuntimeValueCount": 0,
+    "visibleDisclaimerCopyCount": 0
+  },
+  "home": {
+    "positionExecutionWidthRatio": 1.5,
+    "topSixColumns": 3,
+    "topSixRows": 2,
+    "candidateVisibleAsFinal": false,
+    "systemStatusUnchanged": true,
+    "alertsAndEventsUnchanged": true,
+    "positionsUnchanged": true
+  },
+  "viewports": [
+    {"width": 1280, "height": 800, "documentWidth": 1280, "documentHeight": 1252, "positionWidth": 592, "executionWidth": 394, "horizontalOverflow": 0, "textOverflow": 0},
+    {"width": 1440, "height": 900, "documentWidth": 1440, "documentHeight": 1252, "positionWidth": 688, "executionWidth": 458, "horizontalOverflow": 0, "textOverflow": 0},
+    {"width": 1600, "height": 1000, "documentWidth": 1600, "documentHeight": 1252, "positionWidth": 784, "executionWidth": 522, "horizontalOverflow": 0, "textOverflow": 0},
+    {"width": 1728, "height": 1117, "documentWidth": 1728, "documentHeight": 1252, "positionWidth": 860, "executionWidth": 574, "horizontalOverflow": 0, "textOverflow": 0}
+  ],
+  "routeSweep": {
+    "routesChecked": 14,
+    "routeIds": ["R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08", "R09", "R10", "R11", "R12", "R13", "R14"],
+    "stableNavigation": true,
+    "whitelabelErrors": 0,
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "placeholderCount": 0
+  },
+  "interactionChecks": {
+    "singleAiWorkspace": true,
+    "threeRoleTabs": true,
+    "oneVisibleRole": true,
+    "nativeDialogCount": 11,
+    "runtimeOpenCloseFocusChecks": 8,
+    "dataDependentNoDataEntriesWithheld": 3,
+    "dialogFocusRestored": true,
+    "selectedAssetUrlPersistence": true
+  },
+  "evidenceBoundary": {
+    "authenticatedApplication": true,
+    "visualFixtureUsedAsRuntime": false,
+    "fakeMarketOrAiData": false,
+    "targetProviderEvidenceClaimed": false
+  },
+  "semanticMapperRuntimeRefresh": {
+    "validatedAt": "2026-08-15T01:54:37+08:00",
+    "runtimeScope": "AUTHENTICATED_LOCAL_BROWSER_CONTROLLED",
+    "runtimeUrl": "http://127.0.0.1:8082",
+    "frontendContractJs": "45ac09ce6d2dc116f8f7e3b44afb6de2f9ded269df70d9e215ef7f0f873af5a5",
+    "home": {
+      "primaryNavigationCount": 5,
+      "systemStatusCount": 6,
+      "visibleAiRoleCount": 1,
+      "horizontalOverflow": 0,
+      "rawEnumPrimaryDisplayCount": 0
+    },
+    "analysis": {
+      "scoreItemCount": 8,
+      "evidenceItemCount": 5,
+      "visibleAiRoleCount": 1,
+      "horizontalOverflow": 0,
+      "rawEnumPrimaryDisplayCount": 0
+    },
+    "boundary": "This refresh validates the updated shared semantic mapper and its authenticated Home/Analysis consumers. The original multi-route and multi-viewport evidence above remains the owning full visual sweep."
+  }
+}

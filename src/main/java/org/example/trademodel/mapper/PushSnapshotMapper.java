@@ -74,7 +74,7 @@ public interface PushSnapshotMapper {
      * - push_status 仅允许 CAPTURED / RECHECK_REVIEW_WAITING / 历史等待状态
      * - 未过期
      * - attempt 次数 < maxAttempts（基于 tm_push_recheck_log 行数）
-     * - 距离最近一次 recheck_time >= minRetryMinutes
+     * - 最近一次 recheck_time 不晚于由 Java 计算出的 cutoffAt
      */
     @Select("SELECT s.* FROM tm_push_snapshot s " +
             "LEFT JOIN ( " +
@@ -85,29 +85,16 @@ public interface PushSnapshotMapper {
             "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
             "AND (s.expires_at IS NULL OR s.expires_at > #{nowUtc}) " +
             "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
-            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= DATEADD('MINUTE', -#{minRetryMinutes}, #{nowUtc})) " +
+            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= #{cutoffAt}) " +
             "ORDER BY s.push_id ASC " +
             "LIMIT #{limit}")
-    @Select(value = "SELECT s.* FROM tm_push_snapshot s " +
-            "LEFT JOIN ( " +
-            "  SELECT push_id, COUNT(1) AS attempt_count, MAX(recheck_time) AS last_recheck_time " +
-            "  FROM tm_push_recheck_log " +
-            "  GROUP BY push_id " +
-            ") r ON r.push_id = s.push_id " +
-            "WHERE (s.push_status = #{statusA} OR s.push_status = #{statusB} OR s.push_status = #{statusC}) " +
-            "AND (s.expires_at IS NULL OR s.expires_at > #{nowUtc}) " +
-            "AND (r.attempt_count IS NULL OR r.attempt_count < #{maxAttempts}) " +
-            "AND (r.last_recheck_time IS NULL OR r.last_recheck_time <= #{nowUtc} - (#{minRetryMinutes} * INTERVAL '1 minute')) " +
-            "ORDER BY s.push_id ASC " +
-            "LIMIT #{limit}",
-            databaseId = "postgresql")
     List<TmPushSnapshotDO> listPendingRecheckNext(
             @Param("statusA") String statusA,
             @Param("statusB") String statusB,
             @Param("statusC") String statusC,
             @Param("maxAttempts") int maxAttempts,
-            @Param("minRetryMinutes") int minRetryMinutes,
             @Param("nowUtc") LocalDateTime nowUtc,
+            @Param("cutoffAt") LocalDateTime cutoffAt,
             @Param("limit") int limit);
 
     @Update("UPDATE tm_push_snapshot SET push_status = #{pushStatus} WHERE push_id = #{pushId}")

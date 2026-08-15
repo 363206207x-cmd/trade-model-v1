@@ -35,7 +35,13 @@ public interface AssetPoolService {
 
     void removeManyForUser(Long userId, List<String> symbols);
 
-    List<AssetPoolAssetDTO> restoreDefaults(Long userId);
+    List<AssetPoolAssetDTO> topUpDefaults(Long userId);
+
+    List<AssetPoolAssetDTO> resetDefaults(Long userId);
+
+    default List<AssetPoolAssetDTO> restoreDefaults(Long userId) {
+        return topUpDefaults(userId);
+    }
 
     boolean isOpportunitySource(String ownerType, Long ownerId, Long assetId, String symbol);
 

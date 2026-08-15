@@ -33,6 +33,7 @@ public class AnalysisRunDO {
     private Long ownerId;
     private Long assetId;
     private Boolean preview = false;
+    private String analysisMode = "OPPORTUNITY_DECISION";
 
     public String getAnalysisId() { return analysisId; }
     public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
@@ -94,4 +95,6 @@ public class AnalysisRunDO {
     public void setAssetId(Long assetId) { this.assetId = assetId; }
     public Boolean getPreview() { return preview; }
     public void setPreview(Boolean preview) { this.preview = preview; }
+    public String getAnalysisMode() { return analysisMode; }
+    public void setAnalysisMode(String analysisMode) { this.analysisMode = analysisMode; }
 }

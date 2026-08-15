@@ -95,6 +95,10 @@ public class ExecutionPlanDO {
     private String revalidationReason;
     private String hotResetEventId;
     private LocalDateTime revalidationRequiredAt;
+    private String planLifecycleState = "INVALIDATED";
+    private Integer planVersion = 1;
+    private String supersedesPlanId;
+    private String supersededByPlanId;
     private LocalDateTime createTime;
 
     public String getPlanId() { return planId; }
@@ -281,6 +285,14 @@ public class ExecutionPlanDO {
     public void setHotResetEventId(String hotResetEventId) { this.hotResetEventId = hotResetEventId; }
     public LocalDateTime getRevalidationRequiredAt() { return revalidationRequiredAt; }
     public void setRevalidationRequiredAt(LocalDateTime revalidationRequiredAt) { this.revalidationRequiredAt = revalidationRequiredAt; }
+    public String getPlanLifecycleState() { return planLifecycleState; }
+    public void setPlanLifecycleState(String value) { this.planLifecycleState = value; }
+    public Integer getPlanVersion() { return planVersion; }
+    public void setPlanVersion(Integer value) { this.planVersion = value; }
+    public String getSupersedesPlanId() { return supersedesPlanId; }
+    public void setSupersedesPlanId(String value) { this.supersedesPlanId = value; }
+    public String getSupersededByPlanId() { return supersededByPlanId; }
+    public void setSupersededByPlanId(String value) { this.supersededByPlanId = value; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

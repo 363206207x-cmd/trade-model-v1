@@ -26,6 +26,8 @@ public class ReviewStateVO {
     private String errorType;
     private String actualOutcome;
     private String adjustmentSuggestion;
+    private String missedReason;
+    private String laterOutcome;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
@@ -97,6 +99,11 @@ public class ReviewStateVO {
     public void setAdjustmentSuggestion(String adjustmentSuggestion) {
         this.adjustmentSuggestion = adjustmentSuggestion;
     }
+
+    public String getMissedReason() { return missedReason; }
+    public void setMissedReason(String value) { this.missedReason = value; }
+    public String getLaterOutcome() { return laterOutcome; }
+    public void setLaterOutcome(String value) { this.laterOutcome = value; }
 
     public LocalDateTime getCreateTime() {
         return createTime;

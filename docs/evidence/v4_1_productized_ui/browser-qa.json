@@ -1,0 +1,80 @@
+{
+  "capturedAt": "2026-08-13T20:30:00+08:00",
+  "branch": "codex/v4-1-frontend-runtime-alignment",
+  "pullRequest": 1179,
+  "startingHead": "3c485d40f9668f6835328bf8f917fde62d73ebc1",
+  "baseMain": "edc3615c03c9b71763c32574f1d811c1d9a8954d",
+  "sourceMode": "CONTROLLED_VISUAL_FIXTURE",
+  "runtimeSourceHashes": {
+    "dashboardHtml": "6c3ec2ecf8963c64c529dce46efb813dcaaf6e1f325887d4f2b6c5948ac9c2d1",
+    "dashboardLatestCss": "38f50270b4a1ae55cfa597148bc6474f7a176e64fafba660519c3ff867c4ce45",
+    "frontendContractJs": "19e26a013bcca2738527ccd6e2ac676b4d7d46144e2cd9327f2140b12f4b672b",
+    "visualFixture": "484958318b6dca0fd61c31aac968c7440f0a25798d4c6a17bdd116ce9f077a1e"
+  },
+  "externalCalls": 0,
+  "writesRejected": true,
+  "primaryViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "document": {
+    "width": 1440,
+    "height": 2329
+  },
+  "figmaNodes": [
+    "28:154",
+    "31:23",
+    "520:212",
+    "523:748",
+    "35:97",
+    "35:4",
+    "35:35",
+    "35:66"
+  ],
+  "metrics": {
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "topLevelOverlap": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "unhandledRejections": 0,
+    "detachedBusyState": 0,
+    "assetCount": 6,
+    "positionCount": 3,
+    "visibleAiRoleCount": 1,
+    "positionExecutionWidthRatio": 2.3333,
+    "candidateVisibleAsFinal": false
+  },
+  "assetSwitch": {
+    "from": "BTCUSDT",
+    "to": "ETHUSDT",
+    "systemStatusUnchanged": true,
+    "alertsAndEventsUnchanged": true,
+    "positionsUnchanged": true
+  },
+  "states": {
+    "sixAssets": 6,
+    "assetPoolEmptyKinds": 3,
+    "assetPoolCount": 10,
+    "addDisabledBeforeSelection": true,
+    "addEnabledAfterSelection": true,
+    "noPositionRows": 0,
+    "noPositionCloseButtons": 0,
+    "openPositionRows": 3,
+    "finalPlanSource": "final",
+    "blockedFinalBodyCount": 0,
+    "consistencyChartCount": 0,
+    "consistencyPercentageCount": 0
+  },
+  "actualSpringRuntime": {
+    "pageHttpStatus": 200,
+    "pageResponseBytes": 711507,
+    "authenticationEnabled": true,
+    "authenticatedLoginStatus": 302,
+    "health": "UP",
+    "staticResourceHashesMatch": true,
+    "authenticatedDashboardApiStatus": 200,
+    "browserStatus": "BLOCKED_BY_BROWSER_URL_POLICY",
+    "authenticatedProviderEvidence": false
+  }
+}

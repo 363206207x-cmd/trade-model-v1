@@ -11,21 +11,21 @@ public interface AnalysisRunMapper {
     @Insert("INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, rule_version, data_quality_score, trace_id, status, "
             + "idempotency_key, request_id, trigger_type, trigger_reference, parent_analysis_id, parent_trace_id, "
             + "input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, lease_expires_at, started_at, completed_at, "
-            + "error_code, error_message, created_at, updated_at, version_no, owner_type, owner_id, asset_id, preview) "
+            + "error_code, error_message, created_at, updated_at, version_no, owner_type, owner_id, asset_id, preview, analysis_mode) "
             + "VALUES(#{analysisId}, #{symbol}, #{timeframe}, #{analysisTime}, #{ruleVersion}, #{dataQualityScore}, #{traceId}, #{status}, "
             + "#{idempotencyKey}, #{requestId}, #{triggerType}, #{triggerReference}, #{parentAnalysisId}, #{parentTraceId}, "
             + "#{inputSnapshotJson}, #{inputSnapshotHash}, #{attemptCount}, #{leaseOwner}, #{leaseExpiresAt}, #{startedAt}, #{completedAt}, "
-            + "#{errorCode}, #{errorMessage}, #{createdAt}, #{updatedAt}, #{versionNo}, #{ownerType}, #{ownerId}, #{assetId}, #{preview})")
+            + "#{errorCode}, #{errorMessage}, #{createdAt}, #{updatedAt}, #{versionNo}, #{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode})")
     int insert(AnalysisRunDO analysisRun);
 
     @Insert("INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, rule_version, trace_id, status, "
             + "idempotency_key, request_id, trigger_type, trigger_reference, parent_analysis_id, parent_trace_id, "
             + "input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, lease_expires_at, started_at, created_at, updated_at, version_no, "
-            + "owner_type, owner_id, asset_id, preview) "
+            + "owner_type, owner_id, asset_id, preview, analysis_mode) "
             + "VALUES(#{analysisId}, #{symbol}, #{timeframe}, #{analysisTime}, #{ruleVersion}, #{traceId}, #{status}, "
             + "#{idempotencyKey}, #{requestId}, #{triggerType}, #{triggerReference}, #{parentAnalysisId}, #{parentTraceId}, "
             + "#{inputSnapshotJson}, #{inputSnapshotHash}, #{attemptCount}, #{leaseOwner}, #{leaseExpiresAt}, #{startedAt}, #{createdAt}, #{updatedAt}, #{versionNo}, "
-            + "#{ownerType}, #{ownerId}, #{assetId}, #{preview})")
+            + "#{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode})")
     int insertStarted(AnalysisRunDO analysisRun);
 
     @Select("SELECT * FROM tm_analysis_run WHERE analysis_id = #{analysisId}")
@@ -41,7 +41,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "LIMIT 1")
     AnalysisRunDO selectReadableByUser(@Param("analysisId") String analysisId,
                                        @Param("userId") Long userId);
@@ -53,7 +53,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "ORDER BY ar.created_at DESC, ar.analysis_id DESC LIMIT 1")
     AnalysisRunDO selectReadableByTraceId(@Param("traceId") String traceId,
                                           @Param("userId") Long userId);
@@ -65,7 +65,7 @@ public interface AnalysisRunMapper {
             + "(ap.owner_type = 'USER' AND ap.owner_id = #{userId}) OR "
             + "(ap.owner_type = 'SYSTEM' AND ap.owner_id = 0 AND NOT EXISTS ("
             + "SELECT 1 FROM tm_asset_pool_item ov WHERE ov.owner_type = 'USER' "
-            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE))))) "
+            + "AND ov.owner_id = #{userId} AND UPPER(ov.symbol) = UPPER(ar.symbol) AND ov.active = FALSE)))))) "
             + "ORDER BY ar.created_at DESC, ar.analysis_id DESC LIMIT 1")
     AnalysisRunDO selectReadableByRequestId(@Param("requestId") String requestId,
                                             @Param("userId") Long userId);

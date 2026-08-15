@@ -62,7 +62,7 @@ class LocalSmokeSchedulerGateTest {
                     context.getBean(PushRecheckScheduler.class).recheckPendingPushesScheduled();
 
                     verify(mocks.pushSnapshotMapper, never()).listPendingRecheckNext(
-                            any(), any(), any(), anyInt(), anyInt(), any(), anyInt());
+                            any(), any(), any(), anyInt(), any(), any(), anyInt());
                     verify(mocks.pushRecheckService, never()).recheck(
                             anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
                     verify(mocks.dispatchConfigService, never()).loadOrInit(anyInt(), anyInt(), anyInt());
@@ -116,7 +116,7 @@ class LocalSmokeSchedulerGateTest {
                             .isEqualTo(WatchlistLowFrequencyScanScheduler.ScanStatus.DISABLED);
                     assertThat(result.getReason()).isEqualTo("SCHEDULER_DISABLED_BY_CONFIG");
                     verify(mocks.pushSnapshotMapper, never()).listPendingRecheckNext(
-                            any(), any(), any(), anyInt(), anyInt(), any(), anyInt());
+                            any(), any(), any(), anyInt(), any(), any(), anyInt());
                     verify(mocks.pushRecheckService, never()).recheck(
                             anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
                     verify(mocks.positionSyncService, never()).syncPositions();
@@ -157,7 +157,7 @@ class LocalSmokeSchedulerGateTest {
                     context.getBean(MarketDataScheduler.class).fetchRealMarketDataScheduled();
 
                     verify(mocks.pushSnapshotMapper).listPendingRecheckNext(
-                            any(), any(), any(), anyInt(), anyInt(), any(), anyInt());
+                            any(), any(), any(), anyInt(), any(), any(), anyInt());
                     verify(mocks.positionSyncService).syncPositions();
                     verify(mocks.analysisSchedulerService).runScheduledCycle();
                 });
@@ -175,7 +175,7 @@ class LocalSmokeSchedulerGateTest {
             verify(mocks.pushRecheckService, never()).recheck(
                     anyLong(), any(BigDecimal.class), any(RecheckExecutionCommand.class));
             verify(mocks.pushSnapshotMapper, never()).listPendingRecheckNext(
-                    any(), any(), any(), anyInt(), anyInt(), any(), anyInt());
+                    any(), any(), any(), anyInt(), any(), any(), anyInt());
         });
     }
 

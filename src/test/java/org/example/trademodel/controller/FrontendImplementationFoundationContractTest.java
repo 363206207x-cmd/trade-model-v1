@@ -27,10 +27,12 @@ class FrontendImplementationFoundationContractTest {
         assertThat(source.indexOf("GEMINI_REVIEW")).isLessThan(source.indexOf("GROK_CHALLENGE"));
         assertThat(source).contains(
                 "OBSERVING", "CANDIDATE", "WAITING_TRIGGER", "TRIGGERED",
-                "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED",
-                "条件已触发，不代表已开仓");
+                "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED");
         assertThat(source)
-                .contains("normalizeAiTabs", "displayNumber", "parseApiEnvelope")
+                .contains(
+                        "normalizeAiTabs", "displayNumber", "parseApiEnvelope",
+                        "PLAN_MODE_VIEWS", "PLAN_DATA_STATE_VIEWS",
+                        "plan.notTradeInstruction === true")
                 .doesNotContain("localStorage", "OPENED", "EXECUTED");
     }
 
@@ -93,7 +95,10 @@ class FrontendImplementationFoundationContractTest {
         assertThat(desktop)
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
-                .contains("data-desktop-unavailable-nav")
+                .contains(
+                        "href=\"/dashboard\"", "href=\"/positions\"",
+                        "href=\"/analysis\"", "href=\"/messages\"", "href=\"/me\"")
+                .doesNotContain("data-desktop-unavailable-nav")
                 .contains("function refreshAssetContext()")
                 .contains("fetchDashboardHome(true)");
     }
@@ -108,8 +113,9 @@ class FrontendImplementationFoundationContractTest {
                 .doesNotContain("/api/order", "/api/trade", "AI 投票", "投票比例")
                 .doesNotContain(">买入</button>", ">卖出</button>", ">下单</button>", ">执行交易</button>");
         assertThat(desktop)
-                .contains("系统执行建议（非交易指令）")
-                .contains("不会自动下单或创建持仓")
+                .contains("frontendContract.executionPlanAccess(s)")
+                .contains("data-plan-source=\"final\"")
+                .contains("data-result-layer=\"candidate\"")
                 .doesNotContain("AI 投票", "投票比例");
     }
 

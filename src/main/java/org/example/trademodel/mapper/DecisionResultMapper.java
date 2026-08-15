@@ -118,7 +118,7 @@ public interface DecisionResultMapper {
             "scores.opportunity_score AS opportunityScore",
             "FROM (",
             "  SELECT src.*, ROW_NUMBER() OVER (",
-            "    PARTITION BY UPPER(TRIM(src.symbol))",
+            "    PARTITION BY UPPER(TRIM(src.symbol)), LOWER(TRIM(owner_run.timeframe))",
             "    ORDER BY owner_run.analysis_time DESC, src.create_time DESC, src.decision_id DESC",
             "  ) AS symbol_rank",
             "  FROM tm_decision_result src",

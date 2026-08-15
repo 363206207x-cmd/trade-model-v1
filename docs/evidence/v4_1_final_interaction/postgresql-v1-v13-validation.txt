@@ -1,0 +1,25 @@
+FUNDAMENTAL_AI_V4_1_POSTGRESQL_MIGRATION_EVIDENCE
+Generated: 2026-08-14 Asia/Shanghai
+Target: disposable local PostgreSQL 16.14
+Database: trade_model_v1_test
+
+Flyway validation:
+- Successfully validated 13 migrations.
+- Empty schema -> V1..V8: PASS
+- V8 historical fixture -> V9..V11: PASS
+- V11 historical fixture -> V12..V13: PASS
+- Final schema version: v13
+
+Test:
+- org.example.trademodel.postgresql.PostgreSqlFlywayMigrationSmokeTest
+- tests: 1
+- passed: 1
+- failures: 0
+- errors: 0
+- skipped: 0
+
+Safety:
+- isolated non-production database: PASS
+- historical data compatibility assertions: PASS
+- V13 fail-closed constraints: PASS
+- container cleanup: PASS

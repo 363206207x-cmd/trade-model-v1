@@ -288,6 +288,33 @@ class ReviewServiceImplTest {
         });
     }
 
+    @Test
+    void missedReasonAndLaterOutcomeRemainIndependentFrozenFacts() {
+        ReviewServiceImpl service = service();
+        WriteReviewResultReq req = new WriteReviewResultReq();
+        req.setAnalysisId("analysis-missed");
+        req.setMissedReason("PUSHED_NOT_FILLED");
+        req.setLaterOutcome("VALID");
+
+        ReviewResultDO saved = reviewRow("review-missed", "analysis-missed", null, null, null);
+        saved.setMissedReason("PUSHED_NOT_FILLED");
+        saved.setLaterOutcome("VALID");
+        when(reviewResultMapper.selectByAnalysisId("analysis-missed"))
+                .thenReturn(null)
+                .thenReturn(saved);
+        when(reviewResultMapper.insert(any(ReviewResultDO.class))).thenReturn(1);
+        when(ruleVersionLogMapper.insert(any(RuleVersionLogDO.class))).thenReturn(1);
+
+        ReviewStateVO result = service.saveOrUpdate(req);
+
+        ArgumentCaptor<ReviewResultDO> captor = ArgumentCaptor.forClass(ReviewResultDO.class);
+        verify(reviewResultMapper).insert(captor.capture());
+        assertThat(captor.getValue().getMissedReason()).isEqualTo("PUSHED_NOT_FILLED");
+        assertThat(captor.getValue().getLaterOutcome()).isEqualTo("VALID");
+        assertThat(result.getMissedReason()).isEqualTo("PUSHED_NOT_FILLED");
+        assertThat(result.getLaterOutcome()).isEqualTo("VALID");
+    }
+
     private ReviewServiceImpl service() {
         return new ReviewServiceImpl(
                 reviewResultMapper, analysisRunMapper, ruleVersionLogMapper,

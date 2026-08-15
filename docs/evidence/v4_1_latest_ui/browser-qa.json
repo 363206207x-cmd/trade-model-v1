@@ -1,0 +1,71 @@
+{
+  "capturedAt": "2026-08-13T18:32:31+08:00",
+  "branch": "codex/v4-1-frontend-runtime-alignment",
+  "pullRequest": 1179,
+  "startingImplementationHead": "490919d6f8c763ffaac634cfbffd02ad8eaf66c4",
+  "baseMain": "edc3615c03c9b71763c32574f1d811c1d9a8954d",
+  "sourceMode": "CONTROLLED_VISUAL_FIXTURE",
+  "runtimeSourceHashes": {
+    "dashboardHtml": "9709257c0b309b4f598253967f955f4ec4c69d1f84db5375e1e4ca168f04ad3a",
+    "dashboardLatestCss": "c29c77d2df670755580fac73d74db1c359dba54758888514a0861202c1e89e9a",
+    "frontendContractJs": "b80af29796cd6b7f457444edd1e58ae74e66a64fd791b06d36152955e523a3d6",
+    "visualFixture": "7d51745380afac5bac2fe7384c1541904915f1363ae39a84e92a85f91daabbf0"
+  },
+  "externalCalls": 0,
+  "writesRejected": true,
+  "primaryViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "document": {
+    "width": 1440,
+    "height": 2453
+  },
+  "figmaNodes": [
+    "28:154",
+    "31:23",
+    "520:212",
+    "523:748",
+    "35:97",
+    "35:4",
+    "35:35",
+    "35:66"
+  ],
+  "metrics": {
+    "horizontalOverflow": 0,
+    "textOverflow": 0,
+    "topLevelOverlap": 0,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "unhandledRejections": 0,
+    "detachedBusyState": 0,
+    "assetCount": 6,
+    "positionCount": 3,
+    "visibleAiRoleCount": 1,
+    "positionExecutionWidthRatio": 2.3333,
+    "candidateVisibleAsFinal": false
+  },
+  "assetSwitch": {
+    "from": "BTCUSDT",
+    "to": "ETHUSDT",
+    "finalPlanId": "final-plan-eth-asset",
+    "roleAnalysisId": "analysis-eth-asset",
+    "systemStatusUnchanged": true,
+    "alertsAndEventsUnchanged": true,
+    "positionsUnchanged": true
+  },
+  "states": {
+    "sixAssets": 6,
+    "fewerThanSixAssets": 5,
+    "defaultFillCount": 0,
+    "assetPoolCount": 10,
+    "searchSuggestionCount": 3,
+    "noPositionRows": 0,
+    "noPositionCloseButtons": 0,
+    "openPositionRows": 3,
+    "finalPlanSource": "final",
+    "blockedFinalBodyCount": 0,
+    "consistencyChartCount": 0,
+    "consistencyPercentageCount": 0
+  }
+}

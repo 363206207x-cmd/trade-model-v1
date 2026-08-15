@@ -802,6 +802,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             run.setOwnerId(context.getOwnerId());
             run.setAssetId(context.getAssetId());
             run.setPreview(context.isPreview());
+            run.setAnalysisMode(context.isPreview() ? "ANALYSIS_PREVIEW" : "OPPORTUNITY_DECISION");
             if (!context.isRunAlreadyClaimed()) {
                 analysisRunMapper.insert(run);
             }
@@ -1035,6 +1036,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 pdo.setSourceStatus(plan.getSourceStatus());
                 pdo.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
                 pdo.setRevalidationReason(plan.getRevalidationReason());
+                pdo.setPlanLifecycleState(plan.getPlanLifecycleState());
+                pdo.setPlanVersion(plan.getPlanVersion());
+                pdo.setSupersedesPlanId(plan.getSupersedesPlanId());
+                pdo.setSupersededByPlanId(plan.getSupersededByPlanId());
                 pdo.setCreateTime(utcLocalNow());
                 executionPlanMapper.insert(pdo);
                 persistedPlan = pdo;

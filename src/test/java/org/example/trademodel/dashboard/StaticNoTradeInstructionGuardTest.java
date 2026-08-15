@@ -16,9 +16,9 @@ class StaticNoTradeInstructionGuardTest {
             "<section class=\"card module-status-card review-display-card\" id=\"candidateReviewDisplay\"";
     private static final String SKELETON_END = "</section>";
     private static final String POSITION_EXECUTION_ROW_START =
-            "<div class=\"position-execution-row\">";
+            "<section class=\"latest-decision-grid\"";
     private static final String POSITION_EXECUTION_ROW_END =
-            "<div class=\"ai-decision-row\">";
+            "<section class=\"latest-ai-grid\"";
     private static final String ALLOWED_NEGATIVE_CONTEXT =
             "no order, execution, reverse, signal, or auto-trading action is available here.";
     private static final List<String> MANDATORY_SAFE_LABELS = List.of(
@@ -129,15 +129,17 @@ class StaticNoTradeInstructionGuardTest {
     void dashboardPositionExecutionRowKeepsManualPositionDisplayPassive() throws Exception {
         String row = positionExecutionRow();
 
-        assertThat(row).contains("持仓摘要");
-        assertThat(row).contains("用户真实持仓 Top 3 摘要");
-        assertThat(row).contains("仅显示手动录入持仓");
-        assertThat(row).contains("暂无手动持仓");
-        assertThat(row).contains("录入真实持仓后开始监控");
-        assertThat(row).contains("系统执行建议（非交易指令）");
-        assertThat(row).doesNotContain("<button");
+        assertThat(row).contains("持仓监控 Top3");
+        assertThat(row).contains("风险变化、监控结论与建议动作");
+        assertThat(row).contains("暂无活动持仓");
+        assertThat(row).contains("录入真实持仓后查看风险变化与监控结论。");
+        assertThat(row).contains("执行计划");
+        assertThat(row).contains("当前资产的参与方式、风险限制与有效条件");
+        assertThat(row).contains("请选择资产");
+        assertThat(row).contains("选择一个重点机会资产后查看执行计划。");
+        assertThat(row).doesNotContain("非交易指令", "仅供参考", "执行计划不会自动创建仓位");
+        assertThat(row).contains("manualPositionBtn", "录入持仓");
         assertThat(row).doesNotContain("<form");
-        assertThat(row).doesNotContain("manualPositionBtn");
         assertThat(row).doesNotContain("openPositionBtn");
         assertThat(row).doesNotContain("closePositionBtn");
         assertThat(row).doesNotContain("orderBtn");

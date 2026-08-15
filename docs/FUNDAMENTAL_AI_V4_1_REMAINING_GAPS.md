@@ -1,44 +1,52 @@
 # Fundamental AI v4.1 Remaining Gaps
 
-Status: `NO_KNOWN_CONTRACT_GAP_PENDING_EXTERNAL_GATES`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_REAUDIT`
 
-## Product And Implementation Gaps
+## P0
 
-None are known against chapters 1-20 or Appendices A-D of the final frozen
-contract after the remediation and complete local regression.
+No known P0 implementation gap was found in this remediation.
 
-This statement is bounded to backend capability, schema, API, persistence,
-query and automated-test alignment on the candidate branch. It does not claim
-production effectiveness or merged-main completion.
+## P1
 
-## External Gates Still Required
+### Target Runtime Provider-To-Review Evidence
 
-1. Independent final backend capability re-audit of PR #1177.
-2. PR CI on the final pushed commit.
-3. Review and merge decision.
-4. Clean/synced merged-main validation.
-5. Later live-provider and production-runtime acceptance where separately
-   authorized.
+`TARGET_RUNTIME_EXTERNAL_CONFIGURATION_BLOCKED`
 
-## Evidence Boundaries
+The current environment lacks the external market/AI/auth/controlled-
+PostgreSQL variables listed in
+`docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_CHAIN_EVIDENCE.md`. Therefore the full
+Provider -> Final Plan -> UI manual position -> monitoring -> UI close ->
+Review trace cannot honestly be marked PASS.
 
-- PostgreSQL 16.14 V1-to-V12 migration was executed successfully in an isolated
-  disposable local database.
-- No live AI provider call was made and no provider credential was read.
-- Real historical replay without an authorized real fixture remains explicitly
-  unavailable; no local fixture is represented as provider evidence.
-- Full-market catalog fallback remains identified as fallback and cannot bypass
-  Asset Pool membership for persistent Opportunity creation.
-- PR #1177 remains open/draft/unmerged; the current phase is not effective on
-  `main`.
+No controlled fixture, screenshot or direct database row is promoted as live
+evidence. O05, O07 and O11 target-runtime acceptance remain part of this same
+blocked trace.
 
-## Intentional Product Boundaries
+## External Merge Gates
 
-- Figma: unchanged.
-- Mobile: unchanged.
-- P2 Position Monitoring: preserved.
-- automatic open/close/add/reduce/reverse/order: absent.
-- exchange order API: absent.
-- Push Recheck: review-only and not trading authorization.
+1. Independent re-audit of the new exact PR head.
+2. Required GitHub checks on that exact head.
+3. Review/merge decision; PR remains Draft/Open/Unmerged.
+4. Clean merged-main regression and PostgreSQL validation.
+5. Target-runtime acceptance after the missing configuration is supplied.
 
-`READY_FOR_INDEPENDENT_FINAL_REAUDIT`
+## Deployment Boundary
+
+The runbook, environment/secret contract, backup/rollback plan, smoke contract
+and release checklist are complete. The highest possible state before merge is
+`READY_AFTER_MERGED_MAIN_VALIDATION`; the system is not claimed deployed or
+production-effective.
+
+## Post-Launch Backlog
+
+Minor visual polish that does not affect the frozen contract belongs after
+launch. Mobile, additional product modules and any automatic trading behavior
+remain out of scope.
+
+## Preserved Safety
+
+- Mobile changed: NO.
+- duplicate business skeleton: none added.
+- automatic trading capability: zero.
+- Push Recheck: review-only, not trading permission.
+- fake market/AI data: zero.

@@ -118,14 +118,15 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("window.__lastDashboardHome = null")
                 .contains("setRuntimeStatus(runtimeState)")
                 .contains("runtimeState = missing ? \"MISSING\" : \"ERROR\"")
-                .contains("renderHomeSystemStateFromPayload({},")
-                .contains("renderHomeAlertEventRowsFromPayload({})")
                 .contains("assets.dataset.homeState = missing ? \"missing\" : \"error\"")
                 .contains("renderHomeExecutionFromPayload({")
                 .contains("runStatus: \"LOAD_FAILED\"")
                 .contains("runStatusLabel: \"当前不可查看\"")
                 .contains("}, null);")
-                .doesNotContain("renderHomePositionsFromPayload")
+                .doesNotContain(
+                        "renderHomeSystemStateFromPayload",
+                        "renderHomeAlertEventRowsFromPayload",
+                        "renderHomePositionsFromPayload")
                 .doesNotContain("selectedPositionId = null");
     }
 
@@ -147,8 +148,8 @@ class Fe04ShellHomeDashboardContractTest {
                 "</section>");
         String desktopPosition = slice(
                 desktop,
-                "<section class=\"card\" id=\"homePositionCard\"",
-                "</section>");
+                "<article class=\"latest-module latest-position-module\" id=\"homePositionCard\"",
+                "<article class=\"latest-module latest-plan-module\" id=\"homeExecutionCard\"");
 
         assertThat(mobileExecution)
                 .contains(
@@ -171,16 +172,19 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("记录平仓")
                 .doesNotContain("复盘中心");
         assertThat(desktopPosition)
-                .contains("Top 3", "仅显示手动录入持仓")
-                .doesNotContain("manualPositionBtn")
-                .doesNotContain("reviewCenterLink")
-                .doesNotContain("position-action-btn");
+                .contains("持仓监控 Top3", "风险变化、监控结论与建议动作")
+                .contains("manualPositionBtn")
+                .doesNotContain("reviewCenterLink");
+        assertThat(desktop)
+                .contains("class=\"latest-position-close\"")
+                .contains("记录平仓")
+                .contains("data-position-source=", "data-final-plan-id=")
+                .contains("MANUAL_INDEPENDENT");
         assertThat(desktop)
                 .contains(
-                        "资产状态 · 正在同步",
-                        "系统冲突阻断",
-                        "计划冲突阻断",
-                        "AI 一致性阻断");
+                        "请选择资产",
+                        "选择一个重点机会资产后查看执行计划。",
+                        "frontendContract.executionPlanAccess(s)");
         assertThat(mobileAi)
                 .contains("data-ai-role-summary")
                 .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")
@@ -200,7 +204,7 @@ class Fe04ShellHomeDashboardContractTest {
                 .contains("<a href=\"/dashboard/mobile/positions\" data-position-nav>持仓</a>")
                 .doesNotContain("data-position-nav data-unavailable-nav");
         assertThat(desktop)
-                .contains("<a href=\"/dashboard/positions\" class=\"product-nav-item\">持仓</a>")
+                .contains("<a href=\"/positions\" class=\"product-nav-item\">持仓</a>")
                 .doesNotContain("data-desktop-unavailable-nav aria-disabled=\"true\">持仓");
     }
 
@@ -261,9 +265,10 @@ class Fe04ShellHomeDashboardContractTest {
                         "renderDesktopAiAnalysis(ai, asset || null)",
                         "analysisState === \"partial\" ? ai.tabs : []",
                         "/dashboard/analysis-detail?analysisId=",
-                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
+                        "<a href=\"/analysis\" class=\"product-nav-item\">AI分析</a>")
                 .doesNotContain(
-                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))")
+                        "renderDesktopAiAnalysis(ai, selectedHomeAsset(window.__lastDashboardHome || {}))",
+                        "frontendContract.readUrlParam(\"view\") === \"ai\"")
                 .doesNotContain("latestAnalysisId");
         assertThat(mobileStyles)
                 .contains(
@@ -320,7 +325,7 @@ class Fe04ShellHomeDashboardContractTest {
     }
 
     @Test
-    void aiAnalysisRequiresExplicitRoleAvailabilityBeforeRenderingConclusions()
+    void aiAnalysisPreservesStructuredRoleSemanticsWhileUnavailableRolesFailClosed()
             throws Exception {
         String mobile = Files.readString(MOBILE);
         String script = Files.readString(MOBILE_SCRIPT);
@@ -329,12 +334,13 @@ class Fe04ShellHomeDashboardContractTest {
 
         assertThat(contract)
                 .contains(
-                        "if (!supplied || supplied.resultAvailable !== true)",
+                        "normalized.resultAvailable = supplied.resultAvailable === true",
                         "roleLabel: definition.label",
-                        "resultAvailable: false",
-                        "runStatusLabel: displayText(supplied && supplied.runStatusLabel, \"待同步\")",
-                        "supplied && supplied.statusMessage",
-                        "normalized.resultAvailable = true");
+                        "roleState: \"UNAVAILABLE\"",
+                        "dataState: \"SOURCE_UNAVAILABLE\"",
+                        "normalized.roleState = normalizeRoleState(normalized.roleState)",
+                        "STRUCTURED_AI_COLLECTIONS.forEach(function (collection)",
+                        "normalized[collection.key] = Array.isArray(normalized[collection.key])");
         assertThat(mobile)
                 .contains(
                         "data-result-available=${tab.resultAvailable == true}",
@@ -354,29 +360,35 @@ class Fe04ShellHomeDashboardContractTest {
                 .doesNotContain("Number(tab.resultAvailable)");
         assertThat(desktop)
                 .contains(
+                        "function renderHomeAiRoleTab(role, tab)",
+                        "frontendContract.normalizeRoleState(role.roleState)",
+                        "renderGptFinalHomeRole(role)",
+                        "renderGeminiReviewHomeRole(role)",
+                        "renderGrokChallengeHomeRole(role)",
                         "function desktopAiRoleSummary(tab)",
                         "if (tab.resultAvailable !== true)",
                         "var resultAvailable = analysisState === \"partial\" && tab.resultAvailable === true",
                         "data-desktop-ai-role-output hidden",
                         "roleOutput.hidden = !resultAvailable",
-                        "if (role.resultAvailable !== true) roleHtml = renderUnavailableAiRole(role)",
+                        "var hasStructuredContract = tab === \"GPT_FINAL\"",
+                        "(roleState === \"UNAVAILABLE\" || roleState === \"ERROR\") && !hasStructuredContract",
                         "function renderUnavailableAiRole(role)",
                         "roleMetadata(role)")
                 .doesNotContain("Boolean(tab.resultAvailable)");
     }
 
     @Test
-    void desktopAiConsistencyStaysInsideThreeRoleRegionAndUsesConsistencyFieldsOnly()
+    void desktopAiConsistencyStaysAdjacentToSingleWorkspaceAndUsesConsistencyFieldsOnly()
             throws Exception {
         String desktop = Files.readString(DESKTOP);
         String aiPanel = slice(
                 desktop,
-                "<section class=\"card\" id=\"homeAiPanel\"",
-                "</section>");
+                "<article class=\"latest-module latest-ai-workspace\" id=\"homeAiPanel\"",
+                "<aside class=\"latest-module latest-consistency\"");
         String consistencyRenderer = slice(
                 desktop,
                 "function renderHomeConsistencyCard(options)",
-                "function renderGptFinalHomeRole");
+                "function roleMetadata(role)");
         String payloadRenderer = slice(
                 desktop,
                 "function renderHomeAiDecisionFromPayload(aiDecision, asset)",
@@ -384,12 +396,17 @@ class Fe04ShellHomeDashboardContractTest {
 
         assertThat(aiPanel)
                 .contains(
-                        "id=\"homeConsistencyContent\"",
-                        "AI 一致性摘要",
-                        "冲突等级",
+                        "homeAiSummaryCards",
+                        "role=\"tablist\"",
                         "GPT_FINAL",
                         "GEMINI_REVIEW",
                         "GROK_CHALLENGE")
+                .doesNotContain("id=\"homeConsistencyContent\"");
+        assertThat(desktop)
+                .contains(
+                        "id=\"homeConsistencyContent\"",
+                        "冲突与最终调整",
+                        "latest-consistency")
                 .doesNotContain(
                         "homeConsistencyPanel",
                         "consistency-ring",
@@ -502,8 +519,10 @@ class Fe04ShellHomeDashboardContractTest {
         assertThat(desktop)
                 .contains("data-desktop-five-destination-navigation")
                 .contains("Dashboard", "Position", "AI Analysis", "Message", "Profile")
-                .contains("data-desktop-unavailable-nav")
-                .contains("消息与个人页暂未开放");
+                .contains(
+                        "href=\"/dashboard\"", "href=\"/positions\"",
+                        "href=\"/analysis\"", "href=\"/messages\"", "href=\"/me\"")
+                .doesNotContain("data-desktop-unavailable-nav", "消息与个人页暂未开放");
     }
 
     private String slice(String source, String start, String end) {

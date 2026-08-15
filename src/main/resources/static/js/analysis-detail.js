@@ -135,7 +135,16 @@
     setPageStatus(title, "error");
   }
 
-  function renderContext(run, decision) {
+  function aggregateConfidenceScore(items) {
+    var row = (Array.isArray(items) ? items : []).find(function (item) {
+      return item && String(item.scoreType || "").trim() === "综合可信度分"
+        && item.scoreValue !== null && item.scoreValue !== undefined;
+    });
+    return row ? row.scoreValue : null;
+  }
+
+  function renderContext(run, decision, scoreItems) {
+    var aggregateScore = aggregateConfidenceScore(scoreItems);
     setText('[data-analysis-field="symbol"]', run.symbol, "--");
     setText(
       '[data-analysis-field="direction"]',
@@ -144,7 +153,8 @@
     );
     setText(
       '[data-analysis-field="scoreConfidence"]',
-      "-- / " + displayText(decision && decision.confidenceLevel, "待同步"),
+      contract.displayNumber(aggregateScore) + " / "
+        + displayText(decision && decision.confidenceLevel, "待同步"),
       "-- / 待同步"
     );
   }
@@ -191,7 +201,7 @@
     return (Array.isArray(items) ? items : []).filter(function (item) {
       return item && typeof item === "object"
         && [item.evidenceType, item.description, item.direction, item.source].some(hasText);
-    }).slice(0, 3);
+    });
   }
 
   function renderEvidence(items) {
@@ -210,8 +220,8 @@
       var unavailableFields = createElement("dl");
       appendDefinition(unavailableFields, "证据类型", "状态待同步");
       appendDefinition(unavailableFields, "方向", "未提供");
-      appendDefinition(unavailableFields, "证据强度", "未提供");
-      appendDefinition(unavailableFields, "置信度", "未提供");
+      appendDefinition(unavailableFields, "证据强度", "当前不可查看");
+      appendDefinition(unavailableFields, "置信度", "当前不可查看");
       appendDefinition(unavailableFields, "来源", "来源待同步");
       unavailable.appendChild(unavailableFields);
       unavailable.appendChild(createElement("p", "", "证据描述待同步。"));
@@ -229,14 +239,20 @@
       var card = createElement("article", "evidence-card");
       var heading = createElement("div", "card-heading");
       heading.appendChild(createElement("strong", "", "Evidence Card"));
-      heading.appendChild(createElement("span", "", "Top 3 摘要"));
+      heading.appendChild(createElement("span", "", displayText(item.freshness, "状态未提供")));
       card.appendChild(heading);
       var fields = createElement("dl");
+      appendDefinition(fields, "Evidence ID", displayText(item.evidenceId, "当前不可查看"));
       appendDefinition(fields, "证据类型", displayText(item.evidenceType, "未提供"));
       appendDefinition(fields, "方向", displayText(item.direction, "未提供"));
-      appendDefinition(fields, "证据强度", "未提供");
-      appendDefinition(fields, "置信度", "未提供");
+      appendDefinition(fields, "当前值 / 变化", [item.currentValue, item.changeFromBaseline]
+        .filter(hasText).join(" · ") || "当前不可查看");
+      appendDefinition(fields, "证据强度", contract.displayNumber(item.strength));
+      appendDefinition(fields, "置信度", contract.displayNumber(item.confidence));
       appendDefinition(fields, "来源", displayText(item.source, "来源待同步"));
+      appendDefinition(fields, "Provider", displayText(item.sourceProvider, "当前不可查看"));
+      appendDefinition(fields, "观测时间", displayText(item.observedAt, "当前不可查看"));
+      appendDefinition(fields, "Freshness", displayText(item.freshness, "当前不可查看"));
       card.appendChild(fields);
       card.appendChild(createElement(
         "p",
@@ -246,18 +262,18 @@
       card.appendChild(createElement(
         "small",
         "",
-        "仅显示后端返回摘要；完整来源关联、强度与置信度尚未提供。"
+        displayText(item.sourceReference, "当前 analysisId 的持久化证据；未提供来源引用。")
       ));
       list.appendChild(card);
     });
-    setCoverage("[data-evidence-coverage]", "Top 3 摘要", "partial");
+    setCoverage("[data-evidence-coverage]", rows.length + " 条证据", "available");
     return true;
   }
 
   function scoreRows(items) {
     return (Array.isArray(items) ? items : []).filter(function (item) {
       return item && SCORE_TYPES.indexOf(String(item.scoreType || "").trim()) >= 0;
-    }).slice(0, 3);
+    });
   }
 
   function renderScores(items) {
@@ -283,39 +299,92 @@
       node.dataset.returned = "true";
     });
 
-    var label = rows.length ? "Top 3 摘要" : "不可用";
-    var state = rows.length ? "partial" : "unavailable";
+    var label = rows.length ? rows.length + "/8 已返回" : "不可用";
+    var state = rows.length === SCORE_TYPES.length ? "available" : (rows.length ? "partial" : "unavailable");
     setCoverage("[data-score-coverage]", label, state);
     setText("[data-score-card-coverage]", label, "不可用");
     setText(
       "[data-score-note]",
       rows.length
-        ? "仅显示后端返回的评分摘要；缺失维度不是 0，不补齐八项。"
+        ? "仅显示后端返回评分；缺失维度不是 0，不补齐。"
         : null,
-      "评分不可用；不合成、不平均、不排序。"
+      "评分不可用；不合成、不平均、不用默认值补齐。"
     );
     return rows.length > 0;
   }
 
-  function renderTimeframes(decision) {
-    var convergence = decision && decision.multiTfConvergence;
-    var available = hasText(convergence);
-    setText("[data-timeframe-convergence]", convergence, "待同步");
-    document.querySelectorAll("[data-timeframe]").forEach(function (node) {
-      node.textContent = "待同步";
+  function parseJsonObject(value) {
+    if (value && typeof value === "object") return value;
+    if (!hasText(value)) return null;
+    try {
+      var parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function visibleValue(value, fallback) {
+    if (value === null || value === undefined || value === "") {
+      return fallback || "当前不可查看";
+    }
+    if (Array.isArray(value)) return value.length ? value.map(function (item) {
+      return visibleValue(item, "");
+    }).filter(Boolean).join("；") : (fallback || "当前不可查看");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
+
+  function roleContract(audit) {
+    var decision = audit && audit.decisionBundle;
+    var encoded = decision && decision.aiRoleResults;
+    var payload = parseJsonObject(encoded) || {};
+    var rawRoles = payload.roles && typeof payload.roles === "object" ? payload.roles : {};
+    var traces = Array.isArray(audit && audit.aiTraces) ? audit.aiTraces : [];
+    var roles = {};
+    ROLE_ORDER.forEach(function (name) {
+      var role = Object.assign({}, rawRoles[name] || {});
+      var trace = traces.find(function (item) { return item && item.role === name; }) || {};
+      role.analysisId = role.analysisId || trace.analysisId || null;
+      role.traceId = role.traceId || trace.traceId || null;
+      role.generatedAt = role.generatedAt || trace.observedAt || trace.createdAt || null;
+      role.roleState = contract.normalizeRoleState(role.roleState || (trace.fallback === true
+        ? "FALLBACK" : (trace.status === "SUCCESS" ? "READY" : (trace.status ? "ERROR" : "UNAVAILABLE"))));
+      role.errorMessage = role.errorMessage || trace.errorMessage || null;
+      role.fallbackReason = role.fallbackReason || trace.fallbackReason || null;
+      role.callStatus = role.callStatus || trace.status || null;
+      roles[name] = role;
     });
+    return roles;
+  }
+
+  function renderTimeframes(decision, roles) {
+    var convergence = decision && decision.multiTfConvergence;
+    var gpt = roles && roles.GPT_FINAL || {};
+    var details = gpt.multiTimeframeExplanation || {};
+    var mappings = {
+      "4H": details["4h"] || details.fourHour,
+      "1H": details["1h"] || details.oneHour,
+      "15M": details["15m"] || details.fifteenMinute,
+      "5M": details["5m"] || details.fiveMinute
+    };
+    var count = 0;
+    Object.keys(mappings).forEach(function (timeframe) {
+      var node = document.querySelector('[data-timeframe="' + timeframe + '"]');
+      if (!node) return;
+      var value = mappings[timeframe];
+      node.textContent = visibleValue(value, "当前不可查看");
+      if (hasText(value)) count += 1;
+    });
+    setText("[data-timeframe-convergence]", convergence, "当前不可查看");
     setCoverage(
       "[data-timeframe-status]",
-      available ? "收敛摘要可用" : "不可用",
-      available ? "partial" : "unavailable"
+      count === 4 ? "4/4 周期可用" : (count ? count + "/4 周期可用" : "不可用"),
+      count === 4 ? "available" : (count ? "partial" : "unavailable")
     );
     var module = document.querySelector(".timeframe-module");
-    if (module) {
-      module.dataset.failState = available
-        ? "MULTI_TIMEFRAME_DETAIL_UNAVAILABLE"
-        : "MULTI_TIMEFRAME_UNAVAILABLE";
-    }
-    return available;
+    if (module) module.dataset.failState = count ? "MULTI_TIMEFRAME_PARTIAL" : "MULTI_TIMEFRAME_UNAVAILABLE";
+    return count > 0;
   }
 
   function activateRole(role, focusTab) {
@@ -332,21 +401,182 @@
     });
   }
 
-  function renderAiStatus(decision) {
-    var conflict = decision && decision.aiConflictLevel;
-    document.querySelectorAll("[data-role-state]").forEach(function (node) {
-      node.textContent = "当前分析角色结果不可用";
+  function appendObjectDefinitions(target, object, fields) {
+    (fields || []).forEach(function (field) {
+      appendDefinition(target, field[0], visibleValue(object && object[field[1]], field[2]));
     });
-    document.querySelectorAll("[data-role-conflict]").forEach(function (node) {
-      node.textContent = displayText(conflict, "待同步");
-    });
-    setCoverage("[data-ai-status]", "AI 溯源不可用", "unavailable");
-    activateRole(activeRole, false);
-    return false;
   }
 
-  function validateIdentity(data, requestedAnalysisId, requestedSymbol) {
-    var run = data && data.run;
+  function renderStructuredCollection(parent, label, state, values) {
+    var section = createElement("section", "role-collection");
+    var heading = createElement("div", "card-heading");
+    heading.appendChild(createElement("strong", "", label));
+    heading.appendChild(createElement("span", "", contract.collectionStateLabel(state)));
+    section.appendChild(heading);
+    var rows = Array.isArray(values) ? values : [];
+    if (!rows.length) {
+      section.appendChild(createElement("p", "", "集合为空；以集合状态区分未发现、数据不足、来源不可用或过期。"));
+    } else {
+      var list = createElement("div", "role-collection-list");
+      rows.forEach(function (item, index) {
+        var card = createElement("article", "role-collection-item");
+        var dl = createElement("dl");
+        var object = item && typeof item === "object" ? item : { value: item };
+        Object.keys(object).forEach(function (key) {
+          appendDefinition(dl, key, visibleValue(object[key]));
+        });
+        card.appendChild(createElement("strong", "", label + " " + (index + 1)));
+        card.appendChild(dl);
+        list.appendChild(card);
+      });
+      section.appendChild(list);
+    }
+    parent.appendChild(section);
+  }
+
+  function renderRolePanel(roleName, role) {
+    var panel = document.querySelector('[data-role-panel="' + roleName + '"]');
+    var content = panel && panel.querySelector("[data-role-content]");
+    if (!content) return false;
+    content.replaceChildren();
+    var metadata = createElement("dl", "role-metadata");
+    appendObjectDefinitions(metadata, role, [
+      ["Role State", "roleState"],
+      ["Analysis ID", "analysisId"],
+      ["Trace ID", "traceId"],
+      ["Generated At", "generatedAt"],
+      ["调用状态", "callStatus"],
+      ["错误 / Fallback", role.errorMessage ? "errorMessage" : "fallbackReason", "无"]
+    ]);
+    content.appendChild(metadata);
+
+    if (roleName === "GPT_FINAL") {
+      var gpt = createElement("dl", "role-contract-grid");
+      appendObjectDefinitions(gpt, role.coreJudgment || {}, [
+        ["Market Bias", "marketBias"], ["Opportunity State", "opportunityState"], ["核心判断", "text"]
+      ]);
+      appendObjectDefinitions(gpt, role.candidateSummary || {}, [
+        ["Candidate Summary", "summary"], ["Candidate Plan Mode", "planMode"],
+        ["置信度", "confidence"], ["风险", "riskLevel"], ["是否值得开仓", "worthOpening"]
+      ]);
+      appendObjectDefinitions(gpt, role.biasAdjustment || {}, [
+        ["Bias Before", "before"], ["Bias After", "after"], ["调整原因", "reason"]
+      ]);
+      content.appendChild(gpt);
+      renderStructuredCollection(content, "支持证据", role.supportingEvidenceState, role.supportingEvidence);
+      renderStructuredCollection(content, "反对证据", role.opposingEvidenceState, role.opposingEvidence);
+    } else if (roleName === "GEMINI_REVIEW") {
+      var gemini = createElement("dl", "role-contract-grid");
+      appendObjectDefinitions(gemini, role, [
+        ["Review Result", "reviewResult"], ["最终方向影响", "finalDirectionImpact"],
+        ["置信度调整", "confidenceAdjustment"], ["风险调整", "riskAdjustment"],
+        ["Plan Mode 调整", "planModeAdjustment"], ["恢复条件", "recoveryCondition"]
+      ]);
+      appendObjectDefinitions(gemini, role.downgradeSuggestion || {}, [
+        ["降级前", "before"], ["降级后", "after"], ["降级原因", "reason"], ["恢复条件", "recoveryCondition"]
+      ]);
+      content.appendChild(gemini);
+      renderStructuredCollection(content, "Evidence Gaps", role.evidenceGapsState, role.evidenceGaps);
+      renderStructuredCollection(content, "Logic Conflicts", role.logicConflictsState, role.logicConflicts);
+      renderStructuredCollection(content, "Underestimated Risks", role.underestimatedRisksState, role.underestimatedRisks);
+    } else {
+      var grok = createElement("dl", "role-contract-grid");
+      appendObjectDefinitions(grok, role, [
+        ["挑战摘要", "challengeSummary"], ["当前方向挑战", "currentDirectionChallenge"],
+        ["重大反证", "majorCounterEvidence"], ["风险调整", "riskAdjustment"], ["Plan Mode 影响", "planModeImpact"]
+      ]);
+      content.appendChild(grok);
+      renderStructuredCollection(content, "Failure Paths", role.failurePathState, role.failurePaths);
+      renderStructuredCollection(content, "Opposing Scenarios", role.opposingScenariosState, role.opposingScenarios);
+      renderStructuredCollection(content, "External Event Risks", role.externalEventRisksState, role.externalEventRisks);
+      renderStructuredCollection(content, "Microstructure Risks", role.microstructureRisksState, role.microstructureRisks);
+      renderStructuredCollection(content, "Watch Indicators", role.watchIndicatorsState, role.watchIndicators);
+    }
+    return ["READY", "PARTIAL", "FALLBACK"].indexOf(role.roleState) >= 0;
+  }
+
+  function renderAiStatus(audit, roles) {
+    var available = 0;
+    ROLE_ORDER.forEach(function (roleName) {
+      if (renderRolePanel(roleName, roles[roleName] || {})) available += 1;
+    });
+    setCoverage("[data-ai-status]", available + "/3 角色可追溯",
+      available === 3 ? "available" : (available ? "partial" : "unavailable"));
+    activateRole(activeRole, false);
+    return available > 0;
+  }
+
+  function renderAuditChain(audit) {
+    var stages = Array.isArray(audit && audit.orderedStages) ? audit.orderedStages : [];
+    var list = document.querySelector("[data-audit-stage-list]");
+    if (list) {
+      list.replaceChildren();
+      stages.forEach(function (stage) {
+        var item = createElement("li", "audit-stage");
+        item.appendChild(createElement("span", "", String(stage.order)));
+        item.appendChild(createElement("strong", "", visibleValue(stage.stage)));
+        item.appendChild(createElement("small", "", visibleValue(stage.owner) + " · "
+          + visibleValue(stage.status) + " · " + visibleValue(stage.referenceId)));
+        list.appendChild(item);
+      });
+    }
+    setCoverage("[data-audit-status]", stages.length ? stages.length + " 个阶段" : "不可用",
+      stages.length ? "available" : "unavailable");
+
+    var resolver = audit && audit.conflictResolver || {};
+    var resolverList = document.querySelector("[data-resolver-detail]");
+    if (resolverList) {
+      resolverList.replaceChildren();
+      appendObjectDefinitions(resolverList, resolver, [
+        ["Conflict Level", "conflictLevel"], ["Conflict Score", "conflictScore"],
+        ["Market Bias Before", "biasBefore"], ["Market Bias After", "biasAfter"],
+        ["Plan Mode Before", "planModeBefore"], ["Plan Mode After", "planModeAfter"],
+        ["Confidence Before", "confidenceBefore"], ["Confidence After", "confidenceAfter"],
+        ["Risk Before", "riskBefore"], ["Risk After", "riskAfter"],
+        ["Downgrade Reason", "downgradeReason"], ["Recovery Condition", "recoveryCondition"],
+        ["Confused Decision", "confusedDecision"], ["Rule Veto Reason", "ruleVetoReason"]
+      ]);
+    }
+    var validation = audit && audit.ruleValidation || {};
+    var validationList = document.querySelector("[data-rule-validation-detail]");
+    if (validationList) {
+      validationList.replaceChildren();
+      appendObjectDefinitions(validationList, validation, [
+        ["Validation Result ID", "validationResultId"], ["Status", "status"],
+        ["Reasons", "reasons"], ["Veto Reason", "vetoReason"],
+        ["Chain Status", "chainStatus"], ["Source Gate", "sourceGateStatus"],
+        ["Source Complete", "sourceGateComplete"], ["Final Plan", "finalPlan"]
+      ]);
+    }
+  }
+
+  function renderFinalSource(audit) {
+    var plan = audit && audit.finalExecutionPlan;
+    var validation = audit && audit.ruleValidation || {};
+    var valid = !!plan && plan.finalPlan === true && validation.status === "PASS"
+      && plan.notTradeInstruction === true;
+    var grid = document.querySelector("[data-final-source-grid]");
+    if (grid) {
+      grid.replaceChildren();
+      appendDefinition(grid, "Final Plan ID", valid ? visibleValue(plan.planId) : "当前没有可验证 Final");
+      appendDefinition(grid, "Analysis ID", valid ? visibleValue(plan.analysisId) : "当前不可查看");
+      appendDefinition(grid, "Candidate ID", valid ? visibleValue(plan.candidateId) : "当前不可查看");
+      appendDefinition(grid, "Resolver Result ID", valid ? visibleValue(plan.resolverResultId) : "当前不可查看");
+      appendDefinition(grid, "Validation Result ID", valid ? visibleValue(plan.validationResultId) : "当前不可查看");
+      appendDefinition(grid, "Source Status", valid ? visibleValue(plan.sourceStatus) : "当前不可查看");
+      appendDefinition(grid, "Candidate / Final 隔离", audit && audit.candidateFinalIsolated === true ? "PASS" : "不可验证");
+      appendDefinition(grid, "notTradeInstruction", valid ? "true" : "不可验证");
+    }
+    setCoverage("[data-final-source-status]", valid ? "VALIDATED FINAL" : "非 Final",
+      valid ? "available" : "unavailable");
+    setText("[data-final-source-note]", valid
+      ? "Final 已通过 Resolver 与 Rule Validation；页面不把 Candidate 暴露为 Final。"
+      : "Candidate 或未通过 Rule Validation 的内容保持关闭。", "Final 来源不可验证");
+    return valid;
+  }
+
+  function validateIdentity(data, audit, requestedAnalysisId, requestedSymbol) {
+    var run = data && data.run || audit && audit.analysis;
     if (!run || typeof run !== "object") return { ok: false, reason: "RUN_MISSING" };
     if (String(run.analysisId || "") !== requestedAnalysisId) {
       return { ok: false, reason: "ANALYSIS_ID_MISMATCH" };
@@ -357,8 +587,8 @@
     return { ok: true, run: run };
   }
 
-  function renderAggregate(data, requestedAnalysisId, requestedSymbol) {
-    var identity = validateIdentity(data, requestedAnalysisId, requestedSymbol);
+  function renderAggregate(data, audit, requestedAnalysisId, requestedSymbol) {
+    var identity = validateIdentity(data, audit, requestedAnalysisId, requestedSymbol);
     if (!identity.ok) {
       showPageState(
         "ANALYSIS_NOT_FOUND",
@@ -398,8 +628,10 @@
       renderMarketJudgment(null, null);
       renderEvidence([]);
       renderScores([]);
-      renderTimeframes(null);
-      renderAiStatus(null);
+      renderTimeframes(null, {});
+      renderAiStatus(audit || {}, roleContract(audit || {}));
+      renderAuditChain(audit || {});
+      renderFinalSource(audit || {});
       var processingNotice = document.querySelector("[data-partial-notice]");
       if (processingNotice) processingNotice.hidden = false;
       root.dataset.pageState = "PARTIAL_DATA";
@@ -407,17 +639,25 @@
       return;
     }
 
-    renderContext(run, data.decision);
-    renderMarketJudgment(data.decision, data.marketEnvironment);
-    renderEvidence(data.evidenceTopItems);
-    renderScores(data.scoreTopItems);
-    renderTimeframes(data.decision);
-    renderAiStatus(data.decision);
+    var decision = audit && audit.decisionBundle || data.decision;
+    var roles = roleContract(audit || {});
+    var scoreItems = audit && audit.scores || data.scoreTopItems;
+    renderContext(run, decision, scoreItems);
+    renderMarketJudgment(decision, data.marketEnvironment);
+    renderEvidence(audit && audit.evidence || data.evidenceTopItems);
+    renderScores(scoreItems);
+    renderTimeframes(decision, roles);
+    renderAiStatus(audit || {}, roles);
+    renderAuditChain(audit || {});
+    renderFinalSource(audit || {});
 
     var partial = document.querySelector("[data-partial-notice]");
-    if (partial) partial.hidden = false;
-    root.dataset.pageState = "PARTIAL_DATA";
-    setPageStatus("部分数据可用", "partial");
+    var complete = !!(audit && audit.analysis && audit.decisionBundle)
+      && Array.isArray(audit.evidence) && Array.isArray(audit.scores)
+      && Array.isArray(audit.aiTraces);
+    if (partial) partial.hidden = complete;
+    root.dataset.pageState = complete ? "READY" : "PARTIAL_DATA";
+    setPageStatus(complete ? "决策链已同步" : "部分数据可用", complete ? "ready" : "partial");
   }
 
   function bindRoleTabs() {
@@ -477,12 +717,12 @@
         headers: { Accept: "application/json" }
       };
       if (request.controller) requestOptions.signal = request.controller.signal;
-      var response = await fetch(
-        "/api/review/aggregate/" + encodeURIComponent(analysisId),
-        requestOptions
-      );
+      var responses = await Promise.all([
+        fetch("/api/review/aggregate/" + encodeURIComponent(analysisId), requestOptions),
+        fetch("/api/ai/audit-chain?analysisId=" + encodeURIComponent(analysisId), requestOptions)
+      ]);
       if (!isCurrentRequest(request)) return;
-      if (response.status === 404) {
+      if (responses.some(function (response) { return response.status === 404; })) {
         showPageState(
           "ANALYSIS_NOT_FOUND",
           "Analysis Not Found",
@@ -491,13 +731,16 @@
         );
         return;
       }
-      if (!response.ok) throw new Error("ANALYSIS_DETAIL_REQUEST_FAILED");
-      var payload = await response.json();
+      if (responses.some(function (response) { return !response.ok; })) {
+        throw new Error("ANALYSIS_DETAIL_REQUEST_FAILED");
+      }
+      var payloads = await Promise.all(responses.map(function (response) { return response.json(); }));
       if (!isCurrentRequest(request)) return;
-      var parsed = contract.parseApiEnvelope(payload);
-      if (!parsed.ok) throw new Error("ANALYSIS_DETAIL_RESPONSE_INVALID");
+      var aggregate = contract.parseApiEnvelope(payloads[0]);
+      var audit = contract.parseApiEnvelope(payloads[1]);
+      if (!aggregate.ok || !audit.ok) throw new Error("ANALYSIS_DETAIL_RESPONSE_INVALID");
       if (!isCurrentRequest(request)) return;
-      renderAggregate(parsed.data, analysisId, selectedSymbol);
+      renderAggregate(aggregate.data, audit.data, analysisId, selectedSymbol);
     } catch (error) {
       if (!isCurrentRequest(request) || isAbortError(error)) return;
       showPageState(

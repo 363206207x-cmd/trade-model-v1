@@ -5,6 +5,7 @@ import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.HotResetEventDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.HotResetEventTypeEnum;
 import org.example.trademodel.mapper.AssetStateMapper;
@@ -25,6 +26,8 @@ import org.example.trademodel.service.HotResetResult;
 import org.example.trademodel.service.HotResetService;
 import org.example.trademodel.service.OpportunityStateIdentity;
 import org.example.trademodel.service.OpportunityTriggerSource;
+import org.example.trademodel.service.PlanRevalidationService;
+import org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +69,7 @@ public class HotResetServiceImpl implements HotResetService {
     private final ObjectProvider<AnalysisSchedulerService> analysisSchedulerServiceProvider;
     private final RuleConfigContractService ruleConfigContractService;
     private final AssetStateService assetStateService;
+    private PlanRevalidationService planRevalidationService;
     private Clock clock = Clock.systemUTC();
 
     public HotResetServiceImpl(AssetStateMapper assetStateMapper,
@@ -120,6 +124,11 @@ public class HotResetServiceImpl implements HotResetService {
     @Autowired(required = false)
     public void setClock(Clock clock) {
         this.clock = clock != null ? clock : Clock.systemUTC();
+    }
+
+    @Autowired(required = false)
+    public void setPlanRevalidationService(PlanRevalidationService planRevalidationService) {
+        this.planRevalidationService = planRevalidationService;
     }
 
     @Override
@@ -184,9 +193,18 @@ public class HotResetServiceImpl implements HotResetService {
         String reasonCode = evaluation.getReasonCode();
         int decisionCount = decisionResultMapper.markHotResetInvalidatedBySymbol(
                 normalizedSymbol, eventId, reasonCode, nowUtc);
+        List<ExecutionPlanDO> affectedPlans = executionPlanMapper.listFinalPlansForHotReset(
+                command.getAnalysisId(), normalizedSymbol);
         int planCount = executionPlanMapper.markNeedsRevalidationForHotReset(
                 command.getAnalysisId(), normalizedSymbol, eventId,
                 command.getEventType().name() + ":" + reasonCode, nowUtc);
+        if (planRevalidationService != null) {
+            for (ExecutionPlanDO plan : affectedPlans) {
+                planRevalidationService.recordSystemTrigger(
+                        plan, PlanRevalidationTriggerTypeEnum.HOT_RESET,
+                        command.getEventType().name() + ":" + reasonCode, nowUtc);
+            }
+        }
         int pushCount = pushSnapshotMapper.invalidatePendingBySymbolForHotReset(normalizedSymbol);
 
         HotResetEventDO event = buildEvent(command, eventId, evaluation, occurredAt, nowUtc, preState, postState,

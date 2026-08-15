@@ -1,6 +1,23 @@
 # Fundamental AI v4.1 Schema And API Changelog
 
-Status: `FINAL_CONTRACT_ALIGNMENT_COMPLETE_PENDING_REAUDIT`
+Status: `IMPLEMENTED_PENDING_INDEPENDENT_PRODUCT_AUDIT`
+
+## V13 Final Interaction Runtime
+
+Migration: `V13__fundamental_ai_v4_1_final_interaction_runtime.sql`.
+
+V13 extends existing owners with `analysis_mode`, Final plan lifecycle/version/
+supersession, account-risk coverage, review missed/later semantics and user
+notification/pool settings. It adds the non-duplicate owners
+`tm_plan_revalidation_record`, `tm_message`, `tm_channel_delivery`,
+`tm_async_task` and `tm_event_asset_relation`. Historical rows remain null or
+conservative where success cannot be proven.
+
+New read/write surfaces are under `/api/workspace` for validated Final plans,
+plan revalidation, messages, subordinate channel delivery, async tasks,
+Push Recheck and events. Asset Pool adds explicit on-demand Preview and batch
+operations. UserConfig extends its existing owner; no parallel settings owner
+was introduced.
 
 ## Schema
 
@@ -113,3 +130,15 @@ Base: `/api/asset-pool`
 `SCHEMA_CHANGED = YES`
 
 `API_CHANGED = YES`
+
+## Post-Authorization Main Sync Boundary
+
+The authorization-main synchronization changed no application schema or API.
+The candidate still contains the already authorized V13 and `/api/workspace`
+implementation described above. A disposable PostgreSQL 16.14 run validated
+all 13 Flyway migrations from an empty schema through V13, including historical
+compatibility paths.
+
+`POST_AUTH_SYNC_SCHEMA_CHANGE = NO`
+
+`POST_AUTH_SYNC_API_CHANGE = NO`

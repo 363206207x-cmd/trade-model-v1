@@ -68,7 +68,7 @@ class PersistentAssetPoolServiceTest {
     }
 
     @Test
-    void addRemoveAndRestorePersistOnlyExplicitUserIntent() {
+    void addAndRemovePersistOnlyExplicitUserIntent() {
         when(marketAssetCatalog.requireTradable("eth/usdt"))
                 .thenReturn(new MarketAssetDTO("ETHUSDT", "ETH", "USDT", "SPOT"));
         when(mapper.maxUserSortOrder(9L)).thenReturn(20);
@@ -93,14 +93,51 @@ class PersistentAssetPoolServiceTest {
         assertThat(removed.getSourceType()).isEqualTo("USER_OVERRIDE");
         assertThat(removed.getActive()).isFalse();
         assertThat(removed.getFocusEnabled()).isFalse();
+        assertThat(removed.getWatchStatus()).isEqualTo("TRACKING_STOPPED");
         verify(marketAssetCatalog, org.mockito.Mockito.times(1)).requireTradable(any());
+    }
 
-        when(mapper.listSystemDefaults()).thenReturn(List.of(
-                row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT")));
-        when(mapper.listUserOverrides(9L)).thenReturn(List.of());
-        assertThat(service.restoreDefaults(9L)).extracting(AssetPoolAssetDTO::symbol)
-                .containsExactly("BTCUSDT");
-        verify(mapper).deleteUserOverrides(9L);
+    @Test
+    void topUpDefaultsRestoresOnlyMissingDefaultsAndKeepsCustomAssets() {
+        AssetPoolItemDO btcDefault = row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT");
+        AssetPoolItemDO disabledBtc = row("USER", 9L, "BTCUSDT", false, false, 30, "USER_OVERRIDE");
+        AssetPoolItemDO customLink = row("USER", 9L, "LINKUSDT", true, true, 40, "USER_ADDED");
+        AssetPoolItemDO restoredBtc = row("USER", 9L, "BTCUSDT", true, true, 10, "USER_OVERRIDE");
+        when(mapper.listSystemDefaults()).thenReturn(List.of(btcDefault));
+        when(mapper.listUserOverrides(9L)).thenReturn(
+                List.of(disabledBtc, customLink), List.of(restoredBtc, customLink));
+
+        List<AssetPoolAssetDTO> result = service.topUpDefaults(9L);
+
+        assertThat(result).extracting(AssetPoolAssetDTO::symbol)
+                .containsExactly("BTCUSDT", "LINKUSDT");
+        ArgumentCaptor<AssetPoolItemDO> write = ArgumentCaptor.forClass(AssetPoolItemDO.class);
+        verify(mapper).upsert(write.capture());
+        assertThat(write.getValue().getSymbol()).isEqualTo("BTCUSDT");
+        assertThat(write.getValue().getActive()).isTrue();
+        assertThat(write.getValue().getWatchStatus()).isEqualTo("OBSERVING");
+    }
+
+    @Test
+    void resetDefaultsRestoresSystemSetAndMarksCustomTrackingStopped() {
+        AssetPoolItemDO btcDefault = row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT");
+        AssetPoolItemDO overriddenBtc = row("USER", 9L, "BTCUSDT", true, true, 20, "USER_OVERRIDE");
+        AssetPoolItemDO customLink = row("USER", 9L, "LINKUSDT", true, true, 30, "USER_ADDED");
+        AssetPoolItemDO stoppedLink = row("USER", 9L, "LINKUSDT", false, false, 30, "USER_OVERRIDE");
+        stoppedLink.setWatchStatus("TRACKING_STOPPED");
+        when(mapper.listSystemDefaults()).thenReturn(List.of(btcDefault));
+        when(mapper.listUserOverrides(9L)).thenReturn(
+                List.of(overriddenBtc, customLink), List.of(stoppedLink));
+
+        List<AssetPoolAssetDTO> result = service.resetDefaults(9L);
+
+        verify(mapper).deleteUserOverride(9L, "BTCUSDT");
+        ArgumentCaptor<AssetPoolItemDO> write = ArgumentCaptor.forClass(AssetPoolItemDO.class);
+        verify(mapper).upsert(write.capture());
+        assertThat(write.getValue().getSymbol()).isEqualTo("LINKUSDT");
+        assertThat(write.getValue().getActive()).isFalse();
+        assertThat(write.getValue().getWatchStatus()).isEqualTo("TRACKING_STOPPED");
+        assertThat(result).extracting(AssetPoolAssetDTO::symbol).containsExactly("BTCUSDT");
     }
 
     @Test
@@ -117,7 +154,7 @@ class PersistentAssetPoolServiceTest {
         verify(mapper).upsert(write.capture());
         assertThat(write.getValue().getAssetId()).isEqualTo(101L);
         assertThat(write.getValue().getActive()).isFalse();
-        assertThat(write.getValue().getWatchStatus()).isEqualTo("REMOVED");
+        assertThat(write.getValue().getWatchStatus()).isEqualTo("TRACKING_STOPPED");
     }
 
     @Test
