@@ -62,13 +62,14 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
             return unavailable(symbol, traceId, UnifiedSourceStatus.ERROR, "COINGLASS_SYMBOL_UNSUPPORTED");
         }
         if (!properties.isEnabled()) {
-            return unavailable(key, traceId, UnifiedSourceStatus.DISABLED, "COINGLASS_PROVIDER_DISABLED");
+            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED, "COINGLASS_PROVIDER_NOT_CONFIGURED");
         }
         if (!properties.hasApiKey()) {
             return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED, "COINGLASS_API_KEY_MISSING");
         }
         if (!properties.isExternalCallsEnabled()) {
-            return unavailable(key, traceId, UnifiedSourceStatus.DISABLED, "COINGLASS_EXTERNAL_CALLS_DISABLED");
+            return unavailable(key, traceId, UnifiedSourceStatus.NOT_CONFIGURED,
+                    "COINGLASS_EXTERNAL_CALLS_NOT_CONFIGURED");
         }
         Duration minimum = Duration.ofSeconds(Math.max(1, properties.getEmergencyMinRefreshGapSeconds()));
         Duration freshTtl = requestedFreshTtl == null || requestedFreshTtl.compareTo(minimum) < 0

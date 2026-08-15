@@ -98,7 +98,7 @@ class AiOrchestratorControllerTest {
 
         mvc.perform(get("/api/ai/orchestrator/status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.providers[0].ready").value(true))
+                .andExpect(jsonPath("$.providers[0].ready").value(false))
                 .andExpect(jsonPath("$.providers[0].modelReadiness")
                         .value("MODEL_FALLBACK_ACTIVE"))
                 .andExpect(jsonPath("$.providers[0].fallbackUsed").value(true))

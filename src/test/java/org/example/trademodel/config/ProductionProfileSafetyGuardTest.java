@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.example.trademodel.mapper.PersonalUserMapper;
+import org.example.trademodel.security.InitialPasswordPolicy;
 import org.example.trademodel.security.PersonalUserBootstrap;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,29 +128,27 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
-    void rejectsMissingAdminCredentials() {
+    void bootstrapCredentialsAreOwnedByBootstrapReadiness() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.auth.initial-username", "");
         environment.setProperty("trade-model.auth.initial-password", " ");
 
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production initial username missing")
-                .hasMessageContaining("production initial password missing");
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    void rejectsUnsafeAdminPasswordDefaults() {
+    void productionGuardDoesNotDuplicatePasswordPolicy() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.auth.initial-password", "change-me");
 
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production initial password uses an unsafe default value");
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+        assertThat(InitialPasswordPolicy.validate("change-me").accepted()).isFalse();
     }
 
     @Test
-    void copiedEnvExampleFailsProductionSafetyGuard() throws Exception {
+    void copiedEnvExampleIsRejectedByCanonicalPasswordPolicy() throws Exception {
         String templateValue = Files.readAllLines(Path.of(".env.example")).stream()
                 .filter(line -> line.startsWith("TRADE_MODEL_INITIAL_PASSWORD="))
                 .map(line -> line.substring(line.indexOf('=') + 1))
@@ -159,9 +158,10 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.auth.initial-password", templateValue);
 
         assertThat(templateValue).isEmpty();
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production initial password missing");
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+        assertThat(InitialPasswordPolicy.validate(templateValue).reasonCode())
+                .isEqualTo(InitialPasswordPolicy.ReasonCode.PASSWORD_MISSING);
     }
 
     @ParameterizedTest
@@ -171,12 +171,8 @@ class ProductionProfileSafetyGuardTest {
             "REPLACE-WITH-YOUR-SECRET"
     })
     void replaceWithPrefixIsRejected(String password) {
-        MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.initial-password", password);
-
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production initial password uses an unsafe default value");
+        assertThat(InitialPasswordPolicy.validate(password).reasonCode())
+                .isEqualTo(InitialPasswordPolicy.ReasonCode.PASSWORD_TEMPLATE_VALUE);
     }
 
     @ParameterizedTest
@@ -194,12 +190,7 @@ class ProductionProfileSafetyGuardTest {
             "<long-local-secret>"
     })
     void placeholderValuesAreRejected(String password) {
-        MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.initial-password", password);
-
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production initial password uses an unsafe default value");
+        assertThat(InitialPasswordPolicy.validate(password).accepted()).isFalse();
     }
 
     @Test
@@ -209,6 +200,7 @@ class ProductionProfileSafetyGuardTest {
 
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
                 .doesNotThrowAnyException();
+        assertThat(InitialPasswordPolicy.validate("A9!real-operator-secret-2026").accepted()).isTrue();
     }
 
     @Test
@@ -220,12 +212,11 @@ class ProductionProfileSafetyGuardTest {
                 true, "operator", unsafePassword, mock(PersonalUserMapper.class),
                 new BCryptPasswordEncoder());
 
-        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("unsafe default value");
-        assertThatThrownBy(() -> bootstrap.run(mock(ApplicationArguments.class)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("unsafe");
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+        bootstrap.run(mock(ApplicationArguments.class));
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_POLICY_REJECTED);
     }
 
     @Test

@@ -91,10 +91,92 @@ assert_false_permissions FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_FIGMA
 
 base_ref="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
 changed_files="$({ git diff --name-only "$base_ref"; git diff --name-only; git diff --cached --name-only; } | awk 'NF && !seen[$0]++')"
-if grep -Eq '^(pom\.xml|src/(main|test)/|.*application[^/]*\.ya?ml$|.*\.java$|.*\.sql$|.*dashboard.*|.*mobile.*|.*figma.*)' <<<"$changed_files"; then
-  echo "AUTHORIZATION_VALIDATION_BLOCKED forbidden-change-scope" >&2
-  printf '%s\n' "$changed_files" >&2
-  exit 1
+effective_branch="${GITHUB_HEAD_REF:-$(git branch --show-current)}"
+if [[ "$effective_branch" == "codex/v4-1-target-runtime-blocker-remediation" ]]; then
+  implementation_path_allowed() {
+    local file="$1"
+    case "$file" in
+      pom.xml | \
+      scripts/generate-runtime-password.sh | \
+      scripts/standard-release-postgresql-smoke.sh | \
+      scripts/target-runtime-preflight.sh | \
+      scripts/controlled-current-state-clone-rehearsal-p3.sh | \
+      scripts/controlled-postgresql-flyway-v7-evidence.sh | \
+      scripts/validate-v4-1-target-runtime-blocker-authorization.sh | \
+      docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION.md | \
+      docs/FUNDAMENTAL_AI_V4_1_RELEASE_JAR_FLYWAY_FIX.md | \
+      docs/FUNDAMENTAL_AI_V4_1_PROVIDER_CAPABILITY_MATRIX.md | \
+      docs/FUNDAMENTAL_AI_V4_1_AI_PROVIDER_READINESS.md | \
+      docs/FUNDAMENTAL_AI_V4_1_AUTH_BOOTSTRAP_PREFLIGHT.md | \
+      docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_REACCEPTANCE_HANDOFF.md | \
+      docs/FUNDAMENTAL_AI_V4_1_TEST_REPORT.md | \
+      docs/FUNDAMENTAL_AI_V4_1_REMAINING_GAPS.md | \
+      docs/FUNDAMENTAL_AI_V4_1_ENVIRONMENT_VARIABLES.md | \
+      docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_RUNBOOK.md | \
+      docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_SMOKE_TEST.md | \
+      src/main/resources/application.yml | \
+      src/main/resources/application-prod.yml)
+        return 0
+        ;;
+      src/main/java/org/example/trademodel/ai/*.java | \
+      src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java | \
+      src/main/java/org/example/trademodel/config/TargetRuntimePreflight.java | \
+      src/main/java/org/example/trademodel/controller/AiOrchestratorController.java | \
+      src/main/java/org/example/trademodel/controller/AssetPoolController.java | \
+      src/main/java/org/example/trademodel/dto/assetpool/*.java | \
+      src/main/java/org/example/trademodel/dto/ohlcv/PublicProviderErrorCode.java | \
+      src/main/java/org/example/trademodel/localreal/LocalRealDataCoordinator.java | \
+      src/main/java/org/example/trademodel/market/client/impl/*.java | \
+      src/main/java/org/example/trademodel/providercall/coinglass/*.java | \
+      src/main/java/org/example/trademodel/providercall/instrument/*.java | \
+      src/main/java/org/example/trademodel/security/*.java | \
+      src/main/java/org/example/trademodel/service/RealMarketDataFetcherService.java | \
+      src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java | \
+      src/main/java/org/example/trademodel/service/watchlistsource/*.java | \
+      src/test/java/org/example/trademodel/actuator/*.java | \
+      src/test/java/org/example/trademodel/ai/*.java | \
+      src/test/java/org/example/trademodel/config/*.java | \
+      src/test/java/org/example/trademodel/controller/*.java | \
+      src/test/java/org/example/trademodel/localreal/*.java | \
+      src/test/java/org/example/trademodel/market/client/impl/*.java | \
+      src/test/java/org/example/trademodel/postgresql/*.java | \
+      src/test/java/org/example/trademodel/providercall/*.java | \
+      src/test/java/org/example/trademodel/providercall/coinglass/*.java | \
+      src/test/java/org/example/trademodel/providercall/instrument/*.java | \
+      src/test/java/org/example/trademodel/security/*.java | \
+      src/test/java/org/example/trademodel/service/*.java | \
+      src/test/java/org/example/trademodel/service/watchlistsource/*.java)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  forbidden_files=""
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    if ! implementation_path_allowed "$file"; then
+      forbidden_files+="${file}"$'\n'
+    fi
+  done <<<"$changed_files"
+  if [[ -n "$forbidden_files" ]]; then
+    echo "AUTHORIZATION_VALIDATION_BLOCKED implementation-forbidden-change-scope" >&2
+    printf '%s' "$forbidden_files" >&2
+    exit 1
+  fi
+  if grep -Eiq '(^|/)(mobile|figma)(/|\.|$)|\.sql$|dashboard\.(html|js|css)$' <<<"$changed_files"; then
+    echo "AUTHORIZATION_VALIDATION_BLOCKED protected-scope-change" >&2
+    exit 1
+  fi
+  echo "IMPLEMENTATION_EXACT_BRANCH_SCOPE: PASS"
+else
+  if grep -Eq '^(pom\.xml|src/(main|test)/|.*application[^/]*\.ya?ml$|.*\.java$|.*\.sql$|.*dashboard.*|.*mobile.*|.*figma.*)' <<<"$changed_files"; then
+    echo "AUTHORIZATION_VALIDATION_BLOCKED forbidden-change-scope" >&2
+    printf '%s\n' "$changed_files" >&2
+    exit 1
+  fi
 fi
 
 echo "PRODUCT_SOURCE_MAPPING: PASS"

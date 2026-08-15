@@ -1,6 +1,7 @@
 package org.example.trademodel.service.watchlistsource;
 
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.dto.assetpool.AssetPoolScanBatchResultDTO;
 import org.example.trademodel.dto.assetpool.AssetPoolScanResultDTO;
 import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
@@ -52,4 +53,13 @@ public interface AssetPoolService {
     List<AssetPoolScanResultDTO> scanForUser(Long userId, String timeframe);
 
     List<AssetPoolScanResultDTO> scanSelectedForUser(Long userId, List<String> symbols, String timeframe);
+
+    default AssetPoolScanBatchResultDTO scanSummaryForUser(Long userId, String timeframe) {
+        return AssetPoolScanBatchResultDTO.from(scanForUser(userId, timeframe));
+    }
+
+    default AssetPoolScanBatchResultDTO scanSelectedSummaryForUser(
+            Long userId, List<String> symbols, String timeframe) {
+        return AssetPoolScanBatchResultDTO.from(scanSelectedForUser(userId, symbols, timeframe));
+    }
 }

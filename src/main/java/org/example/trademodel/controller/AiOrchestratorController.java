@@ -5,6 +5,9 @@ import org.example.trademodel.ai.AiOrchestratorProperties;
 import org.example.trademodel.ai.AiProviderClient;
 import org.example.trademodel.ai.AiProviderProperties;
 import org.example.trademodel.ai.AiProviderReadiness;
+import org.example.trademodel.ai.AiProviderName;
+import org.example.trademodel.ai.AiProviderReadinessService;
+import org.example.trademodel.ai.AiProviderRuntimeReadiness;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.service.AiCallLogService;
 import org.example.trademodel.service.AiDecisionOrchestratorService;
@@ -12,6 +15,8 @@ import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,6 +35,7 @@ public class AiOrchestratorController {
     private final AiOrchestratorProperties properties;
     private final List<AiProviderClient> providerClients;
     private final AuthenticatedUserIdResolver userIdResolver;
+    private final AiProviderReadinessService readinessService;
 
     public AiOrchestratorController(AiDecisionOrchestratorService orchestratorService,
                                     AiCallLogService callLogService,
@@ -38,12 +44,21 @@ public class AiOrchestratorController {
         this(orchestratorService, callLogService, properties, providerClients, null);
     }
 
-    @Autowired
     public AiOrchestratorController(AiDecisionOrchestratorService orchestratorService,
                                     AiCallLogService callLogService,
                                     AiOrchestratorProperties properties,
                                     List<AiProviderClient> providerClients,
                                     AuthenticatedUserIdResolver userIdResolver) {
+        this(orchestratorService, callLogService, properties, providerClients, userIdResolver, null);
+    }
+
+    @Autowired
+    public AiOrchestratorController(AiDecisionOrchestratorService orchestratorService,
+                                    AiCallLogService callLogService,
+                                    AiOrchestratorProperties properties,
+                                    List<AiProviderClient> providerClients,
+                                    AuthenticatedUserIdResolver userIdResolver,
+                                    AiProviderReadinessService readinessService) {
         this.orchestratorService = orchestratorService;
         this.callLogService = callLogService;
         this.properties = properties;
@@ -51,6 +66,7 @@ public class AiOrchestratorController {
                 .sorted(Comparator.comparing(client -> client.role().name()))
                 .toList();
         this.userIdResolver = userIdResolver;
+        this.readinessService = readinessService;
     }
 
     @GetMapping("/orchestrator/status")
@@ -71,15 +87,26 @@ public class AiOrchestratorController {
                         && providerTimeouts.validProvider(org.example.trademodel.ai.AiProviderName.XAI)));
         map.put("maxInputChars", properties.getMaxInputChars());
         map.put("maxOutputTokens", properties.getMaxOutputTokens());
-        map.put("dailyBudgetConfigured", properties.getDailyBudgetUsd().signum() > 0);
-        map.put("perAnalysisBudgetConfigured", properties.getPerAnalysisBudgetUsd().signum() > 0);
+        map.put("dailyBudgetConfiguration", properties.dailyBudgetPresence().name());
+        map.put("perAnalysisBudgetConfiguration", properties.perAnalysisBudgetPresence().name());
         map.put("fallbackMode", AiOrchestrationMode.RULE_ONLY_FALLBACK.name());
         map.put("modelStrategy", Map.of(
                 "GPT_FINAL", properties.getModelStrategy().getGptFinal().getPriority().name(),
                 "GEMINI_REVIEW", properties.getModelStrategy().getGeminiReview().getPriority().name(),
                 "GROK_CHALLENGE", properties.getModelStrategy().getGrokChallenge().getPriority().name()));
-        map.put("providers", providerClients.stream().map(this::providerStatus).toList());
+        map.put("providers", readinessService == null
+                ? providerClients.stream().map(this::providerStatus).toList()
+                : readinessService.readiness().stream().map(AiOrchestratorController::runtimeProviderStatus).toList());
         return map;
+    }
+
+    @PostMapping("/providers/{provider}/reverify")
+    public AiProviderRuntimeReadiness reverify(@PathVariable String provider) {
+        if (userIdResolver == null || readinessService == null) {
+            throw new IllegalStateException("Authenticated AI provider verification is unavailable");
+        }
+        userIdResolver.requireCurrentUserId();
+        return readinessService.reverify(AiProviderName.valueOf(normalize(provider)));
     }
 
     @GetMapping("/call-logs")
@@ -113,17 +140,37 @@ public class AiOrchestratorController {
         map.put("role", readiness.getRole().name());
         map.put("enabled", readiness.isEnabled());
         map.put("configured", readiness.isConfigured());
-        map.put("ready", readiness.isReady());
+        map.put("ready", readiness.isReady() && !readiness.isFallbackUsed());
         map.put("modelReadiness", readiness.getModelReadinessStatus().name());
         map.put("configuredModel", readiness.getConfiguredModel());
         map.put("effectiveModel", readiness.getEffectiveModel());
         map.put("fallbackUsed", readiness.isFallbackUsed());
         map.put("fallbackReason", readiness.getFallbackReason());
         map.put("modelStrategy", readiness.getModelStrategy());
-        map.put("requestsPerMinuteConfigured", providerProperties.getRequestsPerMinute() > 0);
-        map.put("costRateConfigured", providerProperties.getInputCostPerMillionUsd().signum() > 0
-                && providerProperties.getOutputCostPerMillionUsd().signum() > 0);
+        map.put("requestsPerMinuteConfiguration", providerProperties.requestsPerMinutePresence().name());
+        map.put("inputCostConfiguration", providerProperties.inputCostPresence().name());
+        map.put("outputCostConfiguration", providerProperties.outputCostPresence().name());
         map.put("reasonCodes", readiness.getReasonCodes());
+        return map;
+    }
+
+    private static Map<String, Object> runtimeProviderStatus(AiProviderRuntimeReadiness readiness) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("provider", readiness.provider());
+        map.put("model", readiness.model());
+        map.put("state", readiness.state().name());
+        map.put("ready", readiness.ready());
+        map.put("verifiedAt", readiness.verifiedAt());
+        map.put("expiresAt", readiness.expiresAt());
+        map.put("reasonCode", readiness.reasonCode());
+        map.put("requestId", readiness.requestId());
+        map.put("configVersion", readiness.configVersion());
+        map.put("rpmConfiguration", readiness.rpmConfiguration().name());
+        map.put("inputCostConfiguration", readiness.inputCostConfiguration().name());
+        map.put("outputCostConfiguration", readiness.outputCostConfiguration().name());
+        map.put("dailyBudgetConfiguration", readiness.dailyBudgetConfiguration().name());
+        map.put("perAnalysisBudgetConfiguration", readiness.perAnalysisBudgetConfiguration().name());
+        map.put("fallbackReady", false);
         return map;
     }
 

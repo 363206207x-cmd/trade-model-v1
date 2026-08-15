@@ -20,22 +20,23 @@ import static org.mockito.Mockito.when;
 class KrakenPairResolverTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
-    @Test void assetPairsMapsBtcUsdtToXbtUsdAltname() throws Exception { assertPair("BTCUSDT", "XBTUSD", "XBT/USD"); }
-    @Test void assetPairsMapsEthUsdtToEthUsdAltname() throws Exception { assertPair("ETHUSDT", "ETHUSD", "ETH/USD"); }
-    @Test void assetPairsMapsSolUsdt() throws Exception { assertPair("SOLUSDT", "SOLUSD", "SOL/USD"); }
-    @Test void assetPairsMapsXrpUsdt() throws Exception { assertPair("XRPUSDT", "XRPUSD", "XRP/USD"); }
-    @Test void assetPairsMapsDogeUsdtToXdgUsd() throws Exception { assertPair("DOGEUSDT", "XDGUSD", "XDG/USD"); }
+    @Test void assetPairsMapsBtcUsdtToExactXbtUsdtAltname() throws Exception { assertPair("BTCUSDT", "XBTUSDT", "XBT/USDT"); }
+    @Test void assetPairsMapsEthUsdtToExactEthUsdtAltname() throws Exception { assertPair("ETHUSDT", "ETHUSDT", "ETH/USDT"); }
+    @Test void assetPairsMapsSolUsdt() throws Exception { assertPair("SOLUSDT", "SOLUSDT", "SOL/USDT"); }
+    @Test void assetPairsMapsXrpUsdt() throws Exception { assertPair("XRPUSDT", "XRPUSDT", "XRP/USDT"); }
+    @Test void assetPairsMapsDogeUsdtToXdgUsdt() throws Exception { assertPair("DOGEUSDT", "XDGUSDT", "XDG/USDT"); }
+    @Test void assetPairsMapsAdaUsdtFromAuthoritativeDirectory() throws Exception { assertPair("ADAUSDT", "ADAUSDT", "ADA/USDT"); }
 
     @Test
     void assetPairsHandlesBtcAndXbtDisplayAliases() throws Exception {
-        assertPairFromFixture("BTCUSDT", "XBTUSD", fixtureWithAliases("BTC/USD", "XDG/USD"));
-        assertPairFromFixture("BTCUSDT", "XBTUSD", fixtureWithAliases("XBT/USD", "XDG/USD"));
+        assertPairFromFixture("BTCUSDT", "XBTUSDT", fixtureWithAliases("BTC/USDT", "XDG/USDT"));
+        assertPairFromFixture("BTCUSDT", "XBTUSDT", fixtureWithAliases("XBT/USDT", "XDG/USDT"));
     }
 
     @Test
     void assetPairsHandlesDogeAndXdgDisplayAliases() throws Exception {
-        assertPairFromFixture("DOGEUSDT", "XDGUSD", fixtureWithAliases("XBT/USD", "DOGE/USD"));
-        assertPairFromFixture("DOGEUSDT", "XDGUSD", fixtureWithAliases("XBT/USD", "XDG/USD"));
+        assertPairFromFixture("DOGEUSDT", "XDGUSDT", fixtureWithAliases("XBT/USDT", "DOGE/USDT"));
+        assertPairFromFixture("DOGEUSDT", "XDGUSDT", fixtureWithAliases("XBT/USDT", "XDG/USDT"));
     }
 
     @Test
@@ -63,20 +64,32 @@ class KrakenPairResolverTest {
 
     @Test
     void missingAltnameFallsBackToResultObjectKey() throws Exception {
-        String fixture = assetPairsFixture(false).replace("\"altname\":\"ETHUSD\",", "");
+        String fixture = assetPairsFixture(false).replace("\"altname\":\"ETHUSDT\",", "");
         KrakenPairResolution result = resolver(fetcher(fixture)).resolve("ETHUSDT");
         assertThat(result.ready()).isTrue();
-        assertThat(result.metadata().requestPair()).isEqualTo("XETHZUSD");
+        assertThat(result.metadata().requestPair()).isEqualTo("XETHUSDT");
     }
 
     @Test
-    void missingWsnameForKnownCorePairFailsClosed() throws Exception {
-        String fixture = assetPairsFixture(false).replace("\"wsname\":\"ETH/USD\",", "");
+    void missingWsnameFailsOnlyThatPairAndKeepsDirectoryUsable() throws Exception {
+        String fixture = assetPairsFixture(false).replace("\"wsname\":\"ETH/USDT\",", "");
         KrakenPairResolver resolver = resolver(fetcher(fixture));
         KrakenPairResolution result = resolver.resolve("ETHUSDT");
         assertThat(result.ready()).isFalse();
-        assertThat(result.reasonCode()).isEqualTo("KRAKEN_PAIR_RESOLUTION_ERROR");
-        assertThat(resolver.state()).isEqualTo(KrakenPairCacheState.FAILED);
+        assertThat(result.reasonCode()).isEqualTo("PAIR_NOT_SUPPORTED");
+        assertThat(resolver.resolve("BTCUSDT").ready()).isTrue();
+        assertThat(resolver.state()).isEqualTo(KrakenPairCacheState.READY);
+    }
+
+    @Test
+    void usdPairCannotSilentlySatisfyUsdtInstrument() throws Exception {
+        String usdOnly = assetPairsFixture(false)
+                .replace("USDT", "USD")
+                .replace("XXBTUSD", "XXBTZUSD")
+                .replace("XETHUSD", "XETHZUSD");
+        KrakenPairResolution result = resolver(fetcher(usdOnly)).resolve("ADAUSDT");
+        assertThat(result.ready()).isFalse();
+        assertThat(result.reasonCode()).isEqualTo("PAIR_NOT_SUPPORTED");
     }
 
     @Test
@@ -129,20 +142,21 @@ class KrakenPairResolverTest {
 
     static String assetPairsFixture(boolean includeBnb) {
         String bnb = includeBnb
-                ? ",\"BNBUSD\":{\"altname\":\"BNBUSD\",\"wsname\":\"BNB/USD\",\"base\":\"BNB\",\"quote\":\"ZUSD\",\"status\":\"online\"}"
+                ? ",\"BNBUSDT\":{\"altname\":\"BNBUSDT\",\"wsname\":\"BNB/USDT\",\"base\":\"BNB\",\"quote\":\"USDT\",\"status\":\"online\"}"
                 : "";
         return "{\"error\":[],\"result\":{"
-                + "\"XXBTZUSD\":{\"altname\":\"XBTUSD\",\"wsname\":\"XBT/USD\",\"base\":\"XXBT\",\"quote\":\"ZUSD\",\"status\":\"online\"},"
-                + "\"XETHZUSD\":{\"altname\":\"ETHUSD\",\"wsname\":\"ETH/USD\",\"base\":\"XETH\",\"quote\":\"ZUSD\",\"status\":\"online\"},"
-                + "\"SOLUSD\":{\"altname\":\"SOLUSD\",\"wsname\":\"SOL/USD\",\"base\":\"SOL\",\"quote\":\"ZUSD\",\"status\":\"online\"},"
-                + "\"XXRPZUSD\":{\"altname\":\"XRPUSD\",\"wsname\":\"XRP/USD\",\"base\":\"XXRP\",\"quote\":\"ZUSD\",\"status\":\"online\"},"
-                + "\"XXDGZUSD\":{\"altname\":\"XDGUSD\",\"wsname\":\"XDG/USD\",\"base\":\"XXDG\",\"quote\":\"ZUSD\",\"status\":\"online\"}"
+                + "\"XXBTUSDT\":{\"altname\":\"XBTUSDT\",\"wsname\":\"XBT/USDT\",\"base\":\"XXBT\",\"quote\":\"USDT\",\"status\":\"online\"},"
+                + "\"XETHUSDT\":{\"altname\":\"ETHUSDT\",\"wsname\":\"ETH/USDT\",\"base\":\"XETH\",\"quote\":\"USDT\",\"status\":\"online\"},"
+                + "\"SOLUSDT\":{\"altname\":\"SOLUSDT\",\"wsname\":\"SOL/USDT\",\"base\":\"SOL\",\"quote\":\"USDT\",\"status\":\"online\"},"
+                + "\"XXRPUSDT\":{\"altname\":\"XRPUSDT\",\"wsname\":\"XRP/USDT\",\"base\":\"XXRP\",\"quote\":\"USDT\",\"status\":\"online\"},"
+                + "\"XXDGUSDT\":{\"altname\":\"XDGUSDT\",\"wsname\":\"XDG/USDT\",\"base\":\"XXDG\",\"quote\":\"USDT\",\"status\":\"online\"},"
+                + "\"ADAUSDT\":{\"altname\":\"ADAUSDT\",\"wsname\":\"ADA/USDT\",\"base\":\"ADA\",\"quote\":\"USDT\",\"status\":\"online\"}"
                 + bnb + "}}";
     }
 
     private static String fixtureWithAliases(String btcDisplay, String dogeDisplay) {
         return assetPairsFixture(false)
-                .replace("\"wsname\":\"XBT/USD\"", "\"wsname\":\"" + btcDisplay + "\"")
-                .replace("\"wsname\":\"XDG/USD\"", "\"wsname\":\"" + dogeDisplay + "\"");
+                .replace("\"wsname\":\"XBT/USDT\"", "\"wsname\":\"" + btcDisplay + "\"")
+                .replace("\"wsname\":\"XDG/USDT\"", "\"wsname\":\"" + dogeDisplay + "\"");
     }
 }

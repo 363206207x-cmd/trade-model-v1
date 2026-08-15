@@ -72,7 +72,7 @@ class LocalRealDataCoordinatorTest {
         when(ingestionScheduler.ingestOne(anyString(), anyString())).thenAnswer(invocation ->
                 "BNBUSDT".equals(invocation.getArgument(0))
                         ? new OhlcvIngestionResult(OhlcvSourceState.ERROR, null, 0, 0, 0,
-                        List.of("PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED"))
+                        List.of("REGION_RESTRICTED"))
                         : readyIngestion());
         when(analysisSchedulerService.marketDataReady(anyString())).thenAnswer(invocation ->
                 !"BNBUSDT".equals(invocation.getArgument(0)));
@@ -87,7 +87,7 @@ class LocalRealDataCoordinatorTest {
         assertThat(readiness.readyAssetCount()).isEqualTo(5);
         assertThat(readiness.asset("BNBUSDT").state()).isEqualTo(LocalRealAssetReadinessState.UNAVAILABLE);
         assertThat(readiness.asset("BNBUSDT").reasonCode())
-                .isEqualTo("PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED");
+                .isEqualTo("REGION_RESTRICTED");
         coordinator.shutdown();
     }
 

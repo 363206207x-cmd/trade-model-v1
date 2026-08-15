@@ -28,8 +28,8 @@ class KrakenPublicOhlcvProviderTest {
     void ohlcRequestUsesAltnameNotWsnameAndDropsCurrentCandle() throws Exception {
         RealMarketDataFetcherService fetcher = mock(RealMarketDataFetcherService.class);
         stubAssetPairs(fetcher);
-        when(fetcher.fetchPublicJson(eq("KRAKEN"), contains("pair=XBTUSD")))
-                .thenReturn(ready(ohlc("XXBTZUSD")));
+        when(fetcher.fetchPublicJson(eq("KRAKEN"), contains("pair=XBTUSDT")))
+                .thenReturn(ready(ohlc("XXBTUSDT")));
         KrakenPublicOhlcvProvider provider = provider(fetcher);
 
         PublicOhlcvProviderResult result = provider.fetchClosedBars("BTCUSDT", "5m", 100, "run-1");
@@ -37,7 +37,7 @@ class KrakenPublicOhlcvProviderTest {
         assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.READY);
         assertThat(result.batch().provider()).isEqualTo("KRAKEN");
         assertThat(result.batch().bars()).hasSize(2);
-        assertThat(provider.cachedRequestPair("BTCUSDT")).isEqualTo("XBTUSD");
+        assertThat(provider.cachedRequestPair("BTCUSDT")).isEqualTo("XBTUSDT");
     }
 
     @Test
@@ -50,31 +50,31 @@ class KrakenPublicOhlcvProviderTest {
 
     @Test
     void responseParsesInternalResultKey() throws Exception {
-        assertReadyFromDirectMap("XXBTZUSD", metadata("BTCUSDT", "XBTUSD", "XBT/USD", "XXBTZUSD"));
+        assertReadyFromDirectMap("XXBTUSDT", metadata("BTCUSDT", "XBTUSDT", "XBT/USDT", "XXBTUSDT"));
     }
 
     @Test
     void responseParsesDisplayResultKeyAndIgnoresLastField() throws Exception {
-        assertReadyFromDirectMap("BTC/USD", metadata("BTCUSDT", "XBTUSD", "XBT/USD", "XXBTZUSD"));
+        assertReadyFromDirectMap("BTC/USDT", metadata("BTCUSDT", "XBTUSDT", "XBT/USDT", "XXBTUSDT"));
     }
 
     @Test
     void responseParsesDogeAlternateResultKey() throws Exception {
-        assertReadyFromDirectMap("DOGE/USD", metadata("DOGEUSDT", "XDGUSD", "XDG/USD", "XXDGZUSD"));
+        assertReadyFromDirectMap("DOGE/USDT", metadata("DOGEUSDT", "XDGUSDT", "XDG/USDT", "XXDGUSDT"));
     }
 
     @Test
     void invalidGeometryFailsClosed() throws Exception {
         KrakenPublicOhlcvProvider provider = provider(mock(RealMarketDataFetcherService.class));
         String body = """
-                {"error":[],"result":{"XETHZUSD":[
+                {"error":[],"result":{"XETHUSDT":[
                   [1783936800,"100","90","95","105","100","1.0",1],
                   [1783937100,"100","110","90","105","100","1.0",1]
                 ],"last":1783937100}}
                 """;
 
         PublicOhlcvProviderResult result = provider.mapResponse("ETHUSDT", "5m", 100, "run-1",
-                ready(body), metadata("ETHUSDT", "ETHUSD", "ETH/USD", "XETHZUSD"));
+                ready(body), metadata("ETHUSDT", "ETHUSDT", "ETH/USDT", "XETHUSDT"));
 
         assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.ERROR);
         assertThat(result.reasonCode()).isEqualTo("INVALID_RESPONSE");
@@ -85,7 +85,7 @@ class KrakenPublicOhlcvProviderTest {
         KrakenPublicOhlcvProvider provider = provider(mock(RealMarketDataFetcherService.class));
         PublicOhlcvProviderResult result = provider.mapResponse("XRPUSDT", "5m", 100, "run-1",
                 ready("{\"error\":[],\"result\":{}}"),
-                metadata("XRPUSDT", "XRPUSD", "XRP/USD", "XXRPZUSD"));
+                metadata("XRPUSDT", "XRPUSDT", "XRP/USDT", "XXRPUSDT"));
         assertThat(result.reasonCode()).isEqualTo("INVALID_RESPONSE");
     }
 
@@ -94,7 +94,7 @@ class KrakenPublicOhlcvProviderTest {
         KrakenPublicOhlcvProvider provider = provider(mock(RealMarketDataFetcherService.class));
         PublicOhlcvProviderResult result = provider.mapResponse("BTCUSDT", "5m", 100, "run-1",
                 ready("{\"error\":[\"EQuery:Unknown asset pair\"],\"result\":{}}"),
-                metadata("BTCUSDT", "XBTUSD", "XBT/USD", "XXBTZUSD"));
+                metadata("BTCUSDT", "XBTUSDT", "XBT/USDT", "XXBTUSDT"));
         assertThat(result.reasonCode()).isEqualTo("KRAKEN_OHLC_UNKNOWN_PAIR");
     }
 

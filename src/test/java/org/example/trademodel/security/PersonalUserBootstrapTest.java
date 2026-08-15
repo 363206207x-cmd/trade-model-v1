@@ -17,7 +17,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -52,7 +51,10 @@ class PersonalUserBootstrapTest {
         assertThat(created.getPasswordHash()).isNotEqualTo(PASSWORD).startsWith("$2");
         assertThat(encoder.matches(PASSWORD, created.getPasswordHash())).isTrue();
         assertThat(created.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 7, 20, 4, 5, 6));
-        assertThat(output).doesNotContain(PASSWORD).contains("status=CREATED", "status=SKIPPED_ALREADY_EXISTS");
+        assertThat(output).doesNotContain(PASSWORD)
+                .contains("state=BOOTSTRAP_READY", "state=USER_ALREADY_EXISTS");
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.USER_ALREADY_EXISTS);
     }
 
     @Test
@@ -64,7 +66,9 @@ class PersonalUserBootstrapTest {
         bootstrap.run(mock(ApplicationArguments.class));
 
         verify(mapper, never()).insert(any(PersonalUserDO.class));
-        verify(mapper, never()).countAll();
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.USERNAME_MISSING);
+        assertThat(bootstrap.health().getStatus().getCode()).isEqualTo("DOWN");
     }
 
     @Test
@@ -84,45 +88,63 @@ class PersonalUserBootstrapTest {
     }
 
     @Test
-    void incompleteOrWeakExplicitConfigurationFailsClosed() {
+    void incompleteOrWeakExplicitConfigurationFailsReadinessClosed() {
         PersonalUserMapper mapper = mock(PersonalUserMapper.class);
-        assertThatThrownBy(() -> new PersonalUserBootstrap(
-                true, "operator", "", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
-                .run(mock(ApplicationArguments.class)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("requires both");
-        assertThatThrownBy(() -> new PersonalUserBootstrap(
-                true, "operator", "short", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
-                .run(mock(ApplicationArguments.class)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("unsafe");
+        PersonalUserBootstrap missing = new PersonalUserBootstrap(
+                true, "operator", "", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+        missing.run(mock(ApplicationArguments.class));
+        assertThat(missing.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_MISSING);
+
+        PersonalUserBootstrap weak = new PersonalUserBootstrap(
+                true, "operator", "short", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+        weak.run(mock(ApplicationArguments.class));
+        assertThat(weak.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_POLICY_REJECTED);
+        assertThat(weak.readiness().reasonCode()).isEqualTo("PASSWORD_TOO_SHORT");
+        assertThat(weak.health().getStatus().getCode()).isEqualTo("DOWN");
     }
 
     @Test
     void blankBootstrapPasswordDoesNotCreateUser() {
         PersonalUserMapper mapper = mock(PersonalUserMapper.class);
 
-        assertThatThrownBy(() -> new PersonalUserBootstrap(
-                true, "operator", " ", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
-                .run(mock(ApplicationArguments.class)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("requires both");
+        PersonalUserBootstrap bootstrap = new PersonalUserBootstrap(
+                true, "operator", " ", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+        bootstrap.run(mock(ApplicationArguments.class));
 
         verify(mapper, never()).insert(any(PersonalUserDO.class));
-        verify(mapper, never()).countAll();
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_MISSING);
     }
 
     @Test
     void bootstrapRejectsPublicTemplatePassword() {
         PersonalUserMapper mapper = mock(PersonalUserMapper.class);
 
-        assertThatThrownBy(() -> new PersonalUserBootstrap(
+        PersonalUserBootstrap bootstrap = new PersonalUserBootstrap(
                 true, "operator", "replace-with-long-local-secret",
-                mapper, new BCryptPasswordEncoder(), FIXED_CLOCK)
-                .run(mock(ApplicationArguments.class)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("unsafe");
+                mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+        bootstrap.run(mock(ApplicationArguments.class));
 
         verify(mapper, never()).insert(any(PersonalUserDO.class));
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_POLICY_REJECTED);
+        assertThat(bootstrap.readiness().reasonCode()).isEqualTo("PASSWORD_TEMPLATE_VALUE");
+    }
+
+    @Test
+    void existingUserNeedsNoInitialCredentialsAndRemainsReady() {
+        PersonalUserMapper mapper = mock(PersonalUserMapper.class);
+        when(mapper.countAll()).thenReturn(1);
+        PersonalUserBootstrap bootstrap = new PersonalUserBootstrap(
+                true, "", "", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+
+        bootstrap.run(mock(ApplicationArguments.class));
+
+        verify(mapper, never()).insert(any(PersonalUserDO.class));
+        assertThat(bootstrap.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.USER_ALREADY_EXISTS);
+        assertThat(bootstrap.health().getStatus().getCode()).isEqualTo("UP");
     }
 }

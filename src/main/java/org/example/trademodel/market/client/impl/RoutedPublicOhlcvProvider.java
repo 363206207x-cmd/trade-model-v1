@@ -3,7 +3,9 @@ package org.example.trademodel.market.client.impl;
 import org.example.trademodel.dto.ohlcv.OhlcvSourceState;
 import org.example.trademodel.dto.ohlcv.PublicOhlcvProviderResult;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
 import org.example.trademodel.service.PublicOhlcvProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -20,44 +22,50 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
     private static final Set<String> KRAKEN_FALLBACK_REASONS = Set.of(
             "TIMEOUT", "DNS_FAILURE", "HTTP_5XX", "PROVIDER_UNAVAILABLE", "RATE_LIMITED",
-            "PAIR_NOT_SUPPORTED");
+            "PAIR_NOT_SUPPORTED", "REGION_RESTRICTED");
     private final KrakenPublicOhlcvProvider kraken;
     private final BinancePublicOhlcvProvider binance;
     private final String primary;
     private final String fallback;
     private final boolean fallbackEnabled;
+    private final ProviderCapabilityRegistry capabilityRegistry;
     private final Map<String, MutableHealth> health = new ConcurrentHashMap<>();
 
+    @Autowired
     public RoutedPublicOhlcvProvider(KrakenPublicOhlcvProvider kraken,
                                      BinancePublicOhlcvProvider binance,
                                      @Value("${trade-model.ohlcv.provider.primary:kraken}") String primary,
                                      @Value("${trade-model.ohlcv.provider.fallback:binance}") String fallback,
-                                     @Value("${trade-model.ohlcv.provider.fallback-enabled:true}") boolean fallbackEnabled) {
+                                     @Value("${trade-model.ohlcv.provider.fallback-enabled:true}") boolean fallbackEnabled,
+                                     ProviderCapabilityRegistry capabilityRegistry) {
         this.kraken = kraken;
         this.binance = binance;
         this.primary = normalizeProvider(primary);
         this.fallback = normalizeProvider(fallback);
         this.fallbackEnabled = fallbackEnabled;
+        this.capabilityRegistry = capabilityRegistry;
         health.put("KRAKEN", new MutableHealth("KRAKEN"));
         health.put("BINANCE", new MutableHealth("BINANCE"));
+    }
+
+    RoutedPublicOhlcvProvider(KrakenPublicOhlcvProvider kraken,
+                              BinancePublicOhlcvProvider binance,
+                              String primary,
+                              String fallback,
+                              boolean fallbackEnabled) {
+        this(kraken, binance, primary, fallback, fallbackEnabled, null);
     }
 
     @Override
     public PublicOhlcvProviderResult fetchClosedBars(String symbol, String timeframe, int limit,
                                                      String ingestionRunId) {
         PublicOhlcvProviderResult primaryResult = call(primary, symbol, timeframe, limit, ingestionRunId);
-        record(primary, primaryResult);
+        record(primary, symbol, timeframe, primaryResult);
         if (ready(primaryResult) || !fallbackEnabled || primary.equals(fallback)
                 || !fallbackAllowed(primary, primaryResult)) return primaryResult;
 
         PublicOhlcvProviderResult fallbackResult = call(fallback, symbol, timeframe, limit, ingestionRunId);
-        record(fallback, fallbackResult);
-        if ("PAIR_NOT_SUPPORTED".equals(primaryResult.reasonCode())
-                && ("GEO_RESTRICTED".equals(fallbackResult.reasonCode())
-                || "PROVIDER_UNAVAILABLE_FOR_LOCATION".equals(fallbackResult.reasonCode()))) {
-            return new PublicOhlcvProviderResult(OhlcvSourceState.ERROR,
-                    "PAIR_NOT_SUPPORTED_OR_GEO_RESTRICTED", null);
-        }
+        record(fallback, symbol, timeframe, fallbackResult);
         return fallbackResult;
     }
 
@@ -88,10 +96,16 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         };
     }
 
-    private void record(String provider, PublicOhlcvProviderResult result) {
+    private void record(String provider, String symbol, String timeframe, PublicOhlcvProviderResult result) {
         MutableHealth item = health.computeIfAbsent(provider, MutableHealth::new);
         if (ready(result)) item.success();
         else item.failure(result == null ? "PROVIDER_UNAVAILABLE" : result.reasonCode());
+        if (capabilityRegistry != null) {
+            String providerSymbol = "KRAKEN".equals(provider) ? kraken.cachedRequestPair(symbol) : symbol;
+            String sourceVersion = result != null && result.batch() != null
+                    ? result.batch().provenanceVersion() : provider + "_RUNTIME_CAPABILITY_V1";
+            capabilityRegistry.recordOhlcv(provider, symbol, timeframe, providerSymbol, sourceVersion, result);
+        }
     }
 
     private static boolean ready(PublicOhlcvProviderResult result) {
@@ -129,7 +143,7 @@ public class RoutedPublicOhlcvProvider implements PublicOhlcvProvider {
         }
 
         PublicProviderHealthSnapshot snapshot(boolean circuitOpen) {
-            String status = circuitOpen ? "GEO_RESTRICTED"
+            String status = circuitOpen ? "REGION_RESTRICTED"
                     : lastSuccessAt != null && lastFailureCode == null ? "UP"
                     : lastFailureAt != null ? "DEGRADED" : "NOT_USED";
             return new PublicProviderHealthSnapshot(provider, status, lastSuccessAt,

@@ -16,8 +16,8 @@ public class AiOrchestratorProperties {
     private int maxConcurrentCalls = 3;
     private int maxQueuedCalls = 3;
     private long perAssetRoleMinIntervalMs = 1000L;
-    private BigDecimal dailyBudgetUsd = BigDecimal.ZERO;
-    private BigDecimal perAnalysisBudgetUsd = BigDecimal.ZERO;
+    private BigDecimal dailyBudgetUsd;
+    private BigDecimal perAnalysisBudgetUsd;
     private ProviderTimeouts providerTimeouts = new ProviderTimeouts();
     private ModelStrategy modelStrategy = new ModelStrategy();
     private AiProviderProperties openai = new AiProviderProperties();
@@ -40,13 +40,23 @@ public class AiOrchestratorProperties {
     public void setMaxQueuedCalls(int value) { this.maxQueuedCalls = Math.max(1, value); }
     public long getPerAssetRoleMinIntervalMs() { return perAssetRoleMinIntervalMs; }
     public void setPerAssetRoleMinIntervalMs(long value) { this.perAssetRoleMinIntervalMs = Math.max(0L, value); }
-    public BigDecimal getDailyBudgetUsd() { return dailyBudgetUsd; }
+    public BigDecimal getDailyBudgetUsd() { return dailyBudgetUsd == null ? BigDecimal.ZERO : dailyBudgetUsd; }
+    public BigDecimal getConfiguredDailyBudgetUsd() { return dailyBudgetUsd; }
     public void setDailyBudgetUsd(BigDecimal dailyBudgetUsd) {
-        this.dailyBudgetUsd = dailyBudgetUsd == null ? BigDecimal.ZERO : dailyBudgetUsd;
+        this.dailyBudgetUsd = dailyBudgetUsd;
     }
-    public BigDecimal getPerAnalysisBudgetUsd() { return perAnalysisBudgetUsd; }
+    public BigDecimal getPerAnalysisBudgetUsd() {
+        return perAnalysisBudgetUsd == null ? BigDecimal.ZERO : perAnalysisBudgetUsd;
+    }
+    public BigDecimal getConfiguredPerAnalysisBudgetUsd() { return perAnalysisBudgetUsd; }
     public void setPerAnalysisBudgetUsd(BigDecimal perAnalysisBudgetUsd) {
-        this.perAnalysisBudgetUsd = perAnalysisBudgetUsd == null ? BigDecimal.ZERO : perAnalysisBudgetUsd;
+        this.perAnalysisBudgetUsd = perAnalysisBudgetUsd;
+    }
+    public AiConfigurationPresence dailyBudgetPresence() {
+        return AiConfigurationPresence.of(dailyBudgetUsd);
+    }
+    public AiConfigurationPresence perAnalysisBudgetPresence() {
+        return AiConfigurationPresence.of(perAnalysisBudgetUsd);
     }
     public ProviderTimeouts getProviderTimeouts() { return providerTimeouts; }
     public void setProviderTimeouts(ProviderTimeouts providerTimeouts) {

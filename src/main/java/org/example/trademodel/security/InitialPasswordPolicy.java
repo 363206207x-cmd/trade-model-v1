@@ -43,17 +43,49 @@ public final class InitialPasswordPolicy {
     private InitialPasswordPolicy() {
     }
 
-    public static boolean isUnsafe(String value) {
+    public enum ReasonCode {
+        NONE,
+        PASSWORD_MISSING,
+        PASSWORD_TOO_SHORT,
+        PASSWORD_UNSAFE_VALUE,
+        PASSWORD_TEMPLATE_VALUE
+    }
+
+    public record Validation(boolean accepted, ReasonCode reasonCode) {
+        static Validation pass() {
+            return new Validation(true, ReasonCode.NONE);
+        }
+
+        static Validation reject(ReasonCode reasonCode) {
+            return new Validation(false, reasonCode);
+        }
+    }
+
+    public static Validation validate(String value) {
         if (value == null || value.isBlank()) {
-            return true;
+            return Validation.reject(ReasonCode.PASSWORD_MISSING);
         }
         String normalized = value.trim().toUpperCase(Locale.ROOT);
-        if (normalized.length() < MIN_LENGTH || UNSAFE_VALUES.contains(normalized)) {
-            return true;
+        if (normalized.length() < MIN_LENGTH) {
+            return Validation.reject(ReasonCode.PASSWORD_TOO_SHORT);
+        }
+        if (UNSAFE_VALUES.contains(normalized)) {
+            return Validation.reject(ReasonCode.PASSWORD_UNSAFE_VALUE);
         }
         if (normalized.startsWith("<") && normalized.endsWith(">")) {
-            return true;
+            return Validation.reject(ReasonCode.PASSWORD_TEMPLATE_VALUE);
         }
-        return TEMPLATE_PREFIXES.stream().anyMatch(normalized::startsWith);
+        if (TEMPLATE_PREFIXES.stream().anyMatch(normalized::startsWith)) {
+            return Validation.reject(ReasonCode.PASSWORD_TEMPLATE_VALUE);
+        }
+        return Validation.pass();
+    }
+
+    public static boolean isUnsafe(String value) {
+        return !validate(value).accepted();
+    }
+
+    public static int minimumLength() {
+        return MIN_LENGTH;
     }
 }

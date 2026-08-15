@@ -7,7 +7,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.net.URI;
 
-import org.example.trademodel.security.InitialPasswordPolicy;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -112,18 +111,6 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
         if (!isTrue(property(environment, "trade-model.auth.enabled"))) {
             errors.add("production personal authentication must be enabled");
-        }
-
-        String initialUsername = property(environment, "trade-model.auth.initial-username");
-        if (isBlank(initialUsername)) {
-            errors.add("production initial username missing");
-        }
-
-        String initialPassword = property(environment, "trade-model.auth.initial-password");
-        if (isBlank(initialPassword)) {
-            errors.add("production initial password missing");
-        } else if (InitialPasswordPolicy.isUnsafe(initialPassword)) {
-            errors.add("production initial password uses an unsafe default value");
         }
 
         if (!isTrue(property(environment, "server.servlet.session.cookie.http-only"))) {

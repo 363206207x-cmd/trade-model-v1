@@ -88,16 +88,14 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Test-only PostgreSQL migration smoke dependencies; no real database or secrets required. -->
+        <!-- Runtime migration owner for the standard Spring Boot release artifact. -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -152,19 +150,6 @@
             <properties>
                 <surefire.includeTags>smoke | core-regression</surefire.includeTags>
             </properties>
-        </profile>
-        <profile>
-            <id>flyway-migration</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.flywaydb</groupId>
-                    <artifactId>flyway-core</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.flywaydb</groupId>
-                    <artifactId>flyway-database-postgresql</artifactId>
-                </dependency>
-            </dependencies>
         </profile>
         <profile>
             <id>ci</id>

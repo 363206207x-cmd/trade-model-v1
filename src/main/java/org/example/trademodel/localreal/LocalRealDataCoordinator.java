@@ -153,6 +153,7 @@ public class LocalRealDataCoordinator {
 
     private static boolean unavailable(String reason) {
         return reason != null && (reason.contains("PAIR_NOT_SUPPORTED")
+                || reason.contains("REGION_RESTRICTED")
                 || reason.contains("GEO_RESTRICTED")
                 || reason.contains("PROVIDER_UNAVAILABLE_FOR_LOCATION"));
     }

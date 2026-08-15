@@ -5,11 +5,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
 
 @Component
 @ConfigurationProperties(prefix = "trade-model.instruments")
 public class InstrumentMappingProperties {
     private List<Mapping> mappings = new ArrayList<>();
+    private List<String> defaultSupportedTimeframes = List.of("5m", "15m", "1h", "4h");
+    private Instant defaultVerifiedAt;
 
     public List<Mapping> getMappings() {
         return List.copyOf(mappings);
@@ -17,6 +20,19 @@ public class InstrumentMappingProperties {
 
     public void setMappings(List<Mapping> mappings) {
         this.mappings = mappings == null ? new ArrayList<>() : new ArrayList<>(mappings);
+    }
+
+    public List<String> getDefaultSupportedTimeframes() { return List.copyOf(defaultSupportedTimeframes); }
+    public void setDefaultSupportedTimeframes(List<String> values) {
+        this.defaultSupportedTimeframes = values == null ? List.of() : List.copyOf(values);
+    }
+    public Instant getDefaultVerifiedAt() { return defaultVerifiedAt; }
+    public void setDefaultVerifiedAt(Instant defaultVerifiedAt) { this.defaultVerifiedAt = defaultVerifiedAt; }
+
+    List<ProviderSymbolMapping> toDomainMappings() {
+        return mappings.stream()
+                .map(mapping -> mapping.toDomain(defaultSupportedTimeframes, defaultVerifiedAt))
+                .toList();
     }
 
     public static class Mapping {
@@ -29,11 +45,15 @@ public class InstrumentMappingProperties {
         private String providerSymbol;
         private boolean enabled = true;
         private String sourceVersion = "MAPPING_V1";
+        private List<String> supportedTimeframes;
+        private Instant verifiedAt;
 
-        ProviderSymbolMapping toDomain() {
+        ProviderSymbolMapping toDomain(List<String> defaultTimeframes, Instant defaultVerification) {
             return new ProviderSymbolMapping(provider,
                     new CanonicalInstrumentId(baseAsset, quoteAsset, marketType, venue, contractType),
-                    providerSymbol, enabled, sourceVersion);
+                    providerSymbol, enabled, sourceVersion,
+                    supportedTimeframes == null ? defaultTimeframes : supportedTimeframes,
+                    verifiedAt == null ? defaultVerification : verifiedAt);
         }
 
         public String getProvider() { return provider; }
@@ -54,5 +74,11 @@ public class InstrumentMappingProperties {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public String getSourceVersion() { return sourceVersion; }
         public void setSourceVersion(String sourceVersion) { this.sourceVersion = sourceVersion; }
+        public List<String> getSupportedTimeframes() { return supportedTimeframes; }
+        public void setSupportedTimeframes(List<String> supportedTimeframes) {
+            this.supportedTimeframes = supportedTimeframes;
+        }
+        public Instant getVerifiedAt() { return verifiedAt; }
+        public void setVerifiedAt(Instant verifiedAt) { this.verifiedAt = verifiedAt; }
     }
 }

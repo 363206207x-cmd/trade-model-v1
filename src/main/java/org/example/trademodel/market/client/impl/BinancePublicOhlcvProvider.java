@@ -49,7 +49,7 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             String ingestionRunId
     ) {
         if (geoRestrictedCircuitOpen.get()) {
-            return result(OhlcvSourceState.ERROR, "PROVIDER_UNAVAILABLE_FOR_LOCATION", null);
+            return result(OhlcvSourceState.ERROR, "REGION_RESTRICTED", null);
         }
         if (!providerEnabled) {
             return result(OhlcvSourceState.DISABLED, "PUBLIC_OHLCV_PROVIDER_DISABLED", null);
@@ -69,11 +69,12 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
             return result(OhlcvSourceState.ERROR, "PUBLIC_OHLCV_PROVIDER_RESULT_MISSING", null);
         }
         if (fetched.sourceState() != OhlcvSourceState.READY) {
-            if (fetched.httpStatus() == 451 || "GEO_RESTRICTED".equals(fetched.reasonCode())
+            if (fetched.httpStatus() == 451 || "REGION_RESTRICTED".equals(fetched.reasonCode())
+                    || "GEO_RESTRICTED".equals(fetched.reasonCode())
                     || "ELIGIBILITY_RESTRICTED".equals(fetched.reasonCode())) {
                 geoRestrictedCircuitOpen.set(true);
-                log.warn("BINANCE_GEO_RESTRICTED symbol={} reasonCode={}", symbol, fetched.reasonCode());
-                return result(OhlcvSourceState.ERROR, "GEO_RESTRICTED", null);
+                log.warn("BINANCE_REGION_RESTRICTED symbol={} reasonCode={}", symbol, fetched.reasonCode());
+                return result(OhlcvSourceState.ERROR, "REGION_RESTRICTED", null);
             }
             return result(fetched.sourceState(), fetched.reasonCode(), null);
         }

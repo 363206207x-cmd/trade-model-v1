@@ -1,6 +1,7 @@
 package org.example.trademodel.ai;
 
 import org.example.trademodel.service.AiCallLogService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -12,10 +13,19 @@ import java.time.LocalDateTime;
 public class AiUsageGuard {
     private final AiOrchestratorProperties properties;
     private final AiCallLogService callLogService;
+    private final AiProviderReadinessService readinessService;
 
     public AiUsageGuard(AiOrchestratorProperties properties, AiCallLogService callLogService) {
+        this(properties, callLogService, null);
+    }
+
+    @Autowired
+    public AiUsageGuard(AiOrchestratorProperties properties,
+                        AiCallLogService callLogService,
+                        AiProviderReadinessService readinessService) {
         this.properties = properties;
         this.callLogService = callLogService;
+        this.readinessService = readinessService;
     }
 
     public AiUsageGuardResult evaluate(AiProviderClient client) {
@@ -25,6 +35,12 @@ public class AiUsageGuard {
     public AiUsageGuardResult evaluate(AiProviderClient client, String analysisId) {
         if (!properties.isEnabled()) {
             return AiUsageGuardResult.blocked(AiProviderCallStatus.DISABLED, "AI_ORCHESTRATOR_DISABLED", BigDecimal.ZERO);
+        }
+        if (readinessService != null) {
+            AiProviderRuntimeReadiness runtimeReadiness = readinessService.readiness(client.provider());
+            if (!runtimeReadiness.ready()) {
+                return runtimeBlocked(runtimeReadiness);
+            }
         }
         AiProviderReadiness readiness = client.readiness();
         if (!readiness.isEnabled()) {
@@ -71,6 +87,17 @@ public class AiUsageGuard {
         } catch (Exception e) {
             return AiUsageGuardResult.blocked(AiProviderCallStatus.BUDGET_BLOCKED, "AI_CALL_LOG_UNAVAILABLE", reservedCost);
         }
+    }
+
+    private static AiUsageGuardResult runtimeBlocked(AiProviderRuntimeReadiness readiness) {
+        AiProviderCallStatus status = switch (readiness.state()) {
+            case DISABLED -> AiProviderCallStatus.DISABLED;
+            case RATE_LIMITED -> AiProviderCallStatus.RATE_LIMITED;
+            case BUDGET_BLOCKED, BUDGET_NOT_CONFIGURED, COST_NOT_CONFIGURED ->
+                    AiProviderCallStatus.BUDGET_BLOCKED;
+            default -> AiProviderCallStatus.NOT_CONFIGURED;
+        };
+        return AiUsageGuardResult.blocked(status, readiness.reasonCode(), BigDecimal.ZERO);
     }
 
     private BigDecimal estimateCost(AiProviderProperties providerProperties) {

@@ -37,27 +37,37 @@ can authorize. It does not mean `DEPLOYED` or `PRODUCTION_EFFECTIVE`.
 1. Confirm the approved commit is merged to `main`, local `main` equals
    `origin/main`, and the worktree is clean.
 2. Record the release artifact checksum and build it with Java 17 using
-   `./mvnw clean package`. Do not deploy a local IDE output directory.
+   `./mvnw clean package`. The standard JAR includes Flyway; no special Maven
+   profile is permitted. Do not deploy a local IDE output directory.
 3. Inject environment variables from the host secret store. Do not place
    secrets in Git, frontend assets, command transcripts, logs, screenshots or
    evidence reports.
-4. Run `bash scripts/product-source-gate.sh`,
+4. Run `bash scripts/target-runtime-preflight.sh`. Resolve every blocked state
+   before startup. Optional exact-model probes require an authenticated Session
+   and do not replace business-chain acceptance.
+5. Run `bash scripts/product-source-gate.sh`,
    `bash scripts/check-workflow-contract.sh`, the authorization validator and
    the full Maven suite.
-5. Create and verify a PostgreSQL backup before starting the new artifact.
-6. Stop the prior artifact, retain it for rollback, and start the approved
-   artifact with the `prod` profile.
-7. Let Flyway apply V1 through V13. If migration fails, readiness must remain
+6. Create and verify a PostgreSQL backup before starting the new artifact.
+7. Stop the prior artifact, retain it for rollback, and start the approved
+   standard JAR with `java -jar` and the `prod` profile.
+8. Let Flyway apply V1 through V13 from
+   `classpath:db/migration`. If migration fails, readiness must remain
    unavailable and the release stops.
-8. Verify liveness, readiness and provider health separately. Application
+9. Verify liveness, readiness and provider health separately. Application
    liveness does not prove provider availability.
-9. Run the authenticated deployment smoke in
+10. Run the authenticated deployment smoke in
    `docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_SMOKE_TEST.md`.
-10. Confirm the fourteen Desktop routes, login/session/logout, Dynamic Top6,
+11. Confirm the fourteen Desktop routes, login/session/logout, Dynamic Top6,
     one-role AI workspace and fail-closed states.
-11. Confirm scheduler policy and each explicitly enabled scheduler approval.
-12. Record the artifact, database backup, smoke result, Release Owner and
-    Rollback Decision Owner in the release record.
+12. Confirm scheduler policy and each explicitly enabled scheduler approval.
+13. Record the artifact, database backup, smoke result, Release Owner and
+  Rollback Decision Owner in the release record.
+
+Before any live release, independently run
+`bash scripts/standard-release-postgresql-smoke.sh` against its disposable
+PostgreSQL 16 container. It validates empty V1-V13 migration, existing V13
+restart and checksum fail-closed behavior using the packaged JAR.
 
 ## Runtime Operations
 

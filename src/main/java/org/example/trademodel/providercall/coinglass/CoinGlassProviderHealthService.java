@@ -27,9 +27,8 @@ public class CoinGlassProviderHealthService {
     }
 
     public UnifiedSourceStatus configurationStatus(CoinGlassProperties properties) {
-        if (!properties.isEnabled()) return UnifiedSourceStatus.DISABLED;
-        if (!properties.hasApiKey()) return UnifiedSourceStatus.NOT_CONFIGURED;
-        if (!properties.isExternalCallsEnabled()) return UnifiedSourceStatus.DISABLED;
+        if (!properties.isEnabled() || !properties.hasApiKey()) return UnifiedSourceStatus.NOT_CONFIGURED;
+        if (!properties.isExternalCallsEnabled()) return UnifiedSourceStatus.NOT_CONFIGURED;
         if (health.isEmpty()) return UnifiedSourceStatus.WAITING_SYNC;
         long ready = health.values().stream()
                 .filter(value -> value.status() == UnifiedSourceStatus.READY).count();

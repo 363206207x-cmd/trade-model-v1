@@ -13,6 +13,11 @@ spring:
   application:
     name: trade-model-v1
 
+  # H2 development uses schema.sql. Production explicitly enables the single
+  # Flyway V1-V13 owner in application-prod.yml.
+  flyway:
+    enabled: false
+
   datasource:
     url: jdbc:h2:mem:trade_model_v1;DB_CLOSE_DELAY=-1;MODE=MySQL
     username: sa
@@ -44,6 +49,11 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,personalUserBootstrap
       show-details: never
       show-components: never
 
@@ -175,6 +185,9 @@ trade-model:
       minimum-top-of-book-notional: ${TRADE_MODEL_EXECUTION_MIN_TOP_BOOK_NOTIONAL:10000}
       max-entry-drift-bps: ${TRADE_MODEL_EXECUTION_MAX_ENTRY_DRIFT_BPS:10}
   instruments:
+    default-supported-timeframes: [5m, 15m, 1h, 4h]
+    default-verified-at: ${TRADE_MODEL_INSTRUMENT_REGISTRY_VERIFIED_AT:2026-08-15T00:00:00Z}
+    capability-freshness-seconds: ${TRADE_MODEL_INSTRUMENT_CAPABILITY_FRESHNESS_SECONDS:2592000}
     mappings:
       - { provider: BINANCE, base-asset: BTC, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: BTCUSDT, source-version: BINANCE_SPOT_V1 }
       - { provider: BINANCE, base-asset: BTC, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: BTCUSDT, source-version: BINANCE_USDM_V1 }
@@ -191,6 +204,9 @@ trade-model:
       - { provider: BINANCE, base-asset: XRP, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: XRPUSDT, source-version: BINANCE_SPOT_V1 }
       - { provider: BINANCE, base-asset: XRP, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: XRPUSDT, source-version: BINANCE_USDM_V1 }
       - { provider: COINGLASS, base-asset: XRP, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: XRPUSDT, source-version: COINGLASS_V4_V1 }
+      - { provider: BINANCE, base-asset: ADA, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: ADAUSDT, source-version: BINANCE_SPOT_EXCHANGE_INFO_V1 }
+      - { provider: BINANCE, base-asset: ADA, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: ADAUSDT, source-version: BINANCE_USDM_EXCHANGE_INFO_V1 }
+      - { provider: COINGLASS, base-asset: ADA, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: ADAUSDT, source-version: COINGLASS_V4_V1 }
       - { provider: BINANCE, base-asset: DOGE, quote-asset: USDT, market-type: SPOT, venue: BINANCE, contract-type: NONE, provider-symbol: DOGEUSDT, source-version: BINANCE_SPOT_V1 }
       - { provider: BINANCE, base-asset: DOGE, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: DOGEUSDT, source-version: BINANCE_USDM_V1 }
       - { provider: COINGLASS, base-asset: DOGE, quote-asset: USDT, market-type: PERPETUAL, venue: BINANCE, contract-type: LINEAR, provider-symbol: DOGEUSDT, source-version: COINGLASS_V4_V1 }
@@ -270,6 +286,17 @@ trade-model:
     public-provider:
       enabled: ${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}
+    provider:
+      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}
+      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:binance}
+      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:true}
+    kraken:
+      enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:false}
+      base-url: ${TRADE_MODEL_KRAKEN_OHLCV_BASE_URL:https://api.kraken.com}
+    binance:
+      enabled: ${TRADE_MODEL_BINANCE_OHLCV_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}}
+      external-calls-enabled: ${TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}}
   ai:
     enabled: ${TRADE_MODEL_AI_ENABLED:false}
     request-timeout-ms: ${TRADE_MODEL_AI_REQUEST_TIMEOUT_MS:5000}
@@ -284,8 +311,9 @@ trade-model:
       gemini-ms: ${TRADE_MODEL_AI_GEMINI_TIMEOUT_MS:25000}
       xai-ms: ${TRADE_MODEL_AI_XAI_TIMEOUT_MS:10000}
       overall-ms: ${TRADE_MODEL_AI_OVERALL_TIMEOUT_MS:30000}
-    daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:0}
-    per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:0}
+    daily-budget-usd: ${TRADE_MODEL_AI_DAILY_BUDGET_USD:}
+    per-analysis-budget-usd: ${TRADE_MODEL_AI_PER_ANALYSIS_BUDGET_USD:}
+    readiness-verification-ttl-seconds: ${TRADE_MODEL_AI_READINESS_VERIFICATION_TTL_SECONDS:3600}
     model-strategy:
       gpt-final:
         priority: ${TRADE_MODEL_AI_GPT_FINAL_PRIORITY:QUALITY_FIRST}
@@ -304,25 +332,25 @@ trade-model:
           - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT55_MODEL:gpt-5.5}
           - ${TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_GPT54_MODEL:gpt-5.4}
       base-url: ${TRADE_MODEL_AI_OPENAI_BASE_URL:https://api.openai.com}
-      requests-per-minute: ${TRADE_MODEL_AI_OPENAI_RPM:0}
-      input-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_INPUT_COST_PER_MILLION_USD:0}
-      output-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_OUTPUT_COST_PER_MILLION_USD:0}
+      requests-per-minute: ${TRADE_MODEL_AI_OPENAI_RPM:}
+      input-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_INPUT_COST_PER_MILLION_USD:}
+      output-cost-per-million-usd: ${TRADE_MODEL_AI_OPENAI_OUTPUT_COST_PER_MILLION_USD:}
     gemini:
       enabled: ${TRADE_MODEL_AI_GEMINI_ENABLED:false}
       api-key: ${GEMINI_API_KEY:}
       model: ${TRADE_MODEL_AI_GEMINI_MODEL:gemini-3.5-flash}
       base-url: ${TRADE_MODEL_AI_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
-      requests-per-minute: ${TRADE_MODEL_AI_GEMINI_RPM:0}
-      input-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_INPUT_COST_PER_MILLION_USD:0}
-      output-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_OUTPUT_COST_PER_MILLION_USD:0}
+      requests-per-minute: ${TRADE_MODEL_AI_GEMINI_RPM:}
+      input-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_INPUT_COST_PER_MILLION_USD:}
+      output-cost-per-million-usd: ${TRADE_MODEL_AI_GEMINI_OUTPUT_COST_PER_MILLION_USD:}
     xai:
       enabled: ${TRADE_MODEL_AI_XAI_ENABLED:false}
       api-key: ${XAI_API_KEY:}
       model: ${TRADE_MODEL_AI_XAI_MODEL:grok-4.5}
       base-url: ${TRADE_MODEL_AI_XAI_BASE_URL:https://api.x.ai}
-      requests-per-minute: ${TRADE_MODEL_AI_XAI_RPM:0}
-      input-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_INPUT_COST_PER_MILLION_USD:0}
-      output-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_OUTPUT_COST_PER_MILLION_USD:0}
+      requests-per-minute: ${TRADE_MODEL_AI_XAI_RPM:}
+      input-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_INPUT_COST_PER_MILLION_USD:}
+      output-cost-per-million-usd: ${TRADE_MODEL_AI_XAI_OUTPUT_COST_PER_MILLION_USD:}
   external-context:
     news:
       api-key: ${NEWS_API_KEY:}

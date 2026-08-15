@@ -5,8 +5,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.example.trademodel.ai.AiProviderReadinessService;
+import org.example.trademodel.ai.AiProviderRuntimeReadiness;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
 import org.example.trademodel.localreal.LocalRealDataStatusService;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
+import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -23,6 +28,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
 
     private final Environment environment;
     private LocalRealDataStatusService localRealDataStatusService;
+    private AiProviderReadinessService aiProviderReadinessService;
+    private CoinGlassProperties coinGlassProperties;
+    private CoinGlassProviderHealthService coinGlassProviderHealthService;
 
     public ProviderReadinessServiceImpl(Environment environment) {
         this.environment = environment;
@@ -33,16 +41,29 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         this.localRealDataStatusService = localRealDataStatusService;
     }
 
+    @Autowired(required = false)
+    void setAiProviderReadinessService(AiProviderReadinessService aiProviderReadinessService) {
+        this.aiProviderReadinessService = aiProviderReadinessService;
+    }
+
+    @Autowired(required = false)
+    void setCoinGlassReadiness(CoinGlassProperties properties, CoinGlassProviderHealthService healthService) {
+        this.coinGlassProperties = properties;
+        this.coinGlassProviderHealthService = healthService;
+    }
+
     @Override
     public ProviderReadinessVO getReadiness() {
         ProviderReadinessVO.ProviderStatusVO market = marketDataStatus();
         List<ProviderReadinessVO.ProviderStatusVO> aiProviders = aiProviderStatuses();
         ProviderReadinessVO.ProviderStatusVO externalContext = externalContextStatus();
+        ProviderReadinessVO.ProviderStatusVO coinGlass = coinGlassStatus();
 
         List<ProviderReadinessVO.ProviderStatusVO> providers = new ArrayList<>();
         providers.add(market);
         providers.addAll(aiProviders);
         providers.add(externalContext);
+        providers.add(coinGlass);
 
         ProviderReadinessVO readiness = new ProviderReadinessVO();
         readiness.setMarketDataProviderStatus(market.getStatus());
@@ -55,6 +76,7 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         summary.put("marketDataProvider", readiness.getMarketDataProviderStatus());
         summary.put("aiProvider", readiness.getAiProviderStatus());
         summary.put("externalContextProvider", readiness.getExternalContextProviderStatus());
+        summary.put("coinglassProvider", coinGlass.getStatus());
         readiness.setSummary(summary);
         return readiness;
     }
@@ -140,6 +162,7 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
                     || "INVALID".equals(freshness)
                     || providerHealth != null && (providerHealth.circuitOpen()
                     || "DEGRADED".equals(upper(providerHealth.status()))
+                    || "REGION_RESTRICTED".equals(upper(providerHealth.status()))
                     || "GEO_RESTRICTED".equals(upper(providerHealth.status())))) {
                 readinessStatus = STATUS_FAIL_CLOSED;
                 reason = localRealFailureReason(runtimeState, freshness, providerHealth);
@@ -188,12 +211,33 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     }
 
     private List<ProviderReadinessVO.ProviderStatusVO> aiProviderStatuses() {
+        if (aiProviderReadinessService != null) {
+            return aiProviderReadinessService.readiness().stream()
+                    .map(this::canonicalAiProviderStatus)
+                    .toList();
+        }
         boolean orchestratorEnabled = isTrue(property("trade-model.ai.enabled"));
         return List.of(
                 aiProviderStatus("OPENAI", "trade-model.ai.openai", orchestratorEnabled),
                 aiProviderStatus("GEMINI", "trade-model.ai.gemini", orchestratorEnabled),
                 aiProviderStatus("XAI", "trade-model.ai.xai", orchestratorEnabled)
         );
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO canonicalAiProviderStatus(
+            AiProviderRuntimeReadiness readiness) {
+        String status = switch (readiness.state()) {
+            case AUTHORIZED -> STATUS_CONNECTED;
+            case DISABLED, MODEL_NOT_VERIFIED -> STATUS_WAITING_SYNC;
+            default -> STATUS_FAIL_CLOSED;
+        };
+        boolean enabled = readiness.state() != org.example.trademodel.ai.AiProviderReadinessState.DISABLED;
+        boolean configured = switch (readiness.state()) {
+            case KEY_MISSING, COST_NOT_CONFIGURED, RPM_NOT_CONFIGURED, BUDGET_NOT_CONFIGURED, DISABLED -> false;
+            default -> true;
+        };
+        return item("AI", readiness.provider(), status, enabled, configured,
+                readiness.ready(), readiness.reasonCode());
     }
 
     private ProviderReadinessVO.ProviderStatusVO aiProviderStatus(String name, String prefix, boolean orchestratorEnabled) {
@@ -221,6 +265,7 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
 
     private String aggregateAiStatus(List<ProviderReadinessVO.ProviderStatusVO> providers) {
         boolean sawConfigured = false;
+        boolean allConnected = !providers.isEmpty();
         for (ProviderReadinessVO.ProviderStatusVO provider : providers) {
             if (STATUS_FAIL_CLOSED.equals(provider.getStatus())) {
                 return STATUS_FAIL_CLOSED;
@@ -228,8 +273,30 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
             if (STATUS_CONFIGURED.equals(provider.getStatus())) {
                 sawConfigured = true;
             }
+            if (!STATUS_CONNECTED.equals(provider.getStatus())) {
+                allConnected = false;
+            }
         }
-        return sawConfigured ? STATUS_CONFIGURED : STATUS_WAITING_SYNC;
+        return allConnected ? STATUS_CONNECTED : sawConfigured ? STATUS_CONFIGURED : STATUS_WAITING_SYNC;
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO coinGlassStatus() {
+        if (coinGlassProperties == null || coinGlassProviderHealthService == null) {
+            return item("DERIVATIVES_CONTEXT", "COINGLASS", STATUS_NOT_CONFIGURED,
+                    false, false, false, "COINGLASS_NOT_CONFIGURED");
+        }
+        UnifiedSourceStatus source = coinGlassProviderHealthService.configurationStatus(coinGlassProperties);
+        String status = switch (source) {
+            case READY -> STATUS_CONNECTED;
+            case NOT_CONFIGURED, DISABLED -> STATUS_NOT_CONFIGURED;
+            case WAITING_SYNC -> STATUS_WAITING_SYNC;
+            default -> STATUS_FAIL_CLOSED;
+        };
+        boolean configured = source != UnifiedSourceStatus.NOT_CONFIGURED
+                && source != UnifiedSourceStatus.DISABLED;
+        return item("DERIVATIVES_CONTEXT", "COINGLASS", status,
+                coinGlassProperties.isEnabled(), configured, source == UnifiedSourceStatus.READY,
+                "COINGLASS_" + source.name());
     }
 
     private ProviderReadinessVO.ProviderStatusVO externalContextStatus() {

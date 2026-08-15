@@ -101,7 +101,7 @@ public class RealMarketDataFetcherService {
         PublicMarketHttpResult fetched = fetchPublicJson("BINANCE", url);
         if (!fetched.ready()) {
             String reason = fetched.httpStatus() == 451
-                    ? PublicProviderErrorCode.GEO_RESTRICTED.name() : fetched.reasonCode();
+                    ? PublicProviderErrorCode.REGION_RESTRICTED.name() : fetched.reasonCode();
             return new PublicKlineFetchResult(fetched.sourceState(), reason, fetched.fetchTime(),
                     List.of(), fetched.httpStatus());
         }
@@ -156,7 +156,7 @@ public class RealMarketDataFetcherService {
         if (status == 401) return PublicProviderErrorCode.HTTP_401;
         if (status == 403) return PublicProviderErrorCode.HTTP_403;
         if (status == 429) return PublicProviderErrorCode.HTTP_429;
-        if (status == 451) return PublicProviderErrorCode.HTTP_451;
+        if (status == 451) return PublicProviderErrorCode.REGION_RESTRICTED;
         if (status >= 500) return PublicProviderErrorCode.HTTP_5XX;
         return PublicProviderErrorCode.INVALID_RESPONSE;
     }

@@ -2,12 +2,15 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.dto.assetpool.AssetPoolScanBatchResultDTO;
 import org.example.trademodel.dto.assetpool.AssetPoolScanResultDTO;
 import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
 import org.example.trademodel.dto.assetpool.MarketAssetDTO;
 import org.example.trademodel.dto.req.AddAssetPoolItemReq;
 import org.example.trademodel.dto.req.AssetPoolBatchReq;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
+import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.example.trademodel.entity.AsyncTaskDO;
 import org.example.trademodel.service.AsyncTaskService;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
@@ -28,13 +31,16 @@ public class AssetPoolController {
     private final AssetPoolService assetPoolService;
     private final AuthenticatedUserIdResolver userIdResolver;
     private final AsyncTaskService asyncTaskService;
+    private final ProviderCapabilityRegistry providerCapabilityRegistry;
 
     public AssetPoolController(AssetPoolService assetPoolService,
                                AuthenticatedUserIdResolver userIdResolver,
-                               AsyncTaskService asyncTaskService) {
+                               AsyncTaskService asyncTaskService,
+                               ProviderCapabilityRegistry providerCapabilityRegistry) {
         this.assetPoolService = assetPoolService;
         this.userIdResolver = userIdResolver;
         this.asyncTaskService = asyncTaskService;
+        this.providerCapabilityRegistry = providerCapabilityRegistry;
     }
 
     @GetMapping
@@ -127,6 +133,29 @@ public class AssetPoolController {
         Long userId = userIdResolver.requireCurrentUserId();
         return ApiResponse.success(runScanTask(userId, "ASSET_SELECTION", request.getTimeframe(),
                 () -> assetPoolService.scanSelectedForUser(userId, request.getSymbols(), request.getTimeframe())));
+    }
+
+    @PostMapping("/scan-summary")
+    public ApiResponse<AssetPoolScanBatchResultDTO> scanSummary(
+            @RequestParam(defaultValue = "5m") String timeframe) {
+        Long userId = userIdResolver.requireCurrentUserId();
+        return ApiResponse.success(assetPoolService.scanSummaryForUser(userId, timeframe));
+    }
+
+    @PostMapping("/batch-scan-summary")
+    public ApiResponse<AssetPoolScanBatchResultDTO> batchScanSummary(@RequestBody AssetPoolBatchReq request) {
+        if (request == null) throw new IllegalArgumentException("request is required");
+        Long userId = userIdResolver.requireCurrentUserId();
+        return ApiResponse.success(assetPoolService.scanSelectedSummaryForUser(
+                userId, request.getSymbols(), request.getTimeframe()));
+    }
+
+    @GetMapping("/capabilities/{symbol}")
+    public ApiResponse<List<ProviderInstrumentCapability>> capabilities(
+            @PathVariable String symbol,
+            @RequestParam(defaultValue = "5m") String timeframe) {
+        userIdResolver.requireCurrentUserId();
+        return ApiResponse.success(providerCapabilityRegistry.capabilities(symbol, timeframe));
     }
 
     private List<AssetPoolScanResultDTO> runScanTask(Long userId, String resourceType, String resourceId,

@@ -46,14 +46,15 @@ class CoinGlassV4ProviderTest {
     private static final Instant NOW = Instant.parse("2026-07-10T10:00:00Z");
 
     @Test
-    void coinglassDisabledReturnsDisabled() {
+    void coinglassDisabledReturnsNotConfigured() {
         TestContext context = context("open-interest-success.json");
         context.coinGlassProperties.setEnabled(false);
 
         ProviderCallResult<CoinGlassOpenInterestSnapshot> result = context.oiService.get(
                 "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-disabled");
 
-        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.DISABLED);
+        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.NOT_CONFIGURED);
+        assertThat(result.metadata().errorCode()).isEqualTo("COINGLASS_PROVIDER_NOT_CONFIGURED");
         assertThat(context.transport.calls).hasValue(0);
     }
 
