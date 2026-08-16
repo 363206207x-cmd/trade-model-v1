@@ -12,6 +12,8 @@ import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.decisionchain.DecisionChainBuildInput;
 import org.example.trademodel.decisionchain.DecisionChainBuildResult;
+import org.example.trademodel.opportunitylog.OpportunityLogDTO;
+import org.example.trademodel.telegram.HighValueAlertMessageService;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
@@ -104,6 +106,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private boolean requireRealMarketEnvironment;
     private Clock assemblerClock = Clock.systemUTC();
+    private HighValueAlertMessageService highValueAlertMessageService;
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -146,6 +149,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     @Autowired(required = false)
     void setAssemblerClock(Clock assemblerClock) {
         this.assemblerClock = assemblerClock != null ? assemblerClock : Clock.systemUTC();
+    }
+
+    @Autowired(required = false)
+    void setHighValueAlertMessageService(HighValueAlertMessageService value) {
+        this.highValueAlertMessageService = value;
     }
 
     public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
@@ -1047,12 +1055,16 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
             if (!context.isPreview() && !hotWouldReset && persistedDecision != null && persistedPlan != null
                     && Boolean.TRUE.equals(persistedPlan.getFinalPlan())) {
-                opportunityLogService.recordFromAuthoritativeAnalysis(
+                OpportunityLogDTO persistedOpportunity = opportunityLogService.recordFromAuthoritativeAnalysis(
                         run,
                         persistedDecision,
                         persistedPlan,
                         accountRiskSnapshotId,
                         run.getTraceId());
+                if (highValueAlertMessageService != null) {
+                    highValueAlertMessageService.recordOpportunity(
+                            run, persistedDecision, persistedPlan, decisionChain.opportunity(), persistedOpportunity);
+                }
             }
 
             if (!context.isPreview() && hotWouldReset && hotResetCommand != null) {

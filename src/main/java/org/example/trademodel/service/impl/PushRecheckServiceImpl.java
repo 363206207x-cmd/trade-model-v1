@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.enums.RecheckStatusEnum;
 import org.example.trademodel.providercall.AssetPriority;
@@ -16,6 +18,8 @@ import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
@@ -28,6 +32,8 @@ import org.example.trademodel.service.RecheckExecutionCommand;
 import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
+import org.example.trademodel.telegram.HighValueAlertMessageService;
+import org.example.trademodel.telegram.HighValueAlertPolicy;
 import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
@@ -63,6 +69,9 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private final RuleConfigContractService ruleConfigContractService;
     private final PushRecheckAccessBoundary accessBoundary;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
+    private HighValueAlertMessageService highValueAlertMessageService;
+    private AnalysisRunMapper analysisRunMapper;
+    private ExecutionPlanMapper executionPlanMapper;
     private Clock clock = Clock.systemUTC();
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
@@ -108,6 +117,15 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     @Autowired(required = false)
     void setDerivativesSnapshotReadPort(DerivativesSnapshotReadPort derivativesSnapshotReadPort) {
         this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
+    }
+
+    @Autowired(required = false)
+    void setHighValueAlertDependencies(HighValueAlertMessageService service,
+                                       AnalysisRunMapper analysisRunMapper,
+                                       ExecutionPlanMapper executionPlanMapper) {
+        this.highValueAlertMessageService = service;
+        this.analysisRunMapper = analysisRunMapper;
+        this.executionPlanMapper = executionPlanMapper;
     }
 
     @Autowired(required = false)
@@ -254,8 +272,70 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         // 让手动触发与自动调度共用同一“状态跟随链”。
         String nextPushStatus = PushRecheckStatusContract.toPushStatus(status);
         pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
+        recordHighValueSafetyChange(snap, row, status, message, failReasonJson, now);
 
         return result;
+    }
+
+    private void recordHighValueSafetyChange(TmPushSnapshotDO snapshot,
+                                             TmPushRecheckLogDO log,
+                                             RecheckStatusEnum status,
+                                             String message,
+                                             String failReasonJson,
+                                             LocalDateTime occurredAt) {
+        HighValueAlertPolicy.SafetyChangeType changeType = safetyChangeType(status, failReasonJson);
+        if (changeType == null || highValueAlertMessageService == null || analysisRunMapper == null
+                || snapshot == null || snapshot.getAnalysisId() == null) return;
+        AnalysisRunDO analysis = analysisRunMapper.selectById(snapshot.getAnalysisId());
+        if (analysis == null || !"USER".equalsIgnoreCase(analysis.getOwnerType())
+                || analysis.getOwnerId() == null || analysis.getOwnerId() <= 0) return;
+        ExecutionPlanDO plan = executionPlanMapper == null
+                ? null : executionPlanMapper.selectLatestByAnalysisId(snapshot.getAnalysisId());
+        int severity = status == RecheckStatusEnum.CONFUSED_BLOCKED
+                || status == RecheckStatusEnum.RISK_BLOCKED
+                || status == RecheckStatusEnum.INVALIDATED ? 4 : 3;
+        highValueAlertMessageService.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
+                analysis.getOwnerId(), changeType, "PUSH_RECHECK",
+                log.getLogId() == null ? String.valueOf(snapshot.getPushId()) : String.valueOf(log.getLogId()),
+                snapshot.getAnalysisId(), plan == null ? null : plan.getPlanId(),
+                plan == null ? null : plan.getOpportunityId(), String.valueOf(snapshot.getPushId()),
+                snapshot.getSymbol(), snapshot.getTraceId(),
+                status.name(), severity, message,
+                recoveryCondition(status), occurredAt, snapshot.getExpiresAt()));
+    }
+
+    static HighValueAlertPolicy.SafetyChangeType safetyChangeType(
+            RecheckStatusEnum status, String failReasonJson) {
+        if (status == null) return null;
+        return switch (status) {
+            case DRIFTED_FROM_ENTRY_ZONE, DRIFTED -> HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT;
+            case RISK_BLOCKED -> HighValueAlertPolicy.SafetyChangeType.RISK_BLOCKED;
+            case CONFUSED_BLOCKED -> HighValueAlertPolicy.SafetyChangeType.HIGH_CONFUSED;
+            case EXPIRED -> HighValueAlertPolicy.SafetyChangeType.PLAN_EXPIRED;
+            case INVALIDATED -> {
+                String code = extractFailCode(failReasonJson);
+                if (code != null && (code.contains("DATA_QUALITY") || code.contains("QUALITY"))) {
+                    yield HighValueAlertPolicy.SafetyChangeType.DATA_QUALITY_BLOCKED;
+                }
+                if (code != null && (code.contains("SOURCE") || code.contains("QUOTE")
+                        || code.contains("DERIVATIVES"))) {
+                    yield HighValueAlertPolicy.SafetyChangeType.SOURCE_INVALID;
+                }
+                yield HighValueAlertPolicy.SafetyChangeType.FINAL_INVALIDATED;
+            }
+            case REVIEW_PASSED, REVIEW_WAITING -> null;
+        };
+    }
+
+    static String recoveryCondition(RecheckStatusEnum status) {
+        return switch (status) {
+            case DRIFTED_FROM_ENTRY_ZONE, DRIFTED -> "价格与执行环境重新进入有效范围并再次通过复核";
+            case RISK_BLOCKED -> "风险门禁恢复并由用户重新发起复核";
+            case CONFUSED_BLOCKED -> "冲突降至允许范围并重新通过规则校验";
+            case EXPIRED -> "生成新的可信分析和通过校验的最终计划";
+            case INVALIDATED -> "重新分析并通过来源、风险和规则校验";
+            case REVIEW_PASSED, REVIEW_WAITING -> "等待下一次有效复核";
+        };
     }
 
     @Override

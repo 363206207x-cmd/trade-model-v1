@@ -51,24 +51,34 @@ can authorize. It does not mean `DEPLOYED` or `PRODUCTION_EFFECTIVE`.
 6. Create and verify a PostgreSQL backup before starting the new artifact.
 7. Stop the prior artifact, retain it for rollback, and start the approved
    standard JAR with `java -jar` and the `prod` profile.
-8. Let Flyway apply V1 through V13 from
+8. Let Flyway apply V1 through V14 from
    `classpath:db/migration`. If migration fails, readiness must remain
    unavailable and the release stops.
-9. Verify liveness, readiness and provider health separately. Application
-   liveness does not prove provider availability.
+9. Verify liveness, readiness, provider health and Telegram channel readiness
+   separately. Application liveness does not prove provider availability.
 10. Run the authenticated deployment smoke in
    `docs/FUNDAMENTAL_AI_V4_1_DEPLOYMENT_SMOKE_TEST.md`.
 11. Confirm the fourteen Desktop routes, login/session/logout, Dynamic Top6,
     one-role AI workspace and fail-closed states.
-12. Confirm scheduler policy and each explicitly enabled scheduler approval.
-13. Record the artifact, database backup, smoke result, Release Owner and
-  Rollback Decision Owner in the release record.
+12. When Telegram is approved for this deployment, confirm its Message-first
+    queue, owner-scoped status, and one controlled application delivery. Do not
+    load live Telegram secrets for an unmerged or unaudited artifact.
+13. Confirm scheduler policy and each explicitly enabled scheduler approval,
+    including Telegram dispatch when enabled.
+14. Record the artifact, database backup, smoke result, Release Owner and
+    Rollback Decision Owner in the release record.
 
 Before any live release, independently run
 `bash scripts/standard-release-postgresql-smoke.sh` against its disposable
-PostgreSQL 16 container. It validates empty V1-V13 migration, existing V13
+PostgreSQL 16 container. It validates empty V1-V14 migration, existing V14
 restart, form login/CSRF Session/logout invalidation, and checksum fail-closed
 behavior using the packaged JAR.
+
+Telegram is independently optional. Disabled or incomplete configuration must
+remain `NOT_CONFIGURED` without affecting application liveness or Message
+persistence. Enabled dispatch requires complete secret configuration and the
+explicit external-call and dispatch gates. The status API and deployment
+evidence must never include bot token, chat ID, recipient, or full Bot API URL.
 
 CoinGlass may remain disabled. If enabled for external calls, both
 `COINGLASS_API_KEY` and an explicit positive `COINGLASS_ADVERTISED_RPM` are

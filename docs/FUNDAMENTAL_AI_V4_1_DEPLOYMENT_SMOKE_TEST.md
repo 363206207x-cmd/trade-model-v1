@@ -6,11 +6,11 @@ document does not claim a production deployment occurred.
 ## Preconditions
 
 - Approved merged-main artifact running with Java 17.
-- PostgreSQL backup confirmed and Flyway at V13.
+- PostgreSQL backup confirmed and Flyway at V14.
 - Standard `clean package` artifact passed
   `scripts/standard-release-postgresql-smoke.sh`; no special Flyway profile was
   used. The same script also verifies packaged-JAR login, CSRF Session, logout,
-  old-Session invalidation, existing V13 restart and checksum fail closed.
+  old-Session invalidation, existing V14 restart and checksum fail closed.
 - `TRADE_MODEL_SMOKE_USERNAME` and `TRADE_MODEL_SMOKE_PASSWORD` injected from a
   secret store.
 - `APP_URL` points to the trusted local endpoint or the HTTPS reverse-proxy
@@ -53,6 +53,18 @@ temporary responses with restricted permissions and removes them on exit.
 13. Unsupported/disabled/region-restricted provider identities produce no
     market-data invocation. A fallback is used only with its own exact
     `SUPPORTED` capability.
+14. `GET /api/settings/notifications/telegram/status` is authenticated,
+    owner-scoped, and contains no bot token, chat ID, recipient, secret path,
+    or full provider URL.
+15. When Telegram is disabled or incomplete, Message persistence still works
+    and delivery remains truthfully `NOT_CONFIGURED`; no fake `SENT` appears.
+16. Only after the audited implementation is merged and the release owner
+    explicitly enables the live smoke, verify one application-created Message
+    produces one Telegram delivery and a provider reference. This is separate
+    from direct connectivity evidence and must not use a Preview, Candidate,
+    fake Opportunity, or fake Position.
+17. Confirm Telegram logs and persisted errors contain no token, chat ID, or
+    full Bot API request URL.
 
 ## Result Rules
 
@@ -61,3 +73,5 @@ temporary responses with restricted permissions and removes them on exit.
   provider-dependent decision chain and must render fail closed.
 - A local controlled fixture may validate UI behavior but cannot satisfy target
   runtime provider acceptance.
+- Mock Telegram delivery and user-verified direct connectivity cannot satisfy
+  merged-main application-level Telegram acceptance.

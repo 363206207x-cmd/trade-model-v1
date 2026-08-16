@@ -4,7 +4,12 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.PlanRevalidationRecordDO;
 import org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.PlanRevalidationRecordMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.telegram.HighValueAlertMessageService;
+import org.example.trademodel.telegram.HighValueAlertPolicy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +25,8 @@ public class PlanRevalidationService {
     private final ExecutionPlanMapper planMapper;
     private final AsyncTaskService asyncTaskService;
     private final Clock clock = Clock.systemUTC();
+    private HighValueAlertMessageService highValueAlertMessageService;
+    private AnalysisRunMapper analysisRunMapper;
 
     public PlanRevalidationService(PlanRevalidationRecordMapper recordMapper,
                                    ExecutionPlanMapper planMapper,
@@ -27,6 +34,13 @@ public class PlanRevalidationService {
         this.recordMapper = recordMapper;
         this.planMapper = planMapper;
         this.asyncTaskService = asyncTaskService;
+    }
+
+    @Autowired(required = false)
+    void setHighValueAlertDependencies(HighValueAlertMessageService value,
+                                       AnalysisRunMapper analysisRunMapper) {
+        this.highValueAlertMessageService = value;
+        this.analysisRunMapper = analysisRunMapper;
     }
 
     @Transactional
@@ -54,6 +68,19 @@ public class PlanRevalidationService {
         PlanRevalidationRecordDO record = newRecord(plan, triggerType, normalizedReason, userId, now);
         recordMapper.insert(record);
         asyncTaskService.queueForUser(userId, "PLAN_REVALIDATION", "FINAL_PLAN", planId, record.getTraceId());
+        if (highValueAlertMessageService != null) {
+            AnalysisRunDO analysis = analysisRunMapper == null ? null : analysisRunMapper.selectById(plan.getAnalysisId());
+            if (analysis != null && hasText(analysis.getSymbol())) {
+                highValueAlertMessageService.recordSafetyChange(
+                        new HighValueAlertMessageService.SafetyChangeInput(
+                                userId, HighValueAlertPolicy.SafetyChangeType.NEEDS_REVALIDATION,
+                                "PLAN_REVALIDATION", record.getRecordId(), plan.getAnalysisId(), planId,
+                                plan.getOpportunityId(), null, analysis.getSymbol(), record.getTraceId(),
+                                "NEEDS_REVALIDATION", 2,
+                                normalizedReason, "完成重新验证并再次通过规则与可信来源门禁",
+                                now, plan.getValidUntil()));
+            }
+        }
         return record;
     }
 

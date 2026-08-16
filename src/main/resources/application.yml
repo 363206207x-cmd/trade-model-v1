@@ -58,6 +58,24 @@ management:
       show-components: never
 
 trade-model:
+  telegram:
+    enabled: ${TRADE_MODEL_TELEGRAM_ENABLED:false}
+    external-calls-enabled: ${TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED:false}
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    api-base-url: ${TELEGRAM_API_BASE_URL:https://api.telegram.org}
+    public-base-url: ${TRADE_MODEL_PUBLIC_BASE_URL:}
+    connect-timeout-ms: ${TRADE_MODEL_TELEGRAM_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${TRADE_MODEL_TELEGRAM_READ_TIMEOUT_MS:5000}
+    max-attempts: ${TRADE_MODEL_TELEGRAM_MAX_ATTEMPTS:5}
+    retry-base-seconds: ${TRADE_MODEL_TELEGRAM_RETRY_BASE_SECONDS:5}
+    retry-max-seconds: ${TRADE_MODEL_TELEGRAM_RETRY_MAX_SECONDS:300}
+    delivery-batch-size: ${TRADE_MODEL_TELEGRAM_DELIVERY_BATCH_SIZE:20}
+    dispatch-enabled: ${TRADE_MODEL_TELEGRAM_DISPATCH_ENABLED:false}
+    dispatch-fixed-delay-ms: ${TRADE_MODEL_TELEGRAM_DISPATCH_FIXED_DELAY_MS:5000}
+    claim-lease-seconds: ${TRADE_MODEL_TELEGRAM_CLAIM_LEASE_SECONDS:60}
+    cooldown-minutes: ${TRADE_MODEL_TELEGRAM_COOLDOWN_MINUTES:15}
+    allow-high-quality-reduced: ${TRADE_MODEL_TELEGRAM_ALLOW_HIGH_QUALITY_REDUCED:false}
   provider-call:
     enabled: ${TRADE_MODEL_PROVIDER_CALL_ENABLED:false}
     scheduler-enabled: ${TRADE_MODEL_PROVIDER_SCAN_SCHEDULER_ENABLED:false}

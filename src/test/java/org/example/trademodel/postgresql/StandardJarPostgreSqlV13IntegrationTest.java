@@ -10,14 +10,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StandardJarPostgreSqlV13IntegrationTest {
 
     @Test
-    void controlledHarnessUsesStandardPackageJarAndPostgresql16ForThirteenMigrations() throws Exception {
+    void controlledHarnessUsesStandardPackageJarAndPostgresql16ForFourteenMigrations() throws Exception {
         String script = Files.readString(Path.of("scripts/standard-release-postgresql-smoke.sh"));
         assertThat(script).contains(
                 "./mvnw clean package",
                 "java -jar \"${jar_path}\"",
                 "postgres:16-alpine",
                 "SELECT COUNT(*) FROM flyway_schema_history",
-                "POSTGRESQL_V1_V13=13/13_PASS");
+                "POSTGRESQL_V1_V14=14/14_PASS");
         assertThat(script).doesNotContain("-Pflyway-migration", "spring-boot:run");
     }
 }

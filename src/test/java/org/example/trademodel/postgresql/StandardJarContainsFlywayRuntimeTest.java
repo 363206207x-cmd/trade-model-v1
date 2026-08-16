@@ -21,13 +21,13 @@ class StandardJarContainsFlywayRuntimeTest {
     }
 
     @Test
-    void canonicalMigrationDirectoryContainsExactlyV1ThroughV13() throws Exception {
+    void canonicalMigrationDirectoryContainsExactlyV1ThroughV14() throws Exception {
         try (var files = Files.list(Path.of("src/main/resources/db/migration"))) {
             assertThat(files.map(path -> path.getFileName().toString())
                     .filter(name -> name.startsWith("V") && name.endsWith(".sql"))
                     .sorted().toList())
-                    .hasSize(13)
-                    .allMatch(name -> name.matches("V(?:[1-9]|1[0-3])__.+\\.sql"));
+                    .hasSize(14)
+                    .allMatch(name -> name.matches("V(?:[1-9]|1[0-4])__.+\\.sql"));
         }
     }
 

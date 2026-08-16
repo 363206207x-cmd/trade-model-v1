@@ -28,17 +28,17 @@ public class UserConfigController {
     }
 
     @GetMapping
-    public ApiResponse<UserConfigDO> current() {
+    public ApiResponse<SettingsView> current() {
         String userId = String.valueOf(userIdResolver.requireCurrentUserId());
         UserConfigDO config = userConfigService.getUserConfig(userId);
         if (config == null) {
             config = defaults(userId);
         }
-        return ApiResponse.success(config);
+        return ApiResponse.success(view(config));
     }
 
     @PutMapping
-    public ApiResponse<UserConfigDO> update(@RequestBody SettingsRequest request) {
+    public ApiResponse<SettingsView> update(@RequestBody SettingsRequest request) {
         String userId = String.valueOf(userIdResolver.requireCurrentUserId());
         UserConfigDO config = userConfigService.getUserConfig(userId);
         if (config == null) {
@@ -57,13 +57,8 @@ public class UserConfigController {
             }
             config.setDefaultPoolMode(poolMode);
         }
-        if (request.telegramChatId() != null) {
-            String chatId = request.telegramChatId().trim();
-            config.setTelegramChatId(chatId.isEmpty() ? null : chatId);
-            config.setTelegramBindingStatus(chatId.isEmpty() ? "UNBOUND" : "PENDING");
-        }
         userConfigService.saveUserConfig(config);
-        return ApiResponse.success(config);
+        return ApiResponse.success(view(config));
     }
 
     private UserConfigDO defaults(String userId) {
@@ -86,7 +81,18 @@ public class UserConfigController {
         return value != null && !value.trim().isEmpty();
     }
 
+    private SettingsView view(UserConfigDO config) {
+        return new SettingsView(config.getRiskPreference(), config.getNotificationFiltersJson(),
+                config.getDefaultPoolMode(), config.getTelegramBindingStatus(),
+                config.getCooldownMinutes(), config.getNotifyChannels());
+    }
+
     public record SettingsRequest(String riskPreference, String notificationFiltersJson,
-                                  String telegramChatId, String defaultPoolMode) {
+                                  String defaultPoolMode) {
+    }
+
+    public record SettingsView(String riskPreference, String notificationFiltersJson,
+                               String defaultPoolMode, String telegramBindingStatus,
+                               Integer cooldownMinutes, String notifyChannels) {
     }
 }

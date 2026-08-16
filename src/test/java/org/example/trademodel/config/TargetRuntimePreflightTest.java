@@ -86,6 +86,51 @@ class TargetRuntimePreflightTest {
         assertThat(result.lines()).contains("COINGLASS=NOT_CONFIGURED", "PREFLIGHT=PASS");
     }
 
+    @Test
+    void telegramPreflightReportsPresenceAndReadinessWithoutEmittingValues() {
+        Map<String, String> environment = completeEnvironment();
+        environment.put("TRADE_MODEL_TELEGRAM_ENABLED", "true");
+        environment.put("TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED", "true");
+        environment.put("TELEGRAM_BOT_TOKEN", "TEST_TOKEN");
+        environment.put("TELEGRAM_CHAT_ID", "TEST_CHAT_ID");
+        environment.put("TELEGRAM_API_BASE_URL", "https://api.example.test");
+        environment.put("TRADE_MODEL_PUBLIC_BASE_URL", "https://app.example.test");
+
+        TargetRuntimePreflight.Result result = TargetRuntimePreflight.evaluate(environment);
+
+        assertThat(result.passed()).isTrue();
+        assertThat(result.lines()).contains(
+                "TELEGRAM_ENABLED=SET",
+                "TELEGRAM_EXTERNAL_CALLS_ENABLED=SET",
+                "TELEGRAM_BOT_TOKEN=SET",
+                "TELEGRAM_CHAT_ID=SET",
+                "TELEGRAM_API_BASE_URL=SET",
+                "TELEGRAM_PUBLIC_BASE_URL=SET",
+                "TELEGRAM_READINESS=READY",
+                "TELEGRAM_REASON_CODE=CONFIGURATION_READY",
+                "PREFLIGHT=PASS");
+        assertThat(String.join("\n", result.lines()))
+                .doesNotContain("TEST_TOKEN", "TEST_CHAT_ID", "api.example.test", "app.example.test");
+    }
+
+    @Test
+    void enabledTelegramWithoutRequiredSecretMaterialFailsClosed() {
+        Map<String, String> environment = completeEnvironment();
+        environment.put("TRADE_MODEL_TELEGRAM_ENABLED", "true");
+        environment.put("TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED", "true");
+
+        TargetRuntimePreflight.Result tokenMissing = TargetRuntimePreflight.evaluate(environment);
+        environment.put("TELEGRAM_BOT_TOKEN", "TEST_TOKEN");
+        TargetRuntimePreflight.Result chatMissing = TargetRuntimePreflight.evaluate(environment);
+
+        assertThat(tokenMissing.passed()).isFalse();
+        assertThat(tokenMissing.lines()).contains(
+                "TELEGRAM_READINESS=BLOCKED", "TELEGRAM_REASON_CODE=TOKEN_MISSING", "PREFLIGHT=BLOCKED");
+        assertThat(chatMissing.passed()).isFalse();
+        assertThat(chatMissing.lines()).contains(
+                "TELEGRAM_READINESS=BLOCKED", "TELEGRAM_REASON_CODE=CHAT_ID_MISSING", "PREFLIGHT=BLOCKED");
+    }
+
     private static Map<String, String> completeEnvironment() {
         Map<String, String> environment = new HashMap<>();
         environment.put("TRADE_MODEL_AUTH_ENABLED", "true");

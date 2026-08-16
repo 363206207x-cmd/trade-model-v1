@@ -3,6 +3,10 @@ package org.example.trademodel.config;
 import org.example.trademodel.ai.AiConfigurationPresence;
 import org.example.trademodel.security.InitialPasswordPolicy;
 import org.example.trademodel.providercall.coinglass.CoinGlassConfigurationState;
+import org.example.trademodel.telegram.TelegramBotApiClient;
+import org.example.trademodel.telegram.TelegramClientResult;
+import org.example.trademodel.telegram.TelegramProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -23,6 +27,18 @@ public final class TargetRuntimePreflight {
         result.lines().forEach(System.out::println);
         if (!result.passed()) {
             System.exit(1);
+        }
+        if (contains(args, "--telegram-probe")) {
+            TelegramClientResult probe = telegramProbe(System.getenv());
+            System.out.println("TELEGRAM_PROBE=" + (probe.success() ? "READY" : "BLOCKED"));
+            System.out.println("TELEGRAM_PROBE_REASON="
+                    + (probe.success() ? "NONE" : safeReason(probe.errorCode())));
+            if (probe.success() && probe.botUsername() != null) {
+                System.out.println("TELEGRAM_BOT_USERNAME=" + probe.botUsername());
+            }
+            if (!probe.success()) System.exit(1);
+        } else {
+            System.out.println("TELEGRAM_PROBE=SKIPPED");
         }
     }
 
@@ -70,6 +86,16 @@ public final class TargetRuntimePreflight {
                 && coinGlassState != CoinGlassConfigurationState.CONFIGURED) {
             passed = false;
         }
+        TelegramConfiguration telegram = telegramConfiguration(environment);
+        lines.add("TELEGRAM_ENABLED=" + telegram.enabledPresence());
+        lines.add("TELEGRAM_EXTERNAL_CALLS_ENABLED=" + telegram.externalPresence());
+        lines.add("TELEGRAM_BOT_TOKEN=" + telegram.tokenPresence());
+        lines.add("TELEGRAM_CHAT_ID=" + telegram.chatPresence());
+        lines.add("TELEGRAM_API_BASE_URL=" + telegram.apiBasePresence());
+        lines.add("TELEGRAM_PUBLIC_BASE_URL=" + telegram.publicBasePresence());
+        lines.add("TELEGRAM_READINESS=" + telegram.readiness());
+        lines.add("TELEGRAM_REASON_CODE=" + telegram.reasonCode());
+        passed &= !"BLOCKED".equals(telegram.readiness());
         lines.add("PREFLIGHT=" + (passed ? "PASS" : "BLOCKED"));
         return new Result(passed, List.copyOf(lines));
     }
@@ -155,10 +181,72 @@ public final class TargetRuntimePreflight {
         return CoinGlassConfigurationState.evaluate(enabled, external, keyPresent, rpm);
     }
 
+    private static TelegramConfiguration telegramConfiguration(Map<String, String> environment) {
+        String enabledRaw = trim(environment.get("TRADE_MODEL_TELEGRAM_ENABLED"));
+        String externalRaw = trim(environment.get("TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED"));
+        boolean telegramEnabled = Boolean.parseBoolean(enabledRaw);
+        boolean external = Boolean.parseBoolean(externalRaw);
+        boolean token = trim(environment.get("TELEGRAM_BOT_TOKEN")) != null;
+        boolean chat = trim(environment.get("TELEGRAM_CHAT_ID")) != null;
+        boolean apiBase = trim(environment.get("TELEGRAM_API_BASE_URL")) != null;
+        boolean publicBase = trim(environment.get("TRADE_MODEL_PUBLIC_BASE_URL")) != null;
+        String readiness;
+        String reason;
+        if (!telegramEnabled || !external) {
+            readiness = "NOT_CONFIGURED";
+            reason = !telegramEnabled ? "TELEGRAM_DISABLED" : "EXTERNAL_CALLS_DISABLED";
+        } else if (!token) {
+            readiness = "BLOCKED";
+            reason = "TOKEN_MISSING";
+        } else if (!chat) {
+            readiness = "BLOCKED";
+            reason = "CHAT_ID_MISSING";
+        } else {
+            readiness = "READY";
+            reason = publicBase ? "CONFIGURATION_READY" : "CONFIGURATION_READY_WITHOUT_PUBLIC_LINK";
+        }
+        return new TelegramConfiguration(presence(enabledRaw), presence(externalRaw), presence(token), presence(chat),
+                apiBase ? "SET" : "MISSING", publicBase ? "SET" : "MISSING", readiness, reason);
+    }
+
+    private static TelegramClientResult telegramProbe(Map<String, String> environment) {
+        TelegramProperties properties = new TelegramProperties();
+        properties.setEnabled(enabled(environment, "TRADE_MODEL_TELEGRAM_ENABLED"));
+        properties.setExternalCallsEnabled(enabled(environment, "TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED"));
+        properties.setBotToken(environment.get("TELEGRAM_BOT_TOKEN"));
+        properties.setChatId(environment.get("TELEGRAM_CHAT_ID"));
+        String apiBase = trim(environment.get("TELEGRAM_API_BASE_URL"));
+        if (apiBase != null) properties.setApiBaseUrl(apiBase);
+        return new TelegramBotApiClient(properties, new ObjectMapper()).getMe();
+    }
+
+    private static boolean contains(String[] args, String expected) {
+        if (args == null) return false;
+        for (String arg : args) if (expected.equals(arg)) return true;
+        return false;
+    }
+
+    private static String safeReason(String value) {
+        return value == null || !value.matches("[A-Z0-9_]+") ? "PROVIDER_VALIDATION_FAILED" : value;
+    }
+
+    private static String presence(boolean present) { return present ? "SET" : "MISSING"; }
+    private static String presence(String value) { return value == null ? "MISSING" : "SET"; }
+
     private static String trim(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
     record Result(boolean passed, List<String> lines) {
+    }
+
+    private record TelegramConfiguration(String enabledPresence,
+                                         String externalPresence,
+                                         String tokenPresence,
+                                         String chatPresence,
+                                         String apiBasePresence,
+                                         String publicBasePresence,
+                                         String readiness,
+                                         String reasonCode) {
     }
 }

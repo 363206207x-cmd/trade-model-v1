@@ -107,6 +107,18 @@ class PostgreSqlFlywayMigrationSmokeTest {
         Flyway.configure()
                 .dataSource(target.jdbcUrl(), target.username(), target.password())
                 .locations("classpath:db/migration")
+                .target("13")
+                .load()
+                .migrate();
+
+        try (Connection connection = DriverManager.getConnection(
+                target.jdbcUrl(), target.username(), target.password())) {
+            insertLegacyTelegramV13Fixture(connection);
+        }
+
+        Flyway.configure()
+                .dataSource(target.jdbcUrl(), target.username(), target.password())
+                .locations("classpath:db/migration")
                 .load()
                 .migrate();
 
@@ -154,6 +166,9 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "idx_tm_channel_delivery_message",
                     "idx_tm_async_task_owner_time",
                     "idx_tm_event_asset_symbol_time",
+                    "uk_tm_channel_delivery_message_channel_active",
+                    "idx_tm_channel_delivery_due",
+                    "idx_tm_channel_delivery_cooldown",
                     "uk_tm_review_result_analysis_scope",
                     "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
@@ -169,6 +184,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
             assertDecisionChainV11Contract(connection);
             assertDecisionChainV12AuditTextRoundTrip(connection);
             assertFinalInteractionV13Contract(connection);
+            assertTelegramDeliveryV14Contract(connection);
             String profileUserId = assertProviderScanProfileSaveLoadAndAudit(connection);
             assertProviderScanProfileRollbackIsAtomic(connection, profileUserId);
             assertFlywayHistorySucceeded(connection);
@@ -302,8 +318,8 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 .isEqualTo(CONTROLLED_CONFIRM);
         assertThat(System.getenv("CONTROLLED_POSTGRESQL_FLYWAY_RUN"))
                 .isEqualTo(CONTROLLED_RUN);
-        assertThat(jdbcUrl).isEqualTo(
-                "jdbc:postgresql://127.0.0.1:55432/trade_model_v1_test");
+        assertThat(jdbcUrl)
+                .matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/trade_model_v1_test");
         assertThat(username).isEqualTo("trade_model_test");
         assertThat(jdbcUrl.toLowerCase()).doesNotContain("prod", "production", "live", "primary", "main");
         return new DatabaseTarget(jdbcUrl, username, password);
@@ -371,7 +387,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(13);
+                assertThat(rs.getInt(1)).isGreaterThanOrEqualTo(14);
             }
         }
     }
@@ -425,6 +441,192 @@ class PostgreSqlFlywayMigrationSmokeTest {
                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """))
                     .isInstanceOf(java.sql.SQLException.class);
+        }
+    }
+
+    private static void assertTelegramDeliveryV14Contract(Connection connection) throws Exception {
+        for (String column : List.of(
+                "next_attempt_at", "claimed_at", "lease_until", "claim_token",
+                "last_response_code", "retry_after_seconds", "recipient_fingerprint",
+                "cooldown_key", "severity_rank")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'tm_channel_delivery'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).as("V14 column %s", column).isEqualTo(1);
+                }
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT indexdef FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND indexname = 'uk_tm_channel_delivery_message_channel_active'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).contains("message_id", "channel", "DUPLICATE_MIGRATED");
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT delivery_id, status, error_code, next_attempt_at, severity_rank
+                FROM tm_channel_delivery
+                WHERE delivery_id IN (
+                    'delivery-v13-sent', 'delivery-v13-duplicate', 'delivery-v13-queued'
+                )
+                ORDER BY delivery_id
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("delivery_id")).isEqualTo("delivery-v13-duplicate");
+                assertThat(rs.getString("status")).isEqualTo("SUPPRESSED");
+                assertThat(rs.getString("error_code")).isEqualTo("DUPLICATE_MIGRATED");
+                assertThat(rs.getObject("next_attempt_at")).isNull();
+                assertThat(rs.getInt("severity_rank")).isZero();
+
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("delivery_id")).isEqualTo("delivery-v13-queued");
+                assertThat(rs.getString("status")).isEqualTo("QUEUED");
+                assertThat(rs.getString("error_code")).isNull();
+                assertThat(rs.getObject("next_attempt_at", LocalDateTime.class))
+                        .isEqualTo(LocalDateTime.of(2026, 8, 16, 8, 2));
+                assertThat(rs.getInt("severity_rank")).isZero();
+
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("delivery_id")).isEqualTo("delivery-v13-sent");
+                assertThat(rs.getString("status")).isEqualTo("SENT");
+                assertThat(rs.getString("error_code")).isNull();
+                assertThat(rs.getObject("next_attempt_at")).isNull();
+                assertThat(rs.getInt("severity_rank")).isZero();
+                assertThat(rs.next()).isFalse();
+            }
+        }
+        for (String messageId : List.of(
+                "message-v13-newer-sent", "message-v13-older-sent",
+                "message-v13-multiple-sent", "message-v13-sent-sending")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FILTER (WHERE status = 'SENT') AS sent_count,
+                           COUNT(*) FILTER (WHERE status IN ('QUEUED','RETRYING','SENDING')) AS due_capable_count,
+                           COUNT(*) FILTER (WHERE status = 'SUPPRESSED'
+                             AND error_code = 'DUPLICATE_MIGRATED'
+                             AND next_attempt_at IS NULL AND claim_token IS NULL
+                             AND claimed_at IS NULL AND lease_until IS NULL) AS clean_duplicate_count,
+                           COUNT(*) AS total_count
+                    FROM tm_channel_delivery WHERE message_id = ?
+                    """)) {
+                statement.setString(1, messageId);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt("sent_count")).as(messageId).isEqualTo(1);
+                    assertThat(rs.getInt("due_capable_count")).as(messageId).isZero();
+                    assertThat(rs.getInt("clean_duplicate_count")).as(messageId).isEqualTo(1);
+                    assertThat(rs.getInt("total_count")).as(messageId).isEqualTo(2);
+                }
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT delivery_id FROM tm_channel_delivery
+                WHERE message_id = 'message-v13-multiple-sent' AND status = 'SENT'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("delivery-v13-sent-newer");
+                assertThat(rs.next()).isFalse();
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT status, error_code, next_attempt_at FROM tm_channel_delivery
+                WHERE message_id = 'message-v13-no-sent' AND error_code IS DISTINCT FROM 'DUPLICATE_MIGRATED'
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("status")).isEqualTo("FAILED");
+                assertThat(rs.getString("error_code")).isEqualTo("DELIVERY_OUTCOME_UNKNOWN");
+                assertThat(rs.getObject("next_attempt_at")).isNull();
+                assertThat(rs.next()).isFalse();
+            }
+        }
+    }
+
+    private static void insertLegacyTelegramV13Fixture(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_message(
+                      message_id, user_id, category, source_type, source_id, title,
+                      business_state, read_state, dedupe_key, created_at, updated_at
+                    ) VALUES
+                      ('message-v13-duplicate', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opportunity-v13', 'legacy duplicate', 'ACTIVE',
+                       'UNREAD', 'message-v13-duplicate',
+                       TIMESTAMP '2026-08-16 08:00:00', TIMESTAMP '2026-08-16 08:00:00'),
+                      ('message-v13-queued', 1, 'POSITION_LOGIC_RISK_CHANGE',
+                       'POSITION', 'position-v13', 'legacy queued', 'ACTIVE',
+                       'UNREAD', 'message-v13-queued',
+                       TIMESTAMP '2026-08-16 08:02:00', TIMESTAMP '2026-08-16 08:02:00'),
+                      ('message-v13-newer-sent', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opp-newer-sent', 'newer sent wins', 'ACTIVE',
+                       'UNREAD', 'message-v13-newer-sent', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                      ('message-v13-older-sent', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opp-older-sent', 'older sent wins', 'ACTIVE',
+                       'UNREAD', 'message-v13-older-sent', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                      ('message-v13-multiple-sent', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opp-multiple-sent', 'deterministic sent wins', 'ACTIVE',
+                       'UNREAD', 'message-v13-multiple-sent', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                      ('message-v13-sent-sending', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opp-sent-sending', 'sent beats sending', 'ACTIVE',
+                       'UNREAD', 'message-v13-sent-sending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                      ('message-v13-no-sent', 1, 'HIGH_PERMISSION_OPPORTUNITY',
+                       'OPPORTUNITY', 'opp-no-sent', 'no sent deterministic', 'ACTIVE',
+                       'UNREAD', 'message-v13-no-sent', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """)).isEqualTo(7);
+            statement.executeUpdate("ALTER TABLE tm_channel_delivery DROP CONSTRAINT ck_tm_channel_delivery_status");
+            assertThat(statement.executeUpdate("""
+                    INSERT INTO tm_channel_delivery(
+                      delivery_id, message_id, user_id, channel, status,
+                      attempt_count, attempted_at, delivered_at, created_at, updated_at
+                    ) VALUES
+                      ('delivery-v13-sent', 'message-v13-duplicate', 1, 'TELEGRAM',
+                       'DELIVERED', 1, TIMESTAMP '2026-08-16 08:00:30',
+                       TIMESTAMP '2026-08-16 08:00:31',
+                       TIMESTAMP '2026-08-16 08:00:00', TIMESTAMP '2026-08-16 08:00:31'),
+                      ('delivery-v13-duplicate', 'message-v13-duplicate', 1, 'TELEGRAM',
+                       'QUEUED', 0, NULL, NULL,
+                       TIMESTAMP '2026-08-16 08:01:00', TIMESTAMP '2026-08-16 08:01:00'),
+                      ('delivery-v13-queued', 'message-v13-queued', 1, 'TELEGRAM',
+                       'QUEUED', 0, NULL, NULL,
+                       TIMESTAMP '2026-08-16 08:02:00', TIMESTAMP '2026-08-16 08:02:00'),
+                      ('delivery-v13-newer-sent-queued', 'message-v13-newer-sent', 1, 'TELEGRAM',
+                       'QUEUED', 0, NULL, NULL, TIMESTAMP '2026-08-16 08:00:00', TIMESTAMP '2026-08-16 08:00:00'),
+                      ('delivery-v13-newer-sent', 'message-v13-newer-sent', 1, 'TELEGRAM',
+                       'DELIVERED', 1, CURRENT_TIMESTAMP, TIMESTAMP '2026-08-16 08:05:00',
+                       TIMESTAMP '2026-08-16 08:04:00', TIMESTAMP '2026-08-16 08:05:00'),
+                      ('delivery-v13-older-sent', 'message-v13-older-sent', 1, 'TELEGRAM',
+                       'DELIVERED', 1, CURRENT_TIMESTAMP, TIMESTAMP '2026-08-16 08:00:00',
+                       TIMESTAMP '2026-08-16 08:00:00', TIMESTAMP '2026-08-16 08:00:00'),
+                      ('delivery-v13-older-sent-queued', 'message-v13-older-sent', 1, 'TELEGRAM',
+                       'QUEUED', 0, NULL, NULL, TIMESTAMP '2026-08-16 08:06:00', TIMESTAMP '2026-08-16 08:06:00'),
+                      ('delivery-v13-sent-older', 'message-v13-multiple-sent', 1, 'TELEGRAM',
+                       'DELIVERED', 1, CURRENT_TIMESTAMP, TIMESTAMP '2026-08-16 08:01:00',
+                       TIMESTAMP '2026-08-16 08:01:00', TIMESTAMP '2026-08-16 08:01:00'),
+                      ('delivery-v13-sent-newer', 'message-v13-multiple-sent', 1, 'TELEGRAM',
+                       'DELIVERED', 1, CURRENT_TIMESTAMP, TIMESTAMP '2026-08-16 08:07:00',
+                       TIMESTAMP '2026-08-16 08:02:00', TIMESTAMP '2026-08-16 08:07:00'),
+                      ('delivery-v13-sent-active', 'message-v13-sent-sending', 1, 'TELEGRAM',
+                       'DELIVERED', 1, CURRENT_TIMESTAMP, TIMESTAMP '2026-08-16 08:01:00',
+                       TIMESTAMP '2026-08-16 08:01:00', TIMESTAMP '2026-08-16 08:01:00'),
+                      ('delivery-v13-sending-duplicate', 'message-v13-sent-sending', 1, 'TELEGRAM',
+                       'SENDING', 1, CURRENT_TIMESTAMP, NULL,
+                       TIMESTAMP '2026-08-16 08:08:00', TIMESTAMP '2026-08-16 08:08:00'),
+                      ('delivery-v13-sending-only', 'message-v13-no-sent', 1, 'TELEGRAM',
+                       'SENDING', 1, CURRENT_TIMESTAMP, NULL,
+                       TIMESTAMP '2026-08-16 08:08:00', TIMESTAMP '2026-08-16 08:08:00'),
+                      ('delivery-v13-retrying-duplicate', 'message-v13-no-sent', 1, 'TELEGRAM',
+                       'RETRYING', 1, CURRENT_TIMESTAMP, NULL,
+                       TIMESTAMP '2026-08-16 08:07:00', TIMESTAMP '2026-08-16 08:07:00')
+                    """)).isEqualTo(13);
         }
     }
 

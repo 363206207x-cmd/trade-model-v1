@@ -55,6 +55,41 @@ are `gpt-5.6-sol`, `gemini-3.5-flash`, and `grok-4.5`; a fallback model never
 counts as Ready. `TRADE_MODEL_AI_READINESS_VERIFICATION_TTL_SECONDS` controls
 the cached explicit verification window.
 
+## Telegram High-Value Alert Channel
+
+Telegram defaults fail closed. Both `TRADE_MODEL_TELEGRAM_ENABLED` and
+`TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED` must be true before external
+delivery can be attempted. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are
+required runtime secrets and must never be persisted, returned, or printed.
+
+Provider and link configuration:
+
+- `TELEGRAM_API_BASE_URL`
+- `TRADE_MODEL_PUBLIC_BASE_URL`
+
+Durable delivery controls:
+
+- `TRADE_MODEL_TELEGRAM_CONNECT_TIMEOUT_MS`
+- `TRADE_MODEL_TELEGRAM_READ_TIMEOUT_MS`
+- `TRADE_MODEL_TELEGRAM_MAX_ATTEMPTS`
+- `TRADE_MODEL_TELEGRAM_RETRY_BASE_SECONDS`
+- `TRADE_MODEL_TELEGRAM_RETRY_MAX_SECONDS`
+- `TRADE_MODEL_TELEGRAM_DELIVERY_BATCH_SIZE`
+- `TRADE_MODEL_TELEGRAM_DISPATCH_ENABLED`
+- `TRADE_MODEL_TELEGRAM_DISPATCH_FIXED_DELAY_MS`
+- `TRADE_MODEL_TELEGRAM_CLAIM_LEASE_SECONDS`
+- `TRADE_MODEL_TELEGRAM_COOLDOWN_MINUTES`
+- `TRADE_MODEL_TELEGRAM_ALLOW_HIGH_QUALITY_REDUCED`
+
+The public base URL is optional. It must be public HTTPS before a recheck or
+position link is emitted; otherwise Telegram remains text-only. The dispatcher
+also requires the global scheduler gate. Missing configuration cannot produce
+`SENT` and does not prevent canonical Message persistence.
+
+The operator-managed private Telegram environment file stays outside the
+repository. Preflight checks presence only, and an explicit provider probe is
+allowed only after separate operator authorization.
+
 ## CoinGlass Configuration Presence
 
 `COINGLASS_ADVERTISED_RPM` has no production default. It must be an explicit

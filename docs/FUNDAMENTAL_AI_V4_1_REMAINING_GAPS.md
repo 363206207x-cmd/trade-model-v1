@@ -1,6 +1,6 @@
-# Fundamental AI v4.1 Target Runtime Remediation Remaining Gaps
+# Fundamental AI v4.1 Remaining Gaps
 
-Status: `FINAL_HTTP451_CLOSURE_PENDING_ONE_EXACT_INDEPENDENT_REAUDIT`
+Status: `TELEGRAM_INTEGRATION_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_AUDIT`
 
 `P0_REMAINING=0` and `P1_REMAINING=0` for the authorized implementation
 package. No known B01-B04 implementation blocker, HTTP 451 empty-success
@@ -19,9 +19,24 @@ by mock or fallback data:
 5. Production deployment, rollback drill and secret rotation remain Product
    Owner actions.
 
-PR #1187 remains Draft and unmerged. Exact-head CI plus the one independent
-HTTP 451 closure re-audit are acceptance gates, not another implementation
-package.
+The prior target-runtime remediation is merged in the implementation baseline.
+
+## Telegram Channel
+
+The Telegram application contract, mock delivery, V14 migration, and local
+regression gates are implemented. The following evidence remains intentionally
+deferred:
+
+1. Exact implementation-head CI.
+2. Independent Telegram integration audit.
+3. Merge and merged-main validation.
+4. One controlled application-level live delivery using operator-owned runtime
+   secrets after merge.
+
+Direct bot connectivity was verified by the user. It is recorded as
+`PASS_USER_VERIFIED` and is not presented as application-level acceptance.
+The implementation task did not read or load the operator private environment
+file.
 
 These gaps do not authorize weaker readiness, fake Evidence, fabricated AI
-output, threshold changes or automatic trading.
+output, threshold changes, secret disclosure, or automatic trading.

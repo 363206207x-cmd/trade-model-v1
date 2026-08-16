@@ -1757,6 +1757,15 @@ CREATE TABLE IF NOT EXISTS tm_channel_delivery (
     status VARCHAR(24) NOT NULL,
     provider_reference VARCHAR(256),
     attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP,
+    claimed_at TIMESTAMP,
+    lease_until TIMESTAMP,
+    claim_token VARCHAR(64),
+    last_response_code INT,
+    retry_after_seconds INT,
+    recipient_fingerprint VARCHAR(128),
+    cooldown_key VARCHAR(256),
+    severity_rank INT NOT NULL DEFAULT 0,
     error_code VARCHAR(128),
     error_message CLOB,
     attempted_at TIMESTAMP,
@@ -1765,12 +1774,20 @@ CREATE TABLE IF NOT EXISTS tm_channel_delivery (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_channel_delivery_channel CHECK (channel IN ('TELEGRAM')),
     CONSTRAINT ck_tm_channel_delivery_status CHECK (status IN (
-        'QUEUED', 'SENT', 'DELIVERED', 'FAILED', 'SUPPRESSED')),
+        'QUEUED', 'SENDING', 'SENT', 'RETRYING', 'FAILED', 'SUPPRESSED', 'NOT_CONFIGURED')),
     CONSTRAINT ck_tm_channel_delivery_attempt CHECK (attempt_count >= 0),
+    CONSTRAINT ck_tm_channel_delivery_retry_after CHECK (
+        retry_after_seconds IS NULL OR retry_after_seconds >= 0),
+    CONSTRAINT ck_tm_channel_delivery_severity CHECK (severity_rank >= 0),
+    CONSTRAINT uk_tm_channel_delivery_message_channel UNIQUE (message_id, channel),
     CONSTRAINT fk_tm_channel_delivery_message FOREIGN KEY (message_id) REFERENCES tm_message(message_id)
 );
 CREATE INDEX IF NOT EXISTS idx_tm_channel_delivery_message
     ON tm_channel_delivery(message_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tm_channel_delivery_due
+    ON tm_channel_delivery(status, next_attempt_at, lease_until);
+CREATE INDEX IF NOT EXISTS idx_tm_channel_delivery_cooldown
+    ON tm_channel_delivery(user_id, cooldown_key, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS tm_async_task (
     task_id VARCHAR(64) PRIMARY KEY,

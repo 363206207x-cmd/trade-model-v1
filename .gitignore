@@ -38,6 +38,9 @@ data/*.mv.db
 data/*.trace.db
 data/*.lock.db
 .runtime/
+.config/
+telegram.env
+*.telegram.env
 
 # Xcode/iOS local build and signing artifacts
 DerivedData/
