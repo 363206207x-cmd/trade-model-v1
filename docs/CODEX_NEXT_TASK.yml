@@ -1,60 +1,60 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI v4.1 target-runtime blocker remediation authorization"
+active_block: "Fundamental AI v4.1 Telegram high-value alert channel authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization"
-branch: "codex/v4-1-target-runtime-blocker-authorization"
+module: "Fundamental AI v4.1 Telegram High-Value Alert Authorization"
+branch: "codex/v4-1-telegram-high-value-alert-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 
-current_package_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION"
-current_package_name: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization"
-current_package_active_block: "B01-B04 Product-Source Mapping, Ownership And Exact Permission Gate"
+current_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION"
+current_package_name: "Fundamental AI v4.1 Telegram High-Value Alert Channel Authorization"
+current_package_active_block: "Telegram Product-Source Mapping, Ownership And Exact Permission Gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-target-runtime-blocker-authorization"
+current_package_branch: "codex/v4-1-telegram-high-value-alert-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement B01-B04 in this task"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement Telegram delivery on this branch"
 current_package_allowed_scope:
-  - "Register the four accepted target-runtime blockers against the canonical Product Source"
-  - "Register existing object ownership and exact remediation authorization"
-  - "Update delivery state, exact-package machine permissions, gate validation and authorization evidence"
+  - "Map the frozen Section 15.2 Telegram contract to canonical product ownership"
+  - "Register Message and ChannelDelivery owner reuse and exact integration authorization"
+  - "Update delivery state, exact-package machine permissions and authorization validation"
   - "Validate fail-closed package denial without changing application, API, schema, Figma or Mobile"
 current_package_blocked_scope:
-  - "pom.xml, application configuration, Java, API, schema, provider, PasswordPolicy, Figma, Desktop or Mobile changes"
-  - "Implementation of B01-B04 or target-runtime deployment"
-  - "Secret reading, injection, logging or repository writes"
+  - "Java, application configuration, API, schema, Telegram client, Figma, Desktop or Mobile changes"
+  - "Telegram integration, live connectivity, target-runtime deployment or production deployment"
+  - "Private Telegram file reading, secret injection, logging or repository writes"
 
-authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
-authorized_next_package_name: "Fundamental AI v4.1 Target Runtime Deployment Blocker Remediation"
-authorized_next_package_active_block: "B01 Standard JAR Flyway, B02 Provider Capability, B03 AI Readiness, B04 Auth Bootstrap"
+authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+authorized_next_package_name: "Fundamental AI v4.1 Telegram High-Value Alert Channel Integration"
+authorized_next_package_active_block: "Message Qualification, ChannelDelivery Queue, Telegram Client, Retry, Readiness And Status"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-target-runtime-blocker-remediation"
-authorized_next_package_risk: "B_RISK_TARGET_RUNTIME_REMEDIATION"
+authorized_next_package_branch: "codex/v4-1-telegram-high-value-alert-channel"
+authorized_next_package_risk: "B_RISK_EXTERNAL_NOTIFICATION_CHANNEL"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
 authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
-authorized_next_package_next_action: "From authorization-effective merged main, implement only B01-B04 in one Draft PR and stop for independent remediation audit"
+authorized_next_package_next_action: "From authorization-effective merged main, implement the exact Telegram channel package in one Draft PR and stop for independent integration audit"
 
-blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_MOBILE_FIGMA_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_TARGET_RUNTIME_REMEDIATION_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_TELEGRAM_MOBILE_FIGMA_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_TELEGRAM_CHANNEL_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_TELEGRAM_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
-  - "TARGET_RUNTIME_ACCEPTANCE_BLOCKERS_MAPPED"
-  - "V4_1_FINAL_INTERACTION_EFFECTIVE_MERGED_MAIN"
-  - "TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "V4_1_TARGET_RUNTIME_REMEDIATION_EFFECTIVE_MERGED_MAIN"
+  - "TELEGRAM_SOURCE_AND_OWNERSHIP_MAPPED"
+  - "TELEGRAM_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -80,14 +80,17 @@ v4_1_decision_chain_implementation_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_target_runtime_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_target_runtime_remediation_implementation_status: "NOT_STARTED"
-v4_1_target_runtime_status: "BLOCKED_BY_IMPLEMENTATION_DEFECT"
-authorized_next_package: "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
-scope: "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY"
+v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
+v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
+v4_1_telegram_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_telegram_implementation_status: "NOT_STARTED"
+v4_1_telegram_live_acceptance_status: "DEFERRED_UNTIL_MERGED_MAIN"
+authorized_next_package: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+scope: "V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk authorization package; successor is B-risk target-runtime remediation"
+risk: "A-risk authorization package; successor is B-risk external notification channel integration"
 
 pr_1179_number: "1179"
 pr_1179_status: "MERGED"
@@ -95,44 +98,44 @@ pr_1179_merge_commit: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
 pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
 pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
 
-current_pr: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization / PENDING_REVIEW"
-current_package_pr: "Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization Package"
+current_pr: "Fundamental AI v4.1 Telegram High-Value Alert Authorization / PENDING_REVIEW"
+current_package_pr: "Fundamental AI v4.1 Telegram High-Value Alert Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only authorization package after all gates pass"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "Fundamental AI v4.1 Target Runtime Deployment Blocker Remediation"
+next_business_phase: "Fundamental AI v4.1 Telegram High-Value Alert Channel Integration"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 
-product_phase: "Fundamental AI v4.1 Target Runtime Remediation Authorization"
+product_phase: "Fundamental AI v4.1 Telegram High-Value Alert Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "v4.1 target-runtime blocker source mapping and exact implementation authorization"
+product_module: "v4.1 Telegram high-value alert source mapping and exact channel integration authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "TARGET_RUNTIME_ACCEPTANCE"
-  - "BLOCKER_SOURCE_MAPPING"
+  - "TELEGRAM_HIGH_VALUE_ALERT_CONTRACT"
+  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERSHIP"
   - "OBJECT_OWNERSHIP"
   - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_SOURCE_MAPPING.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION_VALIDATION.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_SOURCE_MAPPING.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_OWNERSHIP_MAP.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md"
+  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "B01_STANDARD_JAR_FLYWAY"
-  - "B02_PROVIDER_CAPABILITY_AND_INSTRUMENT"
-  - "B03_AI_PROVIDER_READINESS"
-  - "B04_AUTH_BOOTSTRAP"
+  - "MESSAGE_SINGLE_BUSINESS_FACT"
+  - "TELEGRAM_CHANNEL_DELIVERY_ONLY"
+  - "THREE_HIGH_VALUE_MESSAGE_CATEGORIES"
+  - "SECRET_SAFE_FAIL_CLOSED_DELIVERY"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -145,46 +148,46 @@ required_product_sources:
   - PS-POSITION-MONITORING
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION
+  - PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  The sole v4.1 Product Source remains unchanged. The four reproduced blockers prevent its fail-closed target-runtime chain from starting or obtaining truthful provider/AI/auth readiness. This package records only the exact repair permission.
+  The sole v4.1 Product Source remains unchanged. Section 15.2 permits Telegram only as a delivery channel for three high-value Message categories. Message remains the sole business fact and Push Recheck remains non-trading revalidation.
 
 design_interaction_mapping: |
-  No design implementation is authorized. Canonical Figma, Desktop and Mobile remain unchanged. The later package may repair runtime state mapping only where an existing status field is incorrect; it may not redesign a page or component.
+  No design implementation is authorized. The successor reuses Message Center, Push Recheck, Position Detail and My/Settings routes. Canonical Figma, Desktop and Mobile remain unchanged.
 
 data_source_mapping: |
-  Reuse the existing build/Flyway, canonical asset and instrument mapping, provider adapters/health, Asset Pool scan/AnalysisRun, AI Orchestrator/AITrace/cost gate, PasswordPolicy/PersonalUser/auth Session and readiness owners. No second owner is authorized.
+  Reuse MessageDO/MessageFactService, ChannelDeliveryDO/ChannelDeliveryService, PushSnapshot/PushRecheck, Opportunity/FinalExecutionPlan, UserPosition/PositionMonitorLog and PersonalUser/UserConfig. Telegram introduces one protocol client only.
 
 current_implementation_gap: |
-  Exact merged-main acceptance found a standard-JAR Flyway packaging defect, exact-provider/instrument and HTTP 451 gaps, application AI readiness configuration/verification gaps, and password bootstrap/readiness inconsistency. Data Quality 55 remains truthful and is not a defect authorized for change.
+  The exact package is not authorized. Existing ChannelDelivery records only simple queued/suppressed state and lacks Telegram protocol delivery, durable retry, readiness, qualification wiring and secure status projection.
 
 allowed_scope:
-  - "Blocker source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
+  - "Telegram source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "B01 standard release JAR Flyway runtime and packaged PostgreSQL V1-V13 validation"
-  - "B02 existing provider capability/instrument mapping, HTTP 451 classification and per-asset failure isolation"
-  - "B03 existing AI readiness, configurable cost/RPM/budget and exact-model preflight"
-  - "B04 existing PasswordPolicy/bootstrap/readiness alignment and secure password helper"
-  - "Secret-free tests, deployment docs and independent remediation audit handoff"
+  - "Existing Message and ChannelDelivery extension with one Telegram client and dispatcher"
+  - "Three frozen high-value qualification policies after trusted persistence"
+  - "Durable dedupe, cooldown, escalation, retry, crash recovery and explicit status"
+  - "Secret-safe configuration/readiness/preflight and owner-scoped API projection"
+  - "Mock-provider tests, deployment docs and independent integration audit handoff"
 
 authorized_next_blocked_scope:
   - "Product, Figma, Desktop UI or Mobile changes"
-  - "Data Quality, Eight Scores, Market Bias, Opportunity State, Plan Mode, Candidate/Final or Position boundary changes"
-  - "Fake data, fake AI, quote substitution, automatic position mutation, order or trading"
+  - "Preview, Candidate-only, ordinary-price or unverified-position delivery"
+  - "Private Telegram file access, fake success, automatic position mutation, order or trading"
 
 blocked_scope:
-  - "Any B01-B04 implementation inside this authorization package"
-  - "Any package except FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+  - "Any Telegram implementation inside this authorization package"
+  - "Any package except FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 
 forbidden_scope:
-  - "pom.xml, application configuration, Java, API, schema, provider, PasswordPolicy, Figma or Mobile changes in the authorization diff"
-  - "Reading, injecting or committing real secrets, or deploying a runtime"
+  - "Application configuration, Java, API, schema, Telegram client, Figma or Mobile changes in the authorization diff"
+  - "Reading, injecting or committing real Telegram secrets, or deploying a runtime"
 
 real_scenario_requirement: |
-  This authorization performs no business scenario. The successor must run the exact standard-JAR, PostgreSQL, provider, AI and auth scenarios and stop for independent audit without lowering gates or manufacturing Final output.
+  This authorization performs no business scenario. The successor must use mock Telegram HTTP for delivery contracts, keep the user-verified direct connectivity as external evidence only, and defer application live acceptance until audited code is merged.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -199,17 +202,17 @@ hard_boundaries:
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and registered authorization hashes pass"
-  - "Authorization remains blocked before merge and exact successor is allowed only after clean/synced merged main"
-  - "Old, typo, expanded, auto-trading, Mobile and Figma packages fail closed"
+  - "Unique active v4.1 Product Source and registered Telegram authorization hash pass"
+  - "Telegram integration remains blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "Typo, expanded, auto-trading, Mobile and Figma packages fail closed"
   - "Application/API/Schema/Figma/Mobile changed-file count is zero"
   - "Workflow, authorization, duplicate-skeleton, Maven, secret and diff checks pass"
 
 stop_conditions:
-  - "Main differs from 3a6f56afaf6fbba3d094d532f7f9555a23ac30a1 before authorization branch creation"
+  - "Main differs from 2787f2e999f7744f0bb3e032b0462c9ddea943e4 before authorization branch creation"
   - "A Product Source conflict, secret exposure or duplicate owner is found"
   - "The diff includes application, API, schema, provider, business-test, Figma or Mobile changes"
-  - "The exact successor is not the only package permitted after merged-main effectivity"
+  - "The exact Telegram successor is not the only package permitted after merged-main effectivity"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"

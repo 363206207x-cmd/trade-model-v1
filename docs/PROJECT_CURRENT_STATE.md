@@ -8,13 +8,34 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Target Runtime Blocker Remediation Authorization
-Product Phase Status: TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the accepted B01-B04 runtime blockers, reuse ownership, and exact implementation permission; no blocker remediation is implemented here
-Next Business Phase: FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION
+Product Phase: Fundamental AI v4.1 Telegram High-Value Alert Authorization
+Product Phase Status: TELEGRAM_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the frozen Telegram source mapping, reuse Message and ChannelDelivery ownership, and exact implementation permission; no Telegram implementation is included here
+Next Business Phase: FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION
 Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## Fundamental AI v4.1 Telegram High-Value Alert Authorization
+
+PR #1187 merged the independently audited target-runtime remediation on main
+`2787f2e999f7744f0bb3e032b0462c9ddea943e4`. The sole authoritative v4.1
+Product Source already freezes Telegram as a delivery channel under the
+persisted Message fact, with exactly three high-value categories and zero
+automatic-trading authority.
+
+This A-risk package maps that contract to existing Message, ChannelDelivery,
+Push/Recheck, Opportunity/Final, UserPosition/PositionMonitorLog and
+PersonalUser/UserConfig owners. It authorizes exactly
+`FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION` after
+clean/synchronized merged-main validation. Before merge, repository edits,
+implementation and successor PR creation remain false.
+
+The authorization changes no application code, API, schema, Figma, Desktop or
+Mobile. It does not read the private Telegram environment file and does not
+claim application-level live delivery. Capability movement is `NONE`.
 
 ---
 

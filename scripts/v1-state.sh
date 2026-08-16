@@ -81,6 +81,9 @@ emit_resolved_task_state() {
   printf 'V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS: %s\n' "${v4_1_target_runtime_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_TARGET_RUNTIME_REMEDIATION_IMPLEMENTATION_STATUS: %s\n' "${v4_1_target_runtime_implementation_status:-UNDECLARED}"
   printf 'V4_1_TARGET_RUNTIME_STATUS: %s\n' "${v4_1_target_runtime_status:-UNDECLARED}"
+  printf 'V4_1_TELEGRAM_AUTHORIZATION_STATUS: %s\n' "${v4_1_telegram_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_TELEGRAM_IMPLEMENTATION_STATUS: %s\n' "${v4_1_telegram_implementation_status:-UNDECLARED}"
+  printf 'V4_1_TELEGRAM_LIVE_ACCEPTANCE_STATUS: %s\n' "${v4_1_telegram_live_acceptance_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -216,6 +219,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V4_1_TELEGRAM_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -231,6 +236,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="V4_1_FINAL_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V4_1_TELEGRAM_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -282,6 +289,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION"
   elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]]; then
     resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION"
+  elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" ]]; then
+    resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -668,7 +677,94 @@ evaluate_v4_1_target_runtime_transition() {
   v4_1_target_runtime_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
+evaluate_v4_1_telegram_transition() {
+  local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
+  local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
+  local merged_main_validation_status="$9" repository_edits_allowed="${10}"
+  local implementation_allowed="${11}" implementation_pr_allowed="${12}"
+  local declared_authorization_status="${13}" predecessor_status="${14}"
+
+  effective_task_mode="$current_mode"
+  p1a_transition_allowed="YES"
+  p1a_completion_status="PASS"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
+  v4_1_target_runtime_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_telegram_authorization_runtime_status="BLOCKED"
+
+  [[ "$current_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]] || return 0
+  [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
+  [[ "$next_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" ]] || return 0
+  [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
+
+  if [[ "$predecessor_status" != "COMPLETE" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TARGET_RUNTIME_REMEDIATION_NOT_COMPLETE"
+    return 0
+  fi
+  if [[ "$current_status" != "COMPLETED" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TELEGRAM_AUTHORIZATION_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$declared_authorization_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TELEGRAM_SCOPE_NOT_AUTHORIZED"
+    return 0
+  fi
+  if ! is_true_flag "$repository_edits_allowed" \
+    || ! is_true_flag "$implementation_allowed" \
+    || ! is_true_flag "$implementation_pr_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TELEGRAM_PERMISSIONS_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$completion_state" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_V4_1_TELEGRAM_AUTHORIZATION_MERGED_MAIN"
+    v4_1_telegram_authorization_runtime_status="PENDING_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "$synced_main_status" != "YES" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH"
+    return 0
+  fi
+  if [[ "$source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "$merged_main_validation_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_V4_1_TELEGRAM_AUTHORIZATION_MERGED_MAIN_VALIDATION"
+    return 0
+  fi
+
+  effective_task_mode="$next_mode"
+  next_transition_allowed="YES"
+  authorization_status="APPROVED"
+  next_task_authorization_status="ALLOWED"
+  v4_1_telegram_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" ]]; then
+    evaluate_v4_1_telegram_transition \
+      "$current_package_phase" \
+      "$current_package_status" \
+      "$current_task_mode" \
+      "$authorized_next_package_phase" \
+      "$authorized_next_task_mode" \
+      "$completion_effective_state" \
+      "$clean_synced_main" \
+      "$product_source_gate_status" \
+      "$p0_merged_main_validation_status" \
+      "$authorized_next_repository_edits_allowed" \
+      "$authorized_next_implementation_allowed" \
+      "$authorized_next_implementation_pr_allowed" \
+      "$v4_1_telegram_authorization_declared_status" \
+      "$v4_1_target_runtime_implementation_status"
+    return 0
+  fi
+
   if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" ]]; then
     evaluate_v4_1_target_runtime_transition \
@@ -1020,6 +1116,9 @@ load_task_package_contract() {
   v4_1_target_runtime_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_authorization_status)"
   v4_1_target_runtime_implementation_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_implementation_status)"
   v4_1_target_runtime_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_status)"
+  v4_1_telegram_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_telegram_authorization_status)"
+  v4_1_telegram_implementation_status="$(yaml_value "$TASK_FILE" v4_1_telegram_implementation_status)"
+  v4_1_telegram_live_acceptance_status="$(yaml_value "$TASK_FILE" v4_1_telegram_live_acceptance_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -1064,7 +1163,9 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]]; then
+        v4_1_target_runtime_implementation_status="IN_PROGRESS"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
         v4_1_implementation_status="IN_PROGRESS"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
         product_p1b_declared_status="IN_PROGRESS"
@@ -1144,7 +1245,7 @@ run_handoff_resolution_simulation() {
       open_pr_none_confirmed="$provided_open_pr_confirmation"
       blockers_text="ACTIVE_CONFLICTING_PR"
       ;;
-    p1b_unauthorized|p2_unauthorized|v4_1_unauthorized)
+    p1b_unauthorized|p2_unauthorized|v4_1_unauthorized|telegram_unauthorized)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -1153,7 +1254,10 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]]; then
+        v4_1_telegram_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="V4_1_TELEGRAM_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" ]]; then
         v4_1_target_runtime_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="V4_1_TARGET_RUNTIME_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "P2_POSITION_MONITORING_AUTHORIZATION" ]]; then
@@ -1180,7 +1284,7 @@ run_handoff_resolution_simulation() {
       open_prs=$'current authorization package\n#2000 active-conflicting-pr'
       blockers_text="ACTIVE_CONFLICTING_PR_BLOCKS_SUCCESSOR_ONLY"
       ;;
-    p1b_permission_missing|p2_permission_missing|v4_1_permission_missing)
+    p1b_permission_missing|p2_permission_missing|v4_1_permission_missing|telegram_permission_missing)
       completion_effective_state="EFFECTIVE_MERGED_MAIN"
       clean_synced_main="YES"
       p0_merged_main_validation_status="PASS"
@@ -1401,6 +1505,9 @@ v4_1_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_interaction_imp
 v4_1_target_runtime_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_authorization_status)"
 v4_1_target_runtime_implementation_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_implementation_status)"
 v4_1_target_runtime_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_status)"
+v4_1_telegram_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_telegram_authorization_status)"
+v4_1_telegram_implementation_status="$(yaml_value "$TASK_FILE" v4_1_telegram_implementation_status)"
+v4_1_telegram_live_acceptance_status="$(yaml_value "$TASK_FILE" v4_1_telegram_live_acceptance_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1487,6 +1594,30 @@ if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_RE
     || "$v4_1_target_runtime_implementation_status" != "NOT_STARTED" \
     || "$v4_1_target_runtime_status" != "BLOCKED_BY_IMPLEMENTATION_DEFECT" \
     || "$p1b_scope" != "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+fi
+if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" ]]; then
+  if [[ "$current_package_status" != "COMPLETED" \
+    || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
+    || "$authorized_next_package_phase" != "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" \
+    || "$authorized_next_package_mode" != "IMPLEMENTATION" \
+    || "$v4_1_design_status" != "FROZEN" \
+    || "$product_v4_1_matrix_authorization" != "AUTHORIZED_TO_IMPLEMENT" \
+    || "$v4_1_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_implementation_status" != "COMPLETE" \
+    || "$v4_1_target_runtime_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_target_runtime_implementation_status" != "COMPLETE" \
+    || "$v4_1_telegram_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$v4_1_telegram_implementation_status" != "NOT_STARTED" \
+    || "$p1b_scope" != "V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
@@ -1826,6 +1957,9 @@ printf 'V4_1_DECISION_CHAIN_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_implem
 printf 'V4_1_TARGET_RUNTIME_REMEDIATION_DECLARED_AUTHORIZATION_STATUS: %s\n' "${v4_1_target_runtime_authorization_declared_status:-UNDECLARED}"
 printf 'V4_1_TARGET_RUNTIME_REMEDIATION_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_target_runtime_implementation_status:-UNDECLARED}"
 printf 'V4_1_TARGET_RUNTIME_DECLARED_STATUS: %s\n' "${v4_1_target_runtime_status:-UNDECLARED}"
+printf 'V4_1_TELEGRAM_DECLARED_AUTHORIZATION_STATUS: %s\n' "${v4_1_telegram_authorization_declared_status:-UNDECLARED}"
+printf 'V4_1_TELEGRAM_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${v4_1_telegram_implementation_status:-UNDECLARED}"
+printf 'V4_1_TELEGRAM_DECLARED_LIVE_ACCEPTANCE_STATUS: %s\n' "${v4_1_telegram_live_acceptance_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"

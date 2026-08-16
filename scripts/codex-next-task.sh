@@ -114,6 +114,7 @@ validate_contract_task() {
   local product_p1b_status product_p2_status p2_authorization_status p2_implementation_status
   local product_v4_1_authorization v4_1_design_status v4_1_authorization_status v4_1_implementation_status
   local v4_1_target_authorization_status v4_1_target_implementation_status v4_1_target_status
+  local v4_1_telegram_authorization_status v4_1_telegram_implementation_status v4_1_telegram_live_acceptance_status
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
@@ -150,6 +151,9 @@ validate_contract_task() {
   v4_1_target_authorization_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_authorization_status)"
   v4_1_target_implementation_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_remediation_implementation_status)"
   v4_1_target_status="$(yaml_value "$TASK_FILE" v4_1_target_runtime_status)"
+  v4_1_telegram_authorization_status="$(yaml_value "$TASK_FILE" v4_1_telegram_authorization_status)"
+  v4_1_telegram_implementation_status="$(yaml_value "$TASK_FILE" v4_1_telegram_implementation_status)"
+  v4_1_telegram_live_acceptance_status="$(yaml_value "$TASK_FILE" v4_1_telegram_live_acceptance_status)"
   p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
@@ -157,12 +161,12 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime authorization declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Telegram authorization declaration mismatch" >&2; failed=1; }
   [[ "$current_package_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized v4.1 target-runtime package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized v4.1 Telegram package mismatch" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded target-runtime permissions are incomplete" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded Telegram permissions are incomplete" >&2; failed=1; }
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   [[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || { echo "TASK_VALIDATION_FAILED P1B-1 predecessor is not effective" >&2; failed=1; }
   [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED Product P1B predecessor boundary mismatch" >&2; failed=1; }
@@ -170,8 +174,9 @@ validate_contract_task() {
   [[ "$p2_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$p2_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED merged P2 compatibility evidence mismatch" >&2; failed=1; }
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
-  [[ "$v4_1_target_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$v4_1_target_implementation_status" == "NOT_STARTED" && "$v4_1_target_status" == "BLOCKED_BY_IMPLEMENTATION_DEFECT" && "$p1b_scope" == "V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_ONLY" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime authorization boundary mismatch" >&2; failed=1; }
-  [[ -f docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_SOURCE_MAPPING.md && -f docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime authorization artifacts are missing" >&2; failed=1; }
+  [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
+  [[ "$v4_1_telegram_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "NOT_STARTED" && "$v4_1_telegram_live_acceptance_status" == "DEFERRED_UNTIL_MERGED_MAIN" && "$p1b_scope" == "V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_ONLY" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Telegram authorization boundary mismatch" >&2; failed=1; }
+  [[ -f docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_SOURCE_MAPPING.md && -f docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED v4.1 Telegram authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -256,6 +261,9 @@ v4_1_implementation_runtime_status="$(state_value "$state_text" V4_1_DECISION_CH
 v4_1_target_authorization_runtime_status="$(state_value "$state_text" V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS)"
 v4_1_target_implementation_runtime_status="$(state_value "$state_text" V4_1_TARGET_RUNTIME_REMEDIATION_IMPLEMENTATION_STATUS)"
 v4_1_target_runtime_status="$(state_value "$state_text" V4_1_TARGET_RUNTIME_STATUS)"
+v4_1_telegram_authorization_runtime_status="$(state_value "$state_text" V4_1_TELEGRAM_AUTHORIZATION_STATUS)"
+v4_1_telegram_implementation_runtime_status="$(state_value "$state_text" V4_1_TELEGRAM_IMPLEMENTATION_STATUS)"
+v4_1_telegram_live_acceptance_runtime_status="$(state_value "$state_text" V4_1_TELEGRAM_LIVE_ACCEPTANCE_STATUS)"
 resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
 resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
 resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
@@ -319,6 +327,10 @@ case "$resolved_scope_profile" in
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: target-runtime remediation resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: target-runtime remediation resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: target-runtime remediation resolved a forbidden Figma file." >&2; exit 1; }
+        elif [[ "$resolved_package" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" ]]; then
+          [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: Telegram integration resolved with forbidden Figma permission." >&2; exit 1; }
+          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: Telegram integration resolved with forbidden Mobile permission." >&2; exit 1; }
+          [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: Telegram integration resolved a forbidden Figma file." >&2; exit 1; }
         fi
         ;;
       *)
@@ -361,6 +373,9 @@ V4_1_FINAL_INTERACTION_IMPLEMENTATION_STATUS: $v4_1_implementation_runtime_statu
 V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION_STATUS: $v4_1_target_authorization_runtime_status
 V4_1_TARGET_RUNTIME_REMEDIATION_IMPLEMENTATION_STATUS: $v4_1_target_implementation_runtime_status
 V4_1_TARGET_RUNTIME_STATUS: $v4_1_target_runtime_status
+V4_1_TELEGRAM_AUTHORIZATION_STATUS: $v4_1_telegram_authorization_runtime_status
+V4_1_TELEGRAM_IMPLEMENTATION_STATUS: $v4_1_telegram_implementation_runtime_status
+V4_1_TELEGRAM_LIVE_ACCEPTANCE_STATUS: $v4_1_telegram_live_acceptance_runtime_status
 RESOLVED_PACKAGE: $resolved_package
 RESOLVED_MODE: $resolved_mode
 RESOLVED_EDIT_PERMISSION: $resolved_edit_permission
