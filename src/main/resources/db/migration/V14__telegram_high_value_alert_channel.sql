@@ -30,14 +30,33 @@ SET next_attempt_at = COALESCE(attempted_at, created_at)
 WHERE status IN ('QUEUED', 'RETRYING')
   AND next_attempt_at IS NULL;
 
+UPDATE tm_channel_delivery
+SET next_attempt_at = NULL,
+    claim_token = NULL,
+    claimed_at = NULL,
+    lease_until = NULL
+WHERE status = 'SENT';
+
 -- Historical duplicate rows remain immutable evidence. Only one non-suppressed
 -- delivery for a Message/channel pair may participate in dispatch.
 WITH ranked AS (
     SELECT delivery_id,
            ROW_NUMBER() OVER (
                PARTITION BY message_id, channel
-               ORDER BY CASE WHEN status <> 'SUPPRESSED' THEN 0 ELSE 1 END,
-                        created_at ASC, delivery_id ASC
+               ORDER BY CASE status
+                            WHEN 'SENT' THEN 1
+                            WHEN 'SENDING' THEN 2
+                            WHEN 'RETRYING' THEN 3
+                            WHEN 'QUEUED' THEN 4
+                            WHEN 'FAILED' THEN 5
+                            WHEN 'NOT_CONFIGURED' THEN 6
+                            WHEN 'SUPPRESSED' THEN 7
+                            ELSE 8
+                        END,
+                        delivered_at DESC NULLS LAST,
+                        updated_at DESC,
+                        created_at DESC,
+                        delivery_id ASC
            ) AS row_number
     FROM tm_channel_delivery
 )
@@ -46,10 +65,26 @@ SET status = 'SUPPRESSED',
     error_code = 'DUPLICATE_MIGRATED',
     error_message = 'Historical duplicate delivery retained as suppressed evidence',
     next_attempt_at = NULL,
+    claim_token = NULL,
+    claimed_at = NULL,
+    lease_until = NULL,
     updated_at = CURRENT_TIMESTAMP
 FROM ranked
 WHERE delivery.delivery_id = ranked.delivery_id
   AND ranked.row_number > 1;
+
+-- A historical SENDING row has an unknown external outcome. It remains manually
+-- recoverable as FAILED and must never become automatically due after migration.
+UPDATE tm_channel_delivery
+SET status = 'FAILED',
+    next_attempt_at = NULL,
+    claim_token = NULL,
+    claimed_at = NULL,
+    lease_until = NULL,
+    error_code = 'DELIVERY_OUTCOME_UNKNOWN',
+    error_message = 'Historical sending outcome is unknown; manual retry required',
+    updated_at = CURRENT_TIMESTAMP
+WHERE status = 'SENDING';
 
 CREATE UNIQUE INDEX uk_tm_channel_delivery_message_channel_active
     ON tm_channel_delivery(message_id, channel)

@@ -152,9 +152,12 @@ public class HighValueAlertMessageService {
                 + "\n原因：" + concise(input.reason())
                 + "\n当前状态：暂不视为有效机会"
                 + "\n恢复条件：" + concise(input.recoveryCondition()));
+        String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
+        String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
+        if (!hasText(subjectId)) return null;
         message.setDedupeKey(TelegramDedupeKey.create(input.changeType().name(),
                 input.state(), Math.max(2, input.severity()), telegramProperties.getCooldownMinutes(),
-                input.userId(), input.sourceType(), input.sourceId(), now));
+                input.userId(), subjectType, subjectId, now));
         return messageFactService.recordIfAbsent(message);
     }
 
@@ -343,6 +346,7 @@ public class HighValueAlertMessageService {
                                     String sourceId,
                                     String analysisId,
                                     String planId,
+                                    String opportunityId,
                                     String pushSnapshotId,
                                     String symbol,
                                     String traceId,

@@ -78,6 +78,11 @@ public class TelegramDeliveryDispatcher {
             suppressExpired(delivery, now);
             return;
         }
+        if (!deliveryService.extendClaimForProviderCall(delivery)) {
+            deliveryService.failClosedOutcome(delivery.getDeliveryId(), "DELIVERY_CLAIM_LOST",
+                    "Delivery claim was not valid before provider call; manual review required");
+            return;
+        }
         TelegramClientResult result;
         try {
             result = client.sendMessage(formatter.format(message));
@@ -95,7 +100,7 @@ public class TelegramDeliveryDispatcher {
             delivery.setRetryAfterSeconds(null);
             delivery.setErrorCode(null);
             delivery.setErrorMessage(null);
-            deliveryService.completeClaim(delivery);
+            deliveryService.reconcileProviderSuccess(delivery);
             return;
         }
         if (result.retryable() && safeAttempts(delivery) < properties.getMaxAttempts()) {
@@ -111,7 +116,7 @@ public class TelegramDeliveryDispatcher {
         delivery.setLastResponseCode(result.httpStatus());
         delivery.setErrorCode(result.errorCode());
         delivery.setErrorMessage(TelegramSecretSanitizer.sanitize(result.errorMessage(), properties));
-        deliveryService.completeClaim(delivery);
+        completeKnownOutcome(delivery);
     }
 
     int retryDelaySeconds(ChannelDeliveryDO delivery, Integer providerRetryAfter) {
@@ -132,7 +137,7 @@ public class TelegramDeliveryDispatcher {
         delivery.setLastResponseCode(status);
         delivery.setErrorCode(code);
         delivery.setErrorMessage(message);
-        deliveryService.completeClaim(delivery);
+        completeKnownOutcome(delivery);
     }
 
     private void suppressExpired(ChannelDeliveryDO delivery, LocalDateTime now) {
@@ -142,7 +147,14 @@ public class TelegramDeliveryDispatcher {
         delivery.setErrorCode("MESSAGE_EXPIRED");
         delivery.setErrorMessage("Telegram alert expired before delivery");
         delivery.setUpdatedAt(now);
-        deliveryService.completeClaim(delivery);
+        completeKnownOutcome(delivery);
+    }
+
+    private void completeKnownOutcome(ChannelDeliveryDO delivery) {
+        if (!deliveryService.completeClaim(delivery)) {
+            deliveryService.failClosedOutcome(delivery.getDeliveryId(), "DELIVERY_OUTCOME_UNKNOWN",
+                    "Delivery claim changed before provider outcome persistence; manual review required");
+        }
     }
 
     private static int safeAttempts(ChannelDeliveryDO delivery) {

@@ -75,8 +75,7 @@ public class ChannelDeliveryService {
 
         LocalDateTime now = LocalDateTime.now(clock);
         int severity = TelegramDedupeKey.severity(message.getDedupeKey());
-        String cooldownKey = message.getCategory() + "|" + message.getSourceType() + "|"
-                + message.getSourceId() + "|" + TelegramDedupeKey.eventType(message.getDedupeKey());
+        String cooldownKey = TelegramDedupeKey.cooldownKey(message.getCategory(), message.getDedupeKey());
         int cooldownMinutes = cooldownMinutes(userId);
         ChannelDeliveryDO recent = mapper.selectRecentActiveCooldown(
                 userId, cooldownKey, now.minusMinutes(cooldownMinutes));
@@ -143,6 +142,34 @@ public class ChannelDeliveryService {
         return mapper.completeClaim(delivery) == 1;
     }
 
+    public boolean extendClaimForProviderCall(ChannelDeliveryDO delivery) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        int providerCallSeconds = Math.max(1,
+                (telegramProperties.getConnectTimeoutMs() + telegramProperties.getReadTimeoutMs() + 999) / 1000);
+        int leaseSeconds = Math.max(telegramProperties.getClaimLeaseSeconds(), providerCallSeconds + 5);
+        return mapper.extendClaim(delivery.getDeliveryId(), delivery.getClaimToken(), now,
+                now.plusSeconds(leaseSeconds)) == 1;
+    }
+
+    public boolean reconcileProviderSuccess(ChannelDeliveryDO delivery) {
+        if (completeClaim(delivery)) return true;
+        ChannelDeliveryDO current = mapper.selectById(delivery.getDeliveryId());
+        if (isSent(current)) return true;
+        delivery.setUpdatedAt(LocalDateTime.now(clock));
+        if (mapper.finalizeProviderSuccess(delivery) == 1) return true;
+        current = mapper.selectById(delivery.getDeliveryId());
+        if (isSent(current)) return true;
+        failClosedOutcome(delivery.getDeliveryId(), "DELIVERY_OUTCOME_UNKNOWN",
+                "Provider accepted delivery but SENT persistence could not be confirmed; manual review required");
+        return false;
+    }
+
+    public boolean failClosedOutcome(String deliveryId, String errorCode, String errorMessage) {
+        return mapper.failClosedOutcome(deliveryId, errorCode,
+                TelegramSecretSanitizer.sanitize(errorMessage, telegramProperties),
+                LocalDateTime.now(clock)) == 1;
+    }
+
     public boolean requeue(Long userId, String deliveryId) {
         return mapper.requeue(deliveryId, userId, LocalDateTime.now(clock)) == 1;
     }
@@ -185,5 +212,9 @@ public class ChannelDeliveryService {
 
     private static int safeSeverity(ChannelDeliveryDO row) {
         return row.getSeverityRank() == null ? 0 : row.getSeverityRank();
+    }
+
+    private static boolean isSent(ChannelDeliveryDO row) {
+        return row != null && TelegramDeliveryStatus.SENT.name().equals(row.getStatus());
     }
 }

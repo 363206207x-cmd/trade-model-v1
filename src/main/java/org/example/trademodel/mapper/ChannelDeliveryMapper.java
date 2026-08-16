@@ -67,6 +67,14 @@ public interface ChannelDeliveryMapper {
               @Param("now") LocalDateTime now,
               @Param("leaseUntil") LocalDateTime leaseUntil);
 
+    @Update("UPDATE tm_channel_delivery SET lease_until = #{leaseUntil}, updated_at = #{now} "
+            + "WHERE delivery_id = #{deliveryId} AND status = 'SENDING' "
+            + "AND claim_token = #{claimToken} AND (lease_until IS NULL OR lease_until >= #{now})")
+    int extendClaim(@Param("deliveryId") String deliveryId,
+                    @Param("claimToken") String claimToken,
+                    @Param("now") LocalDateTime now,
+                    @Param("leaseUntil") LocalDateTime leaseUntil);
+
     @Update("UPDATE tm_channel_delivery SET status = #{status}, provider_reference = #{providerReference}, "
             + "next_attempt_at = #{nextAttemptAt}, last_response_code = #{lastResponseCode}, "
             + "retry_after_seconds = #{retryAfterSeconds}, error_code = #{errorCode}, "
@@ -75,9 +83,30 @@ public interface ChannelDeliveryMapper {
             + "WHERE delivery_id = #{deliveryId} AND status = 'SENDING' AND claim_token = #{claimToken}")
     int completeClaim(ChannelDeliveryDO row);
 
-    @Update("UPDATE tm_channel_delivery SET status = 'RETRYING', next_attempt_at = #{now}, "
+    @Update("UPDATE tm_channel_delivery SET status = 'SENT', provider_reference = #{providerReference}, "
+            + "next_attempt_at = NULL, last_response_code = #{lastResponseCode}, retry_after_seconds = NULL, "
+            + "error_code = NULL, error_message = NULL, delivered_at = #{deliveredAt}, "
+            + "claim_token = NULL, claimed_at = NULL, lease_until = NULL, updated_at = #{updatedAt} "
+            + "WHERE delivery_id = #{deliveryId} AND status <> 'SENT' "
+            + "AND NOT EXISTS (SELECT 1 FROM tm_channel_delivery sent "
+            + "WHERE sent.message_id = #{messageId} AND sent.channel = #{channel} "
+            + "AND sent.delivery_id <> #{deliveryId} AND sent.status = 'SENT' "
+            + "AND (sent.error_code IS NULL OR sent.error_code <> 'DUPLICATE_MIGRATED'))")
+    int finalizeProviderSuccess(ChannelDeliveryDO row);
+
+    @Update("UPDATE tm_channel_delivery SET status = 'FAILED', next_attempt_at = NULL, "
             + "claim_token = NULL, claimed_at = NULL, lease_until = NULL, "
-            + "error_code = 'CLAIM_LEASE_EXPIRED', error_message = 'Recovered after expired delivery claim', "
+            + "error_code = #{errorCode}, error_message = #{errorMessage}, updated_at = #{now} "
+            + "WHERE delivery_id = #{deliveryId} AND status <> 'SENT'")
+    int failClosedOutcome(@Param("deliveryId") String deliveryId,
+                          @Param("errorCode") String errorCode,
+                          @Param("errorMessage") String errorMessage,
+                          @Param("now") LocalDateTime now);
+
+    @Update("UPDATE tm_channel_delivery SET status = 'FAILED', next_attempt_at = NULL, "
+            + "claim_token = NULL, claimed_at = NULL, lease_until = NULL, "
+            + "error_code = 'DELIVERY_OUTCOME_UNKNOWN', "
+            + "error_message = 'Delivery claim expired with unknown provider outcome; manual retry required', "
             + "updated_at = #{now} WHERE channel = 'TELEGRAM' AND status = 'SENDING' "
             + "AND lease_until IS NOT NULL AND lease_until < #{now}")
     int recoverExpiredClaims(@Param("now") LocalDateTime now);

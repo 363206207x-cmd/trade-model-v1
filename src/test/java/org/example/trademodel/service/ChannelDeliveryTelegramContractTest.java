@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,6 +132,141 @@ class ChannelDeliveryTelegramContractTest {
     }
 
     @Test
+    void providerSuccessClaimLossIsReconciledToSentWithoutRetry() {
+        ChannelDeliveryDO delivery = new ChannelDeliveryDO();
+        delivery.setDeliveryId("delivery-1");
+        delivery.setMessageId("message-1");
+        delivery.setChannel("TELEGRAM");
+        delivery.setStatus("SENT");
+        when(mapper.completeClaim(delivery)).thenReturn(0);
+        when(mapper.selectById("delivery-1")).thenReturn(new ChannelDeliveryDO());
+        when(mapper.finalizeProviderSuccess(delivery)).thenReturn(1);
+
+        assertThat(service.reconcileProviderSuccess(delivery)).isTrue();
+
+        verify(mapper).finalizeProviderSuccess(delivery);
+        verify(mapper, never()).failClosedOutcome(anyString(), anyString(), anyString(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void unresolvedProviderSuccessFailsClosedWithoutAutomaticDueTime() {
+        ChannelDeliveryDO delivery = new ChannelDeliveryDO();
+        delivery.setDeliveryId("delivery-1");
+        delivery.setMessageId("message-1");
+        delivery.setChannel("TELEGRAM");
+        delivery.setStatus("SENT");
+        ChannelDeliveryDO unresolved = new ChannelDeliveryDO();
+        unresolved.setStatus("FAILED");
+        when(mapper.completeClaim(delivery)).thenReturn(0);
+        when(mapper.selectById("delivery-1")).thenReturn(unresolved);
+        when(mapper.finalizeProviderSuccess(delivery)).thenReturn(0);
+        when(mapper.failClosedOutcome(anyString(), anyString(), anyString(), any(LocalDateTime.class))).thenReturn(1);
+
+        assertThat(service.reconcileProviderSuccess(delivery)).isFalse();
+
+        verify(mapper).failClosedOutcome(org.mockito.ArgumentMatchers.eq("delivery-1"),
+                org.mockito.ArgumentMatchers.eq("DELIVERY_OUTCOME_UNKNOWN"), anyString(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void providerSuccessReconciliationDoesNotOverwriteExistingSentFact() {
+        ChannelDeliveryDO delivery = new ChannelDeliveryDO();
+        delivery.setDeliveryId("delivery-1");
+        ChannelDeliveryDO persisted = new ChannelDeliveryDO();
+        persisted.setStatus("SENT");
+        when(mapper.completeClaim(delivery)).thenReturn(0);
+        when(mapper.selectById("delivery-1")).thenReturn(persisted);
+
+        assertThat(service.reconcileProviderSuccess(delivery)).isTrue();
+
+        verify(mapper, never()).finalizeProviderSuccess(any());
+        verify(mapper, never()).failClosedOutcome(anyString(), anyString(), anyString(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void sameSubjectAfterCooldownIsAllowedWhenNoActiveDeliveryFallsInsideCutoff() {
+        MessageDO message = message(2);
+        when(messageFactService.findForUser(41L, "message-1")).thenReturn(message);
+        when(mapper.selectRecentActiveCooldown(anyLong(), anyString(), any(LocalDateTime.class))).thenReturn(null);
+        when(readinessService.canAttemptDelivery()).thenReturn(true);
+
+        ChannelDeliveryDO result = service.queueTelegram(41L, "message-1");
+
+        assertThat(result.getStatus()).isEqualTo("QUEUED");
+        assertThat(result.getNextAttemptAt()).isNotNull();
+    }
+
+    @Test
+    void cooldownIdentityUsesStableBusinessSubjectAcrossSnapshotsAndTimeBuckets() {
+        MessageDO first = message(2, "message-1", "snapshot-1", "position-91",
+                LocalDateTime.of(2026, 8, 16, 12, 0));
+        MessageDO second = message(2, "message-2", "snapshot-2", "position-91",
+                LocalDateTime.of(2026, 8, 16, 12, 30));
+        when(messageFactService.findForUser(41L, "message-1")).thenReturn(first);
+        when(messageFactService.findForUser(41L, "message-2")).thenReturn(second);
+        when(readinessService.canAttemptDelivery()).thenReturn(true);
+
+        service.queueTelegram(41L, "message-1");
+        service.queueTelegram(41L, "message-2");
+
+        ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+        verify(mapper, times(2)).selectRecentActiveCooldown(anyLong(), keys.capture(), any(LocalDateTime.class));
+        assertThat(keys.getAllValues()).hasSize(2).allMatch(key -> key.startsWith("TG1C|"));
+        assertThat(keys.getAllValues().stream().distinct()).containsExactly(keys.getAllValues().get(0));
+    }
+
+    @Test
+    void distinctBusinessSubjectsHaveDistinctCooldownIdentity() {
+        String first = TelegramDedupeKey.cooldownKey("POSITION_LOGIC_RISK_CHANGE",
+                TelegramDedupeKey.create("POSITION_RISK_CHANGE", "HIGH", 3, 15,
+                        41L, "USER_POSITION", "position-1", LocalDateTime.now()));
+        String second = TelegramDedupeKey.cooldownKey("POSITION_LOGIC_RISK_CHANGE",
+                TelegramDedupeKey.create("POSITION_RISK_CHANGE", "HIGH", 3, 15,
+                        41L, "USER_POSITION", "position-2", LocalDateTime.now()));
+
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void sameOpportunityAndPlanIgnoreChangingSnapshotRecheckAndTimeBucket() {
+        String opportunityFirst = TelegramDedupeKey.cooldownKey("HIGH_PERMISSION_OPPORTUNITY",
+                TelegramDedupeKey.create("OPPORTUNITY_READY", "TRIGGERED", 3, 15,
+                        41L, "OPPORTUNITY", "opportunity-1", LocalDateTime.of(2026, 8, 16, 12, 0)));
+        String opportunityLater = TelegramDedupeKey.cooldownKey("HIGH_PERMISSION_OPPORTUNITY",
+                TelegramDedupeKey.create("OPPORTUNITY_READY", "TRIGGERED", 3, 15,
+                        41L, "OPPORTUNITY", "opportunity-1", LocalDateTime.of(2026, 8, 16, 12, 30)));
+        String planFirst = TelegramDedupeKey.cooldownKey("OPPORTUNITY_PLAN_SAFETY_CHANGE",
+                TelegramDedupeKey.create("EXECUTION_DRIFT", "HIGH", 3, 15,
+                        41L, "FINAL_PLAN", "plan-1", LocalDateTime.of(2026, 8, 16, 12, 0)));
+        String planEscalated = TelegramDedupeKey.cooldownKey("OPPORTUNITY_PLAN_SAFETY_CHANGE",
+                TelegramDedupeKey.create("HOT_RESET", "EXTREME", 4, 15,
+                        41L, "FINAL_PLAN", "plan-1", LocalDateTime.of(2026, 8, 16, 12, 30)));
+
+        assertThat(opportunityLater).isEqualTo(opportunityFirst);
+        assertThat(planEscalated).isEqualTo(planFirst);
+    }
+
+    @Test
+    void cooldownArchitectureNeverReadsSnapshotOrMonitorLogSourceIdentity() throws Exception {
+        String serviceSource = Files.readString(Path.of(
+                "src/main/java/org/example/trademodel/service/ChannelDeliveryService.java"));
+
+        assertThat(serviceSource).contains("TelegramDedupeKey.cooldownKey(message.getCategory(), message.getDedupeKey())")
+                .doesNotContain("message.getSourceId()", "message.getSourceType()");
+    }
+
+    @Test
+    void expiredSendingRecoveryAndClaimsExcludeSentFromAutomaticDispatch() throws Exception {
+        String mapperSource = Files.readString(Path.of(
+                "src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java"));
+
+        assertThat(mapperSource)
+                .contains("status = 'FAILED'", "error_code = 'DELIVERY_OUTCOME_UNKNOWN'", "next_attempt_at = NULL")
+                .contains("status IN ('QUEUED', 'RETRYING')")
+                .doesNotContain("error_code = 'CLAIM_LEASE_EXPIRED'");
+    }
+
+    @Test
     void failedOrNotConfiguredDeliveryCanBeManuallyRequeuedForItsOwner() {
         ChannelDeliveryDO delivery = new ChannelDeliveryDO();
         delivery.setDeliveryId("delivery-1");
@@ -143,15 +281,20 @@ class ChannelDeliveryTelegramContractTest {
     }
 
     private static MessageDO message(int severity) {
+        return message(severity, "message-1", "91", "91", LocalDateTime.of(2026, 8, 16, 12, 0));
+    }
+
+    private static MessageDO message(int severity, String messageId, String sourceId,
+                                     String stableSubjectId, LocalDateTime occurredAt) {
         MessageDO message = new MessageDO();
-        message.setMessageId("message-1");
+        message.setMessageId(messageId);
         message.setUserId(41L);
         message.setCategory("POSITION_LOGIC_RISK_CHANGE");
-        message.setSourceType("USER_POSITION");
-        message.setSourceId("91");
+        message.setSourceType("POSITION_MONITOR");
+        message.setSourceId(sourceId);
         message.setDedupeKey(TelegramDedupeKey.create(
                 "POSITION_RISK_CHANGE", severity >= 4 ? "EXTREME" : "HIGH", severity, 15,
-                41L, "USER_POSITION", "91", LocalDateTime.of(2026, 8, 16, 12, 0)));
+                41L, "USER_POSITION", stableSubjectId, occurredAt));
         return message;
     }
 

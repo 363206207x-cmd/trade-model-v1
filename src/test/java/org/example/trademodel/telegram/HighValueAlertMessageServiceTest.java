@@ -120,7 +120,7 @@ class HighValueAlertMessageServiceTest {
     void safetyChangeCreatesCanonicalMessageBeforeAnyChannelDelivery() {
         MessageDO message = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.HOT_RESET,
-                "HOT_RESET", "reset-9", "analysis-9", "plan-9", "99",
+                "HOT_RESET", "reset-9", "analysis-9", "plan-9", "opportunity-9", "99",
                 "SOLUSDT", "trace-9", "CONFUSED", 4,
                 "证据冲突", "等待规则与数据重新验证", LocalDateTime.of(2026, 8, 16, 12, 0), null));
 
@@ -131,6 +131,24 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
         assertThat(message.getBody()).contains("当前状态：暂不视为有效机会", "恢复条件");
+    }
+
+    @Test
+    void samePlanUsesStableExactAndCooldownIdentityAcrossDifferentRecheckEvidence() {
+        MessageDO first = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
+                41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
+                "PUSH_RECHECK", "recheck-1", "analysis-1", "plan-1", "opportunity-1", "snapshot-1",
+                "BTCUSDT", "trace-1", "DRIFTED", 3, "drift", "revalidate",
+                LocalDateTime.of(2026, 8, 16, 12, 0), null));
+        MessageDO second = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
+                41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
+                "PUSH_RECHECK", "recheck-2", "analysis-2", "plan-1", "opportunity-1", "snapshot-2",
+                "BTCUSDT", "trace-2", "DRIFTED", 3, "drift", "revalidate",
+                LocalDateTime.of(2026, 8, 16, 12, 30), null));
+
+        assertThat(first.getSourceId()).isNotEqualTo(second.getSourceId());
+        assertThat(TelegramDedupeKey.cooldownKey(first.getCategory(), first.getDedupeKey()))
+                .isEqualTo(TelegramDedupeKey.cooldownKey(second.getCategory(), second.getDedupeKey()));
     }
 
     @Test

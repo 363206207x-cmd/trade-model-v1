@@ -75,7 +75,8 @@ public class PlanRevalidationService {
                         new HighValueAlertMessageService.SafetyChangeInput(
                                 userId, HighValueAlertPolicy.SafetyChangeType.NEEDS_REVALIDATION,
                                 "PLAN_REVALIDATION", record.getRecordId(), plan.getAnalysisId(), planId,
-                                null, analysis.getSymbol(), record.getTraceId(), "NEEDS_REVALIDATION", 2,
+                                plan.getOpportunityId(), null, analysis.getSymbol(), record.getTraceId(),
+                                "NEEDS_REVALIDATION", 2,
                                 normalizedReason, "完成重新验证并再次通过规则与可信来源门禁",
                                 now, plan.getValidUntil()));
             }

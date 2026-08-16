@@ -239,11 +239,14 @@ public class HotResetServiceImpl implements HotResetService {
         if (highValueAlertMessageService != null && "USER".equals(event.getOwnerType())
                 && event.getOwnerId() != null && event.getOwnerId() > 0) {
             String planId = affectedPlans.isEmpty() ? null : affectedPlans.get(0).getPlanId();
+            String opportunityId = affectedPlans.isEmpty()
+                    ? currentState == null ? null : currentState.getOpportunityId()
+                    : affectedPlans.get(0).getOpportunityId();
             highValueAlertMessageService.recordSafetyChange(
                     new HighValueAlertMessageService.SafetyChangeInput(
                             event.getOwnerId(), HighValueAlertPolicy.SafetyChangeType.HOT_RESET,
                             "HOT_RESET", eventId, command.getAnalysisId(), planId,
-                            latestPushId(command.getAnalysisId()), normalizedSymbol, command.getTraceId(),
+                            opportunityId, latestPushId(command.getAnalysisId()), normalizedSymbol, command.getTraceId(),
                             postState.name(), 4, event.getTriggerReasonText(),
                             "等待重建分析、规则校验和计划重新验证完成", occurredAt, null));
         }

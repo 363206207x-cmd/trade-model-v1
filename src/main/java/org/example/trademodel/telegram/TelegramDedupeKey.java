@@ -20,7 +20,8 @@ public final class TelegramDedupeKey {
                 .toEpochSecond(ZoneOffset.UTC);
         long bucket = epoch / seconds;
         return String.join("|", PREFIX, safe(eventType), safe(state), String.valueOf(Math.max(0, severity)),
-                String.valueOf(bucket), fingerprint(userId + "|" + sourceType + "|" + sourceId));
+                String.valueOf(bucket), safe(sourceType),
+                fingerprint(userId + "|" + safe(sourceType) + "|" + safeIdentity(sourceId)));
     }
 
     public static boolean managed(String value) {
@@ -39,9 +40,23 @@ public final class TelegramDedupeKey {
         return parts.length > 1 ? parts[1] : "UNKNOWN";
     }
 
+    public static String cooldownKey(String category, String value) {
+        String[] parts = parts(value);
+        if (parts.length >= 7 && PREFIX.equals(parts[0])) {
+            return String.join("|", PREFIX + "C", safe(category), parts[5], parts[6]);
+        }
+        if (parts.length == 6 && PREFIX.equals(parts[0])) {
+            return String.join("|", PREFIX + "C", safe(category), "LEGACY_SUBJECT", parts[5]);
+        }
+        return String.join("|", PREFIX + "C", safe(category), "UNMANAGED", fingerprint(safeIdentity(value)));
+    }
+
     private static String[] parts(String value) { return value == null ? new String[0] : value.split("\\|", -1); }
     private static String safe(String value) {
         return value == null ? "UNKNOWN" : value.trim().toUpperCase().replaceAll("[^A-Z0-9_]+", "_");
+    }
+    private static String safeIdentity(String value) {
+        return value == null || value.isBlank() ? "UNKNOWN" : value.trim();
     }
     private static String fingerprint(String value) {
         try {

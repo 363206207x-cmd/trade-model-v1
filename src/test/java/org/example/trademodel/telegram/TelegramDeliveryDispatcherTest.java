@@ -17,6 +17,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,8 @@ class TelegramDeliveryDispatcherTest {
         properties.setRetryMaxSeconds(300);
         dispatcher = new TelegramDeliveryDispatcher(
                 properties, client, readiness, formatter, deliveryService, messageMapper, true);
+        org.mockito.Mockito.lenient().when(deliveryService.extendClaimForProviderCall(any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(deliveryService.completeClaim(any())).thenReturn(true);
     }
 
     @Test
@@ -57,7 +60,36 @@ class TelegramDeliveryDispatcherTest {
         assertThat(delivery.getProviderReference()).isEqualTo("provider-9");
         assertThat(delivery.getDeliveredAt()).isNotNull();
         assertThat(delivery.getNextAttemptAt()).isNull();
-        verify(deliveryService).completeClaim(delivery);
+        verify(deliveryService).extendClaimForProviderCall(delivery);
+        verify(deliveryService).reconcileProviderSuccess(delivery);
+        verify(client, times(1)).sendMessage(outbound);
+    }
+
+    @Test
+    void lostClaimBeforeProviderCallFailsClosedWithoutExternalSend() {
+        ChannelDeliveryDO delivery = delivery(1);
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message());
+        when(deliveryService.extendClaimForProviderCall(delivery)).thenReturn(false);
+
+        dispatcher.dispatchOne(delivery);
+
+        verify(client, never()).sendMessage(any());
+        verify(deliveryService).failClosedOutcome("delivery-1", "DELIVERY_CLAIM_LOST",
+                "Delivery claim was not valid before provider call; manual review required");
+    }
+
+    @Test
+    void providerSuccessNeverSchedulesAutomaticRetryWhenSentReconciliationIsUnconfirmed() {
+        ChannelDeliveryDO delivery = delivery(1);
+        stubMessage(delivery, TelegramClientResult.success(200, "provider-9", null));
+        when(deliveryService.reconcileProviderSuccess(delivery)).thenReturn(false);
+
+        dispatcher.dispatchOne(delivery);
+
+        assertThat(delivery.getStatus()).isEqualTo("SENT");
+        assertThat(delivery.getNextAttemptAt()).isNull();
+        verify(client, times(1)).sendMessage(any());
+        verify(deliveryService).reconcileProviderSuccess(delivery);
     }
 
     @Test
@@ -126,6 +158,20 @@ class TelegramDeliveryDispatcherTest {
         inOrder.verify(deliveryService).recoverExpiredClaims();
         inOrder.verify(deliveryService).claimDue(20);
         verify(client, never()).sendMessage(any());
+    }
+
+    @Test
+    void concurrentDispatchCyclesProduceOneExternalCallForOneAtomicClaim() {
+        ChannelDeliveryDO delivery = delivery(1);
+        when(readiness.canAttemptDelivery()).thenReturn(true);
+        when(messageMapper.listTelegramDeliveryOrphans(20)).thenReturn(List.of());
+        when(deliveryService.claimDue(20)).thenReturn(List.of(delivery), List.of());
+        stubMessage(delivery, TelegramClientResult.success(200, "provider-9", null));
+
+        assertThat(dispatcher.dispatchDue()).isEqualTo(1);
+        assertThat(dispatcher.dispatchDue()).isZero();
+
+        verify(client, times(1)).sendMessage(any());
     }
 
     private void stubMessage(ChannelDeliveryDO delivery, TelegramClientResult result) {
