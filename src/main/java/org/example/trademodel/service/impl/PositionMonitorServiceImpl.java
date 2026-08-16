@@ -41,6 +41,7 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.telegram.HighValueAlertMessageService;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
 import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
@@ -85,6 +86,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private final ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
+    private HighValueAlertMessageService highValueAlertMessageService;
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
@@ -146,6 +148,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                                            DerivativesBusinessIntegrationService derivativesBusinessIntegrationService) {
         this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
         this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
+    }
+
+    @Autowired(required = false)
+    void setHighValueAlertMessageService(HighValueAlertMessageService value) {
+        this.highValueAlertMessageService = value;
     }
 
     @Override
@@ -397,6 +404,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setMonitoredAt(log.getCreatedAt());
         result.setLastMonitorTime(log.getCreatedAt());
         result.setDataState(dataState(sourceStatus, monitorConclusion, riskTrend).name());
+        if (highValueAlertMessageService != null) {
+            highValueAlertMessageService.recordPosition(position, log, result);
+        }
         return result;
     }
 

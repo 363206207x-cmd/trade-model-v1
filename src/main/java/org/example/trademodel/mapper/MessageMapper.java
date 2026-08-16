@@ -24,6 +24,9 @@ public interface MessageMapper {
     @Select("SELECT * FROM tm_message WHERE message_id = #{messageId} AND user_id = #{userId}")
     MessageDO selectByIdForUser(@Param("messageId") String messageId, @Param("userId") Long userId);
 
+    @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND dedupe_key = #{dedupeKey} LIMIT 1")
+    MessageDO selectByDedupeKey(@Param("userId") Long userId, @Param("dedupeKey") String dedupeKey);
+
     @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND "
             + "(current_recheck_id = #{recheckId} OR (source_type = 'PUSH_SNAPSHOT' AND source_id = #{recheckId})) "
             + "ORDER BY created_at DESC LIMIT 1")
@@ -38,6 +41,12 @@ public interface MessageMapper {
 
     @Select("SELECT COUNT(*) FROM tm_message WHERE user_id = #{userId} AND dedupe_key = #{dedupeKey}")
     int countByDedupeKey(@Param("userId") Long userId, @Param("dedupeKey") String dedupeKey);
+
+    @Select("SELECT m.* FROM tm_message m LEFT JOIN tm_channel_delivery d "
+            + "ON d.message_id = m.message_id AND d.channel = 'TELEGRAM' "
+            + "WHERE m.dedupe_key LIKE 'TG1|%' AND d.delivery_id IS NULL "
+            + "ORDER BY m.created_at ASC, m.message_id ASC LIMIT #{limit}")
+    List<MessageDO> listTelegramDeliveryOrphans(@Param("limit") int limit);
 
     @Update("UPDATE tm_message SET read_state = 'READ', updated_at = #{updatedAt} "
             + "WHERE message_id = #{messageId} AND user_id = #{userId}")

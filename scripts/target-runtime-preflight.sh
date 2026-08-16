@@ -12,8 +12,25 @@ if ! (cd "${repo_root}" && ./mvnw -q -DskipTests compile >"${build_log}" 2>&1); 
   exit 1
 fi
 
-if ! java -cp "${repo_root}/target/classes" org.example.trademodel.config.TargetRuntimePreflight; then
+java_classpath="${repo_root}/target/classes"
+if [[ "${1:-}" == "--telegram-probe" ]]; then
+  classpath_file="$(mktemp)"
+  chmod 600 "${classpath_file}"
+  trap 'rm -f -- "${build_log}" "${probe_output}" "${classpath_file}"' EXIT
+  if ! (cd "${repo_root}" && ./mvnw -q dependency:build-classpath -Dmdep.outputFile="${classpath_file}"); then
+    printf '%s\n' "TELEGRAM_PROBE=BLOCKED_CLASSPATH"
+    exit 1
+  fi
+  java_classpath="${java_classpath}:$(cat "${classpath_file}")"
+fi
+
+if ! java -cp "${java_classpath}" org.example.trademodel.config.TargetRuntimePreflight "${1:-}"; then
   exit 1
+fi
+
+if [[ "${1:-}" == "--telegram-probe" ]]; then
+  printf '%s\n' "AI_EXACT_MODEL_PROBE=SKIPPED"
+  exit 0
 fi
 
 if [[ "${1:-}" != "--probe" ]]; then

@@ -30,6 +30,8 @@ import org.example.trademodel.service.PlanRevalidationService;
 import org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum;
 import org.example.trademodel.service.support.RuleConfigContractService;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
+import org.example.trademodel.telegram.HighValueAlertMessageService;
+import org.example.trademodel.telegram.HighValueAlertPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -70,6 +72,7 @@ public class HotResetServiceImpl implements HotResetService {
     private final RuleConfigContractService ruleConfigContractService;
     private final AssetStateService assetStateService;
     private PlanRevalidationService planRevalidationService;
+    private HighValueAlertMessageService highValueAlertMessageService;
     private Clock clock = Clock.systemUTC();
 
     public HotResetServiceImpl(AssetStateMapper assetStateMapper,
@@ -129,6 +132,11 @@ public class HotResetServiceImpl implements HotResetService {
     @Autowired(required = false)
     public void setPlanRevalidationService(PlanRevalidationService planRevalidationService) {
         this.planRevalidationService = planRevalidationService;
+    }
+
+    @Autowired(required = false)
+    public void setHighValueAlertMessageService(HighValueAlertMessageService value) {
+        this.highValueAlertMessageService = value;
     }
 
     @Override
@@ -228,6 +236,18 @@ public class HotResetServiceImpl implements HotResetService {
         result.setExecutionStatus("COMPLETED");
         result.setCompletedAt(nowUtc);
 
+        if (highValueAlertMessageService != null && "USER".equals(event.getOwnerType())
+                && event.getOwnerId() != null && event.getOwnerId() > 0) {
+            String planId = affectedPlans.isEmpty() ? null : affectedPlans.get(0).getPlanId();
+            highValueAlertMessageService.recordSafetyChange(
+                    new HighValueAlertMessageService.SafetyChangeInput(
+                            event.getOwnerId(), HighValueAlertPolicy.SafetyChangeType.HOT_RESET,
+                            "HOT_RESET", eventId, command.getAnalysisId(), planId,
+                            latestPushId(command.getAnalysisId()), normalizedSymbol, command.getTraceId(),
+                            postState.name(), 4, event.getTriggerReasonText(),
+                            "等待重建分析、规则校验和计划重新验证完成", occurredAt, null));
+        }
+
         runRebuildAfterCommit(event, result);
         return result;
     }
@@ -303,6 +323,13 @@ public class HotResetServiceImpl implements HotResetService {
         result.setOccurredAt(event.getEventTime());
         result.setCompletedAt(event.getCompletedAt());
         return result;
+    }
+
+    private String latestPushId(String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) return null;
+        var rows = pushSnapshotMapper.listByAnalysisId(analysisId);
+        return rows == null || rows.isEmpty() || rows.get(0).getPushId() == null
+                ? null : String.valueOf(rows.get(0).getPushId());
     }
 
     private void persistAssetState(OpportunityStateIdentity identity, AssetStateEnum postState, int confusedScore,

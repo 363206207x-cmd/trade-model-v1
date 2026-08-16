@@ -79,11 +79,15 @@ class ControlledPostgreSqlFlywaySmokeTest {
                     "uk_tm_review_result_analysis_scope",
                     "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
-                    "idx_tm_persisted_ohlcv_bar_ingestion_run"));
+                    "idx_tm_persisted_ohlcv_bar_ingestion_run",
+                    "uk_tm_channel_delivery_message_channel_active",
+                    "idx_tm_channel_delivery_due",
+                    "idx_tm_channel_delivery_cooldown"));
             assertFlywayHistorySucceeded(connection);
             assertDecisionPlanOffsetTimeColumns(connection);
             assertUserPositionOwnershipContract(connection);
             assertFinalInteractionRuntimeContract(connection);
+            assertTelegramDeliveryV14Contract(connection);
             assertPostgreSqlPushRecheckCutoffQuery(connection);
         }
     }
@@ -164,10 +168,10 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 """)) {
             try (ResultSet rs = statement.executeQuery()) {
                 assertThat(rs.next()).isTrue();
-                assertThat(rs.getInt(1)).isEqualTo(13);
-                assertThat(rs.getInt(2)).isEqualTo(13);
+                assertThat(rs.getInt(1)).isEqualTo(14);
+                assertThat(rs.getInt(2)).isEqualTo(14);
                 assertThat(rs.getInt(3)).isEqualTo(1);
-                assertThat(rs.getInt(4)).isEqualTo(13);
+                assertThat(rs.getInt(4)).isEqualTo(14);
             }
         }
         try (PreparedStatement statement = connection.prepareStatement("""
@@ -254,6 +258,25 @@ class ControlledPostgreSqlFlywaySmokeTest {
                         .contains("OBSERVING")
                         .contains("TRACKING_STOPPED")
                         .doesNotContain("REMOVED");
+            }
+        }
+    }
+
+    private static void assertTelegramDeliveryV14Contract(Connection connection) throws Exception {
+        for (String column : List.of(
+                "next_attempt_at", "claimed_at", "lease_until", "claim_token",
+                "last_response_code", "retry_after_seconds", "recipient_fingerprint",
+                "cooldown_key", "severity_rank")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'tm_channel_delivery'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).as("V14 column %s", column).isEqualTo(1);
+                }
             }
         }
     }

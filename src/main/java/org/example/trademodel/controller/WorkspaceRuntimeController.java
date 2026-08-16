@@ -107,7 +107,15 @@ public class WorkspaceRuntimeController {
 
     @GetMapping("/messages")
     public ApiResponse<List<MessageDO>> messages(@RequestParam(defaultValue = "50") int limit) {
-        return ApiResponse.success(messageFactService.listForUser(userIdResolver.requireCurrentUserId(), limit));
+        List<MessageDO> messages = messageFactService.listForUser(userIdResolver.requireCurrentUserId(), limit);
+        messages.forEach(message -> {
+            ChannelDeliveryDO delivery = channelDeliveryService.latestForMessage(message.getMessageId());
+            if (delivery != null) {
+                message.setTelegramDeliveryState(delivery.getStatus());
+                message.setTelegramDeliveryErrorCode(delivery.getErrorCode());
+            }
+        });
+        return ApiResponse.success(messages);
     }
 
     @PostMapping("/messages/{messageId}/read")

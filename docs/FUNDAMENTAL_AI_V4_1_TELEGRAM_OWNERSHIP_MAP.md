@@ -1,6 +1,6 @@
 # Fundamental AI v4.1 Telegram Ownership Map
 
-Status: `AUTHORIZATION_CANDIDATE`
+Status: `IMPLEMENTATION_CANDIDATE_PENDING_INDEPENDENT_AUDIT`
 
 Exact successor package:
 `FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION`
@@ -40,6 +40,23 @@ Only the final two owners may depend on the Telegram protocol package.
 - Reuses existing owners: YES.
 - Adds one external-provider client owner: YES, because none exists.
 - Increases duplicate skeleton surface: NO.
-- Capability movement in this authorization package: NONE.
+- Capability movement in the authorization package: NONE.
+- Capability movement in the implementation package: durable Telegram
+  delivery under the existing Message and ChannelDelivery owners.
 - Compliance with the #830 freeze recommendation: PASS.
 
+## Implemented Owners
+
+| Runtime responsibility | Exact owner |
+|---|---|
+| High-value qualification and canonical Message assembly | `HighValueAlertMessageService` |
+| Message persistence and post-commit event publication | `MessageFactService` |
+| Channel queue, dedupe, cooldown, claim and recovery | `ChannelDeliveryService` |
+| Due-delivery execution | `TelegramDeliveryDispatcher` |
+| Telegram protocol | `TelegramClient` / `TelegramBotApiClient` |
+| Readiness projection | `TelegramReadinessService` |
+| Safe application links | `TelegramLinkPolicy` |
+| Authenticated status API | `TelegramNotificationController` |
+
+No second Message, PushSnapshot, Opportunity, UserPosition,
+PositionMonitorLog, or ChannelDelivery owner was created.

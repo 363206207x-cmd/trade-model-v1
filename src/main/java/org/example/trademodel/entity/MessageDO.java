@@ -24,6 +24,8 @@ public class MessageDO {
     private LocalDateTime updatedAt;
     private Boolean notTradeInstruction = true;
     private Boolean notOrderExecution = true;
+    private String telegramDeliveryState;
+    private String telegramDeliveryErrorCode;
 
     public String getMessageId() { return messageId; }
     public void setMessageId(String value) { this.messageId = value; }
@@ -67,4 +69,8 @@ public class MessageDO {
     public void setNotTradeInstruction(Boolean value) { this.notTradeInstruction = value; }
     public Boolean getNotOrderExecution() { return notOrderExecution; }
     public void setNotOrderExecution(Boolean value) { this.notOrderExecution = value; }
+    public String getTelegramDeliveryState() { return telegramDeliveryState; }
+    public void setTelegramDeliveryState(String value) { this.telegramDeliveryState = value; }
+    public String getTelegramDeliveryErrorCode() { return telegramDeliveryErrorCode; }
+    public void setTelegramDeliveryErrorCode(String value) { this.telegramDeliveryErrorCode = value; }
 }

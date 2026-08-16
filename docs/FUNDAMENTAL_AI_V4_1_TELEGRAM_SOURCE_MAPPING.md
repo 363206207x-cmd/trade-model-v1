@@ -1,11 +1,15 @@
 # Fundamental AI v4.1 Telegram High-Value Alert Source Mapping
 
-Status: `AUTHORIZATION_CANDIDATE`
+Status: `IMPLEMENTATION_CANDIDATE_PENDING_INDEPENDENT_AUDIT`
 
 Canonical product source:
 `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`
 
-Baseline: merged main `2787f2e999f7744f0bb3e032b0462c9ddea943e4`.
+Authorization baseline: merged main
+`2787f2e999f7744f0bb3e032b0462c9ddea943e4`.
+
+Implementation baseline after authorization merge:
+`21ab98ad4155f2bc5f7792d2290d00f8481b00db`.
 
 This record maps the frozen Message and Telegram contract to existing owners.
 It does not implement delivery and does not redefine the canonical Product
@@ -50,3 +54,17 @@ Source.
 - `UNVERIFIED_POSITION_TELEGRAM_ALLOWED=false`
 - `TELEGRAM_SECRET_REPOSITORY_WRITE_ALLOWED=false`
 - `AUTOMATIC_TRADING_ALLOWED=false`
+
+## Implemented Mapping
+
+- `HighValueAlertMessageService` maps trusted Opportunity/Final/PushSnapshot,
+  safety-change, and PositionMonitor owners into the three canonical Message
+  categories.
+- `MessageRecordedEvent` and `TelegramMessageCommitListener` preserve the
+  commit-before-channel boundary.
+- `ChannelDeliveryService` remains the delivery-fact owner; V14 adds durable
+  Telegram queue semantics without creating another queue.
+- `TelegramDeliveryDispatcher` is the only runtime owner allowed to invoke the
+  single `TelegramClient`.
+- `TelegramNotificationController` exposes only authenticated owner-scoped,
+  secret-free status.

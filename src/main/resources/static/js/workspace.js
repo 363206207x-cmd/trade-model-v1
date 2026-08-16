@@ -1169,16 +1169,32 @@
             const messages = await api("/api/workspace/messages?limit=50") || [];
             document.getElementById("messageEmpty").hidden = messages.length > 0;
             target.innerHTML = messages.map(function (item) {
-                const href = item.currentRecheckId ? "/recheck/" + encodeURIComponent(item.currentRecheckId) : (item.planId ? "/plans/" + encodeURIComponent(item.planId) : "");
-                return '<article class="message-item" data-message-id="' + escapeHtml(item.messageId) + '"><div><strong>' + escapeHtml(text(item.title, label(item.category))) + '</strong><p>' + escapeHtml(text(item.body, "暂无补充说明")) + '</p><small>' + escapeHtml(formatTime(item.createdAt)) + '</small></div><div><span class="state-badge">' + escapeHtml(label(item.readState)) + '</span>' + (href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看</a>' : '<button class="text-action" type="button" data-read-message="' + escapeHtml(item.messageId) + '">标为已读</button>') + "</div></article>";
+                const href = item.positionId ? "/positions/" + encodeURIComponent(item.positionId) : (item.currentRecheckId ? "/recheck/" + encodeURIComponent(item.currentRecheckId) : (item.planId ? "/plans/" + encodeURIComponent(item.planId) : ""));
+                const delivery = item.telegramDeliveryState ? "Telegram · " + label(item.telegramDeliveryState) : "站内消息";
+                const retryable = ["FAILED", "NOT_CONFIGURED"].includes(String(item.telegramDeliveryState || "").toUpperCase());
+                const primaryAction = href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看</a>' : '<button class="text-action" type="button" data-read-message="' + escapeHtml(item.messageId) + '">标为已读</button>';
+                const retryAction = retryable ? '<button class="text-action" type="button" data-retry-telegram="' + escapeHtml(item.messageId) + '">重新投递</button>' : '';
+                return '<article class="message-item" data-message-id="' + escapeHtml(item.messageId) + '"><div><strong>' + escapeHtml(text(item.title, label(item.category))) + '</strong><p>' + escapeHtml(text(item.body, "暂无补充说明")) + '</p><small>' + escapeHtml(formatTime(item.createdAt)) + ' · ' + escapeHtml(delivery) + '</small></div><div><span class="state-badge">' + escapeHtml(label(item.readState)) + '</span>' + primaryAction + retryAction + "</div></article>";
             }).join("");
         } catch (_) { empty(target, "消息当前不可查看", "业务消息 owner 未返回可信记录。"); }
-        document.addEventListener("click", async function (event) {
-            const button = event.target.closest("[data-read-message]");
-            if (!button) return;
-            try { await api("/api/workspace/messages/" + encodeURIComponent(button.dataset.readMessage) + "/read", { method: "POST" }); await loadMessages(); }
-            catch (error) { announce(error.message); }
-        }, { once: true });
+        if (!target.dataset.actionsBound) {
+            document.addEventListener("click", async function (event) {
+                const retry = event.target.closest("[data-retry-telegram]");
+                if (retry) {
+                    try {
+                        await api("/api/settings/notifications/telegram/messages/" + encodeURIComponent(retry.dataset.retryTelegram) + "/retry", { method: "POST" });
+                        announce("Telegram 投递已重新排队");
+                        await loadMessages();
+                    } catch (error) { announce(error.message); }
+                    return;
+                }
+                const button = event.target.closest("[data-read-message]");
+                if (!button) return;
+                try { await api("/api/workspace/messages/" + encodeURIComponent(button.dataset.readMessage) + "/read", { method: "POST" }); await loadMessages(); }
+                catch (error) { announce(error.message); }
+            });
+            target.dataset.actionsBound = "true";
+        }
     }
 
     async function loadRecheck() {
@@ -1301,9 +1317,14 @@
                 form.elements.riskPreference.value = config.riskPreference || "BALANCED";
                 form.elements.defaultPoolMode.value = config.defaultPoolMode || "SYSTEM_DEFAULT";
             }
-            document.getElementById("telegramBindingState").textContent = label(config.telegramBindingStatus, "未绑定");
-            const field = document.querySelector('#telegramBindingForm input[name="telegramChatId"]');
-            if (field) field.value = config.telegramChatId || "";
+        } catch (_) { document.getElementById("telegramBindingState").textContent = "当前不可查看"; }
+        try {
+            const telegram = await api("/api/settings/notifications/telegram/status");
+            const state = label(telegram.state, "当前不可查看");
+            const delivery = telegram.lastDeliveryState ? " · 最近投递 " + label(telegram.lastDeliveryState) : "";
+            document.getElementById("telegramBindingState").textContent = state + delivery;
+            const details = document.getElementById("telegramChannelStatus");
+            if (details) details.innerHTML = '<dl><div><dt>通道状态</dt><dd>' + escapeHtml(state) + '</dd></div><div><dt>接收方</dt><dd>' + (telegram.recipientConfigured ? '已配置' : '未配置') + '</dd></div><div><dt>重试中</dt><dd>' + escapeHtml(String(telegram.retryingCount || 0)) + '</dd></div></dl>';
         } catch (_) { document.getElementById("telegramBindingState").textContent = "当前不可查看"; }
         try {
             const provider = await api("/api/system/runtime-readiness-guardrail-status");
@@ -1317,15 +1338,6 @@
             try {
                 await api("/api/user-config", { method: "PUT", body: JSON.stringify(formJson(form)) });
                 announce("设置已保存");
-            } catch (error) { announce(error.message); }
-        });
-        document.getElementById("telegramBindingForm")?.addEventListener("submit", async function (event) {
-            event.preventDefault();
-            try {
-                await api("/api/user-config", { method: "PUT", body: JSON.stringify(formJson(event.currentTarget)) });
-                closeOverlay(event.currentTarget.closest("dialog"));
-                announce("Telegram 绑定进入待验证状态");
-                await loadSettings();
             } catch (error) { announce(error.message); }
         });
         loadSettings();
