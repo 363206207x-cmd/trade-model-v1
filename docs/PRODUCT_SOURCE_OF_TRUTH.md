@@ -59,6 +59,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FIGMA-BASELINE|docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md|fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851|FE04_SCREENS_AND_COMPONENTS -->
 <!-- PRODUCT_SOURCE|PS-FORMAL-BUSINESS-CONTRACT|docs/PROJECT_DELIVERY_CONTRACT.md|2330e29151336d95f881929cd908b050961557dd57aa2e0cb22c2b8e44e29a64|DELIVERY_AND_SAFETY -->
 
@@ -227,8 +228,24 @@ authorization.
 
 This subordinate authorization does not create a second v4.1 Product Source.
 It maps reproduced target-runtime failures to the sole canonical source and
-existing owners. Its exact successor remains blocked until this record is
-effective on clean, synchronized merged main.
+existing owners.
+
+### PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | Fundamental AI v4.1 Telegram High-Value Alert Authorization |
+| Repository path | `docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md` |
+| Repository SHA-256 | `261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4` |
+| Version/date | Authorization candidate `2026-08-16`; effective only after merged-main validation |
+| Authority | Delivery authorization subordinate to the canonical v4.1 Product Source |
+| Applicable modules | The exact `FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION` package only |
+| Required concepts | Message-first persistence, ChannelDelivery-only Telegram, three high-value categories, trusted source gates, dedupe/cooldown/retry, secret-safe readiness and zero automatic trading |
+| Forbidden reinterpretations | no second Message/Push/Position owner; no Preview/Candidate/unverified-position delivery; no secret persistence or live use before merged-main audit |
+
+This subordinate authorization does not create a second v4.1 Product Source.
+Its exact Telegram successor remains blocked until this record is effective on
+clean, synchronized merged main.
 
 ### PS-FIGMA-BASELINE
 
