@@ -100,7 +100,17 @@ if [[ "$effective_branch" == "codex/v4-1-telegram-high-value-alert-channel" ]]; 
     echo "AUTHORIZATION_VALIDATION_BLOCKED protected-design-scope-change" >&2
     exit 1
   fi
-  if grep -Eiq 'auto[_ -]?(open|close|reverse|order|trade)' <<<"$(git diff "$base_ref" -- $changed_files 2>/dev/null || true)"; then
+  runtime_changed_files="$(printf '%s\n' "$changed_files" | grep -Ev '^(docs/|src/test/)' || true)"
+  runtime_added_lines=""
+  if [[ -n "$runtime_changed_files" ]]; then
+    while IFS= read -r file; do
+      [[ -n "$file" ]] || continue
+      runtime_added_lines+="$(git diff --unified=0 "$base_ref" -- "$file" 2>/dev/null \
+        | awk '/^\+\+\+/{next} /^\+/{print substr($0, 2)}')"$'\n'
+    done <<<"$runtime_changed_files"
+  fi
+  # Negative safety contracts in docs/tests must not be mistaken for runtime capability.
+  if grep -Eiq 'auto[_ -]?(open|close|reverse|order|trade)' <<<"$runtime_added_lines"; then
     echo "AUTHORIZATION_VALIDATION_BLOCKED automatic-trading-scope" >&2
     exit 1
   fi
