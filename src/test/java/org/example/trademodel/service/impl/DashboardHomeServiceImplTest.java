@@ -457,11 +457,14 @@ class DashboardHomeServiceImplTest {
         market.setConnected(true);
         market.setReason("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        service.setLocalRealReadinessService(mock(LocalRealReadinessService.class));
+        LocalRealReadinessService localRealReadiness = mock(LocalRealReadinessService.class);
+        when(localRealReadiness.updatedAt()).thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
+        service.setLocalRealReadinessService(localRealReadiness);
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getHeader().getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
+        assertThat(home.getHeader().getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 8, 20, 9, 56));
         assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONNECTED");
         assertThat(home.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
     }

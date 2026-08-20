@@ -60,7 +60,8 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "position.monitorConclusion", "position.suggestedManualActionText",
                 "position.entryLogicStatus", "position.reversalStatus", "position.riskReason",
                 "contract.normalizeAiTabs", "GPT Candidate · 非 Final",
-                "collectionStateLabel", "Candidate 摘要", "对 Candidate")
+                "collectionStateLabel", "Candidate 摘要", "对 Candidate",
+                "text(header.dataSourceText", "text(header.aiStatusLabel")
                 .doesNotContain(
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
                         "const assets = [", "BTCUSDT,ETHUSDT", "82, 87");

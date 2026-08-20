@@ -113,8 +113,8 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerDataSource", "数据 · " + label(header.dataStatus, "状态待同步")
-            + " · AI · " + label(header.aiStatus, "状态待同步"));
+        setText("headerDataSource", "数据 · " + text(header.dataSourceText, label(header.dataStatus, "状态待同步"))
+            + " · AI · " + text(header.aiStatusLabel, label(header.aiStatus, "状态待同步")));
         setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + time(header.updatedAt) : "更新时间待同步");
     }
 

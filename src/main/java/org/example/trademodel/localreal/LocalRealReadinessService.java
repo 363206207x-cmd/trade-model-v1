@@ -1,5 +1,8 @@
 package org.example.trademodel.localreal;
 
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
@@ -13,11 +16,21 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 @Profile("local-real")
 public class LocalRealReadinessService {
+    private final AnalysisRunMapper analysisRunMapper;
     private final AtomicReference<LocalRealReadinessState> state =
             new AtomicReference<>(LocalRealReadinessState.STARTING);
     private volatile String reasonCode = "LOCAL_REAL_STARTING";
     private volatile Instant updatedAt = Instant.now();
     private final Map<String, LocalRealAssetReadiness> assets = new ConcurrentHashMap<>();
+
+    public LocalRealReadinessService() {
+        this(null);
+    }
+
+    @Autowired
+    public LocalRealReadinessService(AnalysisRunMapper analysisRunMapper) {
+        this.analysisRunMapper = analysisRunMapper;
+    }
 
     public LocalRealReadinessState state() {
         return state.get();
@@ -68,6 +81,48 @@ public class LocalRealReadinessService {
                 .map(symbol -> symbol.trim().toUpperCase(java.util.Locale.ROOT))
                 .collect(java.util.stream.Collectors.toSet());
         assets.keySet().removeIf(symbol -> !retained.contains(symbol));
+    }
+
+    public void synchronizeTrackedAssets(List<String> symbols) {
+        retainAssets(symbols);
+        if (symbols == null) {
+            return;
+        }
+        symbols.stream()
+                .filter(symbol -> symbol != null && !symbol.isBlank())
+                .map(symbol -> symbol.trim().toUpperCase(java.util.Locale.ROOT))
+                .distinct()
+                .forEach(symbol -> assets.putIfAbsent(symbol, new LocalRealAssetReadiness(
+                        symbol, LocalRealAssetReadinessState.NO_DATA, null,
+                        "ANALYSIS_NOT_COMPLETED", Instant.now())));
+    }
+
+    public void refreshFromPersistedAnalyses(List<String> symbols) {
+        synchronizeTrackedAssets(symbols);
+        if (analysisRunMapper == null) {
+            transition(LocalRealReadinessState.DEGRADED, "ANALYSIS_PERSISTENCE_UNAVAILABLE");
+            return;
+        }
+        for (String symbol : assets.keySet()) {
+            AnalysisRunDO latest = analysisRunMapper.selectLatestBySymbol(symbol);
+            if (latest != null && latest.getAnalysisId() != null && !latest.getAnalysisId().isBlank()
+                    && "SUCCESS".equalsIgnoreCase(latest.getStatus())) {
+                updateAsset(symbol, LocalRealAssetReadinessState.READY, null, "REAL_DATA_AVAILABLE");
+            } else {
+                String reason = latest == null || latest.getErrorCode() == null || latest.getErrorCode().isBlank()
+                        ? "ANALYSIS_NOT_COMPLETED" : latest.getErrorCode();
+                updateAsset(symbol, LocalRealAssetReadinessState.DEGRADED, null, reason);
+            }
+        }
+        long tracked = assets.size();
+        long ready = readyAssetCount();
+        if (tracked > 0 && ready == tracked) {
+            transition(LocalRealReadinessState.DASHBOARD_READY, "REAL_DATA_AVAILABLE");
+        } else if (ready > 0) {
+            transition(LocalRealReadinessState.DASHBOARD_PARTIAL, "PARTIAL_REAL_DATA_AVAILABLE");
+        } else {
+            transition(LocalRealReadinessState.DEGRADED, "ANALYSIS_INCOMPLETE");
+        }
     }
 
     public long readyAssetCount() {

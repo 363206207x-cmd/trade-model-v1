@@ -11,6 +11,7 @@ import org.example.trademodel.entity.AssetPoolItemDO;
 import org.example.trademodel.entity.AssetDO;
 import org.example.trademodel.mapper.AssetMapper;
 import org.example.trademodel.mapper.AssetPoolItemMapper;
+import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
 import org.example.trademodel.providercall.instrument.ProviderInstrumentCapability;
 import org.example.trademodel.requestcontext.RequestIdSupport;
@@ -35,6 +36,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
     private final MarketAssetCatalog marketAssetCatalog;
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final ProviderCapabilityRegistry providerCapabilityRegistry;
+    private LocalRealReadinessService localRealReadinessService;
 
     @org.springframework.beans.factory.annotation.Autowired
     public PersistentAssetPoolService(AssetPoolItemMapper mapper,
@@ -54,6 +56,11 @@ public class PersistentAssetPoolService implements AssetPoolService {
                                MarketAssetCatalog marketAssetCatalog,
                                AnalysisRunOrchestrator analysisRunOrchestrator) {
         this(mapper, assetMapper, marketAssetCatalog, analysisRunOrchestrator, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setLocalRealReadinessService(LocalRealReadinessService localRealReadinessService) {
+        this.localRealReadinessService = localRealReadinessService;
     }
 
     @Override
@@ -330,6 +337,12 @@ public class PersistentAssetPoolService implements AssetPoolService {
         String effectiveTimeframe = timeframe == null || timeframe.isBlank() ? "5m" : timeframe.trim();
         List<AssetPoolScanResultDTO> results = new ArrayList<>();
         String scanId = "asset-pool-scan-" + RequestIdSupport.generate();
+        if (localRealReadinessService != null) {
+            localRealReadinessService.synchronizeTrackedAssets(listScanSymbols());
+            localRealReadinessService.transition(
+                    org.example.trademodel.localreal.LocalRealReadinessState.ANALYSIS_RUNNING,
+                    "MANUAL_ASSET_POOL_SCAN_RUNNING");
+        }
         for (AssetPoolAssetDTO asset : assets) {
             Instant observedAt = Instant.now();
             try {
@@ -356,6 +369,9 @@ public class PersistentAssetPoolService implements AssetPoolService {
                         asset.assetId(), provider(null, asset.symbol(), effectiveTimeframe),
                         "FAILED", null, failureReason, observedAt));
             }
+        }
+        if (localRealReadinessService != null) {
+            localRealReadinessService.refreshFromPersistedAnalyses(listScanSymbols());
         }
         return results;
     }

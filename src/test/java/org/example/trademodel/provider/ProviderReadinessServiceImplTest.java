@@ -112,6 +112,20 @@ class ProviderReadinessServiceImplTest {
     }
 
     @Test
+    void localRealRuntimeTrustsAuthoritativeReadySnapshotAfterHealthRegistryReset() {
+        LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
+        when(localRealStatus.providerReadinessSnapshot()).thenReturn(localRealStatus(
+                true, "DASHBOARD_READY", "FRESH", "NOT_USED", false));
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        ReflectionTestUtils.setField(service, "localRealDataStatusService", localRealStatus);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("CONNECTED");
+        assertThat(readiness.getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
+    }
+
+    @Test
     void localRealStaleMarketDataFailsClosedEvenWhenProviderWasUp() {
         LocalRealDataStatusService localRealStatus = mock(LocalRealDataStatusService.class);
         when(localRealStatus.providerReadinessSnapshot()).thenReturn(localRealStatus(
