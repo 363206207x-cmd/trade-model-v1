@@ -74,7 +74,7 @@
                 <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无持仓</strong></div><a class="secondary-action" href="/positions">录入持仓</a></div>
             </section>
             <section class="module plan-module" aria-labelledby="planHeading" data-component-family="PlanSummaryCard">
-                <header class="module-header"><div><h2 id="planHeading">Final Execution Plan</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
+                <header class="module-header"><div><h2 id="planHeading">最终执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
                 <div class="plan-content" id="planContent"></div>
             </section>
         </div>
@@ -82,9 +82,9 @@
             <header class="ai-header">
                 <div><h2 id="aiWorkspaceHeading">AI 分析工作区</h2><span id="aiContext">等待分析上下文</span></div>
                 <div class="ai-tabs" role="tablist" aria-label="AI 分析角色" data-component-family="AIRoleTabs">
-                    <button class="is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-ai-role="GPT_FINAL">GPT 综合判断</button>
-                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GEMINI_REVIEW">Gemini 冲突复核</button>
-                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GROK_CHALLENGE">Grok 反方挑战</button>
+                    <button class="is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-ai-role="GPT_FINAL">GPT 候选判断</button>
+                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GEMINI_REVIEW">Gemini 可信度复核</button>
+                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GROK_CHALLENGE">Grok 失败压力测试</button>
                 </div>
             </header>
             <div class="ai-layout" id="aiLayout"><article class="ai-role-panel" id="aiRolePanel"></article><aside class="conflict-summary" id="conflictSummary" hidden aria-label="冲突摘要"></aside></div>
