@@ -13,24 +13,24 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "Fundamental AI v4.1 Telegram High-Value Alert Authorization"
-product_phase_status: "TELEGRAM_AUTHORIZATION_PENDING_MERGED_MAIN"
+product_phase: "Fundamental AI Local-Real Readiness Authorization"
+product_phase_status: "LOCAL_REAL_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "v4.1 Telegram source/ownership mapping and exact-package permission; channel integration is not started"
-active_block_cn: "v4.1 Telegram 来源、所有权映射与精确包授权；通道集成尚未开始"
+active_block: "local-real readiness/source ownership and exact-package permission; implementation is not started"
+active_block_cn: "本地真实数据 readiness/source 所有权与精确包授权；实现尚未开始"
 
-next_required_action: "Review and merge the docs/gate-only Telegram authorization, then validate the exact successor permissions on clean synchronized main."
-next_business_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+next_required_action: "Review and merge the docs/gate-only local-real authorization, then validate the exact successor permissions on clean synchronized main."
+next_business_phase: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 next_business_phase_allowed: false
 compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact successor is allowed only after the authorization commit is merged to clean/synced main and all gates pass."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "v4.1 Telegram High-Value Alert Authorization PR; derive exact number and state from GitHub"
-current_branch: "codex/v4-1-telegram-high-value-alert-authorization"
-current_package_pr: "v4.1 Telegram High-Value Alert Authorization PR"
+current_pr: "Local-Real Readiness Authorization PR; derive exact number and state from GitHub"
+current_branch: "codex/local-real-readiness-authorization"
+current_package_pr: "Local-Real Readiness Authorization PR"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for docs / contract / workflow packages only"
@@ -40,20 +40,22 @@ v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_C
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_authorized_package: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+v4_1_authorized_package: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-telegram-high-value-alert-channel"
+v4_1_authorized_successor_branch: "codex/local-real-readiness-sync-real-analysis"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
 v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
 v4_1_target_runtime_remediation_canonical_figma_desktop_allowed: false
 v4_1_target_runtime_remediation_mobile_allowed: false
 v4_1_target_runtime_remediation_capability_movement: "NONE"
-v4_1_telegram_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_telegram_implementation_status: "NOT_STARTED"
-v4_1_telegram_live_acceptance_status: "DEFERRED_UNTIL_MERGED_MAIN"
+v4_1_telegram_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_telegram_implementation_status: "COMPLETE"
+v4_1_telegram_live_acceptance_status: "PENDING_PRIVATE_RUNTIME_ACCEPTANCE"
+local_real_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+local_real_implementation_status: "NOT_STARTED"
 pr_1179_status: "MERGED"
 pr_1179_head: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
 pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"

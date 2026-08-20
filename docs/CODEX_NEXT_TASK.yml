@@ -1,60 +1,61 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI v4.1 Telegram high-value alert channel authorization"
+active_block: "Fundamental AI local-real readiness authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI v4.1 Telegram High-Value Alert Authorization"
-branch: "codex/v4-1-telegram-high-value-alert-authorization"
+module: "Fundamental AI Local-Real Readiness Authorization"
+branch: "codex/local-real-readiness-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+authorized_next_product_phase: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 
-current_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_AUTHORIZATION"
-current_package_name: "Fundamental AI v4.1 Telegram High-Value Alert Channel Authorization"
-current_package_active_block: "Telegram Product-Source Mapping, Ownership And Exact Permission Gate"
+current_package_phase: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION"
+current_package_name: "Fundamental AI Local-Real Readiness Sync And Real Analysis Enablement Authorization"
+current_package_active_block: "Local-real readiness ownership, current Home live binding and exact permission gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-telegram-high-value-alert-authorization"
+current_package_branch: "codex/local-real-readiness-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement Telegram delivery on this branch"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement local-real readiness on this branch"
 current_package_allowed_scope:
-  - "Map the frozen Section 15.2 Telegram contract to canonical product ownership"
-  - "Register Message and ChannelDelivery owner reuse and exact integration authorization"
+  - "Register the exact local-real readiness and current Home live-binding package"
+  - "Map existing Asset Pool scan, analysis persistence, readiness and Dashboard owners"
   - "Update delivery state, exact-package machine permissions and authorization validation"
   - "Validate fail-closed package denial without changing application, API, schema, Figma or Mobile"
 current_package_blocked_scope:
-  - "Java, application configuration, API, schema, Telegram client, Figma, Desktop or Mobile changes"
-  - "Telegram integration, live connectivity, target-runtime deployment or production deployment"
-  - "Private Telegram file reading, secret injection, logging or repository writes"
+  - "Java, runtime configuration, API, schema, templates, CSS, JavaScript, Figma or Mobile changes"
+  - "Local-real implementation, deployment, new providers, broad backend refactor or quality-threshold changes"
+  - "Secrets, fake data, automatic trading or automatic position mutation"
 
-authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
-authorized_next_package_name: "Fundamental AI v4.1 Telegram High-Value Alert Channel Integration"
-authorized_next_package_active_block: "Message Qualification, ChannelDelivery Queue, Telegram Client, Retry, Readiness And Status"
+authorized_next_package_phase: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
+authorized_next_package_name: "Fundamental AI Local-Real Readiness Sync And Real Analysis Enablement"
+authorized_next_package_active_block: "Manual scan readiness synchronization and current approved Home authoritative runtime binding"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-telegram-high-value-alert-channel"
-authorized_next_package_risk: "B_RISK_EXTERNAL_NOTIFICATION_CHANNEL"
+authorized_next_package_branch: "codex/local-real-readiness-sync-real-analysis"
+authorized_next_package_risk: "B_RISK_LOCAL_RUNTIME_DATA_INTEGRITY"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
 authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
-authorized_next_package_next_action: "From authorization-effective merged main, implement the exact Telegram channel package in one Draft PR and stop for independent integration audit"
+authorized_next_package_next_action: "From authorization-effective merged main, restore the preserved approved Home work, fix authoritative readiness synchronization, bind current runtime data and run directed local acceptance"
 
-blocked_package_phase: "FUNDAMENTAL_AI_V4_1_UNSCOPED_TELEGRAM_MOBILE_FIGMA_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_TELEGRAM_CHANNEL_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_TELEGRAM_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "UNSCOPED_LOCAL_REAL_SCHEMA_PROVIDER_FIGMA_MOBILE_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_LOCAL_REAL_READINESS_AND_HOME_BINDING_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_LOCAL_REAL_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
   - "V4_1_TARGET_RUNTIME_REMEDIATION_EFFECTIVE_MERGED_MAIN"
-  - "TELEGRAM_SOURCE_AND_OWNERSHIP_MAPPED"
-  - "TELEGRAM_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "V4_1_TELEGRAM_IMPLEMENTATION_EFFECTIVE_MERGED_MAIN"
+  - "LOCAL_REAL_SOURCE_AND_OWNERSHIP_MAPPED"
+  - "LOCAL_REAL_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -83,14 +84,16 @@ v4_1_final_interaction_implementation_status: "COMPLETE"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
 v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
-v4_1_telegram_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_telegram_implementation_status: "NOT_STARTED"
-v4_1_telegram_live_acceptance_status: "DEFERRED_UNTIL_MERGED_MAIN"
-authorized_next_package: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
-scope: "V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_ONLY"
+v4_1_telegram_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_telegram_implementation_status: "COMPLETE"
+v4_1_telegram_live_acceptance_status: "PENDING_PRIVATE_RUNTIME_ACCEPTANCE"
+local_real_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+local_real_implementation_status: "NOT_STARTED"
+authorized_next_package: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
+scope: "LOCAL_REAL_READINESS_AND_CURRENT_HOME_BINDING_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk authorization package; successor is B-risk external notification channel integration"
+risk: "A-risk authorization package; successor is bounded B-risk local runtime data integration"
 
 pr_1179_number: "1179"
 pr_1179_status: "MERGED"
@@ -98,44 +101,46 @@ pr_1179_merge_commit: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
 pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
 pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
 
-current_pr: "Fundamental AI v4.1 Telegram High-Value Alert Authorization / PENDING_REVIEW"
-current_package_pr: "Fundamental AI v4.1 Telegram High-Value Alert Authorization Package"
+current_pr: "Fundamental AI Local-Real Readiness Authorization / PENDING_REVIEW"
+current_package_pr: "Fundamental AI Local-Real Readiness Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only authorization package after all gates pass"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "Fundamental AI v4.1 Telegram High-Value Alert Channel Integration"
+next_business_phase: "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization package; only then request FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+next_allowed_action: "Merge this authorization package; only then request LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 
-product_phase: "Fundamental AI v4.1 Telegram High-Value Alert Authorization"
+product_phase: "Fundamental AI Local-Real Readiness Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "v4.1 Telegram high-value alert source mapping and exact channel integration authorization"
+product_module: "local-real readiness synchronization and approved current Home live runtime binding authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "TELEGRAM_HIGH_VALUE_ALERT_CONTRACT"
-  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERSHIP"
+  - "ASSET_POOL_AND_ANALYSIS_OWNERSHIP"
+  - "LOCAL_REAL_READINESS_OWNERSHIP"
+  - "CURRENT_HOME_READ_MODEL_OWNERSHIP"
   - "OBJECT_OWNERSHIP"
   - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_SOURCE_MAPPING.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_OWNERSHIP_MAP.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md"
-  - "docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_AUTHORIZATION_VALIDATION.md"
+  - "docs/FUNDAMENTAL_AI_LOCAL_REAL_SOURCE_MAPPING.md"
+  - "docs/FUNDAMENTAL_AI_LOCAL_REAL_OWNERSHIP_MAP.md"
+  - "docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md"
+  - "docs/FUNDAMENTAL_AI_LOCAL_REAL_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "MESSAGE_SINGLE_BUSINESS_FACT"
-  - "TELEGRAM_CHANNEL_DELIVERY_ONLY"
-  - "THREE_HIGH_VALUE_MESSAGE_CATEGORIES"
-  - "SECRET_SAFE_FAIL_CLOSED_DELIVERY"
+  - "ASSET_POOL_SINGLE_OPPORTUNITY_SOURCE"
+  - "ANALYSIS_PERSISTENCE_TRUTH"
+  - "LOCAL_REAL_READINESS_TRUTH"
+  - "CURRENT_HOME_AUTHORITATIVE_READ_MODEL"
+  - "FAIL_CLOSED_REAL_DATA"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -148,46 +153,47 @@ required_product_sources:
   - PS-POSITION-MONITORING
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
+  - PS-HOME-INTERACTION
+  - PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  The sole v4.1 Product Source remains unchanged. Section 15.2 permits Telegram only as a delivery channel for three high-value Message categories. Message remains the sole business fact and Push Recheck remains non-trading revalidation.
+  The sole v4.1 Product Source remains unchanged. The exact successor exposes current authoritative Asset Pool, analysis, opportunity, Final, UserPosition, Three-AI and provider/readiness state in the already approved Home without fabricating missing data.
 
 design_interaction_mapping: |
-  No design implementation is authorized. The successor reuses Message Center, Push Recheck, Position Detail and My/Settings routes. Canonical Figma, Desktop and Mobile remain unchanged.
+  The approved current Desktop Home structure is preserved. The successor may bind live data only; Canonical Figma, layout, module order, 70:30, Desktop design and Mobile remain unchanged.
 
 data_source_mapping: |
-  Reuse MessageDO/MessageFactService, ChannelDeliveryDO/ChannelDeliveryService, PushSnapshot/PushRecheck, Opportunity/FinalExecutionPlan, UserPosition/PositionMonitorLog and PersonalUser/UserConfig. Telegram introduces one protocol client only.
+  Reuse PersistentAssetPoolService and existing analysis persistence, LocalRealReadinessService/LocalRealDataStatusService, DashboardHomeService/read models, Opportunity, FinalExecutionPlan, UserPosition, PositionMonitorLog and stored Three-AI owners. No second source of truth is created.
 
 current_implementation_gap: |
-  The exact package is not authorized. Existing ChannelDelivery records only simple queued/suppressed state and lacks Telegram protocol delivery, durable retry, readiness, qualification wiring and secure status projection.
+  Normal manual Asset Pool scans persist six completed analyses but do not refresh the existing local-real readiness projection, leaving readyAssetCount at zero and the active Home at WAITING_SYNC. The approved Home work is preserved separately and must be restored only after this authorization is effective.
 
 allowed_scope:
-  - "Telegram source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
+  - "Local-real source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "Existing Message and ChannelDelivery extension with one Telegram client and dispatcher"
-  - "Three frozen high-value qualification policies after trusted persistence"
-  - "Durable dedupe, cooldown, escalation, retry, crash recovery and explicit status"
-  - "Secret-safe configuration/readiness/preflight and owner-scoped API projection"
-  - "Mock-provider tests, deployment docs and independent integration audit handoff"
+  - "Synchronize existing local-real readiness after normal manual Asset Pool scans"
+  - "Restore the preserved approved Home route/templates/runtime binding"
+  - "Use the minimum existing ViewModel/read-model mapping for current authoritative runtime data"
+  - "Inspect and use an existing supported local real-AI mode when one already exists"
+  - "Directed readiness, Home binding, authenticated smoke and browser runtime verification"
 
 authorized_next_blocked_scope:
-  - "Product, Figma, Desktop UI or Mobile changes"
-  - "Preview, Candidate-only, ordinary-price or unverified-position delivery"
-  - "Private Telegram file access, fake success, automatic position mutation, order or trading"
+  - "Schema redesign, API-contract redesign, new provider architecture or broad backend refactor"
+  - "Quality-gate reduction, fake data, forced AI success or readiness calculated in JavaScript"
+  - "Figma, Mobile, unrelated routes, deployment, automatic trading or automatic position mutation"
 
 blocked_scope:
-  - "Any Telegram implementation inside this authorization package"
-  - "Any package except FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+  - "Any implementation inside this authorization package"
+  - "Any package except LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
 
 forbidden_scope:
-  - "Application configuration, Java, API, schema, Telegram client, Figma or Mobile changes in the authorization diff"
-  - "Reading, injecting or committing real Telegram secrets, or deploying a runtime"
+  - "Application code, runtime configuration, Java, API, schema, template, CSS, JavaScript, Figma or Mobile changes in the authorization diff"
+  - "Reading, printing or committing secrets; lowering quality threshold; fabricating opportunity, position, Final or AI data"
 
 real_scenario_requirement: |
-  This authorization performs no business scenario. The successor must use mock Telegram HTTP for delivery contracts, keep the user-verified direct connectivity as external evidence only, and defer application live acceptance until audited code is merged.
+  This authorization performs no runtime scenario. The successor must use the user's existing private local configuration without disclosure, run normal real-data paths, and prove browser refresh reads current database/runtime truth.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -195,6 +201,7 @@ hard_boundaries:
   push_recheck_trading_authorization: "BLOCKED"
   preview_business_persistence: "BLOCKED"
   fake_data_as_real: "BLOCKED"
+  quality_gate_reduction: "BLOCKED"
   owner_scope_bypass: "BLOCKED"
   figma_change: "BLOCKED"
   canonical_figma_desktop_implementation: "BLOCKED"
@@ -202,17 +209,17 @@ hard_boundaries:
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and registered Telegram authorization hash pass"
-  - "Telegram integration remains blocked before merge and exact successor is allowed only after clean/synced merged main"
-  - "Typo, expanded, auto-trading, Mobile and Figma packages fail closed"
+  - "Unique active v4.1 Product Source and registered local-real authorization hash pass"
+  - "Local-real implementation remains blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "Typo, expanded, schema-redesign, provider-architecture, auto-trading, Mobile and Figma packages fail closed"
   - "Application/API/Schema/Figma/Mobile changed-file count is zero"
   - "Workflow, authorization, duplicate-skeleton, Maven, secret and diff checks pass"
 
 stop_conditions:
-  - "Main differs from 2787f2e999f7744f0bb3e032b0462c9ddea943e4 before authorization branch creation"
+  - "Main differs from 56028b21ac3d4ff9d1ee1368b6a144ad77382e19 before authorization branch creation"
   - "A Product Source conflict, secret exposure or duplicate owner is found"
-  - "The diff includes application, API, schema, provider, business-test, Figma or Mobile changes"
-  - "The exact Telegram successor is not the only package permitted after merged-main effectivity"
+  - "The authorization diff includes application, API, schema, business-test, template, CSS, JavaScript, Figma or Mobile changes"
+  - "The exact local-real successor is not the only package permitted after merged-main effectivity"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"
