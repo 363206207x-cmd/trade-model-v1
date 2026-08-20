@@ -35,6 +35,7 @@
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型", OBSERVATION: "观察", BLOCKED: "阻断",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
+        APPROVE: "维持", DOWNGRADE: "建议降级", REJECT: "驳回", RISK_WARNING: "风险提示",
         READY: "就绪", PARTIAL: "部分可用", FALLBACK: "规则路径降级", UNAVAILABLE: "当前不可用",
         DISABLED: "数据源未启用", WAITING_SYNC: "等待同步", OK: "正常", UP: "正常", DEGRADED: "降级",
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
@@ -171,8 +172,8 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerDataSource", "数据 · " + text(header.dataSourceText, label(header.dataStatus, "状态待同步"))
-            + " · AI · " + text(header.aiStatusLabel, label(header.aiStatus, "状态待同步")));
+        setText("headerDataSource", "数据 · " + label(header.dataSourceText, label(header.dataStatus, "状态待同步"))
+            + " · AI · " + label(header.aiStatusLabel, label(header.aiStatus, "状态待同步")));
         setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + time(header.updatedAt) : "更新时间待同步");
     }
 
@@ -234,8 +235,8 @@
             + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
             + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
             + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-final"><span><small>Final Bias</small><b>' + escapeHtml(finalBias)
-            + "</b></span><span><small>Plan Mode</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
+            + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
+            + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
     }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
@@ -323,7 +324,7 @@
         setText("planAsset", selected || "未选择资产");
         if (!access.visible) {
             target.innerHTML = '<div class="plan-empty"><strong>尚未形成</strong><span>机会状态 · '
-                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(access.reason, "当前没有通过规则校验的 Final Execution Plan。")) + "</span></div>";
+                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(access.reason, "尚未形成有效计划")) + "</span></div>";
             link.hidden = true;
             return;
         }
@@ -337,7 +338,7 @@
             + planField("目标", plan.targetZones || plan.targetLogic || plan.takeProfitRules)
             + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
             + '</div><div class="plan-metadata">' + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
-            + planField("版本 / 来源", planId) + "</div>";
+            + planField("来源", label(plan.sourceStatus, "规则校验")) + "</div>";
         link.href = "/plans/" + encodeURIComponent(planId);
         link.hidden = false;
     }
@@ -366,13 +367,15 @@
         var core = role.coreJudgment || {};
         var candidate = role.candidateSummary || {};
         var multi = role.multiTimeframeExplanation || {};
+        var adjustment = role.biasAdjustment || {};
         var why = text(core.text, text(role.decisionSummary, "当前形成原因不可查看"));
         return '<div class="ai-first-visual"><div class="primary"><small>GPT Candidate · 非 Final</small><strong>'
             + escapeHtml(text(candidate.summary, why)) + "</strong></div><div><small>Market Bias</small><strong>"
             + escapeHtml(label(core.marketBias, "当前不可查看")) + "</strong></div><div><small>Opportunity State · Candidate Mode</small><strong>"
             + escapeHtml(label(core.opportunityState, "当前不可查看") + " · " + label(candidate.planMode, "当前不可查看"))
             + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>形成原因</h3><p>' + escapeHtml(why)
-            + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")]])
+            + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")],
+                ["偏向调整", label(adjustment.before, "当前不可查看") + " → " + label(adjustment.after, "当前不可查看")]])
             + '</section><section class="ai-section"><h3>证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
             + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>反对证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
             + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>Candidate 摘要</strong><span>'
@@ -408,7 +411,7 @@
         target.hidden = !show;
         layout.classList.toggle("has-conflict", show);
         if (!show) { target.innerHTML = ""; return; }
-        target.innerHTML = '<h3>Conflict Summary</h3>' + dl([
+        target.innerHTML = '<h3>冲突摘要</h3>' + dl([
             ["冲突等级", label(consistency.conflictLevel)], ["最终偏向", label(consistency.finalMarketBias)],
             ["最终计划", label(consistency.finalPlanMode)], ["主要原因", text(consistency.mainReason)],
             ["恢复条件", text(consistency.recoveryCondition)]
@@ -472,7 +475,7 @@
         statusNode.textContent = message || "";
         if (!selectedSearchAsset) {
             symbolNode.textContent = "尚未选择资产";
-            stateNode.textContent = "请先从搜索结果中选择";
+            stateNode.textContent = "未选择搜索结果";
             previewButton.textContent = "分析";
             previewButton.disabled = true;
             addButton.disabled = true;
@@ -526,7 +529,7 @@
                 + '"><span><strong>' + escapeHtml(symbol) + "</strong><small>" + escapeHtml(text(asset.baseAsset || asset.name, "市场资产"))
                 + "</small></span><em>" + (inPool ? "已添加" : "未添加") + "</em></button>";
         }).join("");
-        if (!target.innerHTML) target.innerHTML = '<div class="search-result"><span><strong>未找到资产</strong><small>请尝试其他名称或交易对</small></span></div>';
+        if (!target.innerHTML) target.innerHTML = '<div class="search-result"><span><strong>未找到资产</strong><small>可更换名称或交易对</small></span></div>';
         setSearchPopoverOpen(true);
         target.querySelectorAll("[data-search-index]").forEach(function (button) {
             button.addEventListener("click", function () { selectSearchResult(Number(button.dataset.searchIndex)); });
@@ -577,7 +580,7 @@
         document.getElementById("homePreviewAsset").addEventListener("click", async function () {
             if (!selectedSearchAsset || searchActionBusy) return;
             searchActionBusy = true;
-            renderSearchSelection("正在分析…");
+            renderSearchSelection("分析中");
             try {
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
                 if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
@@ -591,7 +594,7 @@
         document.getElementById("homeAddAsset").addEventListener("click", async function () {
             if (!selectedSearchAsset || searchActionBusy || assetPoolSymbols.has(symbolOf(selectedSearchAsset))) return;
             searchActionBusy = true;
-            renderSearchSelection("正在添加…");
+            renderSearchSelection("添加中");
             try {
                 await api("/api/asset-pool", { method: "POST", body: JSON.stringify({ symbol: symbolOf(selectedSearchAsset), focusEnabled: true }) });
                 await loadAssetPoolMembership();

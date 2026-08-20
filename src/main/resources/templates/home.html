@@ -52,7 +52,7 @@
                     <div class="asset-search-popover" id="homeAssetSearchPopover" data-overlay-code="O02" hidden>
                         <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" aria-label="市场资产搜索结果"></div>
                         <div class="asset-search-selection" id="homeAssetSearchSelection" aria-live="polite">
-                            <div class="selected-asset-copy"><strong id="homeSelectedSearchSymbol">尚未选择资产</strong><small id="homeSelectedSearchState">请先从搜索结果中选择</small></div>
+                            <div class="selected-asset-copy"><strong id="homeSelectedSearchSymbol">尚未选择资产</strong><small id="homeSelectedSearchState">未选择搜索结果</small></div>
                             <small class="pool-count" id="homeAssetPoolCount">观察资产池 · 同步中</small>
                             <div class="search-actions">
                                 <button class="search-action search-action-secondary" id="homePreviewAsset" type="button" disabled>分析</button>
@@ -64,7 +64,7 @@
                 </div>
             </header>
             <div class="opportunity-grid" id="opportunityGrid" aria-live="polite"></div>
-            <div class="section-empty" id="opportunityEmpty" hidden><strong>当前没有进入重点机会的资产</strong><span>资产池仍会持续分析，新的有效机会将按优先级进入这里。</span></div>
+            <div class="section-empty" id="opportunityEmpty" hidden><strong>暂无重点机会</strong></div>
         </section>
         <div class="decision-row" data-position-plan-ratio="70:30">
             <section class="module position-module" aria-labelledby="positionHeading" data-component-family="PositionCard">
@@ -73,7 +73,7 @@
                     <div class="position-header-actions"><span id="positionAggregate">活动 0 · 最高风险 暂无评估 · 等待评估</span><a href="/positions">查看全部</a></div>
                 </header>
                 <div class="position-list" id="positionList"></div>
-                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span></div><a class="secondary-action" href="/positions">录入持仓</a></div>
+                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无持仓</strong></div><a class="secondary-action" href="/positions">录入持仓</a></div>
             </section>
             <section class="module plan-module" aria-labelledby="planHeading" data-component-family="PlanSummaryCard">
                 <header class="module-header"><div><h2 id="planHeading">执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>

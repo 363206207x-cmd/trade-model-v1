@@ -1,0 +1,24 @@
+trade-model:
+  ui-review:
+    enabled: true
+  schedulers:
+    enabled: false
+  provider-call:
+    enabled: false
+    external-calls-enabled: false
+  ohlcv:
+    public-provider:
+      enabled: false
+      external-calls-enabled: false
+  providers:
+    coinglass:
+      enabled: false
+      external-calls-enabled: false
+  ai:
+    enabled: false
+    openai:
+      enabled: false
+    gemini:
+      enabled: false
+    xai:
+      enabled: false
