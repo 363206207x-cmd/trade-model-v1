@@ -241,27 +241,17 @@
         });
     }
 
-    async function loadWorkspaceStatus() {
-        try {
-            const data = await api("/api/dashboard/home?limit=1");
-            const header = data?.header || {};
-            document.getElementById("workspaceDataStatus").textContent = label(header.dataStatus, "等待同步");
-            document.getElementById("workspaceAiStatus").textContent =
-                text(header.aiStatusLabel, label(header.aiStatus, "等待同步"));
-        } catch (_) {
-            document.getElementById("workspaceDataStatus").textContent = "当前不可查看";
-            document.getElementById("workspaceAiStatus").textContent = "当前不可查看";
-        }
-    }
-
     async function loadTasks() {
         const target = document.getElementById("asyncTaskList");
         try {
             const tasks = await api("/api/workspace/tasks?limit=30") || [];
             latestTasks = tasks;
-            document.getElementById("workspaceTaskCount").textContent = String(tasks.filter(function (task) {
+            const activeTaskCount = tasks.filter(function (task) {
                 return task.state === "QUEUED" || task.state === "RUNNING" || task.state === "PARTIAL";
-            }).length);
+            }).length;
+            const taskIndicator = document.querySelector(".task-indicator");
+            document.getElementById("workspaceTaskCount").textContent = String(activeTaskCount);
+            if (taskIndicator) taskIndicator.hidden = activeTaskCount === 0;
             if (!target) return;
             if (!tasks.length) {
                 empty(target, "暂无任务", "扫描、分析和重新校验任务会显示在这里。");
@@ -294,6 +284,8 @@
         } catch (_) {
             if (target) empty(target, "任务当前不可查看", "系统没有返回可信任务状态。");
             latestTasks = [];
+            const taskIndicator = document.querySelector(".task-indicator");
+            if (taskIndicator) taskIndicator.hidden = true;
             updatePoolScanCta();
             return [];
         }
@@ -542,33 +534,40 @@
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].includes(monitor.dataState);
     }
 
+    function monitorUnavailableText(monitor) {
+        return {
+            PENDING: "等待监控数据",
+            PENDING_VERIFICATION: "等待监控数据",
+            STALE: "监控数据已过期",
+            INVALID: "当前不可查看",
+            SOURCE_UNAVAILABLE: "监控来源不可用"
+        }[String(monitor?.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase()] || "等待监控数据";
+    }
+
     function renderPosition(userPosition, monitor) {
         const trusted = trustedMonitor(monitor);
         const positionId = userPosition.id || monitor?.positionId;
         const symbol = userPosition.assetSymbol || monitor?.symbol;
         const direction = userPosition.side || monitor?.direction;
-        const facts = [
-            ["开仓价", formatNumber(userPosition.entryPrice)],
-            ["标记价格", trusted ? formatNumber(monitor.markPrice) : "当前不可查看"],
-            ["盈亏", trusted ? formatPercent(monitor.pnlPercent) : "当前不可查看"],
-            ["开仓时间", formatTime(userPosition.openedAt)]
-        ];
+        const facts = [["开仓价", formatNumber(userPosition.entryPrice)], ["开仓时间", formatTime(userPosition.openedAt)]];
+        if (trusted) facts.splice(1, 0, ["标记价格", formatNumber(monitor.markPrice)], ["盈亏", formatPercent(monitor.pnlPercent)]);
         const judgment = trusted ? [
             ["入场逻辑状态", text(monitor.entryLogicStatusLabel, label(monitor.entryLogicStatus))],
             ["反转状态", text(monitor.reversalStatusLabel, label(monitor.reversalStatus))],
             ["持仓风险", text(monitor.riskLevelLabel, label(monitor.riskLevel))],
             ["风险趋势", label(monitor.riskTrend)]
-        ] : [["监控状态", label(monitor?.monitorTrustState, "等待监控数据")]];
+        ] : [];
         const conclusion = trusted ? [
             ["监控结论", text(monitor.monitorConclusionLabel, label(monitor.monitorConclusion))],
             ["建议动作", text(monitor.suggestedManualActionText, label(monitor.suggestedAction))]
-        ] : [["判断与建议", "等待可信监控数据"]];
-        return '<article class="position-card position-row" data-position-id="' + escapeHtml(positionId) + '">'
+        ] : [];
+        const monitoring = trusted
+            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + '<a class="text-action" href="/positions/' + encodeURIComponent(positionId) + '">查看详情</a></section>'
+            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong></section>';
+        return '<article class="position-card position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" data-position-id="' + escapeHtml(positionId) + '">'
             + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
             + '<section class="position-facts">' + factGrid(facts) + '</section>'
-            + '<section class="position-judgement">' + factGrid(judgment) + '</section>'
-            + '<section class="position-conclusion">' + factGrid(conclusion) + '<a class="text-action" href="/positions/' + encodeURIComponent(positionId) + '">查看详情</a></section>'
-            + "</article>";
+            + monitoring + "</article>";
     }
 
     let positionRows = [];
@@ -1024,21 +1023,32 @@
     }
 
     async function loadPlan() {
-        if (!resourceId) return;
+        const revalidation = document.getElementById("requestPlanRevalidation");
+        const actualPositionAction = document.getElementById("planActualPositionAction");
+        if (actualPositionAction) actualPositionAction.remove();
+        if (revalidation) { revalidation.hidden = true; revalidation.disabled = true; }
+        if (!resourceId) {
+            empty(document.getElementById("finalPlanDetail"), "最终计划当前不可查看", "缺少有效 Final 标识。");
+            return;
+        }
         try {
             const plan = await api("/api/workspace/plans/" + encodeURIComponent(resourceId));
+            const lifecycle = String(plan.planLifecycleState || "").toUpperCase();
             document.getElementById("planMode").textContent = label(plan.finalPlanMode || plan.planMode);
-            document.getElementById("planLifecycle").textContent = label(plan.planLifecycleState);
+            document.getElementById("planLifecycle").textContent = label(lifecycle);
             document.getElementById("planSummary").innerHTML = factGrid([["推荐动作", text(plan.recommendedAction)], ["最终方向", label(plan.finalMarketBias)], ["计划版本", text(plan.planVersion)], ["有效期", formatTime(plan.validUntil)]]);
             document.getElementById("planEntry").innerHTML = factGrid([["入场区", text(plan.entryZone)], ["触发条件", text(plan.triggerCondition)], ["触发周期", text(plan.triggerTimeframe)]]);
             document.getElementById("planInvalidation").innerHTML = factGrid([["失效条件", text(plan.invalidCondition)], ["止损逻辑", text(plan.stopLogic)], ["止损", text(plan.stopLoss)]]);
             document.getElementById("planTargets").innerHTML = factGrid([["止盈规则", text(plan.takeProfitRules)], ["目标逻辑", text(plan.targetLogic)], ["持有周期", text(plan.holdingHorizon)]]);
             document.getElementById("planRisk").innerHTML = factGrid([["杠杆建议", text(plan.leverageSuggestion)], ["仓位建议", text(plan.positionSuggestion)], ["风险解释", text(plan.riskExplanation)], ["重新校验规则", text(plan.revalidationRule)]]);
             document.getElementById("planDrawerContent").innerHTML = document.getElementById("finalPlanDetail").innerHTML;
-            const canOpen = ["CONFIRMATION", "REDUCED"].includes(plan.finalPlanMode || plan.planMode) && plan.planLifecycleState === "CURRENT";
+            const canRevalidate = ["CURRENT", "NEEDS_REVALIDATION"].includes(lifecycle);
+            if (revalidation) { revalidation.hidden = !canRevalidate; revalidation.disabled = !canRevalidate; revalidation.dataset.lifecycle = lifecycle; }
+            const canOpen = ["CONFIRMATION", "REDUCED"].includes(plan.finalPlanMode || plan.planMode) && lifecycle === "CURRENT";
             if (canOpen) {
                 const actions = document.querySelector(".workspace-page .section-header");
                 const button = document.createElement("button");
+                button.id = "planActualPositionAction";
                 button.type = "button";
                 button.className = "button button-secondary";
                 button.dataset.openOverlay = "actual-position";
@@ -1048,11 +1058,15 @@
             }
         } catch (_) {
             empty(document.getElementById("finalPlanDetail"), "最终计划当前不可查看", "仅允许展示通过规则校验的 Final，不使用 Candidate 替代。");
+            document.getElementById("planMode").textContent = "当前不可查看";
+            document.getElementById("planLifecycle").textContent = "当前不可查看";
+            if (revalidation) { revalidation.hidden = true; revalidation.disabled = true; revalidation.removeAttribute("data-lifecycle"); }
         }
     }
 
     function bindPlan() {
         document.getElementById("requestPlanRevalidation")?.addEventListener("click", async function (event) {
+            if (event.currentTarget.hidden || !["CURRENT", "NEEDS_REVALIDATION"].includes(event.currentTarget.dataset.lifecycle || "")) return;
             event.currentTarget.disabled = true;
             try {
                 await api("/api/workspace/plan-revalidations", { method: "POST", body: JSON.stringify({ planId: resourceId, triggerType: "MANUAL_REVALIDATION", reason: "USER_REQUESTED" }) });
@@ -1127,7 +1141,7 @@
                 form.elements.riskPreference.value = config.riskPreference || "BALANCED";
                 form.elements.defaultPoolMode.value = config.defaultPoolMode || "SYSTEM_DEFAULT";
                 form.dataset.initialSettings = JSON.stringify(formJson(form));
-                document.getElementById("saveSettings").disabled = true;
+                syncSettingsSaveState(form, document.getElementById("saveSettings"));
             }
         } catch (_) { announce("设置当前不可查看"); }
         try {
@@ -1136,11 +1150,19 @@
         } catch (_) { empty(document.getElementById("providerStatus"), "数据源状态当前不可查看", "不会强制显示就绪。"); }
     }
 
+    function syncSettingsSaveState(form, save) {
+        if (!form || !save) return;
+        const dirty = JSON.stringify(formJson(form)) !== form.dataset.initialSettings;
+        save.disabled = !dirty;
+        save.hidden = !dirty;
+        save.classList.toggle("is-dirty", dirty);
+    }
+
     function bindSettings() {
         const form = document.getElementById("riskPreferenceForm");
         const save = document.getElementById("saveSettings");
         form?.addEventListener("change", function () {
-            save.disabled = JSON.stringify(formJson(form)) === form.dataset.initialSettings;
+            syncSettingsSaveState(form, save);
         });
         save?.addEventListener("click", async function () {
             const form = document.getElementById("riskPreferenceForm");
@@ -1148,10 +1170,11 @@
             try {
                 await api("/api/user-config", { method: "PUT", body: JSON.stringify(formJson(form)) });
                 form.dataset.initialSettings = JSON.stringify(formJson(form));
+                syncSettingsSaveState(form, save);
                 announce("设置已保存");
             } catch (error) {
                 announce(error.message);
-                save.disabled = JSON.stringify(formJson(form)) === form.dataset.initialSettings;
+                syncSettingsSaveState(form, save);
             }
         });
         loadSettings();
@@ -1160,7 +1183,6 @@
     function initialize() {
         bindOverlays();
         bindPositionForms();
-        loadWorkspaceStatus();
         loadTasks();
         if (pageKey === "asset-pool") bindAssetPool();
         if (pageKey === "positions") loadPositions();

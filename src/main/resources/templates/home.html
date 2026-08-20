@@ -11,17 +11,15 @@
 </head>
 <body class="approved-home" data-page-key="home" data-figma-node="636:708">
 <aside class="home-rail" aria-label="主要导航" data-component-family="SideNav">
-    <a class="rail-brand" href="/dashboard" aria-label="Fundamental AI 首页" title="Fundamental AI">F</a>
+    <a class="rail-brand" href="/dashboard" aria-label="Fundamental AI 首页"><span class="rail-brand-mark">F</span><span class="rail-label"><strong>Fundamental AI</strong><small>Decision Workspace</small></span></a>
     <nav class="rail-nav" aria-label="产品页面">
-        <a class="is-active" href="/dashboard" aria-label="首页" title="首页"><span aria-hidden="true">⌂</span></a>
-        <a href="/positions" aria-label="持仓" title="持仓"><span aria-hidden="true">▦</span></a>
-        <a href="/analysis" aria-label="AI分析" title="AI分析"><span aria-hidden="true">✦</span></a>
-        <a href="/messages" aria-label="消息" title="消息"><span aria-hidden="true">▤</span></a>
-        <a href="/me" aria-label="我的" title="我的"><span aria-hidden="true">○</span></a>
+        <a class="is-active" href="/dashboard" aria-label="首页"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="rail-label">首页</span></a>
+        <a href="/positions" aria-label="持仓"><svg aria-hidden="true"><use href="/icons/app-shell.svg#positions"/></svg><span class="rail-label">持仓</span></a>
+        <a href="/analysis" aria-label="AI分析"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="rail-label">AI分析</span></a>
+        <a href="/messages" aria-label="消息"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="rail-label">消息</span></a>
+        <a href="/me" aria-label="我的"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="rail-label">我的</span></a>
     </nav>
-    <form class="rail-logout" th:action="@{/logout}" method="post">
-        <button type="submit" aria-label="退出登录" title="退出登录"><span aria-hidden="true">↪</span></button>
-    </form>
+    <div class="rail-footer"><a href="/asset-pool"><svg aria-hidden="true"><use href="/icons/app-shell.svg#pool"/></svg><span class="rail-label">资产池</span></a><a href="/calendar"><svg aria-hidden="true"><use href="/icons/app-shell.svg#calendar"/></svg><span class="rail-label">事件日历</span></a><a href="#systemStatusStrip"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></a><form th:action="@{/logout}" method="post"><button type="submit" aria-label="退出登录"><svg aria-hidden="true"><use href="/icons/app-shell.svg#logout"/></svg><span class="rail-label">退出登录</span></button></form></div>
 </aside>
 <div class="home-stage">
     <header class="home-page-header" data-component-family="PageHeader">
@@ -30,7 +28,7 @@
     </header>
     <main class="home-main" id="homeMain" tabindex="-1">
         <div class="sr-only" id="homeLiveRegion" aria-live="polite"></div>
-        <section class="system-status-strip" aria-label="系统状态" data-component-family="SystemStatusBar">
+        <section class="system-status-strip" id="systemStatusStrip" aria-label="系统状态" data-component-family="SystemStatusBar">
             <span><small>环境</small><strong id="statusEnvironment">等待同步</strong></span>
             <span><small>系统</small><strong id="statusSystem">等待同步</strong></span>
             <span><small>数据</small><strong id="statusData">等待同步</strong></span>
@@ -47,7 +45,7 @@
             <header class="section-heading opportunity-heading">
                 <h2 id="opportunityHeading">机会资产 · 0</h2>
                 <div class="asset-search" data-component-family="AssetSearch">
-                    <label class="sr-only" for="homeAssetSearch">搜索资产</label><span aria-hidden="true">⌕</span>
+                    <label class="sr-only" for="homeAssetSearch">搜索资产</label><svg aria-hidden="true"><use href="/icons/app-shell.svg#search"/></svg>
                     <input id="homeAssetSearch" type="search" autocomplete="off" placeholder="搜索资产" aria-controls="homeAssetSearchPopover" aria-expanded="false" aria-autocomplete="list">
                     <div class="asset-search-popover" id="homeAssetSearchPopover" data-overlay-code="O02" hidden>
                         <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" aria-label="市场资产搜索结果"></div>

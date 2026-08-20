@@ -15,6 +15,8 @@ class GlobalFrozenUiAlignmentContractTest {
     private static final Path HOME_JS = Path.of("src/main/resources/static/js/home-runtime.js");
     private static final Path WORKSPACE = Path.of("src/main/resources/templates/workspace.html");
     private static final Path WORKSPACE_CSS = Path.of("src/main/resources/static/css/workspace.css");
+    private static final Path OWNER_BROWSER_QA = Path.of(
+            "docs/evidence/global_ui_alignment/owner_blocker_closure/browser-qa.json");
     private static final Path WORKSPACE_JS = Path.of("src/main/resources/static/js/workspace.js");
 
     @Test
@@ -104,8 +106,78 @@ class GlobalFrozenUiAlignmentContractTest {
         assertOrdered(html, "消息中心", "messageUnreadCount", "OPPORTUNITY_PLAN", "POSITION_RISK", "SYSTEM", "messageList");
         assertOrdered(html, "settings-anchors", "risk-preference", "asset-pool-sources");
         assertThat(html + script).contains("开始预览", "positionRows", "renderPositionRows", "data-message-group")
-                .doesNotContain("Telegram", "telegram", "data-retry-telegram", "ChannelDeliveryStatus", "O10",
+                .doesNotContain("SystemStatusBar", "workspace-system-status", "workspaceDataStatus", "workspaceAiStatus",
+                        "Telegram", "telegram", "data-retry-telegram", "ChannelDeliveryStatus", "O10",
                         "async function loadTasks() {\n    async function loadTasks() {");
+    }
+
+    @Test
+    void ownerVisualBlockersHaveExplicitFailClosedDomContracts() throws Exception {
+        String home = Files.readString(HOME);
+        String homeScript = Files.readString(HOME_JS);
+        String homeCss = Files.readString(HOME_CSS);
+        String workspace = Files.readString(WORKSPACE);
+        String workspaceScript = Files.readString(WORKSPACE_JS);
+        String workspaceCss = Files.readString(WORKSPACE_CSS);
+
+        assertThat(homeScript).contains(
+                "<small>最终偏向</small>", "<small>计划模式</small>",
+                "PENDING: \"等待监控数据\"", "STALE: \"监控数据已过期\"",
+                "INVALID: \"当前不可查看\"", "SOURCE_UNAVAILABLE: \"监控来源不可用\"",
+                "position-trust-state", "is-untrusted")
+                .doesNotContain("Final Market Bias", "Final Plan Mode", "等待触发后进入人工确认");
+        assertThat(homeCss).contains(
+                ".opportunity-final b { min-width: 0; white-space: nowrap;",
+                ".system-status-strip strong { min-width: 0;",
+                ".position-trust-state { grid-column: 3 / 5;")
+                .doesNotContain(".opportunity-final b { overflow: hidden", ".system-status-strip strong { overflow: hidden");
+        assertThat(workspace).contains(
+                "暂无需要处理的高价值消息",
+                "新的机会升级、计划安全变化、持仓重大风险和系统异常会显示在这里",
+                "id=\"saveSettings\" hidden disabled>保存更改",
+                "id=\"requestPlanRevalidation\" hidden disabled")
+                .doesNotContain("workspace-system-status", "Telegram", "通知设置");
+        assertThat(workspaceScript).contains(
+                "position-untrusted-state", "monitorUnavailableText",
+                "taskIndicator.hidden = activeTaskCount === 0",
+                "save.hidden = !dirty", "save.classList.toggle(\"is-dirty\", dirty)",
+                "[\"CURRENT\", \"NEEDS_REVALIDATION\"].includes(lifecycle)",
+                "仅允许展示通过规则校验的 Final，不使用 Candidate 替代")
+                .doesNotContain("loadWorkspaceStatus()");
+        assertThat(workspaceCss).contains(
+                "background: #111827", "width: 216px", ".empty-state .button { align-self: flex-start; width: auto; }");
+        assertThat(home + workspace).contains("/icons/app-shell.svg#home", "/icons/app-shell.svg#logout")
+                .doesNotContain("⌂", "▦", "✦", "▤", "↪");
+    }
+
+    @Test
+    void ownerBrowserEvidenceLocksRuntimeVisibilityAndLifecycleGates() throws Exception {
+        String qa = Files.readString(OWNER_BROWSER_QA);
+
+        assertThat(qa).contains(
+                "\"browserStatus\": \"PASS\"",
+                "\"criticalTextClipping\": 0",
+                "\"accountSummaryFits\": true",
+                "\"accountSummaryTextOverflow\": \"clip\"",
+                "\"stateText\": \"等待监控数据\"",
+                "\"stateText\": \"监控数据已过期\"",
+                "\"stateText\": \"当前不可查看\"",
+                "\"stateText\": \"监控来源不可用\"",
+                "\"markPriceVisible\": false",
+                "\"pnlVisible\": false",
+                "\"systemStatusBarCount\": 0",
+                "\"inactiveTaskIndicatorHidden\": true",
+                "\"collapsedRailVisibleLabelCount\": 0",
+                "\"candidateUsedAsFinal\": false",
+                "\"oldCopyCount\": 0",
+                "\"consoleErrors\": 0",
+                "\"textClippingCount\": 0");
+        assertThat(qa).contains(
+                "\"clean\": {\"hidden\": true, \"disabled\": true, \"dirtyClass\": false}",
+                "\"dirty\": {\"hidden\": false, \"disabled\": false, \"dirtyClass\": true",
+                "\"CURRENT\": {\"revalidationHidden\": false, \"revalidationDisabled\": false",
+                "\"NEEDS_REVALIDATION\": {\"revalidationHidden\": false, \"revalidationDisabled\": false",
+                "\"UNAVAILABLE\": {\"revalidationHidden\": true, \"revalidationDisabled\": true");
     }
 
     private static void assertOrdered(String source, String... markers) {

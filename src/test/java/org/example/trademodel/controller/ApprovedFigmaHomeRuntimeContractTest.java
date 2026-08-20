@@ -152,11 +152,13 @@ class ApprovedFigmaHomeRuntimeContractTest {
         assertThat(html).contains(
                 "aria-label=\"持仓视图\"", "活动持仓", "href=\"/reviews\"",
                 "data-review-filter=\"all\"", "data-review-filter=\"position\"", "data-review-filter=\"opportunity\"",
-                "id=\"saveSettings\" disabled");
+                "id=\"saveSettings\" hidden disabled");
         assertThat(script).contains(
                 "function bindReviews()", "data-review-kind", "aria-selected",
                 "role=\"button\"", "event.key === \"Enter\"", "event.key === \" \"",
                 "form?.addEventListener(\"change\"", "initialSettings",
-                "JSON.stringify(formJson(form)) === form.dataset.initialSettings");
+                "const dirty = JSON.stringify(formJson(form)) !== form.dataset.initialSettings",
+                "save.hidden = !dirty",
+                "save.classList.toggle(\"is-dirty\", dirty)");
     }
 }

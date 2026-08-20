@@ -70,7 +70,7 @@ public class DesktopWorkspaceController {
 
     @GetMapping("/me")
     public String me(Model model) {
-        return page(model, "me", "我的", "管理风险偏好、通知与数据源状态", "me", null);
+        return page(model, "me", "我的", "管理风险偏好、资产池与数据源状态", "me", null);
     }
 
     private String page(Model model, String pageKey, String title, String subtitle,

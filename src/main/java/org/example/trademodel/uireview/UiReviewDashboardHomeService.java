@@ -307,7 +307,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         plan.setDirection("LONG");
         plan.setFinalPlanMode("PREPARATION");
         plan.setWorthOpening(true);
-        plan.setRecommendedAction("等待触发后人工确认");
+        plan.setRecommendedAction("等待触发；触发后重新校验，通过后再进入人工确认");
         plan.setEntryZone("62,800–63,200");
         plan.setTriggerCondition("15m 放量站稳 63,200");
         plan.setStopZone("61,500 下方失效");
@@ -361,7 +361,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         consistency.setConflictLevel("LEVEL_2_MINOR_DISAGREEMENT");
         consistency.setFinalMarketBias("WEAK_BULLISH");
         consistency.setFinalPlanMode("PREPARATION");
-        consistency.setMainReason("方向一致，入场确认条件仍需满足");
+        consistency.setMainReason("Gemini 对 BTCUSDT 15m 触发证据完整性存在分歧，当前仍未满足连续站稳条件");
         consistency.setRecoveryCondition("15m 触发成立且数据质量保持稳定");
         decision.setConsistency(consistency);
         return decision;
@@ -413,7 +413,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
     private AiRoleResultsPayload.CandidateSummary candidate() {
         return new AiRoleResultsPayload.CandidateSummary(
                 "PREPARATION", "84%", "MEDIUM", true, "趋势回踩",
-                "等待触发后人工确认", "回踩企稳后确认", "62,800–63,200", "结构区间", "回踩支撑",
+                "等待触发；触发后重新校验，通过后再进入人工确认", "回踩企稳后确认", "62,800–63,200", "结构区间", "回踩支撑",
                 "15m 放量站稳 63,200", "结构止损", "61,500 下方", "4h 支撑", "结构失效",
                 "分批止盈", "65,800 / 68,200", "阻力区间", "前高压力",
                 "触发确认后评估", "风险升高时降低仓位", "4h 跌破 61,500",
@@ -421,7 +421,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
                 "4h 收盘跌破 61,500", "规则边界", "方向基础失效",
                 new BigDecimal("2.2"), "计划边界", "目标与止损区间计算",
                 "24 小时", "15m", "1–3 天", "数据或结构变化后重新校验",
-                "弱偏多 Candidate，等待触发后进入人工确认");
+                "弱偏多 Candidate，等待触发；触发后重新校验，通过后再进入人工确认");
     }
 
     private AiRoleResultsPayload.EvidencePayload evidence(String id, String type, String value,

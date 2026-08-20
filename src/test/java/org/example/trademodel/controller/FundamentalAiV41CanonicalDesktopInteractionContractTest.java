@@ -69,12 +69,12 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
     }
 
     @Test
-    void allFiftyFourCanonicalComponentFamiliesAreRepresentedWithoutDetachedMarkup() throws Exception {
+    void canonicalComponentFamiliesAreRepresentedWithoutDetachedMarkupOrCopiedHomeStatus() throws Exception {
         String html = Files.readString(WORKSPACE);
         Set<String> families = captures(html, "data-component-family=\"([^\"]+)\"");
 
-        assertThat(families).hasSize(53).contains(
-                "AppShell", "SideNav", "PageHeader", "SystemStatusBar", "StateBadge",
+        assertThat(families).hasSize(52).contains(
+                "AppShell", "SideNav", "PageHeader", "StateBadge",
                 "EmptyState", "AsyncTaskIndicator", "Drawer", "Modal", "AuditMetaDisclosure",
                 "AssetSearch", "SearchResultItem", "AssetPoolToolbar", "AssetPoolTable",
                 "PoolScanStatus", "OpportunityGrid", "OpportunityCard", "MultiTimeframeSummary",
@@ -88,7 +88,8 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "OriginalSnapshotCard", "RecheckResultHero",
                 "RecheckActionBar", "EventCalendar", "EventWindowBadge", "FocusedDetailShell",
                 "RiskPreferenceForm", "ProviderStatusPanel", "AuditChainStepper");
-        assertThat(html).doesNotContain("ChannelDeliveryStatus", "TelegramBindingPanel");
+        assertThat(html).doesNotContain("SystemStatusBar", "workspace-system-status",
+                "ChannelDeliveryStatus", "TelegramBindingPanel");
         assertThat(html).doesNotContain("data-detached-instance=\"true\"");
     }
 

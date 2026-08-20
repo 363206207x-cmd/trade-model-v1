@@ -205,7 +205,8 @@
         setText("statusSystem", statusValue(state.riskLevel));
         setText("statusData", statusValue(state.dataQuality));
         setText("statusService", text(home.header && home.header.aiStatusLabel, label(home.header && home.header.aiStatus, "等待同步")));
-        setText("statusAccount", positions.length ? highestRisk(positions) + " / " + positions.length + " 笔 · " + coverage : "— / 无已录入持仓");
+        var compactCoverage = coverage === "覆盖部分" ? "部分覆盖" : coverage;
+        setText("statusAccount", positions.length ? highestRisk(positions) + "·" + positions.length + "笔·" + compactCoverage : "— / 无已录入持仓");
         setText("statusReset", statusValue(state.hotReset, "正常"));
     }
 
@@ -262,8 +263,8 @@
             + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
             + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
             + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-final"><span><small>Final Market Bias</small><b>' + escapeHtml(finalBias)
-            + "</b></span><span><small>Final Plan Mode</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
+            + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
+            + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
     }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
@@ -310,7 +311,14 @@
         return trusted.length ? text(trusted[0].riskLevelLabel, label(trusted[0].riskLevel, "暂无评估")) : "暂无评估";
     }
     function trustStateText(position) {
-        return label(position && position.monitorTrustState, "来源不可用");
+        var state = String(position && position.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase();
+        return {
+            PENDING: "等待监控数据",
+            PENDING_VERIFICATION: "等待监控数据",
+            STALE: "监控数据已过期",
+            INVALID: "当前不可查看",
+            SOURCE_UNAVAILABLE: "监控来源不可用"
+        }[state] || "等待监控数据";
     }
     function positionFact(labelText, value, raw, align) {
         return '<span class="position-fact ' + (align || "") + '"><small>' + escapeHtml(labelText) + "</small><b>"
@@ -319,27 +327,33 @@
     function positionRow(position) {
         var trusted = trustedMonitor(position);
         var unavailable = trustStateText(position);
-        var risk = trusted ? text(position.riskLevelLabel, label(position.riskLevel)) : unavailable;
-        var logic = trusted ? text(position.entryLogicStatusLabel, label(position.entryLogicStatus)) : unavailable;
-        var reversal = trusted ? text(position.reversalStatusLabel, label(position.reversalStatus)) : unavailable;
-        var trend = trusted ? label(position.riskTrend) : unavailable;
-        var conclusion = trusted ? text(position.monitorConclusionLabel, label(position.monitorConclusion)) : unavailable;
-        var action = trusted ? text(position.suggestedManualActionText, label(position.suggestedAction)) : unavailable;
+        var risk = text(position.riskLevelLabel, label(position.riskLevel));
+        var logic = text(position.entryLogicStatusLabel, label(position.entryLogicStatus));
+        var reversal = text(position.reversalStatusLabel, label(position.reversalStatus));
+        var trend = label(position.riskTrend);
+        var conclusion = text(position.monitorConclusionLabel, label(position.monitorConclusion));
+        var action = text(position.suggestedManualActionText, label(position.suggestedAction));
         var source = label(position.sourceType, "来源不可用");
-        return '<article class="position-row" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + conclusion) + '">'
+        var openingFacts = '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
+            + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric");
+        if (trusted) {
+            openingFacts += positionFact("标记价格", number(position.markPrice), "STABLE", "numeric")
+                + positionFact("盈亏", percent(position.pnlPercent), Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID", "numeric");
+        }
+        openingFacts += "</div>";
+        var monitorColumns = trusted
+            ? '<div class="position-judgment">' + positionFact("入场逻辑", logic, position.entryLogicStatus, "center")
+                + positionFact("反转状态", reversal, position.reversalStatus, "center")
+                + positionFact("持仓风险", risk, position.riskLevel, "center")
+                + positionFact("风险趋势", trend, position.riskTrend, "center") + "</div>"
+                + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, position.monitorConclusion, "narrative")
+                + positionFact("建议动作", action, position.suggestedAction, "narrative")
+                + '<a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">查看详情</a></div>'
+            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong></div>';
+        return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + (trusted ? conclusion : unavailable)) + '">'
             + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
             + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
-            + '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
-            + positionFact("标记价格", trusted ? number(position.markPrice) : unavailable, trusted ? "STABLE" : position.monitorTrustState, "numeric")
-            + positionFact("盈亏", trusted ? percent(position.pnlPercent) : unavailable, trusted ? (Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID") : position.monitorTrustState, "numeric")
-            + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric") + "</div>"
-            + '<div class="position-judgment">' + positionFact("入场逻辑", logic, trusted ? position.entryLogicStatus : position.monitorTrustState, "center")
-            + positionFact("反转状态", reversal, trusted ? position.reversalStatus : position.monitorTrustState, "center")
-            + positionFact("持仓风险", risk, trusted ? position.riskLevel : position.monitorTrustState, "center")
-            + positionFact("风险趋势", trend, trusted ? position.riskTrend : position.monitorTrustState, "center") + "</div>"
-            + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, trusted ? position.monitorConclusion : position.monitorTrustState, "narrative")
-            + positionFact("建议动作", action, trusted ? position.suggestedAction : position.monitorTrustState, "narrative")
-            + '<a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">查看详情</a></div></article>';
+            + openingFacts + monitorColumns + "</article>";
     }
     function renderPositions(home) {
         var positions = (Array.isArray(home.positions) ? home.positions : []).filter(validPosition);

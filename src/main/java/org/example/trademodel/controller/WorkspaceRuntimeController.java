@@ -19,6 +19,8 @@ import org.example.trademodel.service.ChannelDeliveryService;
 import org.example.trademodel.service.EventAssetRelationService;
 import org.example.trademodel.service.MessageFactService;
 import org.example.trademodel.service.PlanRevalidationService;
+import org.example.trademodel.uireview.UiReviewWorkspacePlanFixture;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,7 @@ public class WorkspaceRuntimeController {
     private final MessageMapper messageMapper;
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
+    private UiReviewWorkspacePlanFixture uiReviewPlanFixture;
 
     public WorkspaceRuntimeController(AuthenticatedUserIdResolver userIdResolver,
                                       ExecutionPlanMapper executionPlanMapper,
@@ -75,10 +78,18 @@ public class WorkspaceRuntimeController {
         this.pushRecheckLogMapper = pushRecheckLogMapper;
     }
 
+    @Autowired(required = false)
+    void setUiReviewPlanFixture(UiReviewWorkspacePlanFixture uiReviewPlanFixture) {
+        this.uiReviewPlanFixture = uiReviewPlanFixture;
+    }
+
     @GetMapping("/plans/{planId}")
     public ResponseEntity<ApiResponse<ExecutionPlanDO>> finalPlan(@PathVariable String planId) {
         userIdResolver.requireCurrentUserId();
-        ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(planId);
+        ExecutionPlanDO plan = uiReviewPlanFixture == null ? null : uiReviewPlanFixture.find(planId);
+        if (plan == null) {
+            plan = executionPlanMapper.selectByPlanId(planId);
+        }
         if (!isValidatedFinal(plan)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.notFound("validated final plan not found"));

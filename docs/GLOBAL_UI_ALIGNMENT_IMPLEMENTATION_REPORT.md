@@ -3,71 +3,72 @@
 Date: 2026-08-21
 Branch: `codex/frontend-interaction-runtime-closure`
 PR: `#1195` (Draft, unmerged)
-Audited baseline: `97697e84caf5da2279233530912319b6561e9c2e`
+Owner-fix baseline: `af58dc7e7ae6c33f87daf78986fbfafc538a8340`
 
 ## Capability Movement
 
-- Replaced stale Desktop UI contracts with the 2026-08-20 frozen semantics.
-- Removed the duplicate workspace Home implementation; `/dashboard` is the only Home runtime.
-- Unified Home and task-page shell metrics and visual tokens.
-- Completed source-owned Top6, Position, Final Plan, and Three-AI bindings.
-- Closed current-UI Telegram presentation without changing dormant backend capability.
-- Reorganized Positions, Analysis, Messages, Me, and Final Plan detail around the frozen IA.
+- Closed the Owner-review readability, fail-closed Position, lifecycle-copy,
+  AppShell, Messages/Me, and Final Detail blockers.
+- Added only `ui-review` Final lifecycle fixtures for CURRENT and
+  NEEDS_REVALIDATION visual evidence; production plan lookup remains unchanged.
+- Added a shared local SVG icon sprite and removed text/pseudo icons from the
+  production rails.
+- Added runtime DOM assertions and 16 browser screenshots at the required states.
 
-No Figma, mobile, schema, authentication, session, or automatic-trading capability changed.
+No Figma, mobile, schema, authentication, Telegram backend, data-quality
+threshold, provider, business-rule, or automatic-trading capability changed.
 
-## Contract Results
+## Product Results
 
 | Gate | Result |
 |---|---|
-| Product Source Gate | PASS |
-| Workflow Contract | PASS |
-| Exact six Home status scopes | PASS |
-| Legacy Home runtime count | 0 |
-| Current UI `60:40` residue | 0 |
-| Current UI Telegram copy | 0 |
-| Top6 ineligible rendered states | 0 |
-| Position duplicate semantic fallback | 0 |
-| Login/security files changed | 0 |
-| Schema files changed | 0 |
-| Normal-mode fixture leakage | 0 |
-| Browser console errors/warnings | 0 |
-
-The authorization-registration validator intentionally rejects application diffs;
-it is a docs-only authorization-closure check, not the implementation-package test.
-The merged authorization and Product Source Gate remain effective for this same
-authorized package.
+| OpportunityCard readability | PASS |
+| Position trusted four-column hierarchy | PASS |
+| Position nontrusted field isolation | PASS |
+| Waiting-trigger lifecycle semantics | PASS |
+| Shared 64px AppShell | PASS |
+| Task-page copied SystemStatusBar count | 0 |
+| Messages empty-state contract | PASS |
+| Settings clean/dirty contract | PASS |
+| Final lifecycle revalidation gate | PASS |
+| Candidate used as Final Detail | 0 |
+| Browser console errors | 0 |
+| Text clipping | 0 |
 
 ## Verification
 
-- Focused contract suite: PASS.
-- Full Maven suite: 4,713 tests, 0 failures, 0 errors, 14 skipped.
-- JavaScript syntax parse: PASS for `home-runtime.js`, `workspace.js`, and
-  `frontend-contract.js`.
-- `./scripts/run-local.sh --ui-review`: PASS, `/dashboard` 200.
-- `./scripts/run-local.sh`: PASS, `/dashboard` 200.
-- Normal mode: zero Opportunity cards and Position rows in the isolated empty
-  database; no UI-review Final, PnL, or timestamp strings appeared.
+- Java 17 compile/package/local application startup: PASS.
+- Focused UI contract tests: PASS.
+- Full Maven Java 17 suite: 4,715 tests, 0 failures, 0 errors, 14 skipped.
+- Product Source Gate: PASS.
+- JavaScript syntax: PASS for `home-runtime.js` and `workspace.js`.
 - `git diff --check`: PASS.
-- Workflow self-test portability: replaced three `printf | grep -q` assertions
-  with here-strings after GitHub Actions exposed a Linux `pipefail` broken-pipe
-  false negative; validation semantics are unchanged.
+- Browser runtime: 1440/1280/1080 Home, five Position trust states,
+  Messages, Positions, Settings clean/dirty, GPT, CURRENT Final,
+  NEEDS_REVALIDATION, and unavailable Final: PASS.
+- Docker-backed Testcontainers tests were skipped by the existing test policy
+  because Docker was unavailable; Maven remained successful.
 
-Docker-backed Testcontainers checks were skipped by the existing test policy
-because Docker was unavailable locally; this did not produce a Maven failure.
+## Workflow Contract Status
+
+`bash scripts/check-workflow-contract.sh` reaches all workflow self-tests, then
+is blocked by `validate-frontend-interaction-runtime-closure-authorization.sh`.
+That validator intentionally rejects any `src/` diff because it validates the
+docs-only authorization-registration package, while PR #1195 is the already
+authorized implementation package. The same behavior existed before this Owner
+patch and was recorded in the prior report. This task does not modify or bypass
+authorization/workflow policy.
+
+WORKFLOW_CONTRACT: BLOCKED_BY_AUTHORIZATION_VALIDATOR_SCOPE
+GLOBAL_AUDIT_BLOCKERS: 1
 
 ## Visual Evidence
 
-Sixteen PNG files are stored in `docs/evidence/global_ui_alignment/` and indexed
-by `GLOBAL_UI_ALIGNMENT_VISUAL_ACCEPTANCE.md`. They cover:
+Evidence is indexed by `GLOBAL_UI_ALIGNMENT_VISUAL_ACCEPTANCE.md` and stored in
+`docs/evidence/global_ui_alignment/owner_blocker_closure/`.
 
-- Home at 1440, 1280, and below 1120 main-content width;
-- full-page Home;
-- Pending, Stale, Invalid, and Source Unavailable position trust states;
-- GPT, Gemini, and Grok role states with Conflict Summary;
-- Positions, Analysis, Messages, Me, and focused Final Plan detail.
+## Current Gate
 
-## Remaining Gate
-
-Owner visual review and PR merge are intentionally pending. This task does not
-mark PR #1195 Ready and does not merge it.
+All Owner visual and semantic findings are closed. PR #1195 remains Draft and
+must not merge. The workflow validator scope mismatch remains explicitly open
+for repository-owner disposition; it is not hidden as a visual PASS.
