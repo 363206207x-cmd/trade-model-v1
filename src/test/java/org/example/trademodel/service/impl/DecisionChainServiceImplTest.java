@@ -193,9 +193,9 @@ class DecisionChainServiceImplTest {
         assertThat(String.valueOf(input.get("evidence"))).doesNotContain("coinglass-open-interest-1");
         Map<?, ?> derivatives = (Map<?, ?>) input.get("derivativesContext");
         assertThat(derivatives.get("source")).isEqualTo("COINGLASS_V4");
-        assertThat((List<?>) derivatives.get("availableDatasets"))
+        assertThat(((List<?>) derivatives.get("availableDatasets")).stream().map(String::valueOf).toList())
                 .containsExactly("OPEN_INTEREST", "FUNDING", "LIQUIDATION", "LONG_SHORT_RATIO");
-        assertThat(((Map<?, ?>) derivatives.get("datasetReadings")).keySet())
+        assertThat(((Map<?, ?>) derivatives.get("datasetReadings")).keySet().stream().map(String::valueOf).toList())
                 .contains("openInterest", "funding", "liquidation", "longShortRatio");
         assertThat(String.valueOf(derivatives.get("derivedEvidence")))
                 .contains("coinglass-open-interest-1", "OPEN_INTEREST_PRICE_CONFIRMATION");
