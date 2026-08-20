@@ -87,22 +87,48 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
-    void homeAssetQuickSearchHasExplicitSelectionAndSeparateSourceDefinedActions() throws Exception {
+    void homeAssetQuickSearchLocksCompactCopyAndSelectionStateContract() throws Exception {
         String html = Files.readString(HOME);
         String script = Files.readString(SCRIPT);
 
         assertThat(html).contains(
                 "data-overlay-code=\"O02\"", "id=\"homeAssetSearchResults\"",
                 "id=\"homeAssetSearchSelection\"", "尚未选择资产",
-                "id=\"homePreviewAsset\"", "按需分析",
-                "id=\"homeAddAsset\"", "加入观察资产池");
+                "id=\"homePreviewAsset\" type=\"button\" disabled>分析</button>",
+                "id=\"homeAddAsset\" type=\"button\" disabled>添加</button>")
+                .doesNotContain("按需分析", "加入观察资产池", "已在观察资产池");
         assertThat(script).contains(
                 "selectedSearchAsset = null", "aria-selected", "ArrowDown", "ArrowUp", "Enter", "Escape",
                 "selectSearchResult", "loadAssetPoolMembership",
-                "已在观察资产池", "尚未加入观察资产池",
+                "previewButton.textContent = \"分析\"",
+                "addButton.textContent = inPool ? \"已添加\" : \"添加\"",
+                "previewButton.disabled = true", "addButton.disabled = true",
+                "previewButton.disabled = searchActionBusy",
+                "addButton.disabled = searchActionBusy || inPool",
+                "await loadAssetPoolMembership()",
                 "POST", "/api/asset-pool", "/analysis-preview?timeframe=5m",
                 "window.location.assign(\"/analysis/\"")
-                .doesNotContain("window.location.href = \"/analysis?asset=\"");
+                .doesNotContain(
+                        "按需分析", "加入观察资产池", "已在观察资产池",
+                        "window.location.href = \"/analysis?asset=\"");
+    }
+
+    @Test
+    void homeOpportunityProjectionRemainsIndependentFromPoolMembershipAndPreview() throws Exception {
+        String script = Files.readString(SCRIPT);
+
+        assertThat(script).contains(
+                "var assets = all.filter(validOpportunity).slice(0, 6)",
+                "setText(\"opportunityHeading\", \"机会资产 · \" + assets.length)",
+                "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
+                "has(asset && asset.analysisId)",
+                "has(asset && asset.opportunityScore)",
+                "await api(\"/api/asset-pool\", { method: \"POST\"",
+                "await api(\"/api/asset-pool/search/\"",
+                "window.location.assign(\"/analysis/\"")
+                .doesNotContain(
+                        "assetPoolSymbols.size", "assetPoolCount + assets.length",
+                        "selectedSearchAsset.opportunityScore", "selectedSearchAsset.opportunityId");
     }
 
     @Test

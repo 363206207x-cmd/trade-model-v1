@@ -473,19 +473,21 @@
         if (!selectedSearchAsset) {
             symbolNode.textContent = "尚未选择资产";
             stateNode.textContent = "请先从搜索结果中选择";
+            previewButton.textContent = "分析";
             previewButton.disabled = true;
             addButton.disabled = true;
-            addButton.textContent = "加入观察资产池";
+            addButton.textContent = "添加";
             return;
         }
         var symbol = symbolOf(selectedSearchAsset);
         var inPool = assetPoolSymbols.has(symbol);
         symbolNode.textContent = symbol;
         stateNode.textContent = text(selectedSearchAsset.baseAsset || selectedSearchAsset.name, symbol.replace(/USDT$/, ""))
-            + " · " + (inPool ? "已在观察资产池" : "尚未加入观察资产池");
+            + " · " + (inPool ? "已添加" : "未添加");
+        previewButton.textContent = "分析";
         previewButton.disabled = searchActionBusy;
         addButton.disabled = searchActionBusy || inPool;
-        addButton.textContent = inPool ? "已在观察资产池" : "加入观察资产池";
+        addButton.textContent = inPool ? "已添加" : "添加";
     }
     function setActiveSearchResult(index, focusResult) {
         var buttons = Array.from(document.querySelectorAll("#homeAssetSearchResults [data-search-index]"));
@@ -522,7 +524,7 @@
             return '<button class="search-result" type="button" role="option" aria-selected="false" data-search-index="' + index
                 + '" data-search-symbol="' + escapeHtml(symbol)
                 + '"><span><strong>' + escapeHtml(symbol) + "</strong><small>" + escapeHtml(text(asset.baseAsset || asset.name, "市场资产"))
-                + "</small></span><em>" + (inPool ? "已在观察资产池" : "未加入") + "</em></button>";
+                + "</small></span><em>" + (inPool ? "已添加" : "未添加") + "</em></button>";
         }).join("");
         if (!target.innerHTML) target.innerHTML = '<div class="search-result"><span><strong>未找到资产</strong><small>请尝试其他名称或交易对</small></span></div>';
         setSearchPopoverOpen(true);
@@ -575,7 +577,7 @@
         document.getElementById("homePreviewAsset").addEventListener("click", async function () {
             if (!selectedSearchAsset || searchActionBusy) return;
             searchActionBusy = true;
-            renderSearchSelection("正在创建按需分析…");
+            renderSearchSelection("正在分析…");
             try {
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
                 if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
@@ -589,14 +591,14 @@
         document.getElementById("homeAddAsset").addEventListener("click", async function () {
             if (!selectedSearchAsset || searchActionBusy || assetPoolSymbols.has(symbolOf(selectedSearchAsset))) return;
             searchActionBusy = true;
-            renderSearchSelection("正在加入观察资产池…");
+            renderSearchSelection("正在添加…");
             try {
                 await api("/api/asset-pool", { method: "POST", body: JSON.stringify({ symbol: symbolOf(selectedSearchAsset), focusEnabled: true }) });
                 await loadAssetPoolMembership();
                 searchActionBusy = false;
-                renderSearchSelection("已加入观察资产池，将进入正常持续分析流程");
+                renderSearchSelection("已添加");
                 renderSearchResults(searchResultItems);
-                announce(symbolOf(selectedSearchAsset) + " 已加入观察资产池");
+                announce(symbolOf(selectedSearchAsset) + " 已添加");
             } catch (error) {
                 searchActionBusy = false;
                 renderSearchSelection(error.message);
