@@ -63,6 +63,8 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setPositionMonitoringState("OPEN_MONITORING");
         home.setExecutionSuggestion(SELECTED_SYMBOL.equals(selectedSymbol) ? finalPlan() : noFinalPlan());
         home.setAiDecision(SELECTED_SYMBOL.equals(selectedSymbol) ? aiDecision() : unavailableAi());
+        home.setDerivatives(SELECTED_SYMBOL.equals(selectedSymbol)
+                ? derivatives() : new DashboardHomeVO.DerivativesSummaryVO());
         home.setDiagnostics(diagnostics());
         return home;
     }
@@ -393,26 +395,29 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
     private DashboardHomeVO.AiTabVO gpt() {
         DashboardHomeVO.AiTabVO tab = roleBase("GPT_FINAL", "GPT 综合判断", "GPT");
         tab.setCoreJudgment(new AiRoleResultsPayload.CoreJudgment(
-                "WEAK_BULLISH", "WAITING_TRIGGER", "多周期方向保持偏多，触发条件尚未完成"));
+                "WEAK_BULLISH", "WAITING_TRIGGER",
+                "结论：方向仍偏多，但衍生品拥挤限制追涨，先等待 15m 触发确认"));
         tab.setMultiTimeframeExplanation(new AiRoleResultsPayload.MultiTimeframeExplanation(
-                "偏多结构保持", "回踩后企稳", "等待放量确认", "短线动能修复"));
+                "中期结构仍偏多", "回踩后保持支撑", "尚未放量站稳", "短线动能修复但未确认"));
         tab.setBiasAdjustment(new AiRoleResultsPayload.BiasAdjustment(
-                "BULLISH", "WEAK_BULLISH", "反对证据限制方向强度"));
+                "BULLISH", "WEAK_BULLISH", "未平仓量支持方向，但资金费率和多头拥挤限制强度"));
         tab.setCandidateSummary(candidate());
         tab.setSupportingEvidence(List.of(
-                evidence("support-1", "趋势", "4h 结构抬高", "BULLISH", 0.86),
-                evidence("support-2", "成交", "15m 成交量回升", "BULLISH", 0.78)));
+                evidence("support-1", "价格结构", "4h 结构抬高，1h 回踩后仍守住支撑", "BULLISH", 86.0),
+                evidence("support-2", "未平仓量", "CoinGlass 未平仓量随价格增加，说明有新增仓位参与", "BULLISH", 82.0),
+                evidence("support-3", "清算", "CoinGlass 短时清算未出现异常激增", "NEUTRAL", 78.0)));
         tab.setSupportingEvidenceState("FOUND");
         tab.setOpposingEvidence(List.of(
-                evidence("oppose-1", "风险", "短周期动能尚未完全确认", "BEARISH", 0.64)));
+                evidence("oppose-1", "资金费率", "CoinGlass 资金费率偏高，多头持仓成本和挤压风险上升", "BEARISH", 76.0),
+                evidence("oppose-2", "多空拥挤", "CoinGlass 多空账户比显示多头偏拥挤，不能据此继续追涨", "BEARISH", 72.0)));
         tab.setOpposingEvidenceState("FOUND");
-        tab.setDecisionSummary("等待触发确认，维持预备型 Candidate");
+        tab.setDecisionSummary("先不追涨；15m 放量站稳后重新校验，当前只保留弱偏多候选");
         return tab;
     }
 
     private AiRoleResultsPayload.CandidateSummary candidate() {
         return new AiRoleResultsPayload.CandidateSummary(
-                "PREPARATION", "84%", "MEDIUM", true, "趋势回踩",
+                "PREPARATION", "MEDIUM", "MEDIUM", true, "TREND_CONTINUATION",
                 "等待触发；触发后重新校验，通过后再进入人工确认", "回踩企稳后确认", "62,800–63,200", "结构区间", "回踩支撑",
                 "15m 放量站稳 63,200", "结构止损", "61,500 下方", "4h 支撑", "结构失效",
                 "分批止盈", "65,800 / 68,200", "阻力区间", "前高压力",
@@ -421,7 +426,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
                 "4h 收盘跌破 61,500", "规则边界", "方向基础失效",
                 new BigDecimal("2.2"), "计划边界", "目标与止损区间计算",
                 "24 小时", "15m", "1–3 天", "数据或结构变化后重新校验",
-                "弱偏多 Candidate，等待触发；触发后重新校验，通过后再进入人工确认");
+                "方向仍偏多但不适合追涨，等待 15m 放量站稳后重新校验");
     }
 
     private AiRoleResultsPayload.EvidencePayload evidence(String id, String type, String value,
@@ -433,47 +438,76 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
     private DashboardHomeVO.AiTabVO gemini() {
         DashboardHomeVO.AiTabVO tab = roleBase("GEMINI_REVIEW", "Gemini 冲突复核", "Gemini");
         tab.setReviewResult("DOWNGRADE");
-        tab.setPlanModeAdjustment("PREPARATION");
-        tab.setFinalDirectionImpact("建议同向降级");
-        tab.setConfidenceAdjustment("86% → 84%");
-        tab.setRiskAdjustment("LOW → MEDIUM");
+        tab.setPlanModeAdjustment("DOWNGRADE_ONE");
+        tab.setFinalDirectionImpact("SAME_FAMILY_DOWNGRADE");
+        tab.setConfidenceAdjustment("DOWNGRADE_ONE");
+        tab.setRiskAdjustment("RAISE_ONE");
         tab.setDowngradeSuggestion(new AiRoleResultsPayload.DowngradeSuggestion(
-                "CONFIRMATION", "PREPARATION", "触发证据尚不完整", "15m 放量并连续两周期站稳"));
-        tab.setEvidenceGaps(List.of(finding("gap-1", "证据缺口", "短周期量能确认不足", "限制立即入场")));
+                "CONFIRMATION", "PREPARATION", "触发未完成，且资金费率和拥挤度限制追涨",
+                "15m 放量并连续两周期站稳，同时资金费率与拥挤度回落"));
+        tab.setEvidenceGaps(List.of(finding("gap-1", "证据缺口",
+                "15m 尚未放量站稳，止损来源虽可追踪但需在触发后重新确认", "不能按确认型处理")));
         tab.setEvidenceGapsState("FOUND");
-        tab.setLogicConflicts(List.of(finding("logic-1", "逻辑冲突", "4h 偏多与 5m 动能分化", "降低计划强度")));
+        tab.setLogicConflicts(List.of(finding("logic-1", "逻辑冲突",
+                "价格和未平仓量偏多，但资金费率偏高且多头拥挤", "方向不变，计划强度降一级")));
         tab.setLogicConflictsState("FOUND");
-        tab.setUnderestimatedRisks(List.of(finding("risk-1", "风险低估", "事件窗口可能放大波动", "风险上调至中")));
+        tab.setUnderestimatedRisks(List.of(finding("risk-1", "风险低估",
+                "拥挤多头在宏观事件窗口可能出现连锁清算", "风险上调一级并限制追涨")));
         tab.setUnderestimatedRisksState("FOUND");
-        tab.setRecoveryCondition("15m 放量并连续两周期站稳");
+        tab.setRecoveryCondition("15m 放量并连续两周期站稳，且 CoinGlass 资金费率与多头拥挤回落");
         return tab;
     }
 
     private DashboardHomeVO.AiTabVO grok() {
         DashboardHomeVO.AiTabVO tab = roleBase("GROK_CHALLENGE", "Grok 反方挑战", "Grok");
         tab.setFailurePaths(List.of(new AiRoleResultsPayload.FailurePathPayload(
-                "failure-1", "突破失败后回落", "63,200 附近量价背离", "触发失败 → 动能衰减 → 跌破支撑",
-                "未来 4 小时", List.of("15m 成交量", "买卖盘深度"), List.of("市场证据"), "持续放量站稳 63,200")));
+                "failure-1", "最可能失败：拥挤多头在假突破后被连锁清算",
+                "63,200 附近未放量且未平仓量继续增加、资金费率维持偏高",
+                "假突破 → 多头拥挤加深 → 价格回落 → 多头清算放大跌幅",
+                "未来 4 小时", List.of("15m 成交量", "未平仓量", "资金费率", "多头清算额"),
+                List.of("support-1", "support-2", "oppose-1", "oppose-2"), "持续放量站稳 63,200 且拥挤度回落")));
         tab.setFailurePathState("FOUND");
-        tab.setOpposingScenarios(List.of(finding("scenario-1", "反向情景", "突破失败并回落至区间下沿", "方向强度下降")));
+        tab.setOpposingScenarios(List.of(finding("scenario-1", "反向情景",
+                "价格上涨但未平仓量下降时，更可能是空头回补而不是新多头确认", "不得把反弹当成新趋势")));
         tab.setOpposingScenariosState("FOUND");
         tab.setExternalEventRisks(List.of(finding("event-1", "外部事件", "宏观数据公布前波动扩张", "触发条件失真")));
         tab.setExternalEventRisksState("FOUND");
-        tab.setMicrostructureRisks(List.of(finding("micro-1", "微观结构", "上方卖盘深度增加", "突破延迟")));
+        tab.setMicrostructureRisks(List.of(finding("micro-1", "微观结构",
+                "上方卖盘深度增加，同时多头清算开始抬升", "假突破风险上升")));
         tab.setMicrostructureRisksState("FOUND");
-        tab.setWatchIndicators(List.of(finding("watch-1", "观察指标", "15m 成交量与买卖盘深度", "确认触发质量")));
+        tab.setWatchIndicators(List.of(
+                finding("watch-1", "观察指标", "15m 成交量、未平仓量与价格是否同向", "确认是否有新增仓位支持"),
+                finding("watch-2", "观察指标", "资金费率、多空账户比和多头清算额", "监控拥挤与挤压风险")));
         tab.setWatchIndicatorsState("FOUND");
-        tab.setCurrentDirectionChallenge("偏多方向成立，但突破失败路径可验证");
-        tab.setPlanModeImpact("PREPARATION");
-        tab.setChallengeSummary("保留机会，维持预备型并等待触发确认");
+        tab.setCurrentDirectionChallenge("当前偏多不是无条件成立；最需要防的是拥挤多头假突破后连锁清算");
+        tab.setRiskAdjustment("RAISE_ONE");
+        tab.setPlanModeImpact("DOWNGRADE_ONE");
+        tab.setChallengeSummary("结论：保留机会但不追涨，先验证量价、未平仓量和拥挤风险");
         tab.setMajorCounterEvidence(false);
         return tab;
     }
 
+    private DashboardHomeVO.DerivativesSummaryVO derivatives() {
+        DashboardHomeVO.DerivativesSummaryVO summary = new DashboardHomeVO.DerivativesSummaryVO();
+        summary.setStatus("正常");
+        summary.setOpenInterestStructure("价格与未平仓量同向增加");
+        summary.setFundingRisk("偏高");
+        summary.setLiquidationRisk("短时正常");
+        summary.setCrowdingDirection("多头偏拥挤");
+        summary.setDataTime(NOW.minusMinutes(2).toInstant(ZoneOffset.ofHours(8)));
+        summary.setSource("CoinGlass v4");
+        summary.setDecisionImpact("限制追涨，等待确认");
+        summary.setReasonCodes(List.of("OPEN_INTEREST_PRICE_CONFIRMATION", "LONG_CROWDING"));
+        return summary;
+    }
+
     private AiRoleResultsPayload.FindingPayload finding(String id, String category, String value, String impact) {
-        return new AiRoleResultsPayload.FindingPayload(id, category, value, impact, List.of("市场证据"),
-                null, "未来 4 小时", List.of(), "市场证据", "2026-08-20T14:26:00+08:00",
-                null, null, "15m", null, null);
+        return new AiRoleResultsPayload.FindingPayload(id, category, value, impact,
+                List.of("support-1", "support-2", "oppose-1", "oppose-2"),
+                "所述风险条件出现", "未来 4 小时", List.of("15m 成交量", "未平仓量", "资金费率", "清算额"),
+                "CoinGlass v4 / 市场证据", "2026-08-20T14:26:00+08:00",
+                "2026-08-20T14:00:00+08:00/2026-08-20T20:30:00+08:00",
+                value, "15m", category, "待验证");
     }
 
     private DashboardHomeVO.AiTabVO roleBase(String role, String roleLabel, String provider) {
