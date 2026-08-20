@@ -144,13 +144,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
             String provider = upper(firstNonBlank(snapshot.provider(), "UNKNOWN"));
             String freshness = upper(firstNonBlank(snapshot.freshnessStatus(), "NO_DATA"));
             String runtimeState = upper(firstNonBlank(snapshot.runtimeState(), "UNKNOWN"));
-            PublicProviderHealthSnapshot providerHealth = snapshot.providerHealth();
-            boolean providerUp = providerHealth != null
-                    && "UP".equals(upper(providerHealth.status()))
-                    && providerHealth.lastSuccessAt() != null
-                    && !providerHealth.circuitOpen();
             boolean fresh = "FRESH".equals(freshness);
-            boolean connected = snapshot.dashboardReady() && fresh && providerUp;
+            boolean connected = snapshot.dashboardReady() && fresh;
+            PublicProviderHealthSnapshot providerHealth = snapshot.providerHealth();
 
             String readinessStatus;
             String reason;

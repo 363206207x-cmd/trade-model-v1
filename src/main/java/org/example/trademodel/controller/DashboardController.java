@@ -286,11 +286,11 @@ public class DashboardController {
     @GetMapping("/dashboard")
     public String dashboard(Model model) {
         model.addAttribute("pageKey", "home");
-        model.addAttribute("pageTitle", "首页总览");
+        model.addAttribute("pageTitle", "Fundamental AI");
         model.addAttribute("pageSubtitle", "查看当前重点机会、执行建议与真实持仓");
         model.addAttribute("activeNavigation", "home");
         model.addAttribute("resourceId", null);
-        return "workspace";
+        return "home";
     }
 
     @GetMapping("/api/dashboard/refresh")

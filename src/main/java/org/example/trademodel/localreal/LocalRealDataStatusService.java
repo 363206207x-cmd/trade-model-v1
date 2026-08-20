@@ -165,10 +165,11 @@ public class LocalRealDataStatusService {
         String provider = normalizeProvider(routedProvider.primaryProvider());
         PublicProviderHealthSnapshot providerHealth = providerHealth(providers, provider);
         String freshness = currentFreshness(latest);
-        boolean providerUp = providerHealth != null
+        boolean runtimeProviderUp = providerHealth != null
                 && "UP".equalsIgnoreCase(providerHealth.status())
                 && providerHealth.lastSuccessAt() != null
                 && !providerHealth.circuitOpen();
+        boolean providerUp = runtimeProviderUp || persistedProviderReady(latest, provider, freshness);
         boolean dashboardReady = readiness.state() == LocalRealReadinessState.DASHBOARD_READY
                 && trackedAssetCount > 0
                 && readyAssets >= trackedAssetCount
@@ -180,6 +181,15 @@ public class LocalRealDataStatusService {
                 : readinessReason(freshness, providerHealth);
         return new ProviderReadinessSnapshot(provider, readiness.state().name(), dashboardReady,
                 freshness, providerHealth, reason, readyAssets, completedAssets);
+    }
+
+    private static boolean persistedProviderReady(PersistedOhlcvBarDO latest,
+                                                    String provider,
+                                                    String freshness) {
+        return latest != null
+                && provider.equalsIgnoreCase(latest.getProvider())
+                && "READY".equalsIgnoreCase(latest.getSourceStatus())
+                && "FRESH".equals(freshness);
     }
 
     private String currentFreshness(PersistedOhlcvBarDO latest) {

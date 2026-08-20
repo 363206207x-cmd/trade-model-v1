@@ -14,6 +14,9 @@ import org.example.trademodel.entity.AssetPoolItemDO;
 import org.example.trademodel.entity.AssetDO;
 import org.example.trademodel.mapper.AssetMapper;
 import org.example.trademodel.mapper.AssetPoolItemMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
+import org.example.trademodel.localreal.LocalRealReadinessService;
+import org.example.trademodel.localreal.LocalRealReadinessState;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.junit.jupiter.api.BeforeEach;
@@ -351,6 +354,69 @@ class PersistentAssetPoolServiceTest {
         assertThat(command.getValue().getOwnerId()).isEqualTo(31L);
         assertThat(command.getValue().getAssetId()).isNull();
         verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void manualPoolScanSynchronizesReadinessFromCompletedAnalysisResults() {
+        List<AssetPoolItemDO> defaults = List.of(
+                row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT"),
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 20, "DEFAULT"),
+                row("SYSTEM", 0L, "SOLUSDT", true, true, 30, "DEFAULT"),
+                row("SYSTEM", 0L, "BNBUSDT", true, true, 40, "DEFAULT"),
+                row("SYSTEM", 0L, "XRPUSDT", true, true, 50, "DEFAULT"),
+                row("SYSTEM", 0L, "ADAUSDT", true, true, 60, "DEFAULT"));
+        when(mapper.listSystemDefaults()).thenReturn(defaults);
+        when(mapper.listUserOverrides(77L)).thenReturn(List.of());
+        when(mapper.listAllActiveSymbols()).thenReturn(defaults.stream().map(AssetPoolItemDO::getSymbol).toList());
+        when(analysisRunOrchestrator.run(any())).thenAnswer(invocation -> successfulResult(
+                ((AnalysisRunCommand) invocation.getArgument(0)).getSymbol()));
+        AnalysisRunMapper analysisRunMapper = org.mockito.Mockito.mock(AnalysisRunMapper.class);
+        when(analysisRunMapper.selectLatestBySymbol(any())).thenAnswer(invocation -> successfulRun(
+                invocation.getArgument(0)));
+        LocalRealReadinessService readiness = new LocalRealReadinessService(analysisRunMapper);
+        service.setLocalRealReadinessService(readiness);
+
+        List<AssetPoolScanResultDTO> results = service.scanForUser(77L, "5m");
+
+        assertThat(results).hasSize(6).allMatch(result -> "SUCCESS".equals(result.state()));
+        assertThat(readiness.readyAssetCount()).isEqualTo(6);
+        assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_READY);
+    }
+
+    @Test
+    void incompleteManualScanCannotForceDashboardReady() {
+        List<AssetPoolItemDO> defaults = List.of(
+                row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT"),
+                row("SYSTEM", 0L, "ETHUSDT", true, true, 20, "DEFAULT"));
+        when(mapper.listSystemDefaults()).thenReturn(defaults);
+        when(mapper.listUserOverrides(78L)).thenReturn(List.of());
+        when(mapper.listAllActiveSymbols()).thenReturn(defaults.stream().map(AssetPoolItemDO::getSymbol).toList());
+        when(analysisRunOrchestrator.run(any())).thenAnswer(invocation -> {
+            AnalysisRunCommand command = invocation.getArgument(0);
+            return "BTCUSDT".equals(command.getSymbol()) ? successfulResult(command.getSymbol()) : null;
+        });
+        AnalysisRunMapper analysisRunMapper = org.mockito.Mockito.mock(AnalysisRunMapper.class);
+        when(analysisRunMapper.selectLatestBySymbol("BTCUSDT")).thenReturn(successfulRun("BTCUSDT"));
+        when(analysisRunMapper.selectLatestBySymbol("ETHUSDT")).thenReturn(null);
+        LocalRealReadinessService readiness = new LocalRealReadinessService(analysisRunMapper);
+        service.setLocalRealReadinessService(readiness);
+
+        service.scanForUser(78L, "5m");
+
+        assertThat(readiness.readyAssetCount()).isEqualTo(1);
+        assertThat(readiness.state()).isEqualTo(LocalRealReadinessState.DASHBOARD_PARTIAL);
+    }
+
+    private static AnalysisRunResult successfulResult(String symbol) {
+        return AnalysisRunResult.executed(successfulRun(symbol), null, false, false);
+    }
+
+    private static AnalysisRunDO successfulRun(String symbol) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId("analysis-" + symbol);
+        run.setSymbol(symbol);
+        run.setStatus("SUCCESS");
+        return run;
     }
 
     private static AssetPoolItemDO row(String ownerType,

@@ -166,6 +166,38 @@ class LocalRealDataStatusServiceTest {
         assertThat(invalidSnapshot.reasonCode()).isEqualTo("LOCAL_REAL_MARKET_DATA_INVALID");
     }
 
+    @Test
+    void persistedFreshProviderEvidenceRestoresReadinessAfterRuntimeHealthReset() {
+        Instant now = Instant.parse("2026-08-10T14:30:00Z");
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        for (String symbol : POOL_SYMBOLS) {
+            readiness.updateAsset(symbol, LocalRealAssetReadinessState.READY, "KRAKEN",
+                    "REAL_DATA_AVAILABLE");
+        }
+        readiness.transition(LocalRealReadinessState.DASHBOARD_READY, "REAL_DATA_AVAILABLE");
+        when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(6);
+        when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
+        when(routedProvider.krakenPairCacheState()).thenReturn(KrakenPairCacheState.NOT_LOADED);
+        when(routedProvider.health()).thenReturn(Map.of(
+                "kraken", new PublicProviderHealthSnapshot(
+                        "KRAKEN", "NOT_USED", null, null, false, null)));
+        PersistedOhlcvBarDO fresh = readyBar(now.minusSeconds(5 * 60));
+        fresh.setProvider("KRAKEN");
+        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(fresh);
+        LocalRealDataStatusService service = new LocalRealDataStatusService(
+                readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
+                realMarketEnvironmentService, Clock.fixed(now, ZoneOffset.UTC));
+        service.setAssetPoolService(assetPoolService);
+        when(assetPoolService.listScanSymbols()).thenReturn(POOL_SYMBOLS);
+
+        LocalRealDataStatusService.ProviderReadinessSnapshot snapshot =
+                service.providerReadinessSnapshot();
+
+        assertThat(snapshot.dashboardReady()).isTrue();
+        assertThat(snapshot.freshnessStatus()).isEqualTo("FRESH");
+        assertThat(snapshot.reasonCode()).isEqualTo("REAL_DATA_AVAILABLE");
+    }
+
     private PersistedOhlcvBarDO readyBar(Instant closedAt) {
         PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
         bar.setTimeframe("5m");
