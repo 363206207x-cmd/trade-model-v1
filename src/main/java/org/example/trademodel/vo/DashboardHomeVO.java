@@ -2073,13 +2073,13 @@ public class DashboardHomeVO {
 
     public static class DerivativesSummaryVO {
         private String status = "等待同步";
-        private String openInterestStructure = "暂无";
-        private String fundingRisk = "暂无";
-        private String liquidationRisk = "暂无";
-        private String crowdingDirection = "无明确";
+        private String openInterestStructure = "暂无法判断";
+        private String fundingRisk = "暂无法判断";
+        private String liquidationRisk = "暂无法判断";
+        private String crowdingDirection = "暂无法判断";
         private Instant dataTime;
         private String source = "CoinGlass v4";
-        private String decisionImpact = "等待同步";
+        private String decisionImpact = "不可用于判断";
         private List<String> reasonCodes = new ArrayList<>();
 
         public String getStatus() { return status; }
