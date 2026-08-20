@@ -61,6 +61,52 @@
         }
         return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || "当前不可查看") : raw;
     }
+    var alertTokenLabels = Object.freeze({
+        HIGH: "高优先级", WARN: "需关注", ERROR: "读取失败", WAITING_SYNC: "等待同步",
+        SOURCE_UNAVAILABLE: "数据来源不可用", NOT_CALLED: "尚未调用", STALE: "数据已过期",
+        PARTIAL: "数据不完整", REGION_RESTRICTED: "当前区域不可用",
+        DATA_QUALITY_INSUFFICIENT: "数据质量不足", DATA_QUALITY_DEGRADED: "数据质量下降",
+        LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
+        WEAK: "较弱"
+    });
+    var alertMessagePrefixes = Object.freeze([
+        "高风险决策", "数据质量不足", "收敛破裂：冲突升高且多周期弱收敛",
+        "开仓被冲突阻断：冲突升高", "多模型冲突升高", "多周期收敛弱"
+    ]);
+    function alertTokenLabel(value, fallback) {
+        if (!has(value)) return fallback || "当前不可查看";
+        var raw = String(value).trim();
+        var mapped = alertTokenLabels[raw.toUpperCase()];
+        if (mapped) return mapped;
+        if (typeof contract.userFacingValue === "function") {
+            var shared = contract.userFacingValue(raw);
+            if (shared && shared !== raw) return shared;
+        }
+        return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || "当前不可查看") : raw;
+    }
+    function userFacingAlertMessage(value) {
+        var raw = text(value, "风险状态发生变化").trim();
+        if (/^[A-Z][A-Z0-9_]*$/.test(raw)) return alertTokenLabel(raw, "风险状态发生变化");
+        var sourceDefined = alertMessagePrefixes.find(function (prefix) { return raw.indexOf(prefix) === 0; });
+        if (sourceDefined) return sourceDefined;
+        var sanitized = raw
+            .replace(/[（(][^）)]*(?:[A-Za-z][A-Za-z0-9_]*\s*=|[A-Z][A-Z0-9_]{2,})[^）)]*[）)]/g, "")
+            .replace(/\b(?:analysisId|traceId|symbol|riskLevel|dataQualityScore|aiConflictLevel|aiConflictScore|multiTfConvergence|isWorthOpening)\s*=\s*[^，,；;\s）)]+/g, "")
+            .replace(/\b[A-Z][A-Z0-9_]*\b/g, function (token) {
+                var mapped = alertTokenLabels[token];
+                if (mapped) return mapped;
+                if (typeof contract.userFacingValue === "function") {
+                    var shared = contract.userFacingValue(token);
+                    if (shared && shared !== token) return shared;
+                }
+                return token.indexOf("_") < 0 && token.length <= 4 ? token : "";
+            })
+            .replace(/\s*([，,；;：:])\s*([，,；;：:])/g, "$2")
+            .replace(/[，,；;：:]\s*$/g, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+        return sanitized || "风险状态发生变化";
+    }
     function setText(id, value) { var node = document.getElementById(id); if (node) node.textContent = value; }
     function number(value, fractionDigits) {
         if (!has(value) || Number.isNaN(Number(value))) return "当前不可查看";
@@ -153,8 +199,8 @@
         alertNode.hidden = !alert;
         eventNode.hidden = !event;
         if (alert) {
-            alertNode.querySelector("strong").textContent = text(alert.message, "风险状态发生变化");
-            alertNode.querySelector("em").textContent = label(alert.level, "高优先级");
+            alertNode.querySelector("strong").textContent = userFacingAlertMessage(alert.message);
+            alertNode.querySelector("em").textContent = alertTokenLabel(alert.level, "高优先级");
             alertNode.querySelector("time").textContent = has(alert.time) ? time(alert.time) : "";
         }
         if (event) {

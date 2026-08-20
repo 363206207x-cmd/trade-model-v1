@@ -69,20 +69,20 @@
         <div class="decision-row" data-position-plan-ratio="70:30">
             <section class="module position-module" aria-labelledby="positionHeading" data-component-family="PositionCard">
                 <header class="module-header position-header">
-                    <h2 id="positionHeading">持仓监控 · 基于已录入</h2>
+                    <h2 id="positionHeading">持仓监控</h2>
                     <div class="position-header-actions"><span id="positionAggregate">活动 0 · 最高风险 暂无评估 · 等待评估</span><a href="/positions">查看全部</a></div>
                 </header>
                 <div class="position-list" id="positionList"></div>
                 <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span></div><a class="secondary-action" href="/positions">录入持仓</a></div>
             </section>
             <section class="module plan-module" aria-labelledby="planHeading" data-component-family="PlanSummaryCard">
-                <header class="module-header"><div><h2 id="planHeading">最终执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
+                <header class="module-header"><div><h2 id="planHeading">执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
                 <div class="plan-content" id="planContent"></div>
             </section>
         </div>
         <section class="module ai-workspace" aria-labelledby="aiWorkspaceHeading" data-component-family="AIWorkspace">
             <header class="ai-header">
-                <div><h2 id="aiWorkspaceHeading">AI 分析工作区</h2><span id="aiContext">等待分析上下文</span></div>
+                <div><h2 id="aiWorkspaceHeading">AI 分析</h2><span id="aiContext">等待分析上下文</span></div>
                 <div class="ai-tabs" role="tablist" aria-label="AI 分析角色" data-component-family="AIRoleTabs">
                     <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL">GPT 综合判断</button>
                     <button type="button" role="tab" aria-selected="false" data-ai-role="GEMINI_REVIEW">Gemini 冲突复核</button>

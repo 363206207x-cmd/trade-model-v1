@@ -33,12 +33,15 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(html).contains(
                 "class=\"home-rail\"", "机会资产 · 0", "id=\"homeAssetSearch\"",
-                "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入",
+                "data-position-plan-ratio=\"70:30\"", ">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
                 "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
                 "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "查看完整审计链");
         assertThat(html).containsOnlyOnce("查看完整审计链")
-                .doesNotContain("HOME COMPACT", ">FOUND<", ">NONE_FOUND<");
+                .doesNotContain(
+                        "HOME COMPACT", ">FOUND<", ">NONE_FOUND<",
+                        "持仓监控 · 基于已录入", ">最终执行计划</h2>",
+                        ">Final Execution Plan</h2>", ">AI 分析工作区</h2>");
         assertThat(css).contains(
                 "width: 64px", "height: 32px",
                 "grid-template-columns: repeat(6, minmax(0, 1fr))",
@@ -46,6 +49,20 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "grid-template-columns: minmax(0,72fr) minmax(0,28fr)",
                 "min-height: 330px")
                 .doesNotContain("sparkline", "mini-chart");
+    }
+
+    @Test
+    void homeAlertSummaryMapsTechnicalStatesToUserFacingCopy() throws Exception {
+        String script = Files.readString(SCRIPT);
+
+        assertThat(script).contains(
+                "function userFacingAlertMessage(value)",
+                "高风险决策", "数据质量不足", "收敛破裂：冲突升高且多周期弱收敛",
+                "开仓被冲突阻断：冲突升高", "多模型冲突升高", "多周期收敛弱",
+                "ERROR: \"读取失败\"", "WARN: \"需关注\"", "NOT_CALLED: \"尚未调用\"",
+                "REGION_RESTRICTED: \"当前区域不可用\"", "PARTIAL: \"数据不完整\"",
+                "userFacingAlertMessage(alert.message)")
+                .doesNotContain("querySelector(\"strong\").textContent = text(alert.message");
     }
 
     @Test
