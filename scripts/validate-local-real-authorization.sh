@@ -44,9 +44,8 @@ grep -Fq 'MOBILE_IMPLEMENTATION_ALLOWED: false' <<<"$merged_output"
 set +e
 wrong_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_merged_validated \
   bash scripts/v1-state.sh --request-package LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMEN 2>&1)"
-wrong_status=$?
 set -e
-[[ "$wrong_status" -ne 0 ]]
+grep -Fq 'RESOLUTION_STATUS: BLOCKED' <<<"$wrong_output"
 grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$wrong_output"
 
 changed_files="$({ git diff --name-only; git diff --cached --name-only; } | sort -u)"
