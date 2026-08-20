@@ -13,6 +13,8 @@ class ApprovedFigmaHomeRuntimeContractTest {
     private static final Path HOME = Path.of("src/main/resources/templates/home.html");
     private static final Path STYLE = Path.of("src/main/resources/static/css/home.css");
     private static final Path SCRIPT = Path.of("src/main/resources/static/js/home-runtime.js");
+    private static final Path WORKSPACE = Path.of("src/main/resources/templates/workspace.html");
+    private static final Path WORKSPACE_SCRIPT = Path.of("src/main/resources/static/js/workspace.js");
 
     @Test
     void dashboardRouteActivatesTheApprovedHomeInsteadOfTheLegacyWorkspace() throws Exception {
@@ -65,5 +67,55 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 .doesNotContain(
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
                         "const assets = [", "BTCUSDT,ETHUSDT", "82, 87");
+    }
+
+    @Test
+    void homeAssetQuickSearchHasExplicitSelectionAndSeparateSourceDefinedActions() throws Exception {
+        String html = Files.readString(HOME);
+        String script = Files.readString(SCRIPT);
+
+        assertThat(html).contains(
+                "data-overlay-code=\"O02\"", "id=\"homeAssetSearchResults\"",
+                "id=\"homeAssetSearchSelection\"", "尚未选择资产",
+                "id=\"homePreviewAsset\"", "按需分析",
+                "id=\"homeAddAsset\"", "加入观察资产池");
+        assertThat(script).contains(
+                "selectedSearchAsset = null", "aria-selected", "ArrowDown", "ArrowUp", "Enter", "Escape",
+                "selectSearchResult", "loadAssetPoolMembership",
+                "已在观察资产池", "尚未加入观察资产池",
+                "POST", "/api/asset-pool", "/analysis-preview?timeframe=5m",
+                "window.location.assign(\"/analysis/\"")
+                .doesNotContain("window.location.href = \"/analysis?asset=\"");
+    }
+
+    @Test
+    void assetPoolBatchManagementExecutesItsSourceDefinedActions() throws Exception {
+        String html = Files.readString(WORKSPACE);
+        String script = Files.readString(WORKSPACE_SCRIPT);
+
+        assertThat(html).contains(
+                "data-overlay-code=\"O04\"", "id=\"poolBatchList\"",
+                "id=\"poolBatchStatus\"", "id=\"batchScanSelected\"", "扫描所选",
+                "id=\"batchRemoveSelected\"", "移除所选");
+        assertThat(script).contains(
+                "selectedBatchSymbols", "updateBatchActions",
+                "/api/asset-pool/batch-scan", "/api/asset-pool/batch-remove",
+                "正在扫描", "扫描完成", "正在移除", "历史记录会保留");
+    }
+
+    @Test
+    void visibleWorkspaceControlsHaveTheirSourceDefinedInteractionWiring() throws Exception {
+        String html = Files.readString(WORKSPACE);
+        String script = Files.readString(WORKSPACE_SCRIPT);
+
+        assertThat(html).contains(
+                "aria-label=\"持仓视图\"", "活动持仓", "href=\"/reviews\"",
+                "data-review-filter=\"all\"", "data-review-filter=\"position\"", "data-review-filter=\"opportunity\"",
+                "id=\"saveSettings\" disabled");
+        assertThat(script).contains(
+                "function bindReviews()", "data-review-kind", "aria-selected",
+                "role=\"button\"", "event.key === \"Enter\"", "event.key === \" \"",
+                "form?.addEventListener(\"change\"", "initialSettings",
+                "JSON.stringify(formJson(form)) === form.dataset.initialSettings");
     }
 }

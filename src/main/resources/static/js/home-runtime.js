@@ -6,6 +6,14 @@
     var selectedSymbol = "";
     var activeRole = "GPT_FINAL";
     var searchTimer = null;
+    var selectedSearchAsset = null;
+    var searchResultItems = [];
+    var activeSearchResultIndex = -1;
+    var assetPoolSymbols = new Set();
+    var assetPoolCount = 0;
+    var searchActionBusy = false;
+    var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
 
     var labels = Object.freeze({
         LONG: "做多", SHORT: "做空",
@@ -83,8 +91,12 @@
         if (!envelope || Number(envelope.code) !== 200) throw new Error(text(envelope && envelope.msg, "数据暂不可用"));
         return envelope.data;
     }
-    async function api(url) {
-        var response = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
+    async function api(url, options) {
+        var request = Object.assign({ credentials: "same-origin", headers: { Accept: "application/json" } }, options || {});
+        request.headers = Object.assign({}, request.headers || {});
+        if (request.body && !(request.body instanceof FormData)) request.headers["Content-Type"] = "application/json";
+        if (csrfToken && csrfHeader && request.method && request.method !== "GET") request.headers[csrfHeader] = csrfToken;
+        var response = await fetch(url, request);
         if (!response.ok) throw new Error("请求失败（" + response.status + "）");
         return apiData(await response.json());
     }
@@ -397,37 +409,160 @@
         }
     }
 
+    function setSearchPopoverOpen(open) {
+        var input = document.getElementById("homeAssetSearch");
+        var popover = document.getElementById("homeAssetSearchPopover");
+        popover.hidden = !open;
+        input.setAttribute("aria-expanded", String(open));
+    }
+    function renderSearchSelection(message) {
+        var symbolNode = document.getElementById("homeSelectedSearchSymbol");
+        var stateNode = document.getElementById("homeSelectedSearchState");
+        var poolCountNode = document.getElementById("homeAssetPoolCount");
+        var previewButton = document.getElementById("homePreviewAsset");
+        var addButton = document.getElementById("homeAddAsset");
+        var statusNode = document.getElementById("homeAssetSearchStatus");
+        poolCountNode.textContent = "观察资产池 · " + assetPoolCount;
+        statusNode.textContent = message || "";
+        if (!selectedSearchAsset) {
+            symbolNode.textContent = "尚未选择资产";
+            stateNode.textContent = "请先从搜索结果中选择";
+            previewButton.disabled = true;
+            addButton.disabled = true;
+            addButton.textContent = "加入观察资产池";
+            return;
+        }
+        var symbol = symbolOf(selectedSearchAsset);
+        var inPool = assetPoolSymbols.has(symbol);
+        symbolNode.textContent = symbol;
+        stateNode.textContent = text(selectedSearchAsset.baseAsset || selectedSearchAsset.name, symbol.replace(/USDT$/, ""))
+            + " · " + (inPool ? "已在观察资产池" : "尚未加入观察资产池");
+        previewButton.disabled = searchActionBusy;
+        addButton.disabled = searchActionBusy || inPool;
+        addButton.textContent = inPool ? "已在观察资产池" : "加入观察资产池";
+    }
+    function setActiveSearchResult(index, focusResult) {
+        var buttons = Array.from(document.querySelectorAll("#homeAssetSearchResults [data-search-index]"));
+        if (!buttons.length) { activeSearchResultIndex = -1; return; }
+        activeSearchResultIndex = Math.max(0, Math.min(index, buttons.length - 1));
+        buttons.forEach(function (button, buttonIndex) {
+            var active = buttonIndex === activeSearchResultIndex;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-selected", String(active));
+        });
+        if (focusResult) buttons[activeSearchResultIndex].focus();
+    }
+    function selectSearchResult(index) {
+        if (!searchResultItems[index]) return;
+        selectedSearchAsset = searchResultItems[index];
+        setActiveSearchResult(index, false);
+        renderSearchSelection();
+        setSearchPopoverOpen(true);
+    }
+    async function loadAssetPoolMembership() {
+        var items = await api("/api/asset-pool");
+        var values = Array.isArray(items) ? items : [];
+        assetPoolSymbols = new Set(values.map(function (item) { return symbolOf(item); }).filter(Boolean));
+        assetPoolCount = values.length;
+        renderSearchSelection();
+    }
     function renderSearchResults(items) {
         var target = document.getElementById("homeAssetSearchResults");
-        var values = Array.isArray(items) ? items.slice(0, 8) : [];
-        target.innerHTML = values.map(function (asset) {
+        searchResultItems = (Array.isArray(items) ? items : []).filter(function (asset) { return !!symbolOf(asset); }).slice(0, 8);
+        activeSearchResultIndex = -1;
+        target.innerHTML = searchResultItems.map(function (asset, index) {
             var symbol = symbolOf(asset);
-            if (!symbol) return "";
-            return '<button class="search-result" type="button" role="option" data-search-symbol="' + escapeHtml(symbol)
+            var inPool = assetPoolSymbols.has(symbol);
+            return '<button class="search-result" type="button" role="option" aria-selected="false" data-search-index="' + index
+                + '" data-search-symbol="' + escapeHtml(symbol)
                 + '"><span><strong>' + escapeHtml(symbol) + "</strong><small>" + escapeHtml(text(asset.baseAsset || asset.name, "市场资产"))
-                + "</small></span><em>分析</em></button>";
+                + "</small></span><em>" + (inPool ? "已在观察资产池" : "未加入") + "</em></button>";
         }).join("");
-        target.hidden = !target.innerHTML;
-        target.querySelectorAll("[data-search-symbol]").forEach(function (button) {
-            button.addEventListener("click", function () { window.location.href = "/analysis?asset=" + encodeURIComponent(button.dataset.searchSymbol); });
+        if (!target.innerHTML) target.innerHTML = '<div class="search-result"><span><strong>未找到资产</strong><small>请尝试其他名称或交易对</small></span></div>';
+        setSearchPopoverOpen(true);
+        target.querySelectorAll("[data-search-index]").forEach(function (button) {
+            button.addEventListener("click", function () { selectSearchResult(Number(button.dataset.searchIndex)); });
         });
     }
     function bindSearch() {
         var input = document.getElementById("homeAssetSearch");
-        var results = document.getElementById("homeAssetSearchResults");
+        var popover = document.getElementById("homeAssetSearchPopover");
+        input.addEventListener("focus", function () { setSearchPopoverOpen(true); });
         input.addEventListener("input", function () {
             window.clearTimeout(searchTimer);
             var query = input.value.trim();
-            if (!query) { results.hidden = true; results.innerHTML = ""; return; }
+            selectedSearchAsset = null;
+            renderSearchSelection();
+            if (!query) { searchResultItems = []; document.getElementById("homeAssetSearchResults").innerHTML = ""; setSearchPopoverOpen(true); return; }
             searchTimer = window.setTimeout(async function () {
                 try { renderSearchResults(await api("/api/asset-pool/search?query=" + encodeURIComponent(query) + "&limit=8")); }
-                catch (error) { results.innerHTML = '<div class="search-result"><span><strong>搜索当前不可查看</strong><small>' + escapeHtml(error.message) + "</small></span></div>"; results.hidden = false; }
+                catch (error) { document.getElementById("homeAssetSearchResults").innerHTML = '<div class="search-result"><span><strong>搜索当前不可查看</strong><small>' + escapeHtml(error.message) + "</small></span></div>"; setSearchPopoverOpen(true); }
             }, 180);
         });
         input.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") { results.hidden = true; input.blur(); }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                var step = event.key === "ArrowDown" ? 1 : -1;
+                var start = activeSearchResultIndex < 0 ? (step > 0 ? 0 : searchResultItems.length - 1) : activeSearchResultIndex + step;
+                setActiveSearchResult(start, false);
+            } else if (event.key === "Enter" && activeSearchResultIndex >= 0) {
+                event.preventDefault();
+                selectSearchResult(activeSearchResultIndex);
+            } else if (event.key === "Escape") {
+                setSearchPopoverOpen(false);
+                input.blur();
+            }
         });
-        document.addEventListener("click", function (event) { if (!event.target.closest(".asset-search")) results.hidden = true; });
+        document.getElementById("homeAssetSearchResults").addEventListener("keydown", function (event) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveSearchResult(activeSearchResultIndex + (event.key === "ArrowDown" ? 1 : -1), true);
+            } else if (event.key === "Enter" && activeSearchResultIndex >= 0) {
+                event.preventDefault();
+                selectSearchResult(activeSearchResultIndex);
+                input.focus();
+            } else if (event.key === "Escape") {
+                setSearchPopoverOpen(false);
+                input.focus();
+            }
+        });
+        document.getElementById("homePreviewAsset").addEventListener("click", async function () {
+            if (!selectedSearchAsset || searchActionBusy) return;
+            searchActionBusy = true;
+            renderSearchSelection("正在创建按需分析…");
+            try {
+                var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
+                if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
+                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId));
+            } catch (error) {
+                searchActionBusy = false;
+                renderSearchSelection(error.message);
+                announce(error.message);
+            }
+        });
+        document.getElementById("homeAddAsset").addEventListener("click", async function () {
+            if (!selectedSearchAsset || searchActionBusy || assetPoolSymbols.has(symbolOf(selectedSearchAsset))) return;
+            searchActionBusy = true;
+            renderSearchSelection("正在加入观察资产池…");
+            try {
+                await api("/api/asset-pool", { method: "POST", body: JSON.stringify({ symbol: symbolOf(selectedSearchAsset), focusEnabled: true }) });
+                await loadAssetPoolMembership();
+                searchActionBusy = false;
+                renderSearchSelection("已加入观察资产池，将进入正常持续分析流程");
+                renderSearchResults(searchResultItems);
+                announce(symbolOf(selectedSearchAsset) + " 已加入观察资产池");
+            } catch (error) {
+                searchActionBusy = false;
+                renderSearchSelection(error.message);
+                announce(error.message);
+            }
+        });
+        document.addEventListener("click", function (event) { if (!event.target.closest(".asset-search")) setSearchPopoverOpen(false); });
+        loadAssetPoolMembership().catch(function (error) {
+            document.getElementById("homeAssetPoolCount").textContent = "观察资产池 · 当前不可查看";
+            document.getElementById("homeAssetSearchStatus").textContent = error.message;
+        });
+        renderSearchSelection();
     }
     function bindTabs() {
         document.querySelectorAll("[data-ai-role]").forEach(function (button) {

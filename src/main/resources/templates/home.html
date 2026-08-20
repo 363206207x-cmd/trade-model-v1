@@ -48,8 +48,19 @@
                 <h2 id="opportunityHeading">机会资产 · 0</h2>
                 <div class="asset-search" data-component-family="AssetSearch">
                     <label class="sr-only" for="homeAssetSearch">搜索资产</label><span aria-hidden="true">⌕</span>
-                    <input id="homeAssetSearch" type="search" autocomplete="off" placeholder="搜索资产">
-                    <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" hidden></div>
+                    <input id="homeAssetSearch" type="search" autocomplete="off" placeholder="搜索资产" aria-controls="homeAssetSearchPopover" aria-expanded="false" aria-autocomplete="list">
+                    <div class="asset-search-popover" id="homeAssetSearchPopover" data-overlay-code="O02" hidden>
+                        <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" aria-label="市场资产搜索结果"></div>
+                        <div class="asset-search-selection" id="homeAssetSearchSelection" aria-live="polite">
+                            <div class="selected-asset-copy"><strong id="homeSelectedSearchSymbol">尚未选择资产</strong><small id="homeSelectedSearchState">请先从搜索结果中选择</small></div>
+                            <small class="pool-count" id="homeAssetPoolCount">观察资产池 · 同步中</small>
+                            <div class="search-actions">
+                                <button class="search-action search-action-secondary" id="homePreviewAsset" type="button" disabled>按需分析</button>
+                                <button class="search-action search-action-primary" id="homeAddAsset" type="button" disabled>加入观察资产池</button>
+                            </div>
+                            <small class="search-action-status" id="homeAssetSearchStatus"></small>
+                        </div>
+                    </div>
                 </div>
             </header>
             <div class="opportunity-grid" id="opportunityGrid" aria-live="polite"></div>

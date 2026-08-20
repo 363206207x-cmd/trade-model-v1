@@ -444,7 +444,7 @@ td strong { color: var(--text); }
     border-radius: 8px;
     background: #e9edf1;
 }
-.filter-tabs button, .role-tabs button {
+.filter-tabs button, .filter-tabs a, .role-tabs button {
     min-height: 34px;
     padding: 7px 12px;
     border: 0;
@@ -454,7 +454,7 @@ td strong { color: var(--text); }
     font-weight: 600;
     cursor: pointer;
 }
-.filter-tabs button.is-active, .role-tabs button.is-active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(23, 25, 28, 0.08); }
+.filter-tabs button.is-active, .filter-tabs a.is-active, .role-tabs button.is-active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(23, 25, 28, 0.08); }
 .ai-workspace { padding: 0; overflow: hidden; }
 .ai-workspace .role-tabs { width: 100%; border-radius: 0; }
 .ai-workspace .role-tabs button { flex: 1; }

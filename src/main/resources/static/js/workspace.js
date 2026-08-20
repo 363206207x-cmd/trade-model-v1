@@ -734,6 +734,20 @@
         window.location.assign("/analysis/" + encodeURIComponent(result.analysisId));
     }
 
+    function selectedBatchSymbols() {
+        return Array.from(document.querySelectorAll("#poolBatchList input:checked")).map(function (input) { return input.value; });
+    }
+
+    function updateBatchActions(message) {
+        const symbols = selectedBatchSymbols();
+        const status = document.getElementById("poolBatchStatus");
+        const scan = document.getElementById("batchScanSelected");
+        const remove = document.getElementById("batchRemoveSelected");
+        if (status) status.textContent = message || (symbols.length ? "已选择 " + symbols.length + " 个资产" : "尚未选择资产");
+        if (scan) scan.disabled = symbols.length === 0;
+        if (remove) remove.disabled = symbols.length === 0;
+    }
+
     function bindAssetPool() {
         const search = document.getElementById("assetPoolSearch");
         let searchTimer;
@@ -744,6 +758,41 @@
         document.getElementById("quickAssetSearch")?.addEventListener("input", function (event) {
             window.clearTimeout(searchTimer);
             searchTimer = window.setTimeout(function () { searchAssets(event.target.value, document.getElementById("quickAssetResults"), pageKey === "analysis"); }, 180);
+        });
+        document.getElementById("poolBatchList")?.addEventListener("change", function () { updateBatchActions(); });
+        document.getElementById("batchScanSelected")?.addEventListener("click", async function (event) {
+            const symbols = selectedBatchSymbols();
+            if (!symbols.length) return;
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById("batchRemoveSelected").disabled = true;
+            updateBatchActions("正在扫描 " + symbols.length + " 个资产…");
+            try {
+                const result = await api("/api/asset-pool/batch-scan", { method: "POST", body: JSON.stringify({ symbols: symbols, timeframe: "5m" }) }) || [];
+                const completed = result.filter(function (item) { return item.status === "SUCCESS"; }).length;
+                updateBatchActions("扫描完成：" + completed + " / " + result.length);
+                await loadTasks();
+            } catch (error) {
+                updateBatchActions(error.message);
+            } finally {
+                updateBatchActions(document.getElementById("poolBatchStatus").textContent);
+            }
+        });
+        document.getElementById("batchRemoveSelected")?.addEventListener("click", async function (event) {
+            const symbols = selectedBatchSymbols();
+            if (!symbols.length || !window.confirm("从观察资产池移除所选 " + symbols.length + " 个资产？历史记录会保留。")) return;
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById("batchScanSelected").disabled = true;
+            updateBatchActions("正在移除 " + symbols.length + " 个资产…");
+            try {
+                await api("/api/asset-pool/batch-remove", { method: "POST", body: JSON.stringify({ symbols: symbols }) });
+                announce("已移除 " + symbols.length + " 个观察资产");
+                await loadAssetPool();
+                updateBatchActions("移除完成");
+            } catch (error) {
+                updateBatchActions(error.message);
+            }
         });
         document.addEventListener("click", async function (event) {
             const result = event.target.closest("[data-search-symbol]");
@@ -796,6 +845,7 @@
             } finally { scanButton.disabled = false; }
         });
         Promise.all([loadAssetPool(), loadTasks()]).then(function () { updatePoolScanCta(); });
+        updateBatchActions();
     }
 
     function trustedMonitor(monitor) {
@@ -910,8 +960,8 @@
         } catch (_) { empty(target, "开仓计划当前不可查看", "持仓事实仍保留，不使用其他计划替代。"); }
     }
 
-    function reviewCard(title, state, body, href) {
-        return '<article class="review-card"><header><strong>' + escapeHtml(title) + '</strong>' + stateBadge(state) + '</header><p>' + escapeHtml(body) + '</p>' + (href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看复盘</a>' : "") + "</article>";
+    function reviewCard(kind, title, state, body, href) {
+        return '<article class="review-card" data-review-kind="' + escapeHtml(kind) + '"><header><strong>' + escapeHtml(title) + '</strong>' + stateBadge(state) + '</header><p>' + escapeHtml(body) + '</p>' + (href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看复盘</a>' : "") + "</article>";
     }
 
     async function loadReviews() {
@@ -920,14 +970,31 @@
             const data = await api("/api/review/center") || {};
             const rows = [];
             (data.positionReviews || []).forEach(function (item) {
-                rows.push(reviewCard(item.symbol + " · 持仓复盘", item.reviewStatus, text(item.monitorConclusion, "等待复盘结论"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
+                rows.push(reviewCard("position", item.symbol + " · 持仓复盘", item.reviewStatus, text(item.monitorConclusion, "等待复盘结论"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
             });
             (data.opportunityReviews || []).forEach(function (item) {
-                rows.push(reviewCard(item.symbol + " · 机会复盘", item.outcome, label(item.planMode, "等待后续结果"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
+                rows.push(reviewCard("opportunity", item.symbol + " · 机会复盘", item.outcome, label(item.planMode, "等待后续结果"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
             });
             target.innerHTML = rows.join("");
             document.getElementById("reviewEmpty").hidden = rows.length > 0;
         } catch (_) { empty(target, "复盘当前不可查看", "未返回可信复盘记录。"); }
+    }
+
+    function bindReviews() {
+        document.querySelectorAll("[data-review-filter]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const filter = button.dataset.reviewFilter;
+                document.querySelectorAll("[data-review-filter]").forEach(function (item) {
+                    const selected = item === button;
+                    item.classList.toggle("is-active", selected);
+                    item.setAttribute("aria-selected", String(selected));
+                });
+                document.querySelectorAll("[data-review-kind]").forEach(function (card) {
+                    card.hidden = filter !== "all" && card.dataset.reviewKind !== filter;
+                });
+            });
+        });
+        loadReviews();
     }
 
     async function loadReviewDetail() {
@@ -1269,7 +1336,7 @@
                 .concat((data.industryAndProject || []).map(function (item) { return Object.assign({ eventType: item.eventType || "INDUSTRY_OR_PROJECT" }, item); }));
             if (!events.length) return empty(target, "暂无事件", "没有返回可信事件窗口。"), undefined;
             target.innerHTML = events.map(function (item, index) {
-                return '<article class="event-item" tabindex="0" data-event-index="' + index + '"><time>' + escapeHtml(formatTime(item.eventTime || item.publishedAt || item.occurredAt)) + '</time><div><strong>' + escapeHtml(text(item.title || item.eventName, "未命名事件")) + '</strong><p>' + escapeHtml(text(item.summary || item.description, "暂无摘要")) + '</p></div>' + stateBadge(item.impactLevel || item.eventType) + "</article>";
+                return '<article class="event-item" tabindex="0" role="button" aria-label="查看事件详情" data-event-index="' + index + '"><time>' + escapeHtml(formatTime(item.eventTime || item.publishedAt || item.occurredAt)) + '</time><div><strong>' + escapeHtml(text(item.title || item.eventName, "未命名事件")) + '</strong><p>' + escapeHtml(text(item.summary || item.description, "暂无摘要")) + '</p></div>' + stateBadge(item.impactLevel || item.eventType) + "</article>";
             }).join("");
             target._events = events;
             target.addEventListener("click", function (event) {
@@ -1279,6 +1346,13 @@
                 document.getElementById("eventDetailContent").innerHTML = renderStructured(record);
                 document.getElementById("eventRelations").innerHTML = renderStructured(data.assetRelations || []);
                 openOverlay("event-detail", item);
+            });
+            target.addEventListener("keydown", function (event) {
+                const item = event.target.closest("[data-event-index]");
+                if (item && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    item.click();
+                }
             });
         } catch (_) { empty(target, "事件当前不可查看", "没有返回可信事件来源。"); }
     }
@@ -1316,6 +1390,8 @@
             if (form) {
                 form.elements.riskPreference.value = config.riskPreference || "BALANCED";
                 form.elements.defaultPoolMode.value = config.defaultPoolMode || "SYSTEM_DEFAULT";
+                form.dataset.initialSettings = JSON.stringify(formJson(form));
+                document.getElementById("saveSettings").disabled = true;
             }
         } catch (_) { document.getElementById("telegramBindingState").textContent = "当前不可查看"; }
         try {
@@ -1333,12 +1409,22 @@
     }
 
     function bindSettings() {
-        document.getElementById("saveSettings")?.addEventListener("click", async function () {
+        const form = document.getElementById("riskPreferenceForm");
+        const save = document.getElementById("saveSettings");
+        form?.addEventListener("change", function () {
+            save.disabled = JSON.stringify(formJson(form)) === form.dataset.initialSettings;
+        });
+        save?.addEventListener("click", async function () {
             const form = document.getElementById("riskPreferenceForm");
+            save.disabled = true;
             try {
                 await api("/api/user-config", { method: "PUT", body: JSON.stringify(formJson(form)) });
+                form.dataset.initialSettings = JSON.stringify(formJson(form));
                 announce("设置已保存");
-            } catch (error) { announce(error.message); }
+            } catch (error) {
+                announce(error.message);
+                save.disabled = JSON.stringify(formJson(form)) === form.dataset.initialSettings;
+            }
         });
         loadSettings();
     }
@@ -1352,7 +1438,7 @@
         if (pageKey === "asset-pool") bindAssetPool();
         if (pageKey === "positions") loadPositions();
         if (pageKey === "position-detail") loadPositionDetail();
-        if (pageKey === "reviews") loadReviews();
+        if (pageKey === "reviews") bindReviews();
         if (pageKey === "review-detail") loadReviewDetail();
         if (pageKey === "analysis") bindAnalysis();
         if (pageKey === "messages") loadMessages();
