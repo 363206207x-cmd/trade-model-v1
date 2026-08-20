@@ -17,6 +17,9 @@ import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.ConflictResolverResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanCandidateMapper;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.service.AiConflictResolverService;
 import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.DecisionChainAiOrchestratorService;
@@ -38,9 +41,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -151,6 +157,48 @@ class DecisionChainServiceImplTest {
                     .keySet().stream().map(String::valueOf).toList())
                     .containsExactlyInAnyOrder("4h", "1h", "15m", "5m");
         });
+    }
+
+    @Test
+    void coinglassDatasetsRemainExplicitWhenGenericEvidenceWindowIsFull() {
+        stubHappyPath();
+        DecisionChainBuildInput base = input();
+        List<EvidenceItemVO> evidence = new ArrayList<>();
+        for (int index = 0; index < 20; index++) {
+            EvidenceItemVO item = evidence();
+            item.setEvidenceId("price-evidence-" + index);
+            evidence.add(item);
+        }
+        EvidenceItemVO derivative = evidence();
+        derivative.setEvidenceId("coinglass-open-interest-1");
+        derivative.setEvidenceType("OPEN_INTEREST_PRICE_CONFIRMATION");
+        derivative.setSource("PROVIDER_SNAPSHOT");
+        derivative.setSourceProvider("COINGLASS_V4");
+        derivative.setSourceReference("sourceField=openInterestChange5m;provider=COINGLASS_V4");
+        derivative.setCurrentValue("1.8");
+        derivative.setChangeFromBaseline("+1.8%");
+        evidence.add(derivative);
+        DecisionChainBuildInput withDerivatives = new DecisionChainBuildInput(
+                base.analysisId(), base.traceId(), base.symbol(), base.timeframe(), base.dataQualityScore(),
+                base.decision(), base.rulePlan(), evidence, base.scores(), base.triggerType(), base.ownerType(),
+                base.ownerId(), base.assetId(), base.ruleVersion(), base.preview(), base.requestId(),
+                base.accountRiskSnapshot(), derivativesSnapshot(), null);
+
+        service.build(withDerivatives);
+
+        ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
+        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(requests.capture());
+        Map<String, Object> input = requests.getAllValues().get(0).getInput();
+        assertThat((List<?>) input.get("evidence")).hasSize(20);
+        assertThat(String.valueOf(input.get("evidence"))).doesNotContain("coinglass-open-interest-1");
+        Map<?, ?> derivatives = (Map<?, ?>) input.get("derivativesContext");
+        assertThat(derivatives.get("source")).isEqualTo("COINGLASS_V4");
+        assertThat((List<?>) derivatives.get("availableDatasets"))
+                .containsExactly("OPEN_INTEREST", "FUNDING", "LIQUIDATION", "LONG_SHORT_RATIO");
+        assertThat(((Map<?, ?>) derivatives.get("datasetReadings")).keySet())
+                .contains("openInterest", "funding", "liquidation", "longShortRatio");
+        assertThat(String.valueOf(derivatives.get("derivedEvidence")))
+                .contains("coinglass-open-interest-1", "OPEN_INTEREST_PRICE_CONFIRMATION");
     }
 
     @Test
@@ -454,6 +502,23 @@ class DecisionChainServiceImplTest {
         snapshot.setMaxAllowedExposure(new java.math.BigDecimal("0.20"));
         snapshot.setMaxAllowedLeverage(new java.math.BigDecimal("10"));
         return snapshot;
+    }
+
+    private static DerivativesRiskSnapshot derivativesSnapshot() {
+        Instant providerTime = Instant.parse("2026-08-20T06:26:00Z");
+        return new DerivativesRiskSnapshot(
+                "BTCUSDT", "COINGLASS_V4", providerTime, providerTime.plusSeconds(2),
+                providerTime.plusSeconds(62), new BigDecimal("38300000000"),
+                new BigDecimal("0.2"), new BigDecimal("1.8"), new BigDecimal("3.1"),
+                new BigDecimal("5.4"), new BigDecimal("0.00018"), new BigDecimal("72"),
+                new BigDecimal("1.34"), "GLOBAL_ACCOUNT_RATIO",
+                new BigDecimal("120000"), new BigDecimal("360000"), new BigDecimal("820000"),
+                new BigDecimal("3100000"), new BigDecimal("90000"), new BigDecimal("280000"),
+                new BigDecimal("740000"), new BigDecimal("2900000"), new BigDecimal("18"),
+                new BigDecimal("0.42"),
+                List.of("OPEN_INTEREST", "FUNDING", "LIQUIDATION", "LONG_SHORT_RATIO"),
+                List.of(), List.of(), UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH,
+                "COMPLETE", List.of(), "trace-1", Map.of(), null);
     }
 
     private static EvidenceItemVO evidence() {
