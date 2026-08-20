@@ -15,13 +15,13 @@ class FundamentalAiV41FinalP1RemediationContractTest {
     private static final Path STYLE = Path.of("src/main/resources/static/css/workspace.css");
 
     @Test
-    void dashboardProductionRouteUsesTheSingleWorkspaceVisualSystem() throws Exception {
+    void dashboardProductionRouteUsesTheApprovedHomeVisualSystem() throws Exception {
         String controller = Files.readString(Path.of(
                 "src/main/java/org/example/trademodel/controller/DashboardController.java"));
         assertThat(controller).contains(
                 "model.addAttribute(\"pageKey\", \"home\")",
                 "model.addAttribute(\"activeNavigation\", \"home\")",
-                "return \"workspace\"")
+                "return \"home\"")
                 .doesNotContain("return \"dashboard\"");
     }
 
