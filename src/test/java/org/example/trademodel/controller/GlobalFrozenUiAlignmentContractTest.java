@@ -43,7 +43,7 @@ class GlobalFrozenUiAlignmentContractTest {
         String workspace = Files.readString(WORKSPACE);
         assertOrdered(home, "<small>环境</small>", "<small>系统</small>", "<small>数据</small>",
                 "<small>服务</small>", "<small>账户·已录入</small>", "<small>Hot Reset</small>");
-        assertThat(home).contains("持仓监控 · 基于已录入", "Final Execution Plan", "AI 分析工作区")
+        assertThat(home).contains("持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区")
                 .doesNotContain("60:40", "机会数量");
         assertThat(workspace).doesNotContain("pageKey == 'home'", "60:40");
     }
@@ -88,11 +88,17 @@ class GlobalFrozenUiAlignmentContractTest {
         assertThat(script).contains(
                 "plan-status-layer", "plan-key-layer", "plan-metadata-layer", "plan.planVersion",
                 "plan.planLifecycleState", "plan.revalidationReason", "plan.revalidationRule",
-                "[\"APPROVE\", \"DOWNGRADE\", \"REJECT\", \"RISK_WARNING\"]",
+                "plan.stopZone || plan.stopLoss",
+                "[\"APPROVE\", \"DOWNGRADE\", \"REJECT_CANDIDATE\", \"RISK_WARNING\"]",
+                "CoinGlass 衍生品实况 · 数据时间独立标注",
+                "GPT 候选结论（不是最终计划）", "Gemini 复核结论", "Grok 风险结论",
                 "return roleUnavailable(role)", "触发 → 演化 → 失效",
                 "consistency.conflictLevel", "consistency.mainReason",
                 "ArrowRight", "ArrowLeft", "event.key === \"Home\"", "event.key === \"End\"",
                 "item.tabIndex = selected ? 0 : -1");
+        assertThat(Files.readString(HOME_CSS)).contains(
+                ".ai-derivatives-grid", ".tone-positive", ".tone-warning", ".tone-negative", ".tone-info",
+                ".position-judgment { align-items: center; text-align: center; }");
     }
 
     @Test
