@@ -13,6 +13,7 @@ import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.decisionchain.DecisionChainBuildInput;
 import org.example.trademodel.decisionchain.DecisionChainBuildResult;
 import org.example.trademodel.decisionchain.RuleValidationResult;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.entity.ConflictResolverResultDO;
 import org.example.trademodel.entity.ExecutionPlanCandidateDO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
@@ -20,6 +21,7 @@ import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.mapper.ConflictResolverResultMapper;
 import org.example.trademodel.mapper.ExecutionPlanCandidateMapper;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.service.AssetStateService;
 import org.example.trademodel.service.ConfusedStatePolicy;
 import org.example.trademodel.service.DecisionChainAiOrchestratorService;
@@ -523,6 +525,8 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 ? null : opportunity.executionPermission());
         facts.put("opportunity", opportunityFacts);
         facts.put("evidence", evidenceFacts(input.evidence(), input.analysisId()));
+        facts.put("derivativesContext", derivativesFacts(
+                input.derivativesSnapshot(), input.derivativesAssessment(), input.evidence()));
         facts.put("scores", scoreFacts(input.scores()));
         Map<String, Object> decisionFacts = new LinkedHashMap<>();
         decisionFacts.put("ruleDirection", decision.getRuleMarketBias());
@@ -581,6 +585,116 @@ public class DecisionChainServiceImpl implements DecisionChainService {
             value.put("freshness", item.getFreshness());
             return value;
         }).toList();
+    }
+
+    private Map<String, Object> derivativesFacts(DerivativesRiskSnapshot snapshot,
+                                                  DerivativesBusinessAssessment assessment,
+                                                  List<EvidenceItemVO> evidence) {
+        Map<String, Object> facts = new LinkedHashMap<>();
+        facts.put("source", "COINGLASS_V4");
+        facts.put("sourceStatus", assessment != null && assessment.sourceStatus() != null
+                ? assessment.sourceStatus().name()
+                : snapshot == null || snapshot.sourceStatus() == null ? null : snapshot.sourceStatus().name());
+        facts.put("freshnessStatus", assessment != null && assessment.freshnessStatus() != null
+                ? assessment.freshnessStatus().name()
+                : snapshot == null || snapshot.freshnessStatus() == null ? null : snapshot.freshnessStatus().name());
+        facts.put("evidenceAvailability", assessment != null
+                ? assessment.evidenceAvailability()
+                : snapshot == null ? "UNAVAILABLE" : snapshot.evidenceAvailability());
+        facts.put("providerDataTime", assessment != null
+                ? assessment.providerDataTime() : snapshot == null ? null : snapshot.providerDataTime());
+        facts.put("fetchTime", assessment != null
+                ? assessment.fetchTime() : snapshot == null ? null : snapshot.fetchTime());
+        facts.put("expiresAt", snapshot == null ? null : snapshot.expiresAt());
+        facts.put("traceId", assessment != null
+                ? assessment.traceId() : snapshot == null ? null : snapshot.traceId());
+        facts.put("availableDatasets", assessment != null
+                ? assessment.availableDatasets() : snapshot == null ? List.of() : snapshot.availableDatasets());
+        facts.put("missingDatasets", assessment != null
+                ? assessment.missingDatasets() : snapshot == null ? List.of() : snapshot.missingDatasets());
+        facts.put("degradedDatasets", assessment != null
+                ? assessment.degradedDatasets() : snapshot == null ? List.of() : snapshot.degradedDatasets());
+        facts.put("reasonCodes", assessment != null
+                ? assessment.reasonCodes() : snapshot == null ? List.of() : snapshot.reasonCodes());
+
+        Map<String, Object> openInterest = new LinkedHashMap<>();
+        openInterest.put("openInterestUsd", snapshot == null ? null : snapshot.openInterestUsd());
+        openInterest.put("change1m", snapshot == null ? null : snapshot.openInterestChange1m());
+        openInterest.put("change5m", snapshot == null ? null : snapshot.openInterestChange5m());
+        openInterest.put("change15m", snapshot == null ? null : snapshot.openInterestChange15m());
+        openInterest.put("change1h", snapshot == null ? null : snapshot.openInterestChange1h());
+        Map<String, Object> funding = new LinkedHashMap<>();
+        funding.put("weightedFundingRate", snapshot == null ? null : snapshot.weightedFundingRate());
+        funding.put("extremityScore", snapshot == null ? null : snapshot.fundingExtremityScore());
+        Map<String, Object> longShort = new LinkedHashMap<>();
+        longShort.put("ratio", snapshot == null ? null : snapshot.longShortRatio());
+        longShort.put("ratioSource", snapshot == null ? null : snapshot.longShortRatioSource());
+        Map<String, Object> liquidation = new LinkedHashMap<>();
+        liquidation.put("longUsd1m", snapshot == null ? null : snapshot.longLiquidationUsd1m());
+        liquidation.put("longUsd5m", snapshot == null ? null : snapshot.longLiquidationUsd5m());
+        liquidation.put("longUsd15m", snapshot == null ? null : snapshot.longLiquidationUsd15m());
+        liquidation.put("longUsd1h", snapshot == null ? null : snapshot.longLiquidationUsd1h());
+        liquidation.put("shortUsd1m", snapshot == null ? null : snapshot.shortLiquidationUsd1m());
+        liquidation.put("shortUsd5m", snapshot == null ? null : snapshot.shortLiquidationUsd5m());
+        liquidation.put("shortUsd15m", snapshot == null ? null : snapshot.shortLiquidationUsd15m());
+        liquidation.put("shortUsd1h", snapshot == null ? null : snapshot.shortLiquidationUsd1h());
+        liquidation.put("spikeScore", snapshot == null ? null : snapshot.liquidationSpikeScore());
+        Map<String, Object> readings = new LinkedHashMap<>();
+        readings.put("openInterest", openInterest);
+        readings.put("funding", funding);
+        readings.put("longShortRatio", longShort);
+        readings.put("liquidation", liquidation);
+        readings.put("exchangeConcentrationScore",
+                snapshot == null ? null : snapshot.exchangeConcentrationScore());
+        facts.put("datasetReadings", readings);
+
+        Map<String, Object> assessmentFacts = new LinkedHashMap<>();
+        assessmentFacts.put("riskAdjustment", assessment == null ? null : assessment.riskAdjustment());
+        assessmentFacts.put("planMode", assessment == null ? null : assessment.planMode());
+        assessmentFacts.put("confirmEligible", assessment != null && assessment.confirmEligible());
+        assessmentFacts.put("needsRevalidation", assessment != null && assessment.needsRevalidation());
+        assessmentFacts.put("highRisk", assessment != null && assessment.isHighRisk());
+        assessmentFacts.put("reasonCodes", assessment == null ? List.of() : assessment.reasonCodes());
+        facts.put("businessAssessment", assessmentFacts);
+        facts.put("derivedEvidence", derivativeEvidenceFacts(evidence));
+        return facts;
+    }
+
+    private List<Map<String, Object>> derivativeEvidenceFacts(List<EvidenceItemVO> evidence) {
+        if (evidence == null) return List.of();
+        return evidence.stream()
+                .filter(this::isDerivativesEvidence)
+                .map(item -> {
+                    Map<String, Object> value = new LinkedHashMap<>();
+                    value.put("type", item.getEvidenceType());
+                    value.put("evidenceId", item.getEvidenceId());
+                    value.put("analysisId", item.getAnalysisId());
+                    value.put("direction", item.getDirection());
+                    value.put("strength", item.getStrength());
+                    value.put("confidence", item.getConfidence());
+                    value.put("source", item.getSource());
+                    value.put("description", item.getDescription());
+                    value.put("currentValue", item.getCurrentValue());
+                    value.put("changeFromBaseline", item.getChangeFromBaseline());
+                    value.put("sourceReference", item.getSourceReference());
+                    value.put("sourceTraceId", item.getSourceTraceId());
+                    value.put("observedAt", item.getObservedAt());
+                    value.put("freshness", item.getFreshness());
+                    return value;
+                }).toList();
+    }
+
+    private boolean isDerivativesEvidence(EvidenceItemVO item) {
+        if (item == null) return false;
+        String signal = String.join("|",
+                upper(item.getEvidenceType()),
+                upper(item.getSource()),
+                upper(item.getSourceProvider()),
+                upper(item.getSourceReference()),
+                upper(item.getDescription()));
+        return containsAny(signal, "COINGLASS", "OPEN_INTEREST", "FUNDING", "LIQUIDATION",
+                "LONG_CROWDING", "SHORT_CROWDING", "LONG_SHORT", "DERIVATIVES_DATA",
+                "EXCHANGE_CONCENTRATION");
     }
 
     private static String eventWindow(EvidenceItemVO item) {
