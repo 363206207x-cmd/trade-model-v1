@@ -41,7 +41,9 @@
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
         SOURCE_UNAVAILABLE: "来源不可用", STALE: "数据已过期",
         COMPLETE: "覆盖完整", PARTIAL_COVERAGE: "覆盖部分", UNKNOWN: "等待评估",
-        SYSTEM_PLAN_POSITION: "系统计划录入", MANUAL_POSITION: "手动录入"
+        SYSTEM_PLAN_POSITION: "系统计划录入", MANUAL_POSITION: "独立手动录入", MANUAL_INDEPENDENT: "独立手动录入",
+        VERIFIED_FRESH: "已验证且新鲜", PENDING: "等待验证", INVALID: "来源无效",
+        SOURCE_UNAVAILABLE: "来源不可用", CURRENT: "当前有效", NEEDS_REVALIDATION: "正在重验"
     });
 
     function has(value) { return value !== null && value !== undefined && value !== ""; }
@@ -152,12 +154,30 @@
         if (!card) return fallback || "等待同步";
         return text(card.valueLabel, has(card.value) ? label(card.value, fallback) : label(card.status, fallback));
     }
+    function semanticTone(value) {
+        var normalized = String(value || "").trim().toUpperCase();
+        if (["LOW", "STABLE", "STILL_VALID", "LOGIC_VALID", "NO_REVERSAL", "CURRENT", "READY", "VERIFIED_FRESH"].indexOf(normalized) >= 0) return "positive";
+        if (["MEDIUM", "WEAKENED", "WEAK_REVERSAL", "INCREASED", "WAITING_TRIGGER", "PENDING", "STALE", "NEEDS_REVALIDATION"].indexOf(normalized) >= 0) return "warning";
+        if (["HIGH", "EXTREME", "INVALIDATED", "STRONG_REVERSAL", "SHARPLY_INCREASED", "BLOCKED", "PLAN_INVALIDATED", "INVALID"].indexOf(normalized) >= 0) return "negative";
+        return "unknown";
+    }
+    function toneText(value, raw) {
+        return '<span class="semantic-value tone-' + semanticTone(raw) + '">' + escapeHtml(value) + "</span>";
+    }
+    function eligibleOpportunity(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        var mode = String(asset && (asset.primaryPlanMode || asset.planMode) || "").toUpperCase();
+        var risk = String(asset && asset.riskLevel || "").toUpperCase();
+        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED"].indexOf(state) >= 0
+            && mode !== "BLOCKED" && ["HIGH", "EXTREME"].indexOf(risk) < 0;
+    }
     function validOpportunity(asset) {
         return symbolOf(asset)
             && has(asset && (asset.opportunityId || asset.primaryOpportunityId))
             && has(asset && asset.analysisId)
             && has(asset && asset.opportunityScore)
             && !Number.isNaN(Number(asset.opportunityScore))
+            && eligibleOpportunity(asset)
             && String(asset.slotType || "").toUpperCase() !== "DEFAULT_SLOT";
     }
     function selectedFinalAccess(home) {
@@ -177,13 +197,15 @@
         setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + time(header.updatedAt) : "更新时间待同步");
     }
 
-    function renderStatus(home, opportunityCount) {
+    function renderStatus(home) {
         var state = home.systemState || {};
-        setText("statusMarket", statusValue(state.marketTrend));
-        setText("statusRisk", statusValue(state.riskLevel));
-        setText("statusQuality", statusValue(state.dataQuality));
-        setText("statusAi", text(home.header && home.header.aiStatusLabel, label(home.header && home.header.aiStatus, "等待同步")));
-        setText("statusOpportunity", opportunityCount ? opportunityCount + " 个" : "暂无");
+        var positions = (Array.isArray(home.positions) ? home.positions : []).filter(validPosition);
+        var coverage = label(home.diagnostics && home.diagnostics.accountRiskCoverageState, "等待评估");
+        setText("statusEnvironment", statusValue(state.marketTrend));
+        setText("statusSystem", statusValue(state.riskLevel));
+        setText("statusData", statusValue(state.dataQuality));
+        setText("statusService", text(home.header && home.header.aiStatusLabel, label(home.header && home.header.aiStatus, "等待同步")));
+        setText("statusAccount", positions.length ? highestRisk(positions) + " / " + positions.length + " 笔 · " + coverage : "— / 无已录入持仓");
         setText("statusReset", statusValue(state.hotReset, "正常"));
     }
 
@@ -216,37 +238,47 @@
         var view = typeof contract.assetStateView === "function"
             ? contract.assetStateView(asset.opportunityState || asset.assetState, asset.assetStateLabel)
             : { label: label(asset.opportunityState || asset.assetState, "状态待同步"), tone: "neutral" };
-        var tone = view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
-        return '<span class="state-badge' + tone + '">' + escapeHtml(view.label) + "</span>";
+        var revalidating = String(asset.opportunityState || asset.assetState || "").toUpperCase() === "TRIGGERED"
+            && String(asset.finalPlanLifecycle || "").toUpperCase() === "NEEDS_REVALIDATION";
+        var visible = revalidating ? "正在重验" : view.label;
+        var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
+        return '<span class="state-badge' + tone + '">' + escapeHtml(visible) + "</span>";
     }
-    function opportunityCard(asset, finalAccess, selected) {
+    function opportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
-        var finalVisible = isSelected && finalAccess.visible;
-        var plan = finalAccess.plan;
-        var finalBias = finalVisible ? label(plan.finalMarketBias || plan.direction, "—") : "—";
-        var finalMode = finalVisible ? label(plan.finalPlanMode, "尚未形成") : "尚未形成";
+        var finalVisible = asset.hasFinal === true;
+        var finalBias = finalVisible ? label(asset.finalMarketBias, "—") : "—";
+        var finalMode = finalVisible ? label(asset.finalPlanMode, "—") : "—";
         var confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
         var risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
         var timeframe = text(asset.primaryTimeframe, "周期待同步");
+        var conflict = label(asset.timeframeConflictState, "周期关系待同步");
+        var rankingReason = text(asset.rankingReason, "排序原因待同步");
+        var secondaryCount = has(asset.secondaryOpportunityCount) ? Number(asset.secondaryOpportunityCount) : 0;
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" data-symbol="'
-            + escapeHtml(symbol) + '" aria-label="查看 ' + escapeHtml(symbol) + ' 决策上下文"><header><div class="asset-identity"><strong>'
+            + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason) + '" aria-label="查看 ' + escapeHtml(symbol + " 决策上下文，周期关系 " + conflict + "，次级机会 " + secondaryCount + "，" + rankingReason) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol + " · " + timeframe)
             + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
             + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
             + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
-            + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
+            + '</strong></span></div><div class="opportunity-final"><span><small>Final Market Bias</small><b>' + escapeHtml(finalBias)
+            + "</b></span><span><small>Final Plan Mode</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
     }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
-        var assets = all.filter(validOpportunity).slice(0, 6);
+        var seen = new Set();
+        var assets = all.filter(validOpportunity).filter(function (asset) {
+            var identity = has(asset.assetId) ? "asset:" + asset.assetId : "symbol:" + symbolOf(asset);
+            if (seen.has(identity)) return false;
+            seen.add(identity);
+            return true;
+        }).slice(0, 6);
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
-        var finalAccess = selectedFinalAccess(home);
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
         setText("opportunityHeading", "机会资产 · " + assets.length);
-        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, finalAccess, selected); }).join("");
+        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {
@@ -264,7 +296,8 @@
     }
 
     function trustedMonitor(position) {
-        return position && position.markPriceFresh === true
+        var trust = String(position && position.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase();
+        return position && trust === "VERIFIED_FRESH" && position.markPriceFresh === true
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].indexOf(String(position.dataState || "").toUpperCase()) >= 0;
     }
     function validPosition(position) {
@@ -276,26 +309,37 @@
         var trusted = positions.filter(trustedMonitor).sort(function (a, b) { return riskRank(b.riskLevel) - riskRank(a.riskLevel); });
         return trusted.length ? text(trusted[0].riskLevelLabel, label(trusted[0].riskLevel, "暂无评估")) : "暂无评估";
     }
-    function fact(labelText, value) { return "<span><small>" + escapeHtml(labelText) + "</small><b>" + escapeHtml(value) + "</b></span>"; }
+    function trustStateText(position) {
+        return label(position && position.monitorTrustState, "来源不可用");
+    }
+    function positionFact(labelText, value, raw, align) {
+        return '<span class="position-fact ' + (align || "") + '"><small>' + escapeHtml(labelText) + "</small><b>"
+            + toneText(value, raw) + "</b></span>";
+    }
     function positionRow(position) {
         var trusted = trustedMonitor(position);
-        var monitorState = label(position.dataState, "等待监控数据");
-        var risk = trusted ? text(position.riskLevelLabel, label(position.riskLevel)) : "当前不可查看";
-        var conclusion = trusted ? text(position.monitorConclusionLabel, label(position.monitorConclusion)) : monitorState;
-        var action = trusted ? text(position.suggestedManualActionText, label(position.suggestedAction)) : "等待可信监控结果";
-        return '<article class="position-row"><div class="position-primary"><strong>' + escapeHtml(symbolOf(position)) + "<b>"
-            + escapeHtml(text(position.directionLabel, label(position.direction))) + "</b></strong><small>"
-            + escapeHtml(label(position.sourceType, "已录入持仓")) + " · " + escapeHtml(time(position.openedAt))
-            + '</small></div><div class="position-judgment">' + fact("持仓风险", risk) + fact("监控结论", conclusion) + fact("建议动作", action)
-            + '</div><div class="position-facts">' + fact("开仓价", number(position.entryPrice))
-            + fact("标记价格", trusted ? number(position.markPrice) : "当前不可查看")
-            + fact("盈亏", trusted ? percent(position.pnlPercent) : "当前不可查看")
-            + fact("开仓时间", time(position.openedAt))
-            + '</div><div class="monitor-details">' + fact("入场逻辑状态", trusted ? text(position.entryLogicStatusLabel, label(position.entryLogicStatus)) : "等待监控")
-            + fact("反转状态", trusted ? text(position.reversalStatusLabel, label(position.reversalStatus)) : "等待监控")
-            + fact("风险变化原因", trusted ? text(position.riskReasonLabel, label(position.riskReason)) : "等待监控")
-            + fact("最近监控时间", trusted ? time(position.lastMonitorTime || position.lastMonitorAt) : "等待首次监控")
-            + '</div><a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">详情</a></article>';
+        var unavailable = trustStateText(position);
+        var risk = trusted ? text(position.riskLevelLabel, label(position.riskLevel)) : unavailable;
+        var logic = trusted ? text(position.entryLogicStatusLabel, label(position.entryLogicStatus)) : unavailable;
+        var reversal = trusted ? text(position.reversalStatusLabel, label(position.reversalStatus)) : unavailable;
+        var trend = trusted ? label(position.riskTrend) : unavailable;
+        var conclusion = trusted ? text(position.monitorConclusionLabel, label(position.monitorConclusion)) : unavailable;
+        var action = trusted ? text(position.suggestedManualActionText, label(position.suggestedAction)) : unavailable;
+        var source = label(position.sourceType, "来源不可用");
+        return '<article class="position-row" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + conclusion) + '">'
+            + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
+            + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
+            + '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
+            + positionFact("标记价格", trusted ? number(position.markPrice) : unavailable, trusted ? "STABLE" : position.monitorTrustState, "numeric")
+            + positionFact("盈亏", trusted ? percent(position.pnlPercent) : unavailable, trusted ? (Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID") : position.monitorTrustState, "numeric")
+            + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric") + "</div>"
+            + '<div class="position-judgment">' + positionFact("入场逻辑", logic, trusted ? position.entryLogicStatus : position.monitorTrustState, "center")
+            + positionFact("反转状态", reversal, trusted ? position.reversalStatus : position.monitorTrustState, "center")
+            + positionFact("持仓风险", risk, trusted ? position.riskLevel : position.monitorTrustState, "center")
+            + positionFact("风险趋势", trend, trusted ? position.riskTrend : position.monitorTrustState, "center") + "</div>"
+            + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, trusted ? position.monitorConclusion : position.monitorTrustState, "narrative")
+            + positionFact("建议动作", action, trusted ? position.suggestedAction : position.monitorTrustState, "narrative")
+            + '<a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">查看详情</a></div></article>';
     }
     function renderPositions(home) {
         var positions = (Array.isArray(home.positions) ? home.positions : []).filter(validPosition);
@@ -323,22 +367,25 @@
         var plan = access.plan;
         setText("planAsset", selected || "未选择资产");
         if (!access.visible) {
-            target.innerHTML = '<div class="plan-empty"><strong>尚未形成</strong><span>机会状态 · '
-                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(access.reason, "尚未形成有效计划")) + "</span></div>";
+            var revalidating = String(plan.status || "").toUpperCase() === "REVALIDATION_REQUIRED";
+            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : "尚未形成") + '</strong><span>机会状态 · '
+                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(plan.revalidationReason || access.reason, "尚未形成有效计划")) + "</span>"
+                + (revalidating ? '<span>恢复条件 · ' + escapeHtml(text(plan.revalidationRule, "当前无可验证恢复条件")) + "</span>" : "")
+                + (revalidating ? '<span>最新重验状态 · ' + escapeHtml(label(plan.planLifecycleState, "等待重验")) + "</span>" : "") + "</div>";
             link.hidden = true;
             return;
         }
         var planId = plan.sourceExecutionPlanId;
-        target.innerHTML = '<div class="plan-decision"><div><small>最终方向 · 计划模式</small><strong>'
+        var lifecycle = plan.planLifecycleState || plan.status;
+        target.innerHTML = '<div class="plan-status-layer"><div><small>Final Bias · Plan Mode</small><strong>'
             + escapeHtml(label(plan.finalMarketBias || plan.direction)) + " · " + escapeHtml(label(plan.finalPlanMode))
-            + '</strong></div><span class="plan-state">' + escapeHtml(text(plan.statusLabel, "当前有效")) + '</span></div><div class="plan-conditions">'
+            + '</strong></div><span class="plan-state tone-' + semanticTone(lifecycle) + '">' + escapeHtml(label(lifecycle, text(plan.statusLabel, "当前有效"))) + '</span></div><div class="plan-key-layer">'
             + planField("入场 / 触发", plan.entryZone || plan.triggerCondition)
             + planField("失效条件", plan.invalidCondition || plan.abandonCondition)
-            + planField("止损", plan.stopZone || plan.stopLogic || plan.stopLoss)
             + planField("目标", plan.targetZones || plan.targetLogic || plan.takeProfitRules)
-            + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
-            + '</div><div class="plan-metadata">' + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
-            + planField("来源", label(plan.sourceStatus, "规则校验")) + "</div>";
+            + '</div><div class="plan-metadata-layer">' + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
+            + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
+            + planField("版本", has(plan.planVersion) ? "v" + plan.planVersion : "当前不可查看") + "</div>";
         link.href = "/plans/" + encodeURIComponent(planId);
         link.hidden = false;
     }
@@ -382,21 +429,35 @@
             + escapeHtml(text(candidate.summary || candidate.recommendedAction, "当前候选摘要不可查看")) + "</span></div>";
     }
     function renderGemini(role) {
+        var reviewResult = String(role.reviewResult || "").toUpperCase();
+        if (["APPROVE", "DOWNGRADE", "REJECT", "RISK_WARNING"].indexOf(reviewResult) < 0) return roleUnavailable(role);
         var suggestion = role.downgradeSuggestion || {};
         var findings = [].concat(role.evidenceGaps || [], role.logicConflicts || [], role.underestimatedRisks || []);
-        return '<div class="ai-first-visual"><div class="primary"><small>复核结果</small><strong>' + escapeHtml(label(role.reviewResult, "当前不可查看"))
-            + "</strong></div><div><small>调整建议</small><strong>" + escapeHtml(label(role.planModeAdjustment || suggestion.after, "当前不可查看"))
-            + "</strong></div><div><small>对 Candidate</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "建议待同步"))
+        var adjustment = reviewResult === "APPROVE" ? "维持 Candidate" : label(role.planModeAdjustment || suggestion.after, "当前不可查看");
+        return '<div class="ai-first-visual"><div class="primary"><small>复核结果</small><strong>' + escapeHtml(label(reviewResult, "当前不可查看"))
+            + "</strong></div><div><small>调整建议</small><strong>" + escapeHtml(adjustment)
+            + "</strong></div><div><small>对 Candidate</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "当前不可查看"))
             + '</strong></div></div><div class="ai-content-grid gemini"><section class="ai-section"><h3>Before → After</h3>'
             + dl([["Before", label(suggestion.before, "当前不可查看")], ["After", label(suggestion.after, "当前不可查看")], ["置信度", label(role.confidenceAdjustment, "当前不可查看")], ["风险", label(role.riskAdjustment, "当前不可查看")]])
             + '</section><section class="ai-section"><h3>证据缺口 · 逻辑冲突 · 风险低估</h3>' + list(findings, role.evidenceGapsState || role.logicConflictsState || role.underestimatedRisksState)
             + '</section></div><div class="ai-summary-footer"><strong>恢复条件</strong><span>' + escapeHtml(text(role.recoveryCondition || suggestion.recoveryCondition, "当前无可验证恢复条件")) + "</span></div>";
     }
+    function failurePathChain(paths, state) {
+        var rows = Array.isArray(paths) ? paths : [];
+        if (!rows.length) return "<p>" + escapeHtml(collectionLabel(state)) + "</p>";
+        return rows.slice(0, 2).map(function (path) {
+            return '<div class="failure-path-chain"><strong>' + escapeHtml(text(path.hypothesis, "失败路径")) + '</strong><ol>'
+                + '<li><small>触发</small><span>' + escapeHtml(text(path.triggerCondition, "当前不可查看")) + '</span></li>'
+                + '<li><small>演化</small><span>' + escapeHtml(text(path.causalPath, "当前不可查看")) + '</span></li>'
+                + '<li><small>失效</small><span>' + escapeHtml(text(path.invalidatingEvidence, "当前不可查看")) + '</span></li></ol></div>';
+        }).join("");
+    }
     function renderGrok(role) {
         return '<div class="ai-first-visual"><div class="primary"><small>失败路径</small><strong>' + escapeHtml(collectionLabel(role.failurePathState))
             + "</strong></div><div><small>当前方向挑战</small><strong>" + escapeHtml(text(role.currentDirectionChallenge, "当前不可查看"))
             + "</strong></div><div><small>计划模式影响</small><strong>" + escapeHtml(label(role.planModeImpact, "当前不可查看"))
-            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
+            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>失败路径 · 触发 → 演化 → 失效</h3>' + failurePathChain(role.failurePaths, role.failurePathState)
+            + '<h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
             + '<h3>外部事件风险</h3>' + list(role.externalEventRisks, role.externalEventRisksState)
             + '</section><section class="ai-section"><h3>微观结构风险</h3>' + list(role.microstructureRisks, role.microstructureRisksState)
             + '<h3>继续观察指标</h3>' + list(role.watchIndicators, role.watchIndicatorsState) + "</section></div>";
@@ -404,7 +465,8 @@
     function renderConflict(home) {
         var consistency = home.aiDecision && home.aiDecision.consistency || {};
         var level = String(consistency.conflictLevel || "").toUpperCase();
-        var ready = String(consistency.dataState || "").toUpperCase() === "READY";
+        var ready = String(consistency.dataState || "").toUpperCase() === "READY"
+            && has(consistency.conflictLevel) && has(consistency.mainReason);
         var show = ready && level && level !== "LEVEL_1_CONSISTENT";
         var target = document.getElementById("conflictSummary");
         var layout = document.getElementById("aiLayout");
@@ -440,8 +502,8 @@
         selectedSymbol = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
         renderHeader(home);
         renderSignals(home);
-        var count = renderOpportunities(home);
-        renderStatus(home, count);
+        renderOpportunities(home);
+        renderStatus(home);
         renderPositions(home);
         renderPlan(home);
         renderAi(home);
@@ -450,6 +512,10 @@
         try {
             var query = new URLSearchParams({ limit: "6" });
             if (symbol) query.set("selectedSymbol", symbol);
+            var requestedPositionId = new URLSearchParams(window.location.search).get("positionId");
+            if (requestedPositionId && /^\d+$/.test(requestedPositionId)) {
+                query.set("positionId", requestedPositionId);
+            }
             render(await api("/api/dashboard/home?" + query.toString()));
         } catch (error) {
             announce(error.message);
@@ -616,15 +682,32 @@
         renderSearchSelection();
     }
     function bindTabs() {
-        document.querySelectorAll("[data-ai-role]").forEach(function (button) {
+        var tabs = Array.from(document.querySelectorAll("[data-ai-role]"));
+        function activate(button, focus) {
+            activeRole = button.dataset.aiRole;
+            tabs.forEach(function (item) {
+                var selected = item === button;
+                item.classList.toggle("is-active", selected);
+                item.setAttribute("aria-selected", String(selected));
+                item.tabIndex = selected ? 0 : -1;
+            });
+            if (focus) button.focus();
+            renderAi(currentHome);
+        }
+        tabs.forEach(function (button) {
             button.addEventListener("click", function () {
-                activeRole = button.dataset.aiRole;
-                document.querySelectorAll("[data-ai-role]").forEach(function (item) {
-                    var selected = item === button;
-                    item.classList.toggle("is-active", selected);
-                    item.setAttribute("aria-selected", String(selected));
-                });
-                renderAi(currentHome);
+                activate(button, false);
+            });
+            button.addEventListener("keydown", function (event) {
+                var index = tabs.indexOf(button);
+                var next = index;
+                if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+                else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+                else if (event.key === "Home") next = 0;
+                else if (event.key === "End") next = tabs.length - 1;
+                else return;
+                event.preventDefault();
+                activate(tabs[next], true);
             });
         });
     }

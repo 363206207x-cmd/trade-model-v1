@@ -33,19 +33,17 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(html).contains(
                 "class=\"home-rail\"", "机会资产 · 0", "id=\"homeAssetSearch\"",
-                "data-position-plan-ratio=\"70:30\"", ">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>",
+                "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "Final Execution Plan", "AI 分析工作区",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
                 "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
                 "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "查看完整审计链");
         assertThat(html).containsOnlyOnce("查看完整审计链")
                 .doesNotContain(
-                        "HOME COMPACT", ">FOUND<", ">NONE_FOUND<",
-                        "持仓监控 · 基于已录入", ">最终执行计划</h2>",
-                        ">Final Execution Plan</h2>", ">AI 分析工作区</h2>");
+                        "HOME COMPACT", ">FOUND<", ">NONE_FOUND<", ">最终执行计划</h2>");
         assertThat(css).contains(
                 "width: 64px", "height: 32px",
                 "grid-template-columns: repeat(6, minmax(0, 1fr))",
-                "grid-template-columns: minmax(0, 918fr) minmax(0, 394fr)",
+                "grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr)",
                 "grid-template-columns: minmax(0,72fr) minmax(0,28fr)",
                 "min-height: 330px")
                 .doesNotContain("sparkline", "mini-chart");
@@ -71,13 +69,13 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(script).contains(
                 "/api/dashboard/home?", "/api/asset-pool/search?query=",
-                "filter(validOpportunity).slice(0, 6)",
+                "filter(validOpportunity)", ".slice(0, 6)",
                 "has(asset && asset.opportunityScore)",
-                "finalVisible ? label(plan.finalMarketBias", "finalVisible ? label(plan.finalPlanMode",
+                "finalVisible ? label(asset.finalMarketBias", "finalVisible ? label(asset.finalPlanMode",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
                 "position.monitorConclusion", "position.suggestedManualActionText",
-                "position.entryLogicStatus", "position.reversalStatus", "position.riskReason",
+                "position.entryLogicStatus", "position.reversalStatus", "position.riskTrend",
                 "contract.normalizeAiTabs", "GPT Candidate · 非 Final",
                 "collectionStateLabel", "Candidate 摘要", "对 Candidate",
                 "label(header.dataSourceText", "label(header.aiStatusLabel")
@@ -118,7 +116,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
         String script = Files.readString(SCRIPT);
 
         assertThat(script).contains(
-                "var assets = all.filter(validOpportunity).slice(0, 6)",
+                "var assets = all.filter(validOpportunity)", ".slice(0, 6)",
                 "setText(\"opportunityHeading\", \"机会资产 · \" + assets.length)",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",

@@ -49,7 +49,8 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setAlerts(List.of(alert()));
         home.setEvents(List.of(event()));
         home.setAssets(assets);
-        home.setPositions(positions());
+        List<DashboardHomeVO.PositionVO> positions = positions(selectedPositionId);
+        home.setPositions(positions);
         home.setStates(moduleStates());
         home.setSelectedSymbol(selectedSymbol);
         home.setSelectedAssetContext(assets.stream()
@@ -58,7 +59,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setSelectedContextState(home.getSelectedAssetContext().getOpportunityState());
         home.setSelectedPositionId(selectedPositionId);
         home.setPositionSelectionStatus("READY");
-        home.setMatchingPositionCount(3);
+        home.setMatchingPositionCount(positions.size());
         home.setPositionMonitoringState("OPEN_MONITORING");
         home.setExecutionSuggestion(SELECTED_SYMBOL.equals(selectedSymbol) ? finalPlan() : noFinalPlan());
         home.setAiDecision(SELECTED_SYMBOL.equals(selectedSymbol) ? aiDecision() : unavailableAi());
@@ -122,10 +123,10 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         return List.of(
                 asset(1, "BTCUSDT", "比特币", "WAITING_TRIGGER", "PREPARATION", 86, "87%", "MEDIUM", "15m", "WEAK_BULLISH", "ALIGNED", 2),
                 asset(2, "ETHUSDT", "Ethereum", "CANDIDATE", "OBSERVATION", 81, "82%", "LOW", "1h", "BULLISH", "ALIGNED", 1),
-                asset(3, "SOLUSDT", "Solana", "TRIGGERED", "CONFIRMATION", 78, "79%", "HIGH", "5m", "WEAK_BULLISH", "MIXED_NEUTRAL", 3),
-                asset(4, "LINKUSDT", "Chainlink", "HIGH_RISK", "REDUCED", 74, "76%", "HIGH", "4h", "NEUTRAL", "MIXED_NEUTRAL", 2),
-                asset(5, "AVAXUSDT", "Avalanche", "OBSERVING", "OBSERVATION", 69, "73%", "MEDIUM", "1h", "WEAK_BEARISH", "ALIGNED", 1),
-                asset(6, "DOTUSDT", "Polkadot", "COOLING", "BLOCKED", 65, "71%", "LOW", "4h", "BEARISH", "MIXED_NEUTRAL", 2));
+                asset(3, "SOLUSDT", "Solana", "TRIGGERED", "PREPARATION", 78, "79%", "MEDIUM", "5m", "WEAK_BULLISH", "MIXED_NEUTRAL", 3),
+                asset(4, "LINKUSDT", "Chainlink", "CANDIDATE", "REDUCED", 74, "76%", "MEDIUM", "4h", "NEUTRAL", "MIXED_NEUTRAL", 2),
+                asset(5, "AVAXUSDT", "Avalanche", "CANDIDATE", "OBSERVATION", 69, "73%", "LOW", "1h", "WEAK_BEARISH", "ALIGNED", 1),
+                asset(6, "DOTUSDT", "Polkadot", "WAITING_TRIGGER", "PREPARATION", 65, "71%", "LOW", "4h", "BEARISH", "MIXED_NEUTRAL", 2));
     }
 
     private DashboardHomeVO.AssetVO asset(int slot, String symbol, String name, String opportunityState,
@@ -158,6 +159,11 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         asset.setMarketBiasLabel(biasLabel(bias));
         asset.setDataQualityScore(Math.max(72, score));
         asset.setRankingReason("机会质量与数据完整度排序");
+        boolean hasFinal = slot == 1 || slot == 3 || slot == 4;
+        asset.setHasFinal(hasFinal);
+        asset.setFinalMarketBias(hasFinal ? bias : null);
+        asset.setFinalPlanMode(hasFinal ? planMode : null);
+        asset.setFinalPlanLifecycle(slot == 3 ? "NEEDS_REVALIDATION" : hasFinal ? "CURRENT" : null);
         asset.setDataFreshness("FRESH");
         asset.setSourceProvider("Kraken");
         asset.setEvidenceCount(4);
@@ -178,17 +184,59 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
                 "WEAK_BEARISH", "弱偏空", "BEARISH", "偏空").get(bias);
     }
 
-    private List<DashboardHomeVO.PositionVO> positions() {
+    private List<DashboardHomeVO.PositionVO> positions(Long selectedPositionId) {
+        if (selectedPositionId != null && selectedPositionId >= 7201L && selectedPositionId <= 7204L) {
+            DashboardHomeVO.PositionVO position = position(7101L, "BTCUSDT", "LONG", "SYSTEM_PLAN_POSITION",
+                    "62000", "64100", "3.39", "MEDIUM", "STABLE", "STILL_VALID", "NO_REVERSAL",
+                    "NO_CLEAR_RISK_FACTOR", "LOGIC_VALID", "CONTINUE_HOLD", "逻辑仍成立", "继续持有",
+                    NOW.minusDays(12));
+            applyUntrustedMonitorState(position, selectedPositionId);
+            return List.of(position);
+        }
         return List.of(
                 position(7101L, "BTCUSDT", "LONG", "SYSTEM_PLAN_POSITION", "62000", "64100", "3.39",
                         "MEDIUM", "STABLE", "STILL_VALID", "NO_REVERSAL", "NO_CLEAR_RISK_FACTOR",
                         "LOGIC_VALID", "CONTINUE_HOLD", "逻辑仍成立", "继续持有", NOW.minusDays(12)),
-                position(7102L, "ETHUSDT", "SHORT", "MANUAL_POSITION", "3400", "3490", "-2.65",
+                position(7102L, "ETHUSDT", "SHORT", "MANUAL_INDEPENDENT", "3400", "3490", "-2.65",
                         "HIGH", "INCREASED", "WEAKENED", "WEAK_REVERSAL", "OPPOSING_EVIDENCE_INCREASED",
                         "LOGIC_WEAKENED", "TIGHTEN_STOP", "逻辑弱化", "收紧止损", NOW.minusDays(7)),
                 position(7103L, "SOLUSDT", "LONG", "SYSTEM_PLAN_POSITION", "145", "129.5", "-10.69",
                         "EXTREME", "SHARPLY_INCREASED", "INVALIDATED", "STRONG_REVERSAL", "STRUCTURE_CHANGED",
                         "PLAN_INVALIDATED", "WAIT_CONFIRMATION", "计划失效", "等待人工确认", NOW.minusDays(4)));
+    }
+
+    private void applyUntrustedMonitorState(DashboardHomeVO.PositionVO position, Long scenarioId) {
+        String trustState = switch (scenarioId.intValue()) {
+            case 7201 -> "PENDING";
+            case 7202 -> "STALE";
+            case 7203 -> "INVALID";
+            default -> "SOURCE_UNAVAILABLE";
+        };
+        position.setMonitorTrustState(trustState);
+        position.setDataState("WAITING_MONITOR_DATA");
+        position.setMarkPrice(null);
+        position.setCurrentPrice(null);
+        position.setMarkPriceFresh(false);
+        position.setPnlAmount(null);
+        position.setPnlPercent(null);
+        position.setPnlPct(null);
+        position.setRiskLevel(null);
+        position.setRiskLevelLabel(null);
+        position.setRiskTrend(null);
+        position.setEntryLogicStatus(null);
+        position.setEntryLogicStatusLabel(null);
+        position.setReversalStatus(null);
+        position.setReversalStatusLabel(null);
+        position.setRiskReason(null);
+        position.setRiskReasonLabel(null);
+        position.setMonitorConclusion(null);
+        position.setMonitorConclusionLabel(null);
+        position.setSuggestedAction(null);
+        position.setSuggestedManualAction(null);
+        position.setSuggestedManualActionText(null);
+        position.setLastMonitorAt(null);
+        position.setLastMonitorTime(null);
+        position.setModuleState("MISSING");
     }
 
     private DashboardHomeVO.PositionVO position(Long id, String symbol, String direction, String sourceType,
@@ -233,7 +281,8 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         position.setWarningState("EXTREME".equals(risk) ? "HIGH" : "NORMAL");
         position.setDataState("STABLE".equals(riskTrend) ? "OPEN_MONITORING" :
                 ("PLAN_INVALIDATED".equals(conclusion) ? "PLAN_INVALIDATED" : "RISK_ESCALATED"));
-        position.setFinalPlanId("MANUAL_POSITION".equals(sourceType) ? null : "ui-review-final-" + symbol.toLowerCase());
+        position.setMonitorTrustState("VERIFIED_FRESH");
+        position.setFinalPlanId("MANUAL_INDEPENDENT".equals(sourceType) ? null : "ui-review-final-" + symbol.toLowerCase());
         return position;
     }
 
@@ -276,6 +325,10 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         plan.setResolverResultId("ui-review-resolver-btc-001");
         plan.setValidationResultId("ui-review-validation-btc-001");
         plan.setFinalPlan(true);
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setPlanVersion(3);
+        plan.setNeedsRevalidation(false);
+        plan.setRevalidationRule("结构或数据变化后重新校验");
         plan.setExecutionFeasibilityStatus("MANUAL_CONFIRMATION_REQUIRED");
         plan.setNotTradeInstruction(true);
         plan.setModuleState("READY");

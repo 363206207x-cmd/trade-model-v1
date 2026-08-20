@@ -18,7 +18,8 @@ class HomeUiReviewRuntimeContractTest {
                         "UI_REVIEW_MODE=${UI_REVIEW_MODE}", "HOME_URL=\"${LOCAL_URL}/dashboard\"")
                 .doesNotContain("ui-review.html", "home-demo.html", "dashboard-preview.html");
         assertThat(fixture).contains("@Profile(\"ui-review\")", "@Primary",
-                        "implements DashboardHomeService", "setAssets(assets)", "setPositions(positions())")
+                        "implements DashboardHomeService", "setAssets(assets)", "setPositions(positions)",
+                        "applyUntrustedMonitorState", "PENDING", "STALE", "INVALID", "SOURCE_UNAVAILABLE")
                 .doesNotContain("Mapper", "Repository", "AUTO_ORDER", "AUTO_CLOSE", "AUTO_REVERSE");
     }
 
@@ -32,7 +33,7 @@ class HomeUiReviewRuntimeContractTest {
                 .doesNotContain(
                         "按需分析", "加入观察资产池", "已在观察资产池",
                         "请先从搜索结果中选择", "请尝试其他名称或交易对",
-                        "正在分析…", "正在添加…", "Final Bias", "Plan Mode</small>",
+                        "正在分析…", "正在添加…",
                         "当前没有通过规则校验的 Final Execution Plan",
                         "仅供参考", "不构成投资建议", "请自行判断");
     }

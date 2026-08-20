@@ -498,6 +498,10 @@ public class DashboardHomeVO {
         private String aiDecisionResult;
         private Integer dataQualityScore;
         private String rankingReason;
+        private Boolean hasFinal = false;
+        private String finalMarketBias;
+        private String finalPlanMode;
+        private String finalPlanLifecycle;
         private String marketBias;
         private String marketBiasLabel;
         private Integer compositeScore;
@@ -604,6 +608,14 @@ public class DashboardHomeVO {
         public void setDataQualityScore(Integer dataQualityScore) { this.dataQualityScore = dataQualityScore; }
         public String getRankingReason() { return rankingReason; }
         public void setRankingReason(String rankingReason) { this.rankingReason = rankingReason; }
+        public Boolean getHasFinal() { return hasFinal; }
+        public void setHasFinal(Boolean hasFinal) { this.hasFinal = hasFinal; }
+        public String getFinalMarketBias() { return finalMarketBias; }
+        public void setFinalMarketBias(String finalMarketBias) { this.finalMarketBias = finalMarketBias; }
+        public String getFinalPlanMode() { return finalPlanMode; }
+        public void setFinalPlanMode(String finalPlanMode) { this.finalPlanMode = finalPlanMode; }
+        public String getFinalPlanLifecycle() { return finalPlanLifecycle; }
+        public void setFinalPlanLifecycle(String finalPlanLifecycle) { this.finalPlanLifecycle = finalPlanLifecycle; }
 
         public String getMarketBias() {
             return marketBias;
@@ -771,6 +783,7 @@ public class DashboardHomeVO {
         private String moduleState = "MISSING";
         private String warningState = "MISSING";
         private String dataState = "WAITING_MONITOR_DATA";
+        private String monitorTrustState = "SOURCE_UNAVAILABLE";
 
         @JsonSerialize(using = ToStringSerializer.class)
         public Long getPositionId() {
@@ -1005,6 +1018,8 @@ public class DashboardHomeVO {
         public void setWarningState(String warningState) { this.warningState = warningState; }
         public String getDataState() { return dataState; }
         public void setDataState(String dataState) { this.dataState = dataState; }
+        public String getMonitorTrustState() { return monitorTrustState; }
+        public void setMonitorTrustState(String monitorTrustState) { this.monitorTrustState = monitorTrustState; }
     }
 
     public static class ExecutionSuggestionVO {
@@ -1059,6 +1074,11 @@ public class DashboardHomeVO {
         private OffsetDateTime validFrom;
         private OffsetDateTime expiresAt;
         private String invalidCondition;
+        private String planLifecycleState;
+        private Integer planVersion;
+        private Boolean needsRevalidation;
+        private String revalidationReason;
+        private String revalidationRule;
         private Boolean notTradeInstruction = true;
         private String moduleState = "MISSING";
 
@@ -1221,6 +1241,17 @@ public class DashboardHomeVO {
         public void setInvalidCondition(String invalidCondition) {
             this.invalidCondition = invalidCondition;
         }
+
+        public String getPlanLifecycleState() { return planLifecycleState; }
+        public void setPlanLifecycleState(String planLifecycleState) { this.planLifecycleState = planLifecycleState; }
+        public Integer getPlanVersion() { return planVersion; }
+        public void setPlanVersion(Integer planVersion) { this.planVersion = planVersion; }
+        public Boolean getNeedsRevalidation() { return needsRevalidation; }
+        public void setNeedsRevalidation(Boolean needsRevalidation) { this.needsRevalidation = needsRevalidation; }
+        public String getRevalidationReason() { return revalidationReason; }
+        public void setRevalidationReason(String revalidationReason) { this.revalidationReason = revalidationReason; }
+        public String getRevalidationRule() { return revalidationRule; }
+        public void setRevalidationRule(String revalidationRule) { this.revalidationRule = revalidationRule; }
 
         public Boolean getNotTradeInstruction() { return notTradeInstruction; }
         public void setNotTradeInstruction(Boolean value) { this.notTradeInstruction = value; }

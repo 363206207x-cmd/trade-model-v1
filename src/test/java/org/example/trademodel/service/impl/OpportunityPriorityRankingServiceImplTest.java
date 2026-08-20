@@ -185,12 +185,15 @@ class OpportunityPriorityRankingServiceImplTest {
 
     @Test
     void highRiskOpportunityIsReservedForAlertsAndExcludedFromPositiveTopSix() {
-        List<String> symbols = List.of("HIGHUSDT", "READYUSDT");
+        List<String> symbols = List.of("STATEHIGHUSDT", "RISKHIGHUSDT", "EXTREMEUSDT", "READYUSDT");
         List<AssetStateDO> stateRows = states(symbols);
         stateRows.get(0).setState(AssetStateEnum.HIGH_RISK);
+        List<DecisionResultVO> decisionRows = decisions(symbols, List.of(99, 98, 97, 70));
+        stateRows.get(1).setRisk("HIGH");
+        stateRows.get(2).setRisk("EXTREME");
         when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(symbols));
         when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
-                .thenReturn(decisions(symbols, List.of(99, 70)));
+                .thenReturn(decisionRows);
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
                 .thenReturn(stateRows);
 

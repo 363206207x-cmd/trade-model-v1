@@ -13,6 +13,8 @@ class FundamentalAiV41FinalP1RemediationContractTest {
     private static final Path WORKSPACE = Path.of("src/main/resources/templates/workspace.html");
     private static final Path SCRIPT = Path.of("src/main/resources/static/js/workspace.js");
     private static final Path STYLE = Path.of("src/main/resources/static/css/workspace.css");
+    private static final Path HOME = Path.of("src/main/resources/templates/home.html");
+    private static final Path HOME_STYLE = Path.of("src/main/resources/static/css/home.css");
 
     @Test
     void dashboardProductionRouteUsesTheApprovedHomeVisualSystem() throws Exception {
@@ -27,21 +29,22 @@ class FundamentalAiV41FinalP1RemediationContractTest {
 
     @Test
     void canonicalHomeLocksSixSegmentsTopSixRatiosAndOneVisibleRole() throws Exception {
-        String html = Files.readString(WORKSPACE);
-        String css = Files.readString(STYLE);
+        String html = Files.readString(HOME);
+        String css = Files.readString(HOME_STYLE);
         assertThat(html).contains(
-                "pageKey == 'home'", "data-position-execution-ratio=\"60:40\"",
-                "homeMarketTrend", "homeSystemRisk", "homeDataQuality", "homeAiService",
-                "homeOpportunityCount", "homeHotReset", "homeOpportunityGrid",
-                "homePositionList", "homePlanSummary", "homeAiRoleContent", "homeConsistencyContent");
+                "data-page-key=\"home\"", "data-position-plan-ratio=\"70:30\"",
+                "statusEnvironment", "statusSystem", "statusData", "statusService",
+                "statusAccount", "statusReset", "opportunityGrid",
+                "positionList", "planContent", "aiRolePanel", "conflictSummary");
         assertThat(css).contains(
                 "grid-template-columns: repeat(6, minmax(0, 1fr))",
                 "grid-template-columns: repeat(3, minmax(0, 1fr))",
-                "grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr)",
-                "grid-template-columns: minmax(0, 19fr) minmax(240px, 6fr)",
-                "@container (max-width: 1039px)", "height: 128px")
+                "grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr)",
+                "grid-template-columns: minmax(0,22fr) minmax(0,28fr) minmax(0,28fr) minmax(0,22fr)",
+                "@container (max-width: 1239px)", "height: 120px")
                 .doesNotContain("mini-chart", "sparkline");
-        assertThat(html).containsOnlyOnce("id=\"homeAiRoleContent\"");
+        assertThat(html).containsOnlyOnce("id=\"aiRolePanel\"")
+                .doesNotContain("60:40", "pageKey == 'home'");
     }
 
     @Test
@@ -87,8 +90,8 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "userFacingSemantic.field", "fieldLabel(entry[0])",
                 "label(item?.scoreType, \"评分项\")",
                 "label(item?.evidenceType, \"证据\")",
-                "return /^[A-Z0-9][A-Z0-9._:/-]{1,31}$/.test(symbol) ? symbol : \"\";",
-                "frontendContract.replaceUrlParam(\"asset\", selectedHomeSymbol)");
+                "GPT_FINAL: preview ? \"证据综合与方向假设\" : \"证据综合与候选形成\"",
+                "GEMINI_REVIEW: preview ? \"证据质量与逻辑复核\" : \"证据与风险复核\"");
         assertThat(contract).contains(
                 "var USER_FACING_FIELD_LABELS", "function userFacingField(value)",
                 "field: userFacingField", "finalMarketBias: \"最终市场方向\"",
@@ -97,6 +100,6 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "最终裁决</", "冲突复核</", "反方挑战</",
                 "Preview 不创建机会", "计划不会自动变成持仓",
                 "仅展示通过 Rule Validation", "复核不会产生交易授权",
-                "资产池是机会发现的唯一入口");
+                "资产池是机会发现的唯一入口", "Telegram", "telegram");
     }
 }

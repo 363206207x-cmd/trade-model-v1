@@ -16,6 +16,9 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
     private static final Path WORKSPACE = Path.of("src/main/resources/templates/workspace.html");
     private static final Path WORKSPACE_JS = Path.of("src/main/resources/static/js/workspace.js");
     private static final Path WORKSPACE_CSS = Path.of("src/main/resources/static/css/workspace.css");
+    private static final Path HOME = Path.of("src/main/resources/templates/home.html");
+    private static final Path HOME_JS = Path.of("src/main/resources/static/js/home-runtime.js");
+    private static final Path HOME_CSS = Path.of("src/main/resources/static/css/home.css");
     private static final Path ROUTES = Path.of(
             "src/main/java/org/example/trademodel/controller/DesktopWorkspaceController.java");
 
@@ -58,8 +61,8 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
 
         assertThat(overlayCodes).containsExactlyInAnyOrder(
                 "O01", "O02", "O03", "O04", "O05", "O06",
-                "O07", "O08", "O09", "O10", "O11");
-        assertThat(count(html, "<dialog class=\"overlay")).isEqualTo(11);
+                "O07", "O08", "O09", "O11");
+        assertThat(count(html, "<dialog class=\"overlay")).isEqualTo(10);
         assertThat(Files.readString(WORKSPACE_JS)).contains(
                 "dialog.showModal()", "dialog.close()", "restoreFocus",
                 "dialog.addEventListener(\"cancel\"", "focus()");
@@ -70,7 +73,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String html = Files.readString(WORKSPACE);
         Set<String> families = captures(html, "data-component-family=\"([^\"]+)\"");
 
-        assertThat(families).hasSize(54).contains(
+        assertThat(families).hasSize(53).contains(
                 "AppShell", "SideNav", "PageHeader", "SystemStatusBar", "StateBadge",
                 "EmptyState", "AsyncTaskIndicator", "Drawer", "Modal", "AuditMetaDisclosure",
                 "AssetSearch", "SearchResultItem", "AssetPoolToolbar", "AssetPoolTable",
@@ -82,33 +85,35 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "FailurePathList", "ConflictSummary", "PositionRiskAggregate", "PositionCard",
                 "PositionActualForm", "PlanActualComparison", "MonitorTimeline", "ReviewCard",
                 "AtTimeLaterCompare", "ResponsibilityChain", "MessageListItem",
-                "ChannelDeliveryStatus", "OriginalSnapshotCard", "RecheckResultHero",
-                "RecheckActionBar", "EventCalendar", "EventWindowBadge", "TelegramBindingPanel",
+                "OriginalSnapshotCard", "RecheckResultHero",
+                "RecheckActionBar", "EventCalendar", "EventWindowBadge", "FocusedDetailShell",
                 "RiskPreferenceForm", "ProviderStatusPanel", "AuditChainStepper");
+        assertThat(html).doesNotContain("ChannelDeliveryStatus", "TelegramBindingPanel");
         assertThat(html).doesNotContain("data-detached-instance=\"true\"");
     }
 
     @Test
     void desktopHomeUsesFrozenProportionsAndDynamicTopSixWithoutFakeMarketVisuals() throws Exception {
-        String html = Files.readString(WORKSPACE);
-        String script = Files.readString(WORKSPACE_JS);
-        String css = Files.readString(WORKSPACE_CSS);
+        String html = Files.readString(HOME);
+        String script = Files.readString(HOME_JS);
+        String css = Files.readString(HOME_CSS);
 
         assertThat(css).contains(
+                "grid-template-columns: repeat(6, minmax(0, 1fr))",
                 "grid-template-columns: repeat(3, minmax(0, 1fr))",
-                "grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr)",
-                "grid-template-columns: minmax(0, 19fr) minmax(240px, 6fr)");
+                "grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr)",
+                "grid-template-columns: minmax(0,22fr) minmax(0,28fr) minmax(0,28fr) minmax(0,22fr)");
         assertThat(html).contains(
-                "data-position-execution-ratio=\"60:40\"",
-                "id=\"homeOpportunityGrid\"",
-                "id=\"homePositionList\"",
-                "id=\"homePlanSummary\"",
-                "id=\"homeAiRoleContent\"");
+                "data-position-plan-ratio=\"70:30\"",
+                "id=\"opportunityGrid\"",
+                "id=\"positionList\"",
+                "id=\"planContent\"",
+                "id=\"aiRolePanel\"");
         assertThat(script).contains(
-                "asset?.primaryTimeframe",
-                "asset?.secondaryOpportunityCount",
-                "asset?.timeframeConflictState",
-                "frontendContract.replaceUrlParam(\"asset\"")
+                "asset.primaryTimeframe",
+                "asset.secondaryOpportunityCount",
+                "asset.timeframeConflictState",
+                "contract.replaceUrlParam(\"asset\"")
                 .doesNotContain("模拟K线", "模拟走势", "mini-chart", "sparkline");
     }
 
@@ -119,7 +124,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String css = Files.readString(WORKSPACE_CSS);
 
         assertThat(script).contains(
-                "/api/asset-pool", "/api/dashboard/home?", "new URLSearchParams({ limit: \"6\" })",
+                "/api/asset-pool", "/api/dashboard/home?limit=6",
                 "/api/user-positions/open",
                 "/api/review/center", "/api/ai/audit-chain", "/api/workspace/messages",
                 "/api/workspace/rechecks/", "/api/workspace/plans/", "/api/workspace/events",
@@ -127,10 +132,11 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "notTradeInstruction")
                 .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER");
         assertThat(html).contains(
-                "录入实际持仓", "记录平仓", "开始分析", "加入资产池持续跟踪")
+                "录入持仓", "记录平仓", "开始预览", "加入资产池持续跟踪")
                 .doesNotContain("Preview 不创建机会")
                 .doesNotContain("自动开仓", "自动平仓", "自动反手", "自动下单");
         assertThat(css).contains("overflow-x: hidden", ":focus-visible");
+        assertThat(html + script).doesNotContain("Telegram", "telegram", "pageKey == 'home'", "60:40");
     }
 
     private static Set<String> captures(String source, String regex) {

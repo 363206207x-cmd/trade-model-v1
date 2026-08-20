@@ -473,7 +473,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 .contains("private String fallbackReason;");
         assertThat(service)
                 .contains(
-                        "row.setSourceType(trimToNull(position.getSourceType()))",
+                        "row.setSourceType(normalizedPositionSource(position))",
                         "row.setFinalPlanId(trimToNull(position.getFinalPlanId()))",
                         "suggestion.setFinalPlan(Boolean.TRUE.equals(executionPlan.getFinalPlan()))",
                         "tab.setProvider(role.provider())",

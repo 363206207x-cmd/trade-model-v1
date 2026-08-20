@@ -85,6 +85,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -697,12 +698,17 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             List<HomeTopAssetProjection> projections,
             int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
+        Set<Long> usedAssetIds = new LinkedHashSet<>();
+        Set<String> usedSymbols = new LinkedHashSet<>();
         for (HomeTopAssetProjection projection : projections == null
                 ? List.<HomeTopAssetProjection>of() : projections) {
             if (assets.size() >= limit) {
                 break;
             }
-            if (projection == null || projection.sourceDecision() == null) {
+            if (projection == null || projection.sourceDecision() == null
+                    || projection.assetId() == null
+                    || !usedAssetIds.add(projection.assetId())
+                    || !usedSymbols.add(normalizeSymbol(projection.symbol()))) {
                 continue;
             }
             DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
@@ -721,6 +727,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             asset.setAiDecisionResult(projection.aiDecisionResult());
             asset.setDataQualityScore(projection.dataQuality());
             asset.setRankingReason(projection.rankingReason());
+            applyCardFinalProjection(asset, projection.sourceDecision());
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
                 setFieldSource(asset, "score", "DERIVED");
@@ -728,6 +735,32 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             assets.add(asset);
         }
         return assets;
+    }
+
+    private void applyCardFinalProjection(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
+        asset.setHasFinal(false);
+        if (executionPlanMapper == null || analysisRunMapper == null || opportunityLogService == null) {
+            return;
+        }
+        AssetExecutionPlanResolution resolution = resolveAssetExecutionPlan(decision);
+        if (!resolution.verified() || resolution.executionPlan() == null) {
+            return;
+        }
+        ExecutionPlanDO plan = resolution.executionPlan();
+        String lifecycle = trimToNull(plan.getPlanLifecycleState());
+        boolean visibleLifecycle = "CURRENT".equals(lifecycle) || "NEEDS_REVALIDATION".equals(lifecycle);
+        boolean validated = Boolean.TRUE.equals(plan.getFinalPlan())
+                && "PASS".equals(trimToNull(plan.getRuleValidationStatus()))
+                && trimToNull(plan.getCandidateId()) != null
+                && trimToNull(plan.getFinalMarketBias()) != null
+                && trimToNull(plan.getFinalPlanMode()) != null;
+        if (!validated || !visibleLifecycle) {
+            return;
+        }
+        asset.setHasFinal(true);
+        asset.setFinalMarketBias(trimToNull(plan.getFinalMarketBias()));
+        asset.setFinalPlanMode(trimToNull(plan.getFinalPlanMode()));
+        asset.setFinalPlanLifecycle(lifecycle);
     }
 
     private List<DashboardHomeVO.AssetVO> buildLegacyConstructorAssets(List<DecisionResultVO> decisions,
@@ -1058,12 +1091,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             row.setOpenedAt(position.getOpenedAt());
             row.setNextMonitorAt(null);
             row.setSourceRefId(trimToNull(position.getSourceRefId()));
-            row.setSourceType(trimToNull(position.getSourceType()));
+            row.setSourceType(normalizedPositionSource(position));
             row.setFinalPlanId(trimToNull(position.getFinalPlanId()));
             if (trustedMonitor) {
                 applyTrustedMonitor(row, position, latestMonitorLog);
+                row.setMonitorTrustState("VERIFIED_FRESH");
             } else {
-                applyWaitingMonitor(row, latestMonitorLog);
+                applyWaitingMonitor(row, latestMonitorLog, asOf);
             }
             if (trustedMonitor
                     && positionPlanSourceResolver != null
@@ -1135,7 +1169,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setDataState(positionDataState(row));
     }
 
-    private void applyWaitingMonitor(DashboardHomeVO.PositionVO row, PositionMonitorLogDTO monitor) {
+    private void applyWaitingMonitor(DashboardHomeVO.PositionVO row,
+                                     PositionMonitorLogDTO monitor,
+                                     LocalDateTime asOf) {
         row.setMarkPrice(null);
         row.setCurrentPrice(null);
         row.setMarkPriceSource(null);
@@ -1165,6 +1201,33 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setLastMonitorAt(null);
         row.setLastMonitorTime(null);
         row.setDataState("WAITING_MONITOR_DATA");
+        row.setMonitorTrustState(monitorTrustState(monitor, asOf));
+    }
+
+    private String monitorTrustState(PositionMonitorLogDTO monitor, LocalDateTime asOf) {
+        if (monitor == null) return "SOURCE_UNAVAILABLE";
+        String sourceStatus = upper(monitor.getMonitorSourceStatus());
+        if ("PENDING_VERIFICATION".equals(sourceStatus)) return "PENDING";
+        if ("INVALID".equals(sourceStatus)) return "INVALID";
+        if ("VERIFIED".equals(sourceStatus)
+                && monitor.getFreshUntil() != null
+                && asOf != null
+                && !asOf.isBefore(monitor.getFreshUntil())) {
+            return "STALE";
+        }
+        return "INVALID";
+    }
+
+    private String normalizedPositionSource(UserPositionVO position) {
+        String source = upper(position == null ? null : position.getSourceType());
+        if ("SYSTEM_PLAN_POSITION".equals(source)) {
+            return trimToNull(position.getFinalPlanId()) == null ? "SOURCE_UNAVAILABLE" : source;
+        }
+        if ("MANUAL".equals(source) || "MANUAL_POSITION".equals(source)
+                || "MANUAL_INDEPENDENT".equals(source)) {
+            return "MANUAL_INDEPENDENT";
+        }
+        return "SOURCE_UNAVAILABLE";
     }
 
     private boolean isManualPosition(UserPositionVO position) {
@@ -1594,6 +1657,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setValidFrom(planValidity.validFrom());
         suggestion.setExpiresAt(planValidity.expiresAt());
         suggestion.setInvalidCondition(trimPlanValue(executionPlan.getInvalidCondition()));
+        suggestion.setPlanLifecycleState(trimToNull(executionPlan.getPlanLifecycleState()));
+        suggestion.setPlanVersion(executionPlan.getPlanVersion());
+        suggestion.setNeedsRevalidation(Boolean.TRUE.equals(executionPlan.getNeedsRevalidation()));
+        suggestion.setRevalidationReason(trimToNull(executionPlan.getRevalidationReason()));
+        suggestion.setRevalidationRule(trimToNull(executionPlan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(executionPlan.getNotTradeInstruction()));
         return suggestion;
     }

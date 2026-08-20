@@ -72,15 +72,13 @@ class TelegramNotificationControllerTest {
     }
 
     @Test
-    void messageCenterExposesRetryOnlyForTerminalTelegramDeliveryStates() throws Exception {
-        String script = Files.readString(Path.of("src/main/resources/static/js/workspace.js"));
+    void currentProductUiDoesNotExposeTheDormantTelegramChannel() throws Exception {
+        String currentUi = Files.readString(Path.of("src/main/resources/templates/home.html"))
+                + Files.readString(Path.of("src/main/resources/templates/workspace.html"))
+                + Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"))
+                + Files.readString(Path.of("src/main/resources/static/js/workspace.js"));
 
-        assertThat(script).contains(
-                "[\"FAILED\", \"NOT_CONFIGURED\"]",
-                "data-retry-telegram",
-                "/api/settings/notifications/telegram/messages/",
-                "item.positionId ? \"/positions/\"",
-                "item.currentRecheckId ? \"/recheck/\"",
-                "Telegram 投递已重新排队");
+        assertThat(currentUi).doesNotContain(
+                "Telegram", "telegram", "data-retry-telegram", "ChannelDeliveryStatus", "O10");
     }
 }
