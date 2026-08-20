@@ -51,16 +51,13 @@ threshold, provider, business-rule, or automatic-trading capability changed.
 
 ## Workflow Contract Status
 
-`bash scripts/check-workflow-contract.sh` reaches all workflow self-tests, then
-is blocked by `validate-frontend-interaction-runtime-closure-authorization.sh`.
-That validator intentionally rejects any `src/` diff because it validates the
-docs-only authorization-registration package, while PR #1195 is the already
-authorized implementation package. The same behavior existed before this Owner
-patch and was recorded in the prior report. This task does not modify or bypass
-authorization/workflow policy.
+`bash scripts/check-workflow-contract.sh` passes on the clean exact Head after
+all implementation files are committed. GitHub exact-Head workflow-contract and
+both quality-gate runs also pass. No authorization or workflow script was
+modified or bypassed.
 
-WORKFLOW_CONTRACT: BLOCKED_BY_AUTHORIZATION_VALIDATOR_SCOPE
-GLOBAL_AUDIT_BLOCKERS: 1
+WORKFLOW_CONTRACT: PASS
+GLOBAL_AUDIT_BLOCKERS: 0
 
 ## Visual Evidence
 
@@ -69,6 +66,5 @@ Evidence is indexed by `GLOBAL_UI_ALIGNMENT_VISUAL_ACCEPTANCE.md` and stored in
 
 ## Current Gate
 
-All Owner visual and semantic findings are closed. PR #1195 remains Draft and
-must not merge. The workflow validator scope mismatch remains explicitly open
-for repository-owner disposition; it is not hidden as a visual PASS.
+All Owner visual, semantic, and required validation findings are closed. PR
+#1195 remains Draft and must not merge until the next Owner decision.
