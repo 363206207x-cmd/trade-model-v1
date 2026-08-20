@@ -157,6 +157,8 @@ validate_contract_task() {
   v4_1_telegram_live_acceptance_status="$(yaml_value "$TASK_FILE" v4_1_telegram_live_acceptance_status)"
   local_real_authorization_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
+  frontend_interaction_authorization_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
+  frontend_interaction_implementation_status="$(yaml_value "$TASK_FILE" frontend_interaction_implementation_status)"
   p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
@@ -164,12 +166,12 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED local-real authorization declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED frontend interaction authorization declaration mismatch" >&2; failed=1; }
   [[ "$current_package_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized local-real package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized frontend interaction package mismatch" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded local-real permissions are incomplete" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded frontend interaction permissions are incomplete" >&2; failed=1; }
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   [[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || { echo "TASK_VALIDATION_FAILED P1B-1 predecessor is not effective" >&2; failed=1; }
   [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED Product P1B predecessor boundary mismatch" >&2; failed=1; }
@@ -178,8 +180,8 @@ validate_contract_task() {
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
   [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
-  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$local_real_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$local_real_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "LOCAL_REAL_READINESS_AND_CURRENT_HOME_BINDING_ONLY" ]] || { echo "TASK_VALIDATION_FAILED local-real authorization boundary mismatch" >&2; failed=1; }
-  [[ -f docs/FUNDAMENTAL_AI_LOCAL_REAL_SOURCE_MAPPING.md && -f docs/FUNDAMENTAL_AI_LOCAL_REAL_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_LOCAL_REAL_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED local-real authorization artifacts are missing" >&2; failed=1; }
+  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "DESKTOP_RUNTIME_INTERACTION_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED frontend interaction authorization boundary mismatch" >&2; failed=1; }
+  [[ -f docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_SOURCE_MAPPING.md && -f docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_OWNERSHIP_MAP.md && -f docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md && -f docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED frontend interaction authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
     local task_active_block task_module task_next_action
@@ -269,6 +271,8 @@ v4_1_telegram_implementation_runtime_status="$(state_value "$state_text" V4_1_TE
 v4_1_telegram_live_acceptance_runtime_status="$(state_value "$state_text" V4_1_TELEGRAM_LIVE_ACCEPTANCE_STATUS)"
 local_real_authorization_runtime_status="$(state_value "$state_text" LOCAL_REAL_AUTHORIZATION_STATUS)"
 local_real_implementation_runtime_status="$(state_value "$state_text" LOCAL_REAL_IMPLEMENTATION_STATUS)"
+frontend_interaction_authorization_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_AUTHORIZATION_STATUS)"
+frontend_interaction_implementation_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_IMPLEMENTATION_STATUS)"
 resolved_from_state="$(state_value "$state_text" RESOLVED_FROM_STATE)"
 resolution_status="$(state_value "$state_text" RESOLUTION_STATUS)"
 resolution_block_reason="$(state_value "$state_text" RESOLUTION_BLOCK_REASON)"
@@ -340,6 +344,10 @@ case "$resolved_scope_profile" in
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: local-real package resolved a forbidden Figma file." >&2; exit 1; }
+        elif [[ "$resolved_package" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
+          [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: frontend interaction package resolved with forbidden Figma permission." >&2; exit 1; }
+          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: frontend interaction package resolved with forbidden Mobile permission." >&2; exit 1; }
+          [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: frontend interaction package resolved a forbidden Figma file." >&2; exit 1; }
         fi
         ;;
       *)
@@ -387,6 +395,8 @@ V4_1_TELEGRAM_IMPLEMENTATION_STATUS: $v4_1_telegram_implementation_runtime_statu
 V4_1_TELEGRAM_LIVE_ACCEPTANCE_STATUS: $v4_1_telegram_live_acceptance_runtime_status
 LOCAL_REAL_AUTHORIZATION_STATUS: $local_real_authorization_runtime_status
 LOCAL_REAL_IMPLEMENTATION_STATUS: $local_real_implementation_runtime_status
+FRONTEND_INTERACTION_AUTHORIZATION_STATUS: $frontend_interaction_authorization_runtime_status
+FRONTEND_INTERACTION_IMPLEMENTATION_STATUS: $frontend_interaction_implementation_runtime_status
 RESOLVED_PACKAGE: $resolved_package
 RESOLVED_MODE: $resolved_mode
 RESOLVED_EDIT_PERMISSION: $resolved_edit_permission

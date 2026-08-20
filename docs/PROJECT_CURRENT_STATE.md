@@ -8,13 +8,31 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI Local-Real Readiness Authorization
-Product Phase Status: LOCAL_REAL_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact readiness synchronization and current approved Home live-binding permission; no application implementation is included here
-Next Business Phase: LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT
+Product Phase: Fundamental AI Frontend Interaction Runtime Closure Authorization
+Product Phase Status: FRONTEND_INTERACTION_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact Desktop runtime interaction closure permission; no application implementation is included here
+Next Business Phase: FRONTEND_INTERACTION_RUNTIME_CLOSURE
 Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## Fundamental AI Frontend Interaction Runtime Closure Authorization
+
+PR #1192 is effective on merged main
+`141af9945b2e6219ab1a5fbbc904352539b1ac81`. The approved Home now consumes
+current runtime data, while the owner walkthrough found one P0 interaction
+gap: search results cannot be explicitly selected and therefore expose no
+usable analysis-preview or Asset Pool add action.
+
+This A-risk package maps the gap and the bounded Desktop walkthrough to the
+existing catalog search, Asset Pool, analysis preview, Dashboard, route and
+overlay owners. It authorizes exactly `FRONTEND_INTERACTION_RUNTIME_CLOSURE`
+after clean synchronized merged-main validation. It does not authorize Figma,
+Mobile, Schema, CoinGlass, AI enablement, quality-threshold changes, fake data,
+Home redesign, automatic trading or automatic position mutation. Capability
+movement is limited to completing already defined user actions.
 
 ---
 
