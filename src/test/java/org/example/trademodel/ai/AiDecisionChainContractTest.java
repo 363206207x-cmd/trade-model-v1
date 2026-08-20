@@ -194,6 +194,23 @@ class AiDecisionChainContractTest {
         assertThat(payload.dataJson()).doesNotContain("abcdefghijklmnop", "sk-supersecret");
         assertThat(root.path("safetyBoundary").path("candidateGenerationOnly").asBoolean()).isTrue();
         assertThat(root.path("safetyBoundary").path("notFinalExecutionPlanCreation").asBoolean()).isTrue();
+        assertThat(root.path("interpretationContract").path("humanLanguage").asText())
+                .isEqualTo("SIMPLIFIED_CHINESE");
+        assertThat(root.path("interpretationContract").path("requiredEvidenceDomains").toString())
+                .contains("KLINE_MULTI_TIMEFRAME", "COINGLASS_OPEN_INTEREST",
+                        "COINGLASS_WEIGHTED_FUNDING", "COINGLASS_LIQUIDATION",
+                        "COINGLASS_LONG_SHORT_RATIO");
+        assertThat(root.path("interpretationContract").path("crossEvidenceRules").toString())
+                .contains("PRICE_UP_AND_OI_DOWN_IS_SHORT_COVERING",
+                        "LIQUIDATION_IS_FORCED_FLOW_NOT_INDEPENDENT_DIRECTION_PROOF",
+                        "LONG_SHORT_RATIO_IS_CROWDING_NOT_CAPITAL_OR_DIRECTION_PROOF");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GPT_FINAL))
+                .contains("Simplified Chinese", "CoinGlass open interest", "weighted funding",
+                        "liquidation", "long/short-ratio", "conclusion first");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GEMINI_REVIEW))
+                .contains("can be trusted", "stop-loss/source problem", "REJECT_CANDIDATE");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GROK_CHALLENGE))
+                .contains("most likely failure conclusion first", "forced-flow evidence", "crowding evidence");
         assertThat(root.path("outputContract").path("additionalProperties").asBoolean()).isFalse();
     }
 
