@@ -80,7 +80,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "Gemini 复核结论", "Grok 风险结论", "现在该怎么做",
                 "renderDerivatives", "CoinGlass 衍生品实况 · 数据时间独立标注",
                 "plan.stopZone || plan.stopLoss", "止损", "失效条件",
-                "collectionStateLabel", "为什么", "最重要的风险",
+                "collectionStateLabel", "为什么", "最需要防什么",
                 "label(header.dataSourceText", "label(header.aiStatusLabel")
                 .doesNotContain(
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
