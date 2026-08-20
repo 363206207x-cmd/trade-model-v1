@@ -703,11 +703,11 @@ assert_outer_allowed() {
   local output
   shift 3
   output="$(run_outer_scenario "$scenario" "$@")" || { fail "$name outer launcher was blocked"; return; }
-  printf '%s\n' "$output" | grep -Fq "OPERATOR_MODE: $expected_mode" \
+  grep -Fq "OPERATOR_MODE: $expected_mode" <<<"$output" \
     || fail "$name outer launcher mode mismatch"
-  printf '%s\n' "$output" | grep -Fq "OPERATOR_RESULT_STATUS: PASS" \
+  grep -Fq "OPERATOR_RESULT_STATUS: PASS" <<<"$output" \
     || fail "$name outer launcher omitted operator PASS"
-  printf '%s\n' "$output" | grep -Fq "OUTER_LAUNCHER_STATUS: PASS" \
+  grep -Fq "OUTER_LAUNCHER_STATUS: PASS" <<<"$output" \
     || fail "$name outer launcher omitted launcher PASS"
   echo "OUTER_LAUNCHER_$name: PASS"
 }

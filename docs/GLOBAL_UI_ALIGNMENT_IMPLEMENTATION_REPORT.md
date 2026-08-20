@@ -49,6 +49,9 @@ authorized package.
 - Normal mode: zero Opportunity cards and Position rows in the isolated empty
   database; no UI-review Final, PnL, or timestamp strings appeared.
 - `git diff --check`: PASS.
+- Workflow self-test portability: replaced three `printf | grep -q` assertions
+  with here-strings after GitHub Actions exposed a Linux `pipefail` broken-pipe
+  false negative; validation semantics are unchanged.
 
 Docker-backed Testcontainers checks were skipped by the existing test policy
 because Docker was unavailable locally; this did not produce a Maven failure.
