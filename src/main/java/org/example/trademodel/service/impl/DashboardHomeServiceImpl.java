@@ -22,6 +22,7 @@ import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.opportunitylog.OpportunityLogPublicDTO;
 import org.example.trademodel.providercall.AssetPriority;
 import org.example.trademodel.providercall.ProviderCallResult;
+import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshot;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotPolicy;
 import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
@@ -433,6 +434,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             DerivativesRiskSnapshot snapshot = result == null ? null : result.payload();
             if (snapshot == null) {
                 summary.setStatus("未配置");
+                summary.setDecisionImpact("不可用于判断");
                 return summary;
             }
             DerivativesBusinessAssessment assessment = derivativesBusinessIntegrationService.evaluate(
@@ -460,22 +462,43 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                         || type == DerivativesEvidenceType.SHORT_LIQUIDATION_SPIKE
                         || type == DerivativesEvidenceType.LIQUIDATION_IMBALANCE) summary.setLiquidationRisk("异常");
             }
-            if ("暂无".equals(summary.getLiquidationRisk())
+            if ("暂无法判断".equals(summary.getOpenInterestStructure())
+                    && snapshot.openInterestUsd() != null) {
+                summary.setOpenInterestStructure("变化平稳");
+            }
+            if ("暂无法判断".equals(summary.getFundingRisk())
+                    && snapshot.weightedFundingRate() != null) {
+                summary.setFundingRisk("正常");
+            }
+            if ("暂无法判断".equals(summary.getCrowdingDirection())
+                    && snapshot.longShortRatio() != null) {
+                summary.setCrowdingDirection("暂无明显拥挤");
+            }
+            if ("暂无法判断".equals(summary.getLiquidationRisk())
                     && (snapshot.longLiquidationUsd5m() != null || snapshot.longLiquidationUsd15m() != null
                     || snapshot.shortLiquidationUsd5m() != null || snapshot.shortLiquidationUsd15m() != null)) {
                 summary.setLiquidationRisk("正常");
             }
+            boolean unavailable = snapshot.sourceStatus() == null
+                    || snapshot.freshnessStatus() == null
+                    || snapshot.freshnessStatus() != SnapshotFreshnessStatus.FRESH
+                    || "UNAVAILABLE".equalsIgnoreCase(snapshot.evidenceAvailability());
             summary.setDecisionImpact(assessment.isHighRisk() ? "风险阻断"
-                    : "COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability()) ? "确认" : "降级");
+                    : unavailable ? "不可用于判断"
+                    : "COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability())
+                    ? "未发现衍生品阻断" : "数据不足，需降级");
         } catch (RuntimeException failure) {
             summary.setStatus("错误");
-            summary.setDecisionImpact("等待同步");
+            summary.setDecisionImpact("不可用于判断");
         }
         return summary;
     }
 
     private static String derivativesStatusLabel(DerivativesRiskSnapshot snapshot) {
         if (snapshot == null || snapshot.sourceStatus() == null) return "等待同步";
+        if (snapshot.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) return "过期";
+        if (snapshot.freshnessStatus() == SnapshotFreshnessStatus.UNAVAILABLE
+                || snapshot.freshnessStatus() == SnapshotFreshnessStatus.REFRESHING) return "等待同步";
         return switch (snapshot.sourceStatus()) {
             case READY -> "COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability()) ? "正常" : "部分";
             case DEGRADED, EMPTY_CONFIRMED -> "部分";
