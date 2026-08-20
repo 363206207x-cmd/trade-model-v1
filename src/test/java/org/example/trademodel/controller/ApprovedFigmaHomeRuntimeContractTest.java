@@ -33,19 +33,19 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(html).contains(
                 "class=\"home-rail\"", "机会资产 · 0", "id=\"homeAssetSearch\"",
-                "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "Final Execution Plan", "AI 分析工作区",
+                "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
-                "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
+                "GPT 候选判断", "Gemini 可信度复核", "Grok 失败压力测试",
                 "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "查看完整审计链");
         assertThat(html).containsOnlyOnce("查看完整审计链")
                 .doesNotContain(
-                        "HOME COMPACT", ">FOUND<", ">NONE_FOUND<", ">最终执行计划</h2>");
+                        "HOME COMPACT", ">FOUND<", ">NONE_FOUND<", "Final Execution Plan");
         assertThat(css).contains(
                 "width: 64px", "height: 32px",
                 "grid-template-columns: repeat(6, minmax(0, 1fr))",
                 "grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr)",
                 "grid-template-columns: minmax(0,72fr) minmax(0,28fr)",
-                "min-height: 330px")
+                "min-height: 400px")
                 .doesNotContain("sparkline", "mini-chart");
     }
 
@@ -76,8 +76,11 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
                 "position.monitorConclusion", "position.suggestedManualActionText",
                 "position.entryLogicStatus", "position.reversalStatus", "position.riskTrend",
-                "contract.normalizeAiTabs", "GPT Candidate · 非 Final",
-                "collectionStateLabel", "Candidate 摘要", "对 Candidate",
+                "contract.normalizeAiTabs", "GPT 候选结论（不是最终计划）",
+                "Gemini 复核结论", "Grok 风险结论", "现在该怎么做",
+                "renderDerivatives", "CoinGlass 衍生品实况 · 数据时间独立标注",
+                "plan.stopZone || plan.stopLoss", "止损", "失效条件",
+                "collectionStateLabel", "为什么", "最重要的风险",
                 "label(header.dataSourceText", "label(header.aiStatusLabel")
                 .doesNotContain(
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
