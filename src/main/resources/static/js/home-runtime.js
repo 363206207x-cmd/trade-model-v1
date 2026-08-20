@@ -35,7 +35,6 @@
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型", OBSERVATION: "观察", BLOCKED: "阻断",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
-        APPROVE: "维持", DOWNGRADE: "建议降级", REJECT: "驳回", RISK_WARNING: "风险提示",
         READY: "就绪", PARTIAL: "部分可用", FALLBACK: "规则路径降级", UNAVAILABLE: "当前不可用",
         DISABLED: "数据源未启用", WAITING_SYNC: "等待同步", OK: "正常", UP: "正常", DEGRADED: "降级",
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
@@ -391,10 +390,11 @@
         }
         var planId = plan.sourceExecutionPlanId;
         var lifecycle = plan.planLifecycleState || plan.status;
-        target.innerHTML = '<div class="plan-status-layer"><div><small>Final Bias · Plan Mode</small><strong>'
+        target.innerHTML = '<div class="plan-status-layer"><div><small>最终偏向 / 计划模式</small><strong>'
             + escapeHtml(label(plan.finalMarketBias || plan.direction)) + " · " + escapeHtml(label(plan.finalPlanMode))
             + '</strong></div><span class="plan-state tone-' + semanticTone(lifecycle) + '">' + escapeHtml(label(lifecycle, text(plan.statusLabel, "当前有效"))) + '</span></div><div class="plan-key-layer">'
             + planField("入场 / 触发", plan.entryZone || plan.triggerCondition)
+            + planField("止损", plan.stopZone || plan.stopLoss)
             + planField("失效条件", plan.invalidCondition || plan.abandonCondition)
             + planField("目标", plan.targetZones || plan.targetLogic || plan.takeProfitRules)
             + '</div><div class="plan-metadata-layer">' + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
@@ -410,10 +410,16 @@
     function itemText(item) {
         if (!has(item)) return "";
         if (typeof item !== "object") return label(item, text(item));
-        return label(item.text || item.summary || item.hypothesis || item.currentValue || item.reason || item.description || item.source, "");
+        var value = label(item.text || item.summary || item.hypothesis || item.currentValue || item.reason || item.description || item.source, "");
+        var typeValue = item.type || item.category;
+        var changeValue = item.change || item.changeFromBaseline;
+        var type = has(typeValue) ? label(typeValue) : "";
+        var change = has(changeValue) ? label(changeValue) : "";
+        var result = type && value && value.indexOf(type) !== 0 ? type + "：" + value : value || type;
+        return change && result && result.indexOf(change) < 0 ? result + "（" + change + "）" : result;
     }
     function list(items, emptyState) {
-        var values = (Array.isArray(items) ? items : []).map(itemText).filter(Boolean).slice(0, 3);
+        var values = (Array.isArray(items) ? items : []).map(itemText).filter(Boolean).slice(0, 2);
         return values.length ? "<ul>" + values.map(function (value) { return "<li>" + escapeHtml(value) + "</li>"; }).join("") + "</ul>"
             : "<p>" + escapeHtml(collectionLabel(emptyState)) + "</p>";
     }
@@ -421,7 +427,7 @@
         return "<dl>" + items.map(function (item) { return "<div><dt>" + escapeHtml(item[0]) + "</dt><dd>" + escapeHtml(text(item[1], "当前不可查看")) + "</dd></div>"; }).join("") + "</dl>";
     }
     function roleUnavailable(role) {
-        return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核", GROK_CHALLENGE: "Grok 反方挑战" }[activeRole])
+        return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 候选判断", GEMINI_REVIEW: "Gemini 可信度复核", GROK_CHALLENGE: "Grok 失败压力测试" }[activeRole])
             + "</strong><span>" + escapeHtml(text(role && role.statusMessage, "当前角色结果不可查看")) + "</span></div>";
     }
     function renderGpt(role) {
@@ -430,30 +436,30 @@
         var multi = role.multiTimeframeExplanation || {};
         var adjustment = role.biasAdjustment || {};
         var why = text(core.text, text(role.decisionSummary, "当前形成原因不可查看"));
-        return '<div class="ai-first-visual"><div class="primary"><small>GPT Candidate · 非 Final</small><strong>'
-            + escapeHtml(text(candidate.summary, why)) + "</strong></div><div><small>Market Bias</small><strong>"
-            + escapeHtml(label(core.marketBias, "当前不可查看")) + "</strong></div><div><small>Opportunity State · Candidate Mode</small><strong>"
+        return '<div class="ai-first-visual"><div class="primary"><small>GPT 候选结论（不是最终计划）</small><strong>'
+            + escapeHtml(text(candidate.summary, why)) + "</strong></div><div><small>方向判断</small><strong>"
+            + escapeHtml(label(core.marketBias, "当前不可查看")) + "</strong></div><div><small>现在处于</small><strong>"
             + escapeHtml(label(core.opportunityState, "当前不可查看") + " · " + label(candidate.planMode, "当前不可查看"))
-            + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>形成原因</h3><p>' + escapeHtml(why)
+            + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>为什么这样判断</h3><p>' + escapeHtml(why)
             + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")],
                 ["偏向调整", label(adjustment.before, "当前不可查看") + " → " + label(adjustment.after, "当前不可查看")]])
-            + '</section><section class="ai-section"><h3>证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
-            + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>反对证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
-            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>Candidate 摘要</strong><span>'
+            + '</section><section class="ai-section"><h3>支持结论的证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
+            + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>限制结论的证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
+            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>现在该怎么做</strong><span>'
             + escapeHtml(text(candidate.summary || candidate.recommendedAction, "当前候选摘要不可查看")) + "</span></div>";
     }
     function renderGemini(role) {
         var reviewResult = String(role.reviewResult || "").toUpperCase();
-        if (["APPROVE", "DOWNGRADE", "REJECT", "RISK_WARNING"].indexOf(reviewResult) < 0) return roleUnavailable(role);
+        if (["APPROVE", "DOWNGRADE", "REJECT_CANDIDATE", "RISK_WARNING"].indexOf(reviewResult) < 0) return roleUnavailable(role);
         var suggestion = role.downgradeSuggestion || {};
         var findings = [].concat(role.evidenceGaps || [], role.logicConflicts || [], role.underestimatedRisks || []);
         var adjustment = reviewResult === "APPROVE" ? "维持 Candidate" : label(role.planModeAdjustment || suggestion.after, "当前不可查看");
-        return '<div class="ai-first-visual"><div class="primary"><small>复核结果</small><strong>' + escapeHtml(label(reviewResult, "当前不可查看"))
-            + "</strong></div><div><small>调整建议</small><strong>" + escapeHtml(adjustment)
-            + "</strong></div><div><small>对 Candidate</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "当前不可查看"))
-            + '</strong></div></div><div class="ai-content-grid gemini"><section class="ai-section"><h3>Before → After</h3>'
-            + dl([["Before", label(suggestion.before, "当前不可查看")], ["After", label(suggestion.after, "当前不可查看")], ["置信度", label(role.confidenceAdjustment, "当前不可查看")], ["风险", label(role.riskAdjustment, "当前不可查看")]])
-            + '</section><section class="ai-section"><h3>证据缺口 · 逻辑冲突 · 风险低估</h3>' + list(findings, role.evidenceGapsState || role.logicConflictsState || role.underestimatedRisksState)
+        return '<div class="ai-first-visual"><div class="primary"><small>Gemini 复核结论</small><strong>' + escapeHtml(label(reviewResult, "当前不可查看"))
+            + "</strong></div><div><small>计划怎么调</small><strong>" + escapeHtml(adjustment)
+            + "</strong></div><div><small>为什么</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "当前不可查看"))
+            + '</strong></div></div><div class="ai-content-grid gemini"><section class="ai-section"><h3>调整前 / 调整后</h3>'
+            + dl([["调整前", label(suggestion.before, "当前不可查看")], ["调整后", label(suggestion.after, "当前不可查看")], ["置信度", label(role.confidenceAdjustment, "当前不可查看")], ["风险", label(role.riskAdjustment, "当前不可查看")]])
+            + '</section><section class="ai-section"><h3>缺什么 · 哪里冲突 · 哪个风险被低估</h3>' + list(findings, role.evidenceGapsState || role.logicConflictsState || role.underestimatedRisksState)
             + '</section></div><div class="ai-summary-footer"><strong>恢复条件</strong><span>' + escapeHtml(text(role.recoveryCondition || suggestion.recoveryCondition, "当前无可验证恢复条件")) + "</span></div>";
     }
     function failurePathChain(paths, state) {
@@ -467,14 +473,41 @@
         }).join("");
     }
     function renderGrok(role) {
-        return '<div class="ai-first-visual"><div class="primary"><small>失败路径</small><strong>' + escapeHtml(collectionLabel(role.failurePathState))
-            + "</strong></div><div><small>当前方向挑战</small><strong>" + escapeHtml(text(role.currentDirectionChallenge, "当前不可查看"))
-            + "</strong></div><div><small>计划模式影响</small><strong>" + escapeHtml(label(role.planModeImpact, "当前不可查看"))
+        return '<div class="ai-first-visual"><div class="primary"><small>Grok 风险结论</small><strong>' + escapeHtml(text(role.challengeSummary, collectionLabel(role.failurePathState)))
+            + "</strong></div><div><small>最需要防什么</small><strong>" + escapeHtml(text(role.currentDirectionChallenge, "当前不可查看"))
+            + "</strong></div><div><small>对计划的影响</small><strong>" + escapeHtml(label(role.planModeImpact, "当前不可查看"))
             + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>失败路径 · 触发 → 演化 → 失效</h3>' + failurePathChain(role.failurePaths, role.failurePathState)
             + '<h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
             + '<h3>外部事件风险</h3>' + list(role.externalEventRisks, role.externalEventRisksState)
             + '</section><section class="ai-section"><h3>微观结构风险</h3>' + list(role.microstructureRisks, role.microstructureRisksState)
             + '<h3>继续观察指标</h3>' + list(role.watchIndicators, role.watchIndicatorsState) + "</section></div>";
+    }
+
+    function derivativesTone(value, kind) {
+        var raw = String(value || "");
+        if (/错误|过期|未配置|不可用于|阻断|极端|异常/.test(raw)) return "negative";
+        if (/部分|不足|降级|偏高|拥挤|限制|等待/.test(raw)) return "warning";
+        if (/正常|平稳|未发现|暂无明显/.test(raw)) return "positive";
+        return kind === "structure" ? "info" : "unknown";
+    }
+    function derivativesCell(labelText, value, kind) {
+        var shown = text(value, "暂无法判断");
+        return '<span><small>' + escapeHtml(labelText) + '</small><strong class="tone-' + derivativesTone(shown, kind) + '">'
+            + escapeHtml(shown) + "</strong></span>";
+    }
+    function renderDerivatives(derivatives) {
+        var value = derivatives || {};
+        var status = text(value.status, "等待同步");
+        return '<section class="ai-derivatives-strip" aria-label="CoinGlass 衍生品实时风险参照"><header><div><strong>CoinGlass 衍生品实况 · 数据时间独立标注</strong><span class="tone-'
+            + derivativesTone(status, "status") + '">' + escapeHtml(status) + '</span></div><small>'
+            + escapeHtml(text(value.source, "CoinGlass v4") + " · " + (has(value.dataTime) ? time(value.dataTime) : "时间待同步"))
+            + '</small></header><div class="ai-derivatives-grid">'
+            + derivativesCell("未平仓量", value.openInterestStructure, "structure")
+            + derivativesCell("资金费率", value.fundingRisk, "risk")
+            + derivativesCell("强平", value.liquidationRisk, "risk")
+            + derivativesCell("多空拥挤", value.crowdingDirection, "risk")
+            + derivativesCell("对本次结论的影响", value.decisionImpact, "impact")
+            + "</div></section>";
     }
     function renderConflict(home) {
         var consistency = home.aiDecision && home.aiDecision.consistency || {};
@@ -499,10 +532,12 @@
         var role = roles.find(function (item) { return item.role === activeRole; });
         var panel = document.getElementById("aiRolePanel");
         setText("aiContext", symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || "等待分析上下文");
-        if (!role || role.resultAvailable !== true) panel.innerHTML = roleUnavailable(role);
-        else if (activeRole === "GPT_FINAL") panel.innerHTML = renderGpt(role);
-        else if (activeRole === "GEMINI_REVIEW") panel.innerHTML = renderGemini(role);
-        else panel.innerHTML = renderGrok(role);
+        var roleContent;
+        if (!role || role.resultAvailable !== true) roleContent = roleUnavailable(role);
+        else if (activeRole === "GPT_FINAL") roleContent = renderGpt(role);
+        else if (activeRole === "GEMINI_REVIEW") roleContent = renderGemini(role);
+        else roleContent = renderGrok(role);
+        panel.innerHTML = renderDerivatives(home.derivatives) + roleContent;
         setText("aiMetadata", role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 生成时间 " + time(role.generatedAt) + " · 来源 " + text(role.provider, "当前不可查看") : "角色状态待同步");
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
