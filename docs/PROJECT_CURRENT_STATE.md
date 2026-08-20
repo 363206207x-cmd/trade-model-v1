@@ -8,13 +8,37 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI v4.1 Telegram High-Value Alert Authorization
-Product Phase Status: TELEGRAM_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the frozen Telegram source mapping, reuse Message and ChannelDelivery ownership, and exact implementation permission; no Telegram implementation is included here
-Next Business Phase: FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION
+Product Phase: Fundamental AI Local-Real Readiness Authorization
+Product Phase Status: LOCAL_REAL_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact readiness synchronization and current approved Home live-binding permission; no application implementation is included here
+Next Business Phase: LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT
 Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## Fundamental AI Local-Real Readiness Authorization
+
+PR #1190 is effective on merged main
+`56028b21ac3d4ff9d1ee1368b6a144ad77382e19`. The owner-approved current Home
+runtime work is preserved separately at commit `4e447e03` and is not part of
+this authorization diff.
+
+Real local validation reproduced one bounded defect: normal manual Asset Pool
+scans completed and persisted six analyses while the existing
+`LocalRealReadinessService` projection remained at zero, leaving the active
+Home at `WAITING_SYNC`. The approved Home also needs its current authoritative
+runtime/database read binding restored on an authorized implementation branch.
+
+This A-risk package maps that gap to existing Asset Pool, analysis,
+local-real readiness, Dashboard, Opportunity, FinalExecutionPlan,
+UserPosition/PositionMonitor and Three-AI owners. It authorizes exactly
+`LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT` after clean,
+synchronized merged-main validation. It does not authorize Schema/API
+redesign, new provider architecture, quality-threshold reduction, fake data,
+Figma, Mobile, deployment or automatic trading. Capability movement is
+`NONE`.
 
 ---
 
