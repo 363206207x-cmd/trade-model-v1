@@ -429,12 +429,12 @@
     var normalized = String(value || "").trim().toUpperCase();
     return PLAN_MODE_VIEWS[normalized]
       ? PLAN_MODE_VIEWS[normalized].typeLabel
-      : "当前不可查看";
+      : "—";
   }
 
   function opportunityTypeLabel(value) {
     var normalized = String(value || "").trim().toUpperCase();
-    return OPPORTUNITY_TYPE_LABELS[normalized] || "当前不可查看";
+    return OPPORTUNITY_TYPE_LABELS[normalized] || "—";
   }
 
   function userFacingValue(value) {
@@ -442,6 +442,7 @@
     var text = String(value);
     var exact = USER_FACING_VALUE_LABELS[text.trim().toUpperCase()];
     if (exact) return exact;
+    if (/^[A-Z][A-Z0-9_]*$/.test(text.trim())) return "—";
     Object.keys(USER_FACING_VALUE_LABELS)
       .sort(function (left, right) { return right.length - left.length; })
       .forEach(function (code) {

@@ -72,3 +72,22 @@ The browser-read DOM measurements are stored alongside them in
 
 TEXT_CLIPPING_COUNT: 0
 OWNER_VISUAL_BLOCKERS: 0
+
+## Global Semantic Runtime Audit Addendum
+
+The post-Owner global semantic audit revalidated the active Home with the same
+approved geometry and added evidence under
+`docs/evidence/global_semantic_runtime_audit/`.
+
+| Evidence | Result |
+|---|---|
+| `fundamental-ai-global-audit-home-1440.png` | six status scopes, GPT Candidate first visual, 0 clipping/overflow |
+| `fundamental-ai-global-audit-home-1280.png` | responsive 3x2 Top6, account aggregate fully visible |
+| `fundamental-ai-global-audit-home-1080.png` | responsive stack, account aggregate fully visible, 0 clipping/overflow |
+| `fundamental-ai-global-audit-gemini.png` | three independent review collections |
+| `fundamental-ai-global-audit-grok.png` | failure-path state primary; no plan mutation authority |
+| four `position-*` crops | one fail-closed state message; entry facts retained; monitor fields absent |
+
+Visible raw enum count: 0. Browser console error/warning count: 0. The Home
+module order, 7:3 desktop decision layout, approved narrow ordering, and route
+coverage did not change.

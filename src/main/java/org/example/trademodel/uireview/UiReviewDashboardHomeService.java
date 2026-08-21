@@ -85,10 +85,11 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         state.setMarketTrend(status("market", "市场趋势", "弱偏多", "READY", 72));
         state.setRiskLevel(status("risk", "风险等级", "中", "READY", 58));
         state.setDataQuality(status("quality", "数据质量", "87 · 新鲜", "READY", 87));
+        state.setServiceAvailability(status("service", "服务可用性", "正常", "CONNECTED", null));
         state.setAiConflict(status("ai", "AI 系统", "三角色完成", "READY", 82));
         state.setPendingReview(status("positions", "已录入持仓", "活动 3", "READY", 3));
         state.setConfused(status("conflict", "冲突", "轻微分歧", "READY", 2));
-        state.setHotReset(status("reset", "Hot Reset", "正常", "READY", 0));
+        state.setHotReset(status("reset", "Hot Reset", "未触发", "CONNECTED", 0));
         return state;
     }
 

@@ -291,7 +291,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
-        home.setSystemState(buildSystemState(systemStatus, decisions, selectedDecision, aiDecision));
+        home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
@@ -437,6 +437,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 summary.setDecisionImpact("不可用于判断");
                 return summary;
             }
+            summary.setSource(providerLabel(snapshot.provider()));
             DerivativesBusinessAssessment assessment = derivativesBusinessIntegrationService.evaluate(
                     new DerivativesBusinessInput(symbol,
                             selectedDecision == null ? null : selectedDecision.getMarketBiasHierarchy(),
@@ -566,39 +567,40 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private DashboardHomeVO.SystemStateVO buildSystemState(LightSystemStatusVO systemStatus,
                                                            List<DecisionResultVO> decisions,
-                                                           DecisionResultVO selectedDecision,
-                                                           DashboardHomeVO.AiDecisionVO aiDecision) {
+                                                           DashboardHomeVO.AiDecisionVO aiDecision,
+                                                           ProviderReadinessVO providerReadiness) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
-        DecisionResultVO trendDecision = selectedDecision != null ? selectedDecision : firstDecision(decisions);
+        DecisionResultVO trendDecision = findDecision(decisions, "BTCUSDT");
         state.setMarketTrend(card(
                 "marketTrend",
-                "市场趋势",
+                "BTC / 宏观环境",
                 trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null,
                 biasLabel(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
-                "决策摘要",
+                "BTC 环境基准",
                 statusForText(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
                 null
         ));
-        String selectedRisk = trendDecision != null ? trimToNull(trendDecision.getRiskLevel()) : null;
+        String selectedRisk = riskLevelFrom(decisions);
         state.setRiskLevel(card(
                 "riskLevel",
-                "风险等级",
+                "系统风险",
                 selectedRisk,
                 riskLabel(selectedRisk),
-                "选中资产决策风险",
+                "当前机会集合最高风险",
                 statusForText(selectedRisk),
                 null
         ));
-        Integer selectedDataQuality = trendDecision != null ? trendDecision.getDataQualityScore() : null;
+        Integer selectedDataQuality = averageDataQuality(decisions);
         state.setDataQuality(card(
                 "dataQuality",
-                "数据质量分",
+                "全局数据质量",
                 selectedDataQuality,
                 selectedDataQuality != null ? String.valueOf(selectedDataQuality) : null,
-                "选中资产分析快照",
+                "当前机会集合均值",
                 selectedDataQuality != null ? "CONNECTED" : "WAITING_SYNC",
                 selectedDataQuality
         ));
+        state.setServiceAvailability(serviceAvailabilityCard(providerReadiness, aiDecision));
         DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
         boolean aiApplicable = consistency != null
                 && "READY".equalsIgnoreCase(trimToNull(consistency.getDataState()));
@@ -653,6 +655,35 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         hotReset.setMeta(hotMeta);
         state.setHotReset(hotReset);
         return state;
+    }
+
+    private DashboardHomeVO.StatusCardVO serviceAvailabilityCard(
+            ProviderReadinessVO providerReadiness,
+            DashboardHomeVO.AiDecisionVO aiDecision) {
+        String market = upper(providerReadiness != null
+                ? providerReadiness.getMarketDataProviderStatus() : null);
+        String ai = upper(headerAiStatus(providerReadiness, aiDecision));
+        boolean marketReady = "CONNECTED".equals(market);
+        boolean aiReady = "SUCCESS".equals(ai) || "CONNECTED".equals(ai);
+        boolean failed = "FAIL_CLOSED".equals(market) || "ERROR".equals(market)
+                || "FAILED".equals(ai) || "INVALID_RESPONSE".equals(ai);
+        String valueLabel;
+        String status;
+        if (marketReady && aiReady) {
+            valueLabel = "正常";
+            status = "CONNECTED";
+        } else if (marketReady || aiReady || "CONFIGURED".equals(market) || "CONFIGURED".equals(ai)) {
+            valueLabel = "部分可用";
+            status = "PARTIAL";
+        } else if (failed) {
+            valueLabel = "不可用";
+            status = "FAIL_CLOSED";
+        } else {
+            valueLabel = "等待同步";
+            status = "WAITING_SYNC";
+        }
+        return card("serviceAvailability", "服务可用性", status, valueLabel,
+                "行情 Provider + AI", status, null);
     }
 
     private List<DashboardHomeVO.AlertRowVO> buildAlerts(List<MonitorAlertDO> alerts) {
@@ -2448,6 +2479,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String normalized = upper(provider);
         if (normalized.startsWith("KRAKEN")) return "Kraken";
         if (normalized.startsWith("BINANCE")) return "Binance";
+        if (normalized.startsWith("COINGLASS")) return "CoinGlass v4";
         return trimToNull(provider);
     }
 

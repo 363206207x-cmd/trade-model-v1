@@ -39,7 +39,7 @@ threshold, provider, business-rule, or automatic-trading capability changed.
 
 - Java 17 compile/package/local application startup: PASS.
 - Focused UI contract tests: PASS.
-- Full Maven Java 17 suite: 4,715 tests, 0 failures, 0 errors, 14 skipped.
+- Full Maven Java 17 suite: 4,719 tests, 0 failures, 0 errors, 14 skipped.
 - Product Source Gate: PASS.
 - JavaScript syntax: PASS for `home-runtime.js` and `workspace.js`.
 - `git diff --check`: PASS.
@@ -68,3 +68,20 @@ Evidence is indexed by `GLOBAL_UI_ALIGNMENT_VISUAL_ACCEPTANCE.md` and stored in
 
 All Owner visual, semantic, and required validation findings are closed. PR
 #1195 remains Draft and must not merge until the next Owner decision.
+
+## Global Semantic Audit Closure
+
+The later bounded global audit closed seven Home projection/presentation
+blockers: status object ownership, GPT Candidate primary hierarchy, Gemini
+collection isolation, Grok failure-path authority, unknown-enum truthfulness,
+derivatives source truthfulness, and canonical `AI 分析` copy. It did not change
+the Home geometry, product state machines, AI permissions, schema, Figma,
+Mobile, authentication, Telegram, or automatic-trading boundaries.
+
+Normal runtime and isolated UI-review runtime both use the standard Java 17
+release JAR. Normal Home/API smoke returned HTTP 200 without fixture leakage.
+The post-patch browser sweep at 1440/1280/1080 reports zero text clipping,
+horizontal overflow, raw enum display, and console errors/warnings. Four
+untrusted Position states remain fail closed. Evidence is in
+`docs/evidence/global_semantic_runtime_audit/` and the complete lineage is in
+`FUNDAMENTAL_AI_V4_1_GLOBAL_RUNTIME_AUDIT.md`.

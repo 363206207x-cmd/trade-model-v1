@@ -76,15 +76,33 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
                 "position.monitorConclusion", "position.suggestedManualActionText",
                 "position.entryLogicStatus", "position.reversalStatus", "position.riskTrend",
-                "contract.normalizeAiTabs", "GPT 候选结论（不是最终计划）",
-                "Gemini 复核结论", "Grok 风险结论", "现在该怎么做",
-                "renderDerivatives", "CoinGlass 衍生品实况 · 数据时间独立标注",
+                "contract.normalizeAiTabs", "GPT Candidate · 非 Final",
+                "Market Bias", "Opportunity State", "Candidate Mode", "Candidate 摘要",
+                "Gemini 复核结论", "对 Candidate 的调整", "失败路径状态", "重大反证",
+                "renderDerivatives", "衍生品实况 · 数据时间独立标注", "来源不可用",
                 "plan.stopZone || plan.stopLoss", "止损", "失效条件",
                 "collectionStateLabel", "为什么", "最需要防什么",
                 "label(header.dataSourceText", "label(header.aiStatusLabel")
                 .doesNotContain(
+                        "candidate.summary, why", "[].concat(role.evidenceGaps",
+                        "role.evidenceGapsState || role.logicConflictsState", "label(role.planModeImpact",
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
                         "const assets = [", "BTCUSDT,ETHUSDT", "82, 87");
+    }
+
+    @Test
+    void unknownEnumsRemainNeutralWhileRoleAndCollectionStatesStayExplicit() throws Exception {
+        String contract = Files.readString(Path.of(
+                "src/main/resources/static/js/frontend-contract.js"));
+        String script = Files.readString(SCRIPT);
+
+        assertThat(contract).contains(
+                "if (/^[A-Z][A-Z0-9_]*$/.test(text.trim())) return \"—\";",
+                "ROLE_STATE_VIEWS.UNAVAILABLE",
+                "COLLECTION_STATE_VIEWS.SOURCE_UNAVAILABLE");
+        assertThat(script).contains(
+                "return /^[A-Z][A-Z0-9_]*$/.test(raw) ? \"—\" : raw;",
+                "statusValue(state.serviceAvailability, \"等待同步\")");
     }
 
     @Test

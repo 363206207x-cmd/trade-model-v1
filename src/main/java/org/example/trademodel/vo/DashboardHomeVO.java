@@ -263,6 +263,7 @@ public class DashboardHomeVO {
         private StatusCardVO marketTrend = new StatusCardVO();
         private StatusCardVO riskLevel = new StatusCardVO();
         private StatusCardVO dataQuality = new StatusCardVO();
+        private StatusCardVO serviceAvailability = new StatusCardVO();
         private StatusCardVO aiConflict = new StatusCardVO();
         private StatusCardVO pendingReview = new StatusCardVO();
         private StatusCardVO confused = new StatusCardVO();
@@ -290,6 +291,14 @@ public class DashboardHomeVO {
 
         public void setDataQuality(StatusCardVO dataQuality) {
             this.dataQuality = dataQuality;
+        }
+
+        public StatusCardVO getServiceAvailability() {
+            return serviceAvailability;
+        }
+
+        public void setServiceAvailability(StatusCardVO serviceAvailability) {
+            this.serviceAvailability = serviceAvailability;
         }
 
         public StatusCardVO getAiConflict() {
@@ -2078,7 +2087,7 @@ public class DashboardHomeVO {
         private String liquidationRisk = "暂无法判断";
         private String crowdingDirection = "暂无法判断";
         private Instant dataTime;
-        private String source = "CoinGlass v4";
+        private String source;
         private String decisionImpact = "不可用于判断";
         private List<String> reasonCodes = new ArrayList<>();
 

@@ -279,10 +279,10 @@ class DashboardHomeServiceImplTest {
                 .isEqualTo("当前不可查看");
         assertThat(home.getSystemState().getPendingReview().getStatus())
                 .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
-        assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(88);
-        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("选中资产分析快照");
-        assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("HIGH");
-        assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("选中资产决策风险");
+        assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(87);
+        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("当前机会集合均值");
+        assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("EXTREME");
+        assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("当前机会集合最高风险");
         assertThat(home.getSystemState().getMarketTrend().getValue()).isEqualTo("BULLISH");
         assertThat(home.getSystemState().getAiConflict().getValue())
                 .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
@@ -364,7 +364,8 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getDerivatives().getFundingRisk()).isEqualTo("正常");
         assertThat(home.getDerivatives().getLiquidationRisk()).isEqualTo("正常");
         assertThat(home.getDerivatives().getSource()).isEqualTo("CoinGlass v4");
-        assertThat(home.getDerivatives().getDecisionImpact()).isIn("确认", "降级", "风险阻断");
+        assertThat(home.getDerivatives().getDecisionImpact())
+                .isIn("未发现衍生品阻断", "数据不足，需降级", "风险阻断");
         assertThat(home.getDerivatives().getDecisionImpact()).doesNotContain("做多", "做空");
     }
 
@@ -2102,6 +2103,29 @@ class DashboardHomeServiceImplTest {
 
         assertThat(header.getAiStatus()).isEqualTo("DISABLED");
         assertThat(header.getAiStatusLabel()).isEqualTo("已禁用");
+    }
+
+    @Test
+    void systemStripUsesMacroAndAggregateOwnersInsteadOfSelectedAsset() {
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "LOW", "HIGH", 80, 0,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"WAITING_TRIGGER\"}");
+        DecisionResultVO eth = decision("ETHUSDT", "BEARISH", "HIGH", "MEDIUM", 60, 0,
+                "LEVEL_1_CONSISTENT", false, "{\"state\":\"OBSERVING\"}");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(btc, eth));
+        when(providerReadinessService.getReadiness())
+                .thenReturn(providerReadiness("CONNECTED", "SUCCESS", "WAITING_SYNC", "真实行情"));
+
+        DashboardHomeVO.SystemStateVO state = service
+                .getHomeForUser(USER_ID, "ETHUSDT", 6)
+                .getSystemState();
+
+        assertThat(state.getMarketTrend().getValue()).isEqualTo("BULLISH");
+        assertThat(state.getMarketTrend().getHelper()).isEqualTo("BTC 环境基准");
+        assertThat(state.getRiskLevel().getValue()).isEqualTo("HIGH");
+        assertThat(state.getRiskLevel().getHelper()).isEqualTo("当前机会集合最高风险");
+        assertThat(state.getDataQuality().getValue()).isEqualTo(70);
+        assertThat(state.getServiceAvailability().getValueLabel()).isEqualTo("正常");
     }
 
     @Test
