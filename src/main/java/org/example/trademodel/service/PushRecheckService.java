@@ -14,8 +14,6 @@ public interface PushRecheckService {
 
     RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command);
 
-    RecheckResult recheckForOwnedPushOpen(Long pushId, Long retryFromLogId, int retryAttempt);
-
     /**
      * Disabled raw read. Persisted rows have no authoritative owner relation,
      * so this boundary rejects before repository access.

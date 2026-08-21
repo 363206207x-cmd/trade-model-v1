@@ -307,6 +307,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
         home.setPositions(positionRowsResult.topRows());
+        home.setPositionAggregate(buildPositionAggregate(positionRowsResult));
         home.setPositionMonitoringState(positionRowsResult.monitoringState());
         home.setSelectedSymbol(normalizedSelected);
         DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
@@ -2071,7 +2072,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String callStatus = firstNonBlank(trimToNull(rolePayload.callStatus()), "NOT_CALLED");
         tab.setRunStatus(callStatus);
         tab.setRunStatusLabel(aiRunStatusLabel(callStatus));
-        boolean resultAvailable = ("READY".equalsIgnoreCase(rolePayload.roleState())
+        boolean resultAvailable = Boolean.TRUE.equals(rolePayload.resultAvailable())
+                && ("READY".equalsIgnoreCase(rolePayload.roleState())
                 || "PARTIAL".equalsIgnoreCase(rolePayload.roleState()))
                 && "SUCCESS".equalsIgnoreCase(callStatus);
         tab.setResultAvailable(resultAvailable);
@@ -2314,6 +2316,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 .count();
         if (trusted == positions.size()) return "COMPLETE";
         return trusted > 0 ? "PARTIAL_COVERAGE" : "UNKNOWN";
+    }
+
+    private DashboardHomeVO.PositionAggregateVO buildPositionAggregate(PositionRowsResult positionRows) {
+        List<DashboardHomeVO.PositionVO> positions = positionRows == null
+                ? List.of() : positionRows.allRows();
+        DashboardHomeVO.PositionAggregateVO aggregate = new DashboardHomeVO.PositionAggregateVO();
+        aggregate.setActiveCount(positions.size());
+        aggregate.setHighestTrustedRisk(positions.stream()
+                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .map(DashboardHomeVO.PositionVO::getRiskLevel)
+                .filter(this::recognizedPositionRisk)
+                .max(Comparator.comparingInt(this::positionRiskRank))
+                .orElse(null));
+        aggregate.setCoverageState(accountRiskCoverage(positionRows));
+        return aggregate;
     }
 
     private String safeAccountRiskCoverage(DecisionResultVO decision) {

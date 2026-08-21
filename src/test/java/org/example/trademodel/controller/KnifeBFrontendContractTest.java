@@ -31,7 +31,8 @@ class KnifeBFrontendContractTest {
     void analysisUsesFormalModeStructuredRolesAndConflictGate() throws Exception {
         String js = Files.readString(WORKSPACE_JS);
         assertThat(js).contains("analysis.analysisMode")
-                .contains("分析模式当前不可查看")
+                .contains("analysisModeGate(analysis.analysisMode)")
+                .contains("modeView.message")
                 .contains("analysisAudit.aiRoleResults?.roles?.[role]")
                 .contains("renderPreviewRole(role, payload)")
                 .contains("renderOpportunityRole(role, payload)")

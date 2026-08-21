@@ -73,7 +73,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String html = Files.readString(WORKSPACE);
         Set<String> families = captures(html, "data-component-family=\"([^\"]+)\"");
 
-        assertThat(families).hasSize(52).contains(
+        assertThat(families).hasSize(51).contains(
                 "AppShell", "SideNav", "PageHeader", "StateBadge",
                 "EmptyState", "AsyncTaskIndicator", "Drawer", "Modal", "AuditMetaDisclosure",
                 "AssetSearch", "SearchResultItem", "AssetPoolToolbar", "AssetPoolTable",
@@ -82,14 +82,14 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "EntryTriggerSection", "InvalidationStopSection", "TargetTrendSection",
                 "RiskLimitSection", "FinalPlanDetail", "AnalysisModeBanner", "AIWorkspace",
                 "AIRoleTabs", "EvidenceList", "MultiTimeframeMatrix", "BeforeAfterDiff",
-                "FailurePathList", "ConflictSummary", "PositionRiskAggregate", "PositionCard",
+                "ConflictSummary", "PositionRiskAggregate", "PositionCard",
                 "PositionActualForm", "PlanActualComparison", "MonitorTimeline", "ReviewCard",
                 "AtTimeLaterCompare", "ResponsibilityChain", "MessageListItem",
                 "OriginalSnapshotCard", "RecheckResultHero",
                 "RecheckActionBar", "EventCalendar", "EventWindowBadge", "FocusedDetailShell",
                 "RiskPreferenceForm", "ProviderStatusPanel", "AuditChainStepper");
         assertThat(html).doesNotContain("SystemStatusBar", "workspace-system-status",
-                "ChannelDeliveryStatus", "TelegramBindingPanel");
+                "ChannelDeliveryStatus", "TelegramBindingPanel", "analysisFailurePanel", "analysisFailures");
         assertThat(html).doesNotContain("data-detached-instance=\"true\"");
     }
 

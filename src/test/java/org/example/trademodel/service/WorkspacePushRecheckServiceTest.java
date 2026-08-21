@@ -38,7 +38,7 @@ class WorkspacePushRecheckServiceTest {
     @Mock PushSnapshotMapper snapshotMapper;
     @Mock PushRecheckLogMapper logMapper;
     @Mock ExecutionPlanMapper executionPlanMapper;
-    @Mock PushRecheckService pushRecheckService;
+    @Mock PushRecheckCoreTransactionService coreTransactionService;
     @Mock AnalysisRunOrchestrator analysisRunOrchestrator;
 
     private WorkspacePushRecheckService service;
@@ -46,28 +46,25 @@ class WorkspacePushRecheckServiceTest {
     @BeforeEach
     void setUp() {
         service = new WorkspacePushRecheckService(messageMapper, snapshotMapper, logMapper,
-                executionPlanMapper, pushRecheckService, analysisRunOrchestrator);
+                executionPlanMapper, coreTransactionService, analysisRunOrchestrator);
     }
 
     @Test
     void firstOpenCreatesOnePushOpenAndKeepsAllIdsDistinct() {
         stubOwned();
         TmPushRecheckLogDO created = log(701L, "COMPLETED");
-        when(logMapper.selectLatestByPushIdAndTriggerSource(99L, "PUSH_OPEN"))
-                .thenReturn(created);
+        when(coreTransactionService.execute(7L, "message-1", 99L, null, 1))
+                .thenReturn(attempt(created));
 
         WorkspacePushRecheckService.Projection result = service.open(7L, "message-1", "push-snapshot-99");
 
-        verify(pushRecheckService).recheckForOwnedPushOpen(99L, null, 1);
+        verify(coreTransactionService).execute(7L, "message-1", 99L, null, 1);
         assertThat(result.messageId()).isEqualTo("message-1");
         assertThat(result.pushSnapshotId()).isEqualTo("push-snapshot-99");
         assertThat(result.pushId()).isEqualTo(99L);
         assertThat(result.recheckId()).isEqualTo(701L);
         assertThat(result.analysisId()).isEqualTo("analysis-1");
         assertThat(result.planId()).isEqualTo("plan-1");
-        verify(messageMapper).updateCurrentRecheckIdForUser(
-                org.mockito.Mockito.eq("message-1"), org.mockito.Mockito.eq(7L),
-                org.mockito.Mockito.eq("701"), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -78,7 +75,10 @@ class WorkspacePushRecheckServiceTest {
 
         service.read(7L, "message-1", "push-snapshot-99");
 
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(99L, null, 1);
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
         verify(messageMapper, never()).updateCurrentRecheckIdForUser(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
@@ -88,13 +88,13 @@ class WorkspacePushRecheckServiceTest {
     void completedOldOpenDoesNotPermanentlyBlockNewExplicitMessageOpen() {
         stubOwned();
         when(logMapper.countByPushIdAndTriggerSource(99L, "PUSH_OPEN")).thenReturn(1);
-        when(logMapper.selectLatestByPushIdAndTriggerSource(99L, "PUSH_OPEN"))
-                .thenReturn(log(702L, "COMPLETED"));
+        when(coreTransactionService.execute(7L, "message-1", 99L, null, 2))
+                .thenReturn(attempt(log(702L, "COMPLETED")));
 
         WorkspacePushRecheckService.Projection result = service.open(
                 7L, "message-1", "push-snapshot-99");
 
-        verify(pushRecheckService).recheckForOwnedPushOpen(99L, null, 2);
+        verify(coreTransactionService).execute(7L, "message-1", 99L, null, 2);
         assertThat(result.recheckId()).isEqualTo(702L);
     }
 
@@ -104,12 +104,14 @@ class WorkspacePushRecheckServiceTest {
         TmPushRecheckLogDO failed = log(701L, "ERROR");
         TmPushRecheckLogDO retried = log(702L, "COMPLETED");
         when(logMapper.selectLatestByPushIdAndTriggerSource(99L, "PUSH_OPEN"))
-                .thenReturn(failed, retried);
+                .thenReturn(failed);
         when(logMapper.countByPushIdAndTriggerSource(99L, "PUSH_OPEN")).thenReturn(1);
+        when(coreTransactionService.execute(7L, "message-1", 99L, 701L, 2))
+                .thenReturn(attempt(retried));
 
         WorkspacePushRecheckService.Projection result = service.retry(7L, "message-1", "push-snapshot-99");
 
-        verify(pushRecheckService).recheckForOwnedPushOpen(99L, 701L, 2);
+        verify(coreTransactionService).execute(7L, "message-1", 99L, 701L, 2);
         assertThat(result.recheckId()).isEqualTo(702L);
     }
 
@@ -122,8 +124,10 @@ class WorkspacePushRecheckServiceTest {
         assertThatThrownBy(() -> service.retry(7L, "message-1", "push-snapshot-99"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("only an ERROR");
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(
-                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -133,8 +137,10 @@ class WorkspacePushRecheckServiceTest {
         service.reanalyze(7L, "message-1", "push-snapshot-99");
 
         verify(analysisRunOrchestrator).run(org.mockito.ArgumentMatchers.any(AnalysisRunCommand.class));
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(
-                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -143,7 +149,10 @@ class WorkspacePushRecheckServiceTest {
 
         assertThatThrownBy(() -> service.open(8L, "message-1", "push-snapshot-99"))
                 .isInstanceOf(WorkspacePushRecheckService.WorkspaceRecheckNotFoundException.class);
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(99L, null, 1);
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -162,7 +171,10 @@ class WorkspacePushRecheckServiceTest {
 
         assertThatThrownBy(() -> service.open(7L, "message-1", "push-snapshot-99"))
                 .isInstanceOf(WorkspacePushRecheckService.WorkspaceRecheckNotFoundException.class);
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(99L, null, 1);
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -186,8 +198,10 @@ class WorkspacePushRecheckServiceTest {
 
         assertThatThrownBy(() -> service.read(7L, "message-1", "push-snapshot-100"))
                 .isInstanceOf(WorkspacePushRecheckService.WorkspaceRecheckNotFoundException.class);
-        verify(pushRecheckService, never()).recheckForOwnedPushOpen(
-                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt());
+        verify(coreTransactionService, never()).execute(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test
@@ -198,10 +212,8 @@ class WorkspacePushRecheckServiceTest {
         doAnswer(invocation -> {
             entered.countDown();
             assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
-            return null;
-        }).when(pushRecheckService).recheckForOwnedPushOpen(99L, null, 1);
-        when(logMapper.selectLatestByPushIdAndTriggerSource(99L, "PUSH_OPEN"))
-                .thenReturn(log(701L, "COMPLETED"));
+            return attempt(log(701L, "COMPLETED"));
+        }).when(coreTransactionService).execute(7L, "message-1", 99L, null, 1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             Future<WorkspacePushRecheckService.Projection> first = executor.submit(
@@ -214,7 +226,7 @@ class WorkspacePushRecheckServiceTest {
 
             assertThat(first.get(5, TimeUnit.SECONDS).recheckId()).isEqualTo(701L);
             assertThat(second.get(5, TimeUnit.SECONDS).recheckId()).isEqualTo(701L);
-            verify(pushRecheckService, times(1)).recheckForOwnedPushOpen(99L, null, 1);
+            verify(coreTransactionService, times(1)).execute(7L, "message-1", 99L, null, 1);
         } finally {
             release.countDown();
             executor.shutdownNow();
@@ -263,5 +275,10 @@ class WorkspacePushRecheckServiceTest {
         value.setRecheckStatus("REVIEW_PASSED");
         value.setTraceId("trace-recheck");
         return value;
+    }
+
+    private static PushRecheckCoreTransactionService.AttemptResult attempt(TmPushRecheckLogDO log) {
+        return new PushRecheckCoreTransactionService.AttemptResult(new RecheckResult(), log,
+                "COMPLETED".equalsIgnoreCase(log.getExecutionStatus()));
     }
 }

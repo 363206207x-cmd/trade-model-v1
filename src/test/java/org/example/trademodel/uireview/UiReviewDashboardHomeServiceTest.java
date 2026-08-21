@@ -27,6 +27,9 @@ class UiReviewDashboardHomeServiceTest {
                     assertThat(position.getMonitorConclusion()).isNotBlank();
                     assertThat(position.getSuggestedAction()).isNotBlank();
                 });
+        assertThat(home.getPositionAggregate().getActiveCount()).isEqualTo(4);
+        assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("EXTREME");
+        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
         assertThat(home.getExecutionSuggestion().getFinalPlan()).isTrue();
         assertThat(home.getExecutionSuggestion().getValidationStatus()).isEqualTo("PASS");
         assertThat(home.getExecutionSuggestion().getFinalPlanMode()).isEqualTo("PREPARATION");

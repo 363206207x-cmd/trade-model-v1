@@ -9,6 +9,10 @@
     const liveRegion = document.getElementById("workspaceLiveRegion");
     const frontendContract = window.TradeModelFrontendContract || {};
     const userFacingSemantic = frontendContract.USER_FACING_SEMANTIC_MAPPER || {};
+    const reviewResultLabel = frontendContract.reviewResultLabel;
+    const failurePathView = frontendContract.failurePathView;
+    const roleGate = frontendContract.roleGate;
+    const analysisModeGate = frontendContract.analysisModeGate;
     let restoreFocus = null;
     let analysisAudit = null;
     let assetPoolItems = [];
@@ -72,7 +76,7 @@
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
         REVIEW_PASSED: "复核通过", REVIEW_WAITING: "等待人工复核",
-        APPROVE: "通过", DOWNGRADE: "降级", REJECT: "拒绝候选", RISK_WARNING: "风险警告",
+        APPROVE: "通过", DOWNGRADE: "降级", REJECT_CANDIDATE: "拒绝候选", RISK_WARNING: "风险警告",
         DRIFTED_FROM_ENTRY_ZONE: "偏离入场区", DRIFTED: "发生偏移",
         RISK_BLOCKED: "风险阻断", CONFUSED_BLOCKED: "冲突阻断",
         GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核",
@@ -969,17 +973,104 @@
         return '<section class="ai-structured-section"><h4>' + escapeHtml(title) + '</h4>' + content + '</section>';
     }
 
+    function collectionDescriptor(payload, key, stateKey) {
+        const items = Array.isArray(payload?.[key]) ? payload[key] : [];
+        return {
+            state: payload?.[stateKey],
+            size: items.length,
+            failurePath: stateKey === "failurePathState"
+        };
+    }
+
+    function roleCollections(role, payload, mode) {
+        if (role === "GPT_FINAL") return [
+            collectionDescriptor(payload, "supportingEvidence", "supportingEvidenceState"),
+            collectionDescriptor(payload, "opposingEvidence", "opposingEvidenceState")
+        ];
+        if (role === "GEMINI_REVIEW") return [
+            collectionDescriptor(payload, "evidenceGaps", "evidenceGapsState"),
+            collectionDescriptor(payload, "logicConflicts", "logicConflictsState"),
+            collectionDescriptor(payload, "underestimatedRisks", "underestimatedRisksState")
+        ];
+        const collections = [
+            collectionDescriptor(payload, "opposingScenarios", "opposingScenariosState"),
+            collectionDescriptor(payload, "externalEventRisks", "externalEventRisksState"),
+            collectionDescriptor(payload, "microstructureRisks", "microstructureRisksState"),
+            collectionDescriptor(payload, "watchIndicators", "watchIndicatorsState")
+        ];
+        if (mode === "OPPORTUNITY_DECISION") {
+            collections.unshift(collectionDescriptor(payload, "failurePaths", "failurePathState"));
+        }
+        return collections;
+    }
+
+    function hasRoleIdentity(payload) {
+        return hasValue(payload?.analysisId) && hasValue(payload?.traceId)
+            && hasValue(payload?.roleState) && hasValue(payload?.generatedAt);
+    }
+
+    function roleResultAvailable(role, payload, mode) {
+        if (!payload || payload.resultAvailable !== true || !hasRoleIdentity(payload)) return false;
+        const state = typeof frontendContract.normalizeRoleState === "function"
+            ? frontendContract.normalizeRoleState(payload.roleState) : "UNAVAILABLE";
+        if (state !== "READY") return true;
+        if (mode === "ANALYSIS_PREVIEW") {
+            if (role === "GPT_FINAL") {
+                return hasValue(payload.coreJudgment?.marketBias)
+                    && hasValue(payload.coreJudgment?.text || payload.summary);
+            }
+            return true;
+        }
+        if (role === "GPT_FINAL") {
+            return hasValue(payload.coreJudgment?.marketBias)
+                && hasValue(payload.coreJudgment?.opportunityState)
+                && hasValue(payload.candidateSummary?.planMode);
+        }
+        if (role === "GEMINI_REVIEW") {
+            const review = String(payload.reviewResult || "").toUpperCase();
+            const formal = ["APPROVE", "DOWNGRADE", "REJECT_CANDIDATE", "RISK_WARNING"].includes(review);
+            if (!formal) return false;
+            if (review === "APPROVE") return true;
+            return hasValue(payload.downgradeSuggestion?.before)
+                && hasValue(payload.downgradeSuggestion?.after)
+                && hasValue(payload.downgradeSuggestion?.reason)
+                && hasValue(payload.downgradeSuggestion?.recoveryCondition || payload.recoveryCondition);
+        }
+        return failurePathView(payload.failurePathState, payload.failurePaths).valid;
+    }
+
+    function renderRoleFailClosed(message) {
+        return '<div class="empty-state ai-role-fail-closed"><strong>'
+            + escapeHtml(message || "角色结果当前不可查看")
+            + '</strong><span>不会使用旧输出、摘要或其他角色字段补齐。</span></div>';
+    }
+
+    function renderPartialRole(role, payload, mode) {
+        const head = renderRoleMetadata(payload);
+        if (role === "GPT_FINAL") {
+            return head
+                + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
+                + renderRoleCollection("反对证据", payload.opposingEvidence, payload.opposingEvidenceState);
+        }
+        if (role === "GEMINI_REVIEW") {
+            return head
+                + renderRoleCollection("证据缺口", payload.evidenceGaps, payload.evidenceGapsState)
+                + renderRoleCollection("逻辑冲突", payload.logicConflicts, payload.logicConflictsState)
+                + renderRoleCollection("风险低估", payload.underestimatedRisks, payload.underestimatedRisksState);
+        }
+        return head
+            + (mode === "OPPORTUNITY_DECISION" ? renderFailurePaths(payload.failurePaths, payload.failurePathState) : "")
+            + renderRoleCollection("反向情景", payload.opposingScenarios, payload.opposingScenariosState)
+            + renderRoleCollection("外部事件风险", payload.externalEventRisks, payload.externalEventRisksState)
+            + renderRoleCollection("微观结构风险", payload.microstructureRisks, payload.microstructureRisksState)
+            + renderRoleCollection("继续观察指标", payload.watchIndicators, payload.watchIndicatorsState);
+    }
+
     function renderFailurePaths(items, state) {
-        const rows = Array.isArray(items) ? items : [];
-        const normalized = String(state || "").toUpperCase();
-        if (normalized === "FOUND" && !rows.length) {
-            return '<section class="ai-structured-section"><h4>失败路径</h4><p class="muted">失败路径数据不完整</p></section>';
-        }
-        if (!rows.length) {
-            const message = normalized === "NO_VERIFIABLE_FAILURE_PATH"
-                ? "未发现可验证失败路径" : label(state, "当前不可查看");
-            return '<section class="ai-structured-section"><h4>失败路径</h4><p class="muted">' + escapeHtml(message) + '</p></section>';
-        }
+        const view = failurePathView(state, items);
+        const rows = view.paths;
+        if (!view.valid || !rows.length) return '<section class="ai-structured-section"><h4>失败路径</h4><p class="muted">'
+            + escapeHtml(view.label) + '</p></section>';
         return '<section class="ai-structured-section"><h4>失败路径</h4><div class="failure-path-list">'
             + rows.map(function (item) {
                 return '<article class="failure-path-item"><strong>' + escapeHtml(text(item?.hypothesis, "失败路径")) + '</strong>'
@@ -1046,18 +1137,18 @@
                 + '<section class="ai-structured-section"><h4>Candidate 摘要 · 非 Final</h4>' + candidateContent + '</section>';
         }
         if (role === "GEMINI_REVIEW") {
-            if (!hasValue(payload.reviewResult)) {
-                return head + '<div class="empty-state"><strong>复核结果当前不可查看</strong><span>不会使用其他字段推断 Candidate 复核结果。</span></div>';
-            }
             const review = String(payload.reviewResult).toUpperCase();
             const suggestion = payload.downgradeSuggestion;
-            const beforeAfter = review !== "APPROVE" && suggestion && hasValue(suggestion.before) && hasValue(suggestion.after)
+            const illegalWaitingConfirmation = String(analysisAudit?.opportunity?.state || "").toLowerCase() === "waiting_trigger"
+                && String(suggestion?.before || "").toUpperCase() === "CONFIRMATION";
+            const beforeAfter = review !== "APPROVE" && !illegalWaitingConfirmation
                 ? '<section class="ai-structured-section"><h4>Before → After</h4>' + factGrid([
                     ["调整前", label(suggestion.before)], ["调整后", label(suggestion.after)],
                     ["调整原因", text(suggestion.reason)],
                     ["恢复条件", text(suggestion.recoveryCondition || payload.recoveryCondition)]
-                ]) + '</section>' : "";
-            return head + renderRolePrimary("复核结果", label(review), "审查对象：Candidate") + factGrid([
+                ]) + '</section>' : review !== "APPROVE"
+                    ? '<section class="ai-structured-section"><h4>Before → After</h4><p class="muted">调整前后当前不可查看</p></section>' : "";
+            return head + renderRolePrimary("复核结果", reviewResultLabel(review), "审查对象：Candidate") + factGrid([
                 ["对 Candidate 的影响", text(payload.finalDirectionImpact)],
                 ["恢复条件", text(payload.recoveryCondition || suggestion?.recoveryCondition)]
             ]) + beforeAfter
@@ -1065,9 +1156,8 @@
                 + renderRoleCollection("逻辑冲突", payload.logicConflicts, payload.logicConflictsState)
                 + renderRoleCollection("风险低估", payload.underestimatedRisks, payload.underestimatedRisksState);
         }
-        const failureState = payload.failurePathState === "NO_VERIFIABLE_FAILURE_PATH"
-            ? "未发现可验证失败路径" : label(payload.failurePathState);
-        return head + renderRolePrimary("失败路径状态", failureState, "Grok 反方挑战") + factGrid([
+        const failureState = failurePathView(payload.failurePathState, payload.failurePaths);
+        return head + renderRolePrimary("失败路径状态", failureState.label, "Grok 反方挑战") + factGrid([
             ["挑战摘要", text(payload.challengeSummary || payload.summary)],
             ["对当前方向的挑战", text(payload.currentDirectionChallenge)],
             ["重大反证", payload.majorCounterEvidence === true ? "是" : payload.majorCounterEvidence === false ? "否" : "当前不可查看"]
@@ -1080,6 +1170,10 @@
 
     function renderFormalRole(role, payload) {
         if (!payload) return '<div class="empty-state"><strong>该角色暂无结构化输出</strong><span>不会使用原始 JSON 推断结论。</span></div>';
+        const gate = roleGate(payload.roleState, roleResultAvailable(role, payload, analysisMode),
+            roleCollections(role, payload, analysisMode));
+        if (!gate.allowed) return renderRoleFailClosed(gate.message);
+        if (gate.renderMode === "PARTIAL") return renderPartialRole(role, payload, analysisMode);
         return analysisMode === "ANALYSIS_PREVIEW"
             ? renderPreviewRole(role, payload) : renderOpportunityRole(role, payload);
     }
@@ -1126,18 +1220,23 @@
         try {
             analysisAudit = await api("/api/ai/audit-chain?analysisId=" + encodeURIComponent(resourceId));
             const analysis = analysisAudit.analysis || {};
-            const mode = ["ANALYSIS_PREVIEW", "OPPORTUNITY_DECISION"].includes(analysis.analysisMode)
-                ? analysis.analysisMode : null;
-            analysisMode = mode;
-            document.getElementById("analysisMode").textContent = mode ? label(mode) : "分析模式当前不可查看";
-            document.getElementById("analysisModeBoundary").textContent = mode === "ANALYSIS_PREVIEW"
-                ? "按需查看当前资产的分析结果。"
-                : mode === "OPPORTUNITY_DECISION" ? "查看当前机会的完整决策结果。" : "仅展示已验证的通用分析事实。";
-            updateAnalysisRoleLabels(mode);
+            const modeView = analysisModeGate(analysis.analysisMode);
+            analysisMode = modeView.mode;
+            document.getElementById("analysisMode").textContent = modeView.label;
+            document.getElementById("analysisModeBoundary").textContent = modeView.message;
+            updateAnalysisRoleLabels(analysisMode);
             ["analysisTimeframesSection", "analysisEvidenceSection", "analysisScoresSection"].forEach(function (id) {
                 const section = document.getElementById(id);
-                if (section) section.hidden = !mode;
+                if (section) section.hidden = !modeView.valid;
             });
+            if (!modeView.valid) {
+                document.getElementById("analysisDataQuality").innerHTML = renderRoleFailClosed(modeView.message);
+                const conflictSummary = document.getElementById("analysisConflictSummary");
+                if (conflictSummary) conflictSummary.hidden = true;
+                document.getElementById("analysisAiLayout")?.classList.remove("has-conflict");
+                renderAiRole("GPT_FINAL");
+                return;
+            }
             document.getElementById("analysisDataQuality").innerHTML = factGrid([
                 ["数据质量", hasValue(analysis.dataQualityScore) ? formatNumber(analysis.dataQualityScore, { maximumFractionDigits: 0 }) : "当前不可查看"],
                 ["分析周期", text(analysis.timeframe, "当前不可查看")],
@@ -1146,7 +1245,7 @@
             document.getElementById("analysisScores").innerHTML = renderAnalysisScores(analysisAudit.scores || []);
             document.getElementById("analysisEvidence").innerHTML = renderAnalysisEvidence(analysisAudit.evidence || []);
             document.getElementById("analysisTimeframes").innerHTML = renderStructured(analysisAudit.decisionBundle?.multiTimeframeStates || analysisAudit.decisionBundle?.multiTimeframeState);
-            const resolver = mode === "OPPORTUNITY_DECISION" ? analysisAudit.conflictResolver : null;
+            const resolver = analysisMode === "OPPORTUNITY_DECISION" ? analysisAudit.conflictResolver : null;
             const conflictLevel = String(resolver?.conflictLevel || "").toUpperCase();
             const formalConflict = ["LEVEL_2_MINOR_DISAGREEMENT", "LEVEL_3_SIGNIFICANT_DISAGREEMENT", "LEVEL_4_EXTREME_CONFLICT"].includes(conflictLevel);
             const conflictSummary = document.getElementById("analysisConflictSummary");
@@ -1164,9 +1263,7 @@
                 auxiliary.setAttribute("aria-hidden", "true");
             }
             const diffPanel = document.getElementById("analysisDecisionDiff");
-            const failurePanel = document.getElementById("analysisFailurePanel");
             if (diffPanel) diffPanel.hidden = true;
-            if (failurePanel) failurePanel.hidden = true;
             selectAnalysisAsset({ symbol: analysis.symbol, baseAsset: String(analysis.symbol || "").replace(/USDT$/, ""), quoteAsset: "USDT" }, { preserveMode: true });
             renderAiRole("GPT_FINAL");
         } catch (_) {

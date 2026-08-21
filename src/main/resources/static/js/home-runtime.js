@@ -370,8 +370,14 @@
         list.innerHTML = shown.map(positionRow).join("");
         list.hidden = shown.length === 0;
         empty.hidden = shown.length !== 0;
-        var coverage = label(home.diagnostics && home.diagnostics.accountRiskCoverageState, "等待评估");
-        setText("positionAggregate", "活动 " + positions.length + " · 最高风险 " + highestRisk(positions) + " · " + coverage);
+        var aggregate = home.positionAggregate && typeof home.positionAggregate === "object"
+            ? home.positionAggregate : {};
+        var activeCount = Number.isInteger(aggregate.activeCount) ? aggregate.activeCount : "—";
+        var highestTrustedRisk = has(aggregate.highestTrustedRisk)
+            ? label(aggregate.highestTrustedRisk, "—") : "—";
+        var coverage = has(aggregate.coverageState)
+            ? label(aggregate.coverageState, "—") : "—";
+        setText("positionAggregate", "活动 " + activeCount + " · 最高风险 " + highestTrustedRisk + " · " + coverage);
     }
 
     function planField(labelText, value) { return '<span><small>' + escapeHtml(labelText) + '</small><b>' + escapeHtml(text(value, "当前不可查看")) + "</b></span>"; }

@@ -14,7 +14,6 @@ import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -30,7 +29,7 @@ public class WorkspacePushRecheckService {
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PushRecheckLogMapper recheckLogMapper;
     private final ExecutionPlanMapper executionPlanMapper;
-    private final PushRecheckService pushRecheckService;
+    private final PushRecheckCoreTransactionService coreTransactionService;
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final ConcurrentHashMap<OpenKey, CompletableFuture<Projection>> inFlightOpens = new ConcurrentHashMap<>();
 
@@ -38,13 +37,13 @@ public class WorkspacePushRecheckService {
                                        PushSnapshotMapper pushSnapshotMapper,
                                        PushRecheckLogMapper recheckLogMapper,
                                        ExecutionPlanMapper executionPlanMapper,
-                                       PushRecheckService pushRecheckService,
+                                       PushRecheckCoreTransactionService coreTransactionService,
                                        AnalysisRunOrchestrator analysisRunOrchestrator) {
         this.messageMapper = messageMapper;
         this.pushSnapshotMapper = pushSnapshotMapper;
         this.recheckLogMapper = recheckLogMapper;
         this.executionPlanMapper = executionPlanMapper;
-        this.pushRecheckService = pushRecheckService;
+        this.coreTransactionService = coreTransactionService;
         this.analysisRunOrchestrator = analysisRunOrchestrator;
     }
 
@@ -63,9 +62,9 @@ public class WorkspacePushRecheckService {
         }
         try {
             int attempt = recheckLogMapper.countByPushIdAndTriggerSource(target.pushId(), PUSH_OPEN) + 1;
-            pushRecheckService.recheckForOwnedPushOpen(target.pushId(), null, attempt);
-            Projection projection = projection(target, latestOpen(target.pushId()));
-            persistCurrentRecheck(userId, target.message(), projection.recheckId());
+            PushRecheckCoreTransactionService.AttemptResult attemptResult = coreTransactionService.execute(
+                    userId, target.message().getMessageId(), target.pushId(), null, attempt);
+            Projection projection = projection(target, attemptResult.log());
             created.complete(projection);
             return projection;
         } catch (RuntimeException failure) {
@@ -88,10 +87,9 @@ public class WorkspacePushRecheckService {
             throw new IllegalStateException("only an ERROR PUSH_OPEN result can be retried");
         }
         int attempt = recheckLogMapper.countByPushIdAndTriggerSource(target.pushId(), PUSH_OPEN) + 1;
-        pushRecheckService.recheckForOwnedPushOpen(target.pushId(), latest.getLogId(), attempt);
-        Projection projection = projection(target, latestOpen(target.pushId()));
-        persistCurrentRecheck(userId, target.message(), projection.recheckId());
-        return projection;
+        PushRecheckCoreTransactionService.AttemptResult attemptResult = coreTransactionService.execute(
+                userId, target.message().getMessageId(), target.pushId(), latest.getLogId(), attempt);
+        return projection(target, attemptResult.log());
     }
 
     public AnalysisRunResult reanalyze(Long userId, String messageId, String pushSnapshotId) {
@@ -142,15 +140,6 @@ public class WorkspacePushRecheckService {
 
     private TmPushRecheckLogDO latestOpen(Long pushId) {
         return recheckLogMapper.selectLatestByPushIdAndTriggerSource(pushId, PUSH_OPEN);
-    }
-
-    private void persistCurrentRecheck(Long userId, MessageDO message, Long recheckId) {
-        if (recheckId == null) return;
-        if (messageMapper.updateCurrentRecheckIdForUser(
-                message.getMessageId(), userId, String.valueOf(recheckId), LocalDateTime.now()) != 1) {
-            throw new IllegalStateException("recheck message lineage update failed");
-        }
-        message.setCurrentRecheckId(String.valueOf(recheckId));
     }
 
     public static String snapshotIdentity(Long pushId) {

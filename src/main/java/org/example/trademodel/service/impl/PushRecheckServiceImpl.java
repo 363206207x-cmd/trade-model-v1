@@ -38,8 +38,15 @@ import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -59,6 +66,7 @@ import java.util.stream.Collectors;
 public class PushRecheckServiceImpl implements PushRecheckService {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Logger LOG = LoggerFactory.getLogger(PushRecheckServiceImpl.class);
 
     private final PushSnapshotMapper pushSnapshotMapper;
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
@@ -72,6 +80,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private HighValueAlertMessageService highValueAlertMessageService;
     private AnalysisRunMapper analysisRunMapper;
     private ExecutionPlanMapper executionPlanMapper;
+    private TransactionTemplate safetyFailureTransaction;
     private Clock clock = Clock.systemUTC();
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
@@ -126,6 +135,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         this.highValueAlertMessageService = service;
         this.analysisRunMapper = analysisRunMapper;
         this.executionPlanMapper = executionPlanMapper;
+    }
+
+    @Autowired(required = false)
+    void setTransactionManager(PlatformTransactionManager transactionManager) {
+        if (transactionManager == null) return;
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.safetyFailureTransaction = template;
     }
 
     @Autowired(required = false)
@@ -271,62 +288,63 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         row.setTraceId(snap != null ? snap.getTraceId() : null);
         fillSnapshotSideMetrics(row, snap);
         row.setCreateTime(now);
-        pushRecheckLogMapper.insert(row);
+        int inserted = pushRecheckLogMapper.insert(row);
+        if (pushOpen && inserted != 1) {
+            throw new IllegalStateException("push recheck completed result persistence failed");
+        }
 
         // 先落 recheck 日志，再在同一事务里回写 push_snapshot.push_status，
         // 让手动触发与自动调度共用同一“状态跟随链”。
         String nextPushStatus = PushRecheckStatusContract.toPushStatus(status);
-        pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
-        recordHighValueSafetyChange(snap, row, status, message, failReasonJson, now);
+        int snapshotUpdated = pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
+        if (pushOpen && snapshotUpdated != 1) {
+            throw new IllegalStateException("push snapshot status update failed");
+        }
+        scheduleHighValueSafetyChangeAfterCommit(snap, row, status, message, failReasonJson, now);
 
         return result;
     }
 
-    @Override
-    @Transactional
-    public RecheckResult recheckForOwnedPushOpen(Long pushId, Long retryFromLogId, int retryAttempt) {
-        try {
-            return recheck(pushId, null, RecheckExecutionCommand.pushOpen(retryAttempt, retryFromLogId));
-        } catch (RuntimeException failure) {
-            persistPushOpenError(pushId, retryFromLogId, retryAttempt, failure);
-            RecheckResult result = new RecheckResult();
-            result.setPushId(pushId);
-            result.setRecheckStatus(RecheckStatusEnum.REVIEW_WAITING);
-            result.setValid(false);
-            result.setReviewPassed(false);
-            result.setMessage("复核执行失败，请由用户明确重试");
-            return result;
+    private void scheduleHighValueSafetyChangeAfterCommit(TmPushSnapshotDO snapshot,
+                                                           TmPushRecheckLogDO log,
+                                                           RecheckStatusEnum status,
+                                                           String message,
+                                                           String failReasonJson,
+                                                           LocalDateTime occurredAt) {
+        Runnable publish = () -> {
+            try {
+                recordHighValueSafetyChange(snapshot, log, status, message, failReasonJson, occurredAt);
+            } catch (RuntimeException failure) {
+                LOG.error("event=push_recheck_safety_message_failed pushId={} recheckId={} status={}",
+                        snapshot == null ? null : snapshot.getPushId(), log == null ? null : log.getLogId(),
+                        status, failure);
+                markSafetyMessageFailure(log == null ? null : log.getLogId());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publish.run();
+                }
+            });
+        } else {
+            publish.run();
         }
     }
 
-    private void persistPushOpenError(Long pushId, Long retryFromLogId, int retryAttempt,
-                                      RuntimeException failure) {
-        LocalDateTime now = UtcLocalTimePolicy.now(clock);
-        TmPushSnapshotDO snapshot = pushId == null ? null : pushSnapshotMapper.selectByPushId(pushId);
-        TmPushRecheckLogDO row = new TmPushRecheckLogDO();
-        row.setPushId(pushId);
-        row.setTriggerSource("PUSH_OPEN");
-        row.setRetryAttempt(Math.max(1, retryAttempt));
-        row.setReplayFromLogId(retryFromLogId);
-        row.setExecutionStatus("ERROR");
-        row.setExecutionErrorCode(executionErrorCode(failure));
-        row.setExecutionErrorMessage("复核执行失败，请由用户明确重试");
-        row.setRecheckTime(now);
-        row.setRecheckStatus(null);
-        row.setFailReasonJson(failJson(row.getExecutionErrorCode(), "PUSH_OPEN execution failed"));
-        row.setTraceId(snapshot == null ? null : snapshot.getTraceId());
-        row.setCreateTime(now);
-        pushRecheckLogMapper.insert(row);
-    }
-
-    private static String executionErrorCode(Throwable failure) {
-        Throwable current = failure;
-        while (current != null) {
-            String name = current.getClass().getSimpleName().toUpperCase();
-            if (name.contains("TIMEOUT") || name.contains("TIMEDOUT")) return "RECHECK_TIMEOUT";
-            current = current.getCause();
+    private void markSafetyMessageFailure(Long recheckId) {
+        if (recheckId == null) return;
+        Runnable update = () -> {
+            if (pushRecheckLogMapper.markSafetyMessageFailure(recheckId) != 1) {
+                LOG.error("event=push_recheck_safety_failure_record_failed recheckId={}", recheckId);
+            }
+        };
+        if (safetyFailureTransaction != null) {
+            safetyFailureTransaction.executeWithoutResult(status -> update.run());
+        } else {
+            update.run();
         }
-        return "RECHECK_EXECUTION_FAILED";
     }
 
     private void recordHighValueSafetyChange(TmPushSnapshotDO snapshot,

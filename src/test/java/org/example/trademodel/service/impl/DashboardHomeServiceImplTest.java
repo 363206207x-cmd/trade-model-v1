@@ -817,6 +817,9 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getPositions()).isEmpty();
+        assertThat(home.getPositionAggregate().getActiveCount()).isZero();
+        assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isNull();
+        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("UNKNOWN");
         assertThat(home.getPositionMonitoringState()).isEqualTo("NO_POSITION");
         assertThat(home.getPushInbox().getHasOpenPosition()).isFalse();
         assertThat(home.getPushInbox().getMode()).isEqualTo("OPPORTUNITY_ONLY");
@@ -1318,7 +1321,71 @@ class DashboardHomeServiceImplTest {
         assertThat(ethHome.getSelectedPositionId()).isEqualTo(404L);
         assertThat(btcHome.getPositionSelectionStatus()).isEqualTo("EXACT_POSITION_SELECTED");
         assertThat(ethHome.getPositionSelectionStatus()).isEqualTo("EXACT_POSITION_SELECTED");
+        assertThat(btcHome.getPositionAggregate().getActiveCount()).isEqualTo(5);
+        assertThat(btcHome.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("HIGH");
+        assertThat(btcHome.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
+        assertThat(ethHome.getPositionAggregate().getActiveCount())
+                .isEqualTo(btcHome.getPositionAggregate().getActiveCount());
+        assertThat(ethHome.getPositionAggregate().getHighestTrustedRisk())
+                .isEqualTo(btcHome.getPositionAggregate().getHighestTrustedRisk());
+        assertThat(ethHome.getPositionAggregate().getCoverageState())
+                .isEqualTo(btcHome.getPositionAggregate().getCoverageState());
         verify(userPositionService, times(2)).listOpenPositionsForUser(USER_ID);
+    }
+
+    @Test
+    void topThreeProjectionKeepsFullFourPositionAggregateAndFourthTrustedExtremeRisk() {
+        List<UserPositionVO> positions = List.of(
+                activeManualPosition(411L, "BTCUSDT", null),
+                activeManualPosition(412L, "ETHUSDT", null),
+                activeManualPosition(413L, "SOLUSDT", null),
+                activeManualPosition(414L, "BNBUSDT", null));
+        positions.forEach(position -> position.setUpdatedAt(LocalDateTime.of(2026, 7, 20, 9, 0)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 411L, 1))
+                .thenReturn(List.of(positionMonitor(411L, "HIGH_RISK_OBSERVATION", "HIGH", 5)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 412L, 1))
+                .thenReturn(List.of(positionMonitor(412L, "HIGH_RISK_OBSERVATION", "HIGH", 4)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 413L, 1))
+                .thenReturn(List.of(positionMonitor(413L, "HIGH_RISK_OBSERVATION", "HIGH", 3)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 414L, 1))
+                .thenReturn(List.of(positionMonitor(414L, "HIGH_RISK_OBSERVATION", "EXTREME", 1)));
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(positions);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getPositions()).extracting(DashboardHomeVO.PositionVO::getPositionId)
+                .containsExactly(411L, 412L, 413L);
+        assertThat(home.getPositionAggregate().getActiveCount()).isEqualTo(4);
+        assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("EXTREME");
+        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("COMPLETE");
+        assertThat(home.getSystemState().getAccountStatus().getValueLabel())
+                .isEqualTo("极高·4笔·覆盖完整");
+    }
+
+    @Test
+    void fourthUntrustedPositionCountsAsActiveButOnlyChangesCoverage() {
+        List<UserPositionVO> positions = List.of(
+                activeManualPosition(421L, "BTCUSDT", null),
+                activeManualPosition(422L, "ETHUSDT", null),
+                activeManualPosition(423L, "SOLUSDT", null),
+                activeManualPosition(424L, "BNBUSDT", null));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 421L, 1))
+                .thenReturn(List.of(positionMonitor(421L, "LOGIC_VALID", "LOW", 5)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 422L, 1))
+                .thenReturn(List.of(positionMonitor(422L, "LOGIC_WEAKENED", "MEDIUM", 4)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 423L, 1))
+                .thenReturn(List.of(positionMonitor(423L, "HIGH_RISK_OBSERVATION", "HIGH", 3)));
+        when(positionMonitorLogService.listByPositionIdForUser(USER_ID, 424L, 1)).thenReturn(List.of());
+        when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(positions);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getPositions()).hasSize(3);
+        assertThat(home.getPositionAggregate().getActiveCount()).isEqualTo(4);
+        assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("HIGH");
+        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
+        assertThat(home.getSystemState().getAccountStatus().getValueLabel())
+                .isEqualTo("高·4笔·覆盖部分");
     }
 
     @Test
@@ -3224,6 +3291,7 @@ class DashboardHomeServiceImplTest {
             role.put("callStatus", "NOT_CALLED");
             role.put("roleState", "UNAVAILABLE");
             role.put("dataState", "SOURCE_UNAVAILABLE");
+            role.put("resultAvailable", false);
             role.put("fallback", true);
             role.put("fallbackReason", "ROLE_RESULT_UNAVAILABLE");
             initializeRoleCollections(roleName, role, "SOURCE_UNAVAILABLE");
@@ -3238,6 +3306,7 @@ class DashboardHomeServiceImplTest {
         role.put("sourceRole", roleName);
         role.put("callStatus", callStatus);
         role.put("roleState", successful ? "READY" : source.isFallback() ? "FALLBACK" : "ERROR");
+        role.put("resultAvailable", successful);
         role.put("dataState", successful
                 ? insufficient ? "INSUFFICIENT_DATA" : "READY"
                 : "TIMEOUT".equals(callStatus) ? "AI_TIMEOUT" : "AI_FAILED");

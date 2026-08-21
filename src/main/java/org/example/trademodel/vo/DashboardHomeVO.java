@@ -20,6 +20,7 @@ public class DashboardHomeVO {
     private List<EventRowVO> events = new ArrayList<>();
     private List<AssetVO> assets = new ArrayList<>();
     private List<PositionVO> positions = new ArrayList<>();
+    private PositionAggregateVO positionAggregate = new PositionAggregateVO();
     private ModuleStatesVO states = new ModuleStatesVO();
     private String selectedSymbol;
     private AssetVO selectedAssetContext;
@@ -82,6 +83,11 @@ public class DashboardHomeVO {
 
     public void setPositions(List<PositionVO> positions) {
         this.positions = positions;
+    }
+
+    public PositionAggregateVO getPositionAggregate() { return positionAggregate; }
+    public void setPositionAggregate(PositionAggregateVO value) {
+        this.positionAggregate = value == null ? new PositionAggregateVO() : value;
     }
 
     public ModuleStatesVO getStates() {
@@ -2245,6 +2251,21 @@ public class DashboardHomeVO {
 
         public void setProviderReadiness(ProviderReadinessVO providerReadiness) {
             this.providerReadiness = providerReadiness == null ? new ProviderReadinessVO() : providerReadiness;
+        }
+    }
+
+    public static class PositionAggregateVO {
+        private Integer activeCount;
+        private String highestTrustedRisk;
+        private String coverageState = "UNKNOWN";
+
+        public Integer getActiveCount() { return activeCount; }
+        public void setActiveCount(Integer value) { this.activeCount = value; }
+        public String getHighestTrustedRisk() { return highestTrustedRisk; }
+        public void setHighestTrustedRisk(String value) { this.highestTrustedRisk = value; }
+        public String getCoverageState() { return coverageState; }
+        public void setCoverageState(String value) {
+            this.coverageState = value == null ? "UNKNOWN" : value;
         }
     }
 

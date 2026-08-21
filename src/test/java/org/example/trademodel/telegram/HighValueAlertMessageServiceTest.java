@@ -17,7 +17,8 @@ import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.MessageFactService;
 import org.example.trademodel.service.OpportunityTransitionResult;
-import org.example.trademodel.service.PushRecheckService;
+import org.example.trademodel.service.PushRecheckCoreTransactionService;
+import org.example.trademodel.service.RecheckResult;
 import org.example.trademodel.service.WorkspacePushRecheckService;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
@@ -48,7 +49,7 @@ class HighValueAlertMessageServiceTest {
     @Mock private ExecutionPlanMapper executionPlanMapper;
     @Mock private MessageMapper messageMapper;
     @Mock private PushRecheckLogMapper pushRecheckLogMapper;
-    @Mock private PushRecheckService pushRecheckService;
+    @Mock private PushRecheckCoreTransactionService coreTransactionService;
     @Mock private AnalysisRunOrchestrator analysisRunOrchestrator;
 
     private HighValueAlertMessageService service;
@@ -158,9 +159,6 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getCurrentRecheckId()).isNull();
 
         when(messageMapper.selectByIdForUser("message-prod", 41L)).thenReturn(message);
-        when(messageMapper.updateCurrentRecheckIdForUser(
-                org.mockito.Mockito.eq("message-prod"), org.mockito.Mockito.eq(41L),
-                org.mockito.Mockito.eq("701"), org.mockito.ArgumentMatchers.any())).thenReturn(1);
         TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
         snapshot.setPushId(99L);
         snapshot.setAnalysisId("analysis-9");
@@ -178,12 +176,13 @@ class HighValueAlertMessageServiceTest {
         recheck.setTriggerSource("PUSH_OPEN");
         recheck.setExecutionStatus("COMPLETED");
         recheck.setRecheckStatus("REVIEW_PASSED");
-        when(pushRecheckLogMapper.selectLatestByPushIdAndTriggerSource(99L, "PUSH_OPEN"))
-                .thenReturn(recheck);
+        when(coreTransactionService.execute(41L, "message-prod", 99L, null, 1))
+                .thenReturn(new PushRecheckCoreTransactionService.AttemptResult(
+                        new RecheckResult(), recheck, true));
 
         WorkspacePushRecheckService workspace = new WorkspacePushRecheckService(
                 messageMapper, pushSnapshotMapper, pushRecheckLogMapper, executionPlanMapper,
-                pushRecheckService, analysisRunOrchestrator);
+                coreTransactionService, analysisRunOrchestrator);
         WorkspacePushRecheckService.Projection result = workspace.open(
                 41L, "message-prod", "push-snapshot-99");
 
@@ -193,10 +192,7 @@ class HighValueAlertMessageServiceTest {
         assertThat(result.recheckId()).isEqualTo(701L);
         assertThat(result.analysisId()).isEqualTo("analysis-9");
         assertThat(result.planId()).isEqualTo("plan-9");
-        verify(pushRecheckService).recheckForOwnedPushOpen(99L, null, 1);
-        verify(messageMapper).updateCurrentRecheckIdForUser(
-                org.mockito.Mockito.eq("message-prod"), org.mockito.Mockito.eq(41L),
-                org.mockito.Mockito.eq("701"), org.mockito.ArgumentMatchers.any());
+        verify(coreTransactionService).execute(41L, "message-prod", 99L, null, 1);
     }
 
     @Test

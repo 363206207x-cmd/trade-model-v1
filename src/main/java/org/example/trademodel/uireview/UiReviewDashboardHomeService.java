@@ -51,6 +51,11 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setAssets(assets);
         List<DashboardHomeVO.PositionVO> positions = positions(selectedPositionId);
         home.setPositions(positions);
+        DashboardHomeVO.PositionAggregateVO aggregate = new DashboardHomeVO.PositionAggregateVO();
+        aggregate.setActiveCount(4);
+        aggregate.setHighestTrustedRisk("EXTREME");
+        aggregate.setCoverageState("PARTIAL_COVERAGE");
+        home.setPositionAggregate(aggregate);
         home.setStates(moduleStates());
         home.setSelectedSymbol(selectedSymbol);
         home.setSelectedAssetContext(assets.stream()
@@ -86,9 +91,9 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         state.setRiskLevel(status("risk", "系统风险", "— / 尚未形成系统级评估", "SOURCE_UNAVAILABLE", null));
         state.setDataQuality(status("quality", "全局数据质量", "新鲜", "CONNECTED", null));
         state.setServiceAvailability(status("service", "服务可用性", "正常", "CONNECTED", null));
-        state.setAccountStatus(status("account", "账户·已录入", "极高·3笔·覆盖完整", "CONNECTED", 3));
+        state.setAccountStatus(status("account", "账户·已录入", "极高·4笔·覆盖部分", "CONNECTED", 4));
         state.setAiConflict(status("ai", "AI 系统", "三角色完成", "READY", 82));
-        state.setPendingReview(status("positions", "已录入持仓", "活动 3", "READY", 3));
+        state.setPendingReview(status("positions", "已录入持仓", "活动 4", "READY", 4));
         state.setConfused(status("conflict", "冲突", "轻微分歧", "READY", 2));
         state.setHotReset(status("reset", "Hot Reset", "关闭", "CONNECTED", 0));
         return state;

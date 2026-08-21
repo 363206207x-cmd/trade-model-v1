@@ -374,6 +374,17 @@
     "READY", "PARTIAL", "FALLBACK", "UNAVAILABLE", "ERROR"
   ]);
 
+  var REVIEW_RESULT_LABELS = Object.freeze({
+    APPROVE: "通过",
+    DOWNGRADE: "降级",
+    REJECT_CANDIDATE: "拒绝候选",
+    RISK_WARNING: "风险警告"
+  });
+
+  var ANALYSIS_MODES = Object.freeze([
+    "ANALYSIS_PREVIEW", "OPPORTUNITY_DECISION"
+  ]);
+
   var STRUCTURED_AI_COLLECTIONS = Object.freeze([
     Object.freeze({ key: "supportingEvidence", state: "supportingEvidenceState" }),
     Object.freeze({ key: "opposingEvidence", state: "opposingEvidenceState" }),
@@ -519,6 +530,158 @@
   function normalizeRoleState(value) {
     var normalized = String(value || "UNAVAILABLE").trim().toUpperCase();
     return ROLE_STATES.indexOf(normalized) >= 0 ? normalized : "UNAVAILABLE";
+  }
+
+  function reviewResultLabel(reviewResult) {
+    var normalized = String(reviewResult || "").trim().toUpperCase();
+    return REVIEW_RESULT_LABELS[normalized] || "当前不可查看";
+  }
+
+  function failurePathView(failurePathState, failurePaths) {
+    var state = String(failurePathState || "").trim().toUpperCase();
+    var paths = Array.isArray(failurePaths) ? failurePaths : [];
+    var complete = paths.every(function (path) {
+      return path && typeof path === "object"
+        && hasText(path.triggerCondition)
+        && hasText(path.causalPath)
+        && hasText(path.invalidatingEvidence);
+    });
+    if (state === "FOUND") {
+      return paths.length > 0 && complete
+        ? {
+            valid: true,
+            state: state,
+            label: "已发现可验证失败路径",
+            paths: paths.slice(),
+            failClosed: false
+          }
+        : {
+            valid: false,
+            state: state,
+            label: "失败路径数据不完整",
+            paths: [],
+            failClosed: true
+          };
+    }
+    if (state === "NO_VERIFIABLE_FAILURE_PATH" && paths.length === 0) {
+      return {
+        valid: true,
+        state: state,
+        label: "未发现可验证失败路径",
+        paths: [],
+        failClosed: false
+      };
+    }
+    if (["INSUFFICIENT_DATA", "SOURCE_UNAVAILABLE", "STALE"].indexOf(state) >= 0
+        && paths.length === 0) {
+      return {
+        valid: true,
+        state: state,
+        label: collectionStateLabel(state),
+        paths: [],
+        failClosed: false
+      };
+    }
+    return {
+      valid: false,
+      state: state || "SOURCE_UNAVAILABLE",
+      label: paths.length > 0 ? "失败路径状态与内容不一致" : "失败路径当前不可查看",
+      paths: [],
+      failClosed: true
+    };
+  }
+
+  function collectionContract(entry) {
+    var descriptor = entry && typeof entry === "object"
+      ? entry
+      : { state: entry, size: 0 };
+    var state = String(descriptor.state || "").trim().toUpperCase();
+    var size = Number.isInteger(descriptor.size)
+      ? descriptor.size
+      : Array.isArray(descriptor.items) ? descriptor.items.length : 0;
+    if (state === "FOUND") return size > 0;
+    if (["NONE_FOUND", "INSUFFICIENT_DATA", "SOURCE_UNAVAILABLE", "STALE"].indexOf(state) >= 0) {
+      return size === 0;
+    }
+    if (state === "NO_VERIFIABLE_FAILURE_PATH") return descriptor.failurePath === true && size === 0;
+    return false;
+  }
+
+  function roleGate(roleState, resultAvailable, collectionStates) {
+    var state = normalizeRoleState(roleState);
+    if (resultAvailable !== true) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: "角色结果当前不可查看"
+      });
+    }
+    if (["FALLBACK", "UNAVAILABLE", "ERROR"].indexOf(state) >= 0) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    var collections = Array.isArray(collectionStates) ? collectionStates : [];
+    if (!collections.every(collectionContract)) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: "集合状态与内容不一致"
+      });
+    }
+    if (state === "PARTIAL") {
+      return Object.freeze({
+        allowed: true,
+        renderMode: "PARTIAL",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    if (state === "READY") {
+      return Object.freeze({
+        allowed: true,
+        renderMode: "READY",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    return Object.freeze({
+      allowed: false,
+      renderMode: "FAIL_CLOSED",
+      roleState: state,
+      message: "角色状态当前不可查看"
+    });
+  }
+
+  function analysisModeGate(analysisMode) {
+    var mode = String(analysisMode || "").trim().toUpperCase();
+    if (ANALYSIS_MODES.indexOf(mode) < 0) {
+      return Object.freeze({
+        valid: false,
+        mode: null,
+        label: "分析模式当前不可查看",
+        message: "缺少可验证的正式分析模式",
+        candidateAllowed: false,
+        candidateReviewAllowed: false,
+        opportunityFailurePathsAllowed: false
+      });
+    }
+    return Object.freeze({
+      valid: true,
+      mode: mode,
+      label: mode === "ANALYSIS_PREVIEW" ? "按需分析预览" : "机会决策",
+      message: mode === "ANALYSIS_PREVIEW"
+        ? "按需查看当前资产的分析结果。"
+        : "查看当前机会的完整决策结果。",
+      candidateAllowed: mode === "OPPORTUNITY_DECISION",
+      candidateReviewAllowed: mode === "OPPORTUNITY_DECISION",
+      opportunityFailurePathsAllowed: mode === "OPPORTUNITY_DECISION"
+    });
   }
 
   function parseApiEnvelope(envelope) {
@@ -787,6 +950,10 @@
     dataStateView: dataStateView,
     collectionStateLabel: collectionStateLabel,
     normalizeRoleState: normalizeRoleState,
+    reviewResultLabel: reviewResultLabel,
+    failurePathView: failurePathView,
+    roleGate: roleGate,
+    analysisModeGate: analysisModeGate,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,
