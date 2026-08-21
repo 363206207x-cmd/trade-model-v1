@@ -17,6 +17,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class PositionMonitoringProjectionServiceTest {
@@ -93,6 +95,42 @@ class PositionMonitoringProjectionServiceTest {
         when(monitorLogService.listByPositionIdForUser(7L, 9L, 1))
                 .thenReturn(List.of(trusted(9L, new BigDecimal("101"))));
         assertThat(service.findForUser(7L, 9L).monitorAvailable()).isTrue();
+    }
+
+    @Test
+    void partiallyClosedLifecycleRemainsInActiveProjection() {
+        UserPositionVO partial = position(10L, "ETHUSDT");
+        partial.setStatus("PARTIALLY_CLOSED");
+        when(userPositionService.listOpenPositionsForUser(7L)).thenReturn(List.of(partial));
+        when(monitorLogService.listByPositionIdForUser(7L, 10L, 1))
+                .thenReturn(List.of(trusted(10L, new BigDecimal("101"))));
+
+        PositionMonitoringProjectionService.CollectionProjection result = service.listForUser(7L);
+
+        assertThat(result.positions()).singleElement().satisfies(item -> {
+            assertThat(item.position().getStatus()).isEqualTo("PARTIALLY_CLOSED");
+            assertThat(item.monitorAvailable()).isTrue();
+        });
+    }
+
+    @Test
+    void closedDetailPreservesFactsWithoutReadingOldMonitorAsCurrent() {
+        UserPositionVO closed = position(11L, "SOLUSDT");
+        closed.setStatus("CLOSED");
+        closed.setClosePrice(new BigDecimal("112"));
+        closed.setClosedAt(LocalDateTime.of(2026, 8, 1, 10, 0));
+        closed.setCloseReason("用户记录平仓");
+        when(userPositionService.findByIdForUser(11L, 7L)).thenReturn(closed);
+
+        PositionMonitoringProjectionService.ItemProjection result = service.findForUser(7L, 11L);
+
+        assertThat(result.position().getEntryPrice()).isEqualByComparingTo("100");
+        assertThat(result.position().getClosePrice()).isEqualByComparingTo("112");
+        assertThat(result.collectionState()).isEqualTo("CLOSED");
+        assertThat(result.monitorAvailable()).isFalse();
+        assertThat(result.monitor().getDataState()).isEqualTo("CLOSED");
+        assertThat(result.monitor().getMonitorConclusion()).isNull();
+        verify(monitorLogService, never()).listByPositionIdForUser(7L, 11L, 1);
     }
 
     private static UserPositionVO position(Long id, String symbol) {

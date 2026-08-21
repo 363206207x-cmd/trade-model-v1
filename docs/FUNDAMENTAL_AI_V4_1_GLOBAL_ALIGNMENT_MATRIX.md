@@ -147,3 +147,20 @@ TOTAL_UNIQUE_FINDINGS: 56
 | RP0-07 | O-03 plus the frozen independent-dimension contract | PASS |
 | RP0-08 | runtime verification status | PARTIAL: live/snapshot/AI consumption NOT_VERIFIED |
 | RP0-09 | audit governance | PASS |
+
+## Knife B.1 verified residual closure
+
+Implementation base: `1a3363f3f05ec22352477097971965dae4785bc2`. PR #1195 remains Draft and unmerged; merged-main completion is not claimed.
+
+| Package | Frozen contract | Current owner/binding | Verification | Status |
+|---|---|---|---|---|
+| KB-01 | Home Top3 is not the full Position workspace | owner-scoped Position projection returns every OPEN/PARTIALLY_CLOSED Position and its own latest monitor | service/controller regression | PASS |
+| KB-02 | Active and History follow lifecycle; CLOSED is not current monitoring | `UserPosition.status`; positionId detail; CLOSED facts without current monitor fetch | lifecycle tests + UI-review tabs | PASS |
+| KB-03 | Preview != Opportunity; structured role fields; one active role | `AnalysisRun.analysisMode` + structured Three-AI payload; unknown fail closed | frontend/AI contract tests + UI-review Unknown/Grok | PASS |
+| KB-04 | Message-owned PushSnapshot; explicit PUSH_OPEN; GET/F5 read only; ERROR-only Retry | Message source identity -> PushSnapshot -> actual Recheck; in-process coalescing | production-chain, service, engine and boundary tests | PASS |
+| KB-05 | Final Plan never becomes UserPosition automatically | existing explicit user entry flow | O06 regression | PASS |
+| KB-06 | partial close requires an auditable persistence source | no event/quantity producer exists and none was invented | source audit | BLOCKED_BY_MISSING_PERSISTENCE_SOURCE |
+| KB-07 | source context restored; audit target and returnTo are safe | exact internal route allowlist; trace-owned Audit route | frontend contract + browser attack cases | PASS |
+| KB-08 | legacy route matrix remains evidence only | no bulk redirect/retirement changes | route contract regression | PASS |
+
+Knife B.1 boundaries: `FRESHNESS=NOT_VERIFIED`, `CROSS_INSTANCE_IDEMPOTENCY=PARTIAL`, data-rich Recheck browser state `NOT_VERIFIED_BROWSER_DATA_BOUNDARY`. These do not change `CURRENT_PHASE_DONE=NO`, `GLOBAL_SEMANTIC_RUNTIME_DONE=NO`, or `READY_FOR_MERGE=NO`.

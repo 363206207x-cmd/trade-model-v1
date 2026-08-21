@@ -142,7 +142,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     @Transactional(rollbackFor = Exception.class)
     public RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command) {
         RecheckExecutionCommand executionCommand = command != null ? command : RecheckExecutionCommand.manual();
-        if ("PUSH_OPEN".equals(executionCommand.getTriggerSource())) {
+        boolean pushOpen = "PUSH_OPEN".equals(executionCommand.getTriggerSource());
+        if (pushOpen) {
             accessBoundary.requireOwnerScopedPushOpenExecution(executionCommand);
         } else {
             accessBoundary.requireInternalScheduledExecution(executionCommand);
@@ -175,7 +176,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.INVALIDATED;
             message = "复查上下文无效，不得作为当前交易依据";
             failReasonJson = failJson("SNAPSHOT_NOT_FOUND", "push_id=" + pushId);
-        } else if ((thresholds = resolvePushRecheckThresholds()) == null) {
+        } else if ((thresholds = resolvePushRecheckThresholds(pushOpen)) == null) {
             status = RecheckStatusEnum.INVALIDATED;
             message = "复查配置不可用，仅供人工复核";
             failReasonJson = failJson("PUSH_RECHECK_CONFIG_NOT_READY", "push_recheck_config missing or invalid");
@@ -183,14 +184,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.EXPIRED;
             message = "推送已过期，不得作为当前交易依据";
             failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
-        } else if ((derivativesGuard = validateDerivativesForRecheck(snap)) != null
+        } else if ((derivativesGuard = validateDerivativesForRecheck(snap, pushOpen)) != null
                 && derivativesGuard.status() != null) {
             status = derivativesGuard.status();
             message = derivativesGuard.message();
             failReasonJson = failJson(derivativesGuard.reasonCode(), derivativesGuard.detail());
         } else {
             if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
-                PriceResolution resolved = resolveCurrentPrice(snap);
+                PriceResolution resolved = resolveCurrentPrice(snap, pushOpen);
                 currentPrice = resolved.currentPrice();
                 failReasonJson = resolved.failReasonJson();
             }
@@ -282,8 +283,50 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     }
 
     @Override
+    @Transactional
     public RecheckResult recheckForOwnedPushOpen(Long pushId, Long retryFromLogId, int retryAttempt) {
-        return recheck(pushId, null, RecheckExecutionCommand.pushOpen(retryAttempt, retryFromLogId));
+        try {
+            return recheck(pushId, null, RecheckExecutionCommand.pushOpen(retryAttempt, retryFromLogId));
+        } catch (RuntimeException failure) {
+            persistPushOpenError(pushId, retryFromLogId, retryAttempt, failure);
+            RecheckResult result = new RecheckResult();
+            result.setPushId(pushId);
+            result.setRecheckStatus(RecheckStatusEnum.REVIEW_WAITING);
+            result.setValid(false);
+            result.setReviewPassed(false);
+            result.setMessage("复核执行失败，请由用户明确重试");
+            return result;
+        }
+    }
+
+    private void persistPushOpenError(Long pushId, Long retryFromLogId, int retryAttempt,
+                                      RuntimeException failure) {
+        LocalDateTime now = UtcLocalTimePolicy.now(clock);
+        TmPushSnapshotDO snapshot = pushId == null ? null : pushSnapshotMapper.selectByPushId(pushId);
+        TmPushRecheckLogDO row = new TmPushRecheckLogDO();
+        row.setPushId(pushId);
+        row.setTriggerSource("PUSH_OPEN");
+        row.setRetryAttempt(Math.max(1, retryAttempt));
+        row.setReplayFromLogId(retryFromLogId);
+        row.setExecutionStatus("ERROR");
+        row.setExecutionErrorCode(executionErrorCode(failure));
+        row.setExecutionErrorMessage("复核执行失败，请由用户明确重试");
+        row.setRecheckTime(now);
+        row.setRecheckStatus(null);
+        row.setFailReasonJson(failJson(row.getExecutionErrorCode(), "PUSH_OPEN execution failed"));
+        row.setTraceId(snapshot == null ? null : snapshot.getTraceId());
+        row.setCreateTime(now);
+        pushRecheckLogMapper.insert(row);
+    }
+
+    private static String executionErrorCode(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String name = current.getClass().getSimpleName().toUpperCase();
+            if (name.contains("TIMEOUT") || name.contains("TIMEDOUT")) return "RECHECK_TIMEOUT";
+            current = current.getCause();
+        }
+        return "RECHECK_EXECUTION_FAILED";
     }
 
     private void recordHighValueSafetyChange(TmPushSnapshotDO snapshot,
@@ -304,8 +347,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 || status == RecheckStatusEnum.RISK_BLOCKED
                 || status == RecheckStatusEnum.INVALIDATED ? 4 : 3;
         highValueAlertMessageService.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
-                analysis.getOwnerId(), changeType, "PUSH_RECHECK",
-                log.getLogId() == null ? String.valueOf(snapshot.getPushId()) : String.valueOf(log.getLogId()),
+                analysis.getOwnerId(), changeType, "PUSH_SNAPSHOT",
+                String.valueOf(snapshot.getPushId()),
                 snapshot.getAnalysisId(), plan == null ? null : plan.getPlanId(),
                 plan == null ? null : plan.getOpportunityId(), String.valueOf(snapshot.getPushId()),
                 snapshot.getSymbol(), snapshot.getTraceId(),
@@ -412,7 +455,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         row.setCurrentDataQualityScore(snap.getDataQualityScoreSnapshot());
     }
 
-    private PriceResolution resolveCurrentPrice(TmPushSnapshotDO snap) {
+    private PriceResolution resolveCurrentPrice(TmPushSnapshotDO snap, boolean failOnInfrastructure) {
         String symbol = trimToNull(snap != null ? snap.getSymbol() : null);
         if (symbol == null) {
             return PriceResolution.failed(failJson("PRICE_REQUIRED", "snapshot symbol missing"));
@@ -429,19 +472,21 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             }
             return PriceResolution.success(result.payload().lastPrice());
         } catch (RuntimeException ex) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(ex);
             return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", ex.getMessage()));
         }
     }
 
-    private RuleConfigContractService.PushRecheckThresholds resolvePushRecheckThresholds() {
+    private RuleConfigContractService.PushRecheckThresholds resolvePushRecheckThresholds(boolean failOnInfrastructure) {
         try {
             return ruleConfigContractService != null ? ruleConfigContractService.requirePushRecheckThresholds() : null;
         } catch (RuntimeException ex) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(ex);
             return null;
         }
     }
 
-    private DerivativesGuard validateDerivativesForRecheck(TmPushSnapshotDO snap) {
+    private DerivativesGuard validateDerivativesForRecheck(TmPushSnapshotDO snap, boolean failOnInfrastructure) {
         if (snap == null || !requiresDerivatives(snap.getInvalidationConditionJson())) return null;
         if (derivativesSnapshotReadPort == null) {
             return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives reader unavailable");
@@ -471,7 +516,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             }
             return null;
         } catch (RuntimeException failure) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(failure);
             return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives read failed");
+        }
+    }
+
+    private static final class PushOpenInfrastructureException extends RuntimeException {
+        private PushOpenInfrastructureException(Throwable cause) {
+            super("PUSH_OPEN infrastructure failure", cause);
         }
     }
 

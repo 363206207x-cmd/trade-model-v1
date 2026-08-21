@@ -27,8 +27,7 @@ public interface MessageMapper {
     @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND dedupe_key = #{dedupeKey} LIMIT 1")
     MessageDO selectByDedupeKey(@Param("userId") Long userId, @Param("dedupeKey") String dedupeKey);
 
-    @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND "
-            + "(current_recheck_id = #{recheckId} OR (source_type = 'PUSH_SNAPSHOT' AND source_id = #{recheckId})) "
+    @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND current_recheck_id = #{recheckId} "
             + "ORDER BY created_at DESC LIMIT 1")
     MessageDO selectByRecheckIdForUser(@Param("recheckId") String recheckId,
                                        @Param("userId") Long userId);
@@ -53,4 +52,11 @@ public interface MessageMapper {
     int markRead(@Param("messageId") String messageId,
                  @Param("userId") Long userId,
                  @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("UPDATE tm_message SET current_recheck_id = #{recheckId}, updated_at = #{updatedAt} "
+            + "WHERE message_id = #{messageId} AND user_id = #{userId}")
+    int updateCurrentRecheckIdForUser(@Param("messageId") String messageId,
+                                      @Param("userId") Long userId,
+                                      @Param("recheckId") String recheckId,
+                                      @Param("updatedAt") LocalDateTime updatedAt);
 }

@@ -361,6 +361,9 @@ td strong { color: var(--text); }
 .ai-workspace .role-tabs { width: 100%; border-radius: 0; }
 .ai-workspace .role-tabs button { flex: 1; }
 .ai-role-content { min-height: 240px; padding: 16px; }
+.ai-role-primary { display: grid; gap: 4px; margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle); }
+.ai-role-primary span, .ai-role-primary small { color: var(--text-secondary); font-size: 12px; }
+.ai-role-primary strong { font-size: 18px; line-height: 1.35; }
 .analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .analysis-ai-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .analysis-ai-layout.has-conflict { grid-template-columns: minmax(0, 72fr) minmax(240px, 28fr); }

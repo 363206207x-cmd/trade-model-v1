@@ -56,7 +56,7 @@ class FundamentalAiV41FinalP1RemediationContractTest {
         assertThat(html).contains(
                 "id=\"analysisAssetSearch\"", "id=\"analysisSelectedAsset\"",
                 "id=\"startAnalysisPreview\" disabled", "id=\"addAnalysisAsset\"",
-                "证据综合与方向假设", "证据质量与逻辑复核", "反向情景与风险压力测试",
+                "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
                 "id=\"topUpDefaultAssets\"", "id=\"resetDefaultAssets\"", "id=\"scanAssetPool\"");
         assertThat(script).contains(
                 "/api/asset-pool/search?query=", "/analysis-preview?timeframe=5m",
@@ -101,7 +101,7 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "field: userFacingField", "finalMarketBias: \"最终市场方向\"",
                 "planModeAfter: \"调整后计划模式\"", "failurePaths: \"失败路径\"");
         assertThat(html).doesNotContain(
-                "最终裁决</", "冲突复核</", "反方挑战</",
+                ">最终裁决<", ">冲突复核<", ">反方挑战<",
                 "Preview 不创建机会", "计划不会自动变成持仓",
                 "仅展示通过 Rule Validation", "复核不会产生交易授权",
                 "资产池是机会发现的唯一入口", "Telegram", "telegram");

@@ -291,6 +291,46 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
+    void ownedPushOpenInfrastructureFailurePersistsRealErrorForExplicitRetry() {
+        TmPushSnapshotDO snapshot = baseSnap();
+        snapshot.setSymbol("BTCUSDT");
+        snapshot.setTraceId("trace-error");
+        when(pushSnapshotMapper.selectByPushId(451L)).thenReturn(snapshot);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT"))
+                .thenThrow(new RuntimeException("provider unavailable"));
+
+        RecheckResult result = service.recheckForOwnedPushOpen(451L, null, 1);
+
+        assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.REVIEW_WAITING);
+        assertThat(result.isReviewPassed()).isFalse();
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionStatus()).isEqualTo("ERROR");
+        assertThat(cap.getValue().getExecutionErrorCode()).isEqualTo("RECHECK_EXECUTION_FAILED");
+        assertThat(cap.getValue().getTriggerSource()).isEqualTo("PUSH_OPEN");
+        assertThat(cap.getValue().getRetryAttempt()).isEqualTo(1);
+        assertThat(cap.getValue().getRecheckStatus()).isNull();
+        assertThat(cap.getValue().getTraceId()).isEqualTo("trace-error");
+        verify(pushSnapshotMapper, never()).updatePushStatus(any(), any());
+    }
+
+    @Test
+    void ownedPushOpenBusinessInvalidationRemainsCompletedAndIsNotExecutionError() {
+        when(pushSnapshotMapper.selectByPushId(452L)).thenReturn(null);
+
+        RecheckResult result = service.recheckForOwnedPushOpen(452L, null, 1);
+
+        assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionStatus()).isEqualTo("COMPLETED");
+        assertThat(cap.getValue().getRecheckStatus()).isEqualTo("INVALIDATED");
+        verify(pushSnapshotMapper).updatePushStatus(452L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
     void missingCurrentPriceSnapshotSymbolMissingFailsClosedWithPriceRequired() {
         TmPushSnapshotDO s = baseSnap();
         s.setSymbol(null);

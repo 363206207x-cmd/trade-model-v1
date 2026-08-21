@@ -1,5 +1,7 @@
 # Fundamental AI v4.1 Knife B Evidence Index
 
+> Historical evidence captured before Knife B.1 residual closure. Current evidence and status are indexed in `../knife_b_1/README.md`; this directory must not be used as exact-Head proof for the current PR.
+
 ## Evidence Classification
 
 - Files prefixed `normal-` are local standard-release runtime evidence using persisted local state. They are not live-provider acceptance evidence.
@@ -40,7 +42,7 @@ Browser metrics at both 1,440 and 1,080: document `scrollWidth == clientWidth`, 
 | 12 | Recheck current metrics and diff | `workspace.html#recheckCurrentMetrics`, `workspace.html#recheckDiff` |
 | 13 | Persisted `PUSH_OPEN` | `WorkspacePushRecheckServiceTest#firstOpenCreatesOnePushOpenAndKeepsAllIdsDistinct` |
 | 14 | No fake `SCHEDULED` metadata | `PushRecheckAccessBoundaryKnifeBTest#ownerScopedPushOpenUsesNoSchedulerIdentityAndManualRemainsDenied` |
-| 15 | Read-only GET creates no record | `WorkspacePushRecheckServiceTest#reloadAndReadOnlyGetNeverCreateDuplicateOpen` |
+| 15 | Read-only GET creates no record | `WorkspacePushRecheckServiceTest#reloadAndReadOnlyGetNeverCreateOpen` |
 | 16 | ERROR retry creates new attempt | `WorkspacePushRecheckServiceTest#errorRetryCreatesNewAttemptForSameTarget` |
 | 17 | IDs remain separate | Recheck audit IA plus `WorkspacePushRecheckServiceTest#firstOpenCreatesOnePushOpenAndKeepsAllIdsDistinct` |
 | 18 | Cross-user Recheck 404 | `WorkspacePushRecheckServiceTest#crossUserOrIdentityMismatchFailsAsNotFoundWithoutEngineInvocation` and owner-mismatch test |
