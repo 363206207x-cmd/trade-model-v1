@@ -36,6 +36,8 @@ import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
@@ -61,6 +63,7 @@ import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
+import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.HomeTopAssetProjection;
@@ -279,11 +282,13 @@ class DashboardHomeServiceImplTest {
                 .isEqualTo("当前不可查看");
         assertThat(home.getSystemState().getPendingReview().getStatus())
                 .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
-        assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(87);
-        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("当前机会集合均值");
-        assertThat(home.getSystemState().getRiskLevel().getValue()).isEqualTo("EXTREME");
-        assertThat(home.getSystemState().getRiskLevel().getHelper()).isEqualTo("当前机会集合最高风险");
-        assertThat(home.getSystemState().getMarketTrend().getValue()).isEqualTo("BULLISH");
+        assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
+        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("全局行情 Provider 尚未就绪");
+        assertThat(home.getSystemState().getRiskLevel().getValue()).isNull();
+        assertThat(home.getSystemState().getRiskLevel().getValueLabel()).isEqualTo("— / 尚未形成系统级评估");
+        assertThat(home.getSystemState().getMarketTrend().getValue()).isNull();
+        assertThat(home.getSystemState().getAccountStatus().getValueLabel())
+                .isEqualTo("暂无评估·1笔·覆盖未知");
         assertThat(home.getSystemState().getAiConflict().getValue())
                 .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
@@ -584,6 +589,9 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getPnlAmount()).isEqualByComparingTo("300.0");
         assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("2.41935500");
         assertThat(homePosition.getAccountImpactPct()).isNull();
+        assertThat(home.getSystemState().getAccountStatus().getValueLabel())
+                .isEqualTo("低·1笔·覆盖完整");
+        assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("COMPLETE");
     }
 
     @Test
@@ -600,9 +608,13 @@ class DashboardHomeServiceImplTest {
         when(positionMonitorLogService.listByPositionIdForUser(USER_ID, position.getId(), 1))
                 .thenReturn(List.of(monitor));
 
-        DashboardHomeVO.PositionVO row = service.getHomeForUser(USER_ID, null, 6).getPositions().get(0);
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+        DashboardHomeVO.PositionVO row = home.getPositions().get(0);
 
         assertWaitingMonitorData(row);
+        assertThat(home.getSystemState().getAccountStatus().getValueLabel())
+                .isEqualTo("暂无评估·1笔·覆盖未知");
+        assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("UNKNOWN");
     }
 
     @Test
@@ -2116,16 +2128,50 @@ class DashboardHomeServiceImplTest {
         when(providerReadinessService.getReadiness())
                 .thenReturn(providerReadiness("CONNECTED", "SUCCESS", "WAITING_SYNC", "真实行情"));
 
-        DashboardHomeVO.SystemStateVO state = service
-                .getHomeForUser(USER_ID, "ETHUSDT", 6)
-                .getSystemState();
+        DashboardHomeVO.SystemStateVO ethState = service
+                .getHomeForUser(USER_ID, "ETHUSDT", 6).getSystemState();
+        DashboardHomeVO.SystemStateVO btcState = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6).getSystemState();
 
-        assertThat(state.getMarketTrend().getValue()).isEqualTo("BULLISH");
-        assertThat(state.getMarketTrend().getHelper()).isEqualTo("BTC 环境基准");
-        assertThat(state.getRiskLevel().getValue()).isEqualTo("HIGH");
-        assertThat(state.getRiskLevel().getHelper()).isEqualTo("当前机会集合最高风险");
-        assertThat(state.getDataQuality().getValue()).isEqualTo(70);
-        assertThat(state.getServiceAvailability().getValueLabel()).isEqualTo("正常");
+        assertThat(ethState.getMarketTrend().getValue()).isNull();
+        assertThat(ethState.getMarketTrend().getValueLabel()).isEqualTo("— / 当前不可查看");
+        assertThat(ethState.getRiskLevel().getValue()).isNull();
+        assertThat(ethState.getRiskLevel().getValueLabel()).isEqualTo("— / 尚未形成系统级评估");
+        assertThat(ethState.getDataQuality().getValue()).isEqualTo("FRESH");
+        assertThat(ethState.getDataQuality().getValueLabel()).isEqualTo("新鲜");
+        assertThat(ethState.getServiceAvailability().getValueLabel()).isEqualTo("正常");
+        assertThat(btcState.getMarketTrend().getValueLabel()).isEqualTo(ethState.getMarketTrend().getValueLabel());
+        assertThat(btcState.getRiskLevel().getValueLabel()).isEqualTo(ethState.getRiskLevel().getValueLabel());
+        assertThat(btcState.getDataQuality().getValueLabel()).isEqualTo(ethState.getDataQuality().getValueLabel());
+    }
+
+    @Test
+    void systemStripUsesFormalFreshMacroProducerWithoutReadingSelectedOpportunity() {
+        PersistedRealMarketEnvironmentService environmentService = mock(PersistedRealMarketEnvironmentService.class);
+        MarketEnvironmentVO environment = new MarketEnvironmentVO();
+        environment.setEnvironmentType("trend_market");
+        environment.setFreshness("FRESH");
+        when(environmentService.assess("BTCUSDT", "1h")).thenReturn(
+                new PersistedRealMarketEnvironmentAssessment(true, null, "KRAKEN",
+                        "KRAKEN_PERSISTED_OHLCV", environment, Map.of(), 400,
+                        1_786_000_000_000L, List.of("trace-macro")));
+        service.setPersistedRealMarketEnvironmentService(environmentService);
+
+        DecisionResultVO btc = decision("BTCUSDT", "BEARISH", "LOW", "LOW", 90, 0,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"WAITING_TRIGGER\"}");
+        DecisionResultVO eth = decision("ETHUSDT", "BULLISH", "HIGH", "HIGH", 70, 0,
+                "LEVEL_2_MINOR_DISAGREEMENT", true, "{\"state\":\"CANDIDATE\"}");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(btc, eth));
+
+        DashboardHomeVO.SystemStateVO btcState = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getSystemState();
+        DashboardHomeVO.SystemStateVO ethState = service.getHomeForUser(USER_ID, "ETHUSDT", 6).getSystemState();
+
+        assertThat(btcState.getMarketTrend().getValue()).isEqualTo("TREND_MARKET");
+        assertThat(btcState.getMarketTrend().getValueLabel()).isEqualTo("趋势环境");
+        assertThat(btcState.getMarketTrend().getHelper()).isEqualTo("KRAKEN_PERSISTED_OHLCV");
+        assertThat(ethState.getMarketTrend().getValueLabel()).isEqualTo("趋势环境");
+        verify(environmentService, times(2)).assess("BTCUSDT", "1h");
     }
 
     @Test

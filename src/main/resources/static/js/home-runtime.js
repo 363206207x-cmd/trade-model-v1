@@ -33,7 +33,7 @@
         OBSERVING: "观察中", CANDIDATE: "候选", WAITING_TRIGGER: "等待触发", TRIGGERED: "已触发",
         HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型", OBSERVATION: "观察", BLOCKED: "阻断",
-        APPROVE: "可以维持", DOWNGRADE: "需要降级", REJECT_CANDIDATE: "候选不成立", RISK_WARNING: "存在明显风险",
+        APPROVE: "通过", DOWNGRADE: "降级", REJECT_CANDIDATE: "拒绝候选", RISK_WARNING: "风险警告",
         UNCHANGED: "维持不变", SAME_FAMILY_DOWNGRADE: "方向不变，强度降低",
         RULE_REANALYSIS_REQUIRED: "需回到规则层重新分析", DOWNGRADE_ONE: "降一级", DOWNGRADE_TWO: "降两级",
         RAISE_ONE: "升一级", RAISE_TWO: "升两级", NEUTRAL: "中性",
@@ -44,7 +44,7 @@
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
         SOURCE_UNAVAILABLE: "来源不可用", STALE: "数据已过期",
         COMPLETE: "覆盖完整", PARTIAL_COVERAGE: "覆盖部分", UNKNOWN: "等待评估",
-        SYSTEM_PLAN_POSITION: "系统计划录入", MANUAL_POSITION: "独立手动录入", MANUAL_INDEPENDENT: "独立手动录入",
+        SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
         VERIFIED_FRESH: "已验证且新鲜", PENDING: "等待验证", INVALID: "来源无效",
         SOURCE_UNAVAILABLE: "来源不可用", CURRENT: "当前有效", NEEDS_REVALIDATION: "正在重验"
     });
@@ -170,9 +170,8 @@
     function eligibleOpportunity(asset) {
         var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
         var mode = String(asset && (asset.primaryPlanMode || asset.planMode) || "").toUpperCase();
-        var risk = String(asset && asset.riskLevel || "").toUpperCase();
-        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED"].indexOf(state) >= 0
-            && mode !== "BLOCKED" && ["HIGH", "EXTREME"].indexOf(risk) < 0;
+        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0
+            && mode !== "BLOCKED";
     }
     function validOpportunity(asset) {
         return symbolOf(asset)
@@ -202,17 +201,12 @@
 
     function renderStatus(home) {
         var state = home.systemState || {};
-        var positions = (Array.isArray(home.positions) ? home.positions : []).filter(validPosition);
-        var coverage = label(home.diagnostics && home.diagnostics.accountRiskCoverageState, "等待评估");
         setText("statusEnvironment", statusValue(state.marketTrend));
         setText("statusSystem", statusValue(state.riskLevel));
         setText("statusData", statusValue(state.dataQuality));
         setText("statusService", statusValue(state.serviceAvailability, "等待同步"));
-        var compactCoverage = coverage === "覆盖部分" ? "部分覆盖" : coverage;
-        setText("statusAccount", positions.length ? highestRisk(positions) + "·" + positions.length + "笔·" + compactCoverage : "— / 无已录入持仓");
-        var reset = state.hotReset || {};
-        var resetScope = reset.meta && reset.meta.symbol ? "·" + symbolOf({ symbol: reset.meta.symbol }) : "";
-        setText("statusReset", statusValue(reset, "等待同步") + (reset.value === true ? resetScope : ""));
+        setText("statusAccount", statusValue(state.accountStatus, "— / 无已录入持仓"));
+        setText("statusReset", statusValue(state.hotReset, "等待同步"));
     }
 
     function eventTime(value) {
@@ -307,8 +301,14 @@
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].indexOf(String(position.dataState || "").toUpperCase()) >= 0;
     }
     function validPosition(position) {
-        return position && has(position.positionId) && symbolOf(position) && has(position.direction)
+        return position && symbolOf(position) && has(position.direction)
             && has(position.entryPrice) && has(position.openedAt);
+    }
+    function positionDetailLink(positionId) {
+        var normalized = String(positionId || "").trim();
+        return /^\d+$/.test(normalized) && Number(normalized) > 0
+            ? '<a class="position-detail-link" href="/positions/' + encodeURIComponent(normalized) + '">查看详情</a>'
+            : "";
     }
     function riskRank(value) { return { LOW: 1, MEDIUM: 2, HIGH: 3, EXTREME: 4 }[String(value || "").toUpperCase()] || 0; }
     function highestRisk(positions) {
@@ -338,7 +338,9 @@
         var trend = label(position.riskTrend);
         var conclusion = text(position.monitorConclusionLabel, label(position.monitorConclusion));
         var action = text(position.suggestedManualActionText, label(position.suggestedAction));
-        var source = label(position.sourceType, "来源不可用");
+        var source = typeof contract.positionSourceLabel === "function"
+            ? contract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可用");
+        var detailLink = positionDetailLink(position.positionId);
         var openingFacts = '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
             + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric");
         if (trusted) {
@@ -353,8 +355,8 @@
                 + positionFact("风险趋势", trend, position.riskTrend, "center") + "</div>"
                 + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, position.monitorConclusion, "narrative")
                 + positionFact("建议动作", action, position.suggestedAction, "narrative")
-                + '<a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">查看详情</a></div>'
-            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong></div>';
+                + detailLink + '</div>'
+            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + detailLink + '</div>';
         return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + (trusted ? conclusion : unavailable)) + '">'
             + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
             + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
@@ -433,45 +435,84 @@
         return "<dl>" + items.map(function (item) { return "<div><dt>" + escapeHtml(item[0]) + "</dt><dd>" + escapeHtml(text(item[1], "当前不可查看")) + "</dd></div>"; }).join("") + "</dl>";
     }
     function roleUnavailable(role) {
-        return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 候选判断", GEMINI_REVIEW: "Gemini 可信度复核", GROK_CHALLENGE: "Grok 失败压力测试" }[activeRole])
+        return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核", GROK_CHALLENGE: "Grok 反方挑战" }[activeRole])
             + "</strong><span>" + escapeHtml(text(role && role.statusMessage, "当前角色结果不可查看")) + "</span></div>";
+    }
+    function candidateStateLegal(opportunityState, planMode) {
+        var state = String(opportunityState || "").toUpperCase();
+        var mode = String(planMode || "").toUpperCase();
+        return state !== "WAITING_TRIGGER" || mode === "PREPARATION";
+    }
+    function candidateConclusion(summary) {
+        var value = text(summary, "");
+        return value && value.indexOf("人工确认") < 0 ? value : "当前一句话结论不可查看";
     }
     function renderGpt(role) {
         var core = role.coreJudgment || {};
         var candidate = role.candidateSummary || {};
         var multi = role.multiTimeframeExplanation || {};
         var adjustment = role.biasAdjustment || {};
-        var why = text(core.text, text(role.decisionSummary, "当前形成原因不可查看"));
-        return '<div class="ai-first-visual"><div class="primary"><small>GPT Candidate · 非 Final</small><strong>Market Bias：'
-            + escapeHtml(label(core.marketBias, "—")) + "</strong></div><div><small>Opportunity State</small><strong>"
-            + escapeHtml(label(core.opportunityState, "—")) + "</strong></div><div><small>Candidate Mode</small><strong>"
+        if (!candidateStateLegal(core.opportunityState, candidate.planMode)) {
+            return '<div class="ai-unavailable"><strong>GPT 综合判断</strong><span>机会状态与候选参与方式不一致，当前不可查看</span></div>';
+        }
+        var why = text(core.text, "当前形成原因不可查看");
+        return '<div class="ai-first-visual"><div class="primary"><small>GPT 综合判断 · 非最终计划</small><strong>方向判断：'
+            + escapeHtml(label(core.marketBias, "—")) + "</strong></div><div><small>机会进度</small><strong>"
+            + escapeHtml(label(core.opportunityState, "—")) + "</strong></div><div><small>候选参与方式</small><strong>"
             + escapeHtml(label(candidate.planMode, "—"))
-            + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>为什么这样判断</h3><p>' + escapeHtml(why)
+            + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>形成原因</h3><p>' + escapeHtml(why)
             + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")],
                 ["偏向调整", label(adjustment.before, "当前不可查看") + " → " + label(adjustment.after, "当前不可查看")]])
-            + '</section><section class="ai-section"><h3>支持结论的证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
-            + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>限制结论的证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
-            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>Candidate 摘要</strong><span>'
-            + escapeHtml(text(candidate.summary, "—")) + "</span></div>";
+            + '</section><section class="ai-section"><h3>支持证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
+            + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>反对证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
+            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>一句话结论</strong><span>'
+            + escapeHtml(candidateConclusion(candidate.summary)) + "</span></div>";
     }
     function renderGemini(role) {
         var reviewResult = String(role.reviewResult || "").toUpperCase();
         if (["APPROVE", "DOWNGRADE", "REJECT_CANDIDATE", "RISK_WARNING"].indexOf(reviewResult) < 0) return roleUnavailable(role);
         var suggestion = role.downgradeSuggestion || {};
-        var adjustment = reviewResult === "APPROVE" ? "维持 Candidate" : label(role.planModeAdjustment || suggestion.after, "当前不可查看");
-        return '<div class="ai-first-visual"><div class="primary"><small>Gemini 复核结论</small><strong>' + escapeHtml(label(reviewResult, "当前不可查看"))
-            + "</strong></div><div><small>对 Candidate 的调整</small><strong>" + escapeHtml(adjustment)
-            + "</strong></div><div><small>为什么</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "当前不可查看"))
-            + '</strong></div></div><div class="ai-content-grid gemini"><section class="ai-section"><h3>调整前 / 调整后</h3>'
-            + dl([["调整前", label(suggestion.before, "当前不可查看")], ["调整后", label(suggestion.after, "当前不可查看")], ["置信度", label(role.confidenceAdjustment, "当前不可查看")], ["风险", label(role.riskAdjustment, "当前不可查看")]])
-            + '</section><section class="ai-section"><h3>证据缺口 · ' + escapeHtml(collectionLabel(role.evidenceGapsState)) + '</h3>' + list(role.evidenceGaps, role.evidenceGapsState)
+        var selectedState = String(currentHome && currentHome.selectedAssetContext
+            && (currentHome.selectedAssetContext.opportunityState || currentHome.selectedAssetContext.assetState) || "").toUpperCase();
+        if (selectedState === "WAITING_TRIGGER" && has(suggestion.before)
+                && (String(suggestion.before).toUpperCase() === "CONFIRMATION"
+                || String(suggestion.after || "").toUpperCase() !== "PREPARATION")) {
+            return '<div class="ai-unavailable"><strong>Gemini 冲突复核</strong><span>复核前后状态与等待触发生命周期不一致，当前不可查看</span></div>';
+        }
+        var hasBeforeAfter = has(suggestion.before) && has(suggestion.after);
+        var beforeAfter = hasBeforeAfter
+            ? '<section class="ai-section"><h3>调整前 / 调整后</h3>'
+                + dl([["调整前", label(suggestion.before)], ["调整后", label(suggestion.after)], ["调整原因", text(suggestion.reason, "当前不可查看")]]) + '</section>'
+            : "";
+        return '<div class="ai-first-visual is-single"><div class="primary"><small>Gemini 冲突复核</small><strong>复核结果：' + escapeHtml(label(reviewResult, "当前不可查看"))
+            + '</strong></div></div><div class="ai-content-grid gemini">' + beforeAfter
+            + '<section class="ai-section"><h3>证据缺口 · ' + escapeHtml(collectionLabel(role.evidenceGapsState)) + '</h3>' + list(role.evidenceGaps, role.evidenceGapsState)
             + '<h3>逻辑冲突 · ' + escapeHtml(collectionLabel(role.logicConflictsState)) + '</h3>' + list(role.logicConflicts, role.logicConflictsState)
             + '<h3>风险低估 · ' + escapeHtml(collectionLabel(role.underestimatedRisksState)) + '</h3>' + list(role.underestimatedRisks, role.underestimatedRisksState)
             + '</section></div><div class="ai-summary-footer"><strong>恢复条件</strong><span>' + escapeHtml(text(role.recoveryCondition || suggestion.recoveryCondition, "当前无可验证恢复条件")) + "</span></div>";
     }
-    function failurePathChain(paths, state) {
+    function completeFailurePath(path) {
+        return path && has(path.triggerCondition) && has(path.causalPath) && has(path.invalidatingEvidence);
+    }
+    function failurePathStateView(role) {
+        var state = String(role && role.failurePathState || "").toUpperCase();
+        var paths = (Array.isArray(role && role.failurePaths) ? role.failurePaths : []).filter(completeFailurePath);
+        if (state === "FOUND") {
+            return paths.length ? { valid: true, label: "已发现可验证失败路径", paths: paths }
+                : { valid: false, label: "失败路径状态不一致，当前不可查看", paths: [] };
+        }
+        if ((state === "NONE_FOUND" || state === "NO_VERIFIABLE_FAILURE_PATH")
+                && (!role.failurePaths || role.failurePaths.length === 0)) {
+            return { valid: true, label: "未发现可验证失败路径", paths: [] };
+        }
+        if (state === "INSUFFICIENT_DATA") return { valid: true, label: "数据不足，无法判断", paths: [] };
+        if (state === "SOURCE_UNAVAILABLE") return { valid: true, label: "数据来源暂不可用", paths: [] };
+        if (state === "STALE") return { valid: true, label: "数据已过期", paths: [] };
+        return { valid: false, label: "失败路径状态不一致，当前不可查看", paths: [] };
+    }
+    function failurePathChain(paths, state, invalidStateLabel) {
         var rows = Array.isArray(paths) ? paths : [];
-        if (!rows.length) return "<p>" + escapeHtml(collectionLabel(state)) + "</p>";
+        if (!rows.length) return "<p>" + escapeHtml(invalidStateLabel || collectionLabel(state)) + "</p>";
         return rows.slice(0, 2).map(function (path) {
             return '<div class="failure-path-chain"><strong>' + escapeHtml(text(path.hypothesis, "失败路径")) + '</strong><ol>'
                 + '<li><small>触发</small><span>' + escapeHtml(text(path.triggerCondition, "当前不可查看")) + '</span></li>'
@@ -480,12 +521,10 @@
         }).join("");
     }
     function renderGrok(role) {
-        var counterEvidence = role.majorCounterEvidence === true ? "构成重大反证"
-            : role.majorCounterEvidence === false ? "未构成重大反证" : "—";
-        return '<div class="ai-first-visual"><div class="primary"><small>失败路径状态</small><strong>' + escapeHtml(collectionLabel(role.failurePathState))
-            + "</strong></div><div><small>最需要防什么</small><strong>" + escapeHtml(text(role.currentDirectionChallenge, "当前不可查看"))
-            + "</strong></div><div><small>重大反证</small><strong>" + escapeHtml(counterEvidence)
-            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>失败路径 · 触发 → 演化 → 失效</h3>' + failurePathChain(role.failurePaths, role.failurePathState)
+        var failurePath = failurePathStateView(role);
+        return '<div class="ai-first-visual is-single"><div class="primary"><small>Grok 反方挑战</small><strong>失败路径：' + escapeHtml(failurePath.label)
+            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>失败路径 · 触发 → 演化 → 失效</h3>'
+            + failurePathChain(failurePath.paths, role.failurePathState, failurePath.valid ? null : failurePath.label)
             + '<h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
             + '<h3>外部事件风险</h3>' + list(role.externalEventRisks, role.externalEventRisksState)
             + '</section><section class="ai-section"><h3>微观结构风险</h3>' + list(role.microstructureRisks, role.microstructureRisksState)
@@ -493,32 +532,6 @@
             + '<h3>挑战摘要</h3><p>' + escapeHtml(text(role.challengeSummary, "—")) + "</p></section></div>";
     }
 
-    function derivativesTone(value, kind) {
-        var raw = String(value || "");
-        if (/错误|过期|未配置|不可用于|阻断|极端|异常/.test(raw)) return "negative";
-        if (/部分|不足|降级|偏高|拥挤|限制|等待/.test(raw)) return "warning";
-        if (/正常|平稳|未发现|暂无明显/.test(raw)) return "positive";
-        return kind === "structure" ? "info" : "unknown";
-    }
-    function derivativesCell(labelText, value, kind) {
-        var shown = text(value, "暂无法判断");
-        return '<span><small>' + escapeHtml(labelText) + '</small><strong class="tone-' + derivativesTone(shown, kind) + '">'
-            + escapeHtml(shown) + "</strong></span>";
-    }
-    function renderDerivatives(derivatives) {
-        var value = derivatives || {};
-        var status = text(value.status, "等待同步");
-        return '<section class="ai-derivatives-strip" aria-label="衍生品风险参照"><header><div><strong>衍生品实况 · 数据时间独立标注</strong><span class="tone-'
-            + derivativesTone(status, "status") + '">' + escapeHtml(status) + '</span></div><small>'
-            + escapeHtml(text(value.source, "来源不可用") + " · " + (has(value.dataTime) ? time(value.dataTime) : "时间待同步"))
-            + '</small></header><div class="ai-derivatives-grid">'
-            + derivativesCell("未平仓量", value.openInterestStructure, "structure")
-            + derivativesCell("资金费率", value.fundingRisk, "risk")
-            + derivativesCell("强平", value.liquidationRisk, "risk")
-            + derivativesCell("多空拥挤", value.crowdingDirection, "risk")
-            + derivativesCell("对本次结论的影响", value.decisionImpact, "impact")
-            + "</div></section>";
-    }
     function renderConflict(home) {
         var consistency = home.aiDecision && home.aiDecision.consistency || {};
         var level = String(consistency.conflictLevel || "").toUpperCase();
@@ -547,7 +560,7 @@
         else if (activeRole === "GPT_FINAL") roleContent = renderGpt(role);
         else if (activeRole === "GEMINI_REVIEW") roleContent = renderGemini(role);
         else roleContent = renderGrok(role);
-        panel.innerHTML = renderDerivatives(home.derivatives) + roleContent;
+        panel.innerHTML = roleContent;
         setText("aiMetadata", role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 生成时间 " + time(role.generatedAt) + " · 来源 " + text(role.provider, "当前不可查看") : "角色状态待同步");
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;

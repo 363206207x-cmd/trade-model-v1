@@ -36,6 +36,8 @@ import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
 import org.example.trademodel.localreal.LocalRealAssetReadinessState;
 import org.example.trademodel.localreal.LocalRealReadinessService;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.ConfusedStatePolicy;
@@ -60,6 +62,7 @@ import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.LightSystemStatusVO;
 import org.example.trademodel.vo.HomeTopAssetProjection;
+import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
@@ -124,6 +127,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private AssetPoolService assetPoolService;
     private OpportunityPriorityRankingService opportunityPriorityRankingService;
     private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
+    private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -202,6 +206,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     @Autowired(required = false)
     void setAccountRiskSnapshotMapper(AccountRiskSnapshotMapper accountRiskSnapshotMapper) {
         this.accountRiskSnapshotMapper = accountRiskSnapshotMapper;
+    }
+
+    @Autowired(required = false)
+    void setPersistedRealMarketEnvironmentService(
+            PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService) {
+        this.persistedRealMarketEnvironmentService = persistedRealMarketEnvironmentService;
     }
 
     @Autowired(required = false)
@@ -289,13 +299,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
+        PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
-        home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness));
+        home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness, positionRowsResult));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
-        PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         home.setPositions(positionRowsResult.topRows());
         home.setPositionMonitoringState(positionRowsResult.monitoringState());
         home.setSelectedSymbol(normalizedSelected);
@@ -319,7 +329,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setPushInbox(pushInboxContext.pushInbox());
         home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
-                pushInboxContext, providerReadiness));
+                pushInboxContext, providerReadiness, positionRowsResult));
         home.setSafety(new DashboardHomeVO.SafetyVO());
         DashboardHomeVO.ModuleStatesVO moduleStates = buildModuleStates(
                 selectedContext, executionSuggestion, positionRowsResult, aiDecision,
@@ -568,39 +578,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.SystemStateVO buildSystemState(LightSystemStatusVO systemStatus,
                                                            List<DecisionResultVO> decisions,
                                                            DashboardHomeVO.AiDecisionVO aiDecision,
-                                                           ProviderReadinessVO providerReadiness) {
+                                                           ProviderReadinessVO providerReadiness,
+                                                           PositionRowsResult positionRows) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
-        DecisionResultVO trendDecision = findDecision(decisions, "BTCUSDT");
-        state.setMarketTrend(card(
-                "marketTrend",
-                "BTC / 宏观环境",
-                trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null,
-                biasLabel(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
-                "BTC 环境基准",
-                statusForText(trendDecision != null ? trendDecision.getMarketBiasHierarchy() : null),
-                null
-        ));
-        String selectedRisk = riskLevelFrom(decisions);
+        state.setMarketTrend(macroEnvironmentCard());
         state.setRiskLevel(card(
                 "riskLevel",
                 "系统风险",
-                selectedRisk,
-                riskLabel(selectedRisk),
-                "当前机会集合最高风险",
-                statusForText(selectedRisk),
+                null,
+                "— / 尚未形成系统级评估",
+                "未取得系统级风险生产者",
+                "SOURCE_UNAVAILABLE",
                 null
         ));
-        Integer selectedDataQuality = averageDataQuality(decisions);
-        state.setDataQuality(card(
-                "dataQuality",
-                "全局数据质量",
-                selectedDataQuality,
-                selectedDataQuality != null ? String.valueOf(selectedDataQuality) : null,
-                "当前机会集合均值",
-                selectedDataQuality != null ? "CONNECTED" : "WAITING_SYNC",
-                selectedDataQuality
-        ));
+        state.setDataQuality(providerDataQualityCard(providerReadiness));
         state.setServiceAvailability(serviceAvailabilityCard(providerReadiness, aiDecision));
+        state.setAccountStatus(accountStatusCard(positionRows));
         DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
         boolean aiApplicable = consistency != null
                 && "READY".equalsIgnoreCase(trimToNull(consistency.getDataState()));
@@ -647,14 +640,95 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "hotReset",
                 "热重置",
                 Boolean.TRUE.equals(hotResetFired),
-                Boolean.TRUE.equals(hotResetFired) ? "已触发" : "未触发",
-                Boolean.TRUE.equals(hotResetFired) ? "最近一次" : "暂无",
-                hotResetFired != null ? "CONNECTED" : "WAITING_SYNC",
+                Boolean.TRUE.equals(hotResetFired) ? "已触发 · 范围不可用" : "关闭",
+                Boolean.TRUE.equals(hotResetFired) ? "未取得正式 scope" : "当前无活动 Hot Reset",
+                Boolean.TRUE.equals(hotResetFired) ? "SOURCE_UNAVAILABLE"
+                        : hotResetFired != null ? "CONNECTED" : "WAITING_SYNC",
                 null
         );
         hotReset.setMeta(hotMeta);
         state.setHotReset(hotReset);
         return state;
+    }
+
+    private DashboardHomeVO.StatusCardVO macroEnvironmentCard() {
+        if (persistedRealMarketEnvironmentService == null) {
+            return card("marketTrend", "BTC / 宏观环境", null, "— / 当前不可查看",
+                    "正式环境生产者不可用", "SOURCE_UNAVAILABLE", null);
+        }
+        try {
+            PersistedRealMarketEnvironmentAssessment assessment =
+                    persistedRealMarketEnvironmentService.assess("BTCUSDT", "1h");
+            MarketEnvironmentVO environment = assessment != null ? assessment.environment() : null;
+            if (assessment == null || !assessment.ready() || environment == null
+                    || !"FRESH".equalsIgnoreCase(trimToNull(environment.getFreshness()))) {
+                return card("marketTrend", "BTC / 宏观环境", null, "— / 当前不可查看",
+                        assessment != null ? assessment.reasonCode() : "ENVIRONMENT_SOURCE_UNAVAILABLE",
+                        "SOURCE_UNAVAILABLE", null);
+            }
+            String environmentType = upper(environment.getEnvironmentType());
+            String environmentLabel = switch (environmentType) {
+                case "TREND_MARKET" -> "趋势环境";
+                case "RANGE_MARKET" -> "震荡环境";
+                default -> null;
+            };
+            if (environmentLabel == null) {
+                return card("marketTrend", "BTC / 宏观环境", null, "— / 当前不可查看",
+                        "环境分类不可识别", "SOURCE_UNAVAILABLE", null);
+            }
+            return card("marketTrend", "BTC / 宏观环境", environmentType, environmentLabel,
+                    assessment.sourceType(), "CONNECTED", null);
+        } catch (RuntimeException ignored) {
+            return card("marketTrend", "BTC / 宏观环境", null, "— / 当前不可查看",
+                    "正式环境读取失败", "SOURCE_UNAVAILABLE", null);
+        }
+    }
+
+    private DashboardHomeVO.StatusCardVO providerDataQualityCard(ProviderReadinessVO providerReadiness) {
+        String marketStatus = upper(providerReadiness != null
+                ? providerReadiness.getMarketDataProviderStatus() : null);
+        return switch (marketStatus) {
+            case "CONNECTED" -> card("dataQuality", "全局数据质量", "FRESH", "新鲜",
+                    "全局行情 Provider", "CONNECTED", null);
+            case "FAIL_CLOSED", "ERROR", "INVALID", "STALE" ->
+                    card("dataQuality", "全局数据质量", null, "当前不可查看",
+                            "全局行情 Provider 未通过新鲜度门禁", "FAIL_CLOSED", null);
+            default -> card("dataQuality", "全局数据质量", null, "等待同步",
+                    "全局行情 Provider 尚未就绪", "WAITING_SYNC", null);
+        };
+    }
+
+    private DashboardHomeVO.StatusCardVO accountStatusCard(PositionRowsResult positionRows) {
+        List<DashboardHomeVO.PositionVO> positions = positionRows == null
+                ? List.of() : positionRows.allRows();
+        if (positions.isEmpty()) {
+            return card("accountStatus", "账户·已录入", 0, "— / 无已录入持仓",
+                    "活动持仓 0", "EMPTY", 0);
+        }
+        List<DashboardHomeVO.PositionVO> trusted = positions.stream()
+                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .toList();
+        String highestRisk = trusted.stream()
+                .map(DashboardHomeVO.PositionVO::getRiskLevel)
+                .filter(this::recognizedPositionRisk)
+                .max(Comparator.comparingInt(this::positionRiskRank))
+                .orElse(null);
+        String coverage = trusted.size() == positions.size() ? "覆盖完整"
+                : trusted.isEmpty() ? "覆盖未知" : "覆盖部分";
+        String risk = highestRisk == null ? "暂无评估" : positionRiskLevelLabel(highestRisk);
+        return card("accountStatus", "账户·已录入", positions.size(),
+                risk + "·" + positions.size() + "笔·" + coverage,
+                "全部活动持仓", trusted.isEmpty() ? "WAITING_SYNC" : "CONNECTED", positions.size());
+    }
+
+    private int positionRiskRank(String riskLevel) {
+        return switch (upper(riskLevel)) {
+            case "LOW" -> 1;
+            case "MEDIUM" -> 2;
+            case "HIGH" -> 3;
+            case "EXTREME" -> 4;
+            default -> 0;
+        };
     }
 
     private DashboardHomeVO.StatusCardVO serviceAvailabilityCard(
@@ -2205,7 +2279,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                            DecisionResultVO selectedDecision,
                                                            PositionSyncStatusVO positionSyncStatus,
                                                            PushInboxContext pushInboxContext,
-                                                           ProviderReadinessVO providerReadiness) {
+                                                           ProviderReadinessVO providerReadiness,
+                                                           PositionRowsResult positionRows) {
         DashboardHomeVO.DiagnosticsVO diagnostics = new DashboardHomeVO.DiagnosticsVO();
         diagnostics.setDataIngestion(diagnosticFromFreshness(positionSyncStatus));
         diagnostics.setDataQuality(averageDataQuality(decisions) != null ? "CONNECTED" : "WAITING_SYNC");
@@ -2225,9 +2300,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setExternalContextProvider(firstNonBlank(
                 providerReadiness != null ? providerReadiness.getExternalContextProviderStatus() : null,
                 "WAITING_SYNC"));
-        diagnostics.setAccountRiskCoverageState(safeAccountRiskCoverage(selectedDecision));
+        diagnostics.setAccountRiskCoverageState(accountRiskCoverage(positionRows));
         diagnostics.setProviderReadiness(providerReadiness);
         return diagnostics;
+    }
+
+    private String accountRiskCoverage(PositionRowsResult positionRows) {
+        List<DashboardHomeVO.PositionVO> positions = positionRows == null
+                ? List.of() : positionRows.allRows();
+        if (positions.isEmpty()) return "UNKNOWN";
+        long trusted = positions.stream()
+                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .count();
+        if (trusted == positions.size()) return "COMPLETE";
+        return trusted > 0 ? "PARTIAL_COVERAGE" : "UNKNOWN";
     }
 
     private String safeAccountRiskCoverage(DecisionResultVO decision) {

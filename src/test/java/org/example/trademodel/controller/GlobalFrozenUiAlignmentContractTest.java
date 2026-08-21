@@ -17,6 +17,8 @@ class GlobalFrozenUiAlignmentContractTest {
     private static final Path WORKSPACE_CSS = Path.of("src/main/resources/static/css/workspace.css");
     private static final Path OWNER_BROWSER_QA = Path.of(
             "docs/evidence/global_ui_alignment/owner_blocker_closure/browser-qa.json");
+    private static final Path RESIDUAL_P0_BROWSER_QA = Path.of(
+            "docs/evidence/global_ui_alignment/owner_blocker_closure/residual-p0-browser-qa.json");
     private static final Path WORKSPACE_JS = Path.of("src/main/resources/static/js/workspace.js");
 
     @Test
@@ -52,8 +54,8 @@ class GlobalFrozenUiAlignmentContractTest {
     void topSixIsDefensiveDedupedAndUsesEachCardsFinal() throws Exception {
         String script = Files.readString(HOME_JS);
         assertThat(script).contains(
-                "[\"CANDIDATE\", \"WAITING_TRIGGER\", \"TRIGGERED\"]",
-                "mode !== \"BLOCKED\"", "[\"HIGH\", \"EXTREME\"]",
+                "[\"CANDIDATE\", \"WAITING_TRIGGER\", \"TRIGGERED\", \"HIGH_RISK\"]",
+                "mode !== \"BLOCKED\"",
                 "var seen = new Set()", "seen.has(identity)", ".slice(0, 6)",
                 "asset.hasFinal === true", "asset.finalMarketBias", "asset.finalPlanMode",
                 "asset.primaryTimeframe", "asset.timeframeConflictState", "asset.rankingReason",
@@ -77,6 +79,7 @@ class GlobalFrozenUiAlignmentContractTest {
                 "position.entryPrice", "position.openedAt", "position.riskTrend",
                 "position.entryLogicStatus", "position.monitorConclusion",
                 "PENDING", "STALE", "INVALID", "SOURCE_UNAVAILABLE",
+                "function positionDetailLink(positionId)", "contract.positionSourceLabel",
                 "query.set(\"positionId\", requestedPositionId)",
                 "function semanticTone(value)", "tone-positive", "tone-warning", "tone-negative", "tone-unknown")
                 .doesNotContain("position.riskReason", "position.lastMonitorTime");
@@ -90,15 +93,44 @@ class GlobalFrozenUiAlignmentContractTest {
                 "plan.planLifecycleState", "plan.revalidationReason", "plan.revalidationRule",
                 "plan.stopZone || plan.stopLoss",
                 "[\"APPROVE\", \"DOWNGRADE\", \"REJECT_CANDIDATE\", \"RISK_WARNING\"]",
-                "衍生品实况 · 数据时间独立标注",
-                "GPT Candidate · 非 Final", "Gemini 复核结论", "失败路径状态",
+                "GPT 综合判断 · 非最终计划", "Gemini 冲突复核", "Grok 反方挑战",
                 "return roleUnavailable(role)", "触发 → 演化 → 失效",
                 "consistency.conflictLevel", "consistency.mainReason",
                 "ArrowRight", "ArrowLeft", "event.key === \"Home\"", "event.key === \"End\"",
                 "item.tabIndex = selected ? 0 : -1");
         assertThat(Files.readString(HOME_CSS)).contains(
-                ".ai-derivatives-grid", ".tone-positive", ".tone-warning", ".tone-negative", ".tone-info",
+                ".tone-positive", ".tone-warning", ".tone-negative", ".tone-info",
                 ".position-judgment { align-items: center; text-align: center; }");
+    }
+
+    @Test
+    void residualP0HomeContractsKeepOwnershipAndRemoveLocalDerivativesProjection() throws Exception {
+        String home = Files.readString(HOME);
+        String script = Files.readString(HOME_JS);
+        String workspace = Files.readString(WORKSPACE);
+        String contract = Files.readString(Path.of("src/main/resources/static/js/frontend-contract.js"));
+
+        assertThat(home + workspace)
+                .contains(">分析</span>", "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战")
+                .doesNotContain("Decision Workspace", ">AI 分析</span>", "GPT 候选判断", "Gemini 可信度复核");
+        assertThat(script)
+                .contains(
+                        "statusValue(state.marketTrend)", "statusValue(state.riskLevel)",
+                        "statusValue(state.dataQuality)", "statusValue(state.serviceAvailability",
+                        "statusValue(state.accountStatus", "statusValue(state.hotReset",
+                        "GPT 综合判断 · 非最终计划", "方向判断", "机会进度", "候选参与方式",
+                        "复核结果：", "completeFailurePath", "已发现可验证失败路径",
+                        "未发现可验证失败路径", "机会状态与候选参与方式不一致",
+                        "复核前后状态与等待触发生命周期不一致",
+                        "function candidateConclusion(summary)", "当前一句话结论不可查看")
+                .doesNotContain("renderDerivatives", "ai-derivatives-strip", "维持 Candidate",
+                        "GPT Candidate · 非 Final", "Market Bias：", "Candidate Mode");
+        assertThat(contract).contains(
+                "HIGH_RISK: Object.freeze({ label: \"高风险\"",
+                "function positionSourceLabel(sourceType)",
+                "return \"系统计划\"", "return \"独立录入\"",
+                "label: \"状态待同步\"")
+                .doesNotContain("label: displayText(returnedLabel, \"状态待同步\")");
     }
 
     @Test
@@ -159,6 +191,7 @@ class GlobalFrozenUiAlignmentContractTest {
     @Test
     void ownerBrowserEvidenceLocksRuntimeVisibilityAndLifecycleGates() throws Exception {
         String qa = Files.readString(OWNER_BROWSER_QA);
+        String residual = Files.readString(RESIDUAL_P0_BROWSER_QA);
 
         assertThat(qa).contains(
                 "\"browserStatus\": \"PASS\"",
@@ -184,6 +217,16 @@ class GlobalFrozenUiAlignmentContractTest {
                 "\"CURRENT\": {\"revalidationHidden\": false, \"revalidationDisabled\": false",
                 "\"NEEDS_REVALIDATION\": {\"revalidationHidden\": false, \"revalidationDisabled\": false",
                 "\"UNAVAILABLE\": {\"revalidationHidden\": true, \"revalidationDisabled\": true");
+        assertThat(residual).contains(
+                "\"horizontalOverflowCount\": 0",
+                "\"textClippingCount\": 0",
+                "\"statusCount\": 6",
+                "\"homeDerivativesStripCount\": 0",
+                "\"visibleDecisionWorkspaceCount\": 0",
+                "\"brokenPositionDetailLinkCount\": 0",
+                "\"systemOwnedSlotsUnchanged\": true",
+                "\"riskLevelStateSlotLeakageCount\": 0",
+                "\"FOUND_EMPTY\": {\"failClosed\": true, \"foundCopyCount\": 0, \"notFoundCopyCount\": 0}");
     }
 
     private static void assertOrdered(String source, String... markers) {

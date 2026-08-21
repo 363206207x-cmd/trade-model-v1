@@ -35,7 +35,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "class=\"home-rail\"", "机会资产 · 0", "id=\"homeAssetSearch\"",
                 "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
-                "GPT 候选判断", "Gemini 可信度复核", "Grok 失败压力测试",
+                "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
                 "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "查看完整审计链");
         assertThat(html).containsOnlyOnce("查看完整审计链")
                 .doesNotContain(
@@ -76,16 +76,18 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
                 "position.monitorConclusion", "position.suggestedManualActionText",
                 "position.entryLogicStatus", "position.reversalStatus", "position.riskTrend",
-                "contract.normalizeAiTabs", "GPT Candidate · 非 Final",
-                "Market Bias", "Opportunity State", "Candidate Mode", "Candidate 摘要",
-                "Gemini 复核结论", "对 Candidate 的调整", "失败路径状态", "重大反证",
-                "renderDerivatives", "衍生品实况 · 数据时间独立标注", "来源不可用",
+                "contract.normalizeAiTabs", "GPT 综合判断 · 非最终计划",
+                "方向判断", "机会进度", "候选参与方式", "一句话结论",
+                "Gemini 冲突复核", "复核结果", "Grok 反方挑战", "失败路径",
+                "completeFailurePath", "failurePathStateView", "来源不可用",
                 "plan.stopZone || plan.stopLoss", "止损", "失效条件",
-                "collectionStateLabel", "为什么", "最需要防什么",
+                "collectionStateLabel", "形成原因", "支持证据", "反对证据",
                 "label(header.dataSourceText", "label(header.aiStatusLabel")
                 .doesNotContain(
                         "candidate.summary, why", "[].concat(role.evidenceGaps",
                         "role.evidenceGapsState || role.logicConflictsState", "label(role.planModeImpact",
+                        "renderDerivatives", "衍生品实况 · 数据时间独立标注",
+                        "维持 Candidate", "GPT Candidate · 非 Final", "Candidate Mode",
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
                         "const assets = [", "BTCUSDT,ETHUSDT", "82, 87");
     }

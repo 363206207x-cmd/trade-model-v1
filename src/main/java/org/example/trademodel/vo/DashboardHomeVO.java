@@ -264,6 +264,7 @@ public class DashboardHomeVO {
         private StatusCardVO riskLevel = new StatusCardVO();
         private StatusCardVO dataQuality = new StatusCardVO();
         private StatusCardVO serviceAvailability = new StatusCardVO();
+        private StatusCardVO accountStatus = new StatusCardVO();
         private StatusCardVO aiConflict = new StatusCardVO();
         private StatusCardVO pendingReview = new StatusCardVO();
         private StatusCardVO confused = new StatusCardVO();
@@ -299,6 +300,14 @@ public class DashboardHomeVO {
 
         public void setServiceAvailability(StatusCardVO serviceAvailability) {
             this.serviceAvailability = serviceAvailability;
+        }
+
+        public StatusCardVO getAccountStatus() {
+            return accountStatus;
+        }
+
+        public void setAccountStatus(StatusCardVO accountStatus) {
+            this.accountStatus = accountStatus;
         }
 
         public StatusCardVO getAiConflict() {

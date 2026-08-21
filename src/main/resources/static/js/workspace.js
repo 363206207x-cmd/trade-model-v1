@@ -35,7 +35,7 @@
         REDUCE_POSITION: "降低仓位", TIGHTEN_STOP: "收紧止损",
         MOVE_STOP: "移动止损", PARTIAL_TAKE_PROFIT: "分批止盈",
         WAIT_CONFIRMATION: "等待人工确认", RECORD_CLOSE_REVIEW: "记录平仓并进入复盘",
-        SYSTEM_PLAN_POSITION: "系统计划来源", MANUAL_INDEPENDENT: "独立手动录入",
+        SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
         OPEN_MONITORING: "持续监控", WAITING_MONITOR_DATA: "等待监控数据",
         RISK_ESCALATED: "风险升级", CLOSED: "已平仓", NO_POSITION: "暂无持仓",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型",
@@ -71,8 +71,8 @@
         TRIGGERED: "已触发", HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
-        GPT_FINAL: "证据综合与候选形成", GEMINI_REVIEW: "证据与风险复核",
-        GROK_CHALLENGE: "失败路径与压力测试",
+        GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核",
+        GROK_CHALLENGE: "Grok 反方挑战",
         NOT_CALLED_INPUT_GATE: "未调用（输入门禁）", INVALID_RESPONSE: "返回内容无效",
         MARKET_HEURISTIC: "市场启发式", SYSTEM_GENERATED: "系统生成",
         MODERATE_LEVERAGE: "适中杠杆"
@@ -108,12 +108,11 @@
     }
 
     function roleLabel(role, mode) {
-        const preview = mode === "ANALYSIS_PREVIEW";
         return {
-            GPT_FINAL: preview ? "证据综合与方向假设" : "证据综合与候选形成",
-            GEMINI_REVIEW: preview ? "证据质量与逻辑复核" : "证据与风险复核",
-            GROK_CHALLENGE: preview ? "反向情景与风险压力测试" : "失败路径与压力测试"
-        }[String(role || "").toUpperCase()] || "AI 分析";
+            GPT_FINAL: "GPT 综合判断",
+            GEMINI_REVIEW: "Gemini 冲突复核",
+            GROK_CHALLENGE: "Grok 反方挑战"
+        }[String(role || "").toUpperCase()] || "分析";
     }
 
     function escapeHtml(value) {
@@ -565,7 +564,7 @@
             ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + '<a class="text-action" href="/positions/' + encodeURIComponent(positionId) + '">查看详情</a></section>'
             : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong></section>';
         return '<article class="position-card position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" data-position-id="' + escapeHtml(positionId) + '">'
-            + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
+            + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(userPosition.sourceType) : label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
             + '<section class="position-facts">' + factGrid(facts) + '</section>'
             + monitoring + "</article>";
     }

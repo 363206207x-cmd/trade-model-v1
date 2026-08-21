@@ -62,7 +62,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setMatchingPositionCount(positions.size());
         home.setPositionMonitoringState("OPEN_MONITORING");
         home.setExecutionSuggestion(SELECTED_SYMBOL.equals(selectedSymbol) ? finalPlan() : noFinalPlan());
-        home.setAiDecision(SELECTED_SYMBOL.equals(selectedSymbol) ? aiDecision() : unavailableAi());
+        home.setAiDecision(SELECTED_SYMBOL.equals(selectedSymbol) ? aiDecision(selectedPositionId) : unavailableAi());
         home.setDerivatives(SELECTED_SYMBOL.equals(selectedSymbol)
                 ? derivatives() : new DashboardHomeVO.DerivativesSummaryVO());
         home.setDiagnostics(diagnostics());
@@ -82,14 +82,15 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
 
     private DashboardHomeVO.SystemStateVO systemState() {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
-        state.setMarketTrend(status("market", "市场趋势", "弱偏多", "READY", 72));
-        state.setRiskLevel(status("risk", "风险等级", "中", "READY", 58));
-        state.setDataQuality(status("quality", "数据质量", "87 · 新鲜", "READY", 87));
+        state.setMarketTrend(status("market", "BTC / 宏观环境", "趋势环境", "READY", null));
+        state.setRiskLevel(status("risk", "系统风险", "— / 尚未形成系统级评估", "SOURCE_UNAVAILABLE", null));
+        state.setDataQuality(status("quality", "全局数据质量", "新鲜", "CONNECTED", null));
         state.setServiceAvailability(status("service", "服务可用性", "正常", "CONNECTED", null));
+        state.setAccountStatus(status("account", "账户·已录入", "极高·3笔·覆盖完整", "CONNECTED", 3));
         state.setAiConflict(status("ai", "AI 系统", "三角色完成", "READY", 82));
         state.setPendingReview(status("positions", "已录入持仓", "活动 3", "READY", 3));
         state.setConfused(status("conflict", "冲突", "轻微分歧", "READY", 2));
-        state.setHotReset(status("reset", "Hot Reset", "未触发", "CONNECTED", 0));
+        state.setHotReset(status("reset", "Hot Reset", "关闭", "CONNECTED", 0));
         return state;
     }
 
@@ -124,11 +125,11 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
 
     private List<DashboardHomeVO.AssetVO> assets() {
         return List.of(
-                asset(1, "BTCUSDT", "比特币", "WAITING_TRIGGER", "PREPARATION", 86, "87%", "MEDIUM", "15m", "WEAK_BULLISH", "ALIGNED", 2),
+                asset(1, "BTCUSDT", "比特币", "WAITING_TRIGGER", "PREPARATION", 86, "87%", "HIGH", "15m", "WEAK_BULLISH", "ALIGNED", 2),
                 asset(2, "ETHUSDT", "Ethereum", "CANDIDATE", "OBSERVATION", 81, "82%", "LOW", "1h", "BULLISH", "ALIGNED", 1),
                 asset(3, "SOLUSDT", "Solana", "TRIGGERED", "PREPARATION", 78, "79%", "MEDIUM", "5m", "WEAK_BULLISH", "MIXED_NEUTRAL", 3),
-                asset(4, "LINKUSDT", "Chainlink", "CANDIDATE", "REDUCED", 74, "76%", "MEDIUM", "4h", "NEUTRAL", "MIXED_NEUTRAL", 2),
-                asset(5, "AVAXUSDT", "Avalanche", "CANDIDATE", "OBSERVATION", 69, "73%", "LOW", "1h", "WEAK_BEARISH", "ALIGNED", 1),
+                asset(4, "LINKUSDT", "Chainlink", "HIGH_RISK", "REDUCED", 74, "76%", "HIGH", "4h", "NEUTRAL", "MIXED_NEUTRAL", 2),
+                asset(5, "AVAXUSDT", "Avalanche", "HIGH_RISK", "OBSERVATION", 69, "73%", "EXTREME", "1h", "WEAK_BEARISH", "ALIGNED", 1),
                 asset(6, "DOTUSDT", "Polkadot", "WAITING_TRIGGER", "PREPARATION", 65, "71%", "LOW", "4h", "BEARISH", "MIXED_NEUTRAL", 2));
     }
 
@@ -350,7 +351,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         return plan;
     }
 
-    private DashboardHomeVO.AiDecisionVO aiDecision() {
+    private DashboardHomeVO.AiDecisionVO aiDecision(Long scenarioId) {
         DashboardHomeVO.AiDecisionVO decision = new DashboardHomeVO.AiDecisionVO();
         decision.setSchemaVersion("v2");
         decision.setRunStatus("READY");
@@ -358,7 +359,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         decision.setDecisionMode("OPPORTUNITY_DECISION");
         decision.setDecisionModeLabel("机会裁决");
         decision.setActiveTab("GPT_FINAL");
-        decision.setTabs(List.of(gpt(), gemini(), grok()));
+        decision.setTabs(List.of(gpt(), gemini(scenarioId), grok(scenarioId)));
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
         consistency.setDataState("READY");
         consistency.setConflictLevel("LEVEL_2_MINOR_DISAGREEMENT");
@@ -436,15 +437,23 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
                 direction, confidence, confidence, "2026-08-20T14:26:00+08:00", "FRESH", ANALYSIS_ID);
     }
 
-    private DashboardHomeVO.AiTabVO gemini() {
+    private DashboardHomeVO.AiTabVO gemini(Long scenarioId) {
         DashboardHomeVO.AiTabVO tab = roleBase("GEMINI_REVIEW", "Gemini 冲突复核", "Gemini");
-        tab.setReviewResult("DOWNGRADE");
+        String reviewResult = switch (scenarioId != null ? scenarioId.intValue() : 0) {
+            case 7301 -> "APPROVE";
+            case 7303 -> "REJECT_CANDIDATE";
+            case 7304 -> "RISK_WARNING";
+            default -> "DOWNGRADE";
+        };
+        tab.setReviewResult(reviewResult);
         tab.setPlanModeAdjustment("DOWNGRADE_ONE");
         tab.setFinalDirectionImpact("SAME_FAMILY_DOWNGRADE");
         tab.setConfidenceAdjustment("DOWNGRADE_ONE");
         tab.setRiskAdjustment("RAISE_ONE");
+        String before = scenarioId != null && scenarioId == 7310L ? "CONFIRMATION" : null;
+        String after = scenarioId != null && scenarioId == 7310L ? "PREPARATION" : null;
         tab.setDowngradeSuggestion(new AiRoleResultsPayload.DowngradeSuggestion(
-                "CONFIRMATION", "PREPARATION", "触发未完成，且资金费率和拥挤度限制追涨",
+                before, after, "触发未完成，且资金费率和拥挤度限制追涨",
                 "15m 放量并连续两周期站稳，同时资金费率与拥挤度回落"));
         tab.setEvidenceGaps(List.of(finding("gap-1", "证据缺口",
                 "15m 尚未放量站稳，止损来源虽可追踪但需在触发后重新确认", "不能按确认型处理")));
@@ -459,15 +468,17 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         return tab;
     }
 
-    private DashboardHomeVO.AiTabVO grok() {
+    private DashboardHomeVO.AiTabVO grok(Long scenarioId) {
         DashboardHomeVO.AiTabVO tab = roleBase("GROK_CHALLENGE", "Grok 反方挑战", "Grok");
-        tab.setFailurePaths(List.of(new AiRoleResultsPayload.FailurePathPayload(
+        boolean emptyPath = scenarioId != null && (scenarioId == 7401L || scenarioId == 7402L);
+        tab.setFailurePaths(emptyPath ? List.of() : List.of(new AiRoleResultsPayload.FailurePathPayload(
                 "failure-1", "最可能失败：拥挤多头在假突破后被连锁清算",
                 "63,200 附近未放量且未平仓量继续增加、资金费率维持偏高",
                 "假突破 → 多头拥挤加深 → 价格回落 → 多头清算放大跌幅",
                 "未来 4 小时", List.of("15m 成交量", "未平仓量", "资金费率", "多头清算额"),
                 List.of("support-1", "support-2", "oppose-1", "oppose-2"), "持续放量站稳 63,200 且拥挤度回落")));
-        tab.setFailurePathState("FOUND");
+        tab.setFailurePathState(scenarioId != null && scenarioId == 7401L
+                ? "NO_VERIFIABLE_FAILURE_PATH" : "FOUND");
         tab.setOpposingScenarios(List.of(finding("scenario-1", "反向情景",
                 "价格上涨但未平仓量下降时，更可能是空头回补而不是新多头确认", "不得把反弹当成新趋势")));
         tab.setOpposingScenariosState("FOUND");

@@ -103,7 +103,16 @@ Existing market-structure boundary extraction and rule path create the Candidate
 
 ## System Status ownership
 
-The view has the correct six display slots and no opportunity count. Account status is derived from recorded active positions. However, `buildSystemState` still produces environment, risk, and data quality from the selected decision, making asset scope look like system scope. Service display uses only the header AI status and can hide partial provider availability. Hot Reset lacks explicit scope in compact display. Result: BLOCKER; fix only the projection and existing compact bindings.
+The view has exactly six display slots and no opportunity count. Environment
+uses the existing persisted BTC market-environment producer and fails closed
+when that source is not ready and fresh. No formal system-level risk producer
+exists, so that slot truthfully renders `— / 尚未形成系统级评估`. Data uses
+global market-provider readiness/freshness, service combines provider and AI
+readiness without guessing counts, and account aggregates every valid active
+recorded position while using trusted monitor rows only for highest risk.
+Inactive Hot Reset renders `关闭`; an active event without formal scope fails
+closed. Selected BTC/ETH A/B runtime evidence leaves all six slots unchanged.
+Result: PASS.
 
 ## Fixtures and production guard
 
@@ -137,8 +146,8 @@ Telegram behavior.
 
 | Gate | Result | Evidence |
 |---|---|---|
-| N-01 status ownership | PASS | aggregate system risk/global quality, BTC macro environment, combined provider/AI service state; selected-asset isolation test |
-| N-02 GPT primary | PASS | runtime first visual is `GPT Candidate · 非 Final` plus Market Bias / Opportunity State / Candidate Mode |
+| N-01 status ownership | PASS | formal BTC environment, fail-closed system risk, provider freshness, combined provider/AI service, all-active-position account aggregation; selected-asset isolation test |
+| N-02 GPT primary | PASS | runtime first visual is `GPT 综合判断 · 非最终计划` plus 方向判断 / 机会进度 / 候选参与方式 |
 | N-03 Gemini collections | PASS | three separate runtime sections and independent collection states |
 | N-04 Grok authority | PASS | `failurePathState` is primary; no Grok plan-mode mutation field is rendered |
 | N-05 unknown enum | PASS | shared and Home mappers return `—`; actual role/data unavailability remains explicit |
@@ -163,5 +172,54 @@ Workflow Contract PASS; JavaScript syntax PASS; `git diff --check` PASS. The
 14 skips are the repository's Docker-unavailable Testcontainers behavior and
 did not hide a Maven failure.
 
-GLOBAL_AUDIT_BLOCKERS: 0
-CURRENT_PHASE_DONE: YES (this bounded audit/remediation package only)
+GLOBAL_AUDIT_BLOCKERS: 0 (for the earlier seven-item package)
+CURRENT_PHASE_DONE: NO (PR #1195 remains Draft and unmerged)
+
+## Residual P0 closure
+
+Start Head: `10a740bbf2f7231a03154491bdedec6694ad6dff`.
+The residual package does not change schema, formal enums, state machines,
+business thresholds, AI permissions, authentication, Telegram, Figma, Mobile,
+or automatic-trading capability.
+
+| Residual | Result | Current binding / evidence |
+|---|---|---|
+| RP0-01 Position detail path | PASS | all five trust states retain persistent opening facts and a valid `/positions/{positionId}` link; untrusted rows expose exactly one status and no monitor-owned fields |
+| RP0-02 Position source copy | PASS | shared mapper: system plan -> `系统计划`; manual aliases -> `独立录入` |
+| RP0-03 status ownership | PASS | formal BTC environment, fail-closed system risk, provider freshness, provider+AI service, all-active-position account summary, scoped Hot Reset fail-closed behavior |
+| RP0-04 Three-AI Home semantics | PASS | Chinese role names, exact Gemini result labels, GPT three-value first visual, independent collections, strict Grok path-state gate |
+| RP0-05 derivatives strip | PASS | Home renderer/call/style removed; backend provider/evidence chain retained |
+| RP0-06 navigation | PASS | 首页 / 持仓 / 分析 / 消息 / 我的; no visible `Decision Workspace` |
+| RP0-07 HIGH_RISK ownership | PASS | lifecycle state and risk level are rendered independently; missing/illegal state ignores returned risk-like labels |
+| RP0-08 CoinGlass truth split | PARTIAL | code path present and tested; live call, live freshness, and real AI-run consumption are NOT_VERIFIED because the private runtime has no CoinGlass key or enabled provider |
+| RP0-09 audit truth | PASS | evidence and PR handoff keep fixture/live and PASS/NOT_VERIFIED separate |
+
+Normal and ui-review startup were run separately with Java 17 and the standard
+release JAR; both returned authenticated `/dashboard` HTTP 200. Current browser
+evidence is in `docs/evidence/global_ui_alignment/owner_blocker_closure/`.
+The available browser surface was fixed at 1280 x 720, so the current-Head exact
+1440 screenshot is explicitly NOT_VERIFIED rather than being substituted with
+the older `home-1440-top.png`.
+
+COINGLASS_CODE_PATH: PASS
+COINGLASS_LIVE_CALL: NOT_VERIFIED_MISSING_PRIVATE_KEY_AND_PROVIDER_ENABLEMENT
+COINGLASS_SNAPSHOT_FRESHNESS: NOT_VERIFIED_NO_LIVE_SNAPSHOT
+COINGLASS_AI_RUN_CONSUMPTION: NOT_VERIFIED_NO_LIVE_AI_RUN
+LIVE_RUNTIME_ACCEPTANCE_DONE: NO
+GLOBAL_SEMANTIC_RUNTIME_DONE: NO
+CURRENT_PHASE_DONE: NO
+
+Residual-package validation on Java 17: directed Home/Position/Three-AI and
+CoinGlass code-path tests PASS; full Maven `4723` tests, `0` failures, `0`
+errors, `14` skipped; Product Source Gate PASS; Workflow Contract PASS;
+JavaScript syntax PASS; `git diff --check` PASS. Normal and isolated
+`ui-review` startup each returned authenticated `/dashboard` HTTP 200.
+
+The current-Head browser evidence records horizontal overflow, text clipping,
+broken Position detail links, Home derivatives strips, visible Decision
+Workspace labels, and risk-level/state-slot leakage as zero. An exact
+current-Head console counter is NOT_VERIFIED because the controlled browser tab
+could not reuse the temporary runtime login session through its supported log
+inspection API. This is not represented as zero. The exact current-Head 1440
+capture also remains NOT_VERIFIED; both evidence limitations must remain
+visible to Owner review.

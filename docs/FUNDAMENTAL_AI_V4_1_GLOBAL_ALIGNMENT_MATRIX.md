@@ -16,7 +16,7 @@ Every supplied finding is classified exactly once. Detailed producer/transport/c
 | H-05 | ALREADY_FIXED | AppShell | collapsed rail and overlay expansion behavior present | NO | none |
 | H-06 | ALREADY_FIXED | UI freeze | current header/padding/gap geometry matches contract | NO | none |
 | H-07 | ALREADY_FIXED | design tokens | current Home/workspace use the frozen token set | NO | none |
-| S-01 | PARTIALLY_CURRENT | System Status | six slots exist, but selected asset supplies macro/system/global values | YES | correct projection scope and compact binding |
+| S-01 | ALREADY_FIXED | System Status | six slots use their formal owners or fail closed; A/B selected-asset isolation is verified | NO | none |
 | S-02 | ALREADY_FIXED | System Status | no Top6 count in strip | NO | none |
 | S-03 | ALREADY_FIXED | recorded account | runtime counts only valid active positions and truthful empty state | NO | none |
 | O-01 | ALREADY_FIXED | Opportunity ranking | backend ranking eligibility/dedupe is present | NO | none |
@@ -44,8 +44,8 @@ Every supplied finding is classified exactly once. Detailed producer/transport/c
 | F-04 | ALREADY_FIXED | revalidation | reason/recovery/latest lifecycle state shown | NO | none |
 | F-05 | ALREADY_FIXED | Final access gate | only validated exact Final is visible | NO | none |
 | A-01 | ALREADY_FIXED | AI Workspace | one workspace, three tabs, one active role | NO | none |
-| A-02 | PARTIALLY_CURRENT | Gemini | reviewResult gate exists; three list/state pairs are merged in renderer | YES | preserve three independent groups |
-| A-03 | PARTIALLY_CURRENT | Grok | causal path survives, but primary/authority semantics are wrong | YES | use failurePathState and remove Final-plan mutation implication |
+| A-02 | ALREADY_FIXED | Gemini | one primary reviewResult and three independently owned list/state pairs | NO | none |
+| A-03 | ALREADY_FIXED | Grok | failurePathState is primary; complete-path and inconsistent-empty gates are distinct | NO | none |
 | A-04 | ALREADY_FIXED | Resolver | summary consumes separate consistency/resolver fields and fails closed | NO | none |
 | A-05 | ALREADY_FIXED | state/mode legality | legal selected fixture and guards preserve waiting-trigger/PREPARATION | NO | none |
 | A-06 | ALREADY_FIXED | AI tabs | roving tabindex, arrows, Home/End, focus behavior present | NO | none |
@@ -61,15 +61,15 @@ Every supplied finding is classified exactly once. Detailed producer/transport/c
 | T-01 | ALREADY_FIXED | current static contracts | current semantics replace stale screenshot-only contract | NO | rerun |
 | T-02 | ALREADY_FIXED | user copy inventory | current inventory excludes auth | NO | rerun |
 | V-01 | ALREADY_FIXED | fixture isolation | profile + explicit enable + prod guard present | NO | rerun normal/ui-review |
-| V-02 | PARTIALLY_CURRENT | visual evidence | prior evidence exists; exact post-patch Head must be recaptured | NO | capture post-patch screenshots |
+| V-02 | ALREADY_FIXED | visual evidence | current 1280 runtime scenarios recaptured; exact current-Head 1440 remains explicitly NOT_VERIFIED | NO | Owner evidence note retained |
 
 ## Revalidation totals
 
 | Classification | Count |
 |---|---:|
 | CONFIRMED_CURRENT | 0 |
-| PARTIALLY_CURRENT | 4 |
-| ALREADY_FIXED | 41 |
+| PARTIALLY_CURRENT | 0 |
+| ALREADY_FIXED | 45 |
 | OUTDATED | 0 |
 | OUT_OF_SCOPE | 8 |
 | BLOCKED_BY_MISSING_SOURCE | 0 |
@@ -79,13 +79,13 @@ Every supplied finding is classified exactly once. Detailed producer/transport/c
 
 | ID | Severity | Frozen clause | Producer -> transport -> consumer | Current state | Blocks | Correction/test |
 |---|---|---|---|---|---|---|
-| N-01 | P0 | System Status object scopes | decisions/provider/account -> `SystemStateVO` -> status strip | selected asset leaks into system scope | YES | aggregate projection; ownership tests |
-| N-02 | P0 | GPT primary three values | structured role -> `AiTabVO` -> `renderGpt` | summary promoted as conclusion | YES | exact first visual; DOM contract |
-| N-03 | P0 | Gemini independent collections | three formal pairs -> `AiTabVO` -> `renderGemini` | arrays/states concatenated | YES | three sections; independent-state test |
-| N-04 | P0 | Grok failure-path primary and no plan authority | failure path + challenge -> `AiTabVO` -> `renderGrok` | challenge summary primary; planModeImpact shown | YES | state primary, preserve causal chain, remove mutation implication |
-| N-05 | P0 | unknown enum truthfulness | API value -> shared mapper/`label` -> all Home copy | unknown uppercase becomes role-unavailable copy | YES | `—` plus explicit surrounding state |
-| N-06 | P0 | provider truthfulness | derivatives summary -> renderer | missing source hardcodes CoinGlass | YES | no source invention; source unavailable copy |
-| N-07 | P0 | frozen navigation copy | static Home/workspace shell | `AI分析` missing canonical spacing | YES | text/ARIA-only correction |
+| N-01 | P0 | System Status object scopes | formal producers -> `SystemStateVO` -> status strip | CLOSED | NO | owner-specific projection and A/B behavior tests |
+| N-02 | P0 | GPT primary three values | structured role -> `AiTabVO` -> `renderGpt` | CLOSED | NO | exact Chinese first visual and Candidate-not-Final boundary |
+| N-03 | P0 | Gemini independent collections | three formal pairs -> `AiTabVO` -> `renderGemini` | CLOSED | NO | three independent groups |
+| N-04 | P0 | Grok failure-path primary and no plan authority | failure path + challenge -> `AiTabVO` -> `renderGrok` | CLOSED | NO | strict failurePathState and complete-chain gate |
+| N-05 | P0 | unknown enum truthfulness | API value -> shared mapper/`label` -> all Home copy | CLOSED | NO | unknown state fails closed without using returned risk-like labels |
+| N-06 | P0 | provider truthfulness | provider/evidence chain -> role output | CLOSED | NO | Home derivatives strip removed; underlying real chain retained |
+| N-07 | P0 | frozen navigation copy | static Home/workspace shell | CLOSED | NO | exact `分析` copy |
 
 ## Current implementation mapping
 
@@ -109,8 +109,8 @@ P1-IA-01 Positions independent IA acceptance; P1-IA-02 Analysis Preview/Opportun
 
 | Finding | Old binding | New binding | Verification | Status |
 |---|---|---|---|---|
-| N-01 | selected asset supplied system-scope environment/risk/data | BTC macro environment, aggregate risk/global quality, provider+AI service availability, explicit Hot Reset state | service unit test + 1440/1280/1080 DOM | PASS |
-| N-02 | GPT summary promoted above frozen values | Candidate-not-Final plus Market Bias / Opportunity State / Candidate Mode | focused contract + runtime screenshot | PASS |
+| N-01 | selected asset supplied system-scope environment/risk/data | formal BTC environment, fail-closed system risk, provider freshness, provider+AI service availability, all-position account status, explicit Hot Reset state | service unit test + A/B API/DOM | PASS |
+| N-02 | GPT summary promoted above frozen values | 非最终计划 plus 方向判断 / 机会进度 / 候选参与方式 | focused contract + runtime screenshot | PASS |
 | N-03 | Gemini arrays and states merged | evidence gaps, logic conflicts, underestimated risks remain independent | focused contract + runtime tab | PASS |
 | N-04 | challenge summary primary and plan impact implied authority | failure-path state primary; challenge detail secondary; no Final mutation field | focused contract + runtime tab | PASS |
 | N-05 | unknown uppercase value read as unavailable | `—`; actual unavailable state stays explicit | mapper tests | PASS |
@@ -120,3 +120,30 @@ P1-IA-01 Positions independent IA acceptance; P1-IA-02 Analysis Preview/Opportun
 All 53 supplied findings remain classified against the pre-implementation
 baseline above. This closure table records the result of the seven authorized
 P0 corrections; the five P1 IA items remain registered and unimplemented.
+
+## Residual P0 deduplication and closure
+
+The seven previously reported findings are not mechanically added to the 53:
+N-01 duplicates S-01, N-03 duplicates A-02, N-04 duplicates A-03, and N-07
+duplicates H-01. N-02, N-05, and N-06 are the three distinct additions.
+Residual RP0-01 through RP0-07 refine those existing rows (P-07/P-09/P-10,
+S-01, A-02/A-03/N-02/N-05, N-06, H-01/N-07, and O-03). RP0-08 is a
+runtime-verification status and RP0-09 is reporting governance, not additional
+product defects.
+
+SUPPLIED_BASELINE_FINDINGS_COUNT: 53
+PREVIOUSLY_REPORTED_NEW_FINDINGS_COUNT: 7
+RESIDUAL_FINDINGS_IN_THIS_PACKAGE: RP0-01..RP0-09
+TOTAL_UNIQUE_FINDINGS: 56
+
+| Residual | Existing unique owner rows | Status |
+|---|---|---|
+| RP0-01 | P-07, P-09 | PASS |
+| RP0-02 | P-10 | PASS |
+| RP0-03 | S-01 / N-01 | PASS |
+| RP0-04 | A-02, A-03 / N-02..N-05 | PASS |
+| RP0-05 | N-06 | PASS |
+| RP0-06 | H-01 / N-07 | PASS |
+| RP0-07 | O-03 plus the frozen independent-dimension contract | PASS |
+| RP0-08 | runtime verification status | PARTIAL: live/snapshot/AI consumption NOT_VERIFIED |
+| RP0-09 | audit governance | PASS |

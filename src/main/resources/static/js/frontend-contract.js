@@ -2,9 +2,9 @@
   "use strict";
 
   var AI_ROLES = Object.freeze([
-    Object.freeze({ role: "GPT_FINAL", label: "证据综合与候选形成" }),
-    Object.freeze({ role: "GEMINI_REVIEW", label: "证据与风险复核" }),
-    Object.freeze({ role: "GROK_CHALLENGE", label: "失败路径与压力测试" })
+    Object.freeze({ role: "GPT_FINAL", label: "GPT 综合判断" }),
+    Object.freeze({ role: "GEMINI_REVIEW", label: "Gemini 冲突复核" }),
+    Object.freeze({ role: "GROK_CHALLENGE", label: "Grok 反方挑战" })
   ]);
 
   var ASSET_STATES = Object.freeze({
@@ -544,7 +544,7 @@
     }
     return {
       code: code ? code.toLowerCase() : "unknown",
-      label: displayText(returnedLabel, "状态待同步"),
+      label: "状态待同步",
       tone: "neutral"
     };
   }
@@ -680,6 +680,15 @@
     };
   }
 
+  function positionSourceLabel(sourceType) {
+    var source = String(sourceType || "").trim().toUpperCase();
+    if (source === "SYSTEM_PLAN_POSITION") return "系统计划";
+    if (source === "MANUAL_POSITION" || source === "MANUAL_INDEPENDENT" || source === "MANUAL") {
+      return "独立录入";
+    }
+    return "来源不可用";
+  }
+
   function csrfHeaders(headers, root) {
     var result = {};
     Object.keys(headers || {}).forEach(function (key) {
@@ -784,6 +793,7 @@
     aiAnalysisState: aiAnalysisState,
     aiAnalysisStateView: aiAnalysisStateView,
     executionPlanAccess: executionPlanAccess,
+    positionSourceLabel: positionSourceLabel,
     csrfHeaders: csrfHeaders,
     clearTextFields: clearTextFields,
     readUrlParam: readUrlParam,

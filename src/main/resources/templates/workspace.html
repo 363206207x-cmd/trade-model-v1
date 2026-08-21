@@ -14,12 +14,12 @@
 <aside class="workspace-sidebar" data-component-family="SideNav" aria-label="主要导航">
     <a class="workspace-brand" href="/dashboard" aria-label="Fundamental AI 首页">
         <span class="workspace-brand-mark" aria-hidden="true">F</span>
-        <span class="workspace-rail-label"><strong>Fundamental AI</strong><small>Decision Workspace</small></span>
+        <span class="workspace-rail-label"><strong>Fundamental AI</strong></span>
     </a>
     <nav class="workspace-navigation" aria-label="产品页面">
         <a href="/dashboard" th:classappend="${activeNavigation == 'home'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="workspace-rail-label">首页</span></a>
         <a href="/positions" th:classappend="${activeNavigation == 'positions'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#positions"/></svg><span class="workspace-rail-label">持仓</span></a>
-        <a href="/analysis" th:classappend="${activeNavigation == 'analysis'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="workspace-rail-label">AI 分析</span></a>
+        <a href="/analysis" th:classappend="${activeNavigation == 'analysis'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="workspace-rail-label">分析</span></a>
         <a href="/messages" th:classappend="${activeNavigation == 'messages'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="workspace-rail-label">消息</span></a>
         <a href="/me" th:classappend="${activeNavigation == 'me'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="workspace-rail-label">我的</span></a>
     </nav>

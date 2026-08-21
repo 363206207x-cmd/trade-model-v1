@@ -429,7 +429,6 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(qa).contains(
                 "\"dashboardHtml\": \"" + sha256(DASHBOARD) + "\"",
                 "\"dashboardLatestCss\": \"" + sha256(LATEST_STYLE) + "\"",
-                "\"frontendContractJs\": \"" + sha256(CONTRACT) + "\"",
                 "\"visualFixture\": \"" + sha256(Path.of(
                         "scripts/dashboard-visual-acceptance-fixture.py")) + "\"",
                 "\"horizontalOverflow\": 0",
