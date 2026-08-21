@@ -170,37 +170,6 @@ public class WorkspaceRuntimeController {
         }
     }
 
-    @GetMapping("/rechecks/{pushSnapshotId}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> recheck(@PathVariable String pushSnapshotId) {
-        Long userId = userIdResolver.requireCurrentUserId();
-        MessageDO owner = messageMapper.selectByRecheckIdForUser(pushSnapshotId, userId);
-        if (owner == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot not found or not owned"));
-        }
-        Long pushId;
-        try {
-            pushId = Long.valueOf(owner.getSourceId());
-        } catch (RuntimeException exception) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot identity unavailable"));
-        }
-        TmPushSnapshotDO snapshot = pushSnapshotMapper.selectByPushId(pushId);
-        if (snapshot == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot unavailable"));
-        }
-        TmPushRecheckLogDO latest = pushRecheckLogMapper.selectLatestByPushId(pushId);
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pushSnapshotId", pushSnapshotId);
-        data.put("originalSnapshot", snapshot);
-        data.put("currentResult", latest);
-        data.put("resultState", latest == null ? "INSUFFICIENT_DATA" : latest.getRecheckStatus());
-        data.put("reason", latest == null ? "WAITING_RECHECK_RESULT" : latest.getExecutionErrorMessage());
-        data.put("notTradeInstruction", true);
-        return ResponseEntity.ok(ApiResponse.success(data));
-    }
-
     @GetMapping("/events")
     public ApiResponse<Map<String, Object>> events(@RequestParam(defaultValue = "30") int limit,
                                                    @RequestParam(required = false) String symbol) {

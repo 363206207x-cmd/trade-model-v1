@@ -1,5 +1,6 @@
 package org.example.trademodel.vo;
 
+import org.example.trademodel.ai.AiRoleResultsPayload;
 import org.example.trademodel.entity.ConflictResolverResultDO;
 import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.entity.EvidenceItemDO;
@@ -24,6 +25,7 @@ public class DecisionChainAuditVO {
     private DecisionResult decisionBundle;
     private ExecutionPlanCandidateDO candidate;
     private List<AiTraceStage> aiTraces = List.of();
+    private AiRoleResultsPayload aiRoleResults;
     private ConflictResolverResultDO conflictResolver;
     private RuleValidationStage ruleValidation;
     private ExecutionPlanDO finalExecutionPlan;
@@ -50,6 +52,8 @@ public class DecisionChainAuditVO {
     public void setCandidate(ExecutionPlanCandidateDO value) { this.candidate = value; }
     public List<AiTraceStage> getAiTraces() { return aiTraces; }
     public void setAiTraces(List<AiTraceStage> value) { this.aiTraces = value == null ? List.of() : value; }
+    public AiRoleResultsPayload getAiRoleResults() { return aiRoleResults; }
+    public void setAiRoleResults(AiRoleResultsPayload value) { this.aiRoleResults = value; }
     public ConflictResolverResultDO getConflictResolver() { return conflictResolver; }
     public void setConflictResolver(ConflictResolverResultDO value) { this.conflictResolver = value; }
     public RuleValidationStage getRuleValidation() { return ruleValidation; }

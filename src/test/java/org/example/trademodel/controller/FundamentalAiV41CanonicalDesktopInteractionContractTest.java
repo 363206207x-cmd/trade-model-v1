@@ -125,12 +125,13 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String css = Files.readString(WORKSPACE_CSS);
 
         assertThat(script).contains(
-                "/api/asset-pool", "/api/dashboard/home?limit=6",
-                "/api/user-positions/open",
+                "/api/asset-pool", "/api/workspace/positions/monitoring",
+                "/api/workspace/positions/history?limit=100",
                 "/api/review/center", "/api/ai/audit-chain", "/api/workspace/messages",
                 "/api/workspace/rechecks/", "/api/workspace/plans/", "/api/workspace/events",
                 "/api/user-config", "等待监控数据", "当前不可查看", "暂无数据",
                 "notTradeInstruction")
+                .doesNotContain("/api/dashboard/home?limit=6", "/api/user-positions/open")
                 .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER");
         assertThat(html).contains(
                 "录入持仓", "记录平仓", "开始预览", "加入资产池持续跟踪")

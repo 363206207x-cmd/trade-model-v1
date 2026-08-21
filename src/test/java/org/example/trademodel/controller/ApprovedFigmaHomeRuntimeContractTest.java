@@ -36,8 +36,11 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
                 "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
-                "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "查看完整审计链");
-        assertThat(html).containsOnlyOnce("查看完整审计链")
+                "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "id=\"auditChainLink\"");
+        assertThat(Files.readString(SCRIPT)).contains(
+                        "查看完整审计链", "查看分析详情", "审计链尚未形成")
+                .containsOnlyOnce("查看完整审计链");
+        assertThat(html)
                 .doesNotContain(
                         "HOME COMPACT", ">FOUND<", ">NONE_FOUND<", "Final Execution Plan");
         assertThat(css).contains(
@@ -173,9 +176,10 @@ class ApprovedFigmaHomeRuntimeContractTest {
         String script = Files.readString(WORKSPACE_SCRIPT);
 
         assertThat(html).contains(
-                "aria-label=\"持仓视图\"", "活动持仓", "href=\"/reviews\"",
+                "aria-label=\"持仓视图\"", "活动持仓", "历史持仓",
                 "data-review-filter=\"all\"", "data-review-filter=\"position\"", "data-review-filter=\"opportunity\"",
-                "id=\"saveSettings\" hidden disabled");
+                "id=\"saveSettings\" hidden disabled")
+                .doesNotContain("历史 / 复盘");
         assertThat(script).contains(
                 "function bindReviews()", "data-review-kind", "aria-selected",
                 "role=\"button\"", "event.key === \"Enter\"", "event.key === \" \"",

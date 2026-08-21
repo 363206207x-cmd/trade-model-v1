@@ -68,7 +68,7 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "data-analysis-score-item", "data-analysis-evidence-item",
                 "NOT_CALLED_INPUT_GATE: \"未调用（输入门禁）\"",
                 "analysisEvidenceDescription(item?.description)",
-                "label(trace.model, text(trace.model, \"模型未记录\"))",
+                "label(trace?.model, text(trace?.model, \"模型未记录\"))",
                 "GPT_FINAL: \"GPT 综合判断\"",
                 "GEMINI_REVIEW: \"Gemini 冲突复核\"",
                 "GROK_CHALLENGE: \"Grok 反方挑战\"",

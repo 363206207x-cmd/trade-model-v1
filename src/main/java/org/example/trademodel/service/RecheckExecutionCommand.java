@@ -47,6 +47,15 @@ public class RecheckExecutionCommand {
         return cmd;
     }
 
+    /** Owner-proven workspace open/retry; never carries scheduler identity. */
+    public static RecheckExecutionCommand pushOpen(int retryAttempt, Long retryFromLogId) {
+        RecheckExecutionCommand cmd = new RecheckExecutionCommand();
+        cmd.setTriggerSource("PUSH_OPEN");
+        cmd.setRetryAttempt(retryAttempt);
+        cmd.setReplayFromLogId(retryFromLogId);
+        return cmd;
+    }
+
     public String getTriggerSource() {
         return triggerSource;
     }

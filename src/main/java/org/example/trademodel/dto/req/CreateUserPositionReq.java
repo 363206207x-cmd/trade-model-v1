@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -16,6 +17,8 @@ public class CreateUserPositionReq {
     private BigDecimal entryPrice;
     private BigDecimal quantity;
     private BigDecimal leverage;
+    @JsonAlias("opened_at")
+    private LocalDateTime openedAt;
     @JsonAlias("stop_loss")
     private BigDecimal stopLoss;
     @JsonAlias("take_profit")
@@ -70,6 +73,10 @@ public class CreateUserPositionReq {
     public BigDecimal getLeverage() {
         return leverage;
     }
+
+    public LocalDateTime getOpenedAt() { return openedAt; }
+
+    public void setOpenedAt(LocalDateTime openedAt) { this.openedAt = openedAt; }
 
     public void setLeverage(BigDecimal leverage) {
         this.leverage = leverage;

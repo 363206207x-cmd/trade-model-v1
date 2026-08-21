@@ -71,14 +71,20 @@
         <section class="workspace-page" th:if="${pageKey == 'positions'}" aria-labelledby="positionsHeading">
             <header class="section-header"><div><h2 id="positionsHeading">持仓监控 · 基于已录入</h2></div><button class="button button-secondary populated-position-action" type="button" data-open-overlay="actual-position">录入持仓</button></header>
             <div class="risk-aggregate" data-component-family="PositionRiskAggregate"><span>账户风险覆盖 · 基于已录入</span><strong id="accountRiskCoverage">等待评估</strong><small>仅在已录入持仓数据完整时显示完整覆盖。</small></div>
-            <nav class="filter-tabs" aria-label="持仓视图"><a class="is-active" href="/positions" aria-current="page">活动持仓</a><a href="/reviews">历史 / 复盘</a></nav>
-            <div class="position-toolbar" aria-label="持仓筛选与排序"><label>筛选<select id="positionStateFilter"><option value="ALL">全部活动持仓</option><option value="RISK">风险变化</option><option value="WAITING">等待监控</option></select></label><label>排序<select id="positionSort"><option value="RISK_DESC">风险从高到低</option><option value="OPENED_DESC">最近录入</option></select></label></div>
-            <div class="position-grid" id="positionGrid"></div>
-            <div class="empty-state" id="positionEmpty" data-component-family="EmptyState" hidden><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span><button class="button button-primary" type="button" data-open-overlay="actual-position">录入持仓</button></div>
+            <nav class="filter-tabs" aria-label="持仓视图"><button class="is-active" type="button" aria-current="page" data-position-tab="active">活动持仓</button><button type="button" data-position-tab="history">历史持仓</button></nav>
+            <section id="activePositionsPanel" data-position-panel="active">
+                <div class="position-toolbar" aria-label="持仓筛选与排序"><label>筛选<select id="positionStateFilter"><option value="ALL">全部活动持仓</option><option value="RISK">风险变化</option><option value="WAITING">等待监控</option></select></label><label>排序<select id="positionSort"><option value="RISK_DESC">风险从高到低</option><option value="OPENED_DESC">最近录入</option></select></label></div>
+                <div class="position-grid" id="positionGrid"></div>
+                <div class="empty-state" id="positionEmpty" data-component-family="EmptyState" hidden><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span><button class="button button-primary" type="button" data-open-overlay="actual-position">录入持仓</button></div>
+            </section>
+            <section id="positionHistoryPanel" data-position-panel="history" hidden>
+                <div class="position-grid" id="positionHistoryGrid"></div>
+                <div class="empty-state" id="positionHistoryEmpty" data-component-family="EmptyState" hidden><strong>暂无历史持仓</strong><span>完整记录平仓后，持仓会移入这里；复盘仍是独立对象。</span></div>
+            </section>
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'position-detail'}" aria-labelledby="positionDetailHeading">
-            <header class="section-header"><div><h2 id="positionDetailHeading" class="sr-only">持仓详情</h2></div><button class="button button-secondary" type="button" data-open-overlay="close-position">记录平仓</button></header>
+            <header class="section-header"><div><a class="text-action" id="positionDetailReturn" href="/positions?tab=active">返回持仓</a><h2 id="positionDetailHeading" class="sr-only">持仓详情</h2></div><button class="button button-secondary" id="closePositionAction" type="button" data-open-overlay="close-position">记录平仓</button></header>
             <article class="surface position-detail-card" data-component-family="PositionCard" id="positionDetailCard"></article>
             <section class="surface comparison-grid" data-component-family="PlanActualComparison"><div><h3>开仓计划基线</h3><div id="openingPlanBaseline" class="content-state">等待数据</div></div><div><h3>当前实际持仓</h3><div id="actualPositionFacts" class="content-state">等待数据</div></div></section>
             <section class="surface" data-component-family="MonitorTimeline"><header class="surface-header"><h3>监控时间线</h3></header><div id="monitorTimeline" class="timeline-list"><p class="muted">暂无监控记录</p></div></section>
@@ -98,7 +104,7 @@
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'analysis'}" aria-labelledby="analysisHeading">
-            <header class="section-header"><div><h2 id="analysisHeading">结构化分析</h2></div></header>
+            <header class="section-header"><div><a class="text-action" id="analysisReturn" href="/dashboard" hidden>返回首页</a><h2 id="analysisHeading">结构化分析</h2></div></header>
             <section class="workspace-search analysis-search" data-component-family="AssetSearch">
                 <label for="analysisAssetSearch">搜索市场资产</label>
                 <div class="search-control"><input id="analysisAssetSearch" type="search" autocomplete="off" placeholder="输入名称、别名或交易对"><button class="button button-secondary" type="button" id="analysisSearchButton">搜索</button></div>
@@ -114,6 +120,7 @@
                 <section class="surface" data-component-family="EvidenceList"><header class="surface-header"><h3>支持 / 反对证据</h3></header><div id="analysisEvidence"><p class="muted">暂无数据</p></div></section>
                 <section class="surface" data-component-family="EvidenceList"><header class="surface-header"><h3>八大评分</h3></header><div id="analysisScores"><p class="muted">等待分析</p></div></section>
             </div>
+            <div class="analysis-ai-layout" id="analysisAiLayout">
             <section class="surface ai-workspace" data-component-family="AIWorkspace">
                 <div class="role-tabs" data-component-family="AIRoleTabs" role="tablist">
                     <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL">证据综合与方向假设</button>
@@ -122,11 +129,12 @@
                 </div>
                 <article class="ai-role-content" id="analysisRoleContent"><div class="empty-state" data-component-family="EmptyState"><strong>暂无分析数据</strong><span>输入真实资产或打开已有分析记录。</span></div></article>
             </section>
+            <aside class="surface conflict-summary" data-component-family="ConflictSummary" id="analysisConflictSummary" hidden><h3>冲突摘要</h3><div id="analysisConflict">暂无冲突数据</div></aside>
+            </div>
             <div class="analysis-grid">
-                <section class="surface" data-component-family="BeforeAfterDiff"><header class="surface-header"><h3>冲突处理前后</h3></header><div id="analysisDiff"><p class="muted">暂无数据</p></div></section>
+                <section class="surface" data-component-family="BeforeAfterDiff" id="analysisDecisionDiff"><header class="surface-header"><h3>冲突处理前后</h3></header><div id="analysisDiff"><p class="muted">暂无数据</p></div></section>
                 <section class="surface" data-component-family="FailurePathList"><header class="surface-header"><h3>失败路径</h3></header><div id="analysisFailures"><p class="muted">暂无数据</p></div></section>
             </div>
-            <aside class="surface conflict-summary" data-component-family="ConflictSummary"><h3>冲突摘要</h3><div id="analysisConflict">暂无冲突数据</div></aside>
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'messages'}" aria-labelledby="messagesHeading">
@@ -138,14 +146,17 @@
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'recheck'}" aria-labelledby="recheckHeading">
-            <header class="section-header"><div><h2 id="recheckHeading" class="sr-only">推送复核</h2></div></header>
+            <header class="section-header"><div><a class="text-action" id="recheckReturn" href="/messages">返回消息</a><h2 id="recheckHeading" class="sr-only">推送复核</h2></div></header>
             <section class="surface" data-component-family="OriginalSnapshotCard"><header class="surface-header"><h3>原始推送快照</h3></header><div id="originalSnapshot" class="content-state">等待数据</div></section>
+            <section class="surface"><header class="surface-header"><h3>复核进度</h3></header><div id="recheckProgress" class="content-state">等待数据</div></section>
             <section class="recheck-hero" data-component-family="RecheckResultHero"><span>当前复核结果</span><strong id="recheckResult">当前不可查看</strong><p id="recheckReason">等待可信数据</p></section>
-            <div class="recheck-actions" data-component-family="RecheckActionBar"><a class="button button-secondary" href="/messages">返回消息</a><button class="button button-primary" type="button" id="requestPushRecheck">刷新当前对比</button></div>
+            <section class="surface comparison-grid"><div><h3>当前指标</h3><div id="recheckCurrentMetrics" class="content-state">等待数据</div></div><div><h3>原始与当前</h3><div id="recheckDiff" class="content-state">等待数据</div></div></section>
+            <section class="surface"><header class="surface-header"><h3>审计链</h3></header><div id="recheckAudit" class="content-state">等待数据</div><p class="safety-boundary">本次复核仅供人工判断，不构成交易授权。</p></section>
+            <div class="recheck-actions" data-component-family="RecheckActionBar"><a class="button button-secondary" id="recheckPlanLink" href="/plans/" hidden>查看原计划</a><button class="button button-secondary" type="button" id="reanalyzePush">重新分析</button><button class="button button-secondary" type="button" id="retryPushRecheck" hidden>重试复核</button><button class="button button-primary" type="button" id="requestPushRecheck">刷新当前对比</button></div>
         </section>
 
         <section class="workspace-page focused-detail-shell" th:if="${pageKey == 'plan'}" aria-labelledby="planHeading" data-component-family="FocusedDetailShell">
-            <header class="section-header plan-action-header"><div><h2 id="planHeading" class="sr-only">Final Execution Plan</h2></div><button class="button button-primary" type="button" id="requestPlanRevalidation" hidden disabled>重新校验</button></header>
+            <header class="section-header plan-action-header"><div><a class="text-action" id="planReturn" href="/analysis">返回</a><h2 id="planHeading" class="sr-only">Final Execution Plan</h2></div><button class="button button-primary" type="button" id="requestPlanRevalidation" hidden disabled>重新校验</button></header>
             <div class="plan-header" data-component-family="PlanModeHeader"><span>计划模式</span><strong id="planMode">当前不可查看</strong><span class="state-badge" data-component-family="PlanLifecycleBadge" id="planLifecycle">当前不可查看</span></div>
             <section class="surface plan-detail" data-component-family="FinalPlanDetail" id="finalPlanDetail">
                 <div class="plan-section" data-component-family="PlanSummaryCard"><h3>决策摘要</h3><div id="planSummary" class="content-state">等待数据</div></div>
@@ -163,7 +174,7 @@
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'audit'}" aria-labelledby="auditHeading">
-            <header class="section-header"><div><h2 id="auditHeading" class="sr-only">完整审计链</h2></div><button class="button button-secondary" type="button" data-open-overlay="audit-detail">查看元数据</button></header>
+            <header class="section-header"><div><a class="text-action" id="auditReturn" href="/dashboard" hidden>返回首页</a><h2 id="auditHeading" class="sr-only">完整审计链</h2></div><button class="button button-secondary" type="button" data-open-overlay="audit-detail">查看元数据</button></header>
             <div class="audit-steps" id="auditChain" data-component-family="AuditChainStepper"></div>
             <details class="audit-disclosure" data-component-family="AuditMetaDisclosure"><summary>审计元数据</summary><pre id="auditMetadata">暂无数据</pre></details>
         </section>
@@ -193,8 +204,8 @@
 <dialog class="overlay drawer" id="overlay-pool-asset-detail" data-overlay-code="O03" data-component-family="Drawer"><div class="overlay-header"><h2>资产池详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="poolAssetDetailContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
 <dialog class="overlay modal" id="overlay-pool-batch-management" data-overlay-code="O04" data-component-family="Modal"><div class="overlay-header"><h2>批量管理</h2><button type="button" data-close-overlay>关闭</button></div><div class="overlay-content"><p>选择资产后可批量删除或扫描。历史分析不会被删除。</p><div id="poolBatchList"></div><p class="muted" id="poolBatchStatus">尚未选择资产</p><div class="overlay-actions"><button class="button button-secondary" id="batchScanSelected" type="button" disabled>扫描所选</button><button class="button button-quiet" id="batchRemoveSelected" type="button" disabled>移除所选</button></div></div></dialog>
 <dialog class="overlay drawer" id="overlay-final-plan-detail" data-overlay-code="O05" data-component-family="Drawer"><div class="overlay-header"><h2>最终计划详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="planDrawerContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
-<dialog class="overlay modal" id="overlay-actual-position" data-overlay-code="O06" data-component-family="Modal"><form id="actualPositionForm" class="overlay-content" data-component-family="PositionActualForm"><div class="overlay-header"><h2>录入实际持仓</h2><button type="button" data-close-overlay>关闭</button></div><div class="form-grid"><label>资产<input name="assetSymbol" required></label><label>方向<select name="side"><option value="LONG">做多</option><option value="SHORT">做空</option></select></label><label>开仓价<input name="entryPrice" type="number" step="any" required></label><label>数量<input name="quantity" type="number" step="any" required></label><label>杠杆<input name="leverage" type="number" step="any" required></label><label>止损<input name="stopLoss" type="number" step="any"></label><label>目标<input name="takeProfit" type="number" step="any"></label></div><input name="finalPlanId" type="hidden"><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认录入</button></div></form></dialog>
-<dialog class="overlay modal" id="overlay-close-position" data-overlay-code="O07" data-component-family="Modal"><form id="closePositionForm" class="overlay-content"><div class="overlay-header"><h2>记录平仓</h2><button type="button" data-close-overlay>关闭</button></div><label>平仓价格<input name="closePrice" type="number" step="any" required></label><label>原因<textarea name="closeReason" rows="3" required></textarea></label><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认记录</button></div></form></dialog>
+<dialog class="overlay modal" id="overlay-actual-position" data-overlay-code="O06" data-component-family="Modal"><form id="actualPositionForm" class="overlay-content" data-component-family="PositionActualForm"><div class="overlay-header"><h2>录入实际持仓</h2><button type="button" data-close-overlay>关闭</button></div><div class="form-grid"><label>资产<input name="assetSymbol" required></label><label>方向<select name="side"><option value="LONG">做多</option><option value="SHORT">做空</option></select></label><label>实际开仓价<input name="entryPrice" type="number" step="any" required></label><label>实际开仓时间<input name="openedAt" type="datetime-local" required></label><label>数量<input name="quantity" type="number" step="any" required></label><label>杠杆<input name="leverage" type="number" step="any" required></label><label>止损<input name="stopLoss" type="number" step="any"></label><label>目标<input name="takeProfit" type="number" step="any"></label></div><input name="sourceType" type="hidden" value="MANUAL_INDEPENDENT"><input name="finalPlanId" type="hidden"><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认录入</button></div></form></dialog>
+<dialog class="overlay modal" id="overlay-close-position" data-overlay-code="O07" data-component-family="Modal"><form id="closePositionForm" class="overlay-content"><div class="overlay-header"><h2>记录平仓</h2><button type="button" data-close-overlay>关闭</button></div><label>实际平仓价格<input name="closePrice" type="number" step="any" required></label><label>实际平仓时间<input name="closedAt" type="datetime-local" required></label><label>结果备注<textarea name="closeReason" rows="3" required></textarea></label><div class="overlay-actions"><button class="button button-secondary" type="button" data-close-overlay>取消</button><button class="button button-primary" type="submit">确认记录</button></div></form></dialog>
 <dialog class="overlay drawer" id="overlay-audit-detail" data-overlay-code="O08" data-component-family="Drawer"><div class="overlay-header"><h2>审计元数据</h2><button type="button" data-close-overlay>关闭</button></div><pre id="auditDrawerContent" class="overlay-content">暂无数据</pre></dialog>
 <dialog class="overlay drawer" id="overlay-async-task-center" data-overlay-code="O09" data-component-family="Drawer"><div class="overlay-header"><h2>任务中心</h2><button type="button" data-close-overlay>关闭</button></div><div id="asyncTaskList" class="overlay-content"><p class="muted">暂无任务</p></div></dialog>
 <dialog class="overlay drawer" id="overlay-event-detail" data-overlay-code="O11" data-component-family="Drawer"><div class="overlay-header"><h2>事件详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="eventDetailContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>

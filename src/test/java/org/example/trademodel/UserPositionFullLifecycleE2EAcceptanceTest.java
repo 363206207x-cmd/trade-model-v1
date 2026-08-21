@@ -289,6 +289,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         req.setLeverage(new BigDecimal("2"));
         req.setStopLoss(new BigDecimal("90"));
         req.setTakeProfit(new BigDecimal("120"));
+        req.setOpenedAt(LocalDateTime.of(2024, 1, 1, 10, 0));
         req.setSourceType("MANUAL");
         req.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(PLAN_ID));
         return req;
@@ -298,6 +299,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         CloseUserPositionReq req = new CloseUserPositionReq();
         req.setClosePrice(new BigDecimal("112"));
         req.setCloseReason("manual acceptance close");
+        req.setClosedAt(LocalDateTime.of(2024, 1, 1, 12, 0));
         return req;
     }
 

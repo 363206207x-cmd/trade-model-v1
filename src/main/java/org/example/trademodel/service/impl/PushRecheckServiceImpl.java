@@ -142,7 +142,11 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     @Transactional(rollbackFor = Exception.class)
     public RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command) {
         RecheckExecutionCommand executionCommand = command != null ? command : RecheckExecutionCommand.manual();
-        accessBoundary.requireInternalScheduledExecution(executionCommand);
+        if ("PUSH_OPEN".equals(executionCommand.getTriggerSource())) {
+            accessBoundary.requireOwnerScopedPushOpenExecution(executionCommand);
+        } else {
+            accessBoundary.requireInternalScheduledExecution(executionCommand);
+        }
         if (pushId == null) {
             RecheckResult early = new RecheckResult();
             early.setPushId(null);
@@ -275,6 +279,11 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         recordHighValueSafetyChange(snap, row, status, message, failReasonJson, now);
 
         return result;
+    }
+
+    @Override
+    public RecheckResult recheckForOwnedPushOpen(Long pushId, Long retryFromLogId, int retryAttempt) {
+        return recheck(pushId, null, RecheckExecutionCommand.pushOpen(retryAttempt, retryFromLogId));
     }
 
     private void recordHighValueSafetyChange(TmPushSnapshotDO snapshot,

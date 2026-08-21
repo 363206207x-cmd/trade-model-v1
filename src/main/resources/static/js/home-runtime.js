@@ -307,7 +307,7 @@
     function positionDetailLink(positionId) {
         var normalized = String(positionId || "").trim();
         return /^\d+$/.test(normalized) && Number(normalized) > 0
-            ? '<a class="position-detail-link" href="/positions/' + encodeURIComponent(normalized) + '">查看详情</a>'
+            ? '<a class="position-detail-link" href="/positions/' + encodeURIComponent(normalized) + '?returnTo=' + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : "")) + '">查看详情</a>'
             : "";
     }
     function riskRank(value) { return { LOW: 1, MEDIUM: 2, HIGH: 3, EXTREME: 4 }[String(value || "").toUpperCase()] || 0; }
@@ -408,7 +408,8 @@
             + '</div><div class="plan-metadata-layer">' + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
             + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
             + planField("版本", has(plan.planVersion) ? "v" + plan.planVersion : "当前不可查看") + "</div>";
-        link.href = "/plans/" + encodeURIComponent(planId);
+        link.href = "/plans/" + encodeURIComponent(planId) + "?returnTo="
+            + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
         link.hidden = false;
     }
 
@@ -565,7 +566,21 @@
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
         var audit = document.getElementById("auditChainLink");
-        audit.href = trace ? "/audit/" + encodeURIComponent(trace) : analysis ? "/analysis/" + encodeURIComponent(analysis) : "/analysis";
+        if (trace) {
+            audit.href = "/audit/" + encodeURIComponent(trace) + "?returnTo="
+                + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
+            audit.textContent = "查看完整审计链";
+            audit.removeAttribute("aria-disabled");
+        } else if (analysis) {
+            audit.href = "/analysis/" + encodeURIComponent(analysis) + "?returnTo="
+                + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
+            audit.textContent = "查看分析详情";
+            audit.removeAttribute("aria-disabled");
+        } else {
+            audit.removeAttribute("href");
+            audit.textContent = "审计链尚未形成";
+            audit.setAttribute("aria-disabled", "true");
+        }
         renderConflict(home);
     }
 
@@ -722,7 +737,8 @@
             try {
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
                 if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
-                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId));
+                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId) + "?returnTo="
+                    + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : "")));
             } catch (error) {
                 searchActionBusy = false;
                 renderSearchSelection(error.message);
