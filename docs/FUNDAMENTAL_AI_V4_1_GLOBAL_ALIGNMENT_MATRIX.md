@@ -156,11 +156,21 @@ Implementation base: `1a3363f3f05ec22352477097971965dae4785bc2`. PR #1195 remain
 |---|---|---|---|---|
 | KB-01 | Home Top3 is not the full Position workspace | owner-scoped Position projection returns every OPEN/PARTIALLY_CLOSED Position and its own latest monitor | service/controller regression | PASS |
 | KB-02 | Active and History follow lifecycle; CLOSED is not current monitoring | `UserPosition.status`; positionId detail; CLOSED facts without current monitor fetch | lifecycle tests + UI-review tabs | PASS |
-| KB-03 | Preview != Opportunity; structured role fields; one active role | `AnalysisRun.analysisMode` + structured Three-AI payload; unknown fail closed | frontend/AI contract tests + UI-review Unknown/Grok | PASS |
-| KB-04 | Message-owned PushSnapshot; explicit PUSH_OPEN; GET/F5 read only; ERROR-only Retry | Message source identity -> PushSnapshot -> actual Recheck; in-process coalescing | production-chain, service, engine and boundary tests | PASS |
+| KB-03 | Preview != Opportunity; structured role fields; one active role | `AnalysisRun.analysisMode` + explicit `resultAvailable` + production role/mode/collection gates | executable Node matrix + role codec/query tests + correct `/analysis/{id}` UI-review evidence | PASS_IN_B1_1 |
+| KB-04 | Message-owned PushSnapshot; explicit PUSH_OPEN; GET/F5 read only; ERROR-only Retry | atomic COMPLETED + PushSnapshot + actual Message recheck binding; ERROR after rollback; safety message after commit | eight real Spring/H2 transaction cases plus owner/read/safety gates | PASS_IN_B1_1 |
 | KB-05 | Final Plan never becomes UserPosition automatically | existing explicit user entry flow | O06 regression | PASS |
 | KB-06 | partial close requires an auditable persistence source | no event/quantity producer exists and none was invented | source audit | BLOCKED_BY_MISSING_PERSISTENCE_SOURCE |
 | KB-07 | source context restored; audit target and returnTo are safe | exact internal route allowlist; trace-owned Audit route | frontend contract + browser attack cases | PASS |
 | KB-08 | legacy route matrix remains evidence only | no bulk redirect/retirement changes | route contract regression | PASS |
 
-Knife B.1 boundaries: `FRESHNESS=NOT_VERIFIED`, `CROSS_INSTANCE_IDEMPOTENCY=PARTIAL`, data-rich Recheck browser state `NOT_VERIFIED_BROWSER_DATA_BOUNDARY`. These do not change `CURRENT_PHASE_DONE=NO`, `GLOBAL_SEMANTIC_RUNTIME_DONE=NO`, or `READY_FOR_MERGE=NO`.
+Knife B.1.1 evidence source Head is `c376950f9ce7c0f2d7eae75c8eb861ca9ae38255`.
+The four residual groups are locally validated: Analysis gates, Recheck core
+transaction, Home full aggregate/Top3 split, and truthful evidence. The old
+`KNIFE_B_1_IMPLEMENTATION_DONE` remains `NO`; the bounded replacement is
+`KNIFE_B_1_1_IMPLEMENTATION_DONE=YES`. Boundaries remain
+`FRESHNESS=NOT_VERIFIED`, `CROSS_INSTANCE_IDEMPOTENCY=PARTIAL`,
+`SAFETY_MESSAGE_CHAIN=PARTIAL`, data-rich Recheck browser state
+`NOT_VERIFIED_BROWSER_DATA_BOUNDARY`, and
+`KB-06=BLOCKED_BY_MISSING_PERSISTENCE_SOURCE`. These do not change
+`CURRENT_PHASE_DONE=NO`, `GLOBAL_SEMANTIC_RUNTIME_DONE=NO`, or
+`READY_FOR_MERGE=NO`.

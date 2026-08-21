@@ -12,8 +12,8 @@ This package changes no schema, Flyway migration, Mobile/Figma surface, CoinGlas
 |---|---|---|---|---|---|
 | KB-01 regression | Home Top3 risked being reused as the workspace list | owner-scoped workspace continues to query every active Position and each Position's own latest monitor | Position projection and controller tests | UI-review Home Top3 | PASS |
 | KB-02 lifecycle | legacy empty copy; CLOSED detail could request current monitor and render self-detail semantics | exact empty copy; OPEN/PARTIALLY_CLOSED remain active; CLOSED is historical, preserves real facts and does not query current monitor | Position projection/frontend tests | empty Active and History tabs; data-rich CLOSED browser record unavailable | PASS |
-| KB-03 mode/roles | Preview could inherit Candidate semantics; Gemini/Grok formal fields were incomplete; duplicate panels could remain | server-owned Preview/Opportunity/Unknown gates; formal Candidate/review/downgrade/failure-path renderers; stable hidden auxiliary nodes | frontend contract and existing structured AI tests | Unknown fail closed and Opportunity Grok; remaining formal data cases are test evidence | PASS |
-| KB-04 Push Recheck | `currentRecheckId=pushId`; historical record acted as a permanent gate; bind could POST; execution ERROR was not durable | Message -> source PushSnapshot -> owner-scoped PUSH_OPEN; actual recheck id persisted after OPEN; bind/F5 GET-only; ERROR-only Retry; in-flight coalescing | HighValueAlert, workspace recheck, engine and boundary tests | isolated runtime has no owner-scoped Message/Recheck record | PASS |
+| KB-03 mode/roles | Preview could inherit Candidate semantics; Gemini/Grok formal fields were incomplete; duplicate panels could remain | superseded by Knife B.1.1 executable role/mode/collection gates and correct `/analysis/{id}` evidence | production-function Node matrix plus role codec/query tests | Analysis-route Opportunity, Preview and Unknown UI-review evidence | PASS_IN_B1_1 |
+| KB-04 Push Recheck | `currentRecheckId=pushId`; historical record acted as a permanent gate; bind could POST; execution ERROR was not durable | superseded by Knife B.1.1 atomic core transaction, independent ERROR transaction and after-commit safety-message handling | real Spring/H2 transaction integration tests plus owner/read boundary tests | data-rich Recheck browser state remains unavailable | PASS_IN_B1_1 |
 | KB-05 regression | explicit Final-to-Position boundary | unchanged: only user submission creates UserPosition | existing O06 tests | not changed | PASS |
 | KB-06 | no auditable partial-close event/quantity producer | unchanged; no persistence invented | repository ownership audit | not applicable | BLOCKED_BY_MISSING_PERSISTENCE_SOURCE |
 | KB-07 context/audit | Message Plan/Analysis links lost group; returnTo used broad prefixes | route-specific internal allowlist; Message/Recheck/Position context preserved; audit uses real trace route | frontend contract tests | valid internal context preserved; four hostile shapes rejected | PASS |
@@ -82,10 +82,27 @@ Evidence and truth labels are indexed at `docs/evidence/knife_b_1/README.md`. No
 - `KB-06 = BLOCKED_BY_MISSING_PERSISTENCE_SOURCE`.
 - CoinGlass live and Owner final live-runtime acceptance were not run.
 
+## Knife B.1.1 residual closure
+
+Evidence source Head: `c376950f9ce7c0f2d7eae75c8eb861ca9ae38255`.
+
+| Group | Result | Decisive evidence |
+|---|---|---|
+| B1.1-01 Analysis semantic gates | PASS | four production functions in `frontend-contract.js`; Maven-executed Node matrix; `/analysis/{id}` UI-review captures |
+| B1.1-02 Recheck core transaction | PASS | atomic COMPLETED + PushSnapshot + Message binding; rollback-first independent ERROR; eight transaction integration cases |
+| B1.1-03 Home aggregate | PASS | all-position aggregate remains separate from Top3 display; four-position tests and Home captures |
+| B1.1-04 evidence truthfulness | PASS | old Home evidence corrected; new evidence classification and limits recorded in `docs/evidence/knife_b_1_1/README.md` |
+
+The safety message runs after core commit. Its failure preserves the core
+COMPLETED result and records `SAFETY_MESSAGE_FAILED` in
+`tm_push_recheck_log.execution_error_code`; therefore
+`SAFETY_MESSAGE_CHAIN=PARTIAL`, not PASS.
+
 ## Phase Status
 
-- `KNIFE_B_1_IMPLEMENTATION_DONE = VALIDATED_PENDING_EXACT_HEAD_CI`.
-- `KNIFE_B_IMPLEMENTATION_DONE = VALIDATED_PENDING_EXACT_HEAD_CI`.
+- `KNIFE_B_1_IMPLEMENTATION_DONE = NO` (historical package did not close the verified residuals).
+- `KNIFE_B_1_1_IMPLEMENTATION_DONE = YES` after local validation; exact-head CI is reported separately.
+- `KNIFE_B_IMPLEMENTATION_DONE = NO`.
 - `CURRENT_PHASE_DONE = NO`.
 - `GLOBAL_SEMANTIC_RUNTIME_DONE = NO`.
 - `LIVE_RUNTIME_ACCEPTANCE_DONE = NO`.

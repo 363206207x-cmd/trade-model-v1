@@ -14,8 +14,8 @@
 | Home at 1,440 | UI_REVIEW_FIXTURE | `knife-b1-home-1440.png` | Home Top3, Opportunity and single-workspace regression visible |
 | Home at 1,080 | UI_REVIEW_FIXTURE | `knife-b1-home-1080.png` | document horizontal overflow 0; visible text clipping 0 |
 | Analysis unknown mode | UI_REVIEW_FIXTURE | `knife-b1-analysis-unknown.png` | fail closed; no Candidate or failure-path copy rendered |
-| Opportunity Gemini | UI_REVIEW_FIXTURE | `knife-b1-opportunity-gemini.png` | formal review result visible; fixture has no downgrade before/after values |
-| Opportunity Grok | UI_REVIEW_FIXTURE | `knife-b1-opportunity-grok.png` | trigger -> causal path -> invalidating evidence visible |
+| Historical Home Gemini tab | UI_REVIEW_FIXTURE | `knife-b1-opportunity-gemini.png` | Home single-workspace layout only; this is not `/analysis/{id}` evidence and does not prove the formal Review Result contract |
+| Historical Home Grok tab | UI_REVIEW_FIXTURE | `knife-b1-opportunity-grok.png` | Home single-workspace layout only; this is not `/analysis/{id}` evidence and does not prove the formal Failure Path contract |
 | Positions active | UI_REVIEW_FIXTURE | `knife-b1-positions-active.png` | exact empty copy `暂无已录入持仓` |
 | Positions history | UI_REVIEW_FIXTURE | `knife-b1-positions-history.png` | real tab action updates URL to `?tab=history` |
 | Full audit destination | UI_REVIEW_FIXTURE | `knife-b1-audit-return.png` | real `/audit/{traceId}` target and encoded Home return context; missing audit record fails closed |
@@ -32,7 +32,7 @@ Browser session facts: authenticated isolated runtime, standard release JAR, HTT
 | CLOSED detail preserves facts and does not query current monitor | AUTOMATED_TEST | `PositionMonitoringProjectionServiceTest#closedDetailPreservesFactsWithoutReadingOldMonitorAsCurrent`; frontend contract test |
 | Cross-user Position/Recheck access is 404/fail closed | AUTOMATED_TEST | existing owner-scoped controller tests; `WorkspacePushRecheckServiceTest` mismatch cases |
 | Preview GPT/Gemini/Grok mode ownership | AUTOMATED_TEST | `KnifeBFrontendContractTest#analysisUsesFormalModeStructuredRolesAndConflictGate` and structured AI schema tests |
-| Opportunity GPT Candidate, Gemini downgrade, Grok failure path | AUTOMATED_TEST | frontend contract test plus Three-AI structured semantic tests; Grok also has UI-review evidence |
+| Opportunity GPT Candidate, Gemini downgrade, Grok failure path | AUTOMATED_TEST | historical evidence is limited to frontend/structured semantic tests; the old Home screenshots do not prove `/analysis/{id}` role output |
 | Unknown Analysis mode fail closed | UI_REVIEW_FIXTURE + AUTOMATED_TEST | `knife-b1-analysis-unknown.png`; frontend contract test |
 | No duplicate failure panel outside role tab | UI_REVIEW_FIXTURE + AUTOMATED_TEST | runtime `#analysisFailures` client rect count 0; frontend contract test |
 | Production owner chain | AUTOMATED_TEST | `HighValueAlertMessageServiceTest#productionMessageIdentityResolvesOwnedSnapshotAndWritesRealRecheckOnlyAfterOpen` |
@@ -54,3 +54,4 @@ Browser session facts: authenticated isolated runtime, standard release JAR, HTT
 - `KB-06 = BLOCKED_BY_MISSING_PERSISTENCE_SOURCE`: no auditable partial-close event producer exists.
 - Four-position, CLOSED-detail and Recheck/ERROR browser captures are `NOT_VERIFIED_BROWSER_DATA_BOUNDARY`; their claims remain automated-test evidence.
 - `LIVE_RUNTIME_ACCEPTANCE_DONE = NO`.
+- The old `knife-b1-opportunity-gemini.png` and `knife-b1-opportunity-grok.png` are retained as historical Home facts; superseding Analysis-route evidence is indexed in `../knife_b_1_1/README.md`.
