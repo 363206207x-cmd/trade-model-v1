@@ -186,11 +186,17 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         if (!globallyEnabled || !ingestionEnabled) {
             return;
         }
-        if (!isTrue(property(environment, "trade-model.ohlcv.public-provider.enabled"))) {
-            errors.add("production OHLCV ingestion requires explicitly enabled public provider");
+        if (!isTrue(property(environment, "trade-model.ohlcv.kraken.enabled"))) {
+            errors.add("production OHLCV ingestion requires explicitly enabled Kraken provider");
         }
-        if (!isTrue(property(environment, "trade-model.ohlcv.public-provider.external-calls-enabled"))) {
-            errors.add("production OHLCV ingestion requires explicit external-call opt-in");
+        if (!isTrue(property(environment, "trade-model.ohlcv.kraken.external-calls-enabled"))) {
+            errors.add("production OHLCV ingestion requires explicit Kraken external-call opt-in");
+        }
+        if (isTrue(property(environment, "trade-model.ohlcv.binance.enabled"))
+                || isTrue(property(environment, "trade-model.ohlcv.binance.external-calls-enabled"))
+                || isTrue(property(environment, "trade-model.ohlcv.public-provider.enabled"))
+                || isTrue(property(environment, "trade-model.ohlcv.public-provider.external-calls-enabled"))) {
+            errors.add("production release policy requires Binance OHLCV disabled due HTTP 451");
         }
         String maxSymbolsValue = property(environment, "trade-model.schedulers.ohlcv-ingestion.max-symbols");
         if (!isPositiveInteger(maxSymbolsValue) || Integer.parseInt(trim(maxSymbolsValue)) > 20) {

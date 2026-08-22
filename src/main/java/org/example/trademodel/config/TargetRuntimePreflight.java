@@ -77,8 +77,11 @@ public final class TargetRuntimePreflight {
                     || enabled(environment, "TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED"));
         lines.add("KRAKEN_OHLCV=" + (krakenReady ? "ENABLED" : "DISABLED"));
         lines.add("BINANCE_OHLCV=" + (binanceReady ? "ENABLED" : "DISABLED"));
-        lines.add("MARKET_PROVIDER_PATH=" + (krakenReady || binanceReady ? "PASS" : "MISSING"));
-        passed &= krakenReady || binanceReady;
+        lines.add("BINANCE_RELEASE_POLICY="
+                + (binanceReady ? "BLOCKED_MUST_BE_DISABLED" : "DISABLED_DUE_451"));
+        lines.add("MARKET_PROVIDER_PATH="
+                + (krakenReady && !binanceReady ? "PASS" : krakenReady ? "INVALID" : "MISSING"));
+        passed &= krakenReady && !binanceReady;
         CoinGlassConfigurationState coinGlassState = coinGlassState(environment);
         lines.add("COINGLASS=" + coinGlassState.name());
         if (enabled(environment, "TRADE_MODEL_COINGLASS_ENABLED")

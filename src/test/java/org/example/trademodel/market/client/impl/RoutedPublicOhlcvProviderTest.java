@@ -78,6 +78,23 @@ class RoutedPublicOhlcvProviderTest {
         verify(binance).fetchClosedBars("BTCUSDT", "5m", 100, "run-1");
     }
 
+    @Test
+    void disabledReleaseFallbackNeverCallsBinanceAndFailsClosedOnKrakenFailure() {
+        KrakenPublicOhlcvProvider kraken = mock(KrakenPublicOhlcvProvider.class);
+        BinancePublicOhlcvProvider binance = mock(BinancePublicOhlcvProvider.class);
+        when(kraken.fetchClosedBars("BTCUSDT", "5m", 100, "run-release"))
+                .thenReturn(failed("TIMEOUT"));
+        RoutedPublicOhlcvProvider routed = new RoutedPublicOhlcvProvider(
+                kraken, binance, "kraken", "kraken", false);
+
+        PublicOhlcvProviderResult result = routed.fetchClosedBars(
+                "BTCUSDT", "5m", 100, "run-release");
+
+        assertThat(result.reasonCode()).isEqualTo("TIMEOUT");
+        verify(kraken).fetchClosedBars("BTCUSDT", "5m", 100, "run-release");
+        verify(binance, never()).fetchClosedBars("BTCUSDT", "5m", 100, "run-release");
+    }
+
     private static PublicOhlcvProviderResult failed(String reason) {
         return new PublicOhlcvProviderResult(OhlcvSourceState.ERROR, reason, null);
     }

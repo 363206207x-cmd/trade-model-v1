@@ -39,24 +39,24 @@ read_provider_count() {
   local marker_file="${1:-}"
   local provider="${2:-}"
   if [[ ! -r "${marker_file}" ]]; then
-    printf '%s\n' "UNKNOWN_MAX_1"
+    printf '%s\n' "UNKNOWN_MAX_2"
     return
   fi
   awk -F= -v provider="${provider}" '
     $1 == provider { matches += 1; value = $2 }
     END {
-      if (matches == 1 && (value == "0" || value == "1")) print value
-      else print "UNKNOWN_MAX_1"
+      if (matches == 1 && (value == "0" || value == "1" || value == "2")) print value
+      else print "UNKNOWN_MAX_2"
     }
-  ' "${marker_file}" 2>/dev/null || printf '%s\n' "UNKNOWN_MAX_1"
+  ' "${marker_file}" 2>/dev/null || printf '%s\n' "UNKNOWN_MAX_2"
 }
 
 aggregate_call_count() {
-  local openai="${1:-UNKNOWN_MAX_1}"
-  local gemini="${2:-UNKNOWN_MAX_1}"
-  local xai="${3:-UNKNOWN_MAX_1}"
-  if [[ ! "${openai}" =~ ^[01]$ || ! "${gemini}" =~ ^[01]$ || ! "${xai}" =~ ^[01]$ ]]; then
-    printf '%s\n' "UNKNOWN_MAX_3"
+  local openai="${1:-UNKNOWN_MAX_2}"
+  local gemini="${2:-UNKNOWN_MAX_2}"
+  local xai="${3:-UNKNOWN_MAX_2}"
+  if [[ ! "${openai}" =~ ^[012]$ || ! "${gemini}" =~ ^[012]$ || ! "${xai}" =~ ^[012]$ ]]; then
+    printf '%s\n' "UNKNOWN_MAX_6"
     return
   fi
   printf '%s\n' "$((openai + gemini + xai))"
@@ -69,7 +69,7 @@ read_stage_marker() {
     stage="$(tr -d '\r\n' <"${marker_file}" 2>/dev/null || true)"
   fi
   case "${stage}" in
-    PRECHECK|SPRING_STARTING|SPRING_READY|ORCHESTRATOR_STARTING|PROVIDERS_SUBMITTED|ORCHESTRATOR_COMPLETED|OUTPUT_EMITTED)
+    PRECHECK|SPRING_STARTING|SPRING_READY|READINESS_VERIFYING|READINESS_VERIFIED|ORCHESTRATOR_STARTING|PROVIDERS_SUBMITTED|ORCHESTRATOR_COMPLETED|OUTPUT_EMITTED)
       printf '%s\n' "${stage}"
       ;;
     *)
@@ -246,6 +246,9 @@ main() {
   export SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver
   export SPRING_DATASOURCE_USERNAME=sa
   export SPRING_DATASOURCE_PASSWORD=
+  # This isolated H2 harness owns schema.sql and must not inherit the
+  # PostgreSQL target-runtime Flyway override.
+  export SPRING_FLYWAY_ENABLED=false
   export SPRING_SQL_INIT_MODE=always
   export TRADE_MODEL_AI_OPENAI_GPT_FINAL_FALLBACK_ENABLED=false
   export TRADE_MODEL_AI_OPENAI_TIMEOUT_MS=10000

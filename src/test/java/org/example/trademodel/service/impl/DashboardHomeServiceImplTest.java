@@ -483,6 +483,31 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void selectedAssetCannotChangeGlobalProviderReadiness() {
+        ProviderReadinessVO readiness = providerReadiness(
+                "CONNECTED",
+                "WAITING_SYNC",
+                "WAITING_SYNC",
+                "Kraken public data / CONNECTED"
+        );
+        when(providerReadinessService.getReadiness()).thenReturn(readiness);
+        when(localRealDataStatusService.latestClosedBarAt())
+                .thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
+
+        DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
+        DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
+
+        assertThat(btcHome.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
+        assertThat(ethHome.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
+        assertThat(btcHome.getHeader().getDataSourceText())
+                .isEqualTo(ethHome.getHeader().getDataSourceText())
+                .isEqualTo("Kraken public data / CONNECTED");
+        assertThat(btcHome.getHeader().getUpdatedAt())
+                .isEqualTo(ethHome.getHeader().getUpdatedAt())
+                .isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
+    }
+
+    @Test
     void readinessUpdatedAtCannotPopulateHomeWhenNoPersistedClosedBarExists() {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DEGRADED,

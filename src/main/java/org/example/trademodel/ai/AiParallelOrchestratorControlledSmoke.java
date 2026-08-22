@@ -131,7 +131,8 @@ public final class AiParallelOrchestratorControlledSmoke {
             Map<AiProviderName, String> safe = new EnumMap<>(AiProviderName.class);
             for (AiProviderName provider : PROVIDERS) {
                 String value = supplied == null ? null : supplied.get(provider);
-                safe.put(provider, "0".equals(value) || "1".equals(value) ? value : "UNKNOWN_MAX_1");
+                safe.put(provider, "0".equals(value) || "1".equals(value) || "2".equals(value)
+                        ? value : "UNKNOWN_MAX_2");
             }
             return safe;
         } catch (Exception exception) {
@@ -156,7 +157,7 @@ public final class AiParallelOrchestratorControlledSmoke {
 
     private static Map<AiProviderName, String> unknownCounts() {
         Map<AiProviderName, String> counts = new EnumMap<>(AiProviderName.class);
-        PROVIDERS.forEach(provider -> counts.put(provider, "UNKNOWN_MAX_1"));
+        PROVIDERS.forEach(provider -> counts.put(provider, "UNKNOWN_MAX_2"));
         return counts;
     }
 
@@ -206,12 +207,12 @@ public final class AiParallelOrchestratorControlledSmoke {
             }
             Map<AiProviderName, ProviderEvidence> evidence = new EnumMap<>(AiProviderName.class);
             for (AiProviderReviewResult providerResult : result.getProviderResults()) {
-                String count = counts.getOrDefault(providerResult.getProvider(), "UNKNOWN_MAX_1");
+                String count = counts.getOrDefault(providerResult.getProvider(), "UNKNOWN_MAX_2");
                 evidence.put(providerResult.getProvider(), providerEvidence(providerResult, count));
             }
             for (AiProviderName provider : PROVIDERS) {
                 evidence.putIfAbsent(provider,
-                        ProviderEvidence.notRun(counts.getOrDefault(provider, "UNKNOWN_MAX_1")));
+                        ProviderEvidence.notRun(counts.getOrDefault(provider, "UNKNOWN_MAX_2")));
             }
             return new SmokeResult(status, result.getOrchestrationMode().name(),
                     result.getOrchestrationLatencyMs(), result.isGlobalDeadlineExceeded(),
@@ -245,7 +246,7 @@ public final class AiParallelOrchestratorControlledSmoke {
         }
 
         private static void appendProvider(List<String> lines, String prefix, ProviderEvidence evidence) {
-            ProviderEvidence value = evidence == null ? ProviderEvidence.notRun("UNKNOWN_MAX_1") : evidence;
+            ProviderEvidence value = evidence == null ? ProviderEvidence.notRun("UNKNOWN_MAX_2") : evidence;
             lines.add(prefix + "_STATUS: " + value.status());
             lines.add(prefix + "_HTTP_STATUS_CLASS: " + value.httpStatusClass());
             lines.add(prefix + "_PARSE_STATUS: " + value.parseStatus());
@@ -292,10 +293,11 @@ public final class AiParallelOrchestratorControlledSmoke {
         }
 
         private static String aggregateCount(Map<AiProviderName, String> counts) {
-            if (counts.values().stream().anyMatch(value -> !"0".equals(value) && !"1".equals(value))) {
-                return "UNKNOWN_MAX_3";
+            if (counts.values().stream().anyMatch(value -> !"0".equals(value)
+                    && !"1".equals(value) && !"2".equals(value))) {
+                return "UNKNOWN_MAX_6";
             }
-            int total = counts.values().stream().mapToInt(value -> "1".equals(value) ? 1 : 0).sum();
+            int total = counts.values().stream().mapToInt(Integer::parseInt).sum();
             return Integer.toString(total);
         }
     }

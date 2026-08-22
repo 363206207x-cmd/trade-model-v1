@@ -53,6 +53,12 @@ class AiParallelOrchestratorControlledSmokeTest {
                 .properties("spring.main.banner-mode=off")
                 .run()) {
             stageAudit.write("SPRING_READY");
+            AiProviderReadinessService readinessService =
+                    context.getBean(AiProviderReadinessService.class);
+            stageAudit.write("READINESS_VERIFYING");
+            List.of(AiProviderName.OPENAI, AiProviderName.GEMINI, AiProviderName.XAI)
+                    .forEach(readinessService::reverify);
+            stageAudit.write("READINESS_VERIFIED");
             AiDecisionOrchestratorService orchestrator =
                     context.getBean(AiDecisionOrchestratorService.class);
             ControlledCountingAiHttpTransport transport =
@@ -63,7 +69,8 @@ class AiParallelOrchestratorControlledSmokeTest {
             stageAudit.write("ORCHESTRATOR_COMPLETED");
             result.sanitizedOutputLines().forEach(System.out::println);
             stageAudit.write("OUTPUT_EMITTED");
-            assertThat(result.liveProviderCalls()).isIn("0", "1", "2", "3", "UNKNOWN_MAX_3");
+            assertThat(result.liveProviderCalls()).isIn(
+                    "0", "1", "2", "3", "4", "5", "6", "UNKNOWN_MAX_6");
             assertThat(result.finalResultOrder()).isEqualTo(
                     AiParallelOrchestratorControlledSmoke.FINAL_RESULT_ORDER);
         }
@@ -178,7 +185,7 @@ class AiParallelOrchestratorControlledSmokeTest {
     }
 
     @Test
-    void countingTransportRefusesSecondCallAndPersistsBoundedCounts() throws Exception {
+    void countingTransportAllowsReadinessAndExecutionThenRefusesThirdCall() throws Exception {
         Path marker = Files.createTempFile("ai-parallel-count", ".txt");
         try {
             ControlledCountingAiHttpTransport transport =
@@ -187,14 +194,15 @@ class AiParallelOrchestratorControlledSmokeTest {
             AiHttpRequest request = request("https://api.openai.com/v1/responses");
 
             transport.post(request);
+            transport.post(request);
 
-            assertThat(transport.snapshot()).containsEntry(AiProviderName.OPENAI, "1")
+            assertThat(transport.snapshot()).containsEntry(AiProviderName.OPENAI, "2")
                     .containsEntry(AiProviderName.GEMINI, "0")
                     .containsEntry(AiProviderName.XAI, "0");
             assertThatThrownBy(() -> transport.post(request))
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("CALL_LIMIT_EXCEEDED");
-            assertThat(Files.readString(marker)).contains("OPENAI=1", "GEMINI=0", "XAI=0");
+            assertThat(Files.readString(marker)).contains("OPENAI=2", "GEMINI=0", "XAI=0");
         } finally {
             Files.deleteIfExists(marker);
         }
@@ -220,17 +228,17 @@ class AiParallelOrchestratorControlledSmokeTest {
     void malformedSingleProviderReportsPartialUnknown() throws Exception {
         String output = failureOutput("OPENAI=1\nGEMINI=invalid\nXAI=0\n", "", "PRECHECK", "0", 1, false);
 
-        assertThat(output).contains("OPENAI_CALL_COUNT: 1", "GEMINI_CALL_COUNT: UNKNOWN_MAX_1",
-                "XAI_CALL_COUNT: 0", "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_3");
+        assertThat(output).contains("OPENAI_CALL_COUNT: 1", "GEMINI_CALL_COUNT: UNKNOWN_MAX_2",
+                "XAI_CALL_COUNT: 0", "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_6");
     }
 
     @Test
     void missingMarkerReportsUnknownMax3() throws Exception {
         String output = failureOutput(null, "", "PRECHECK", "0", 1, false);
 
-        assertThat(output).contains("OPENAI_CALL_COUNT: UNKNOWN_MAX_1",
-                "GEMINI_CALL_COUNT: UNKNOWN_MAX_1", "XAI_CALL_COUNT: UNKNOWN_MAX_1",
-                "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_3");
+        assertThat(output).contains("OPENAI_CALL_COUNT: UNKNOWN_MAX_2",
+                "GEMINI_CALL_COUNT: UNKNOWN_MAX_2", "XAI_CALL_COUNT: UNKNOWN_MAX_2",
+                "LIVE_PROVIDER_CALLS: UNKNOWN_MAX_6");
     }
 
     @Test
@@ -366,7 +374,7 @@ class AiParallelOrchestratorControlledSmokeTest {
         String script = Files.readString(
                 Path.of("scripts/ai-parallel-orchestrator-controlled-smoke.sh"));
 
-        assertThat(script).contains("SPRING_SQL_INIT_MODE=always")
+        assertThat(script).contains("SPRING_FLYWAY_ENABLED=false", "SPRING_SQL_INIT_MODE=always")
                 .doesNotContain("SPRING_SQL_INIT_MODE=never");
         assertThat(offlineContextEvidence().schemaInitialized()).isTrue();
     }
@@ -772,10 +780,10 @@ class AiParallelOrchestratorControlledSmokeTest {
 
         private synchronized void markAttempt(AiProviderName provider) throws IOException {
             int current = counts.getOrDefault(provider, 0);
-            if (current >= 1) {
+            if (current >= 2) {
                 throw new IOException("CONTROLLED_SMOKE_CALL_LIMIT_EXCEEDED");
             }
-            counts.put(provider, 1);
+            counts.put(provider, current + 1);
             persist();
         }
 
@@ -808,7 +816,8 @@ class AiParallelOrchestratorControlledSmokeTest {
 
     static final class StageAudit {
         private static final List<String> ALLOWED = List.of(
-                "PRECHECK", "SPRING_STARTING", "SPRING_READY", "ORCHESTRATOR_STARTING",
+                "PRECHECK", "SPRING_STARTING", "SPRING_READY", "READINESS_VERIFYING",
+                "READINESS_VERIFIED", "ORCHESTRATOR_STARTING",
                 "PROVIDERS_SUBMITTED", "ORCHESTRATOR_COMPLETED", "OUTPUT_EMITTED");
         private final Path marker;
 
