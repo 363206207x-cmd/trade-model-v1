@@ -94,12 +94,15 @@ both consumers together.
 - Directed tests: `133/133` PASS
 - LOCAL RUN Full Maven: `4786` tests / `0` failures / `0` errors /
   `14` skipped
-- Exact-head CI profile: pending first exact-head GitHub run; final count is
-  written back before closure and revalidated on the final Head
-- Required check categories: `quality-gate` pending;
-  `workflow-contract` pending
-- Product Source Gate: pending final local validation
-- Workflow Contract: pending final local validation
+- First exact-head CI profile: `938` tests / `0` failures / `0` errors /
+  `0` skipped
+- Required check categories on the first implementation Head:
+  `quality-gate` PASS (two duplicate triggers, one category) and
+  `workflow-contract` PASS (one category)
+- Final docs-only Head: must repeat both required categories before the final
+  report
+- Product Source Gate: PASS
+- Workflow Contract: PASS on the clean implementation Head
 - PR remains Draft / unmerged: YES
 
 Prior evidence directories `b1_2_3` and `b1_2_3_1` were not modified.

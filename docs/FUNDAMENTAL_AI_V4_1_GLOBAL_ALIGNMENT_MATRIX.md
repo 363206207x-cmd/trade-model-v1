@@ -263,7 +263,13 @@ semantics, production JavaScript, UI layout, Position, Three-AI, Recheck,
 authentication, Telegram, schema, or business state machines. The screenshot
 is `UI_REVIEW_FIXTURE / CONTROLLED_TRANSPORT_EVIDENCE`, not live-provider data.
 
-Local gates are complete. Exact-head GitHub `quality-gate` and
-`workflow-contract` are pending the implementation push; therefore final
-`B1_2_3_IMPLEMENTATION_DONE` remains pending until those required categories
-pass on the exact PR Head. `CURRENT_PHASE_DONE=NO` and `MERGE=NO` remain fixed.
+Local gates and the first exact-head GitHub run are complete. The CI profile
+reported `938` tests, `0` failures, `0` errors and `0` skipped. Both duplicated
+`quality-gate` runs passed and are reported as one required check category;
+`workflow-contract` passed as its own required category. The final docs-only
+Head must repeat those same categories before closure.
+
+`HEADER_STATUS_TIMESTAMP_TRANSPORT=PASS` and
+`B1_2_3_2_IMPLEMENTATION_DONE=YES`. With the locked B.1.2.3.1 source and
+risk/state gates still passing, `B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to
+this package only. `CURRENT_PHASE_DONE=NO` and `MERGE=NO` remain fixed.

@@ -143,9 +143,14 @@ Evidence: `docs/evidence/b1_2_3_1/README.md`.
 - DIRECTED TESTS: `133/133` PASS.
 - LOCAL RUN Full Maven: `4786` tests, `0` failures, `0` errors, `14` skipped
   under the existing Docker/Testcontainers-unavailable policy.
-- Exact-head CI profile and the single required `quality-gate` /
-  `workflow-contract` categories are pending commit and push; they are not
-  inferred from the local run.
+- First exact-head CI profile: `938` tests, `0` failures, `0` errors, `0`
+  skipped. Both duplicated `quality-gate` runs passed and count as one required
+  category; `workflow-contract` passed as one required category. The final
+  docs-only Head repeats those categories before closure. These numbers are
+  not inferred from the local run.
+- `HEADER_STATUS_TIMESTAMP_TRANSPORT=PASS`,
+  `B1_2_3_2_IMPLEMENTATION_DONE=YES`, and bounded
+  `B1_2_3_IMPLEMENTATION_DONE=YES`. The overall current phase remains open.
 
 Evidence: `docs/evidence/b1_2_3_2/README.md`.
 
