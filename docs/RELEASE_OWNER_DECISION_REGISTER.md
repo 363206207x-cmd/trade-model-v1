@@ -54,9 +54,9 @@ Current classification:
 | HTTPS / proxy auth smoke | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Provide TLS/redirect/HSTS/forwarded-header/authenticated dashboard-review smoke through intended proxy, or an explicit private-only staging exception for candidate only. |
 | Real secret-store injection | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Provide redacted secret-store names/versions/injection evidence with no values. |
 | Credential rotation drill | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Run and record admin, datasource, Binance/API, and AI provider credential rotation drills, or owner-approved staged rotation plan for candidate only. |
-| OpenAI | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
-| Gemini | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
-| xAI / Grok | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
+| OpenAI | LIVE_PROVIDER_PASS_2026_08_23 | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Controlled redacted connectivity passed; choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE and require application-lineage evidence when enabled. |
+| Gemini | LIVE_PROVIDER_HTTP_400_2026_08_23 | REQUIRED_PASS | YES | YES | Correct the provider request/runtime configuration in a separately authorized task, then provide redacted connectivity and application-lineage PASS. |
+| xAI / Grok | LIVE_PROVIDER_PASS_2026_08_23 | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Controlled redacted connectivity passed; choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE and require application-lineage evidence when enabled. |
 | External context / news / macro / ETF | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, DISABLED_FOR_RELEASE, or NOT_APPLICABLE; if required, provide controlled PASS evidence. |
 | Release timing | MISSING_EVIDENCE | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Release owner must approve target window, rollback cutoff, and go/no-go criteria. |
 | Rollback owner | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Name rollback owner and confirm backup/restore authority and rollback decision path. |
@@ -91,7 +91,7 @@ This package creates the decision register and waiver policy. It does not approv
 3. HTTPS/proxy auth smoke remains `MISSING_EVIDENCE`.
 4. Real secret-store injection remains `MISSING_EVIDENCE`.
 5. Credential rotation drill remains `MISSING_EVIDENCE`.
-6. OpenAI, Gemini, and xAI/Grok remain `SKIPPED_MISSING_SECRET` and unclassified by owner decision.
+6. OpenAI and xAI/Grok controlled live connectivity passed on 2026-08-23, but remain unclassified by owner decision and lack complete application-lineage evidence; Gemini returned HTTP 400 and remains blocked.
 7. External context/news/macro/ETF providers remain `SKIPPED_MISSING_SECRET` or missing harness evidence and unclassified by owner decision.
 8. Release timing, rollback owner, and incident owner remain undecided.
 

@@ -273,3 +273,29 @@ Head must repeat those same categories before closure.
 `B1_2_3_2_IMPLEMENTATION_DONE=YES`. With the locked B.1.2.3.1 source and
 risk/state gates still passing, `B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to
 this package only. `CURRENT_PHASE_DONE=NO` and `MERGE=NO` remain fixed.
+
+## 2026-08-23 production readiness final gate without CoinGlass
+
+Implementation Head: `a39c3979f57f31e61ff56924c0135dce8570a44f`.
+PR #1195 remains Draft and unmerged.
+
+| Gate | Evidence | Status |
+|---|---|---|
+| Locked data-time and risk/state contracts | directed regression + Normal/UI-review browser checks | PASS |
+| Local build and regression | 159 directed; local Maven 4,786 with 14 controlled skips | PASS_LOCAL |
+| Normal runtime | H2 fail-closed, no fixture leakage, console/overflow 0 | PASS_LOCAL_H2 |
+| UI-review isolation | fixture-only Top3/detail/O07 mapping, no close POST/provider call | PASS_FIXTURE_ONLY |
+| Live market excluding CoinGlass | Kraken persistence/restart PASS; Binance HTTP 451 | BLOCKED |
+| Three AI | OpenAI/xAI PASS; Gemini HTTP 400; parallel lineage harness DB init failure | BLOCKED |
+| PostgreSQL | disposable V1 to V14 PASS; staging upgrade/least privilege absent | BLOCKED |
+| Staging operations | full close, backup/restore, HTTPS, secret rotation, scheduler cycles, observability absent | BLOCKED |
+| Release decisions | target and release/rollback/incident owners remain missing | BLOCKED |
+
+`PRODUCTION_READINESS_AUDIT_DONE=YES`, but
+`NON_COINGLASS_READINESS=BLOCKED`,
+`PRODUCTION_READINESS=BLOCKED_BY_COINGLASS_PRIVATE_KEY`,
+`DEPLOYMENT_ALLOWED=NO`, `CURRENT_PHASE_DONE=NO`, and `MERGE=NO`.
+
+Canonical report:
+`docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`.
+Evidence: `docs/evidence/production_readiness_without_coinglass/`.
