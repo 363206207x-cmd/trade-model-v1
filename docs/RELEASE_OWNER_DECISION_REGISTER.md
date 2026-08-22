@@ -7,7 +7,7 @@ Status date: 2026-07-09
 
 Production deployment readiness: BLOCKED
 Deployment decision: DO NOT DEPLOY
-Release owner status: MISSING_EVIDENCE
+Release owner status: RECORDED_2026_08_23
 
 ## Scope
 
@@ -23,6 +23,9 @@ This package records the release-owner decision register and waiver policy for r
 - `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
 
 ## Existing Owner / Waiver Evidence
+
+Historical snapshot from the original PDR-LIVE18 package; superseded for the
+current private single-user candidate by the 2026-08-23 section below.
 
 No explicit release-owner approval, provider waiver, deployment timing approval, rollback owner approval, or incident owner approval was found in the reviewed status-source documents.
 
@@ -112,3 +115,29 @@ Proceed to a release-owner decision capture package if a release owner can provi
 - No order execution or auto-trading behavior was introduced.
 - No external Push was sent.
 - No fake positions or fake review records were created.
+
+## 2026-08-23 private single-user release policy
+
+This section supersedes the missing Owner classifications above for the
+current `PRIVATE_SINGLE_USER_WEB` candidate. It does not authorize deployment.
+
+| Decision | Owner record |
+|---|---|
+| Release owner | repository Owner `363206207x-cmd` |
+| Rollback owner | repository Owner `363206207x-cmd` |
+| Incident owner | repository Owner `363206207x-cmd` |
+| Go/No-Go | `NO_GO_PENDING_TECHNICAL_GATES_AND_COINGLASS` |
+| Kraken | `REQUIRED_PASS` |
+| OpenAI/GPT | `REQUIRED_PASS` |
+| Gemini | `REQUIRED_PASS` |
+| xAI/Grok | `REQUIRED_PASS` |
+| CoinGlass | `DEFERRED_MISSING_PRIVATE_KEY` |
+| Binance | `DISABLED_FOR_RELEASE_DUE_HTTP_451` |
+| External news/macro/ETF/context | `DISABLED_FOR_RELEASE` unless separately configured and independently PASS |
+| Recheck | `DEFERRED_UNTIL_LEGAL_SOURCE` when no natural in-app `PUSH_SNAPSHOT` exists |
+| Legacy routes | retained, authenticated, and unlinked from formal navigation |
+| Partial close writes | outside release scope; full close retained |
+
+Gemini remains blocked by provider account/location/region policy. No
+authorized remote P3H staging identity is configured. Current readiness is
+`PRODUCTION_READINESS=BLOCKED_MULTIPLE`; `DEPLOYMENT_ALLOWED=NO`.

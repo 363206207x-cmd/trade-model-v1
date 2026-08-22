@@ -2,6 +2,14 @@
 
 Evidence package: Production Readiness Final Gate excluding a CoinGlass live call.
 
+> **Current correction:** this package is historical evidence for Head
+> `a39c3979`. The follow-up implementation/evidence is indexed at
+> `docs/evidence/non_coinglass_blocker_closure/README.md`. Telegram identity is
+> authorized, Binance is disabled for release, the controlled Three-AI harness
+> now starts and completes with partial real-provider results, and Gemini is
+> blocked by account/location/region policy. Remote P3H staging remains
+> unavailable. Current status: `PRODUCTION_READINESS=BLOCKED_MULTIPLE`.
+
 - Implementation Head: `a39c3979f57f31e61ff56924c0135dce8570a44f`
 - Final evidence Head: the exact PR #1195 Head containing this file; recorded in the PR description and final audit response after the single evidence commit
 - PR: `#1195`, branch `codex/frontend-interaction-runtime-closure`, base `2698ca50ae2a9e125e4848865c3151f1adade4a3`
@@ -164,7 +172,8 @@ P0 findings: none. No fake data was accepted as live evidence, and automatic-tra
 
 - `NON_COINGLASS_READINESS=BLOCKED`
 - `PRODUCTION_READINESS_AUDIT_DONE=YES`
-- `PRODUCTION_READINESS=BLOCKED_BY_COINGLASS_PRIVATE_KEY`
+- Historical value at the audited Head: `PRODUCTION_READINESS=BLOCKED_BY_COINGLASS_PRIVATE_KEY`
+- Superseding current value: `PRODUCTION_READINESS=BLOCKED_MULTIPLE`
 - Additional non-CoinGlass P1 blockers are listed above.
 - `DEPLOYMENT_ALLOWED=NO`
 - `CURRENT_PHASE_DONE=NO`

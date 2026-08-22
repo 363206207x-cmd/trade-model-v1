@@ -291,6 +291,7 @@ PR #1195 remains Draft and unmerged.
 | Staging operations | full close, backup/restore, HTTPS, secret rotation, scheduler cycles, observability absent | BLOCKED |
 | Release decisions | target and release/rollback/incident owners remain missing | BLOCKED |
 
+Historical result at implementation Head `a39c3979`:
 `PRODUCTION_READINESS_AUDIT_DONE=YES`, but
 `NON_COINGLASS_READINESS=BLOCKED`,
 `PRODUCTION_READINESS=BLOCKED_BY_COINGLASS_PRIVATE_KEY`,
@@ -299,3 +300,28 @@ PR #1195 remains Draft and unmerged.
 Canonical report:
 `docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`.
 Evidence: `docs/evidence/production_readiness_without_coinglass/`.
+
+## 2026-08-23 non-CoinGlass blocker closure
+
+Start Head: `c80af6bf20c1135e174ef636f28abd5f8e7f97af`.
+Implementation Head: `8c5f6f11`.
+PR #1195 remains Draft and unmerged.
+
+| Gate | Current evidence | Status |
+|---|---|---|
+| Telegram scope | `currentRecheckId = null` is the Owner-authorized Message/Recheck identity correction; delivery/session/webhook unchanged | PASS |
+| Gemini | real `/v1/interactions` request consistently rejected by provider account/location/region policy; no impersonation or bypass | BLOCKED |
+| Three-AI harness | isolated H2 owns `schema.sql`; target Flyway override excluded; exact-model readiness verified before orchestration | PASS implementation / partial live |
+| Kraken/Binance | Kraken required; Binance and fallback disabled; enabled Binance rejected by preflight and production guard | PASS |
+| Full local regression | 4,791 tests, 0 failures, 0 errors, 14 controlled skips | PASS_LOCAL |
+| Remote P3H | 13 required authorization/configuration inputs absent | NOT_VERIFIED |
+| Release ownership | release/rollback/incident owner `363206207x-cmd`; current decision NO_GO | RECORDED |
+
+The complete non-CoinGlass lineage remains blocked by Gemini and remote P3H
+evidence. CoinGlass is an additional deferred missing-key gap and was not
+called. Therefore `NON_COINGLASS_READINESS=BLOCKED` and
+`PRODUCTION_READINESS=BLOCKED_MULTIPLE`. `CURRENT_PHASE_DONE=NO`, `MERGE=NO`,
+and `DEPLOYMENT_ALLOWED=NO`.
+
+Canonical current report:
+`docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`.
