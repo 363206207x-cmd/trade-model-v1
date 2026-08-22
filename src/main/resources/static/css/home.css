@@ -73,7 +73,6 @@ a { color: inherit; text-decoration: none; }
 .home-title-block h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 720; }
 .selected-context { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .header-context { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 11px; }
-.header-context span { padding-right: 14px; border-right: 1px solid var(--line); }
 
 .home-main { container-type: inline-size; display: grid; gap: 16px; width: 100%; padding: 16px 24px 28px; }
 .system-status-strip {

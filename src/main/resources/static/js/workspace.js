@@ -198,6 +198,15 @@
         }).join("") + "</dl>";
     }
 
+    function lifecycleActionText(value, opportunityState) {
+        const raw = text(value, "");
+        if ((String(opportunityState || "").toUpperCase() === "WAITING_TRIGGER"
+                || /等待触发/.test(raw)) && /人工确认/.test(raw)) {
+            return "等待触发；触发后重新校验，通过后再进入人工确认";
+        }
+        return raw || "当前不可查看";
+    }
+
     function stateBadge(value) {
         const raw = text(value, "UNKNOWN").toUpperCase();
         return '<span class="state-badge" data-state="' + escapeHtml(raw.toLowerCase()) + '">' + escapeHtml(label(raw)) + "</span>";
@@ -211,9 +220,7 @@
             ["数据库", label(provider?.databaseStatus, "当前不可查看")]
         ]);
         const explanation = '<p class="provider-status-message">' + escapeHtml(
-            provider?.failClosed === true
-                ? "当前状态仅供人工复核；所有下游动作保持关闭。"
-                : "当前运行状态可读；这不是交易授权。"
+            provider?.failClosed === true ? "运行条件未通过" : "运行状态可读"
         ) + "</p>";
         const audit = '<details class="audit-disclosure provider-audit"><summary>查看审计元数据</summary>' + factGrid([
             ["调度观察", label(provider?.schedulerObservationStatus, "当前不可查看")],
@@ -339,7 +346,7 @@
                 ["检查时间", formatTime(readiness?.checkedAt || readiness?.updatedAt)]
             ]);
         } catch (_) {
-            empty(target, "系统状态当前不可查看", "请稍后重试；当前不会显示推测状态。");
+            empty(target, "系统状态当前不可查看", "请稍后重试。");
         }
     }
 
@@ -589,7 +596,8 @@
         return "/positions?" + query.toString();
     }
 
-    function renderPosition(userPosition, monitor) {
+    function renderPosition(userPosition, monitor, options) {
+        const showDetailLink = options?.showDetailLink !== false;
         const trusted = trustedMonitor(monitor);
         const positionId = userPosition.id || monitor?.positionId;
         const symbol = userPosition.assetSymbol || monitor?.symbol;
@@ -607,9 +615,10 @@
             ["建议动作", text(monitor.suggestedManualActionText, label(monitor.suggestedAction))]
         ] : [];
         const detailHref = "/positions/" + encodeURIComponent(positionId) + "?returnTo=" + encodeURIComponent(positionListReturnTo("active"));
+        const detailLink = showDetailLink ? '<a class="text-action" href="' + detailHref + '">查看详情</a>' : "";
         const monitoring = trusted
-            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + '<a class="text-action" href="' + detailHref + '">查看详情</a></section>'
-            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong><a class="text-action" href="' + detailHref + '">查看详情</a></section>';
+            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + detailLink + '</section>'
+            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong>' + detailLink + '</section>';
         return '<article class="position-card position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" data-position-id="' + escapeHtml(positionId) + '">'
             + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(userPosition.sourceType) : label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
             + '<section class="position-facts">' + factGrid(facts) + '</section>'
@@ -725,7 +734,11 @@
     }
 
     function positionCloseActionVisible(status) {
-        return String(status || "").toUpperCase() !== "CLOSED";
+        return ["OPEN", "PARTIALLY_CLOSED"].includes(String(status || "").trim().toUpperCase());
+    }
+
+    function syncPositionCloseAction(action, status) {
+        if (action) action.hidden = !positionCloseActionVisible(status);
     }
 
     function prepareManualPositionForm() {
@@ -798,18 +811,20 @@
     async function loadPositionDetail() {
         const card = document.getElementById("positionDetailCard");
         if (!card || !resourceId) return;
+        const closeAction = document.getElementById("closePositionAction");
+        syncPositionCloseAction(closeAction, null);
         try {
             const projection = await api("/api/workspace/positions/" + encodeURIComponent(resourceId) + "/monitoring");
             const position = projection.position;
+            if (!position) throw new Error("POSITION_MISSING");
             const monitor = projection.monitor;
             const closed = String(position.status || "").toUpperCase() === "CLOSED";
-            card.innerHTML = closed ? renderHistoricalPositionDetail(position) : renderPosition(position, monitor);
+            card.innerHTML = closed ? renderHistoricalPositionDetail(position) : renderPosition(position, monitor, { showDetailLink: false });
             const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"),
                 closed ? "/positions?tab=history" : "/positions?tab=active");
             const returnLink = document.getElementById("positionDetailReturn");
             if (returnLink) returnLink.href = returnTo;
-            const closeAction = document.getElementById("closePositionAction");
-            if (closeAction) closeAction.hidden = !positionCloseActionVisible(position.status);
+            syncPositionCloseAction(closeAction, position.status);
             const closeForm = document.getElementById("closePositionForm");
             if (closeForm) closeForm.dataset.positionId = String(position.id || resourceId);
             const closeHeading = document.getElementById("closePositionHeading");
@@ -823,7 +838,7 @@
             else empty(document.getElementById("openingPlanBaseline"), "独立手动持仓", "该持仓没有系统最终计划来源。仍可持续监控。 ");
             const timeline = document.getElementById("monitorTimeline");
             if (closed) {
-                empty(timeline, "持仓已关闭", "活动监控已结束；历史监控不会冒充当前判断。");
+                empty(timeline, "持仓已关闭", "活动监控已结束。");
                 return;
             }
             try {
@@ -1146,8 +1161,8 @@
                 ["候选参与方式", label(candidate.planMode)],
                 ["候选置信度", text(candidate.confidence)],
                 ["候选风险", label(candidate.riskLevel)],
-                ["建议动作", text(candidate.recommendedAction)],
-                ["摘要", text(candidate.summary)]
+                ["建议动作", lifecycleActionText(candidate.recommendedAction, payload.coreJudgment?.opportunityState)],
+                ["摘要", lifecycleActionText(candidate.summary, payload.coreJudgment?.opportunityState)]
             ]) : '<p class="muted">Candidate 当前不可查看</p>';
             return head + renderRolePrimary("GPT Candidate · 非 Final",
                 candidate ? label(candidate.planMode) : "当前不可查看", "候选参与方式") + factGrid([
@@ -1191,7 +1206,7 @@
     }
 
     function renderFormalRole(role, payload) {
-        if (!payload) return '<div class="empty-state"><strong>该角色暂无结构化输出</strong><span>不会使用原始 JSON 推断结论。</span></div>';
+        if (!payload) return '<div class="empty-state"><strong>该角色暂无结构化输出</strong></div>';
         const gate = roleGate(payload.roleState, roleResultAvailable(role, payload, analysisMode),
             roleCollections(role, payload, analysisMode));
         if (!gate.allowed) return renderRoleFailClosed(gate.message);
@@ -1586,7 +1601,7 @@
             const lifecycle = String(plan.planLifecycleState || "").toUpperCase();
             document.getElementById("planMode").textContent = label(plan.finalPlanMode || plan.planMode);
             document.getElementById("planLifecycle").textContent = label(lifecycle);
-            document.getElementById("planSummary").innerHTML = factGrid([["推荐动作", text(plan.recommendedAction)], ["最终方向", label(plan.finalMarketBias)], ["计划版本", text(plan.planVersion)], ["有效期", formatTime(plan.validUntil)]]);
+            document.getElementById("planSummary").innerHTML = factGrid([["推荐动作", lifecycleActionText(plan.recommendedAction, plan.opportunityState)], ["最终方向", label(plan.finalMarketBias)], ["计划版本", text(plan.planVersion)], ["有效期", formatTime(plan.validUntil)]]);
             document.getElementById("planEntry").innerHTML = factGrid([["入场区", text(plan.entryZone)], ["触发条件", text(plan.triggerCondition)], ["触发周期", text(plan.triggerTimeframe)]]);
             document.getElementById("planInvalidation").innerHTML = factGrid([["失效条件", text(plan.invalidCondition)], ["止损逻辑", text(plan.stopLogic)], ["止损", text(plan.stopLoss)]]);
             document.getElementById("planTargets").innerHTML = factGrid([["止盈规则", text(plan.takeProfitRules)], ["目标逻辑", text(plan.targetLogic)], ["持有周期", text(plan.holdingHorizon)]]);
@@ -1708,7 +1723,7 @@
         try {
             const provider = await api("/api/system/runtime-readiness-guardrail-status");
             document.getElementById("providerStatus").innerHTML = renderProviderStatus(provider);
-        } catch (_) { empty(document.getElementById("providerStatus"), "数据源状态当前不可查看", "不会强制显示就绪。"); }
+        } catch (_) { empty(document.getElementById("providerStatus"), "数据源状态当前不可查看", "请稍后重试。"); }
     }
 
     function syncSettingsSaveState(form, save) {

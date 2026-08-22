@@ -1,0 +1,31 @@
+{
+  "fixture": "UI_REVIEW",
+  "externalCallCount": 0,
+  "home": {
+    "viewport1440Overflow": 0,
+    "viewport1080Overflow": 0,
+    "viewport1080VisibleTextClipping": 0,
+    "consoleErrorCount": 0,
+    "visibleRoleTabs": ["GPT", "Gemini", "Grok"],
+    "closeActionCount": 0
+  },
+  "positions": {
+    "listDetailLinks": [7103, 7102, 7101],
+    "listCloseActionCount": 0,
+    "detailSelfLinkCount": {"7101": 0, "7102": 0, "7103": 0},
+    "identity": {"7101": "BTCUSDT", "7102": "ETHUSDT", "7103": "SOLUSDT"},
+    "o07": {"positionId": 7101, "symbol": "BTCUSDT", "cancelPostCount": 0},
+    "missing7999": {"apiStatus": 404, "closeActionVisible": false}
+  },
+  "closeActionAllowlist": {
+    "OPEN": true,
+    "open": true,
+    "PARTIALLY_CLOSED": true,
+    "CLOSED": false,
+    "null": false,
+    "undefined": false,
+    "empty": false,
+    "UNKNOWN": false,
+    "UNRECOGNIZED_VALUE": false
+  }
+}

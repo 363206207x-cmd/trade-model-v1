@@ -196,3 +196,26 @@ PageHeader `当前资产 · SYMBOL` remains required and is not a prohibited car
 badge. Opportunity State and risk remain independent formal fields. This
 exception does not authorize UI redesign, Recheck work, fixture expansion,
 schema changes, or Knife C.
+
+## 2026-08-22 B.1.2.3 owner copy and Position detail micro-closure
+
+Implementation base: `1fa13891ba2aa897ef89c73a6f41731ba709aa0f`.
+PR #1195 remains Draft and unmerged.
+
+| Contract item | Owner/binding | Verification | Status |
+|---|---|---|---|
+| A1 detail self-link | shared Position renderer uses `showDetailLink=false` in detail mode | 7101/7102/7103 browser DOM + contract test | PASS |
+| A2 close allowlist | explicit `OPEN` / `PARTIALLY_CLOSED` allowlist, hidden by default | pure function + DOM matrix + 7999 Fail Closed | PASS |
+| Formal Web brand | login/Home/workspace production surfaces use `RINE LOGIC` | copy contract + browser evidence | PASS |
+| Short titles and tabs | Home short module names, Analysis PageHeader `分析`, visible tabs GPT/Gemini/Grok | DOM contract + browser evidence | PASS |
+| PageHeader cleanup | Controller no longer projects `pageSubtitle`; subtitle DOM removed | controller/template contract | PASS |
+| Status ownership | formal producer values or fail-closed dash; account uses all active positions | service unit tests + browser visual fixture | PASS |
+| B.1.2.2 read chain | existing owner-scoped read service unchanged | 7101/7102/7103 identity + 7999 404 regression | PASS |
+
+Evidence: `docs/evidence/b1_2_3/`.
+
+`B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to this package.
+`B1_2_INTERACTION_ACCEPTANCE_DONE=NO`, `CURRENT_PHASE_DONE=NO`, and
+`READY_FOR_MERGE=NO` remain unchanged. Recheck's real message path and normal
+real-position close E2E remain not verified; KB-06 remains blocked by its
+missing persistence source. Telegram brand copy is out of scope.

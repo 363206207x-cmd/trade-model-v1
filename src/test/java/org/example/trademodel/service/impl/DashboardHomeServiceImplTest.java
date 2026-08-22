@@ -283,12 +283,12 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getPendingReview().getStatus())
                 .isEqualTo("PRIVATE_SOURCE_UNAVAILABLE");
         assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
-        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("全局行情 Provider 尚未就绪");
+        assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("未取得正式全局更新时间");
         assertThat(home.getSystemState().getRiskLevel().getValue()).isNull();
-        assertThat(home.getSystemState().getRiskLevel().getValueLabel()).isEqualTo("— / 尚未形成系统级评估");
+        assertThat(home.getSystemState().getRiskLevel().getValueLabel()).isEqualTo("—");
         assertThat(home.getSystemState().getMarketTrend().getValue()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("暂无评估·1笔·覆盖未知");
+                .isEqualTo("1 笔");
         assertThat(home.getSystemState().getAiConflict().getValue())
                 .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
@@ -471,6 +471,10 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getHeader().getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
         assertThat(home.getHeader().getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 8, 20, 9, 56));
+        assertThat(home.getSystemState().getDataQuality().getValue())
+                .isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
+        assertThat(home.getSystemState().getDataQuality().getValueLabel()).isNull();
+        assertThat(home.getSystemState().getServiceAvailability().getValueLabel()).isEqualTo("1/3 可用");
         assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONNECTED");
         assertThat(home.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
     }
@@ -590,7 +594,7 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("2.41935500");
         assertThat(homePosition.getAccountImpactPct()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("低·1笔·覆盖完整");
+                .isEqualTo("1 笔");
         assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("COMPLETE");
     }
 
@@ -613,7 +617,7 @@ class DashboardHomeServiceImplTest {
 
         assertWaitingMonitorData(row);
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("暂无评估·1笔·覆盖未知");
+                .isEqualTo("1 笔");
         assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("UNKNOWN");
     }
 
@@ -1359,7 +1363,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("EXTREME");
         assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("COMPLETE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("极高·4笔·覆盖完整");
+                .isEqualTo("4 笔");
     }
 
     @Test
@@ -1385,7 +1389,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("HIGH");
         assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("高·4笔·覆盖部分");
+                .isEqualTo("4 笔");
     }
 
     @Test
@@ -1691,7 +1695,7 @@ class DashboardHomeServiceImplTest {
         assertThat(asset.getMultiTimeframeState()).isEqualTo("ALIGNED");
         assertThat(asset.getConfused()).isFalse();
         assertThat(asset.getUpdatedAt()).isEqualTo(decisionUpdatedAt);
-        assertThat(home.getHeader().getUpdatedAt()).isEqualTo(decisionUpdatedAt);
+        assertThat(home.getHeader().getUpdatedAt()).isNull();
         assertThat(asset.getModuleState()).isEqualTo("READY");
         assertThat(home.getStates().getAssets()).isEqualTo("READY");
         assertThat(asset.getFieldSourceStatus()).containsEntry("symbol", "REAL")
@@ -2203,10 +2207,10 @@ class DashboardHomeServiceImplTest {
         assertThat(ethState.getMarketTrend().getValue()).isNull();
         assertThat(ethState.getMarketTrend().getValueLabel()).isEqualTo("— / 当前不可查看");
         assertThat(ethState.getRiskLevel().getValue()).isNull();
-        assertThat(ethState.getRiskLevel().getValueLabel()).isEqualTo("— / 尚未形成系统级评估");
-        assertThat(ethState.getDataQuality().getValue()).isEqualTo("FRESH");
-        assertThat(ethState.getDataQuality().getValueLabel()).isEqualTo("新鲜");
-        assertThat(ethState.getServiceAvailability().getValueLabel()).isEqualTo("正常");
+        assertThat(ethState.getRiskLevel().getValueLabel()).isEqualTo("—");
+        assertThat(ethState.getDataQuality().getValue()).isNull();
+        assertThat(ethState.getDataQuality().getValueLabel()).isEqualTo("—");
+        assertThat(ethState.getServiceAvailability().getValueLabel()).isEqualTo("0/3 可用");
         assertThat(btcState.getMarketTrend().getValueLabel()).isEqualTo(ethState.getMarketTrend().getValueLabel());
         assertThat(btcState.getRiskLevel().getValueLabel()).isEqualTo(ethState.getRiskLevel().getValueLabel());
         assertThat(btcState.getDataQuality().getValueLabel()).isEqualTo(ethState.getDataQuality().getValueLabel());

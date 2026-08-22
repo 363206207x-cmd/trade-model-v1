@@ -45,7 +45,7 @@ class GlobalFrozenUiAlignmentContractTest {
         String workspace = Files.readString(WORKSPACE);
         assertOrdered(home, "<small>环境</small>", "<small>系统</small>", "<small>数据</small>",
                 "<small>服务</small>", "<small>账户·已录入</small>", "<small>Hot Reset</small>");
-        assertThat(home).contains("持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区")
+        assertThat(home).contains(">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>")
                 .doesNotContain("60:40", "机会数量");
         assertThat(workspace).doesNotContain("pageKey == 'home'", "60:40");
     }
@@ -116,13 +116,13 @@ class GlobalFrozenUiAlignmentContractTest {
         assertThat(script)
                 .contains(
                         "statusValue(state.marketTrend)", "statusValue(state.riskLevel)",
-                        "statusValue(state.dataQuality)", "statusValue(state.serviceAvailability",
+                        "has(state.dataQuality?.value)", "statusValue(state.serviceAvailability",
                         "statusValue(state.accountStatus", "statusValue(state.hotReset",
                         "GPT 综合判断 · 非最终计划", "方向判断", "机会进度", "候选参与方式",
                         "复核结果：", "completeFailurePath", "已发现可验证失败路径",
                         "未发现可验证失败路径", "机会状态与候选参与方式不一致",
                         "复核前后状态与等待触发生命周期不一致",
-                        "function candidateConclusion(summary)", "当前一句话结论不可查看")
+                        "function candidateConclusion(summary, opportunityState)", "当前一句话结论不可查看")
                 .doesNotContain("renderDerivatives", "ai-derivatives-strip", "维持 Candidate",
                         "GPT Candidate · 非 Final", "Market Bias：", "Candidate Mode");
         assertThat(contract).contains(
@@ -137,7 +137,7 @@ class GlobalFrozenUiAlignmentContractTest {
     void primaryPagesFollowFrozenIaAndExposeNoTelegramUi() throws Exception {
         String html = Files.readString(WORKSPACE);
         String script = Files.readString(WORKSPACE_JS);
-        assertOrdered(html, "持仓监控 · 基于已录入", "账户风险覆盖 · 基于已录入", "活动持仓",
+        assertOrdered(html, "<h2 id=\"positionsHeading\">持仓监控</h2>", "账户风险覆盖 · 基于已录入", "活动持仓",
                 "positionStateFilter", "positionSort", "positionGrid");
         assertOrdered(html, "analysisAssetSearch", "analysisMode", "analysisDataQuality", "analysisTimeframes",
                 "analysisEvidence", "analysisScores", "AIRoleTabs");

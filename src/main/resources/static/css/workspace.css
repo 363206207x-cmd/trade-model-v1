@@ -133,7 +133,6 @@ a { color: inherit; }
     backdrop-filter: blur(14px);
 }
 .workspace-page-header h1 { margin: 0; font-size: 20px; font-weight: 650; line-height: 26px; }
-.workspace-page-header p { margin: 2px 0 0; color: var(--text-tertiary); font-size: 11px; }
 .workspace-header-actions { display: flex; align-items: center; gap: 12px; }
 .workspace-header-actions form { margin: 0; }
 .task-indicator {

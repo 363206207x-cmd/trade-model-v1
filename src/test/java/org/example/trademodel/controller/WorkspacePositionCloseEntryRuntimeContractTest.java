@@ -24,8 +24,25 @@ class WorkspacePositionCloseEntryRuntimeContractTest {
                 assert.equal(manualCloseSubmitGate('7101', '', false), 'MISSING_POSITION_ID');
                 assert.equal(manualCloseSubmitGate('7101', '7101', false), 'ALLOW');
                 assert.equal(positionCloseActionVisible('OPEN'), true);
+                assert.equal(positionCloseActionVisible('open'), true);
                 assert.equal(positionCloseActionVisible('PARTIALLY_CLOSED'), true);
                 assert.equal(positionCloseActionVisible('CLOSED'), false);
+                assert.equal(positionCloseActionVisible(null), false);
+                assert.equal(positionCloseActionVisible(undefined), false);
+                assert.equal(positionCloseActionVisible(''), false);
+                assert.equal(positionCloseActionVisible('UNKNOWN'), false);
+                assert.equal(positionCloseActionVisible('UNRECOGNIZED_VALUE'), false);
+                const action = { hidden: false };
+                syncPositionCloseAction(action, 'OPEN');
+                assert.equal(action.hidden, false);
+                syncPositionCloseAction(action, 'PARTIALLY_CLOSED');
+                assert.equal(action.hidden, false);
+                syncPositionCloseAction(action, 'CLOSED');
+                assert.equal(action.hidden, true);
+                syncPositionCloseAction(action, 'UNKNOWN');
+                assert.equal(action.hidden, true);
+                syncPositionCloseAction(action, null);
+                assert.equal(action.hidden, true);
                 console.log('POSITION_CLOSE_ENTRY_RUNTIME=PASS');
                 """.formatted(gate, visibility);
 
@@ -44,7 +61,11 @@ class WorkspacePositionCloseEntryRuntimeContractTest {
                 .contains("if (gate === \"UI_REVIEW_READ_ONLY\") return announce")
                 .contains("closeForm.dataset.positionId = String(position.id || resourceId)")
                 .contains("closeHeading.textContent = \"记录平仓 · \" + position.assetSymbol")
-                .contains("/api/user-positions/\" + encodeURIComponent(resourceId) + \"/manual-close");
+                .contains("/api/user-positions/\" + encodeURIComponent(resourceId) + \"/manual-close")
+                .contains("renderPosition(position, monitor, { showDetailLink: false })")
+                .contains("syncPositionCloseAction(closeAction, null)")
+                .contains("syncPositionCloseAction(closeAction, position.status)")
+                .doesNotContain("String(status || \"\").toUpperCase() !== \"CLOSED\"");
     }
 
     private static String slice(String value, String start, String end) {

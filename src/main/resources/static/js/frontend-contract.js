@@ -811,7 +811,7 @@
           plan.originalPlanLabel,
           "原执行计划，仅用于持仓复核和复盘对照"
         ),
-        reason: "系统建议，仅供人工复核"
+        reason: "系统建议"
       };
     }
 
@@ -838,8 +838,8 @@
 
     return {
       visible: true,
-      statusLabel: displayText(plan.statusLabel, "执行建议，仅供人工复核"),
-      reason: "系统建议，仅供人工复核"
+      statusLabel: displayText(plan.statusLabel, "执行建议"),
+      reason: "系统建议"
     };
   }
 

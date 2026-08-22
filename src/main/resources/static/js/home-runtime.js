@@ -129,6 +129,12 @@
         if (Number.isNaN(date.getTime())) return text(value);
         return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
     }
+    function clockTime(value) {
+        if (!has(value)) return "—";
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "—";
+        return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(date);
+    }
     function symbolOf(asset) {
         var raw = text(asset && (asset.rawSymbol || asset.symbol), "").trim().toUpperCase();
         return /^[A-Z0-9][A-Z0-9._:/-]{1,31}$/.test(raw) ? raw : "";
@@ -194,19 +200,17 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerDataSource", "数据 · " + label(header.dataSourceText, label(header.dataStatus, "状态待同步"))
-            + " · AI · " + label(header.aiStatusLabel, label(header.aiStatus, "状态待同步")));
-        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + time(header.updatedAt) : "更新时间待同步");
+        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "—");
     }
 
     function renderStatus(home) {
         var state = home.systemState || {};
         setText("statusEnvironment", statusValue(state.marketTrend));
         setText("statusSystem", statusValue(state.riskLevel));
-        setText("statusData", statusValue(state.dataQuality));
-        setText("statusService", statusValue(state.serviceAvailability, "等待同步"));
-        setText("statusAccount", statusValue(state.accountStatus, "— / 无已录入持仓"));
-        setText("statusReset", statusValue(state.hotReset, "等待同步"));
+        setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "—");
+        setText("statusService", statusValue(state.serviceAvailability, "—"));
+        setText("statusAccount", statusValue(state.accountStatus, "—"));
+        setText("statusReset", statusValue(state.hotReset, "—"));
     }
 
     function eventTime(value) {
@@ -278,7 +282,7 @@
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
-        setText("opportunityHeading", "机会资产 · " + assets.length);
+        setText("opportunityHeading", "资产");
         grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
@@ -451,9 +455,13 @@
         var mode = String(planMode || "").toUpperCase();
         return state !== "WAITING_TRIGGER" || mode === "PREPARATION";
     }
-    function candidateConclusion(summary) {
+    function candidateConclusion(summary, opportunityState) {
         var value = text(summary, "");
-        return value && value.indexOf("人工确认") < 0 ? value : "当前一句话结论不可查看";
+        if (String(opportunityState || "").toUpperCase() === "WAITING_TRIGGER"
+                && value.indexOf("人工确认") >= 0) {
+            return "等待触发；触发后重新校验，通过后再进入人工确认";
+        }
+        return value || "当前一句话结论不可查看";
     }
     function renderGpt(role) {
         var core = role.coreJudgment || {};
@@ -474,7 +482,7 @@
             + '</section><section class="ai-section"><h3>支持证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
             + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>反对证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
             + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>一句话结论</strong><span>'
-            + escapeHtml(candidateConclusion(candidate.summary)) + "</span></div>";
+            + escapeHtml(candidateConclusion(candidate.summary, core.opportunityState)) + "</span></div>";
     }
     function renderGemini(role) {
         var reviewResult = String(role.reviewResult || "").toUpperCase();
@@ -614,7 +622,6 @@
         } catch (error) {
             announce(error.message);
             render({ states: { overall: "ERROR" }, diagnostics: {}, assets: [], positions: [], aiDecision: { tabs: [] } });
-            setText("headerDataSource", "当前不可查看");
         }
     }
 

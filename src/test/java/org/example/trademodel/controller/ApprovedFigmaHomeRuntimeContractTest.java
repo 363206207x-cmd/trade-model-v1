@@ -32,10 +32,13 @@ class ApprovedFigmaHomeRuntimeContractTest {
         String css = Files.readString(STYLE);
 
         assertThat(html).contains(
-                "class=\"home-rail\"", "机会资产 · 0", "id=\"homeAssetSearch\"",
-                "data-position-plan-ratio=\"70:30\"", "持仓监控 · 基于已录入", "最终执行计划", "AI 分析工作区",
+                "class=\"home-rail\"", "<h2 id=\"opportunityHeading\">资产</h2>", "id=\"homeAssetSearch\"",
+                "data-position-plan-ratio=\"70:30\"", "<h2 id=\"positionHeading\">持仓监控</h2>",
+                "<h2 id=\"planHeading\">执行计划</h2>", "<h2 id=\"aiWorkspaceHeading\">AI 分析</h2>",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
-                "GPT 综合判断", "Gemini 冲突复核", "Grok 反方挑战",
+                "data-ai-role=\"GPT_FINAL\" aria-label=\"GPT 综合判断\">GPT</button>",
+                "data-ai-role=\"GEMINI_REVIEW\" aria-label=\"Gemini 冲突复核\">Gemini</button>",
+                "data-ai-role=\"GROK_CHALLENGE\" aria-label=\"Grok 反方挑战\">Grok</button>",
                 "id=\"aiRolePanel\"", "id=\"conflictSummary\"", "id=\"auditChainLink\"");
         assertThat(Files.readString(SCRIPT)).contains(
                         "查看完整审计链", "查看分析详情", "审计链尚未形成")
@@ -85,7 +88,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "completeFailurePath", "failurePathStateView", "来源不可用",
                 "plan.stopZone || plan.stopLoss", "止损", "失效条件",
                 "collectionStateLabel", "形成原因", "支持证据", "反对证据",
-                "label(header.dataSourceText", "label(header.aiStatusLabel")
+                "has(header.updatedAt)", "clockTime(header.updatedAt)")
                 .doesNotContain(
                         "candidate.summary, why", "[].concat(role.evidenceGaps",
                         "role.evidenceGapsState || role.logicConflictsState", "label(role.planModeImpact",
@@ -107,7 +110,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "COLLECTION_STATE_VIEWS.SOURCE_UNAVAILABLE");
         assertThat(script).contains(
                 "return /^[A-Z][A-Z0-9_]*$/.test(raw) ? \"—\" : raw;",
-                "statusValue(state.serviceAvailability, \"等待同步\")");
+                "statusValue(state.serviceAvailability, \"—\")");
     }
 
     @Test
@@ -143,7 +146,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(script).contains(
                 "var assets = all.filter(validOpportunity)", ".slice(0, 6)",
-                "setText(\"opportunityHeading\", \"机会资产 · \" + assets.length)",
+                "setText(\"opportunityHeading\", \"资产\")",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",
                 "has(asset && asset.opportunityScore)",

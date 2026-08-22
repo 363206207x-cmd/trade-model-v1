@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
     <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
-    <meta name="description" content="Fundamental AI 专业金融决策工作区">
-    <title th:text="${pageTitle + ' · Fundamental AI'}">Fundamental AI</title>
+    <meta name="description" content="RINE LOGIC 专业金融决策工作区">
+    <title th:text="${pageTitle + ' · RINE LOGIC'}">RINE LOGIC</title>
     <link rel="stylesheet" th:href="@{/css/workspace.css}" href="/css/workspace.css">
 </head>
 <body data-component-family="AppShell"
       th:attr="data-page-key=${pageKey},data-resource-id=${resourceId == null ? '' : resourceId},data-ui-review-mode=${uiReviewMode}">
 <aside class="workspace-sidebar" data-component-family="SideNav" aria-label="主要导航">
-    <a class="workspace-brand" href="/dashboard" aria-label="Fundamental AI 首页">
-        <span class="workspace-brand-mark" aria-hidden="true">F</span>
-        <span class="workspace-rail-label"><strong>Fundamental AI</strong></span>
+    <a class="workspace-brand" href="/dashboard" aria-label="RINE LOGIC 首页">
+        <span class="workspace-brand-mark" aria-hidden="true">R</span>
+        <span class="workspace-rail-label"><strong>RINE LOGIC</strong></span>
     </a>
     <nav class="workspace-navigation" aria-label="产品页面">
         <a href="/dashboard" th:classappend="${activeNavigation == 'home'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="workspace-rail-label">首页</span></a>
@@ -33,10 +33,7 @@
 
 <div class="workspace-stage">
     <header class="workspace-page-header" data-component-family="PageHeader">
-        <div>
-            <h1 th:text="${pageTitle}">页面</h1>
-            <p th:text="${pageSubtitle}">页面说明</p>
-        </div>
+        <div><h1 th:text="${pageTitle}">页面</h1></div>
         <div class="workspace-header-actions">
             <button type="button" class="task-indicator" data-component-family="AsyncTaskIndicator"
                     data-open-overlay="async-task-center" hidden>进行中的任务 <b id="workspaceTaskCount">0</b></button>
@@ -69,7 +66,7 @@
         </section>
 
         <section class="workspace-page" th:if="${pageKey == 'positions'}" aria-labelledby="positionsHeading">
-            <header class="section-header"><div><h2 id="positionsHeading">持仓监控 · 基于已录入</h2></div><button class="button button-secondary populated-position-action" type="button" data-open-overlay="actual-position">录入持仓</button></header>
+            <header class="section-header"><div><h2 id="positionsHeading">持仓监控</h2></div><button class="button button-secondary populated-position-action" type="button" data-open-overlay="actual-position">录入持仓</button></header>
             <div class="risk-aggregate" data-component-family="PositionRiskAggregate"><span>账户风险覆盖 · 基于已录入</span><strong id="accountRiskCoverage">等待评估</strong><small>仅在已录入持仓数据完整时显示完整覆盖。</small></div>
             <nav class="filter-tabs" aria-label="持仓视图"><button class="is-active" type="button" aria-current="page" data-position-tab="active">活动持仓</button><button type="button" data-position-tab="history">历史持仓</button></nav>
             <section id="activePositionsPanel" data-position-panel="active">
@@ -123,9 +120,9 @@
             <div class="analysis-ai-layout" id="analysisAiLayout">
             <section class="surface ai-workspace" data-component-family="AIWorkspace">
                 <div class="role-tabs" data-component-family="AIRoleTabs" role="tablist">
-                    <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL">GPT 综合判断</button>
-                    <button type="button" role="tab" aria-selected="false" data-ai-role="GEMINI_REVIEW">Gemini 冲突复核</button>
-                    <button type="button" role="tab" aria-selected="false" data-ai-role="GROK_CHALLENGE">Grok 反方挑战</button>
+                    <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL" aria-label="GPT 综合判断">GPT</button>
+                    <button type="button" role="tab" aria-selected="false" data-ai-role="GEMINI_REVIEW" aria-label="Gemini 冲突复核">Gemini</button>
+                    <button type="button" role="tab" aria-selected="false" data-ai-role="GROK_CHALLENGE" aria-label="Grok 反方挑战">Grok</button>
                 </div>
                 <article class="ai-role-content" id="analysisRoleContent"><div class="empty-state" data-component-family="EmptyState"><strong>暂无分析数据</strong><span>输入真实资产或打开已有分析记录。</span></div></article>
             </section>

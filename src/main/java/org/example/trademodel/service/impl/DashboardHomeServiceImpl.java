@@ -300,9 +300,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
+        Instant globalDataUpdatedAt = localRealReadinessService == null
+                ? null : localRealReadinessService.updatedAt();
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
-        home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness, positionRowsResult));
+        home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness,
+                positionRowsResult, globalDataUpdatedAt));
         home.setAlerts(buildAlerts(alerts));
         home.setEvents(buildEvents(externalContext));
         home.setAssets(assets);
@@ -337,11 +340,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 decisionRead.failed() || selectedDecisionReadFailed || rankingRead.failed(), positionRead.failed());
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
-        LocalDateTime headerUpdatedAt = selectedContext != null ? selectedContext.getUpdatedAt() : null;
-        if (headerUpdatedAt == null && localRealReadinessService != null
-                && localRealReadinessService.updatedAt() != null) {
-            headerUpdatedAt = LocalDateTime.ofInstant(localRealReadinessService.updatedAt(), ZoneOffset.UTC);
-        }
+        LocalDateTime headerUpdatedAt = globalDataUpdatedAt == null
+                ? null : LocalDateTime.ofInstant(globalDataUpdatedAt, ZoneOffset.UTC);
         home.getHeader().setUpdatedAt(headerUpdatedAt);
         return home;
     }
@@ -580,20 +580,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                            List<DecisionResultVO> decisions,
                                                            DashboardHomeVO.AiDecisionVO aiDecision,
                                                            ProviderReadinessVO providerReadiness,
-                                                           PositionRowsResult positionRows) {
+                                                           PositionRowsResult positionRows,
+                                                           Instant globalDataUpdatedAt) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
         state.setMarketTrend(macroEnvironmentCard());
         state.setRiskLevel(card(
                 "riskLevel",
                 "系统风险",
                 null,
-                "— / 尚未形成系统级评估",
+                "—",
                 "未取得系统级风险生产者",
                 "SOURCE_UNAVAILABLE",
                 null
         ));
-        state.setDataQuality(providerDataQualityCard(providerReadiness));
-        state.setServiceAvailability(serviceAvailabilityCard(providerReadiness, aiDecision));
+        state.setDataQuality(globalDataUpdateCard(globalDataUpdatedAt));
+        state.setServiceAvailability(serviceAvailabilityCard(providerReadiness));
         state.setAccountStatus(accountStatusCard(positionRows));
         DashboardHomeVO.ConsistencyVO consistency = aiDecision != null ? aiDecision.getConsistency() : null;
         boolean aiApplicable = consistency != null
@@ -640,11 +641,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.StatusCardVO hotReset = card(
                 "hotReset",
                 "热重置",
-                Boolean.TRUE.equals(hotResetFired),
-                Boolean.TRUE.equals(hotResetFired) ? "已触发 · 范围不可用" : "关闭",
-                Boolean.TRUE.equals(hotResetFired) ? "未取得正式 scope" : "当前无活动 Hot Reset",
-                Boolean.TRUE.equals(hotResetFired) ? "SOURCE_UNAVAILABLE"
-                        : hotResetFired != null ? "CONNECTED" : "WAITING_SYNC",
+                hotResetFired,
+                hotResetFired == null ? "—" : Boolean.TRUE.equals(hotResetFired) ? "已触发" : "关闭",
+                hotResetFired == null ? "未取得 Hot Reset 状态" : "正式系统状态",
+                hotResetFired == null ? "SOURCE_UNAVAILABLE"
+                        : Boolean.TRUE.equals(hotResetFired) ? "TRIGGERED" : "INACTIVE",
                 null
         );
         hotReset.setMeta(hotMeta);
@@ -685,41 +686,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private DashboardHomeVO.StatusCardVO providerDataQualityCard(ProviderReadinessVO providerReadiness) {
-        String marketStatus = upper(providerReadiness != null
-                ? providerReadiness.getMarketDataProviderStatus() : null);
-        return switch (marketStatus) {
-            case "CONNECTED" -> card("dataQuality", "全局数据质量", "FRESH", "新鲜",
-                    "全局行情 Provider", "CONNECTED", null);
-            case "FAIL_CLOSED", "ERROR", "INVALID", "STALE" ->
-                    card("dataQuality", "全局数据质量", null, "当前不可查看",
-                            "全局行情 Provider 未通过新鲜度门禁", "FAIL_CLOSED", null);
-            default -> card("dataQuality", "全局数据质量", null, "等待同步",
-                    "全局行情 Provider 尚未就绪", "WAITING_SYNC", null);
-        };
+    private DashboardHomeVO.StatusCardVO globalDataUpdateCard(Instant globalDataUpdatedAt) {
+        return card("dataQuality", "全局数据", globalDataUpdatedAt,
+                globalDataUpdatedAt == null ? "—" : null,
+                globalDataUpdatedAt == null ? "未取得正式全局更新时间" : "LocalRealReadinessService.updatedAt",
+                globalDataUpdatedAt == null ? "SOURCE_UNAVAILABLE" : "AVAILABLE", null);
     }
 
     private DashboardHomeVO.StatusCardVO accountStatusCard(PositionRowsResult positionRows) {
         List<DashboardHomeVO.PositionVO> positions = positionRows == null
                 ? List.of() : positionRows.allRows();
         if (positions.isEmpty()) {
-            return card("accountStatus", "账户·已录入", 0, "— / 无已录入持仓",
+            return card("accountStatus", "账户·已录入", 0, "—",
                     "活动持仓 0", "EMPTY", 0);
         }
-        List<DashboardHomeVO.PositionVO> trusted = positions.stream()
-                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
-                .toList();
-        String highestRisk = trusted.stream()
-                .map(DashboardHomeVO.PositionVO::getRiskLevel)
-                .filter(this::recognizedPositionRisk)
-                .max(Comparator.comparingInt(this::positionRiskRank))
-                .orElse(null);
-        String coverage = trusted.size() == positions.size() ? "覆盖完整"
-                : trusted.isEmpty() ? "覆盖未知" : "覆盖部分";
-        String risk = highestRisk == null ? "暂无评估" : positionRiskLevelLabel(highestRisk);
         return card("accountStatus", "账户·已录入", positions.size(),
-                risk + "·" + positions.size() + "笔·" + coverage,
-                "全部活动持仓", trusted.isEmpty() ? "WAITING_SYNC" : "CONNECTED", positions.size());
+                positions.size() + " 笔",
+                "全部活动持仓（OPEN + PARTIALLY_CLOSED）", "AVAILABLE", positions.size());
     }
 
     private int positionRiskRank(String riskLevel) {
@@ -732,33 +715,23 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         };
     }
 
-    private DashboardHomeVO.StatusCardVO serviceAvailabilityCard(
-            ProviderReadinessVO providerReadiness,
-            DashboardHomeVO.AiDecisionVO aiDecision) {
-        String market = upper(providerReadiness != null
-                ? providerReadiness.getMarketDataProviderStatus() : null);
-        String ai = upper(headerAiStatus(providerReadiness, aiDecision));
-        boolean marketReady = "CONNECTED".equals(market);
-        boolean aiReady = "SUCCESS".equals(ai) || "CONNECTED".equals(ai);
-        boolean failed = "FAIL_CLOSED".equals(market) || "ERROR".equals(market)
-                || "FAILED".equals(ai) || "INVALID_RESPONSE".equals(ai);
-        String valueLabel;
-        String status;
-        if (marketReady && aiReady) {
-            valueLabel = "正常";
-            status = "CONNECTED";
-        } else if (marketReady || aiReady || "CONFIGURED".equals(market) || "CONFIGURED".equals(ai)) {
-            valueLabel = "部分可用";
-            status = "PARTIAL";
-        } else if (failed) {
-            valueLabel = "不可用";
-            status = "FAIL_CLOSED";
-        } else {
-            valueLabel = "等待同步";
-            status = "WAITING_SYNC";
+    private DashboardHomeVO.StatusCardVO serviceAvailabilityCard(ProviderReadinessVO providerReadiness) {
+        List<ProviderReadinessVO.ProviderStatusVO> providers = providerReadiness == null
+                ? List.of() : providerReadiness.getProviders();
+        if (providers == null || providers.isEmpty()) {
+            return card("serviceAvailability", "服务可用性", null, "—",
+                    "未取得正式可用数与服务总数", "SOURCE_UNAVAILABLE", null);
         }
-        return card("serviceAvailability", "服务可用性", status, valueLabel,
-                "行情 Provider + AI", status, null);
+        long available = providers.stream()
+                .filter(provider -> Boolean.TRUE.equals(provider.getConnected()))
+                .filter(provider -> "CONNECTED".equalsIgnoreCase(trimToNull(provider.getStatus())))
+                .count();
+        int total = providers.size();
+        String status = available == total ? "AVAILABLE"
+                : available > 0 ? "PARTIAL" : "UNAVAILABLE";
+        return card("serviceAvailability", "服务可用性", available,
+                available + "/" + total + " 可用",
+                "ProviderReadiness.providers", status, total);
     }
 
     private List<DashboardHomeVO.AlertRowVO> buildAlerts(List<MonitorAlertDO> alerts) {
@@ -1741,7 +1714,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
 
         suggestion.setStatus("USABLE_REVIEW_PLAN");
-        suggestion.setStatusLabel("完整执行计划，仅供人工复核");
+        suggestion.setStatusLabel("完整执行计划");
         suggestion.setModuleState("READY");
         suggestion.setSourceAnalysisId(assetPlan.analysisId());
         suggestion.setSourceExecutionPlanId(assetPlan.executionPlanId());
@@ -2692,7 +2665,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return "数据质量不足，暂不交易 / 事件观望";
         }
         if ("CONFUSED".equals(assetState)) return "冲突状态，等待人工复核";
-        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) return "风险较高，仅供人工复核";
+        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) return "高风险观察";
         if (Boolean.TRUE.equals(decision.getIsWorthOpening())) return "条件满足，等待人工确认";
         return "当前条件不足，继续观察";
     }
@@ -3086,8 +3059,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         String value = trimToNull(leverageSuggestion);
         if (value == null) return null;
         return switch (value.toLowerCase(Locale.ROOT)) {
-            case "low_leverage" -> "低杠杆，仅供人工复核";
-            case "moderate_leverage" -> "适中杠杆，仅供人工复核";
+            case "low_leverage" -> "低杠杆";
+            case "moderate_leverage" -> "适中杠杆";
             default -> value.matches("[A-Za-z_ ]+") ? "未知状态" : value;
         };
     }

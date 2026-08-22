@@ -80,29 +80,27 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         DashboardHomeVO.HeaderVO header = new DashboardHomeVO.HeaderVO();
         header.setPageTitle("首页总览");
         header.setDataStatus("READY");
-        header.setDataSourceText("数据新鲜 · 服务正常");
+        header.setDataSourceText("UI_REVIEW_FIXTURE");
         header.setAiStatus("READY");
         header.setAiStatusLabel("三角色完成");
-        header.setUpdatedAt(NOW);
+        header.setUpdatedAt(null);
         return header;
     }
 
     private DashboardHomeVO.SystemStateVO systemState(DashboardHomeVO.PositionAggregateVO aggregate) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
         state.setMarketTrend(status("market", "BTC / 宏观环境", "趋势环境", "READY", null));
-        state.setRiskLevel(status("risk", "系统风险", "— / 尚未形成系统级评估", "SOURCE_UNAVAILABLE", null));
-        state.setDataQuality(status("quality", "全局数据质量", "新鲜", "CONNECTED", null));
-        state.setServiceAvailability(status("service", "服务可用性", "正常", "CONNECTED", null));
-        String risk = riskLabel(aggregate.getHighestTrustedRisk());
-        String coverage = "COMPLETE".equals(aggregate.getCoverageState()) ? "完整覆盖" : "覆盖部分";
+        state.setRiskLevel(status("risk", "系统风险", "—", "SOURCE_UNAVAILABLE", null));
+        state.setDataQuality(status("quality", "全局数据", "—", "SOURCE_UNAVAILABLE", null));
+        state.setServiceAvailability(status("service", "服务可用性", "—", "SOURCE_UNAVAILABLE", null));
         state.setAccountStatus(status("account", "账户·已录入",
-                risk + "·" + aggregate.getActiveCount() + "笔·" + coverage,
-                "CONNECTED", aggregate.getActiveCount()));
+                aggregate.getActiveCount() > 0 ? aggregate.getActiveCount() + " 笔" : "—",
+                "AVAILABLE", aggregate.getActiveCount()));
         state.setAiConflict(status("ai", "AI 系统", "三角色完成", "READY", 82));
         state.setPendingReview(status("positions", "已录入持仓",
                 "活动 " + aggregate.getActiveCount(), "READY", aggregate.getActiveCount()));
         state.setConfused(status("conflict", "冲突", "轻微分歧", "READY", 2));
-        state.setHotReset(status("reset", "Hot Reset", "关闭", "CONNECTED", 0));
+        state.setHotReset(status("reset", "Hot Reset", "—", "SOURCE_UNAVAILABLE", null));
         return state;
     }
 
