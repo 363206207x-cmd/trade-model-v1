@@ -9,7 +9,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UiReviewDashboardHomeServiceTest {
-    private final UiReviewDashboardHomeService service = new UiReviewDashboardHomeService();
+    private final UiReviewPositionMonitoringReadService positionReadService =
+            new UiReviewPositionMonitoringReadService();
+    private final UiReviewDashboardHomeService service =
+            new UiReviewDashboardHomeService(positionReadService);
 
     @Test
     void fullStateFixtureIsCompleteAndUsesLegalSelectedOpportunitySemantics() {
@@ -29,9 +32,9 @@ class UiReviewDashboardHomeServiceTest {
                     assertThat(position.getMonitorConclusion()).isNotBlank();
                     assertThat(position.getSuggestedAction()).isNotBlank();
                 });
-        assertThat(home.getPositionAggregate().getActiveCount()).isEqualTo(4);
+        assertThat(home.getPositionAggregate().getActiveCount()).isEqualTo(3);
         assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("EXTREME");
-        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
+        assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("COMPLETE");
         assertThat(home.getExecutionSuggestion().getFinalPlan()).isTrue();
         assertThat(home.getExecutionSuggestion().getValidationStatus()).isEqualTo("PASS");
         assertThat(home.getExecutionSuggestion().getFinalPlanMode()).isEqualTo("PREPARATION");
@@ -144,9 +147,10 @@ class UiReviewDashboardHomeServiceTest {
         }
         try (AnnotationConfigApplicationContext review = new AnnotationConfigApplicationContext()) {
             review.getEnvironment().setActiveProfiles("ui-review");
-            review.register(UiReviewDashboardHomeService.class);
+            review.register(UiReviewPositionMonitoringReadService.class, UiReviewDashboardHomeService.class);
             review.refresh();
             assertThat(review.getBeansOfType(UiReviewDashboardHomeService.class)).hasSize(1);
+            assertThat(review.getBeansOfType(UiReviewPositionMonitoringReadService.class)).hasSize(1);
         }
     }
 

@@ -4,6 +4,7 @@
     const root = document.body;
     const pageKey = root.dataset.pageKey || "";
     const resourceId = root.dataset.resourceId || "";
+    const uiReviewMode = root.dataset.uiReviewMode === "true";
     const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
     const liveRegion = document.getElementById("workspaceLiveRegion");
@@ -717,6 +718,16 @@
         return Object.fromEntries(new FormData(form).entries());
     }
 
+    function manualCloseSubmitGate(formPositionId, requestedPositionId, reviewMode) {
+        if (!requestedPositionId) return "MISSING_POSITION_ID";
+        if (String(formPositionId || "") !== String(requestedPositionId)) return "POSITION_ID_MISMATCH";
+        return reviewMode ? "UI_REVIEW_READ_ONLY" : "ALLOW";
+    }
+
+    function positionCloseActionVisible(status) {
+        return String(status || "").toUpperCase() !== "CLOSED";
+    }
+
     function prepareManualPositionForm() {
         const form = document.getElementById("actualPositionForm");
         if (!form) return;
@@ -770,7 +781,10 @@
         });
         document.getElementById("closePositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
-            if (!resourceId) return announce("缺少持仓标识");
+            const gate = manualCloseSubmitGate(event.currentTarget.dataset.positionId, resourceId, uiReviewMode);
+            if (gate === "MISSING_POSITION_ID") return announce("缺少持仓标识");
+            if (gate === "POSITION_ID_MISMATCH") return announce("持仓标识不一致，未提交");
+            if (gate === "UI_REVIEW_READ_ONLY") return announce("UI-review 只读验收不提交平仓");
             const values = formJson(event.currentTarget);
             if (values.closedAt) values.closedAt = new Date(values.closedAt).toISOString().slice(0, 19);
             try {
@@ -795,7 +809,11 @@
             const returnLink = document.getElementById("positionDetailReturn");
             if (returnLink) returnLink.href = returnTo;
             const closeAction = document.getElementById("closePositionAction");
-            if (closeAction) closeAction.hidden = closed;
+            if (closeAction) closeAction.hidden = !positionCloseActionVisible(position.status);
+            const closeForm = document.getElementById("closePositionForm");
+            if (closeForm) closeForm.dataset.positionId = String(position.id || resourceId);
+            const closeHeading = document.getElementById("closePositionHeading");
+            if (closeHeading) closeHeading.textContent = "记录平仓 · " + position.assetSymbol;
             document.getElementById("actualPositionFacts").innerHTML = factGrid([
                 ["资产", position.assetSymbol], ["方向", label(position.side)],
                 ["开仓价", formatNumber(position.entryPrice)], ["数量", formatNumber(position.quantity)],
@@ -808,11 +826,15 @@
                 empty(timeline, "持仓已关闭", "活动监控已结束；历史监控不会冒充当前判断。");
                 return;
             }
-            const logs = await api("/api/review/positions/" + encodeURIComponent(resourceId) + "/monitor-logs?limit=30");
-            if (!(logs || []).length) empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
-            else timeline.innerHTML = logs.map(function (item) {
-                return '<article class="timeline-item"><time>' + escapeHtml(formatTime(item.observedAt || item.createdAt)) + '</time><strong>' + escapeHtml(label(item.monitorConclusion, "等待监控数据")) + '</strong><p>' + escapeHtml(label(item.riskReason, "暂无风险变化原因")) + "</p></article>";
-            }).join("");
+            try {
+                const logs = await api("/api/review/positions/" + encodeURIComponent(resourceId) + "/monitor-logs?limit=30");
+                if (!(logs || []).length) empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
+                else timeline.innerHTML = logs.map(function (item) {
+                    return '<article class="timeline-item"><time>' + escapeHtml(formatTime(item.observedAt || item.createdAt)) + '</time><strong>' + escapeHtml(label(item.monitorConclusion, "等待监控数据")) + '</strong><p>' + escapeHtml(label(item.riskReason, "暂无风险变化原因")) + "</p></article>";
+                }).join("");
+            } catch (_) {
+                empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
+            }
         } catch (_) { empty(card, "持仓详情当前不可查看", "未返回可信的持仓事实。"); }
     }
 

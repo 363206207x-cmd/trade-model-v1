@@ -23,6 +23,11 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
     private static final String SELECTED_SYMBOL = "BTCUSDT";
     private static final String ANALYSIS_ID = "ui-review-analysis-btc";
     private static final String TRACE_ID = "ui-review-trace-btc";
+    private final UiReviewPositionMonitoringReadService positionReadService;
+
+    public UiReviewDashboardHomeService(UiReviewPositionMonitoringReadService positionReadService) {
+        this.positionReadService = positionReadService;
+    }
 
     @Override
     public DashboardHomeVO getHome(String selectedSymbol, Integer limit, Long selectedPositionId) {
@@ -44,18 +49,15 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
                 .findFirst()
                 .orElse(SELECTED_SYMBOL);
 
+        DashboardHomeVO.PositionAggregateVO positionAggregate = positionReadService.aggregate();
         home.setHeader(header());
-        home.setSystemState(systemState());
+        home.setSystemState(systemState(positionAggregate));
         home.setAlerts(List.of(alert()));
         home.setEvents(List.of(event()));
         home.setAssets(assets);
-        List<DashboardHomeVO.PositionVO> positions = positions(selectedPositionId);
+        List<DashboardHomeVO.PositionVO> positions = positionReadService.homeTopThree(selectedPositionId);
         home.setPositions(positions);
-        DashboardHomeVO.PositionAggregateVO aggregate = new DashboardHomeVO.PositionAggregateVO();
-        aggregate.setActiveCount(4);
-        aggregate.setHighestTrustedRisk("EXTREME");
-        aggregate.setCoverageState("PARTIAL_COVERAGE");
-        home.setPositionAggregate(aggregate);
+        home.setPositionAggregate(positionAggregate);
         home.setStates(moduleStates());
         home.setSelectedSymbol(selectedSymbol);
         home.setSelectedAssetContext(assets.stream()
@@ -70,7 +72,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         home.setAiDecision(SELECTED_SYMBOL.equals(selectedSymbol) ? aiDecision(selectedPositionId) : unavailableAi());
         home.setDerivatives(SELECTED_SYMBOL.equals(selectedSymbol)
                 ? derivatives() : new DashboardHomeVO.DerivativesSummaryVO());
-        home.setDiagnostics(diagnostics());
+        home.setDiagnostics(diagnostics(positionAggregate));
         return home;
     }
 
@@ -85,15 +87,20 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         return header;
     }
 
-    private DashboardHomeVO.SystemStateVO systemState() {
+    private DashboardHomeVO.SystemStateVO systemState(DashboardHomeVO.PositionAggregateVO aggregate) {
         DashboardHomeVO.SystemStateVO state = new DashboardHomeVO.SystemStateVO();
         state.setMarketTrend(status("market", "BTC / 宏观环境", "趋势环境", "READY", null));
         state.setRiskLevel(status("risk", "系统风险", "— / 尚未形成系统级评估", "SOURCE_UNAVAILABLE", null));
         state.setDataQuality(status("quality", "全局数据质量", "新鲜", "CONNECTED", null));
         state.setServiceAvailability(status("service", "服务可用性", "正常", "CONNECTED", null));
-        state.setAccountStatus(status("account", "账户·已录入", "极高·4笔·覆盖部分", "CONNECTED", 4));
+        String risk = riskLabel(aggregate.getHighestTrustedRisk());
+        String coverage = "COMPLETE".equals(aggregate.getCoverageState()) ? "完整覆盖" : "覆盖部分";
+        state.setAccountStatus(status("account", "账户·已录入",
+                risk + "·" + aggregate.getActiveCount() + "笔·" + coverage,
+                "CONNECTED", aggregate.getActiveCount()));
         state.setAiConflict(status("ai", "AI 系统", "三角色完成", "READY", 82));
-        state.setPendingReview(status("positions", "已录入持仓", "活动 4", "READY", 4));
+        state.setPendingReview(status("positions", "已录入持仓",
+                "活动 " + aggregate.getActiveCount(), "READY", aggregate.getActiveCount()));
         state.setConfused(status("conflict", "冲突", "轻微分歧", "READY", 2));
         state.setHotReset(status("reset", "Hot Reset", "关闭", "CONNECTED", 0));
         return state;
@@ -191,118 +198,6 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
     private String biasLabel(String bias) {
         return Map.of("BULLISH", "偏多", "WEAK_BULLISH", "弱偏多", "NEUTRAL", "中性",
                 "WEAK_BEARISH", "弱偏空", "BEARISH", "偏空").get(bias);
-    }
-
-    private List<DashboardHomeVO.PositionVO> positions(Long selectedPositionId) {
-        if (selectedPositionId != null && selectedPositionId >= 7201L && selectedPositionId <= 7204L) {
-            DashboardHomeVO.PositionVO position = position(7101L, "BTCUSDT", "LONG", "SYSTEM_PLAN_POSITION",
-                    "62000", "64100", "3.39", "MEDIUM", "STABLE", "STILL_VALID", "NO_REVERSAL",
-                    "NO_CLEAR_RISK_FACTOR", "LOGIC_VALID", "CONTINUE_HOLD", "逻辑仍成立", "继续持有",
-                    NOW.minusDays(12));
-            applyUntrustedMonitorState(position, selectedPositionId);
-            return List.of(position);
-        }
-        return List.of(
-                position(7101L, "BTCUSDT", "LONG", "SYSTEM_PLAN_POSITION", "62000", "64100", "3.39",
-                        "MEDIUM", "STABLE", "STILL_VALID", "NO_REVERSAL", "NO_CLEAR_RISK_FACTOR",
-                        "LOGIC_VALID", "CONTINUE_HOLD", "逻辑仍成立", "继续持有", NOW.minusDays(12)),
-                position(7102L, "ETHUSDT", "SHORT", "MANUAL_INDEPENDENT", "3400", "3490", "-2.65",
-                        "HIGH", "INCREASED", "WEAKENED", "WEAK_REVERSAL", "OPPOSING_EVIDENCE_INCREASED",
-                        "LOGIC_WEAKENED", "TIGHTEN_STOP", "逻辑弱化", "收紧止损", NOW.minusDays(7)),
-                position(7103L, "SOLUSDT", "LONG", "SYSTEM_PLAN_POSITION", "145", "129.5", "-10.69",
-                        "EXTREME", "SHARPLY_INCREASED", "INVALIDATED", "STRONG_REVERSAL", "STRUCTURE_CHANGED",
-                        "PLAN_INVALIDATED", "WAIT_CONFIRMATION", "计划失效", "等待人工确认", NOW.minusDays(4)));
-    }
-
-    private void applyUntrustedMonitorState(DashboardHomeVO.PositionVO position, Long scenarioId) {
-        String trustState = switch (scenarioId.intValue()) {
-            case 7201 -> "PENDING";
-            case 7202 -> "STALE";
-            case 7203 -> "INVALID";
-            default -> "SOURCE_UNAVAILABLE";
-        };
-        position.setMonitorTrustState(trustState);
-        position.setDataState("WAITING_MONITOR_DATA");
-        position.setMarkPrice(null);
-        position.setCurrentPrice(null);
-        position.setMarkPriceFresh(false);
-        position.setPnlAmount(null);
-        position.setPnlPercent(null);
-        position.setPnlPct(null);
-        position.setRiskLevel(null);
-        position.setRiskLevelLabel(null);
-        position.setRiskTrend(null);
-        position.setEntryLogicStatus(null);
-        position.setEntryLogicStatusLabel(null);
-        position.setReversalStatus(null);
-        position.setReversalStatusLabel(null);
-        position.setRiskReason(null);
-        position.setRiskReasonLabel(null);
-        position.setMonitorConclusion(null);
-        position.setMonitorConclusionLabel(null);
-        position.setSuggestedAction(null);
-        position.setSuggestedManualAction(null);
-        position.setSuggestedManualActionText(null);
-        position.setLastMonitorAt(null);
-        position.setLastMonitorTime(null);
-        position.setModuleState("MISSING");
-    }
-
-    private DashboardHomeVO.PositionVO position(Long id, String symbol, String direction, String sourceType,
-                                                 String entry, String mark, String pnlPercent, String risk,
-                                                 String riskTrend, String logic, String reversal, String riskReason,
-                                                 String conclusion, String action, String conclusionLabel,
-                                                 String actionLabel, LocalDateTime openedAt) {
-        DashboardHomeVO.PositionVO position = new DashboardHomeVO.PositionVO();
-        position.setPositionId(id);
-        position.setSymbol(symbol);
-        position.setDirection(direction);
-        position.setDirectionLabel("LONG".equals(direction) ? "做多" : "做空");
-        position.setSourceType(sourceType);
-        position.setEntryPrice(new BigDecimal(entry));
-        position.setMarkPrice(new BigDecimal(mark));
-        position.setCurrentPrice(new BigDecimal(mark));
-        position.setMarkPriceSource("MARKET_SNAPSHOT");
-        position.setMarkPriceObservedAt(NOW.minusMinutes(2));
-        position.setMarkPriceFresh(true);
-        position.setPnlPercent(new BigDecimal(pnlPercent));
-        position.setPnlPct(new BigDecimal(pnlPercent));
-        position.setRiskLevel(risk);
-        position.setRiskLevelLabel(riskLabel(risk));
-        position.setRiskTrend(riskTrend);
-        position.setEntryLogicStatus(logic);
-        position.setEntryLogicStatusLabel(labelFor(logic));
-        position.setReversalStatus(reversal);
-        position.setReversalStatusLabel(labelFor(reversal));
-        position.setRiskReason(riskReason);
-        position.setRiskReasonLabel(labelFor(riskReason));
-        position.setMonitorConclusion(conclusion);
-        position.setMonitorConclusionLabel(conclusionLabel);
-        position.setSuggestedAction(action);
-        position.setSuggestedManualAction(action);
-        position.setSuggestedManualActionText(actionLabel);
-        position.setOpenedAt(openedAt);
-        position.setLastMonitorAt(NOW.minusMinutes(3));
-        position.setLastMonitorTime(NOW.minusMinutes(3));
-        position.setUpdatedAt(NOW.minusMinutes(3));
-        position.setPositionStatus("OPEN");
-        position.setModuleState("READY");
-        position.setWarningState("EXTREME".equals(risk) ? "HIGH" : "NORMAL");
-        position.setDataState("STABLE".equals(riskTrend) ? "OPEN_MONITORING" :
-                ("PLAN_INVALIDATED".equals(conclusion) ? "PLAN_INVALIDATED" : "RISK_ESCALATED"));
-        position.setMonitorTrustState("VERIFIED_FRESH");
-        position.setFinalPlanId("MANUAL_INDEPENDENT".equals(sourceType) ? null : "ui-review-final-" + symbol.toLowerCase());
-        return position;
-    }
-
-    private String labelFor(String value) {
-        return Map.ofEntries(
-                Map.entry("STILL_VALID", "仍成立"), Map.entry("WEAKENED", "弱化"),
-                Map.entry("INVALIDATED", "失效"), Map.entry("NO_REVERSAL", "无明显反转"),
-                Map.entry("WEAK_REVERSAL", "弱反转"), Map.entry("STRONG_REVERSAL", "强反转"),
-                Map.entry("NO_CLEAR_RISK_FACTOR", "暂无明显风险因素"),
-                Map.entry("OPPOSING_EVIDENCE_INCREASED", "反向证据增加"),
-                Map.entry("STRUCTURE_CHANGED", "结构变化")).get(value);
     }
 
     private DashboardHomeVO.ExecutionSuggestionVO finalPlan() {
@@ -558,7 +453,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         return states;
     }
 
-    private DashboardHomeVO.DiagnosticsVO diagnostics() {
+    private DashboardHomeVO.DiagnosticsVO diagnostics(DashboardHomeVO.PositionAggregateVO aggregate) {
         DashboardHomeVO.DiagnosticsVO diagnostics = new DashboardHomeVO.DiagnosticsVO();
         diagnostics.setDataIngestion("READY");
         diagnostics.setDataQuality("READY");
@@ -568,7 +463,7 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
         diagnostics.setMarketDataProvider("READY");
         diagnostics.setAiProvider("READY");
         diagnostics.setExternalContextProvider("READY");
-        diagnostics.setAccountRiskCoverageState("PARTIAL_COVERAGE");
+        diagnostics.setAccountRiskCoverageState(aggregate.getCoverageState());
         return diagnostics;
     }
 

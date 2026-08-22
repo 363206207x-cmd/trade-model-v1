@@ -133,6 +133,22 @@ class PositionMonitoringProjectionServiceTest {
         verify(monitorLogService, never()).listByPositionIdForUser(7L, 11L, 1);
     }
 
+    @Test
+    void historyRemainsOwnerScopedAndSeparateFromActiveMonitoring() {
+        UserPositionVO closed = position(12L, "BTCUSDT");
+        closed.setStatus("CLOSED");
+        when(userPositionService.listClosedPositionsForUser(7L, 100)).thenReturn(List.of(closed));
+        when(userPositionService.countClosedPositionsForUser(7L)).thenReturn(1);
+
+        PositionMonitoringProjectionService.HistoryProjection result = service.historyForUser(7L, 100);
+
+        assertThat(result.positions()).extracting(UserPositionVO::getId).containsExactly(12L);
+        assertThat(result.totalCount()).isEqualTo(1);
+        verify(userPositionService).listClosedPositionsForUser(7L, 100);
+        verify(userPositionService).countClosedPositionsForUser(7L);
+        verify(monitorLogService, never()).listByPositionIdForUser(7L, 12L, 1);
+    }
+
     private static UserPositionVO position(Long id, String symbol) {
         UserPositionVO value = new UserPositionVO();
         value.setId(id);

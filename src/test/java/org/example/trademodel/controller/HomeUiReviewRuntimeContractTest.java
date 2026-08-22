@@ -15,14 +15,21 @@ class HomeUiReviewRuntimeContractTest {
         String launcher = Files.readString(Path.of("scripts/run-local.sh"));
         String fixture = Files.readString(Path.of(
                 "src/main/java/org/example/trademodel/uireview/UiReviewDashboardHomeService.java"));
+        String positionSource = Files.readString(Path.of(
+                "src/main/java/org/example/trademodel/uireview/UiReviewPositionMonitoringReadService.java"));
 
         assertThat(launcher).contains("--ui-review", "SPRING_PROFILES_ACTIVE=\"ui-review\"",
                         "UI_REVIEW_MODE=${UI_REVIEW_MODE}", "HOME_URL=\"${LOCAL_URL}/dashboard\"")
                 .doesNotContain("ui-review.html", "home-demo.html", "dashboard-preview.html");
         assertThat(fixture).contains("@Profile(\"ui-review\")", "@Primary",
-                        "implements DashboardHomeService", "setAssets(assets)", "setPositions(positions)",
-                        "applyUntrustedMonitorState", "PENDING", "STALE", "INVALID", "SOURCE_UNAVAILABLE")
+                        "implements DashboardHomeService", "setAssets(assets)",
+                        "positionReadService.homeTopThree", "positionReadService.aggregate")
                 .doesNotContain("Mapper", "Repository", "AUTO_ORDER", "AUTO_CLOSE", "AUTO_REVERSE");
+        assertThat(positionSource)
+                .contains("@Profile(\"ui-review\")", "implements PositionMonitoringReadService",
+                        "applyUntrustedMonitorState", "PENDING", "STALE", "INVALID", "SOURCE_UNAVAILABLE",
+                        "homeTopThree", "listForUser", "findForUser")
+                .doesNotContain("Mapper", "Repository", "manual-close", "save(", "insert(", "update(");
     }
 
     @Test

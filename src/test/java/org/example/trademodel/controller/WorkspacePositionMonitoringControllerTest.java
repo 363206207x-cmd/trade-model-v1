@@ -3,7 +3,7 @@ package org.example.trademodel.controller;
 import org.example.trademodel.common.GlobalExceptionHandler;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.PositionMonitoringProjectionService;
-import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.service.PositionMonitoringReadService;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,15 +22,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class WorkspacePositionMonitoringControllerTest {
     @Mock AuthenticatedUserIdResolver userIdResolver;
-    @Mock PositionMonitoringProjectionService projectionService;
-    @Mock UserPositionService userPositionService;
+    @Mock PositionMonitoringReadService projectionService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new WorkspacePositionMonitoringController(
-                        userIdResolver, projectionService, userPositionService))
+                        userIdResolver, projectionService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

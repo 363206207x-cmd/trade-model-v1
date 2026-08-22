@@ -1,12 +1,19 @@
 package org.example.trademodel.controller;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 @Controller
 public class DesktopWorkspaceController {
+    private final boolean uiReviewMode;
+
+    public DesktopWorkspaceController(
+            @Value("${trade-model.ui-review.enabled:false}") boolean uiReviewMode) {
+        this.uiReviewMode = uiReviewMode;
+    }
 
     @GetMapping("/asset-pool")
     public String assetPool(Model model) {
@@ -80,6 +87,7 @@ public class DesktopWorkspaceController {
         model.addAttribute("pageSubtitle", subtitle);
         model.addAttribute("activeNavigation", activeNavigation);
         model.addAttribute("resourceId", resourceId);
+        model.addAttribute("uiReviewMode", uiReviewMode);
         return "workspace";
     }
 }

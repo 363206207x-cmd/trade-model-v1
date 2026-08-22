@@ -7,6 +7,7 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Profile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,7 +20,8 @@ import java.util.Locale;
 
 /** Owner-scoped read projection for the full Positions workspace. */
 @Service
-public class PositionMonitoringProjectionService {
+@Profile("!ui-review")
+public class PositionMonitoringProjectionService implements PositionMonitoringReadService {
     private final UserPositionService userPositionService;
     private final PositionMonitorLogService monitorLogService;
     private final PositionPlanSourceResolver sourceResolver;
@@ -34,6 +36,7 @@ public class PositionMonitoringProjectionService {
         this.sourceResolver = new PositionPlanSourceResolver(executionPlanMapper, analysisRunMapper);
     }
 
+    @Override
     public CollectionProjection listForUser(Long userId) {
         List<ItemProjection> items = new ArrayList<>();
         for (UserPositionVO position : userPositionService.listOpenPositionsForUser(userId)) {
@@ -44,11 +47,19 @@ public class PositionMonitoringProjectionService {
         return new CollectionProjection(List.copyOf(items), items.size(), coverage);
     }
 
+    @Override
     public ItemProjection findForUser(Long userId, Long positionId) {
         UserPositionVO position = userPositionService.findByIdForUser(positionId, userId);
         boolean active = "OPEN".equalsIgnoreCase(position.getStatus())
                 || "PARTIALLY_CLOSED".equalsIgnoreCase(position.getStatus());
         return project(userId, position, active);
+    }
+
+    @Override
+    public HistoryProjection historyForUser(Long userId, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        List<UserPositionVO> positions = userPositionService.listClosedPositionsForUser(userId, safeLimit);
+        return new HistoryProjection(positions, userPositionService.countClosedPositionsForUser(userId));
     }
 
     private ItemProjection project(Long userId, UserPositionVO position, boolean includeLiveMonitor) {
@@ -201,4 +212,6 @@ public class PositionMonitoringProjectionService {
     public record CollectionProjection(List<ItemProjection> positions,
                                        int activeCount,
                                        String accountRiskCoverageState) { }
+
+    public record HistoryProjection(List<UserPositionVO> positions, int totalCount) { }
 }
