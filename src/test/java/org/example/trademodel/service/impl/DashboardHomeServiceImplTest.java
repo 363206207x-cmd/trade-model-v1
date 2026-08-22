@@ -38,6 +38,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
+import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
@@ -152,6 +153,8 @@ class DashboardHomeServiceImplTest {
     private DecisionResultMapper decisionResultMapper;
     @Mock
     private ExecutionPlanMapper executionPlanMapper;
+    @Mock
+    private LocalRealDataStatusService localRealDataStatusService;
 
     private DashboardHomeServiceImpl service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -171,6 +174,7 @@ class DashboardHomeServiceImplTest {
         );
         service.setAssetStateMapper(assetStateMapper);
         service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
+        service.setLocalRealDataStatusService(localRealDataStatusService);
         service.setOriginalPlanSources(decisionResultMapper, executionPlanMapper, analysisRunMapper);
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
         lenient().when(analysisRunMapper.selectAverageScoreByAnalysisId(anyString())).thenReturn(null);
@@ -451,7 +455,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void localRealHeaderAndDiagnosticsUseTheSameProviderReadinessSnapshot() {
+    void localRealHeaderAndDiagnosticsUsePersistedClosedBarTimeAndProviderReadinessIndependently() {
         ProviderReadinessVO readiness = providerReadiness(
                 "CONNECTED",
                 "WAITING_SYNC",
@@ -463,9 +467,8 @@ class DashboardHomeServiceImplTest {
         market.setConnected(true);
         market.setReason("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        LocalRealReadinessService localRealReadiness = mock(LocalRealReadinessService.class);
-        when(localRealReadiness.updatedAt()).thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
-        service.setLocalRealReadinessService(localRealReadiness);
+        when(localRealDataStatusService.latestClosedBarAt())
+                .thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
@@ -477,6 +480,61 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getServiceAvailability().getValueLabel()).isEqualTo("1/3 可用");
         assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONNECTED");
         assertThat(home.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
+    }
+
+    @Test
+    void readinessUpdatedAtCannotPopulateHomeWhenNoPersistedClosedBarExists() {
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DEGRADED,
+                "READINESS_CHANGED");
+        assertThat(readiness.updatedAt()).isNotNull();
+        service.setLocalRealReadinessService(readiness);
+        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(null);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
+
+        assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
+        assertThat(home.getSystemState().getDataQuality().getValueLabel()).isEqualTo("—");
+        assertThat(home.getHeader().getUpdatedAt()).isNull();
+        verify(localRealDataStatusService).latestClosedBarAt();
+    }
+
+    @Test
+    void globalClosedBarTimeIsStableAcrossReadinessAndSelectedAssetChanges() {
+        Instant closedAt = Instant.parse("2026-08-20T09:56:00Z");
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DEGRADED,
+                "INITIAL_SYNC");
+        service.setLocalRealReadinessService(readiness);
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 80, 0,
+                null, false, "{\"state\":\"WAITING_TRIGGER\"}");
+        DecisionResultVO eth = decision("ETHUSDT", "RANGE", "MEDIUM", "LOW", 80, 0,
+                null, false, "{\"state\":\"OBSERVING\"}");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(btc, eth));
+        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(closedAt);
+
+        DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
+        readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DASHBOARD_READY,
+                "READINESS_CHANGED_WITHOUT_NEW_BAR");
+        DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
+
+        assertSameGlobalDataTime(btcHome, closedAt);
+        assertSameGlobalDataTime(ethHome, closedAt);
+        verify(localRealDataStatusService, times(2)).latestClosedBarAt();
+    }
+
+    @Test
+    void latestPersistedClosedBarChangeUpdatesStatusAndHeaderTogether() {
+        Instant first = Instant.parse("2026-08-20T09:56:00Z");
+        Instant second = Instant.parse("2026-08-20T10:01:00Z");
+        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(first, second);
+
+        DashboardHomeVO firstHome = service.getHomeForUser(USER_ID, null, 6);
+        DashboardHomeVO secondHome = service.getHomeForUser(USER_ID, null, 6);
+
+        assertSameGlobalDataTime(firstHome, first);
+        assertSameGlobalDataTime(secondHome, second);
     }
 
     @Test
@@ -2349,6 +2407,51 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void riskLevelAndOpportunityStateRemainIndependentInAssetProjection() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 80, 0,
+                null, false, null);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+        AssetStateDO state = new AssetStateDO();
+        state.setSymbol("BTCUSDT");
+        state.setState(AssetStateEnum.WAITING_TRIGGER);
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
+
+        DashboardHomeVO.AssetVO high = asset(
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
+
+        assertThat(high.getAssetState()).isEqualTo("WAITING_TRIGGER");
+        assertThat(high.getAssetStateLabel()).isEqualTo("等待触发");
+        assertThat(high.getRiskLabel()).isEqualTo("高");
+        assertThat(high.getCurrentConclusion()).isEqualTo("当前风险较高");
+
+        decision.setRiskLevel("EXTREME");
+        DashboardHomeVO.AssetVO extreme = asset(
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
+
+        assertThat(extreme.getAssetStateLabel()).isEqualTo("等待触发");
+        assertThat(extreme.getRiskLabel()).isEqualTo("极高");
+        assertThat(extreme.getCurrentConclusion()).isEqualTo("当前风险极高");
+
+        state.setState(AssetStateEnum.HIGH_RISK);
+        DashboardHomeVO.AssetVO highRiskOpportunity = asset(
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
+
+        assertThat(highRiskOpportunity.getAssetStateLabel()).isEqualTo("高风险观察");
+        assertThat(highRiskOpportunity.getCurrentConclusion()).isEqualTo("高风险观察");
+
+        decision.setRiskLevel("HIGH");
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
+        DashboardHomeVO.AssetVO missingOpportunityState = asset(
+                service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
+
+        assertThat(missingOpportunityState.getAssetState()).isNull();
+        assertThat(missingOpportunityState.getAssetStateLabel()).isNull();
+        assertThat(missingOpportunityState.getRiskLabel()).isEqualTo("高");
+        assertThat(missingOpportunityState.getCurrentConclusion()).isEqualTo("当前风险较高");
+    }
+
+    @Test
     void dataQualityCircuitBreakerHidesExactPlanBelowSeventyAndMissingSnapshotHidesBoundaries() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
@@ -3645,6 +3748,12 @@ class DashboardHomeServiceImplTest {
         decision.setIsWorthOpening(worthOpening);
         decision.setAssetStateSnapshot(assetStateSnapshot);
         return decision;
+    }
+
+    private void assertSameGlobalDataTime(DashboardHomeVO home, Instant expected) {
+        assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(expected);
+        assertThat(home.getHeader().getUpdatedAt())
+                .isEqualTo(LocalDateTime.ofInstant(expected, ZoneOffset.UTC));
     }
 
     private HomeTopAssetProjection projection(Long assetId,

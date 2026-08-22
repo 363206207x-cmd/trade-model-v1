@@ -69,16 +69,15 @@ The executable matrices are in
 |---|---|---|
 | Environment | formal macro/BTC environment owner | formal value, otherwise `—` |
 | System | formal system-level risk/safety owner | formal value, otherwise `—` |
-| Data | `LocalRealReadinessService.updatedAt` | `更新于 HH:mm`, otherwise `—` |
+| Data | Historical finding at Head `5066a61c`: readiness time was incorrectly bound; superseded by `LocalRealDataStatusService.latestClosedBarAt` in B.1.2.3.1 | `更新于 HH:mm`, otherwise `—` |
 | Service | formal provider availability collection | `n/m 可用`, no denominator -> `—` |
 | Account | all owner active UserPositions | `n 笔`, none -> `—` |
 | Hot Reset | explicit system field | `关闭` / `已触发`, missing -> `—` |
 
-`Provider CONNECTED` alone cannot produce `新鲜`: the data cell does not read
-provider connection status. `DashboardHomeServiceImplTest` verifies timestamp
-and denominator ownership, selected-asset independence, active-position count,
-and fail-closed missing producers. The UI-review status values are only visual
-fixtures.
+`Provider CONNECTED` alone cannot produce `新鲜`. B.1.2.3.1 corrected the data
+timestamp owner because this historical package still read readiness time.
+Current executable evidence is indexed at `docs/evidence/b1_2_3_1/README.md`.
+The UI-review status values are only visual fixtures.
 
 ## Copy/DOM counts
 

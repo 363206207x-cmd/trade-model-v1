@@ -73,7 +73,7 @@ class B123OwnerCopyAndPositionDetailContractTest {
         String runtime = Files.readString(HOME_JS);
 
         assertThat(service).contains("globalDataUpdateCard(globalDataUpdatedAt)",
-                        "LocalRealReadinessService.updatedAt", "ProviderReadiness.providers",
+                        "LocalRealDataStatusService.latestClosedBarAt", "ProviderReadiness.providers",
                         "positions.size() + \" 笔\"", "Boolean.TRUE.equals(hotResetFired) ? \"已触发\" : \"关闭\"")
                 .doesNotContain("case \"CONNECTED\" -> card(\"dataQuality\"", "valueLabel = \"正常\"");
         assertThat(runtime).contains("has(state.dataQuality?.value)",

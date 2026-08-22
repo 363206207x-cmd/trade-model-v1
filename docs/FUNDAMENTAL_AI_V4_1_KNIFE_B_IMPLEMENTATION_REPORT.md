@@ -98,6 +98,29 @@ COMPLETED result and records `SAFETY_MESSAGE_FAILED` in
 `tm_push_recheck_log.execution_error_code`; therefore
 `SAFETY_MESSAGE_CHAIN=PARTIAL`, not PASS.
 
+## B.1.2.3.1 state semantic ownership residual closure
+
+- Data time now follows
+  `PersistedOhlcvBarMapper.selectLatestClosedBar().closeTimeMs ->`
+  `LocalRealDataStatusService.latestClosedBarAt -> DashboardHomeServiceImpl ->`
+  both System Status Data and PageHeader `updatedAt`.
+- `LocalRealReadinessService.updatedAt`, application start time, current time,
+  and Provider CONNECTED are not timestamp fallbacks.
+- `riskLevel=HIGH/EXTREME` remains a risk field and can only produce
+  `当前风险较高/当前风险极高`; only `opportunityState=HIGH_RISK` owns
+  `高风险观察`.
+- No enum, state machine, risk algorithm, schema, Position, close action,
+  brand, layout, Three-AI, Recheck, authentication, or Telegram behavior was
+  changed.
+- LOCAL RUN: Java 17 focused owner matrices `108/108`; full Maven `4782`
+  tests, `0` failures, `0` errors, `14` skipped under the existing
+  Docker/Testcontainers-unavailable policy.
+- Exact-head GitHub CI is reported separately in the final PR canonical
+  comment as one `quality-gate` and one `workflow-contract`; this report does
+  not label local Maven as CI or claim an aggregate CI count.
+
+Evidence: `docs/evidence/b1_2_3_1/README.md`.
+
 ## Phase Status
 
 - `KNIFE_B_1_IMPLEMENTATION_DONE = NO` (historical package did not close the verified residuals).

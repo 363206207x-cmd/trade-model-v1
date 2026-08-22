@@ -35,6 +35,7 @@ import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
 import org.example.trademodel.localreal.LocalRealAssetReadinessState;
+import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
@@ -122,6 +123,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DecisionResultMapper decisionResultMapper;
     private ExecutionPlanMapper executionPlanMapper;
     private PositionPlanSourceResolver positionPlanSourceResolver;
+    private LocalRealDataStatusService localRealDataStatusService;
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
     private AssetPoolService assetPoolService;
@@ -180,6 +182,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                       AnalysisRunMapper analysisRunMapper) {
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
         this.analysisRunMapper = analysisRunMapper;
+    }
+
+    @Autowired(required = false)
+    void setLocalRealDataStatusService(LocalRealDataStatusService localRealDataStatusService) {
+        this.localRealDataStatusService = localRealDataStatusService;
     }
 
     @Autowired(required = false)
@@ -300,8 +307,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
-        Instant globalDataUpdatedAt = localRealReadinessService == null
-                ? null : localRealReadinessService.updatedAt();
+        Instant globalDataUpdatedAt = localRealDataStatusService == null
+                ? null : localRealDataStatusService.latestClosedBarAt();
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
         home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness,
@@ -689,7 +696,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DashboardHomeVO.StatusCardVO globalDataUpdateCard(Instant globalDataUpdatedAt) {
         return card("dataQuality", "全局数据", globalDataUpdatedAt,
                 globalDataUpdatedAt == null ? "—" : null,
-                globalDataUpdatedAt == null ? "未取得正式全局更新时间" : "LocalRealReadinessService.updatedAt",
+                globalDataUpdatedAt == null ? "未取得正式全局更新时间"
+                        : "LocalRealDataStatusService.latestClosedBarAt",
                 globalDataUpdatedAt == null ? "SOURCE_UNAVAILABLE" : "AVAILABLE", null);
     }
 
@@ -2664,8 +2672,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (DataQualityCircuitBreakerPolicy.isBlocked(decision.getDataQualityScore())) {
             return "数据质量不足，暂不交易 / 事件观望";
         }
+        if ("HIGH_RISK".equals(assetState)) return "高风险观察";
         if ("CONFUSED".equals(assetState)) return "冲突状态，等待人工复核";
-        if (riskRank(decision.getRiskLevel()) >= riskRank("HIGH")) return "高风险观察";
+        if ("EXTREME".equals(upper(decision.getRiskLevel()))) return "当前风险极高";
+        if ("HIGH".equals(upper(decision.getRiskLevel()))) return "当前风险较高";
         if (Boolean.TRUE.equals(decision.getIsWorthOpening())) return "条件满足，等待人工确认";
         return "当前条件不足，继续观察";
     }

@@ -209,12 +209,35 @@ PR #1195 remains Draft and unmerged.
 | Formal Web brand | login/Home/workspace production surfaces use `RINE LOGIC` | copy contract + browser evidence | PASS |
 | Short titles and tabs | Home short module names, Analysis PageHeader `分析`, visible tabs GPT/Gemini/Grok | DOM contract + browser evidence | PASS |
 | PageHeader cleanup | Controller no longer projects `pageSubtitle`; subtitle DOM removed | controller/template contract | PASS |
-| Status ownership | formal producer values or fail-closed dash; account uses all active positions | service unit tests + browser visual fixture | PASS |
+| Status ownership | account uses all active positions; the original data-time binding still used readiness time at this Head | residual owner audit | PARTIAL |
 | B.1.2.2 read chain | existing owner-scoped read service unchanged | 7101/7102/7103 identity + 7999 404 regression | PASS |
 
 Evidence: `docs/evidence/b1_2_3/`.
 
-`B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to this package.
+At Head `5066a61c52dca77c919dd2555bfc9c29e0ed97df`,
+`B1_2_3_IMPLEMENTATION_DONE=NO`: data time was still owned by readiness and
+`riskLevel` could still emit the `HIGH_RISK` opportunity-state label. Those
+residuals are closed by B.1.2.3.1 below; the earlier package is not represented
+as independently complete.
+
+## 2026-08-22 B.1.2.3.1 state semantic ownership residual closure
+
+Start Head: `5066a61c52dca77c919dd2555bfc9c29e0ed97df`.
+PR #1195 remains Draft and unmerged.
+
+| Contract item | Old binding | New binding | Automated evidence | Status |
+|---|---|---|---|---|
+| Global data timestamp | `LocalRealReadinessService.updatedAt` | `LocalRealDataStatusService.latestClosedBarAt` from `PersistedOhlcvBarMapper.selectLatestClosedBar().closeTimeMs` | null/readiness-change/bar-change/asset-switch matrix | PASS |
+| Header/status synchronization | two consumers inherited the readiness timestamp | both receive the same single formal closed-bar `Instant` per Home projection | synchronized timestamp assertions | PASS |
+| Risk vs opportunity state | `riskLevel >= HIGH` emitted `高风险观察` | HIGH/EXTREME emit risk conclusions; only `opportunityState=HIGH_RISK` emits `高风险观察` | WAITING_TRIGGER HIGH/EXTREME, HIGH_RISK, missing-state matrix | PASS |
+| UI-review time | no formal runtime data timestamp | explicit fixture only; current fixture remains null and displays `—` | source inspection + existing UI-review contract | PASS |
+
+Evidence: `docs/evidence/b1_2_3_1/README.md`.
+
+`DATA_TIMESTAMP_OWNERSHIP=PASS` and
+`RISK_LEVEL_OPPORTUNITY_STATE_SEPARATION=PASS`.
+`B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to B.1.2.3 plus this residual
+closure.
 `B1_2_INTERACTION_ACCEPTANCE_DONE=NO`, `CURRENT_PHASE_DONE=NO`, and
 `READY_FOR_MERGE=NO` remain unchanged. Recheck's real message path and normal
 real-position close E2E remain not verified; KB-06 remains blocked by its
