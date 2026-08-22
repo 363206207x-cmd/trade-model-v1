@@ -174,3 +174,25 @@ transaction, Home full aggregate/Top3 split, and truthful evidence. The old
 `KB-06=BLOCKED_BY_MISSING_PERSISTENCE_SOURCE`. These do not change
 `CURRENT_PHASE_DONE=NO`, `GLOBAL_SEMANTIC_RUNTIME_DONE=NO`, or
 `READY_FOR_MERGE=NO`.
+
+## 2026-08-22 B.1.2.1 Owner freeze exception
+
+The Owner explicitly supersedes the Freeze 1.2 requirement for a visible
+card-level `当前` label in the current Home Opportunity implementation. This
+does not rewrite the historical Freeze 1.2 requirement. Selection is now
+communicated by the selected-card outline, PageHeader `当前资产 · SYMBOL`, the
+Final Plan and Three-AI selected-asset binding, and programmatic
+`aria-pressed` state.
+
+| Contract item | Frozen status |
+|---|---|
+| `B12-P1-01` | `CLOSED_BY_OWNER_FREEZE_EXCEPTION` |
+| `CARD_VISIBLE_CURRENT_LABEL_REQUIRED` | `NO` |
+| `CARD_VISIBLE_CURRENT_LABEL_COUNT` | `0`, scoped only to OpportunityCard DOM subtrees |
+| `PAGEHEADER_CURRENT_ASSET_REQUIRED` | `YES` |
+| `ARIA_PRESSED_REQUIRED` | `YES` |
+
+PageHeader `当前资产 · SYMBOL` remains required and is not a prohibited card
+badge. Opportunity State and risk remain independent formal fields. This
+exception does not authorize UI redesign, Recheck work, fixture expansion,
+schema changes, or Knife C.

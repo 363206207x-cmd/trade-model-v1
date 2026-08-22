@@ -24,10 +24,10 @@ delta were both zero.
 
 | Item | Status | Result |
 |---|---|---|
-| IA-01 Home opportunity selection | `FAIL` | BTCUSDT -> ETHUSDT selection, URL persistence, refresh, Back/Forward, Plan fail-closed state, AI state, and single-selection behavior worked. The selected card has no user-visible `当前` label, and the selected ETHUSDT audit link targets a BTC trace. See B12-P1-01 and B12-P1-02. |
+| IA-01 Home opportunity selection | `PASS` | Revalidated by B.1.2.1: BTCUSDT -> ETHUSDT selection, URL persistence, refresh, replaceState Back/Forward semantics, Plan/AI fail-closed state, and one `aria-pressed=true` all passed. The visible card-level `当前` requirement is superseded by the dated Owner exception. |
 | IA-02 Analysis Preview | `PASS` | Formal `/analysis` search and Preview worked. PREVIEW stayed isolated from Opportunity/Candidate/Final semantics, one role rendered at a time, unknown mode failed closed, and no role tab or first visual intersected the sticky Header. |
 | IA-03 Messages -> Recheck | `NOT_VERIFIED` | The current authenticated user had zero active Messages, therefore no legal `PUSH_SNAPSHOT` owner chain was available. No naked pushId route was constructed and screenshots 8-13 were not fabricated. |
-| `B1_2_INTERACTION_ACCEPTANCE_DONE` | `NO` | Two P1 findings block interaction acceptance. |
+| `B1_2_INTERACTION_ACCEPTANCE_DONE` | `NO` | IA-03 remains `NOT_VERIFIED_NOT_EXECUTED`; the B.1.2.1 correction does not execute Recheck. |
 
 The fixed phase statements remain:
 `KNIFE_B_1_1_IMPLEMENTATION_DONE=YES`, `CURRENT_PHASE_DONE=NO`,
@@ -43,11 +43,11 @@ The fixed phase statements remain:
 - Refresh reproduced the same ETHUSDT URL and page state.
 - Back/Forward restored the same ETHUSDT Home context and did not enter a
   legacy dashboard detail route.
-- The selected ETHUSDT audit link was
-  `/audit/ui-review-trace-btc-gpt_final?returnTo=%2Fdashboard%3Fasset%3DETHUSDT`.
-  The audit page did not show BTC output; it failed closed with no trusted
-  trace, and its return URL remained the ETHUSDT Home context.
-- The card state had `.is-selected` but no visible `当前` text.
+- After B.1.2.1, the selected ETHUSDT unavailable roles have no analysisId or
+  traceId. The UI says `审计链尚未形成`, sets `aria-disabled=true`, and has no
+  usable audit href.
+- The card state has `.is-selected` and `aria-pressed=true` but no visible
+  card-level `当前` text, as required by the dated Owner exception.
 - No AnalysisRun, Position, Final Plan, or external-provider request was
   created by selection.
 
@@ -88,10 +88,12 @@ The authenticated Message query returned zero active rows. Consequently:
 | pushSnapshotId | `NOT_AVAILABLE` |
 | pushId | `NOT_AVAILABLE` |
 | recheckId | `NOT_AVAILABLE` |
-| Message OPEN POST count | `0` |
-| PUSH_OPEN POST count on bind/F5/refresh | `0 / 0 / 0` |
-| PUSH_OPEN row delta on bind/F5/refresh | `NOT_VERIFIED / NOT_VERIFIED / NOT_VERIFIED` |
-| Retry request count | `0` |
+| Message OPEN | `NOT_EXECUTED` |
+| Recheck bind | `NOT_EXECUTED` |
+| Recheck F5 | `NOT_EXECUTED` |
+| Recheck refresh | `NOT_EXECUTED` |
+| Recheck Retry | `NOT_EXECUTED` |
+| Recheck row delta | `NOT_VERIFIED` |
 | ERROR Retry browser | `NOT_VERIFIED` |
 
 No Recheck route was opened because doing so without a Message-owned
@@ -104,15 +106,15 @@ No Recheck route was opened because doing so without a Message-owned
 | IA-01.0 | Open Home | GET | `/dashboard` and `/api/dashboard/home` | 200 | `BTCUSDT` | Read | BTCUSDT selected. |
 | IA-01.1 | Click ETH card once | GET | `/api/dashboard/home` | 200 | `ETHUSDT` | Read | URL became `/dashboard?asset=ETHUSDT`; exactly one selected card. |
 | IA-01.2 | Refresh Home | GET | `/dashboard?asset=ETHUSDT` and `/api/dashboard/home` | 200 | `ETHUSDT` | Read | ETHUSDT restored. |
-| IA-01.3 | Open related audit | GET | `/audit/ui-review-trace-btc-gpt_final?returnTo=%2Fdashboard%3Fasset%3DETHUSDT`; then `/api/ai/audit-chain` | 200 / 404 | `ui-review-trace-btc-gpt_final` | Read | Wrong-asset trace target failed closed; ETH return context preserved. |
+| IA-01.3 | Inspect related audit control | NONE | N/A | N/A | unavailable | None | ETH unavailable roles have no analysisId/traceId; control says `审计链尚未形成`, is disabled, and has no href. No audit request was made. |
 | IA-02.0 | Search BTC | GET | `/api/asset-pool/search?query=BTC&limit=20` | 200 | `BTCUSDT` | Read | Existing asset selected. |
 | IA-02.1 | Click Start Preview once | POST | `/api/asset-pool/search/BTCUSDT/analysis-preview?timeframe=5m` | 200 | `ui-review-preview-analysis` | Preview action | Preview result only; no Opportunity/Candidate/Final/UserPosition. |
 | IA-02.2 | Open Preview route | GET | `/analysis/ui-review-preview-analysis` | 200 | `ui-review-preview-analysis` | Read | PREVIEW page rendered. |
 | IA-02.3 | Click GPT/Gemini/Grok tabs | NONE | N/A | N/A | role only | Client state | One role visible; no request. |
 | IA-02.4 | Open controlled unknown mode | GET | `/analysis/ui-review-analysis-unknown` | 200 | `ui-review-analysis-unknown` | Read | Fail closed. |
 | IA-03.0 | Open Messages | GET | `/messages` and `/api/workspace/messages` | 200 | none | Read | Active Message count 0. |
-| IA-03.1 | Message OPEN | NONE | N/A | N/A | unavailable | None | `NOT_VERIFIED`; no legal owner chain. |
-| IA-03.2 | Recheck bind/F5/refresh/Retry/return | NONE | N/A | N/A | unavailable | None | `NOT_VERIFIED`; no route fabricated. |
+| IA-03.1 | Message OPEN | NOT EXECUTED | N/A | N/A | unavailable | None | `NOT_VERIFIED`; no legal owner chain. |
+| IA-03.2 | Recheck bind/F5/refresh/Retry/return | NOT EXECUTED | N/A | N/A | unavailable | None | `NOT_VERIFIED`; no route fabricated. |
 
 The ledger is correlated from the actual browser action, application access
 log method/path/status, and rendered result. No external provider request was
@@ -131,7 +133,7 @@ observed.
 | `07-preview-grok.png` | Preview, Grok | 1440x900 | 0 | `UI_REVIEW_FIXTURE` | IA-02 Grok |
 | `08-analysis-unknown.png` | unknown analysis mode | 1440x900 | 0 | `UI_REVIEW_FIXTURE` | IA-02 mode gate |
 | `09-messages-current-state.png` | `/messages`, no active Message | 1440x900 | 0 | `UI_REVIEW_FIXTURE` | IA-03 evidence gap |
-| `10-eth-audit-entry-fail-closed.png` | ETH Home audit link target | 1440x900 | 0 | `UI_REVIEW_FIXTURE` | B12-P1-02 |
+| `10-eth-audit-entry-fail-closed.png` | Historical pre-B.1.2.1 ETH wrong-owner fail-closed evidence | 1440x900 | 0 | `UI_REVIEW_FIXTURE` | Superseded by B.1.2.1 evidence |
 
 All files have real PNG signatures and exact 1440x900 dimensions. They were
 transcoded from the in-app browser's uncropped viewport capture encoding only;
@@ -139,40 +141,33 @@ no crop, resize, zoom, transform, or content-concealing edit was applied.
 
 ## Findings
 
-### B12-P1-01
+### B12-P1-01 — closed
 
 - `FINDING_ID`: `B12-P1-01`
 - `ROUTE`: `/dashboard?asset=ETHUSDT`
 - `USER_ACTION`: Click ETHUSDT opportunity card once.
-- `EXPECTED`: The unique selected card displays an explicit user-visible
-  `当前` state.
-- `ACTUAL`: Selection is unique and visually styled with `.is-selected`, but
-  no card contains user-visible `当前` text.
-- `REQUEST_EVIDENCE`: One `GET /api/dashboard/home`, status 200, no write.
-- `SCREENSHOT`: `02-home-after-eth.png`
-- `BLOCKER_CLASS`: `P1`
-- `REPRODUCIBILITY`: `ALWAYS` in the controlled UI-review state.
-- `BLOCKS_INTERACTION_ACCEPTANCE`: `YES`
-- `RECOMMENDED_NEXT_PACKAGE`: Owner-authorized targeted Home selection-state
-  patch only.
+- `STATUS`: `CLOSED_BY_OWNER_FREEZE_EXCEPTION`
+- `OWNER_EXCEPTION`: Visible card-level `当前` is no longer required. Selected
+  outline, PageHeader, selected-asset content, and `aria-pressed` jointly
+  communicate selection.
+- `CARD_VISIBLE_CURRENT_LABEL_COUNT`: `0`
+- `PAGEHEADER_CURRENT_ASSET`: `PASS`
+- `ARIA_PRESSED`: `PASS`
+- `BLOCKS_INTERACTION_ACCEPTANCE`: `NO`
+- `EVIDENCE`: `../b1_2_1_opportunity_selection/`
 
-### B12-P1-02
+### B12-P1-02 — closed
 
 - `FINDING_ID`: `B12-P1-02`
 - `ROUTE`: `/dashboard?asset=ETHUSDT`
-- `USER_ACTION`: Open `查看完整审计` from the selected ETHUSDT AI area.
-- `EXPECTED`: Related audit/detail entry uses the selected ETHUSDT context.
-- `ACTUAL`: Link targets `ui-review-trace-btc-gpt_final`. The destination
-  correctly fails closed and does not display BTC output, while returnTo keeps
-  ETHUSDT.
-- `REQUEST_EVIDENCE`: Page `GET` status 200 followed by fail-closed
-  `GET /api/ai/audit-chain` status 404.
-- `SCREENSHOT`: `10-eth-audit-entry-fail-closed.png`
-- `BLOCKER_CLASS`: `P1`
-- `REPRODUCIBILITY`: `ALWAYS` in the controlled UI-review state.
-- `BLOCKS_INTERACTION_ACCEPTANCE`: `YES`
-- `RECOMMENDED_NEXT_PACKAGE`: Owner-authorized selected-asset audit-link
-  binding patch only.
+- `USER_ACTION`: Inspect the selected ETHUSDT AI audit control.
+- `STATUS`: `CLOSED`
+- `ROOT_CAUSE`: `UI_REVIEW_FIXTURE_STALE_IDENTITY`
+- `ACTUAL_AFTER_FIX`: Non-BTC unavailable roles expose no borrowed analysisId
+  or traceId; the audit control has no href and says `审计链尚未形成`.
+- `PRODUCTION_STALE_IDENTITY`: `NOT_VERIFIED`
+- `BLOCKS_INTERACTION_ACCEPTANCE`: `NO`
+- `EVIDENCE`: `../b1_2_1_opportunity_selection/04-eth-audit-not-formed.png`
 
 ### B12-EG-01
 
@@ -191,7 +186,7 @@ no crop, resize, zoom, transform, or content-concealing edit was applied.
 - `RECOMMENDED_NEXT_PACKAGE`: None until Owner provides a legal runtime Message
   owner chain or separately authorizes controlled data.
 
-## Safety and exact-Head evidence
+## Safety and validation evidence
 
 - Product Source Gate: PASS at the source Head.
 - Workflow Contract: PASS at the source Head.
@@ -199,14 +194,14 @@ no crop, resize, zoom, transform, or content-concealing edit was applied.
   `FundamentalAiV41FrontendRuntimeAlignmentContractTest`,
   `WorkspacePushRecheckServiceTest`, and
   `PushRecheckAccessBoundaryKnifeBTest`.
-- `quality-gate` SUCCESS runs:
-  - <https://github.com/363206207x-cmd/trade-model-v1/actions/runs/32514730702/job/96873691263>
-  - <https://github.com/363206207x-cmd/trade-model-v1/actions/runs/32514727332/job/96873680328>
-- `workflow-contract` SUCCESS run:
-  <https://github.com/363206207x-cmd/trade-model-v1/actions/runs/32514730762/job/96873691663>
+- B.1.2.1 final-Head CI links are intentionally pending until the final push.
+  Exact run links belong in the canonical PR handoff and must not trigger an
+  additional documentation-only commit cycle.
 - Fake SCHEDULED, old user/pushId, manual/replay, cross-user, and read-only
   bind/F5 safety gates remain `AUTOMATED_TEST` evidence only in this package.
   They are not represented as browser PASS.
-- Production code changed: NO.
-- Fixture changed: NO.
+- Production code changed: YES, limited to the OpportunityCard
+  `aria-pressed` accessibility contract.
+- UI-review fixture changed: YES, limited to clearing borrowed analysisId and
+  traceId from unavailable non-BTC roles.
 - PR #1195 remains OPEN, DRAFT, and UNMERGED.

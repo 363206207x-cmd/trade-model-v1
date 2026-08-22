@@ -390,6 +390,8 @@ public class UiReviewDashboardHomeService implements DashboardHomeService {
 
     private DashboardHomeVO.AiTabVO unavailableRole(String role, String roleLabel) {
         DashboardHomeVO.AiTabVO tab = roleBase(role, roleLabel, role.toLowerCase());
+        tab.setAnalysisId(null);
+        tab.setTraceId(null);
         tab.setRoleState("UNAVAILABLE");
         tab.setDataState("SOURCE_UNAVAILABLE");
         tab.setRunStatus("UNAVAILABLE");

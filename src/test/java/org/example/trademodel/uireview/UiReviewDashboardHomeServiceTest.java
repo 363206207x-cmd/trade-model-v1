@@ -4,6 +4,8 @@ import org.example.trademodel.vo.DashboardHomeVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UiReviewDashboardHomeServiceTest {
@@ -110,8 +112,27 @@ class UiReviewDashboardHomeServiceTest {
 
         assertThat(home.getSelectedSymbol()).isEqualTo("ETHUSDT");
         assertThat(home.getExecutionSuggestion().getFinalPlan()).isFalse();
-        assertThat(home.getAiDecision().getTabs()).allSatisfy(role ->
-                assertThat(role.getResultAvailable()).isFalse());
+        assertThat(home.getAiDecision().getTabs()).allSatisfy(role -> {
+            assertThat(role.getResultAvailable()).isFalse();
+            assertThat(role.getRoleState()).isEqualTo("UNAVAILABLE");
+            assertThat(role.getAnalysisId()).isNull();
+            assertThat(role.getTraceId()).isNull();
+        });
+    }
+
+    @Test
+    void everyNonBtcUnavailableRoleHasNoBorrowedBtcIdentity() {
+        for (String symbol : List.of("ETHUSDT", "SOLUSDT", "LINKUSDT", "AVAXUSDT", "DOTUSDT")) {
+            DashboardHomeVO home = service.getHomeForUser(1L, symbol, 6, null);
+
+            assertThat(home.getSelectedSymbol()).isEqualTo(symbol);
+            assertThat(home.getAiDecision().getTabs()).allSatisfy(role -> {
+                assertThat(role.getRoleState()).isEqualTo("UNAVAILABLE");
+                assertThat(role.getResultAvailable()).isFalse();
+                assertThat(role.getAnalysisId()).isNull();
+                assertThat(role.getTraceId()).isNull();
+            });
+        }
     }
 
     @Test
