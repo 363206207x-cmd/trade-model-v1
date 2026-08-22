@@ -347,9 +347,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 decisionRead.failed() || selectedDecisionReadFailed || rankingRead.failed(), positionRead.failed());
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
-        LocalDateTime headerUpdatedAt = globalDataUpdatedAt == null
-                ? null : LocalDateTime.ofInstant(globalDataUpdatedAt, ZoneOffset.UTC);
-        home.getHeader().setUpdatedAt(headerUpdatedAt);
+        home.getHeader().setUpdatedAt(globalDataUpdatedAt);
         return home;
     }
 

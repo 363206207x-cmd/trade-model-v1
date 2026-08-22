@@ -236,9 +236,34 @@ Evidence: `docs/evidence/b1_2_3_1/README.md`.
 
 `DATA_TIMESTAMP_OWNERSHIP=PASS` and
 `RISK_LEVEL_OPPORTUNITY_STATE_SEPARATION=PASS`.
-`B1_2_3_IMPLEMENTATION_DONE=YES` is bounded to B.1.2.3 plus this residual
-closure.
+At that Head, `B1_2_3_IMPLEMENTATION_DONE=NO`: Header transported the same
+formal Instant as an offset-free `LocalDateTime`, so browser timezone
+conversion could diverge from System Status Data. B.1.2.3.2 below owns that
+remaining transport defect.
 `B1_2_INTERACTION_ACCEPTANCE_DONE=NO`, `CURRENT_PHASE_DONE=NO`, and
 `READY_FOR_MERGE=NO` remain unchanged. Recheck's real message path and normal
 real-position close E2E remain not verified; KB-06 remains blocked by its
 missing persistence source. Telegram brand copy is out of scope.
+
+## 2026-08-23 B.1.2.3.2 Header/status timestamp transport closure
+
+Start Head: `015cf232089fa581417212994b7e954393a5ec7b`.
+PR #1195 remains Draft and unmerged.
+
+| Contract item | Old transport | New transport | Evidence | Status |
+|---|---|---|---|---|
+| Header transport type | `HeaderVO.updatedAt: LocalDateTime` | `HeaderVO.updatedAt: Instant` | application Jackson full-Home serialization | PASS |
+| Header/status JSON | `09:56:00` vs `09:56:00Z` possible | byte-identical `2026-08-20T09:56:00Z` | `HomeTimestampTransportContractTest` | PASS |
+| Browser formatter | both paths called `clockTime`, but received different time semantics | both paths call the same production `clockTime` with the same offset timestamp | Maven-executed Node TZ matrix | PASS |
+| Empty timestamp | null must not enter `new Date` | Header and Status render `—` | Java + Node fail-closed matrix | PASS |
+| Browser evidence | not proven with a non-empty controlled transport | Header and Status both render `更新于 17:56` at 1440x900 / Asia/Shanghai | `docs/evidence/b1_2_3_2/home-timestamp-asia-shanghai-1440x900.png` | PASS |
+
+This package does not change the formal closed-bar source, risk/state
+semantics, production JavaScript, UI layout, Position, Three-AI, Recheck,
+authentication, Telegram, schema, or business state machines. The screenshot
+is `UI_REVIEW_FIXTURE / CONTROLLED_TRANSPORT_EVIDENCE`, not live-provider data.
+
+Local gates are complete. Exact-head GitHub `quality-gate` and
+`workflow-contract` are pending the implementation push; therefore final
+`B1_2_3_IMPLEMENTATION_DONE` remains pending until those required categories
+pass on the exact PR Head. `CURRENT_PHASE_DONE=NO` and `MERGE=NO` remain fixed.

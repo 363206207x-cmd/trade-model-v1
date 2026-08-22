@@ -121,6 +121,34 @@ COMPLETED result and records `SAFETY_MESSAGE_FAILED` in
 
 Evidence: `docs/evidence/b1_2_3_1/README.md`.
 
+## B.1.2.3.2 Header/status timestamp transport closure
+
+- Start Head: `015cf232089fa581417212994b7e954393a5ec7b`.
+- The formal source remains
+  `PersistedOhlcvBarMapper.selectLatestClosedBar().closeTimeMs ->`
+  `LocalRealDataStatusService.latestClosedBarAt`.
+- `DashboardHomeVO.HeaderVO.updatedAt` now transports that value as `Instant`,
+  and `DashboardHomeServiceImpl` passes the same `globalDataUpdatedAt` directly
+  to Header and System Status Data.
+- Production `home-runtime.js` is unchanged: both consumers continue through
+  the single `clockTime()` formatter.
+- Application Jackson serialization produces the byte-identical offset value
+  `2026-08-20T09:56:00Z` for both JSON fields; null remains fail closed.
+- Maven executes the production-formatter Node matrix: UTC `09:56/09:56`,
+  Asia/Shanghai `17:56/17:56`, and the legacy offset-free counterexample
+  `09:56`.
+- Browser evidence at 1440x900 / 100% shows Header and System Status Data both
+  as `更新于 17:56`. It is explicitly controlled UI-review transport evidence,
+  not live-provider data.
+- DIRECTED TESTS: `133/133` PASS.
+- LOCAL RUN Full Maven: `4786` tests, `0` failures, `0` errors, `14` skipped
+  under the existing Docker/Testcontainers-unavailable policy.
+- Exact-head CI profile and the single required `quality-gate` /
+  `workflow-contract` categories are pending commit and push; they are not
+  inferred from the local run.
+
+Evidence: `docs/evidence/b1_2_3_2/README.md`.
+
 ## Phase Status
 
 - `KNIFE_B_1_IMPLEMENTATION_DONE = NO` (historical package did not close the verified residuals).

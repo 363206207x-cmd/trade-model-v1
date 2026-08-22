@@ -192,7 +192,7 @@ public class DashboardHomeVO {
         private String aiStatus = "WAITING_SYNC";
         private String aiStatusLabel = "等待同步";
         private String dataSourceText = "WAITING_SYNC";
-        private LocalDateTime updatedAt;
+        private Instant updatedAt;
 
         public String getPageTitle() {
             return pageTitle;
@@ -234,11 +234,11 @@ public class DashboardHomeVO {
             this.dataSourceText = dataSourceText;
         }
 
-        public LocalDateTime getUpdatedAt() {
+        public Instant getUpdatedAt() {
             return updatedAt;
         }
 
-        public void setUpdatedAt(LocalDateTime updatedAt) {
+        public void setUpdatedAt(Instant updatedAt) {
             this.updatedAt = updatedAt;
         }
     }

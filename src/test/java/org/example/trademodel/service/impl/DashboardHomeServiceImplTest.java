@@ -473,7 +473,7 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getHeader().getDataSourceText()).isEqualTo("Kraken public data / CONNECTED");
-        assertThat(home.getHeader().getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 8, 20, 9, 56));
+        assertThat(home.getHeader().getUpdatedAt()).isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
         assertThat(home.getSystemState().getDataQuality().getValue())
                 .isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
         assertThat(home.getSystemState().getDataQuality().getValueLabel()).isNull();
@@ -3752,8 +3752,7 @@ class DashboardHomeServiceImplTest {
 
     private void assertSameGlobalDataTime(DashboardHomeVO home, Instant expected) {
         assertThat(home.getSystemState().getDataQuality().getValue()).isEqualTo(expected);
-        assertThat(home.getHeader().getUpdatedAt())
-                .isEqualTo(LocalDateTime.ofInstant(expected, ZoneOffset.UTC));
+        assertThat(home.getHeader().getUpdatedAt()).isEqualTo(expected);
     }
 
     private HomeTopAssetProjection projection(Long assetId,
