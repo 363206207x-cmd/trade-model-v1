@@ -38,8 +38,15 @@ import org.example.trademodel.vo.PushRecheckLogItemVO;
 import org.example.trademodel.vo.PushRecheckOpsOverviewVO;
 import org.example.trademodel.vo.PushRecheckReplaySummaryVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -59,6 +66,7 @@ import java.util.stream.Collectors;
 public class PushRecheckServiceImpl implements PushRecheckService {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Logger LOG = LoggerFactory.getLogger(PushRecheckServiceImpl.class);
 
     private final PushSnapshotMapper pushSnapshotMapper;
     private final AccountRiskSnapshotMapper accountRiskSnapshotMapper;
@@ -72,6 +80,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     private HighValueAlertMessageService highValueAlertMessageService;
     private AnalysisRunMapper analysisRunMapper;
     private ExecutionPlanMapper executionPlanMapper;
+    private TransactionTemplate safetyFailureTransaction;
     private Clock clock = Clock.systemUTC();
 
     public PushRecheckServiceImpl(PushSnapshotMapper pushSnapshotMapper,
@@ -129,6 +138,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     }
 
     @Autowired(required = false)
+    void setTransactionManager(PlatformTransactionManager transactionManager) {
+        if (transactionManager == null) return;
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.safetyFailureTransaction = template;
+    }
+
+    @Autowired(required = false)
     public void setClock(Clock clock) {
         this.clock = clock != null ? clock : Clock.systemUTC();
     }
@@ -142,7 +159,12 @@ public class PushRecheckServiceImpl implements PushRecheckService {
     @Transactional(rollbackFor = Exception.class)
     public RecheckResult recheck(Long pushId, BigDecimal currentPrice, RecheckExecutionCommand command) {
         RecheckExecutionCommand executionCommand = command != null ? command : RecheckExecutionCommand.manual();
-        accessBoundary.requireInternalScheduledExecution(executionCommand);
+        boolean pushOpen = "PUSH_OPEN".equals(executionCommand.getTriggerSource());
+        if (pushOpen) {
+            accessBoundary.requireOwnerScopedPushOpenExecution(executionCommand);
+        } else {
+            accessBoundary.requireInternalScheduledExecution(executionCommand);
+        }
         if (pushId == null) {
             RecheckResult early = new RecheckResult();
             early.setPushId(null);
@@ -171,7 +193,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.INVALIDATED;
             message = "复查上下文无效，不得作为当前交易依据";
             failReasonJson = failJson("SNAPSHOT_NOT_FOUND", "push_id=" + pushId);
-        } else if ((thresholds = resolvePushRecheckThresholds()) == null) {
+        } else if ((thresholds = resolvePushRecheckThresholds(pushOpen)) == null) {
             status = RecheckStatusEnum.INVALIDATED;
             message = "复查配置不可用，仅供人工复核";
             failReasonJson = failJson("PUSH_RECHECK_CONFIG_NOT_READY", "push_recheck_config missing or invalid");
@@ -179,14 +201,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             status = RecheckStatusEnum.EXPIRED;
             message = "推送已过期，不得作为当前交易依据";
             failReasonJson = failJson("EXPIRED", "expires_at=" + snap.getExpiresAt());
-        } else if ((derivativesGuard = validateDerivativesForRecheck(snap)) != null
+        } else if ((derivativesGuard = validateDerivativesForRecheck(snap, pushOpen)) != null
                 && derivativesGuard.status() != null) {
             status = derivativesGuard.status();
             message = derivativesGuard.message();
             failReasonJson = failJson(derivativesGuard.reasonCode(), derivativesGuard.detail());
         } else {
             if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
-                PriceResolution resolved = resolveCurrentPrice(snap);
+                PriceResolution resolved = resolveCurrentPrice(snap, pushOpen);
                 currentPrice = resolved.currentPrice();
                 failReasonJson = resolved.failReasonJson();
             }
@@ -266,15 +288,63 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         row.setTraceId(snap != null ? snap.getTraceId() : null);
         fillSnapshotSideMetrics(row, snap);
         row.setCreateTime(now);
-        pushRecheckLogMapper.insert(row);
+        int inserted = pushRecheckLogMapper.insert(row);
+        if (pushOpen && inserted != 1) {
+            throw new IllegalStateException("push recheck completed result persistence failed");
+        }
 
         // 先落 recheck 日志，再在同一事务里回写 push_snapshot.push_status，
         // 让手动触发与自动调度共用同一“状态跟随链”。
         String nextPushStatus = PushRecheckStatusContract.toPushStatus(status);
-        pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
-        recordHighValueSafetyChange(snap, row, status, message, failReasonJson, now);
+        int snapshotUpdated = pushSnapshotMapper.updatePushStatus(pushId, nextPushStatus);
+        if (pushOpen && snapshotUpdated != 1) {
+            throw new IllegalStateException("push snapshot status update failed");
+        }
+        scheduleHighValueSafetyChangeAfterCommit(snap, row, status, message, failReasonJson, now);
 
         return result;
+    }
+
+    private void scheduleHighValueSafetyChangeAfterCommit(TmPushSnapshotDO snapshot,
+                                                           TmPushRecheckLogDO log,
+                                                           RecheckStatusEnum status,
+                                                           String message,
+                                                           String failReasonJson,
+                                                           LocalDateTime occurredAt) {
+        Runnable publish = () -> {
+            try {
+                recordHighValueSafetyChange(snapshot, log, status, message, failReasonJson, occurredAt);
+            } catch (RuntimeException failure) {
+                LOG.error("event=push_recheck_safety_message_failed pushId={} recheckId={} status={}",
+                        snapshot == null ? null : snapshot.getPushId(), log == null ? null : log.getLogId(),
+                        status, failure);
+                markSafetyMessageFailure(log == null ? null : log.getLogId());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publish.run();
+                }
+            });
+        } else {
+            publish.run();
+        }
+    }
+
+    private void markSafetyMessageFailure(Long recheckId) {
+        if (recheckId == null) return;
+        Runnable update = () -> {
+            if (pushRecheckLogMapper.markSafetyMessageFailure(recheckId) != 1) {
+                LOG.error("event=push_recheck_safety_failure_record_failed recheckId={}", recheckId);
+            }
+        };
+        if (safetyFailureTransaction != null) {
+            safetyFailureTransaction.executeWithoutResult(status -> update.run());
+        } else {
+            update.run();
+        }
     }
 
     private void recordHighValueSafetyChange(TmPushSnapshotDO snapshot,
@@ -295,8 +365,8 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 || status == RecheckStatusEnum.RISK_BLOCKED
                 || status == RecheckStatusEnum.INVALIDATED ? 4 : 3;
         highValueAlertMessageService.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
-                analysis.getOwnerId(), changeType, "PUSH_RECHECK",
-                log.getLogId() == null ? String.valueOf(snapshot.getPushId()) : String.valueOf(log.getLogId()),
+                analysis.getOwnerId(), changeType, "PUSH_SNAPSHOT",
+                String.valueOf(snapshot.getPushId()),
                 snapshot.getAnalysisId(), plan == null ? null : plan.getPlanId(),
                 plan == null ? null : plan.getOpportunityId(), String.valueOf(snapshot.getPushId()),
                 snapshot.getSymbol(), snapshot.getTraceId(),
@@ -403,7 +473,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
         row.setCurrentDataQualityScore(snap.getDataQualityScoreSnapshot());
     }
 
-    private PriceResolution resolveCurrentPrice(TmPushSnapshotDO snap) {
+    private PriceResolution resolveCurrentPrice(TmPushSnapshotDO snap, boolean failOnInfrastructure) {
         String symbol = trimToNull(snap != null ? snap.getSymbol() : null);
         if (symbol == null) {
             return PriceResolution.failed(failJson("PRICE_REQUIRED", "snapshot symbol missing"));
@@ -420,19 +490,21 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             }
             return PriceResolution.success(result.payload().lastPrice());
         } catch (RuntimeException ex) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(ex);
             return PriceResolution.failed(failJson("QUOTE_UNAVAILABLE", ex.getMessage()));
         }
     }
 
-    private RuleConfigContractService.PushRecheckThresholds resolvePushRecheckThresholds() {
+    private RuleConfigContractService.PushRecheckThresholds resolvePushRecheckThresholds(boolean failOnInfrastructure) {
         try {
             return ruleConfigContractService != null ? ruleConfigContractService.requirePushRecheckThresholds() : null;
         } catch (RuntimeException ex) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(ex);
             return null;
         }
     }
 
-    private DerivativesGuard validateDerivativesForRecheck(TmPushSnapshotDO snap) {
+    private DerivativesGuard validateDerivativesForRecheck(TmPushSnapshotDO snap, boolean failOnInfrastructure) {
         if (snap == null || !requiresDerivatives(snap.getInvalidationConditionJson())) return null;
         if (derivativesSnapshotReadPort == null) {
             return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives reader unavailable");
@@ -462,7 +534,14 @@ public class PushRecheckServiceImpl implements PushRecheckService {
             }
             return null;
         } catch (RuntimeException failure) {
+            if (failOnInfrastructure) throw new PushOpenInfrastructureException(failure);
             return DerivativesGuard.blocked("DERIVATIVES_UNAVAILABLE", "cached derivatives read failed");
+        }
+    }
+
+    private static final class PushOpenInfrastructureException extends RuntimeException {
+        private PushOpenInfrastructureException(Throwable cause) {
+            super("PUSH_OPEN infrastructure failure", cause);
         }
     }
 

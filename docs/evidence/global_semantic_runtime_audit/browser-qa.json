@@ -1,0 +1,42 @@
+{
+  "browserStatus": "PASS",
+  "viewports": [
+    {"width": 1440, "height": 900, "documentWidth": 1440, "horizontalOverflow": 0, "textClippingCount": 0},
+    {"width": 1280, "height": 800, "documentWidth": 1280, "horizontalOverflow": 0, "textClippingCount": 0},
+    {"width": 1080, "height": 800, "documentWidth": 1080, "horizontalOverflow": 0, "textClippingCount": 0}
+  ],
+  "systemStatus": {
+    "environment": "弱偏多",
+    "systemRisk": "中",
+    "dataQuality": "87 · 新鲜",
+    "serviceAvailability": "正常",
+    "recordedAccount": "极高·3笔·部分覆盖",
+    "hotReset": "未触发"
+  },
+  "gpt": {
+    "firstVisual": "GPT Candidate · 非 Final",
+    "marketBias": "弱偏多",
+    "opportunityState": "等待触发",
+    "candidateMode": "预备型"
+  },
+  "gemini": {
+    "independentSections": ["证据缺口", "逻辑冲突", "风险低估"],
+    "reviewsCandidate": true
+  },
+  "grok": {
+    "firstVisual": "失败路径状态",
+    "failurePathState": "已发现",
+    "planModeMutationVisible": false
+  },
+  "positionFailClosed": {
+    "PENDING": {"stateTextCount": 1, "entryFactsVisible": true, "monitorFieldsVisible": false},
+    "STALE": {"stateTextCount": 1, "entryFactsVisible": true, "monitorFieldsVisible": false},
+    "INVALID": {"stateTextCount": 1, "entryFactsVisible": true, "monitorFieldsVisible": false},
+    "SOURCE_UNAVAILABLE": {"stateTextCount": 1, "entryFactsVisible": true, "monitorFieldsVisible": false}
+  },
+  "visibleRawEnumCount": 0,
+  "consoleErrorWarningCount": 0,
+  "normalRuntimeDashboardHttp": 200,
+  "normalRuntimeHomeApiCode": 200,
+  "uiReviewMarkerInNormalRuntime": false
+}

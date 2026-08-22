@@ -291,6 +291,41 @@ class PushRecheckServiceImplTest {
     }
 
     @Test
+    void ownedPushOpenInfrastructureFailureEscapesForIndependentErrorTransaction() {
+        TmPushSnapshotDO snapshot = baseSnap();
+        snapshot.setSymbol("BTCUSDT");
+        snapshot.setTraceId("trace-error");
+        when(pushSnapshotMapper.selectByPushId(451L)).thenReturn(snapshot);
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT"))
+                .thenThrow(new RuntimeException("provider unavailable"));
+
+        assertThatThrownBy(() -> service.recheck(451L, null,
+                RecheckExecutionCommand.pushOpen(1, null)))
+                .isInstanceOf(RuntimeException.class);
+
+        verify(pushRecheckLogMapper, never()).insert(any());
+        verify(pushSnapshotMapper, never()).updatePushStatus(any(), any());
+    }
+
+    @Test
+    void ownedPushOpenBusinessInvalidationRemainsCompletedAndIsNotExecutionError() {
+        when(pushSnapshotMapper.selectByPushId(452L)).thenReturn(null);
+        when(pushRecheckLogMapper.insert(any())).thenReturn(1);
+        when(pushSnapshotMapper.updatePushStatus(452L, "RECHECK_INVALIDATED")).thenReturn(1);
+
+        RecheckResult result = service.recheck(452L, null,
+                RecheckExecutionCommand.pushOpen(1, null));
+
+        assertThat(result.getRecheckStatus()).isEqualTo(RecheckStatusEnum.INVALIDATED);
+        ArgumentCaptor<org.example.trademodel.entity.TmPushRecheckLogDO> cap =
+                ArgumentCaptor.forClass(org.example.trademodel.entity.TmPushRecheckLogDO.class);
+        verify(pushRecheckLogMapper).insert(cap.capture());
+        assertThat(cap.getValue().getExecutionStatus()).isEqualTo("COMPLETED");
+        assertThat(cap.getValue().getRecheckStatus()).isEqualTo("INVALIDATED");
+        verify(pushSnapshotMapper).updatePushStatus(452L, "RECHECK_INVALIDATED");
+    }
+
+    @Test
     void missingCurrentPriceSnapshotSymbolMissingFailsClosedWithPriceRequired() {
         TmPushSnapshotDO s = baseSnap();
         s.setSymbol(null);

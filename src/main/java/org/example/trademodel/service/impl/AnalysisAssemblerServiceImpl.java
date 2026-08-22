@@ -424,7 +424,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     effectiveContext.getRuleVersion(),
                     effectiveContext.isPreview(),
                     effectiveContext.getRequestId(),
-                    accountRiskSnapshot));
+                    accountRiskSnapshot,
+                    derivativesInput == null ? null : derivativesInput.snapshot(),
+                    derivativesAssessment));
             if (decisionChain == null) {
                 throw new IllegalStateException("V4_1_DECISION_CHAIN_RESULT_REQUIRED");
             }

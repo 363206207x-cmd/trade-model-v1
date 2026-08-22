@@ -10,6 +10,7 @@ import org.example.trademodel.enums.UserPositionStatusEnum;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,6 +34,7 @@ public class UserPositionServiceImpl implements UserPositionService {
 
     private final UserPositionMapper userPositionMapper;
     private final ExecutionPlanMapper executionPlanMapper;
+    private Clock clock = Clock.systemUTC();
 
     public UserPositionServiceImpl(UserPositionMapper userPositionMapper) {
         this(userPositionMapper, null);
@@ -60,7 +63,14 @@ public class UserPositionServiceImpl implements UserPositionService {
         BigDecimal stopLoss = optionalPositive(request.getStopLoss(), "stop_loss");
         BigDecimal takeProfit = optionalPositive(request.getTakeProfit(), "take_profit");
         String finalPlanId = validateFinalPlanReference(sourceType, request.getFinalPlanId(), assetSymbol);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = UtcLocalTimePolicy.now(clock);
+        LocalDateTime openedAt = request.getOpenedAt();
+        if (openedAt == null) {
+            throw new IllegalArgumentException("opened_at is required");
+        }
+        if (openedAt.isAfter(now)) {
+            throw new IllegalArgumentException("opened_at must not be in the future");
+        }
 
         UserPositionDO row = new UserPositionDO();
         row.setUserId(userId);
@@ -72,7 +82,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         row.setLeverage(leverage);
         row.setStopLoss(stopLoss);
         row.setTakeProfit(takeProfit);
-        row.setOpenedAt(now);
+        row.setOpenedAt(openedAt);
         row.setClosedAt(null);
         row.setClosePrice(null);
         row.setCloseReason(null);
@@ -106,11 +116,21 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (!isActivePositionStatus(existing.getStatus())) {
             throw new UserPositionConflictException("UserPosition is not OPEN or PARTIALLY_CLOSED");
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = UtcLocalTimePolicy.now(clock);
+        LocalDateTime closedAt = request.getClosedAt();
+        if (closedAt == null) {
+            throw new IllegalArgumentException("closed_at is required");
+        }
+        if (closedAt.isAfter(now)) {
+            throw new IllegalArgumentException("closed_at must not be in the future");
+        }
+        if (existing.getOpenedAt() != null && closedAt.isBefore(existing.getOpenedAt())) {
+            throw new IllegalArgumentException("closed_at must not be before opened_at");
+        }
         int updated = userPositionMapper.manualCloseByIdAndUserId(
                 id,
                 userId,
-                now,
+                closedAt,
                 closePrice,
                 trimToNull(request.getCloseReason()),
                 now
@@ -138,6 +158,22 @@ public class UserPositionServiceImpl implements UserPositionService {
                 .filter(row -> row != null && isActivePositionStatus(row.getStatus()))
                 .map(UserPositionServiceImpl::toVo)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserPositionVO> listClosedPositionsForUser(Long userId, int limit) {
+        requireUserId(userId);
+        if (limit <= 0 || limit > 100) throw new IllegalArgumentException("limit must be between 1 and 100");
+        List<UserPositionDO> rows = userPositionMapper.listClosedManualByUserId(userId, limit);
+        return (rows == null ? List.<UserPositionDO>of() : rows).stream()
+                .map(UserPositionServiceImpl::toVo)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public int countClosedPositionsForUser(Long userId) {
+        requireUserId(userId);
+        return userPositionMapper.countClosedByUserId(userId);
     }
 
     @Override

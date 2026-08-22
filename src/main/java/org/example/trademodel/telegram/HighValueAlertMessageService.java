@@ -122,7 +122,7 @@ public class HighValueAlertMessageService {
         MessageDO message = base(run.getOwnerId(), "HIGH_PERMISSION_OPPORTUNITY", "PUSH_SNAPSHOT",
                 String.valueOf(snapshot.getPushId()), run.getAnalysisId(), null, plan.getPlanId(),
                 run.getSymbol(), run.getTraceId(), plan.getValidUntil());
-        message.setCurrentRecheckId(String.valueOf(snapshot.getPushId()));
+        message.setCurrentRecheckId(null);
         message.setTitle("【机会达到人工复核条件】");
         message.setBody("资产：" + safe(run.getSymbol())
                 + "\n方向：" + readableBias(plan.getFinalMarketBias())
@@ -145,7 +145,7 @@ public class HighValueAlertMessageService {
         MessageDO message = base(input.userId(), "OPPORTUNITY_PLAN_SAFETY_CHANGE",
                 required(input.sourceType()), required(input.sourceId()), input.analysisId(), null,
                 input.planId(), input.symbol(), input.traceId(), input.expiresAt());
-        message.setCurrentRecheckId(input.pushSnapshotId());
+        message.setCurrentRecheckId(null);
         message.setTitle("【原计划需要重新验证】");
         message.setBody("资产：" + safe(input.symbol())
                 + "\n变化：" + readableSafetyChange(input.changeType())

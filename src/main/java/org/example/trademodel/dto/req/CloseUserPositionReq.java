@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -13,6 +14,8 @@ public class CloseUserPositionReq {
     private BigDecimal closePrice;
     @JsonAlias("close_reason")
     private String closeReason;
+    @JsonAlias("closed_at")
+    private LocalDateTime closedAt;
 
     @JsonIgnore
     private final Map<String, Object> extraFields = new LinkedHashMap<>();
@@ -36,6 +39,14 @@ public class CloseUserPositionReq {
 
     public void setCloseReason(String closeReason) {
         this.closeReason = closeReason;
+    }
+
+    public LocalDateTime getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(LocalDateTime closedAt) {
+        this.closedAt = closedAt;
     }
 
     public Map<String, Object> getExtraFields() {

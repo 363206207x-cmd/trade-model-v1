@@ -14,6 +14,8 @@ public class AnalysisTraceSnapshot {
     private final String symbol;
     private final String timeframe;
     private final String status;
+    private final String analysisMode;
+    private final Boolean preview;
     private final String traceStatus;
     private final List<String> missingSegments;
     private final LocalDateTime generatedAt;
@@ -60,6 +62,8 @@ public class AnalysisTraceSnapshot {
         this.symbol = run.getSymbol();
         this.timeframe = run.getTimeframe();
         this.status = run.getStatus();
+        this.analysisMode = run.getAnalysisMode();
+        this.preview = run.getPreview();
         this.missingSegments = missingSegments(evidenceIds, scoreIds, decisionIds, executionPlanIds);
         this.traceStatus = traceStatus(run.getStatus(), this.missingSegments);
         this.generatedAt = LocalDateTime.now();
@@ -87,6 +91,8 @@ public class AnalysisTraceSnapshot {
     public String getSymbol() { return symbol; }
     public String getTimeframe() { return timeframe; }
     public String getStatus() { return status; }
+    public String getAnalysisMode() { return analysisMode; }
+    public Boolean getPreview() { return preview; }
     public String getTraceStatus() { return traceStatus; }
     public List<String> getMissingSegments() { return missingSegments; }
     public LocalDateTime getGeneratedAt() { return generatedAt; }

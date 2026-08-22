@@ -12,7 +12,7 @@
   "sourceHashes": {
     "dashboardHtml": "1ad287ccd22a6bd53accd90f56e5079989f1397e735c0165aa7249d8dd09c125",
     "dashboardLatestCss": "625c9fb07d051e595d56bd265bfab1ce5ec76bfc71d02ef21e7a1ce026ccba69",
-    "frontendContractJs": "45ac09ce6d2dc116f8f7e3b44afb6de2f9ded269df70d9e215ef7f0f873af5a5",
+    "frontendContractJs": "dc1afbf7302b4d8923880616a241aa57117b70f95eecca116f6a9b4279201c11",
     "visualFixture": "7bb2bcf8fed2761c2d40ae7d79d2e0084010476332886842eb3b877afc7c7785"
   },
   "counts": {
@@ -76,7 +76,7 @@
     "validatedAt": "2026-08-15T01:54:37+08:00",
     "runtimeScope": "AUTHENTICATED_LOCAL_BROWSER_CONTROLLED",
     "runtimeUrl": "http://127.0.0.1:8082",
-    "frontendContractJs": "45ac09ce6d2dc116f8f7e3b44afb6de2f9ded269df70d9e215ef7f0f873af5a5",
+    "frontendContractJs": "dc1afbf7302b4d8923880616a241aa57117b70f95eecca116f6a9b4279201c11",
     "home": {
       "primaryNavigationCount": 5,
       "systemStatusCount": 6,

@@ -56,13 +56,6 @@ body {
     box-shadow: 18px 0 0 #17a673, 36px 0 0 #e7a53a;
 }
 
-.product-name {
-    margin: 0 0 8px;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 700;
-}
-
 h1 {
     margin: 0 0 24px;
     font-size: 24px;
@@ -147,13 +140,6 @@ h1 {
 .login-form button:focus-visible {
     outline: 3px solid rgba(31, 100, 216, 0.22);
     outline-offset: 2px;
-}
-
-.login-footnote {
-    margin: 22px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-    text-align: center;
 }
 
 @media (max-width: 420px) {

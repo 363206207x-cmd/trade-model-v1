@@ -1,6 +1,8 @@
 package org.example.trademodel.decisionchain;
 
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
+import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
+import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
@@ -26,7 +28,31 @@ public record DecisionChainBuildInput(
         String ruleVersion,
         boolean preview,
         String requestId,
-        TmAccountRiskSnapshotDO accountRiskSnapshot) {
+        TmAccountRiskSnapshotDO accountRiskSnapshot,
+        DerivativesRiskSnapshot derivativesSnapshot,
+        DerivativesBusinessAssessment derivativesAssessment) {
+
+    public DecisionChainBuildInput(String analysisId,
+                                   String traceId,
+                                   String symbol,
+                                   String timeframe,
+                                   Integer dataQualityScore,
+                                   DecisionBundleVO decision,
+                                   ExecutionPlanVO rulePlan,
+                                   List<EvidenceItemVO> evidence,
+                                   List<ScoreItemVO> scores,
+                                   AnalysisRunTriggerType triggerType,
+                                   String ownerType,
+                                   Long ownerId,
+                                   Long assetId,
+                                   String ruleVersion,
+                                   boolean preview,
+                                   String requestId,
+                                   TmAccountRiskSnapshotDO accountRiskSnapshot) {
+        this(analysisId, traceId, symbol, timeframe, dataQualityScore, decision, rulePlan,
+                evidence, scores, triggerType, ownerType, ownerId, assetId, ruleVersion,
+                preview, requestId, accountRiskSnapshot, null, null);
+    }
 
     public DecisionChainBuildInput(String analysisId,
                                    String traceId,

@@ -524,6 +524,7 @@ class V1BusinessStressTest {
         req.setLeverage(new BigDecimal("2"));
         req.setStopLoss(new BigDecimal("90"));
         req.setTakeProfit(new BigDecimal("120"));
+        req.setOpenedAt(LocalDateTime.of(2024, 1, 1, 10, 0));
         req.setSourceType("MANUAL");
         req.setSourceRefId(planId);
         return req;
@@ -533,6 +534,7 @@ class V1BusinessStressTest {
         CloseUserPositionReq req = new CloseUserPositionReq();
         req.setClosePrice(new BigDecimal("112"));
         req.setCloseReason("paper stress close");
+        req.setClosedAt(LocalDateTime.of(2024, 1, 1, 12, 0));
         return req;
     }
 

@@ -4,21 +4,23 @@
     const root = document.body;
     const pageKey = root.dataset.pageKey || "";
     const resourceId = root.dataset.resourceId || "";
+    const uiReviewMode = root.dataset.uiReviewMode === "true";
     const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
     const liveRegion = document.getElementById("workspaceLiveRegion");
     const frontendContract = window.TradeModelFrontendContract || {};
     const userFacingSemantic = frontendContract.USER_FACING_SEMANTIC_MAPPER || {};
+    const reviewResultLabel = frontendContract.reviewResultLabel;
+    const failurePathView = frontendContract.failurePathView;
+    const roleGate = frontendContract.roleGate;
+    const analysisModeGate = frontendContract.analysisModeGate;
     let restoreFocus = null;
     let analysisAudit = null;
-    let currentHome = null;
-    let selectedHomeSymbol = "";
-    let activeHomeAiRole = "GPT_FINAL";
     let assetPoolItems = [];
     let latestTasks = [];
     let analysisSelectedAsset = null;
     let analysisPoolSymbols = new Set();
-    let analysisMode = "ANALYSIS_PREVIEW";
+    let analysisMode = null;
 
     const labels = {
         LONG: "做多", SHORT: "做空",
@@ -38,6 +40,7 @@
         REDUCE_POSITION: "降低仓位", TIGHTEN_STOP: "收紧止损",
         MOVE_STOP: "移动止损", PARTIAL_TAKE_PROFIT: "分批止盈",
         WAIT_CONFIRMATION: "等待人工确认", RECORD_CLOSE_REVIEW: "记录平仓并进入复盘",
+        SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
         OPEN_MONITORING: "持续监控", WAITING_MONITOR_DATA: "等待监控数据",
         RISK_ESCALATED: "风险升级", CLOSED: "已平仓", NO_POSITION: "暂无持仓",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型",
@@ -73,8 +76,12 @@
         TRIGGERED: "已触发", HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
-        GPT_FINAL: "证据综合与候选形成", GEMINI_REVIEW: "证据与风险复核",
-        GROK_CHALLENGE: "失败路径与压力测试",
+        REVIEW_PASSED: "复核通过", REVIEW_WAITING: "等待人工复核",
+        APPROVE: "通过", DOWNGRADE: "降级", REJECT_CANDIDATE: "拒绝候选", RISK_WARNING: "风险警告",
+        DRIFTED_FROM_ENTRY_ZONE: "偏离入场区", DRIFTED: "发生偏移",
+        RISK_BLOCKED: "风险阻断", CONFUSED_BLOCKED: "冲突阻断",
+        GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核",
+        GROK_CHALLENGE: "Grok 反方挑战",
         NOT_CALLED_INPUT_GATE: "未调用（输入门禁）", INVALID_RESPONSE: "返回内容无效",
         MARKET_HEURISTIC: "市场启发式", SYSTEM_GENERATED: "系统生成",
         MODERATE_LEVERAGE: "适中杠杆"
@@ -110,12 +117,11 @@
     }
 
     function roleLabel(role, mode) {
-        const preview = mode === "ANALYSIS_PREVIEW";
         return {
-            GPT_FINAL: preview ? "证据综合与方向假设" : "证据综合与候选形成",
-            GEMINI_REVIEW: preview ? "证据质量与逻辑复核" : "证据与风险复核",
-            GROK_CHALLENGE: preview ? "反向情景与风险压力测试" : "失败路径与压力测试"
-        }[String(role || "").toUpperCase()] || "AI 分析";
+            GPT_FINAL: "GPT 综合判断",
+            GEMINI_REVIEW: "Gemini 冲突复核",
+            GROK_CHALLENGE: "Grok 反方挑战"
+        }[String(role || "").toUpperCase()] || "分析";
     }
 
     function escapeHtml(value) {
@@ -161,10 +167,44 @@
         return payload && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;
     }
 
+    function safeReturnTo(value, fallback) {
+        if (!value || typeof value !== "string") return fallback;
+        const candidate = value.trim();
+        if (!candidate || candidate.includes("\\")
+            || candidate.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(candidate)) return fallback;
+        try {
+            const parsed = new URL(candidate, window.location.origin);
+            const allowed = [
+                /^\/dashboard$/,
+                /^\/messages$/,
+                /^\/recheck\/[^/]+$/,
+                /^\/plans\/[^/]+$/,
+                /^\/positions(?:\/[^/]+)?$/,
+                /^\/analysis(?:\/[^/]+)?$/,
+                /^\/audit\/[^/]+$/
+            ];
+            if (parsed.origin !== window.location.origin
+                || /%(?:2f|5c|25)/i.test(parsed.pathname)
+                || !allowed.some(function (pattern) { return pattern.test(parsed.pathname); })) return fallback;
+            return parsed.pathname + parsed.search + parsed.hash;
+        } catch (_) {
+            return fallback;
+        }
+    }
+
     function factGrid(items) {
         return '<dl class="fact-grid">' + items.map(function (item) {
             return '<div><dt>' + escapeHtml(item[0]) + '</dt><dd' + (item[2] ? ' class="' + escapeHtml(item[2]) + '"' : "") + '>' + escapeHtml(item[1]) + '</dd></div>';
         }).join("") + "</dl>";
+    }
+
+    function lifecycleActionText(value, opportunityState) {
+        const raw = text(value, "");
+        if ((String(opportunityState || "").toUpperCase() === "WAITING_TRIGGER"
+                || /等待触发/.test(raw)) && /人工确认/.test(raw)) {
+            return "等待触发；触发后重新校验，通过后再进入人工确认";
+        }
+        return raw || "当前不可查看";
     }
 
     function stateBadge(value) {
@@ -180,9 +220,7 @@
             ["数据库", label(provider?.databaseStatus, "当前不可查看")]
         ]);
         const explanation = '<p class="provider-status-message">' + escapeHtml(
-            provider?.failClosed === true
-                ? "当前状态仅供人工复核；所有下游动作保持关闭。"
-                : "当前运行状态可读；这不是交易授权。"
+            provider?.failClosed === true ? "运行条件未通过" : "运行状态可读"
         ) + "</p>";
         const audit = '<details class="audit-disclosure provider-audit"><summary>查看审计元数据</summary>' + factGrid([
             ["调度观察", label(provider?.schedulerObservationStatus, "当前不可查看")],
@@ -243,337 +281,17 @@
         });
     }
 
-    async function loadHomeContext(symbol) {
-        try {
-            const query = new URLSearchParams({ limit: "6" });
-            if (hasValue(symbol)) query.set("selectedSymbol", symbol);
-            const data = await api("/api/dashboard/home?" + query.toString());
-            const header = data?.header || {};
-            document.getElementById("workspaceDataStatus").textContent = label(header.dataStatus, "等待同步");
-            document.getElementById("workspaceAiStatus").textContent = text(header.aiStatusLabel, label(header.aiStatus, "等待同步"));
-            currentHome = data || {};
-            return data || {};
-        } catch (_) {
-            document.getElementById("workspaceDataStatus").textContent = "当前不可查看";
-            document.getElementById("workspaceAiStatus").textContent = "当前不可查看";
-            return {};
-        }
-    }
-
-    function setText(id, value) {
-        const node = document.getElementById(id);
-        if (node) node.textContent = value;
-    }
-
-    function statusValue(card, fallback) {
-        if (!card) return fallback || "等待同步";
-        return text(card.valueLabel, hasValue(card.value) ? label(card.value, fallback) : label(card.status, fallback));
-    }
-
-    function homeSymbol(asset) {
-        const symbol = text(asset?.rawSymbol || asset?.symbol, "").trim().toUpperCase();
-        return /^[A-Z0-9][A-Z0-9._:/-]{1,31}$/.test(symbol) ? symbol : "";
-    }
-
-    function homeEmpty(title, detail, action) {
-        return '<div class="home-compact-empty"><strong>' + escapeHtml(title) + '</strong><span>'
-            + escapeHtml(detail) + '</span>' + (action || "") + '</div>';
-    }
-
-    function timeframeSummary(asset) {
-        const primary = text(asset?.primaryTimeframe, "");
-        const secondary = Number(asset?.secondaryOpportunityCount || 0);
-        let summary = primary ? primary + (secondary > 0 ? " + " + secondary + " 个次级周期" : "")
-            : text(asset?.multiTimeframeState, "多周期状态当前不可查看");
-        if (String(asset?.timeframeConflictState || "").toUpperCase() === "OPPOSING") {
-            summary += " · 周期方向冲突";
-        }
-        return summary;
-    }
-
-    function renderHomeStatus(home) {
-        const state = home?.systemState || {};
-        const assets = Array.isArray(home?.assets) ? home.assets : [];
-        setText("homeMarketTrend", statusValue(state.marketTrend));
-        setText("homeSystemRisk", statusValue(state.riskLevel));
-        setText("homeDataQuality", statusValue(state.dataQuality));
-        setText("homeAiService", text(home?.header?.aiStatusLabel, label(home?.header?.aiStatus, "等待同步")));
-        setText("homeOpportunityCount", assets.length ? assets.length + " 个" : "暂无建议");
-        setText("homeHotReset", statusValue(state.hotReset, "正常"));
-    }
-
-    function eventTime(value) {
-        if (!hasValue(value)) return "";
-        if (typeof value === "string") return formatTime(value);
-        return formatTime(value.startAt || value.start || value.from || value.observedAt);
-    }
-
-    function renderHomeSignals(home) {
-        const alerts = Array.isArray(home?.alerts) ? home.alerts : [];
-        const events = Array.isArray(home?.events) ? home.events : [];
-        const alert = alerts[0];
-        const event = events[0];
-        const strip = document.getElementById("homeSignalStrip");
-        const alertRow = document.getElementById("homeAlertRow");
-        const eventRow = document.getElementById("homeEventRow");
-        if (alertRow) {
-            alertRow.hidden = !alert;
-            if (alert) {
-                alertRow.querySelector("strong").textContent = text(alert.message, "风险状态已变化");
-                alertRow.querySelector("time").textContent = formatTime(alert.time);
-            }
-        }
-        if (eventRow) {
-            eventRow.hidden = !event;
-            if (event) {
-                eventRow.querySelector("strong").textContent = text(event.label, "重要事件");
-                eventRow.querySelector("time").textContent = eventTime(event.timeWindow);
-                eventRow.onclick = function () {
-                    const target = document.getElementById("eventDetailContent");
-                    if (target) target.innerHTML = factGrid([
-                        ["事件", text(event.label, "重要事件")],
-                        ["类型", label(event.type, "事件")],
-                        ["影响", label(event.impactLevel, "当前不可查看")],
-                        ["时间", eventTime(event.timeWindow) || "当前不可查看"]
-                    ]);
-                };
-            }
-        }
-        if (strip) strip.hidden = !alert && !event;
-    }
-
-    function renderHomeAssets(home) {
-        const target = document.getElementById("homeOpportunityGrid");
-        if (!target) return;
-        const assets = (Array.isArray(home?.assets) ? home.assets : [])
-            .filter(function (asset) { return homeSymbol(asset) && asset.slotType !== "DEFAULT_SLOT"; })
-            .slice(0, 6);
-        const state = String(home?.states?.assets || "MISSING").toUpperCase();
-        if (!assets.length) {
-            const poolAction = '<a class="button button-secondary" href="/asset-pool">管理资产池</a>';
-            const title = state === "ERROR" || state === "MISSING" ? "机会排序暂不可用" : "当前没有进入重点机会的资产";
-            const detail = state === "ERROR" || state === "MISSING" ? "数据恢复后可重新扫描。" : "观察资产仍会持续分析。";
-            target.innerHTML = homeEmpty(title, detail, poolAction);
-            setText("homeOpportunitySummary", title);
-            return;
-        }
-        setText("homeOpportunitySummary", "按当前机会质量动态排序 · " + assets.length + " 个");
-        target.innerHTML = assets.map(function (asset) {
-            const symbol = homeSymbol(asset);
-            const selected = symbol === selectedHomeSymbol ? " is-selected" : "";
-            const name = text(asset.name, symbol.replace(/USDT$/, ""));
-            const bias = text(asset.marketBiasLabel, label(asset.marketBias, "当前不可查看"));
-            const mode = label(asset.primaryPlanMode || asset.planMode, "当前不可查看");
-            const score = hasValue(asset.opportunityScore) ? formatNumber(asset.opportunityScore, { maximumFractionDigits: 0 }) : "当前不可查看";
-            const confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
-            const risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
-            return '<article class="home-opportunity-card' + selected + '" tabindex="0" role="button" data-home-symbol="'
-                + escapeHtml(symbol) + '" aria-label="查看 ' + escapeHtml(symbol) + ' 决策上下文"><header><div><strong>'
-                + escapeHtml(name) + '</strong><small>' + escapeHtml(symbol) + '</small></div>'
-                + stateBadge(asset.opportunityState || asset.assetState) + '</header><div class="home-opportunity-primary">'
-                + '<span><small>方向 / 模式</small><strong>' + escapeHtml(bias + " · " + mode) + '</strong></span>'
-                + '<span><small>机会评分</small><strong>' + escapeHtml(score) + '</strong></span>'
-                + '<span><small>置信度</small><strong>' + escapeHtml(confidence) + '</strong></span>'
-                + '<span><small>风险</small><strong>' + escapeHtml(risk) + '</strong></span></div>'
-                + '<div class="home-timeframe-row"><span>' + escapeHtml(timeframeSummary(asset)) + '</span>'
-                + '<em data-ranking-reason="' + escapeHtml(text(asset.rankingReason, "排名依据当前不可查看")) + '">排名依据</em></div></article>';
-        }).join("");
-        target.querySelectorAll("[data-home-symbol]").forEach(function (card) {
-            function select(event) {
-                if (event?.target?.closest("[data-ranking-reason]")) return;
-                selectedHomeSymbol = card.dataset.homeSymbol;
-                if (typeof frontendContract.replaceUrlParam === "function") frontendContract.replaceUrlParam("asset", selectedHomeSymbol);
-                loadHome(selectedHomeSymbol);
-            }
-            card.addEventListener("click", select);
-            card.addEventListener("keydown", function (event) {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                select(event);
-            });
-        });
-        target.querySelectorAll("[data-ranking-reason]").forEach(function (control) {
-            control.addEventListener("click", function (event) {
-                event.stopPropagation();
-                const detail = document.getElementById("poolAssetDetailContent");
-                if (detail) detail.innerHTML = '<h3>排名依据</h3><p>' + escapeHtml(control.dataset.rankingReason) + '</p>';
-                openOverlay("pool-asset-detail", control);
-            });
-        });
-    }
-
-    function renderHomePositions(home) {
-        const target = document.getElementById("homePositionList");
-        if (!target) return;
-        const positions = (Array.isArray(home?.positions) ? home.positions : []).slice(0, 3);
-        if (!positions.length) {
-            target.innerHTML = homeEmpty("暂无手动录入持仓", "录入真实开仓事实后开始监控。",
-                '<button class="button button-secondary" type="button" data-open-overlay="actual-position">录入持仓</button>');
-            return;
-        }
-        target.innerHTML = positions.map(function (position) {
-            const trusted = trustedMonitor(position);
-            const status = trusted ? text(position.monitorConclusionLabel, label(position.monitorConclusion))
-                : label(position.dataState, "等待监控数据");
-            const action = trusted ? text(position.suggestedManualActionText, label(position.suggestedAction)) : "等待可信结果";
-            return '<article class="home-position-row"><header><strong>' + escapeHtml(text(position.symbol, "持仓资产"))
-                + '<span>' + escapeHtml(text(position.directionLabel, label(position.direction))) + '</span></strong><div class="home-position-judgement">'
-                + '<span><small>持仓风险</small><b>' + escapeHtml(trusted ? text(position.riskLevelLabel, label(position.riskLevel)) : "当前不可查看") + '</b></span>'
-                + '<span><small>监控结论</small><b>' + escapeHtml(status) + '</b></span>'
-                + '<span><small>建议动作</small><b>' + escapeHtml(action) + '</b></span></div>'
-                + '<a class="text-action" href="/positions/' + encodeURIComponent(position.positionId) + '">详情</a></header>'
-                + '<dl class="home-position-facts"><div><dt>开仓价</dt><dd>' + escapeHtml(formatNumber(position.entryPrice)) + '</dd></div>'
-                + '<div><dt>标记价格</dt><dd>' + escapeHtml(trusted ? formatNumber(position.markPrice) : "当前不可查看") + '</dd></div>'
-                + '<div><dt>盈亏</dt><dd>' + escapeHtml(trusted ? formatPercent(position.pnlPercent) : "当前不可查看") + '</dd></div>'
-                + '<div><dt>最近监控时间</dt><dd>' + escapeHtml(trusted ? formatTime(position.lastMonitorTime || position.lastMonitorAt) : "等待首次监控") + '</dd></div></dl></article>';
-        }).join("");
-    }
-
-    function renderHomePlan(home) {
-        const target = document.getElementById("homePlanSummary");
-        const button = document.getElementById("homePlanDetailButton");
-        if (!target || !button) return;
-        const plan = home?.executionSuggestion || {};
-        const access = typeof frontendContract.executionPlanAccess === "function"
-            ? frontendContract.executionPlanAccess(plan)
-            : { visible: plan.finalPlan === true && String(plan.validationStatus || "").toUpperCase() === "PASS" };
-        const selected = home?.selectedAssetContext;
-        setText("homePlanAsset", selected ? homeSymbol(selected) : "请选择重点机会");
-        if (!access.visible) {
-            button.disabled = true;
-            target.innerHTML = homeEmpty(access.statusLabel || "尚未形成最终计划",
-                access.reason || "选择重点机会后查看当前计划。", "");
-            const drawer = document.getElementById("planDrawerContent");
-            if (drawer) drawer.innerHTML = '<p class="muted">当前没有可验证的最终计划。</p>';
-            return;
-        }
-        const bias = label(plan.finalMarketBias || plan.direction, "当前不可查看");
-        const mode = label(plan.finalPlanMode, "当前不可查看");
-        target.innerHTML = '<div class="home-plan-decision"><small>最终方向 / 计划模式</small><strong>'
-            + escapeHtml(bias + " · " + mode) + '</strong></div>' + factGrid([
-                ["当前计划状态", text(plan.statusLabel, label(plan.status, "当前有效"))],
-                ["入场摘要", text(plan.entryZone, "当前不可查看")],
-                ["失效与止损", text(plan.stopLogic || plan.stopLoss || plan.invalidCondition, "当前不可查看")],
-                ["目标与趋势", text(plan.targetLogic || plan.targetZones || plan.takeProfitRules, "当前不可查看")],
-                ["有效期", text(plan.validPeriod, formatTime(plan.expiresAt))],
-                ["建议动作", label(plan.recommendedAction, "当前不可查看")]
-            ]) + '<p class="home-plan-note">' + escapeHtml(text(plan.executionFeasibilityReason || plan.downgradeReason, "当前计划已通过校验。")) + '</p>';
-        button.disabled = false;
-        const drawer = document.getElementById("planDrawerContent");
-        if (drawer) drawer.innerHTML = '<h3>' + escapeHtml(bias + " · " + mode) + '</h3>' + factGrid([
-            ["推荐动作", label(plan.recommendedAction)], ["入场逻辑", text(plan.entryLogic)],
-            ["入场区间", text(plan.entryZone)], ["触发条件", text(plan.triggerCondition)],
-            ["止损逻辑", text(plan.stopLogic || plan.stopLoss)], ["目标区域", text(plan.targetZones || plan.takeProfitRules)],
-            ["加仓条件", text(plan.addCondition)], ["减仓条件", text(plan.reduceCondition)],
-            ["放弃条件", text(plan.abandonCondition || plan.invalidCondition)], ["有效期", text(plan.validPeriod, formatTime(plan.expiresAt))]
-        ]) + '<a class="button button-secondary" href="/plans/' + encodeURIComponent(plan.sourceExecutionPlanId) + '">打开完整计划</a>';
-    }
-
-    function aiItemText(item) {
-        if (!hasValue(item)) return "";
-        if (typeof item !== "object") return label(item, text(item));
-        return label(item.text || item.currentValue || item.summary || item.reason || item.description || item.source,
-            "当前条目不可查看");
-    }
-
-    function homeAiCollection(role) {
-        if (role.role === "GPT_FINAL") return [...(role.supportingEvidence || []), ...(role.opposingEvidence || [])];
-        if (role.role === "GEMINI_REVIEW") return [...(role.evidenceGaps || []), ...(role.logicConflicts || []), ...(role.underestimatedRisks || [])];
-        return [...(role.failurePaths || []), ...(role.opposingScenarios || []), ...(role.externalEventRisks || [])];
-    }
-
-    function renderHomeAiRole() {
-        const target = document.getElementById("homeAiRoleContent");
-        const ai = currentHome?.aiDecision || {};
-        const roles = Array.isArray(ai.tabs) ? ai.tabs : [];
-        const role = roles.find(function (item) { return item.role === activeHomeAiRole; });
-        if (!target) return;
-        if (!role || role.resultAvailable !== true) {
-            target.innerHTML = homeEmpty(roleLabel(activeHomeAiRole, "OPPORTUNITY_DECISION"),
-                text(role?.statusMessage, "当前角色结果不可查看。"), "");
-            return;
-        }
-        const core = role.coreJudgment || {};
-        const summary = text(core.summary || role.decisionSummary || role.challengeSummary
-            || role.currentDirectionChallenge || role.reviewResult, "当前结论已生成");
-        const facts = activeHomeAiRole === "GPT_FINAL" ? [
-            ["候选方向", label(core.marketBias || core.direction || role.finalMarketBias)],
-            ["置信度", label(core.confidence || role.finalConfidence)],
-            ["风险", label(core.riskLevel || role.finalRiskLevel)],
-            ["候选模式", label(role.candidateSummary?.planMode || role.finalPlanMode)]
-        ] : activeHomeAiRole === "GEMINI_REVIEW" ? [
-            ["复核结果", label(role.reviewResult)], ["方向影响", label(role.finalDirectionImpact)],
-            ["置信度调整", label(role.confidenceAdjustment)], ["风险调整", label(role.riskAdjustment)]
-        ] : [
-            ["方向挑战", label(role.currentDirectionChallenge)],
-            ["重大反证", role.majorCounterEvidence === true ? "存在" : role.majorCounterEvidence === false ? "未发现" : "当前不可查看"],
-            ["计划影响", label(role.planModeImpact)], ["角色状态", label(role.roleState)]
-        ];
-        const items = homeAiCollection(role).map(aiItemText).filter(Boolean).slice(0, 4);
-        target.innerHTML = '<div class="home-ai-summary"><h3>' + escapeHtml(roleLabel(activeHomeAiRole, "OPPORTUNITY_DECISION"))
-            + '</h3><p>' + escapeHtml(summary) + '</p>' + factGrid(facts)
-            + (items.length ? '<ul class="home-ai-list">' + items.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join("") + '</ul>' : "")
-            + (role.analysisId ? '<a class="text-action" href="/analysis/' + encodeURIComponent(role.analysisId) + '">查看完整分析</a>' : "") + '</div>';
-    }
-
-    function renderHomeConsistency(home) {
-        const target = document.getElementById("homeConsistencyContent");
-        if (!target) return;
-        const consistency = home?.aiDecision?.consistency || {};
-        if (String(consistency.dataState || "").toUpperCase() !== "READY") {
-            target.innerHTML = '<div class="empty-state"><strong>暂无冲突与调整数据</strong></div>';
-            return;
-        }
-        target.innerHTML = factGrid([
-            ["一致性", label(consistency.conflictLevel)],
-            ["最终方向", label(consistency.finalMarketBias)],
-            ["计划模式", label(consistency.finalPlanMode)],
-            ["主要原因", text(consistency.mainReason)]
-        ]);
-    }
-
-    async function loadHome(symbol) {
-        const home = await loadHomeContext(symbol);
-        const assets = Array.isArray(home.assets) ? home.assets : [];
-        const selected = home.selectedSymbol || homeSymbol(home.selectedAssetContext) || homeSymbol(assets[0]);
-        selectedHomeSymbol = homeSymbol({ rawSymbol: selected });
-        if (typeof frontendContract.replaceUrlParam === "function") {
-            frontendContract.replaceUrlParam("asset", selectedHomeSymbol);
-        }
-        renderHomeStatus(home);
-        renderHomeSignals(home);
-        renderHomeAssets(home);
-        renderHomePositions(home);
-        renderHomePlan(home);
-        renderHomeAiRole();
-        renderHomeConsistency(home);
-    }
-
-    function bindHome() {
-        document.querySelectorAll("[data-home-ai-role]").forEach(function (tab) {
-            tab.addEventListener("click", function () {
-                activeHomeAiRole = tab.dataset.homeAiRole;
-                document.querySelectorAll("[data-home-ai-role]").forEach(function (item) {
-                    const selected = item === tab;
-                    item.classList.toggle("is-active", selected);
-                    item.setAttribute("aria-selected", String(selected));
-                });
-                renderHomeAiRole();
-            });
-        });
-        const requested = typeof frontendContract.readUrlParam === "function"
-            ? frontendContract.readUrlParam("asset") : new URLSearchParams(window.location.search).get("asset");
-        loadHome(requested || "");
-    }
-
     async function loadTasks() {
         const target = document.getElementById("asyncTaskList");
         try {
             const tasks = await api("/api/workspace/tasks?limit=30") || [];
             latestTasks = tasks;
-            document.getElementById("workspaceTaskCount").textContent = String(tasks.filter(function (task) {
+            const activeTaskCount = tasks.filter(function (task) {
                 return task.state === "QUEUED" || task.state === "RUNNING" || task.state === "PARTIAL";
-            }).length);
+            }).length;
+            const taskIndicator = document.querySelector(".task-indicator");
+            document.getElementById("workspaceTaskCount").textContent = String(activeTaskCount);
+            if (taskIndicator) taskIndicator.hidden = activeTaskCount === 0;
             if (!target) return;
             if (!tasks.length) {
                 empty(target, "暂无任务", "扫描、分析和重新校验任务会显示在这里。");
@@ -606,6 +324,8 @@
         } catch (_) {
             if (target) empty(target, "任务当前不可查看", "系统没有返回可信任务状态。");
             latestTasks = [];
+            const taskIndicator = document.querySelector(".task-indicator");
+            if (taskIndicator) taskIndicator.hidden = true;
             updatePoolScanCta();
             return [];
         }
@@ -626,7 +346,7 @@
                 ["检查时间", formatTime(readiness?.checkedAt || readiness?.updatedAt)]
             ]);
         } catch (_) {
-            empty(target, "系统状态当前不可查看", "请稍后重试；当前不会显示推测状态。");
+            empty(target, "系统状态当前不可查看", "请稍后重试。");
         }
     }
 
@@ -734,6 +454,20 @@
         window.location.assign("/analysis/" + encodeURIComponent(result.analysisId));
     }
 
+    function selectedBatchSymbols() {
+        return Array.from(document.querySelectorAll("#poolBatchList input:checked")).map(function (input) { return input.value; });
+    }
+
+    function updateBatchActions(message) {
+        const symbols = selectedBatchSymbols();
+        const status = document.getElementById("poolBatchStatus");
+        const scan = document.getElementById("batchScanSelected");
+        const remove = document.getElementById("batchRemoveSelected");
+        if (status) status.textContent = message || (symbols.length ? "已选择 " + symbols.length + " 个资产" : "尚未选择资产");
+        if (scan) scan.disabled = symbols.length === 0;
+        if (remove) remove.disabled = symbols.length === 0;
+    }
+
     function bindAssetPool() {
         const search = document.getElementById("assetPoolSearch");
         let searchTimer;
@@ -744,6 +478,41 @@
         document.getElementById("quickAssetSearch")?.addEventListener("input", function (event) {
             window.clearTimeout(searchTimer);
             searchTimer = window.setTimeout(function () { searchAssets(event.target.value, document.getElementById("quickAssetResults"), pageKey === "analysis"); }, 180);
+        });
+        document.getElementById("poolBatchList")?.addEventListener("change", function () { updateBatchActions(); });
+        document.getElementById("batchScanSelected")?.addEventListener("click", async function (event) {
+            const symbols = selectedBatchSymbols();
+            if (!symbols.length) return;
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById("batchRemoveSelected").disabled = true;
+            updateBatchActions("正在扫描 " + symbols.length + " 个资产…");
+            try {
+                const result = await api("/api/asset-pool/batch-scan", { method: "POST", body: JSON.stringify({ symbols: symbols, timeframe: "5m" }) }) || [];
+                const completed = result.filter(function (item) { return item.status === "SUCCESS"; }).length;
+                updateBatchActions("扫描完成：" + completed + " / " + result.length);
+                await loadTasks();
+            } catch (error) {
+                updateBatchActions(error.message);
+            } finally {
+                updateBatchActions(document.getElementById("poolBatchStatus").textContent);
+            }
+        });
+        document.getElementById("batchRemoveSelected")?.addEventListener("click", async function (event) {
+            const symbols = selectedBatchSymbols();
+            if (!symbols.length || !window.confirm("从观察资产池移除所选 " + symbols.length + " 个资产？历史记录会保留。")) return;
+            const button = event.currentTarget;
+            button.disabled = true;
+            document.getElementById("batchScanSelected").disabled = true;
+            updateBatchActions("正在移除 " + symbols.length + " 个资产…");
+            try {
+                await api("/api/asset-pool/batch-remove", { method: "POST", body: JSON.stringify({ symbols: symbols }) });
+                announce("已移除 " + symbols.length + " 个观察资产");
+                await loadAssetPool();
+                updateBatchActions("移除完成");
+            } catch (error) {
+                updateBatchActions(error.message);
+            }
         });
         document.addEventListener("click", async function (event) {
             const result = event.target.closest("[data-search-symbol]");
@@ -796,64 +565,226 @@
             } finally { scanButton.disabled = false; }
         });
         Promise.all([loadAssetPool(), loadTasks()]).then(function () { updatePoolScanCta(); });
+        updateBatchActions();
     }
 
     function trustedMonitor(monitor) {
-        return monitor && monitor.markPriceFresh === true && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].includes(monitor.dataState);
+        return monitor && monitor.monitorTrustState === "VERIFIED_FRESH"
+            && monitor.markPriceFresh === true
+            && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].includes(monitor.dataState);
     }
 
-    function renderPosition(userPosition, monitor) {
+    function monitorUnavailableText(monitor) {
+        return {
+            PENDING: "等待监控数据",
+            PENDING_VERIFICATION: "等待监控数据",
+            STALE: "监控数据已过期",
+            INVALID: "当前不可查看",
+            SOURCE_UNAVAILABLE: "监控来源不可用"
+        }[String(monitor?.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase()] || "等待监控数据";
+    }
+
+    function positionListReturnTo(tab) {
+        const query = new URLSearchParams();
+        query.set("tab", tab === "history" ? "history" : "active");
+        if (tab !== "history") {
+            const state = document.getElementById("positionStateFilter")?.value;
+            const sort = document.getElementById("positionSort")?.value;
+            if (state && state !== "ALL") query.set("state", state);
+            if (sort && sort !== "RISK_DESC") query.set("sort", sort);
+        }
+        return "/positions?" + query.toString();
+    }
+
+    function renderPosition(userPosition, monitor, options) {
+        const showDetailLink = options?.showDetailLink !== false;
         const trusted = trustedMonitor(monitor);
         const positionId = userPosition.id || monitor?.positionId;
         const symbol = userPosition.assetSymbol || monitor?.symbol;
         const direction = userPosition.side || monitor?.direction;
-        const primary = trusted ? [
-            ["持仓风险", text(monitor.riskLevelLabel, label(monitor.riskLevel))],
-            ["监控结论", text(monitor.monitorConclusionLabel, label(monitor.monitorConclusion))],
-            ["建议动作", text(monitor.suggestedManualActionText, label(monitor.suggestedAction))]
-        ] : [["监控状态", label(monitor?.dataState, "等待监控数据")]];
-        const facts = [
-            ["开仓价", formatNumber(userPosition.entryPrice)],
-            ["标记价格", trusted ? formatNumber(monitor.markPrice) : "当前不可查看"],
-            ["盈亏", trusted ? formatPercent(monitor.pnlPercent) : "当前不可查看"],
-            ["开仓时间", formatTime(userPosition.openedAt)]
-        ];
-        const detail = trusted ? [
+        const facts = [["开仓价", formatNumber(userPosition.entryPrice)], ["开仓时间", formatTime(userPosition.openedAt)]];
+        if (trusted) facts.splice(1, 0, ["标记价格", formatNumber(monitor.markPrice)], ["盈亏", formatPercent(monitor.pnlPercent)]);
+        const judgment = trusted ? [
             ["入场逻辑状态", text(monitor.entryLogicStatusLabel, label(monitor.entryLogicStatus))],
             ["反转状态", text(monitor.reversalStatusLabel, label(monitor.reversalStatus))],
-            ["风险变化原因", text(monitor.riskReasonLabel, label(monitor.riskReason))],
-            ["最近监控时间", formatTime(monitor.lastMonitorTime || monitor.lastMonitorAt)]
+            ["持仓风险", text(monitor.riskLevelLabel, label(monitor.riskLevel))],
+            ["风险趋势", label(monitor.riskTrend)]
         ] : [];
-        return '<article class="position-card" data-position-id="' + escapeHtml(positionId) + '"><header><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><a class="text-action" href="/positions/' + encodeURIComponent(positionId) + '">查看详情</a></header><section class="position-judgement">' + factGrid(primary) + '</section>' + factGrid(facts) + (detail.length ? '<section class="position-monitor-details">' + factGrid(detail) + "</section>" : '<p class="waiting-note">可信监控结果尚未生成；判断字段保持关闭。</p>') + "</article>";
+        const conclusion = trusted ? [
+            ["监控结论", text(monitor.monitorConclusionLabel, label(monitor.monitorConclusion))],
+            ["建议动作", text(monitor.suggestedManualActionText, label(monitor.suggestedAction))]
+        ] : [];
+        const detailHref = "/positions/" + encodeURIComponent(positionId) + "?returnTo=" + encodeURIComponent(positionListReturnTo("active"));
+        const detailLink = showDetailLink ? '<a class="text-action" href="' + detailHref + '">查看详情</a>' : "";
+        const monitoring = trusted
+            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + detailLink + '</section>'
+            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong>' + detailLink + '</section>';
+        return '<article class="position-card position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" data-position-id="' + escapeHtml(positionId) + '">'
+            + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(userPosition.sourceType) : label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
+            + '<section class="position-facts">' + factGrid(facts) + '</section>'
+            + monitoring + "</article>";
+    }
+
+    let positionRows = [];
+    function renderPositionRows() {
+        const grid = document.getElementById("positionGrid");
+        if (!grid) return;
+        const stateFilter = document.getElementById("positionStateFilter")?.value || "ALL";
+        const sort = document.getElementById("positionSort")?.value || "RISK_DESC";
+        const riskRank = { LOW: 1, MEDIUM: 2, HIGH: 3, EXTREME: 4 };
+        const rows = positionRows.filter(function (row) {
+            if (stateFilter === "WAITING") return !trustedMonitor(row.monitor);
+            if (stateFilter === "RISK") return trustedMonitor(row.monitor)
+                && (row.monitor.riskTrend !== "STABLE" || ["HIGH", "EXTREME"].includes(row.monitor.riskLevel));
+            return true;
+        }).sort(function (left, right) {
+            if (sort === "OPENED_DESC") return new Date(right.position.openedAt || 0) - new Date(left.position.openedAt || 0);
+            return (riskRank[right.monitor?.riskLevel] || 0) - (riskRank[left.monitor?.riskLevel] || 0);
+        });
+        grid.innerHTML = rows.map(function (row) { return renderPosition(row.position, row.monitor); }).join("");
     }
 
     async function loadPositions() {
         const grid = document.getElementById("positionGrid");
         if (!grid) return;
         try {
-            const [positions, home] = await Promise.all([api("/api/user-positions/open"), loadHomeContext()]);
-            const active = positions || [];
-            document.getElementById("positionEmpty").hidden = active.length > 0;
-            grid.innerHTML = active.map(function (position) {
-                const monitor = (home.positions || []).find(function (item) { return String(item.positionId) === String(position.id); });
-                return renderPosition(position, monitor);
-            }).join("");
-            const coverage = home?.diagnostics?.accountRiskCoverageState || home?.safety?.accountRiskCoverageState;
-            document.getElementById("accountRiskCoverage").textContent = label(coverage, "等待评估");
+            const data = await api("/api/workspace/positions/monitoring") || {};
+            positionRows = data.positions || [];
+            document.getElementById("positionEmpty").hidden = positionRows.length > 0;
+            renderPositionRows();
+            document.getElementById("accountRiskCoverage").textContent = label(data.accountRiskCoverageState, "等待评估");
         } catch (_) {
             empty(grid, "持仓当前不可查看", "未返回可信的用户持仓数据。");
         }
     }
 
+    function renderHistoricalPosition(position) {
+        const returnTo = positionListReturnTo("history");
+        return '<article class="position-card position-row history-position-row" data-position-id="' + escapeHtml(position.id) + '">'
+            + '<header class="position-identity"><div><strong>' + escapeHtml(position.assetSymbol) + '</strong><span>' + escapeHtml(label(position.side)) + '</span></div><small>'
+            + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可查看")) + '</small></header>'
+            + '<section class="position-facts">' + factGrid([["开仓价", formatNumber(position.entryPrice)], ["开仓时间", formatTime(position.openedAt)]]) + '</section>'
+            + '<section class="position-judgement">' + factGrid([["平仓价", formatNumber(position.closePrice)], ["平仓时间", formatTime(position.closedAt)]]) + '</section>'
+            + '<section class="position-conclusion">' + factGrid([["结果说明", text(position.closeReason, "未记录说明")]])
+            + '<a class="text-action" href="/positions/' + encodeURIComponent(position.id) + '?returnTo=' + encodeURIComponent(returnTo) + '">查看持仓详情</a></section></article>';
+    }
+
+    async function loadPositionHistory() {
+        const grid = document.getElementById("positionHistoryGrid");
+        if (!grid) return;
+        try {
+            const data = await api("/api/workspace/positions/history?limit=100") || {};
+            const positions = data.positions || [];
+            grid.innerHTML = positions.map(renderHistoricalPosition).join("");
+            document.getElementById("positionHistoryEmpty").hidden = positions.length > 0;
+        } catch (_) {
+            empty(grid, "历史持仓当前不可查看", "未返回可信的已平仓持仓记录。");
+        }
+    }
+
+    function selectPositionTab(tab) {
+        const selected = tab === "history" ? "history" : "active";
+        document.querySelectorAll("[data-position-tab]").forEach(function (button) {
+            const active = button.dataset.positionTab === selected;
+            button.classList.toggle("is-active", active);
+            if (active) button.setAttribute("aria-current", "page");
+            else button.removeAttribute("aria-current");
+        });
+        document.querySelectorAll("[data-position-panel]").forEach(function (panel) {
+            panel.hidden = panel.dataset.positionPanel !== selected;
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", selected);
+        window.history.replaceState({}, "", url);
+        if (selected === "history") loadPositionHistory();
+        else loadPositions();
+    }
+
+    function syncPositionListUrl() {
+        const url = new URL(window.location.href);
+        const state = document.getElementById("positionStateFilter")?.value || "ALL";
+        const sort = document.getElementById("positionSort")?.value || "RISK_DESC";
+        if (state === "ALL") url.searchParams.delete("state");
+        else url.searchParams.set("state", state);
+        if (sort === "RISK_DESC") url.searchParams.delete("sort");
+        else url.searchParams.set("sort", sort);
+        window.history.replaceState({}, "", url);
+    }
+
+    document.getElementById("positionStateFilter")?.addEventListener("change", function () {
+        syncPositionListUrl();
+        renderPositionRows();
+    });
+    document.getElementById("positionSort")?.addEventListener("change", function () {
+        syncPositionListUrl();
+        renderPositionRows();
+    });
+    document.querySelectorAll("[data-position-tab]").forEach(function (button) {
+        button.addEventListener("click", function () { selectPositionTab(button.dataset.positionTab); });
+    });
+
     function formJson(form) {
         return Object.fromEntries(new FormData(form).entries());
     }
 
+    function manualCloseSubmitGate(formPositionId, requestedPositionId, reviewMode) {
+        if (!requestedPositionId) return "MISSING_POSITION_ID";
+        if (String(formPositionId || "") !== String(requestedPositionId)) return "POSITION_ID_MISMATCH";
+        return reviewMode ? "UI_REVIEW_READ_ONLY" : "ALLOW";
+    }
+
+    function positionCloseActionVisible(status) {
+        return ["OPEN", "PARTIALLY_CLOSED"].includes(String(status || "").trim().toUpperCase());
+    }
+
+    function syncPositionCloseAction(action, status) {
+        if (action) action.hidden = !positionCloseActionVisible(status);
+    }
+
+    function prepareManualPositionForm() {
+        const form = document.getElementById("actualPositionForm");
+        if (!form) return;
+        form.reset();
+        form.elements.sourceType.value = "MANUAL_INDEPENDENT";
+        form.elements.finalPlanId.value = "";
+    }
+
+    function numericPlanValue(value) {
+        const raw = String(value == null ? "" : value).trim();
+        return /^\d+(?:\.\d+)?$/.test(raw) ? raw : "";
+    }
+
+    function sideFromMarketBias(value) {
+        const bias = String(value || "").toUpperCase();
+        if (bias.includes("BULLISH")) return "LONG";
+        if (bias.includes("BEARISH")) return "SHORT";
+        return "";
+    }
+
+    async function preparePlanPositionForm(plan) {
+        const form = document.getElementById("actualPositionForm");
+        if (!form || !plan?.planId || !plan?.analysisId) return;
+        const analysis = await api("/api/analysis/runs/" + encodeURIComponent(plan.analysisId));
+        form.reset();
+        form.elements.finalPlanId.value = plan.planId;
+        form.elements.sourceType.value = "SYSTEM_PLAN_POSITION";
+        form.elements.assetSymbol.value = text(analysis.symbol, "");
+        const side = sideFromMarketBias(plan.finalMarketBias);
+        if (side) form.elements.side.value = side;
+        form.elements.stopLoss.value = numericPlanValue(plan.stopLoss);
+        form.elements.takeProfit.value = numericPlanValue(plan.takeProfitRules);
+    }
+
     function bindPositionForms() {
+        document.addEventListener("click", function (event) {
+            const opener = event.target.closest('[data-open-overlay="actual-position"]');
+            if (opener && opener.id !== "planActualPositionAction") prepareManualPositionForm();
+        }, true);
         document.getElementById("actualPositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
             const values = formJson(event.currentTarget);
-            values.sourceType = values.finalPlanId ? "SYSTEM_PLAN_POSITION" : "MANUAL_POSITION";
+            values.sourceType = values.finalPlanId ? "SYSTEM_PLAN_POSITION" : "MANUAL_INDEPENDENT";
+            if (values.openedAt) values.openedAt = new Date(values.openedAt).toISOString().slice(0, 19);
             try {
                 await api("/api/user-positions/manual-open", { method: "POST", body: JSON.stringify(values) });
                 closeOverlay(event.currentTarget.closest("dialog"));
@@ -863,11 +794,16 @@
         });
         document.getElementById("closePositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
-            if (!resourceId) return announce("缺少持仓标识");
+            const gate = manualCloseSubmitGate(event.currentTarget.dataset.positionId, resourceId, uiReviewMode);
+            if (gate === "MISSING_POSITION_ID") return announce("缺少持仓标识");
+            if (gate === "POSITION_ID_MISMATCH") return announce("持仓标识不一致，未提交");
+            if (gate === "UI_REVIEW_READ_ONLY") return announce("UI-review 只读验收不提交平仓");
+            const values = formJson(event.currentTarget);
+            if (values.closedAt) values.closedAt = new Date(values.closedAt).toISOString().slice(0, 19);
             try {
-                await api("/api/user-positions/" + encodeURIComponent(resourceId) + "/manual-close", { method: "POST", body: JSON.stringify(formJson(event.currentTarget)) });
+                await api("/api/user-positions/" + encodeURIComponent(resourceId) + "/manual-close", { method: "POST", body: JSON.stringify(values) });
                 closeOverlay(event.currentTarget.closest("dialog"));
-                window.location.assign("/reviews");
+                window.location.assign("/positions?tab=history");
             } catch (error) { announce(error.message); }
         });
     }
@@ -875,14 +811,24 @@
     async function loadPositionDetail() {
         const card = document.getElementById("positionDetailCard");
         if (!card || !resourceId) return;
+        const closeAction = document.getElementById("closePositionAction");
+        syncPositionCloseAction(closeAction, null);
         try {
-            const [position, home, logs] = await Promise.all([
-                api("/api/user-positions/" + encodeURIComponent(resourceId)),
-                loadHomeContext(),
-                api("/api/review/positions/" + encodeURIComponent(resourceId) + "/monitor-logs?limit=30")
-            ]);
-            const monitor = (home.positions || []).find(function (item) { return String(item.positionId) === String(resourceId); });
-            card.innerHTML = renderPosition(position, monitor);
+            const projection = await api("/api/workspace/positions/" + encodeURIComponent(resourceId) + "/monitoring");
+            const position = projection.position;
+            if (!position) throw new Error("POSITION_MISSING");
+            const monitor = projection.monitor;
+            const closed = String(position.status || "").toUpperCase() === "CLOSED";
+            card.innerHTML = closed ? renderHistoricalPositionDetail(position) : renderPosition(position, monitor, { showDetailLink: false });
+            const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"),
+                closed ? "/positions?tab=history" : "/positions?tab=active");
+            const returnLink = document.getElementById("positionDetailReturn");
+            if (returnLink) returnLink.href = returnTo;
+            syncPositionCloseAction(closeAction, position.status);
+            const closeForm = document.getElementById("closePositionForm");
+            if (closeForm) closeForm.dataset.positionId = String(position.id || resourceId);
+            const closeHeading = document.getElementById("closePositionHeading");
+            if (closeHeading) closeHeading.textContent = "记录平仓 · " + position.assetSymbol;
             document.getElementById("actualPositionFacts").innerHTML = factGrid([
                 ["资产", position.assetSymbol], ["方向", label(position.side)],
                 ["开仓价", formatNumber(position.entryPrice)], ["数量", formatNumber(position.quantity)],
@@ -891,11 +837,29 @@
             if (position.finalPlanId) await loadOpeningPlan(position.finalPlanId);
             else empty(document.getElementById("openingPlanBaseline"), "独立手动持仓", "该持仓没有系统最终计划来源。仍可持续监控。 ");
             const timeline = document.getElementById("monitorTimeline");
-            if (!(logs || []).length) empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
-            else timeline.innerHTML = logs.map(function (item) {
-                return '<article class="timeline-item"><time>' + escapeHtml(formatTime(item.observedAt || item.createdAt)) + '</time><strong>' + escapeHtml(label(item.monitorConclusion, "等待监控数据")) + '</strong><p>' + escapeHtml(label(item.riskReason, "暂无风险变化原因")) + "</p></article>";
-            }).join("");
+            if (closed) {
+                empty(timeline, "持仓已关闭", "活动监控已结束。");
+                return;
+            }
+            try {
+                const logs = await api("/api/review/positions/" + encodeURIComponent(resourceId) + "/monitor-logs?limit=30");
+                if (!(logs || []).length) empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
+                else timeline.innerHTML = logs.map(function (item) {
+                    return '<article class="timeline-item"><time>' + escapeHtml(formatTime(item.observedAt || item.createdAt)) + '</time><strong>' + escapeHtml(label(item.monitorConclusion, "等待监控数据")) + '</strong><p>' + escapeHtml(label(item.riskReason, "暂无风险变化原因")) + "</p></article>";
+                }).join("");
+            } catch (_) {
+                empty(timeline, "暂无监控记录", "等待首次可信监控。 ");
+            }
         } catch (_) { empty(card, "持仓详情当前不可查看", "未返回可信的持仓事实。"); }
+    }
+
+    function renderHistoricalPositionDetail(position) {
+        return '<article class="position-card position-row history-position-row is-closed" data-position-id="' + escapeHtml(position.id) + '">'
+            + '<header class="position-identity"><div><strong>' + escapeHtml(position.assetSymbol) + '</strong><span>' + escapeHtml(label(position.side)) + '</span></div><small>'
+            + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可查看")) + '</small></header>'
+            + '<section class="position-facts">' + factGrid([["生命周期", "已关闭"], ["开仓价", formatNumber(position.entryPrice)], ["开仓时间", formatTime(position.openedAt)]]) + '</section>'
+            + '<section class="position-judgement">' + factGrid([["平仓价", formatNumber(position.closePrice)], ["平仓时间", formatTime(position.closedAt)]]) + '</section>'
+            + '<section class="position-conclusion">' + factGrid([["结果说明", text(position.closeReason, "当前不可查看")]]) + '</section></article>';
     }
 
     async function loadOpeningPlan(planId) {
@@ -906,12 +870,13 @@
                 ["计划模式", label(plan.finalPlanMode || plan.planMode)],
                 ["计划版本", text(plan.planVersion)],
                 ["开仓时计划", plan.planId]
-            ]) + '<a class="text-action" href="/plans/' + encodeURIComponent(plan.planId) + '">查看开仓计划</a>';
+            ]) + '<a class="text-action" href="/plans/' + encodeURIComponent(plan.planId)
+                + '?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search) + '">查看开仓计划</a>';
         } catch (_) { empty(target, "开仓计划当前不可查看", "持仓事实仍保留，不使用其他计划替代。"); }
     }
 
-    function reviewCard(title, state, body, href) {
-        return '<article class="review-card"><header><strong>' + escapeHtml(title) + '</strong>' + stateBadge(state) + '</header><p>' + escapeHtml(body) + '</p>' + (href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看复盘</a>' : "") + "</article>";
+    function reviewCard(kind, title, state, body, href) {
+        return '<article class="review-card" data-review-kind="' + escapeHtml(kind) + '"><header><strong>' + escapeHtml(title) + '</strong>' + stateBadge(state) + '</header><p>' + escapeHtml(body) + '</p>' + (href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看复盘</a>' : "") + "</article>";
     }
 
     async function loadReviews() {
@@ -920,14 +885,31 @@
             const data = await api("/api/review/center") || {};
             const rows = [];
             (data.positionReviews || []).forEach(function (item) {
-                rows.push(reviewCard(item.symbol + " · 持仓复盘", item.reviewStatus, text(item.monitorConclusion, "等待复盘结论"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
+                rows.push(reviewCard("position", item.symbol + " · 持仓复盘", item.reviewStatus, text(item.monitorConclusion, "等待复盘结论"), item.reviewId ? "/reviews/" + encodeURIComponent(item.reviewId) : null));
             });
             (data.opportunityReviews || []).forEach(function (item) {
-                rows.push(reviewCard(item.symbol + " · 机会复盘", item.outcome, label(item.planMode, "等待后续结果"), item.analysisId ? "/reviews/" + encodeURIComponent(item.analysisId) : null));
+                rows.push(reviewCard("opportunity", item.symbol + " · 机会复盘", item.outcome, label(item.planMode, "等待后续结果"), item.reviewId ? "/reviews/" + encodeURIComponent(item.reviewId) : null));
             });
             target.innerHTML = rows.join("");
             document.getElementById("reviewEmpty").hidden = rows.length > 0;
         } catch (_) { empty(target, "复盘当前不可查看", "未返回可信复盘记录。"); }
+    }
+
+    function bindReviews() {
+        document.querySelectorAll("[data-review-filter]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const filter = button.dataset.reviewFilter;
+                document.querySelectorAll("[data-review-filter]").forEach(function (item) {
+                    const selected = item === button;
+                    item.classList.toggle("is-active", selected);
+                    item.setAttribute("aria-selected", String(selected));
+                });
+                document.querySelectorAll("[data-review-kind]").forEach(function (card) {
+                    card.hidden = filter !== "all" && card.dataset.reviewKind !== filter;
+                });
+            });
+        });
+        loadReviews();
     }
 
     async function loadReviewDetail() {
@@ -1020,12 +1002,234 @@
         }).join("") + "</div>";
     }
 
+    function renderRoleCollection(title, items, state) {
+        const rows = Array.isArray(items) ? items : [];
+        const content = rows.length ? '<ul class="ai-structured-list">' + rows.map(function (item) {
+            return '<li>' + escapeHtml(text(item?.text || item?.currentValue || item?.reason || item?.hypothesis || item?.summary, "当前不可查看")) + '</li>';
+        }).join("") + '</ul>' : '<p class="muted">' + escapeHtml(label(state, "当前不可查看")) + '</p>';
+        return '<section class="ai-structured-section"><h4>' + escapeHtml(title) + '</h4>' + content + '</section>';
+    }
+
+    function collectionDescriptor(payload, key, stateKey) {
+        const items = Array.isArray(payload?.[key]) ? payload[key] : [];
+        return {
+            state: payload?.[stateKey],
+            size: items.length,
+            failurePath: stateKey === "failurePathState"
+        };
+    }
+
+    function roleCollections(role, payload, mode) {
+        if (role === "GPT_FINAL") return [
+            collectionDescriptor(payload, "supportingEvidence", "supportingEvidenceState"),
+            collectionDescriptor(payload, "opposingEvidence", "opposingEvidenceState")
+        ];
+        if (role === "GEMINI_REVIEW") return [
+            collectionDescriptor(payload, "evidenceGaps", "evidenceGapsState"),
+            collectionDescriptor(payload, "logicConflicts", "logicConflictsState"),
+            collectionDescriptor(payload, "underestimatedRisks", "underestimatedRisksState")
+        ];
+        const collections = [
+            collectionDescriptor(payload, "opposingScenarios", "opposingScenariosState"),
+            collectionDescriptor(payload, "externalEventRisks", "externalEventRisksState"),
+            collectionDescriptor(payload, "microstructureRisks", "microstructureRisksState"),
+            collectionDescriptor(payload, "watchIndicators", "watchIndicatorsState")
+        ];
+        if (mode === "OPPORTUNITY_DECISION") {
+            collections.unshift(collectionDescriptor(payload, "failurePaths", "failurePathState"));
+        }
+        return collections;
+    }
+
+    function hasRoleIdentity(payload) {
+        return hasValue(payload?.analysisId) && hasValue(payload?.traceId)
+            && hasValue(payload?.roleState) && hasValue(payload?.generatedAt);
+    }
+
+    function roleResultAvailable(role, payload, mode) {
+        if (!payload || payload.resultAvailable !== true || !hasRoleIdentity(payload)) return false;
+        const state = typeof frontendContract.normalizeRoleState === "function"
+            ? frontendContract.normalizeRoleState(payload.roleState) : "UNAVAILABLE";
+        if (state !== "READY") return true;
+        if (mode === "ANALYSIS_PREVIEW") {
+            if (role === "GPT_FINAL") {
+                return hasValue(payload.coreJudgment?.marketBias)
+                    && hasValue(payload.coreJudgment?.text || payload.summary);
+            }
+            return true;
+        }
+        if (role === "GPT_FINAL") {
+            return hasValue(payload.coreJudgment?.marketBias)
+                && hasValue(payload.coreJudgment?.opportunityState)
+                && hasValue(payload.candidateSummary?.planMode);
+        }
+        if (role === "GEMINI_REVIEW") {
+            const review = String(payload.reviewResult || "").toUpperCase();
+            const formal = ["APPROVE", "DOWNGRADE", "REJECT_CANDIDATE", "RISK_WARNING"].includes(review);
+            if (!formal) return false;
+            if (review === "APPROVE") return true;
+            return hasValue(payload.downgradeSuggestion?.before)
+                && hasValue(payload.downgradeSuggestion?.after)
+                && hasValue(payload.downgradeSuggestion?.reason)
+                && hasValue(payload.downgradeSuggestion?.recoveryCondition || payload.recoveryCondition);
+        }
+        return failurePathView(payload.failurePathState, payload.failurePaths).valid;
+    }
+
+    function renderRoleFailClosed(message) {
+        return '<div class="empty-state ai-role-fail-closed"><strong>'
+            + escapeHtml(message || "角色结果当前不可查看")
+            + '</strong><span>不会使用旧输出、摘要或其他角色字段补齐。</span></div>';
+    }
+
+    function renderPartialRole(role, payload, mode) {
+        const head = renderRoleMetadata(payload);
+        if (role === "GPT_FINAL") {
+            return head
+                + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
+                + renderRoleCollection("反对证据", payload.opposingEvidence, payload.opposingEvidenceState);
+        }
+        if (role === "GEMINI_REVIEW") {
+            return head
+                + renderRoleCollection("证据缺口", payload.evidenceGaps, payload.evidenceGapsState)
+                + renderRoleCollection("逻辑冲突", payload.logicConflicts, payload.logicConflictsState)
+                + renderRoleCollection("风险低估", payload.underestimatedRisks, payload.underestimatedRisksState);
+        }
+        return head
+            + (mode === "OPPORTUNITY_DECISION" ? renderFailurePaths(payload.failurePaths, payload.failurePathState) : "")
+            + renderRoleCollection("反向情景", payload.opposingScenarios, payload.opposingScenariosState)
+            + renderRoleCollection("外部事件风险", payload.externalEventRisks, payload.externalEventRisksState)
+            + renderRoleCollection("微观结构风险", payload.microstructureRisks, payload.microstructureRisksState)
+            + renderRoleCollection("继续观察指标", payload.watchIndicators, payload.watchIndicatorsState);
+    }
+
+    function renderFailurePaths(items, state) {
+        const view = failurePathView(state, items);
+        const rows = view.paths;
+        if (!view.valid || !rows.length) return '<section class="ai-structured-section"><h4>失败路径</h4><p class="muted">'
+            + escapeHtml(view.label) + '</p></section>';
+        return '<section class="ai-structured-section"><h4>失败路径</h4><div class="failure-path-list">'
+            + rows.map(function (item) {
+                return '<article class="failure-path-item"><strong>' + escapeHtml(text(item?.hypothesis, "失败路径")) + '</strong>'
+                    + factGrid([
+                        ["触发", text(item?.triggerCondition)],
+                        ["演化", text(item?.causalPath)],
+                        ["失效", text(item?.invalidatingEvidence)]
+                    ]) + '</article>';
+            }).join("") + '</div></section>';
+    }
+
+    function renderRoleMetadata(payload) {
+        return factGrid([
+            ["角色状态", label(payload.roleState)],
+            ["数据状态", label(payload.dataState)],
+            ["生成时间", formatTime(payload.generatedAt)]
+        ]);
+    }
+
+    function renderRolePrimary(title, value, note) {
+        return '<section class="ai-role-primary"><span>' + escapeHtml(title) + '</span><strong>'
+            + escapeHtml(value) + '</strong>' + (note ? '<small>' + escapeHtml(note) + '</small>' : "") + '</section>';
+    }
+
+    function renderPreviewRole(role, payload) {
+        const head = renderRoleMetadata(payload);
+        if (role === "GPT_FINAL") {
+            return head + renderRolePrimary("方向假设", label(payload.coreJudgment?.marketBias), "按需分析预览 · 非 Opportunity")
+                + factGrid([["形成依据", text(payload.coreJudgment?.text || payload.summary)]])
+                + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
+                + renderRoleCollection("反对证据", payload.opposingEvidence, payload.opposingEvidenceState);
+        }
+        if (role === "GEMINI_REVIEW") {
+            return head
+                + renderRoleCollection("证据缺口", payload.evidenceGaps, payload.evidenceGapsState)
+                + renderRoleCollection("逻辑冲突", payload.logicConflicts, payload.logicConflictsState)
+                + renderRoleCollection("可信度复核", payload.underestimatedRisks, payload.underestimatedRisksState);
+        }
+        return head
+            + renderRoleCollection("反向情景", payload.opposingScenarios, payload.opposingScenariosState)
+            + renderRoleCollection("外部事件风险", payload.externalEventRisks, payload.externalEventRisksState)
+            + renderRoleCollection("微观结构风险", payload.microstructureRisks, payload.microstructureRisksState)
+            + renderRoleCollection("继续观察指标", payload.watchIndicators, payload.watchIndicatorsState);
+    }
+
+    function renderOpportunityRole(role, payload) {
+        const head = renderRoleMetadata(payload);
+        if (role === "GPT_FINAL") {
+            const candidate = payload.candidateSummary;
+            const candidateContent = candidate ? factGrid([
+                ["候选参与方式", label(candidate.planMode)],
+                ["候选置信度", text(candidate.confidence)],
+                ["候选风险", label(candidate.riskLevel)],
+                ["建议动作", lifecycleActionText(candidate.recommendedAction, payload.coreJudgment?.opportunityState)],
+                ["摘要", lifecycleActionText(candidate.summary, payload.coreJudgment?.opportunityState)]
+            ]) : '<p class="muted">Candidate 当前不可查看</p>';
+            return head + renderRolePrimary("GPT Candidate · 非 Final",
+                candidate ? label(candidate.planMode) : "当前不可查看", "候选参与方式") + factGrid([
+                ["方向判断", label(payload.coreJudgment?.marketBias)],
+                ["机会进度", label(payload.coreJudgment?.opportunityState)],
+                ["计划边界", "Candidate · 非 Final"]
+            ]) + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
+                + renderRoleCollection("反对证据", payload.opposingEvidence, payload.opposingEvidenceState)
+                + '<section class="ai-structured-section"><h4>Candidate 摘要 · 非 Final</h4>' + candidateContent + '</section>';
+        }
+        if (role === "GEMINI_REVIEW") {
+            const review = String(payload.reviewResult).toUpperCase();
+            const suggestion = payload.downgradeSuggestion;
+            const illegalWaitingConfirmation = String(analysisAudit?.opportunity?.state || "").toLowerCase() === "waiting_trigger"
+                && String(suggestion?.before || "").toUpperCase() === "CONFIRMATION";
+            const beforeAfter = review !== "APPROVE" && !illegalWaitingConfirmation
+                ? '<section class="ai-structured-section"><h4>Before → After</h4>' + factGrid([
+                    ["调整前", label(suggestion.before)], ["调整后", label(suggestion.after)],
+                    ["调整原因", text(suggestion.reason)],
+                    ["恢复条件", text(suggestion.recoveryCondition || payload.recoveryCondition)]
+                ]) + '</section>' : review !== "APPROVE"
+                    ? '<section class="ai-structured-section"><h4>Before → After</h4><p class="muted">调整前后当前不可查看</p></section>' : "";
+            return head + renderRolePrimary("复核结果", reviewResultLabel(review), "审查对象：Candidate") + factGrid([
+                ["对 Candidate 的影响", text(payload.finalDirectionImpact)],
+                ["恢复条件", text(payload.recoveryCondition || suggestion?.recoveryCondition)]
+            ]) + beforeAfter
+                + renderRoleCollection("证据缺口", payload.evidenceGaps, payload.evidenceGapsState)
+                + renderRoleCollection("逻辑冲突", payload.logicConflicts, payload.logicConflictsState)
+                + renderRoleCollection("风险低估", payload.underestimatedRisks, payload.underestimatedRisksState);
+        }
+        const failureState = failurePathView(payload.failurePathState, payload.failurePaths);
+        return head + renderRolePrimary("失败路径状态", failureState.label, "Grok 反方挑战") + factGrid([
+            ["挑战摘要", text(payload.challengeSummary || payload.summary)],
+            ["对当前方向的挑战", text(payload.currentDirectionChallenge)],
+            ["重大反证", payload.majorCounterEvidence === true ? "是" : payload.majorCounterEvidence === false ? "否" : "当前不可查看"]
+        ]) + renderFailurePaths(payload.failurePaths, payload.failurePathState)
+            + renderRoleCollection("反向情景", payload.opposingScenarios, payload.opposingScenariosState)
+            + renderRoleCollection("外部事件风险", payload.externalEventRisks, payload.externalEventRisksState)
+            + renderRoleCollection("微观结构风险", payload.microstructureRisks, payload.microstructureRisksState)
+            + renderRoleCollection("继续观察指标", payload.watchIndicators, payload.watchIndicatorsState);
+    }
+
+    function renderFormalRole(role, payload) {
+        if (!payload) return '<div class="empty-state"><strong>该角色暂无结构化输出</strong></div>';
+        const gate = roleGate(payload.roleState, roleResultAvailable(role, payload, analysisMode),
+            roleCollections(role, payload, analysisMode));
+        if (!gate.allowed) return renderRoleFailClosed(gate.message);
+        if (gate.renderMode === "PARTIAL") return renderPartialRole(role, payload, analysisMode);
+        return analysisMode === "ANALYSIS_PREVIEW"
+            ? renderPreviewRole(role, payload) : renderOpportunityRole(role, payload);
+    }
+
     function renderAiRole(role) {
         const target = document.getElementById("analysisRoleContent");
         if (!target || !analysisAudit) return;
+        if (!analysisMode) {
+            empty(target, "当前分析模式暂不可用", "仅保留已验证的公共分析事实，不展示 Candidate、复核或失败路径。");
+            return;
+        }
         const trace = (analysisAudit.aiTraces || []).find(function (item) { return item.role === role; });
-        if (!trace) return empty(target, roleLabel(role, analysisMode) + " 暂无输出", "该角色没有返回可验证结果。"), undefined;
-        target.innerHTML = '<header class="ai-role-head"><div><strong>' + escapeHtml(roleLabel(role, analysisMode)) + '</strong><small>' + escapeHtml(label(trace.model, text(trace.model, "模型未记录"))) + '</small></div>' + stateBadge(trace.status) + '</header><div class="ai-output">' + renderStructured(trace.outputJson) + '</div><details class="audit-disclosure"><summary>调用元数据</summary>' + factGrid([["Trace", trace.traceId], ["生成时间", formatTime(trace.observedAt || trace.createdAt)], ["耗时", hasValue(trace.latencyMs) ? trace.latencyMs + " ms" : "当前不可查看"], ["降级", trace.fallback === true ? "已进入规则路径" : "未触发"]]) + "</details>";
+        const payload = analysisAudit.aiRoleResults?.roles?.[role];
+        if (!trace && !payload) return empty(target, roleLabel(role, analysisMode) + " 暂无输出", "该角色没有返回可验证结果。"), undefined;
+        const traceId = payload?.traceId || trace?.traceId;
+        const auditEntry = hasValue(traceId)
+            ? '<a class="text-action" href="/audit/' + encodeURIComponent(traceId) + '?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search) + '">查看完整审计</a>'
+            : '<span class="muted">审计链尚未形成</span>';
+        target.innerHTML = '<header class="ai-role-head"><div><strong>' + escapeHtml(roleLabel(role, analysisMode)) + '</strong><small>' + escapeHtml(label(trace?.model, text(trace?.model, "模型未记录"))) + '</small></div>' + stateBadge(payload?.roleState || trace?.status) + '</header><div class="ai-output">' + renderFormalRole(role, payload) + '</div><details class="audit-disclosure"><summary>调用与责任链元数据</summary>' + factGrid([["Analysis", payload?.analysisId || trace?.analysisId], ["Trace", traceId], ["生成时间", formatTime(payload?.generatedAt || trace?.observedAt || trace?.createdAt)], ["耗时", hasValue(trace?.latencyMs) ? trace.latencyMs + " ms" : "当前不可查看"], ["降级", payload?.fallback === true || trace?.fallback === true ? "已进入规则路径" : "未触发"]]) + "</details>" + auditEntry;
     }
 
     function updateAnalysisRoleLabels(mode) {
@@ -1053,11 +1257,23 @@
         try {
             analysisAudit = await api("/api/ai/audit-chain?analysisId=" + encodeURIComponent(resourceId));
             const analysis = analysisAudit.analysis || {};
-            const mode = analysis.analysisMode || (analysis.preview === true ? "ANALYSIS_PREVIEW" : "OPPORTUNITY_DECISION");
-            analysisMode = mode;
-            document.getElementById("analysisMode").textContent = label(mode);
-            document.getElementById("analysisModeBoundary").textContent = mode === "ANALYSIS_PREVIEW" ? "按需查看当前资产的分析结果。" : "查看当前机会的完整决策结果。";
-            updateAnalysisRoleLabels(mode);
+            const modeView = analysisModeGate(analysis.analysisMode);
+            analysisMode = modeView.mode;
+            document.getElementById("analysisMode").textContent = modeView.label;
+            document.getElementById("analysisModeBoundary").textContent = modeView.message;
+            updateAnalysisRoleLabels(analysisMode);
+            ["analysisTimeframesSection", "analysisEvidenceSection", "analysisScoresSection"].forEach(function (id) {
+                const section = document.getElementById(id);
+                if (section) section.hidden = !modeView.valid;
+            });
+            if (!modeView.valid) {
+                document.getElementById("analysisDataQuality").innerHTML = renderRoleFailClosed(modeView.message);
+                const conflictSummary = document.getElementById("analysisConflictSummary");
+                if (conflictSummary) conflictSummary.hidden = true;
+                document.getElementById("analysisAiLayout")?.classList.remove("has-conflict");
+                renderAiRole("GPT_FINAL");
+                return;
+            }
             document.getElementById("analysisDataQuality").innerHTML = factGrid([
                 ["数据质量", hasValue(analysis.dataQualityScore) ? formatNumber(analysis.dataQualityScore, { maximumFractionDigits: 0 }) : "当前不可查看"],
                 ["分析周期", text(analysis.timeframe, "当前不可查看")],
@@ -1066,11 +1282,26 @@
             document.getElementById("analysisScores").innerHTML = renderAnalysisScores(analysisAudit.scores || []);
             document.getElementById("analysisEvidence").innerHTML = renderAnalysisEvidence(analysisAudit.evidence || []);
             document.getElementById("analysisTimeframes").innerHTML = renderStructured(analysisAudit.decisionBundle?.multiTimeframeStates || analysisAudit.decisionBundle?.multiTimeframeState);
-            document.getElementById("analysisDiff").innerHTML = renderStructured(analysisAudit.conflictResolver || {});
-            const grok = (analysisAudit.aiTraces || []).find(function (item) { return item.role === "GROK_CHALLENGE"; });
-            document.getElementById("analysisFailures").innerHTML = renderStructured(grok?.outputJson);
-            document.getElementById("analysisConflict").innerHTML = renderStructured(analysisAudit.conflictResolver || {});
-            selectAnalysisAsset({ symbol: analysis.symbol, baseAsset: String(analysis.symbol || "").replace(/USDT$/, ""), quoteAsset: "USDT" });
+            const resolver = analysisMode === "OPPORTUNITY_DECISION" ? analysisAudit.conflictResolver : null;
+            const conflictLevel = String(resolver?.conflictLevel || "").toUpperCase();
+            const formalConflict = ["LEVEL_2_MINOR_DISAGREEMENT", "LEVEL_3_SIGNIFICANT_DISAGREEMENT", "LEVEL_4_EXTREME_CONFLICT"].includes(conflictLevel);
+            const conflictSummary = document.getElementById("analysisConflictSummary");
+            const aiLayout = document.getElementById("analysisAiLayout");
+            if (conflictSummary) conflictSummary.hidden = !formalConflict;
+            aiLayout?.classList.toggle("has-conflict", formalConflict);
+            if (formalConflict) document.getElementById("analysisConflict").innerHTML = factGrid([
+                ["冲突等级", label(conflictLevel)],
+                ["主要原因", text(resolver.downgradeReason || resolver.ruleVetoReason)],
+                ["计划模式", label(resolver.planModeAfter)]
+            ]);
+            const auxiliary = document.getElementById("analysisAuxiliaryPanels");
+            if (auxiliary) {
+                auxiliary.hidden = true;
+                auxiliary.setAttribute("aria-hidden", "true");
+            }
+            const diffPanel = document.getElementById("analysisDecisionDiff");
+            if (diffPanel) diffPanel.hidden = true;
+            selectAnalysisAsset({ symbol: analysis.symbol, baseAsset: String(analysis.symbol || "").replace(/USDT$/, ""), quoteAsset: "USDT" }, { preserveMode: true });
             renderAiRole("GPT_FINAL");
         } catch (_) {
             empty(document.getElementById("analysisRoleContent"), "分析当前不可查看", "未返回可信分析链，当前不会构造 AI 输出。");
@@ -1104,7 +1335,7 @@
         }
     }
 
-    function selectAnalysisAsset(asset) {
+    function selectAnalysisAsset(asset, options) {
         if (!asset?.symbol) return;
         analysisSelectedAsset = asset;
         const selected = document.getElementById("analysisSelectedAsset");
@@ -1119,12 +1350,16 @@
         if (start) start.disabled = false;
         const add = document.getElementById("addAnalysisAsset");
         if (add) add.hidden = inPool;
-        document.getElementById("analysisMode").textContent = "按需分析预览";
-        document.getElementById("analysisModeBoundary").textContent = "开始后将在独立分析页展示结果。";
     }
 
     function bindAnalysis() {
         bindAiTabs();
+        const returnValue = new URLSearchParams(window.location.search).get("returnTo");
+        const returnLink = document.getElementById("analysisReturn");
+        if (returnLink && returnValue) {
+            returnLink.href = safeReturnTo(returnValue, "/dashboard");
+            returnLink.hidden = false;
+        }
         let timer;
         const search = document.getElementById("analysisAssetSearch");
         search?.addEventListener("input", function () {
@@ -1142,7 +1377,7 @@
             event.currentTarget.disabled = true;
             event.currentTarget.textContent = "分析中";
             try { await previewAsset(analysisSelectedAsset.symbol); }
-            catch (error) { announce(error.message); event.currentTarget.disabled = false; event.currentTarget.textContent = "开始分析"; }
+            catch (error) { announce(error.message); event.currentTarget.disabled = false; event.currentTarget.textContent = "开始预览"; }
         });
         document.getElementById("addAnalysisAsset")?.addEventListener("click", async function () {
             if (!analysisSelectedAsset?.symbol) return;
@@ -1166,45 +1401,154 @@
     async function loadMessages() {
         const target = document.getElementById("messageList");
         try {
-            const messages = await api("/api/workspace/messages?limit=50") || [];
-            document.getElementById("messageEmpty").hidden = messages.length > 0;
-            target.innerHTML = messages.map(function (item) {
-                const href = item.positionId ? "/positions/" + encodeURIComponent(item.positionId) : (item.currentRecheckId ? "/recheck/" + encodeURIComponent(item.currentRecheckId) : (item.planId ? "/plans/" + encodeURIComponent(item.planId) : ""));
-                const delivery = item.telegramDeliveryState ? "Telegram · " + label(item.telegramDeliveryState) : "站内消息";
-                const retryable = ["FAILED", "NOT_CONFIGURED"].includes(String(item.telegramDeliveryState || "").toUpperCase());
-                const primaryAction = href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看</a>' : '<button class="text-action" type="button" data-read-message="' + escapeHtml(item.messageId) + '">标为已读</button>';
-                const retryAction = retryable ? '<button class="text-action" type="button" data-retry-telegram="' + escapeHtml(item.messageId) + '">重新投递</button>' : '';
-                return '<article class="message-item" data-message-id="' + escapeHtml(item.messageId) + '"><div><strong>' + escapeHtml(text(item.title, label(item.category))) + '</strong><p>' + escapeHtml(text(item.body, "暂无补充说明")) + '</p><small>' + escapeHtml(formatTime(item.createdAt)) + ' · ' + escapeHtml(delivery) + '</small></div><div><span class="state-badge">' + escapeHtml(label(item.readState)) + '</span>' + primaryAction + retryAction + "</div></article>";
+            const messages = (await api("/api/workspace/messages?limit=50") || []).filter(function (item) {
+                return String(item.sourceMode || item.analysisMode || "").toUpperCase() !== "ANALYSIS_PREVIEW";
+            });
+            const groups = {
+                OPPORTUNITY_PLAN: ["OPPORTUNITY", "PLAN", "FINAL_PLAN", "OPPORTUNITY_PLAN"],
+                POSITION_RISK: ["POSITION", "POSITION_RISK", "RISK"],
+                SYSTEM: ["SYSTEM", "DATA", "PROVIDER", "HOT_RESET"]
+            };
+            function groupFor(item) {
+                const category = String(item.category || item.targetType || "SYSTEM").toUpperCase();
+                return Object.keys(groups).find(function (group) {
+                    return groups[group].some(function (token) { return category.indexOf(token) >= 0; });
+                }) || "SYSTEM";
+            }
+            const requestedGroup = new URLSearchParams(window.location.search).get("group");
+            const activeGroup = requestedGroup || document.querySelector("[data-message-group].is-active")?.dataset.messageGroup || "OPPORTUNITY_PLAN";
+            document.querySelectorAll("[data-message-group]").forEach(function (button) {
+                button.classList.toggle("is-active", button.dataset.messageGroup === activeGroup);
+            });
+            const visible = messages.filter(function (item) { return groupFor(item) === activeGroup; });
+            document.getElementById("messageUnreadCount").textContent = String(messages.filter(function (item) { return String(item.readState || "").toUpperCase() !== "READ"; }).length);
+            document.getElementById("messageHighPriorityCount").textContent = String(messages.filter(function (item) { return ["HIGH", "EXTREME", "P0", "P1"].includes(String(item.priority || item.severity || "").toUpperCase()); }).length);
+            document.getElementById("messageRecheckCount").textContent = String(messages.filter(function (item) {
+                return String(item.sourceType || "").toUpperCase() === "PUSH_SNAPSHOT";
+            }).length);
+            document.getElementById("messageEmpty").hidden = visible.length > 0;
+            target.innerHTML = visible.map(function (item) {
+                const targetType = String(item.targetType || item.category || "").toUpperCase();
+                const messageReturn = "/messages?group=" + encodeURIComponent(activeGroup);
+                const sourceType = String(item.sourceType || "").toUpperCase();
+                const rawSourceId = String(item.sourceId || "");
+                const pushSnapshotId = sourceType === "PUSH_SNAPSHOT" && rawSourceId
+                    ? (rawSourceId.startsWith("push-snapshot-") ? rawSourceId : "push-snapshot-" + rawSourceId) : "";
+                const href = targetType.indexOf("POSITION") >= 0 && item.positionId ? "/positions/" + encodeURIComponent(item.positionId) + "?returnTo=" + encodeURIComponent(messageReturn)
+                    : item.planId ? "/plans/" + encodeURIComponent(item.planId) + "?returnTo=" + encodeURIComponent(messageReturn)
+                    : item.analysisId ? "/analysis/" + encodeURIComponent(item.analysisId) + "?returnTo=" + encodeURIComponent(messageReturn) : "";
+                const primaryAction = pushSnapshotId
+                    ? '<button class="text-action" type="button" data-open-recheck="' + escapeHtml(pushSnapshotId)
+                        + '" data-message-id="' + escapeHtml(item.messageId) + '" data-return-to="' + escapeHtml(messageReturn) + '">查看复核</button>'
+                    : href ? '<a class="text-action" href="' + escapeHtml(href) + '">查看</a>'
+                        : '<button class="text-action" type="button" data-read-message="' + escapeHtml(item.messageId) + '">标为已读</button>';
+                return '<article class="message-item" data-message-id="' + escapeHtml(item.messageId) + '"><div><strong>' + escapeHtml(text(item.title, label(item.category))) + '</strong><p>' + escapeHtml(text(item.body, "暂无补充说明")) + '</p><small>' + escapeHtml(formatTime(item.createdAt)) + ' · 站内消息</small></div><div><span class="state-badge">' + escapeHtml(label(item.readState)) + '</span>' + primaryAction + "</div></article>";
             }).join("");
         } catch (_) { empty(target, "消息当前不可查看", "业务消息 owner 未返回可信记录。"); }
         if (!target.dataset.actionsBound) {
             document.addEventListener("click", async function (event) {
-                const retry = event.target.closest("[data-retry-telegram]");
-                if (retry) {
-                    try {
-                        await api("/api/settings/notifications/telegram/messages/" + encodeURIComponent(retry.dataset.retryTelegram) + "/retry", { method: "POST" });
-                        announce("Telegram 投递已重新排队");
-                        await loadMessages();
-                    } catch (error) { announce(error.message); }
-                    return;
-                }
                 const button = event.target.closest("[data-read-message]");
                 if (!button) return;
                 try { await api("/api/workspace/messages/" + encodeURIComponent(button.dataset.readMessage) + "/read", { method: "POST" }); await loadMessages(); }
                 catch (error) { announce(error.message); }
             });
+            document.addEventListener("click", async function (event) {
+                const button = event.target.closest("[data-open-recheck]");
+                if (!button || button.disabled) return;
+                button.disabled = true;
+                try {
+                    const snapshotId = button.dataset.openRecheck;
+                    await api("/api/workspace/rechecks/" + encodeURIComponent(snapshotId) + "/open", {
+                        method: "POST", body: JSON.stringify({ messageId: button.dataset.messageId })
+                    });
+                    window.location.assign("/recheck/" + encodeURIComponent(snapshotId)
+                        + "?messageId=" + encodeURIComponent(button.dataset.messageId)
+                        + "&returnTo=" + encodeURIComponent(button.dataset.returnTo || "/messages"));
+                } catch (error) {
+                    button.disabled = false;
+                    announce(error.message);
+                }
+            });
+            document.querySelectorAll("[data-message-group]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    document.querySelectorAll("[data-message-group]").forEach(function (item) { item.classList.toggle("is-active", item === button); });
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("group", button.dataset.messageGroup);
+                    window.history.replaceState({}, "", url);
+                    loadMessages();
+                });
+            });
             target.dataset.actionsBound = "true";
         }
     }
 
-    async function loadRecheck() {
+    function renderRecheck(result) {
+        const snapshot = document.getElementById("originalSnapshot");
+        const original = result.originalSnapshot || {};
+        const current = result.currentResult || {};
+        snapshot.innerHTML = factGrid([
+            ["资产", text(original.symbol)], ["原计划模式", label(original.planModeSnapshot)],
+            ["原入场区", text(original.entryZoneJson)], ["发送时间", formatTime(original.pushCreateTime)],
+            ["到期时间", formatTime(original.expiresAt)]
+        ]);
+        document.getElementById("recheckProgress").innerHTML = factGrid([
+            ["快照", result.pushSnapshotId], ["当前行情", hasValue(current.currentPrice) ? "已获取" : "当前不可查看"],
+            ["执行环境", label(current.executionStatus, "等待复核")], ["风险", current.currentAccountRiskAllowed === false ? "已阻断" : current.currentAccountRiskAllowed === true ? "允许人工复核" : "当前不可查看"],
+            ["状态", label(result.resultState)]
+        ]);
+        document.getElementById("recheckResult").textContent = label(result.resultState);
+        document.getElementById("recheckReason").textContent = text(result.reason, "暂无原因说明");
+        document.getElementById("recheckCurrentMetrics").innerHTML = factGrid([
+            ["当前价格", formatNumber(current.currentPrice)], ["价格偏移", formatPercent(current.priceDriftRatio == null ? null : Number(current.priceDriftRatio) * 100)],
+            ["滑点估算", formatPercent(current.currentSlippageEstimation == null ? null : Number(current.currentSlippageEstimation) * 100)],
+            ["数据质量（原快照）", hasValue(original.dataQualityScoreSnapshot) ? text(original.dataQualityScoreSnapshot) : "当前不可查看"],
+            ["Opportunity", text(original.pushStatus)], ["Risk", current.currentAccountRiskAllowed === false ? "阻断" : "当前不可查看"],
+            ["Confused（原快照）", hasValue(original.confusedScoreSnapshot) ? text(original.confusedScoreSnapshot) : "当前不可查看"]
+        ]);
+        document.getElementById("recheckDiff").innerHTML = factGrid([
+            ["原触发价格", formatNumber(original.triggerPrice)], ["当前价格", formatNumber(current.currentPrice)],
+            ["原状态", label(original.pushStatus)], ["复核状态", label(result.resultState)]
+        ]);
+        document.getElementById("recheckAudit").innerHTML = factGrid([
+            ["触发来源", text(current.triggerSource, "尚未形成")], ["Message ID", result.messageId],
+            ["Push Snapshot ID", result.pushSnapshotId], ["Push ID", result.pushId],
+            ["Recheck ID", text(result.recheckId, "尚未形成")], ["Analysis ID", result.analysisId],
+            ["Plan ID", text(result.planId, "当前不可查看")], ["Trace ID", text(result.traceId, "当前不可查看")],
+            ["复核时间", formatTime(current.recheckTime)], ["来源状态", label(current.executionStatus, "等待复核")]
+        ]);
+        const retry = document.getElementById("retryPushRecheck");
+        if (retry) retry.hidden = result.retryAvailable !== true;
+        const planLink = document.getElementById("recheckPlanLink");
+        if (planLink) {
+            planLink.hidden = !result.planId;
+            if (result.planId) planLink.href = "/plans/" + encodeURIComponent(result.planId) + "?returnTo=" + encodeURIComponent(window.location.pathname + window.location.search);
+        }
+    }
+
+    function recheckContext() {
+        const query = new URLSearchParams(window.location.search);
+        return {
+            messageId: query.get("messageId"),
+            returnTo: safeReturnTo(query.get("returnTo"), "/messages")
+        };
+    }
+
+    async function loadRecheck(open) {
         const snapshot = document.getElementById("originalSnapshot");
         if (!snapshot || !resourceId) return;
+        const context = recheckContext();
+        const returnLink = document.getElementById("recheckReturn");
+        if (returnLink) returnLink.href = context.returnTo;
+        if (!context.messageId) {
+            empty(snapshot, "原始快照当前不可查看", "缺少消息与推送快照的所有权上下文。");
+            return;
+        }
         try {
-            const result = await api("/api/workspace/rechecks/" + encodeURIComponent(resourceId));
-            snapshot.innerHTML = renderStructured(result.originalSnapshot);
-            document.getElementById("recheckResult").textContent = label(result.resultState);
-            document.getElementById("recheckReason").textContent = text(result.reason, "暂无原因说明");
+            const endpoint = "/api/workspace/rechecks/" + encodeURIComponent(resourceId);
+            const result = open
+                ? await api(endpoint + "/open", { method: "POST", body: JSON.stringify({ messageId: context.messageId }) })
+                : await api(endpoint + "?messageId=" + encodeURIComponent(context.messageId));
+            renderRecheck(result);
         } catch (_) {
             empty(snapshot, "原始快照当前不可查看", "缺少可验证的用户消息与推送快照关联。");
             document.getElementById("recheckResult").textContent = "当前不可查看";
@@ -1214,42 +1558,85 @@
 
     function bindRecheck() {
         document.getElementById("requestPushRecheck")?.addEventListener("click", function () {
-            loadRecheck();
+            loadRecheck(false);
             announce("正在刷新当前复核结果；该操作不是交易授权");
         });
-        loadRecheck();
+        document.getElementById("retryPushRecheck")?.addEventListener("click", async function () {
+            const context = recheckContext();
+            try {
+                renderRecheck(await api("/api/workspace/rechecks/" + encodeURIComponent(resourceId) + "/retry", {
+                    method: "POST", body: JSON.stringify({ messageId: context.messageId })
+                }));
+            } catch (error) { announce(error.message); }
+        });
+        document.getElementById("reanalyzePush")?.addEventListener("click", async function () {
+            const context = recheckContext();
+            try {
+                const result = await api("/api/workspace/rechecks/" + encodeURIComponent(resourceId) + "/reanalyze", {
+                    method: "POST", body: JSON.stringify({ messageId: context.messageId })
+                });
+                if (result.analysisId) {
+                    const returnTo = window.location.pathname + window.location.search;
+                    window.location.assign("/analysis/" + encodeURIComponent(result.analysisId)
+                        + "?returnTo=" + encodeURIComponent(returnTo));
+                } else announce("重新分析请求未形成可信结果");
+            } catch (error) { announce(error.message); }
+        });
+        loadRecheck(false);
     }
 
     async function loadPlan() {
-        if (!resourceId) return;
+        const revalidation = document.getElementById("requestPlanRevalidation");
+        const actualPositionAction = document.getElementById("planActualPositionAction");
+        if (actualPositionAction) actualPositionAction.remove();
+        if (revalidation) { revalidation.hidden = true; revalidation.disabled = true; }
+        if (!resourceId) {
+            empty(document.getElementById("finalPlanDetail"), "最终计划当前不可查看", "缺少有效 Final 标识。");
+            return;
+        }
+        const planReturn = document.getElementById("planReturn");
+        if (planReturn) planReturn.href = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"), "/analysis");
         try {
             const plan = await api("/api/workspace/plans/" + encodeURIComponent(resourceId));
+            const lifecycle = String(plan.planLifecycleState || "").toUpperCase();
             document.getElementById("planMode").textContent = label(plan.finalPlanMode || plan.planMode);
-            document.getElementById("planLifecycle").textContent = label(plan.planLifecycleState);
-            document.getElementById("planSummary").innerHTML = factGrid([["推荐动作", text(plan.recommendedAction)], ["最终方向", label(plan.finalMarketBias)], ["计划版本", text(plan.planVersion)], ["有效期", formatTime(plan.validUntil)]]);
+            document.getElementById("planLifecycle").textContent = label(lifecycle);
+            document.getElementById("planSummary").innerHTML = factGrid([["推荐动作", lifecycleActionText(plan.recommendedAction, plan.opportunityState)], ["最终方向", label(plan.finalMarketBias)], ["计划版本", text(plan.planVersion)], ["有效期", formatTime(plan.validUntil)]]);
             document.getElementById("planEntry").innerHTML = factGrid([["入场区", text(plan.entryZone)], ["触发条件", text(plan.triggerCondition)], ["触发周期", text(plan.triggerTimeframe)]]);
             document.getElementById("planInvalidation").innerHTML = factGrid([["失效条件", text(plan.invalidCondition)], ["止损逻辑", text(plan.stopLogic)], ["止损", text(plan.stopLoss)]]);
             document.getElementById("planTargets").innerHTML = factGrid([["止盈规则", text(plan.takeProfitRules)], ["目标逻辑", text(plan.targetLogic)], ["持有周期", text(plan.holdingHorizon)]]);
             document.getElementById("planRisk").innerHTML = factGrid([["杠杆建议", text(plan.leverageSuggestion)], ["仓位建议", text(plan.positionSuggestion)], ["风险解释", text(plan.riskExplanation)], ["重新校验规则", text(plan.revalidationRule)]]);
             document.getElementById("planDrawerContent").innerHTML = document.getElementById("finalPlanDetail").innerHTML;
-            const canOpen = ["CONFIRMATION", "REDUCED"].includes(plan.finalPlanMode || plan.planMode) && plan.planLifecycleState === "CURRENT";
+            const canRevalidate = ["CURRENT", "NEEDS_REVALIDATION"].includes(lifecycle);
+            if (revalidation) { revalidation.hidden = !canRevalidate; revalidation.disabled = !canRevalidate; revalidation.dataset.lifecycle = lifecycle; }
+            const canOpen = ["CONFIRMATION", "REDUCED"].includes(plan.finalPlanMode || plan.planMode) && lifecycle === "CURRENT";
             if (canOpen) {
                 const actions = document.querySelector(".workspace-page .section-header");
                 const button = document.createElement("button");
+                button.id = "planActualPositionAction";
                 button.type = "button";
                 button.className = "button button-secondary";
                 button.dataset.openOverlay = "actual-position";
                 button.textContent = "录入实际持仓";
                 actions.appendChild(button);
-                document.querySelector('#actualPositionForm input[name="finalPlanId"]').value = plan.planId;
+                button.addEventListener("click", function () {
+                    preparePlanPositionForm(plan).catch(function () {
+                        prepareManualPositionForm();
+                        announce("计划上下文当前不可查看，未预填系统计划");
+                    });
+                }, true);
             }
         } catch (_) {
             empty(document.getElementById("finalPlanDetail"), "最终计划当前不可查看", "仅允许展示通过规则校验的 Final，不使用 Candidate 替代。");
+            document.getElementById("planMode").textContent = "当前不可查看";
+            document.getElementById("planLifecycle").textContent = "当前不可查看";
+            if (revalidation) { revalidation.hidden = true; revalidation.disabled = true; revalidation.removeAttribute("data-lifecycle"); }
         }
     }
 
     function bindPlan() {
         document.getElementById("requestPlanRevalidation")?.addEventListener("click", async function (event) {
+            if (event.currentTarget.hidden || !["CURRENT", "NEEDS_REVALIDATION"].includes(event.currentTarget.dataset.lifecycle || "")) return;
             event.currentTarget.disabled = true;
             try {
                 await api("/api/workspace/plan-revalidations", { method: "POST", body: JSON.stringify({ planId: resourceId, triggerType: "MANUAL_REVALIDATION", reason: "USER_REQUESTED" }) });
@@ -1269,7 +1656,7 @@
                 .concat((data.industryAndProject || []).map(function (item) { return Object.assign({ eventType: item.eventType || "INDUSTRY_OR_PROJECT" }, item); }));
             if (!events.length) return empty(target, "暂无事件", "没有返回可信事件窗口。"), undefined;
             target.innerHTML = events.map(function (item, index) {
-                return '<article class="event-item" tabindex="0" data-event-index="' + index + '"><time>' + escapeHtml(formatTime(item.eventTime || item.publishedAt || item.occurredAt)) + '</time><div><strong>' + escapeHtml(text(item.title || item.eventName, "未命名事件")) + '</strong><p>' + escapeHtml(text(item.summary || item.description, "暂无摘要")) + '</p></div>' + stateBadge(item.impactLevel || item.eventType) + "</article>";
+                return '<article class="event-item" tabindex="0" role="button" aria-label="查看事件详情" data-event-index="' + index + '"><time>' + escapeHtml(formatTime(item.eventTime || item.publishedAt || item.occurredAt)) + '</time><div><strong>' + escapeHtml(text(item.title || item.eventName, "未命名事件")) + '</strong><p>' + escapeHtml(text(item.summary || item.description, "暂无摘要")) + '</p></div>' + stateBadge(item.impactLevel || item.eventType) + "</article>";
             }).join("");
             target._events = events;
             target.addEventListener("click", function (event) {
@@ -1279,6 +1666,13 @@
                 document.getElementById("eventDetailContent").innerHTML = renderStructured(record);
                 document.getElementById("eventRelations").innerHTML = renderStructured(data.assetRelations || []);
                 openOverlay("event-detail", item);
+            });
+            target.addEventListener("keydown", function (event) {
+                const item = event.target.closest("[data-event-index]");
+                if (item && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault();
+                    item.click();
+                }
             });
         } catch (_) { empty(target, "事件当前不可查看", "没有返回可信事件来源。"); }
     }
@@ -1305,6 +1699,12 @@
 
     async function loadAudit() {
         if (!resourceId) return;
+        const returnValue = new URLSearchParams(window.location.search).get("returnTo");
+        const returnLink = document.getElementById("auditReturn");
+        if (returnLink && returnValue) {
+            returnLink.href = safeReturnTo(returnValue, "/dashboard");
+            returnLink.hidden = false;
+        }
         try { renderAuditChain(await api("/api/ai/audit-chain?traceId=" + encodeURIComponent(resourceId))); }
         catch (_) { empty(document.getElementById("auditChain"), "审计链当前不可查看", "没有找到该 Trace 的可信责任链。"); }
     }
@@ -1316,29 +1716,42 @@
             if (form) {
                 form.elements.riskPreference.value = config.riskPreference || "BALANCED";
                 form.elements.defaultPoolMode.value = config.defaultPoolMode || "SYSTEM_DEFAULT";
+                form.dataset.initialSettings = JSON.stringify(formJson(form));
+                syncSettingsSaveState(form, document.getElementById("saveSettings"));
             }
-        } catch (_) { document.getElementById("telegramBindingState").textContent = "当前不可查看"; }
-        try {
-            const telegram = await api("/api/settings/notifications/telegram/status");
-            const state = label(telegram.state, "当前不可查看");
-            const delivery = telegram.lastDeliveryState ? " · 最近投递 " + label(telegram.lastDeliveryState) : "";
-            document.getElementById("telegramBindingState").textContent = state + delivery;
-            const details = document.getElementById("telegramChannelStatus");
-            if (details) details.innerHTML = '<dl><div><dt>通道状态</dt><dd>' + escapeHtml(state) + '</dd></div><div><dt>接收方</dt><dd>' + (telegram.recipientConfigured ? '已配置' : '未配置') + '</dd></div><div><dt>重试中</dt><dd>' + escapeHtml(String(telegram.retryingCount || 0)) + '</dd></div></dl>';
-        } catch (_) { document.getElementById("telegramBindingState").textContent = "当前不可查看"; }
+        } catch (_) { announce("设置当前不可查看"); }
         try {
             const provider = await api("/api/system/runtime-readiness-guardrail-status");
             document.getElementById("providerStatus").innerHTML = renderProviderStatus(provider);
-        } catch (_) { empty(document.getElementById("providerStatus"), "数据源状态当前不可查看", "不会强制显示就绪。"); }
+        } catch (_) { empty(document.getElementById("providerStatus"), "数据源状态当前不可查看", "请稍后重试。"); }
+    }
+
+    function syncSettingsSaveState(form, save) {
+        if (!form || !save) return;
+        const dirty = JSON.stringify(formJson(form)) !== form.dataset.initialSettings;
+        save.disabled = !dirty;
+        save.hidden = !dirty;
+        save.classList.toggle("is-dirty", dirty);
     }
 
     function bindSettings() {
-        document.getElementById("saveSettings")?.addEventListener("click", async function () {
+        const form = document.getElementById("riskPreferenceForm");
+        const save = document.getElementById("saveSettings");
+        form?.addEventListener("change", function () {
+            syncSettingsSaveState(form, save);
+        });
+        save?.addEventListener("click", async function () {
             const form = document.getElementById("riskPreferenceForm");
+            save.disabled = true;
             try {
                 await api("/api/user-config", { method: "PUT", body: JSON.stringify(formJson(form)) });
+                form.dataset.initialSettings = JSON.stringify(formJson(form));
+                syncSettingsSaveState(form, save);
                 announce("设置已保存");
-            } catch (error) { announce(error.message); }
+            } catch (error) {
+                announce(error.message);
+                syncSettingsSaveState(form, save);
+            }
         });
         loadSettings();
     }
@@ -1346,13 +1759,20 @@
     function initialize() {
         bindOverlays();
         bindPositionForms();
-        if (pageKey === "home") bindHome();
-        else loadHomeContext();
         loadTasks();
         if (pageKey === "asset-pool") bindAssetPool();
-        if (pageKey === "positions") loadPositions();
+        if (pageKey === "positions") {
+            const query = new URLSearchParams(window.location.search);
+            const state = query.get("state");
+            const sort = query.get("sort");
+            const stateFilter = document.getElementById("positionStateFilter");
+            const sortControl = document.getElementById("positionSort");
+            if (stateFilter && ["ALL", "WAITING", "RISK"].includes(state)) stateFilter.value = state;
+            if (sortControl && ["RISK_DESC", "OPENED_DESC"].includes(sort)) sortControl.value = sort;
+            selectPositionTab(query.get("tab"));
+        }
         if (pageKey === "position-detail") loadPositionDetail();
-        if (pageKey === "reviews") loadReviews();
+        if (pageKey === "reviews") bindReviews();
         if (pageKey === "review-detail") loadReviewDetail();
         if (pageKey === "analysis") bindAnalysis();
         if (pageKey === "messages") loadMessages();

@@ -19,6 +19,8 @@ import org.example.trademodel.service.ChannelDeliveryService;
 import org.example.trademodel.service.EventAssetRelationService;
 import org.example.trademodel.service.MessageFactService;
 import org.example.trademodel.service.PlanRevalidationService;
+import org.example.trademodel.uireview.UiReviewWorkspacePlanFixture;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,7 @@ public class WorkspaceRuntimeController {
     private final MessageMapper messageMapper;
     private final PushSnapshotMapper pushSnapshotMapper;
     private final PushRecheckLogMapper pushRecheckLogMapper;
+    private UiReviewWorkspacePlanFixture uiReviewPlanFixture;
 
     public WorkspaceRuntimeController(AuthenticatedUserIdResolver userIdResolver,
                                       ExecutionPlanMapper executionPlanMapper,
@@ -75,10 +78,18 @@ public class WorkspaceRuntimeController {
         this.pushRecheckLogMapper = pushRecheckLogMapper;
     }
 
+    @Autowired(required = false)
+    void setUiReviewPlanFixture(UiReviewWorkspacePlanFixture uiReviewPlanFixture) {
+        this.uiReviewPlanFixture = uiReviewPlanFixture;
+    }
+
     @GetMapping("/plans/{planId}")
     public ResponseEntity<ApiResponse<ExecutionPlanDO>> finalPlan(@PathVariable String planId) {
         userIdResolver.requireCurrentUserId();
-        ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(planId);
+        ExecutionPlanDO plan = uiReviewPlanFixture == null ? null : uiReviewPlanFixture.find(planId);
+        if (plan == null) {
+            plan = executionPlanMapper.selectByPlanId(planId);
+        }
         if (!isValidatedFinal(plan)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.notFound("validated final plan not found"));
@@ -157,37 +168,6 @@ public class WorkspaceRuntimeController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest(ex.getMessage()));
         }
-    }
-
-    @GetMapping("/rechecks/{pushSnapshotId}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> recheck(@PathVariable String pushSnapshotId) {
-        Long userId = userIdResolver.requireCurrentUserId();
-        MessageDO owner = messageMapper.selectByRecheckIdForUser(pushSnapshotId, userId);
-        if (owner == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot not found or not owned"));
-        }
-        Long pushId;
-        try {
-            pushId = Long.valueOf(owner.getSourceId());
-        } catch (RuntimeException exception) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot identity unavailable"));
-        }
-        TmPushSnapshotDO snapshot = pushSnapshotMapper.selectByPushId(pushId);
-        if (snapshot == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.notFound("push snapshot unavailable"));
-        }
-        TmPushRecheckLogDO latest = pushRecheckLogMapper.selectLatestByPushId(pushId);
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("pushSnapshotId", pushSnapshotId);
-        data.put("originalSnapshot", snapshot);
-        data.put("currentResult", latest);
-        data.put("resultState", latest == null ? "INSUFFICIENT_DATA" : latest.getRecheckStatus());
-        data.put("reason", latest == null ? "WAITING_RECHECK_RESULT" : latest.getExecutionErrorMessage());
-        data.put("notTradeInstruction", true);
-        return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     @GetMapping("/events")

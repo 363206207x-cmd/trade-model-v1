@@ -1,5 +1,7 @@
 package org.example.trademodel.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
@@ -41,6 +43,8 @@ import java.util.Set;
 @Service
 public class DecisionChainAuditQueryServiceImpl implements DecisionChainAuditQueryService {
     private static final Set<String> V41_ROLES = Set.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+    private static final AiRoleResultsCodec AI_ROLE_RESULTS_CODEC =
+            new AiRoleResultsCodec(new ObjectMapper());
 
     private final AnalysisRunMapper analysisRunMapper;
     private final ExecutionPlanCandidateMapper candidateMapper;
@@ -166,6 +170,11 @@ public class DecisionChainAuditQueryServiceImpl implements DecisionChainAuditQue
         result.setDecisionBundle(decision);
         result.setCandidate(selectedCandidate);
         result.setAiTraces(traces.stream().map(DecisionChainAuditQueryServiceImpl::toTrace).toList());
+        AiRoleResultsCodec.ParseResult roleResults = AI_ROLE_RESULTS_CODEC.parse(
+                decision == null ? null : decision.getAiRoleResults());
+        if (roleResults.current() && resolvedAnalysis.equals(roleResults.payload().analysisId())) {
+            result.setAiRoleResults(roleResults.payload());
+        }
         result.setConflictResolver(conflict);
         result.setRuleValidation(toValidation(plan));
         result.setFinalExecutionPlan(isValidatedFinal(plan) ? plan : null);

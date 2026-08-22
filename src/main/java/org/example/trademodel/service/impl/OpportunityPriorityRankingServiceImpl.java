@@ -135,6 +135,8 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
             return null;
         }
         if (PlanModeEnum.BLOCKED.name().equals(planMode)
+                || "HIGH".equals(riskLevel)
+                || "EXTREME".equals(riskLevel)
                 || dataQuality < properties.getRanking().getMinimumDataQuality()) {
             return null;
         }

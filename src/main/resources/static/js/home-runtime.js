@@ -6,6 +6,14 @@
     var selectedSymbol = "";
     var activeRole = "GPT_FINAL";
     var searchTimer = null;
+    var selectedSearchAsset = null;
+    var searchResultItems = [];
+    var activeSearchResultIndex = -1;
+    var assetPoolSymbols = new Set();
+    var assetPoolCount = 0;
+    var searchActionBusy = false;
+    var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
 
     var labels = Object.freeze({
         LONG: "做多", SHORT: "做空",
@@ -25,6 +33,10 @@
         OBSERVING: "观察中", CANDIDATE: "候选", WAITING_TRIGGER: "等待触发", TRIGGERED: "已触发",
         HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型", OBSERVATION: "观察", BLOCKED: "阻断",
+        APPROVE: "通过", DOWNGRADE: "降级", REJECT_CANDIDATE: "拒绝候选", RISK_WARNING: "风险警告",
+        UNCHANGED: "维持不变", SAME_FAMILY_DOWNGRADE: "方向不变，强度降低",
+        RULE_REANALYSIS_REQUIRED: "需回到规则层重新分析", DOWNGRADE_ONE: "降一级", DOWNGRADE_TWO: "降两级",
+        RAISE_ONE: "升一级", RAISE_TWO: "升两级", NEUTRAL: "中性",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
         READY: "就绪", PARTIAL: "部分可用", FALLBACK: "规则路径降级", UNAVAILABLE: "当前不可用",
@@ -32,7 +44,9 @@
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
         SOURCE_UNAVAILABLE: "来源不可用", STALE: "数据已过期",
         COMPLETE: "覆盖完整", PARTIAL_COVERAGE: "覆盖部分", UNKNOWN: "等待评估",
-        SYSTEM_PLAN_POSITION: "系统计划录入", MANUAL_POSITION: "手动录入"
+        SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
+        VERIFIED_FRESH: "已验证且新鲜", PENDING: "等待验证", INVALID: "来源无效",
+        SOURCE_UNAVAILABLE: "来源不可用", CURRENT: "当前有效", NEEDS_REVALIDATION: "正在重验"
     });
 
     function has(value) { return value !== null && value !== undefined && value !== ""; }
@@ -51,7 +65,53 @@
             var shared = contract.userFacingValue(raw);
             if (shared && shared !== raw) return shared;
         }
+        return /^[A-Z][A-Z0-9_]*$/.test(raw) ? "—" : raw;
+    }
+    var alertTokenLabels = Object.freeze({
+        HIGH: "高优先级", WARN: "需关注", ERROR: "读取失败", WAITING_SYNC: "等待同步",
+        SOURCE_UNAVAILABLE: "数据来源不可用", NOT_CALLED: "尚未调用", STALE: "数据已过期",
+        PARTIAL: "数据不完整", REGION_RESTRICTED: "当前区域不可用",
+        DATA_QUALITY_INSUFFICIENT: "数据质量不足", DATA_QUALITY_DEGRADED: "数据质量下降",
+        LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
+        WEAK: "较弱"
+    });
+    var alertMessagePrefixes = Object.freeze([
+        "高风险决策", "数据质量不足", "收敛破裂：冲突升高且多周期弱收敛",
+        "开仓被冲突阻断：冲突升高", "多模型冲突升高", "多周期收敛弱"
+    ]);
+    function alertTokenLabel(value, fallback) {
+        if (!has(value)) return fallback || "当前不可查看";
+        var raw = String(value).trim();
+        var mapped = alertTokenLabels[raw.toUpperCase()];
+        if (mapped) return mapped;
+        if (typeof contract.userFacingValue === "function") {
+            var shared = contract.userFacingValue(raw);
+            if (shared && shared !== raw) return shared;
+        }
         return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || "当前不可查看") : raw;
+    }
+    function userFacingAlertMessage(value) {
+        var raw = text(value, "风险状态发生变化").trim();
+        if (/^[A-Z][A-Z0-9_]*$/.test(raw)) return alertTokenLabel(raw, "风险状态发生变化");
+        var sourceDefined = alertMessagePrefixes.find(function (prefix) { return raw.indexOf(prefix) === 0; });
+        if (sourceDefined) return sourceDefined;
+        var sanitized = raw
+            .replace(/[（(][^）)]*(?:[A-Za-z][A-Za-z0-9_]*\s*=|[A-Z][A-Z0-9_]{2,})[^）)]*[）)]/g, "")
+            .replace(/\b(?:analysisId|traceId|symbol|riskLevel|dataQualityScore|aiConflictLevel|aiConflictScore|multiTfConvergence|isWorthOpening)\s*=\s*[^，,；;\s）)]+/g, "")
+            .replace(/\b[A-Z][A-Z0-9_]*\b/g, function (token) {
+                var mapped = alertTokenLabels[token];
+                if (mapped) return mapped;
+                if (typeof contract.userFacingValue === "function") {
+                    var shared = contract.userFacingValue(token);
+                    if (shared && shared !== token) return shared;
+                }
+                return token.indexOf("_") < 0 && token.length <= 4 ? token : "";
+            })
+            .replace(/\s*([，,；;：:])\s*([，,；;：:])/g, "$2")
+            .replace(/[，,；;：:]\s*$/g, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+        return sanitized || "风险状态发生变化";
     }
     function setText(id, value) { var node = document.getElementById(id); if (node) node.textContent = value; }
     function number(value, fractionDigits) {
@@ -69,6 +129,12 @@
         if (Number.isNaN(date.getTime())) return text(value);
         return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
     }
+    function clockTime(value) {
+        if (!has(value)) return "—";
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "—";
+        return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(date);
+    }
     function symbolOf(asset) {
         var raw = text(asset && (asset.rawSymbol || asset.symbol), "").trim().toUpperCase();
         return /^[A-Z0-9][A-Z0-9._:/-]{1,31}$/.test(raw) ? raw : "";
@@ -83,8 +149,12 @@
         if (!envelope || Number(envelope.code) !== 200) throw new Error(text(envelope && envelope.msg, "数据暂不可用"));
         return envelope.data;
     }
-    async function api(url) {
-        var response = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
+    async function api(url, options) {
+        var request = Object.assign({ credentials: "same-origin", headers: { Accept: "application/json" } }, options || {});
+        request.headers = Object.assign({}, request.headers || {});
+        if (request.body && !(request.body instanceof FormData)) request.headers["Content-Type"] = "application/json";
+        if (csrfToken && csrfHeader && request.method && request.method !== "GET") request.headers[csrfHeader] = csrfToken;
+        var response = await fetch(url, request);
         if (!response.ok) throw new Error("请求失败（" + response.status + "）");
         return apiData(await response.json());
     }
@@ -93,12 +163,29 @@
         if (!card) return fallback || "等待同步";
         return text(card.valueLabel, has(card.value) ? label(card.value, fallback) : label(card.status, fallback));
     }
+    function semanticTone(value) {
+        var normalized = String(value || "").trim().toUpperCase();
+        if (["LOW", "STABLE", "STILL_VALID", "LOGIC_VALID", "NO_REVERSAL", "CURRENT", "READY", "VERIFIED_FRESH"].indexOf(normalized) >= 0) return "positive";
+        if (["MEDIUM", "WEAKENED", "WEAK_REVERSAL", "INCREASED", "WAITING_TRIGGER", "PENDING", "STALE", "NEEDS_REVALIDATION"].indexOf(normalized) >= 0) return "warning";
+        if (["HIGH", "EXTREME", "INVALIDATED", "STRONG_REVERSAL", "SHARPLY_INCREASED", "BLOCKED", "PLAN_INVALIDATED", "INVALID"].indexOf(normalized) >= 0) return "negative";
+        return "unknown";
+    }
+    function toneText(value, raw) {
+        return '<span class="semantic-value tone-' + semanticTone(raw) + '">' + escapeHtml(value) + "</span>";
+    }
+    function eligibleOpportunity(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        var mode = String(asset && (asset.primaryPlanMode || asset.planMode) || "").toUpperCase();
+        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0
+            && mode !== "BLOCKED";
+    }
     function validOpportunity(asset) {
         return symbolOf(asset)
             && has(asset && (asset.opportunityId || asset.primaryOpportunityId))
             && has(asset && asset.analysisId)
             && has(asset && asset.opportunityScore)
             && !Number.isNaN(Number(asset.opportunityScore))
+            && eligibleOpportunity(asset)
             && String(asset.slotType || "").toUpperCase() !== "DEFAULT_SLOT";
     }
     function selectedFinalAccess(home) {
@@ -113,19 +200,17 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerDataSource", "数据 · " + text(header.dataSourceText, label(header.dataStatus, "状态待同步"))
-            + " · AI · " + text(header.aiStatusLabel, label(header.aiStatus, "状态待同步")));
-        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + time(header.updatedAt) : "更新时间待同步");
+        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "—");
     }
 
-    function renderStatus(home, opportunityCount) {
+    function renderStatus(home) {
         var state = home.systemState || {};
-        setText("statusMarket", statusValue(state.marketTrend));
-        setText("statusRisk", statusValue(state.riskLevel));
-        setText("statusQuality", statusValue(state.dataQuality));
-        setText("statusAi", text(home.header && home.header.aiStatusLabel, label(home.header && home.header.aiStatus, "等待同步")));
-        setText("statusOpportunity", opportunityCount ? opportunityCount + " 个" : "暂无");
-        setText("statusReset", statusValue(state.hotReset, "正常"));
+        setText("statusEnvironment", statusValue(state.marketTrend));
+        setText("statusSystem", statusValue(state.riskLevel));
+        setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "—");
+        setText("statusService", statusValue(state.serviceAvailability, "—"));
+        setText("statusAccount", statusValue(state.accountStatus, "—"));
+        setText("statusReset", statusValue(state.hotReset, "—"));
     }
 
     function eventTime(value) {
@@ -141,8 +226,8 @@
         alertNode.hidden = !alert;
         eventNode.hidden = !event;
         if (alert) {
-            alertNode.querySelector("strong").textContent = text(alert.message, "风险状态发生变化");
-            alertNode.querySelector("em").textContent = label(alert.level, "高优先级");
+            alertNode.querySelector("strong").textContent = userFacingAlertMessage(alert.message);
+            alertNode.querySelector("em").textContent = alertTokenLabel(alert.level, "高优先级");
             alertNode.querySelector("time").textContent = has(alert.time) ? time(alert.time) : "";
         }
         if (event) {
@@ -157,37 +242,48 @@
         var view = typeof contract.assetStateView === "function"
             ? contract.assetStateView(asset.opportunityState || asset.assetState, asset.assetStateLabel)
             : { label: label(asset.opportunityState || asset.assetState, "状态待同步"), tone: "neutral" };
-        var tone = view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
-        return '<span class="state-badge' + tone + '">' + escapeHtml(view.label) + "</span>";
+        var revalidating = String(asset.opportunityState || asset.assetState || "").toUpperCase() === "TRIGGERED"
+            && String(asset.finalPlanLifecycle || "").toUpperCase() === "NEEDS_REVALIDATION";
+        var visible = revalidating ? "正在重验" : view.label;
+        var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
+        return '<span class="state-badge' + tone + '">' + escapeHtml(visible) + "</span>";
     }
-    function opportunityCard(asset, finalAccess, selected) {
+    function opportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
-        var finalVisible = isSelected && finalAccess.visible;
-        var plan = finalAccess.plan;
-        var finalBias = finalVisible ? label(plan.finalMarketBias || plan.direction, "—") : "—";
-        var finalMode = finalVisible ? label(plan.finalPlanMode, "尚未形成") : "尚未形成";
+        var finalVisible = asset.hasFinal === true;
+        var finalBias = finalVisible ? label(asset.finalMarketBias, "—") : "—";
+        var finalMode = finalVisible ? label(asset.finalPlanMode, "—") : "—";
         var confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
         var risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
         var timeframe = text(asset.primaryTimeframe, "周期待同步");
-        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" data-symbol="'
-            + escapeHtml(symbol) + '" aria-label="查看 ' + escapeHtml(symbol) + ' 决策上下文"><header><div class="asset-identity"><strong>'
+        var conflict = label(asset.timeframeConflictState, "周期关系待同步");
+        var rankingReason = text(asset.rankingReason, "排序原因待同步");
+        var secondaryCount = has(asset.secondaryOpportunityCount) ? Number(asset.secondaryOpportunityCount) : 0;
+        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
+            + String(isSelected) + '" data-symbol="'
+            + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason) + '" aria-label="查看 ' + escapeHtml(symbol + " 决策上下文，周期关系 " + conflict + "，次级机会 " + secondaryCount + "，" + rankingReason) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol + " · " + timeframe)
             + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
             + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
             + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-final"><span><small>Final Bias</small><b>' + escapeHtml(finalBias)
-            + "</b></span><span><small>Plan Mode</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
+            + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
+            + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
     }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
-        var assets = all.filter(validOpportunity).slice(0, 6);
+        var seen = new Set();
+        var assets = all.filter(validOpportunity).filter(function (asset) {
+            var identity = has(asset.assetId) ? "asset:" + asset.assetId : "symbol:" + symbolOf(asset);
+            if (seen.has(identity)) return false;
+            seen.add(identity);
+            return true;
+        }).slice(0, 6);
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
-        var finalAccess = selectedFinalAccess(home);
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
-        setText("opportunityHeading", "机会资产 · " + assets.length);
-        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, finalAccess, selected); }).join("");
+        setText("opportunityHeading", "资产");
+        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {
@@ -205,38 +301,71 @@
     }
 
     function trustedMonitor(position) {
-        return position && position.markPriceFresh === true
+        var trust = String(position && position.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase();
+        return position && trust === "VERIFIED_FRESH" && position.markPriceFresh === true
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].indexOf(String(position.dataState || "").toUpperCase()) >= 0;
     }
     function validPosition(position) {
-        return position && has(position.positionId) && symbolOf(position) && has(position.direction)
+        return position && symbolOf(position) && has(position.direction)
             && has(position.entryPrice) && has(position.openedAt);
+    }
+    function positionDetailLink(positionId) {
+        var normalized = String(positionId || "").trim();
+        return /^\d+$/.test(normalized) && Number(normalized) > 0
+            ? '<a class="position-detail-link" href="/positions/' + encodeURIComponent(normalized) + '?returnTo=' + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : "")) + '">查看详情</a>'
+            : "";
     }
     function riskRank(value) { return { LOW: 1, MEDIUM: 2, HIGH: 3, EXTREME: 4 }[String(value || "").toUpperCase()] || 0; }
     function highestRisk(positions) {
         var trusted = positions.filter(trustedMonitor).sort(function (a, b) { return riskRank(b.riskLevel) - riskRank(a.riskLevel); });
         return trusted.length ? text(trusted[0].riskLevelLabel, label(trusted[0].riskLevel, "暂无评估")) : "暂无评估";
     }
-    function fact(labelText, value) { return "<span><small>" + escapeHtml(labelText) + "</small><b>" + escapeHtml(value) + "</b></span>"; }
+    function trustStateText(position) {
+        var state = String(position && position.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase();
+        return {
+            PENDING: "等待监控数据",
+            PENDING_VERIFICATION: "等待监控数据",
+            STALE: "监控数据已过期",
+            INVALID: "当前不可查看",
+            SOURCE_UNAVAILABLE: "监控来源不可用"
+        }[state] || "等待监控数据";
+    }
+    function positionFact(labelText, value, raw, align) {
+        return '<span class="position-fact ' + (align || "") + '"><small>' + escapeHtml(labelText) + "</small><b>"
+            + toneText(value, raw) + "</b></span>";
+    }
     function positionRow(position) {
         var trusted = trustedMonitor(position);
-        var monitorState = label(position.dataState, "等待监控数据");
-        var risk = trusted ? text(position.riskLevelLabel, label(position.riskLevel)) : "当前不可查看";
-        var conclusion = trusted ? text(position.monitorConclusionLabel, label(position.monitorConclusion)) : monitorState;
-        var action = trusted ? text(position.suggestedManualActionText, label(position.suggestedAction)) : "等待可信监控结果";
-        return '<article class="position-row"><div class="position-primary"><strong>' + escapeHtml(symbolOf(position)) + "<b>"
-            + escapeHtml(text(position.directionLabel, label(position.direction))) + "</b></strong><small>"
-            + escapeHtml(label(position.sourceType, "已录入持仓")) + " · " + escapeHtml(time(position.openedAt))
-            + '</small></div><div class="position-judgment">' + fact("持仓风险", risk) + fact("监控结论", conclusion) + fact("建议动作", action)
-            + '</div><div class="position-facts">' + fact("开仓价", number(position.entryPrice))
-            + fact("标记价格", trusted ? number(position.markPrice) : "当前不可查看")
-            + fact("盈亏", trusted ? percent(position.pnlPercent) : "当前不可查看")
-            + fact("开仓时间", time(position.openedAt))
-            + '</div><div class="monitor-details">' + fact("入场逻辑状态", trusted ? text(position.entryLogicStatusLabel, label(position.entryLogicStatus)) : "等待监控")
-            + fact("反转状态", trusted ? text(position.reversalStatusLabel, label(position.reversalStatus)) : "等待监控")
-            + fact("风险变化原因", trusted ? text(position.riskReasonLabel, label(position.riskReason)) : "等待监控")
-            + fact("最近监控时间", trusted ? time(position.lastMonitorTime || position.lastMonitorAt) : "等待首次监控")
-            + '</div><a class="position-detail-link" href="/positions/' + encodeURIComponent(position.positionId) + '">详情</a></article>';
+        var unavailable = trustStateText(position);
+        var risk = text(position.riskLevelLabel, label(position.riskLevel));
+        var logic = text(position.entryLogicStatusLabel, label(position.entryLogicStatus));
+        var reversal = text(position.reversalStatusLabel, label(position.reversalStatus));
+        var trend = label(position.riskTrend);
+        var conclusion = text(position.monitorConclusionLabel, label(position.monitorConclusion));
+        var action = text(position.suggestedManualActionText, label(position.suggestedAction));
+        var source = typeof contract.positionSourceLabel === "function"
+            ? contract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可用");
+        var detailLink = positionDetailLink(position.positionId);
+        var openingFacts = '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
+            + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric");
+        if (trusted) {
+            openingFacts += positionFact("标记价格", number(position.markPrice), "STABLE", "numeric")
+                + positionFact("盈亏", percent(position.pnlPercent), Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID", "numeric");
+        }
+        openingFacts += "</div>";
+        var monitorColumns = trusted
+            ? '<div class="position-judgment">' + positionFact("入场逻辑", logic, position.entryLogicStatus, "center")
+                + positionFact("反转状态", reversal, position.reversalStatus, "center")
+                + positionFact("持仓风险", risk, position.riskLevel, "center")
+                + positionFact("风险趋势", trend, position.riskTrend, "center") + "</div>"
+                + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, position.monitorConclusion, "narrative")
+                + positionFact("建议动作", action, position.suggestedAction, "narrative")
+                + detailLink + '</div>'
+            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + detailLink + '</div>';
+        return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + (trusted ? conclusion : unavailable)) + '">'
+            + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
+            + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
+            + openingFacts + monitorColumns + "</article>";
     }
     function renderPositions(home) {
         var positions = (Array.isArray(home.positions) ? home.positions : []).filter(validPosition);
@@ -246,8 +375,14 @@
         list.innerHTML = shown.map(positionRow).join("");
         list.hidden = shown.length === 0;
         empty.hidden = shown.length !== 0;
-        var coverage = label(home.diagnostics && home.diagnostics.accountRiskCoverageState, "等待评估");
-        setText("positionAggregate", "活动 " + positions.length + " · 最高风险 " + highestRisk(positions) + " · " + coverage);
+        var aggregate = home.positionAggregate && typeof home.positionAggregate === "object"
+            ? home.positionAggregate : {};
+        var activeCount = Number.isInteger(aggregate.activeCount) ? aggregate.activeCount : "—";
+        var highestTrustedRisk = has(aggregate.highestTrustedRisk)
+            ? label(aggregate.highestTrustedRisk, "—") : "—";
+        var coverage = has(aggregate.coverageState)
+            ? label(aggregate.coverageState, "—") : "—";
+        setText("positionAggregate", "活动 " + activeCount + " · 最高风险 " + highestTrustedRisk + " · " + coverage);
     }
 
     function planField(labelText, value) { return '<span><small>' + escapeHtml(labelText) + '</small><b>' + escapeHtml(text(value, "当前不可查看")) + "</b></span>"; }
@@ -264,23 +399,28 @@
         var plan = access.plan;
         setText("planAsset", selected || "未选择资产");
         if (!access.visible) {
-            target.innerHTML = '<div class="plan-empty"><strong>尚未形成</strong><span>机会状态 · '
-                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(access.reason, "当前没有通过规则校验的 Final Execution Plan。")) + "</span></div>";
+            var revalidating = String(plan.status || "").toUpperCase() === "REVALIDATION_REQUIRED";
+            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : "尚未形成") + '</strong><span>机会状态 · '
+                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(plan.revalidationReason || access.reason, "尚未形成有效计划")) + "</span>"
+                + (revalidating ? '<span>恢复条件 · ' + escapeHtml(text(plan.revalidationRule, "当前无可验证恢复条件")) + "</span>" : "")
+                + (revalidating ? '<span>最新重验状态 · ' + escapeHtml(label(plan.planLifecycleState, "等待重验")) + "</span>" : "") + "</div>";
             link.hidden = true;
             return;
         }
         var planId = plan.sourceExecutionPlanId;
-        target.innerHTML = '<div class="plan-decision"><div><small>最终方向 · 计划模式</small><strong>'
+        var lifecycle = plan.planLifecycleState || plan.status;
+        target.innerHTML = '<div class="plan-status-layer"><div><small>最终偏向 / 计划模式</small><strong>'
             + escapeHtml(label(plan.finalMarketBias || plan.direction)) + " · " + escapeHtml(label(plan.finalPlanMode))
-            + '</strong></div><span class="plan-state">' + escapeHtml(text(plan.statusLabel, "当前有效")) + '</span></div><div class="plan-conditions">'
+            + '</strong></div><span class="plan-state tone-' + semanticTone(lifecycle) + '">' + escapeHtml(label(lifecycle, text(plan.statusLabel, "当前有效"))) + '</span></div><div class="plan-key-layer">'
             + planField("入场 / 触发", plan.entryZone || plan.triggerCondition)
+            + planField("止损", plan.stopZone || plan.stopLoss)
             + planField("失效条件", plan.invalidCondition || plan.abandonCondition)
-            + planField("止损", plan.stopZone || plan.stopLogic || plan.stopLoss)
             + planField("目标", plan.targetZones || plan.targetLogic || plan.takeProfitRules)
-            + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
-            + '</div><div class="plan-metadata">' + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
-            + planField("版本 / 来源", planId) + "</div>";
-        link.href = "/plans/" + encodeURIComponent(planId);
+            + '</div><div class="plan-metadata-layer">' + planField("杠杆", plan.leverageSuggestion) + planField("仓位", plan.positionSuggestion)
+            + planField("有效期", plan.validPeriod || (has(plan.expiresAt) ? time(plan.expiresAt) : null))
+            + planField("版本", has(plan.planVersion) ? "v" + plan.planVersion : "当前不可查看") + "</div>";
+        link.href = "/plans/" + encodeURIComponent(planId) + "?returnTo="
+            + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
         link.hidden = false;
     }
 
@@ -290,10 +430,16 @@
     function itemText(item) {
         if (!has(item)) return "";
         if (typeof item !== "object") return label(item, text(item));
-        return label(item.text || item.summary || item.hypothesis || item.currentValue || item.reason || item.description || item.source, "");
+        var value = label(item.text || item.summary || item.hypothesis || item.currentValue || item.reason || item.description || item.source, "");
+        var typeValue = item.type || item.category;
+        var changeValue = item.change || item.changeFromBaseline;
+        var type = has(typeValue) ? label(typeValue) : "";
+        var change = has(changeValue) ? label(changeValue) : "";
+        var result = type && value && value.indexOf(type) !== 0 ? type + "：" + value : value || type;
+        return change && result && result.indexOf(change) < 0 ? result + "（" + change + "）" : result;
     }
     function list(items, emptyState) {
-        var values = (Array.isArray(items) ? items : []).map(itemText).filter(Boolean).slice(0, 3);
+        var values = (Array.isArray(items) ? items : []).map(itemText).filter(Boolean).slice(0, 2);
         return values.length ? "<ul>" + values.map(function (value) { return "<li>" + escapeHtml(value) + "</li>"; }).join("") + "</ul>"
             : "<p>" + escapeHtml(collectionLabel(emptyState)) + "</p>";
     }
@@ -304,53 +450,116 @@
         return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核", GROK_CHALLENGE: "Grok 反方挑战" }[activeRole])
             + "</strong><span>" + escapeHtml(text(role && role.statusMessage, "当前角色结果不可查看")) + "</span></div>";
     }
+    function candidateStateLegal(opportunityState, planMode) {
+        var state = String(opportunityState || "").toUpperCase();
+        var mode = String(planMode || "").toUpperCase();
+        return state !== "WAITING_TRIGGER" || mode === "PREPARATION";
+    }
+    function candidateConclusion(summary, opportunityState) {
+        var value = text(summary, "");
+        if (String(opportunityState || "").toUpperCase() === "WAITING_TRIGGER"
+                && value.indexOf("人工确认") >= 0) {
+            return "等待触发；触发后重新校验，通过后再进入人工确认";
+        }
+        return value || "当前一句话结论不可查看";
+    }
     function renderGpt(role) {
         var core = role.coreJudgment || {};
         var candidate = role.candidateSummary || {};
         var multi = role.multiTimeframeExplanation || {};
-        var why = text(core.text, text(role.decisionSummary, "当前形成原因不可查看"));
-        return '<div class="ai-first-visual"><div class="primary"><small>GPT Candidate · 非 Final</small><strong>'
-            + escapeHtml(text(candidate.summary, why)) + "</strong></div><div><small>Market Bias</small><strong>"
-            + escapeHtml(label(core.marketBias, "当前不可查看")) + "</strong></div><div><small>Opportunity State · Candidate Mode</small><strong>"
-            + escapeHtml(label(core.opportunityState, "当前不可查看") + " · " + label(candidate.planMode, "当前不可查看"))
+        var adjustment = role.biasAdjustment || {};
+        if (!candidateStateLegal(core.opportunityState, candidate.planMode)) {
+            return '<div class="ai-unavailable"><strong>GPT 综合判断</strong><span>机会状态与候选参与方式不一致，当前不可查看</span></div>';
+        }
+        var why = text(core.text, "当前形成原因不可查看");
+        return '<div class="ai-first-visual"><div class="primary"><small>GPT 综合判断 · 非最终计划</small><strong>方向判断：'
+            + escapeHtml(label(core.marketBias, "—")) + "</strong></div><div><small>机会进度</small><strong>"
+            + escapeHtml(label(core.opportunityState, "—")) + "</strong></div><div><small>候选参与方式</small><strong>"
+            + escapeHtml(label(candidate.planMode, "—"))
             + '</strong></div></div><div class="ai-content-grid"><section class="ai-section"><h3>形成原因</h3><p>' + escapeHtml(why)
-            + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")]])
-            + '</section><section class="ai-section"><h3>证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
+            + "</p>" + dl([["4h", label(multi["4h"], "暂无数据")], ["1h", label(multi["1h"], "暂无数据")], ["15m", label(multi["15m"], "暂无数据")], ["5m", label(multi["5m"], "暂无数据")],
+                ["偏向调整", label(adjustment.before, "当前不可查看") + " → " + label(adjustment.after, "当前不可查看")]])
+            + '</section><section class="ai-section"><h3>支持证据 · ' + escapeHtml(collectionLabel(role.supportingEvidenceState)) + "</h3>"
             + list(role.supportingEvidence, role.supportingEvidenceState) + '<h3>反对证据 · ' + escapeHtml(collectionLabel(role.opposingEvidenceState)) + "</h3>"
-            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>Candidate 摘要</strong><span>'
-            + escapeHtml(text(candidate.summary || candidate.recommendedAction, "当前候选摘要不可查看")) + "</span></div>";
+            + list(role.opposingEvidence, role.opposingEvidenceState) + '</section></div><div class="ai-summary-footer"><strong>一句话结论</strong><span>'
+            + escapeHtml(candidateConclusion(candidate.summary, core.opportunityState)) + "</span></div>";
     }
     function renderGemini(role) {
+        var reviewResult = String(role.reviewResult || "").toUpperCase();
+        if (["APPROVE", "DOWNGRADE", "REJECT_CANDIDATE", "RISK_WARNING"].indexOf(reviewResult) < 0) return roleUnavailable(role);
         var suggestion = role.downgradeSuggestion || {};
-        var findings = [].concat(role.evidenceGaps || [], role.logicConflicts || [], role.underestimatedRisks || []);
-        return '<div class="ai-first-visual"><div class="primary"><small>复核结果</small><strong>' + escapeHtml(label(role.reviewResult, "当前不可查看"))
-            + "</strong></div><div><small>调整建议</small><strong>" + escapeHtml(label(role.planModeAdjustment || suggestion.after, "当前不可查看"))
-            + "</strong></div><div><small>对 Candidate</small><strong>" + escapeHtml(text(suggestion.reason || role.finalDirectionImpact, "建议待同步"))
-            + '</strong></div></div><div class="ai-content-grid gemini"><section class="ai-section"><h3>Before → After</h3>'
-            + dl([["Before", label(suggestion.before, "当前不可查看")], ["After", label(suggestion.after, "当前不可查看")], ["置信度", label(role.confidenceAdjustment, "当前不可查看")], ["风险", label(role.riskAdjustment, "当前不可查看")]])
-            + '</section><section class="ai-section"><h3>证据缺口 · 逻辑冲突 · 风险低估</h3>' + list(findings, role.evidenceGapsState || role.logicConflictsState || role.underestimatedRisksState)
+        var selectedState = String(currentHome && currentHome.selectedAssetContext
+            && (currentHome.selectedAssetContext.opportunityState || currentHome.selectedAssetContext.assetState) || "").toUpperCase();
+        if (selectedState === "WAITING_TRIGGER" && has(suggestion.before)
+                && (String(suggestion.before).toUpperCase() === "CONFIRMATION"
+                || String(suggestion.after || "").toUpperCase() !== "PREPARATION")) {
+            return '<div class="ai-unavailable"><strong>Gemini 冲突复核</strong><span>复核前后状态与等待触发生命周期不一致，当前不可查看</span></div>';
+        }
+        var hasBeforeAfter = has(suggestion.before) && has(suggestion.after);
+        var beforeAfter = hasBeforeAfter
+            ? '<section class="ai-section"><h3>调整前 / 调整后</h3>'
+                + dl([["调整前", label(suggestion.before)], ["调整后", label(suggestion.after)], ["调整原因", text(suggestion.reason, "当前不可查看")]]) + '</section>'
+            : "";
+        return '<div class="ai-first-visual is-single"><div class="primary"><small>Gemini 冲突复核</small><strong>复核结果：' + escapeHtml(label(reviewResult, "当前不可查看"))
+            + '</strong></div></div><div class="ai-content-grid gemini">' + beforeAfter
+            + '<section class="ai-section"><h3>证据缺口 · ' + escapeHtml(collectionLabel(role.evidenceGapsState)) + '</h3>' + list(role.evidenceGaps, role.evidenceGapsState)
+            + '<h3>逻辑冲突 · ' + escapeHtml(collectionLabel(role.logicConflictsState)) + '</h3>' + list(role.logicConflicts, role.logicConflictsState)
+            + '<h3>风险低估 · ' + escapeHtml(collectionLabel(role.underestimatedRisksState)) + '</h3>' + list(role.underestimatedRisks, role.underestimatedRisksState)
             + '</section></div><div class="ai-summary-footer"><strong>恢复条件</strong><span>' + escapeHtml(text(role.recoveryCondition || suggestion.recoveryCondition, "当前无可验证恢复条件")) + "</span></div>";
     }
+    function completeFailurePath(path) {
+        return path && has(path.triggerCondition) && has(path.causalPath) && has(path.invalidatingEvidence);
+    }
+    function failurePathStateView(role) {
+        var state = String(role && role.failurePathState || "").toUpperCase();
+        var paths = (Array.isArray(role && role.failurePaths) ? role.failurePaths : []).filter(completeFailurePath);
+        if (state === "FOUND") {
+            return paths.length ? { valid: true, label: "已发现可验证失败路径", paths: paths }
+                : { valid: false, label: "失败路径状态不一致，当前不可查看", paths: [] };
+        }
+        if ((state === "NONE_FOUND" || state === "NO_VERIFIABLE_FAILURE_PATH")
+                && (!role.failurePaths || role.failurePaths.length === 0)) {
+            return { valid: true, label: "未发现可验证失败路径", paths: [] };
+        }
+        if (state === "INSUFFICIENT_DATA") return { valid: true, label: "数据不足，无法判断", paths: [] };
+        if (state === "SOURCE_UNAVAILABLE") return { valid: true, label: "数据来源暂不可用", paths: [] };
+        if (state === "STALE") return { valid: true, label: "数据已过期", paths: [] };
+        return { valid: false, label: "失败路径状态不一致，当前不可查看", paths: [] };
+    }
+    function failurePathChain(paths, state, invalidStateLabel) {
+        var rows = Array.isArray(paths) ? paths : [];
+        if (!rows.length) return "<p>" + escapeHtml(invalidStateLabel || collectionLabel(state)) + "</p>";
+        return rows.slice(0, 2).map(function (path) {
+            return '<div class="failure-path-chain"><strong>' + escapeHtml(text(path.hypothesis, "失败路径")) + '</strong><ol>'
+                + '<li><small>触发</small><span>' + escapeHtml(text(path.triggerCondition, "当前不可查看")) + '</span></li>'
+                + '<li><small>演化</small><span>' + escapeHtml(text(path.causalPath, "当前不可查看")) + '</span></li>'
+                + '<li><small>失效</small><span>' + escapeHtml(text(path.invalidatingEvidence, "当前不可查看")) + '</span></li></ol></div>';
+        }).join("");
+    }
     function renderGrok(role) {
-        return '<div class="ai-first-visual"><div class="primary"><small>失败路径</small><strong>' + escapeHtml(collectionLabel(role.failurePathState))
-            + "</strong></div><div><small>当前方向挑战</small><strong>" + escapeHtml(text(role.currentDirectionChallenge, "当前不可查看"))
-            + "</strong></div><div><small>计划模式影响</small><strong>" + escapeHtml(label(role.planModeImpact, "当前不可查看"))
-            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
+        var failurePath = failurePathStateView(role);
+        return '<div class="ai-first-visual is-single"><div class="primary"><small>Grok 反方挑战</small><strong>失败路径：' + escapeHtml(failurePath.label)
+            + '</strong></div></div><div class="ai-content-grid grok"><section class="ai-section"><h3>失败路径 · 触发 → 演化 → 失效</h3>'
+            + failurePathChain(failurePath.paths, role.failurePathState, failurePath.valid ? null : failurePath.label)
+            + '<h3>反向情景</h3>' + list(role.opposingScenarios, role.opposingScenariosState)
             + '<h3>外部事件风险</h3>' + list(role.externalEventRisks, role.externalEventRisksState)
             + '</section><section class="ai-section"><h3>微观结构风险</h3>' + list(role.microstructureRisks, role.microstructureRisksState)
-            + '<h3>继续观察指标</h3>' + list(role.watchIndicators, role.watchIndicatorsState) + "</section></div>";
+            + '<h3>继续观察指标</h3>' + list(role.watchIndicators, role.watchIndicatorsState)
+            + '<h3>挑战摘要</h3><p>' + escapeHtml(text(role.challengeSummary, "—")) + "</p></section></div>";
     }
+
     function renderConflict(home) {
         var consistency = home.aiDecision && home.aiDecision.consistency || {};
         var level = String(consistency.conflictLevel || "").toUpperCase();
-        var ready = String(consistency.dataState || "").toUpperCase() === "READY";
+        var ready = String(consistency.dataState || "").toUpperCase() === "READY"
+            && has(consistency.conflictLevel) && has(consistency.mainReason);
         var show = ready && level && level !== "LEVEL_1_CONSISTENT";
         var target = document.getElementById("conflictSummary");
         var layout = document.getElementById("aiLayout");
         target.hidden = !show;
         layout.classList.toggle("has-conflict", show);
         if (!show) { target.innerHTML = ""; return; }
-        target.innerHTML = '<h3>Conflict Summary</h3>' + dl([
+        target.innerHTML = '<h3>冲突摘要</h3>' + dl([
             ["冲突等级", label(consistency.conflictLevel)], ["最终偏向", label(consistency.finalMarketBias)],
             ["最终计划", label(consistency.finalPlanMode)], ["主要原因", text(consistency.mainReason)],
             ["恢复条件", text(consistency.recoveryCondition)]
@@ -362,15 +571,31 @@
         var role = roles.find(function (item) { return item.role === activeRole; });
         var panel = document.getElementById("aiRolePanel");
         setText("aiContext", symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || "等待分析上下文");
-        if (!role || role.resultAvailable !== true) panel.innerHTML = roleUnavailable(role);
-        else if (activeRole === "GPT_FINAL") panel.innerHTML = renderGpt(role);
-        else if (activeRole === "GEMINI_REVIEW") panel.innerHTML = renderGemini(role);
-        else panel.innerHTML = renderGrok(role);
+        var roleContent;
+        if (!role || role.resultAvailable !== true) roleContent = roleUnavailable(role);
+        else if (activeRole === "GPT_FINAL") roleContent = renderGpt(role);
+        else if (activeRole === "GEMINI_REVIEW") roleContent = renderGemini(role);
+        else roleContent = renderGrok(role);
+        panel.innerHTML = roleContent;
         setText("aiMetadata", role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 生成时间 " + time(role.generatedAt) + " · 来源 " + text(role.provider, "当前不可查看") : "角色状态待同步");
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
         var audit = document.getElementById("auditChainLink");
-        audit.href = trace ? "/audit/" + encodeURIComponent(trace) : analysis ? "/analysis/" + encodeURIComponent(analysis) : "/analysis";
+        if (trace) {
+            audit.href = "/audit/" + encodeURIComponent(trace) + "?returnTo="
+                + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
+            audit.textContent = "查看完整审计链";
+            audit.removeAttribute("aria-disabled");
+        } else if (analysis) {
+            audit.href = "/analysis/" + encodeURIComponent(analysis) + "?returnTo="
+                + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : ""));
+            audit.textContent = "查看分析详情";
+            audit.removeAttribute("aria-disabled");
+        } else {
+            audit.removeAttribute("href");
+            audit.textContent = "审计链尚未形成";
+            audit.setAttribute("aria-disabled", "true");
+        }
         renderConflict(home);
     }
 
@@ -379,8 +604,8 @@
         selectedSymbol = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
         renderHeader(home);
         renderSignals(home);
-        var count = renderOpportunities(home);
-        renderStatus(home, count);
+        renderOpportunities(home);
+        renderStatus(home);
         renderPositions(home);
         renderPlan(home);
         renderAi(home);
@@ -389,56 +614,202 @@
         try {
             var query = new URLSearchParams({ limit: "6" });
             if (symbol) query.set("selectedSymbol", symbol);
+            var requestedPositionId = new URLSearchParams(window.location.search).get("positionId");
+            if (requestedPositionId && /^\d+$/.test(requestedPositionId)) {
+                query.set("positionId", requestedPositionId);
+            }
             render(await api("/api/dashboard/home?" + query.toString()));
         } catch (error) {
             announce(error.message);
             render({ states: { overall: "ERROR" }, diagnostics: {}, assets: [], positions: [], aiDecision: { tabs: [] } });
-            setText("headerDataSource", "当前不可查看");
         }
     }
 
+    function setSearchPopoverOpen(open) {
+        var input = document.getElementById("homeAssetSearch");
+        var popover = document.getElementById("homeAssetSearchPopover");
+        popover.hidden = !open;
+        input.setAttribute("aria-expanded", String(open));
+    }
+    function renderSearchSelection(message) {
+        var symbolNode = document.getElementById("homeSelectedSearchSymbol");
+        var stateNode = document.getElementById("homeSelectedSearchState");
+        var poolCountNode = document.getElementById("homeAssetPoolCount");
+        var previewButton = document.getElementById("homePreviewAsset");
+        var addButton = document.getElementById("homeAddAsset");
+        var statusNode = document.getElementById("homeAssetSearchStatus");
+        poolCountNode.textContent = "观察资产池 · " + assetPoolCount;
+        statusNode.textContent = message || "";
+        if (!selectedSearchAsset) {
+            symbolNode.textContent = "尚未选择资产";
+            stateNode.textContent = "未选择搜索结果";
+            previewButton.textContent = "分析";
+            previewButton.disabled = true;
+            addButton.disabled = true;
+            addButton.textContent = "添加";
+            return;
+        }
+        var symbol = symbolOf(selectedSearchAsset);
+        var inPool = assetPoolSymbols.has(symbol);
+        symbolNode.textContent = symbol;
+        stateNode.textContent = text(selectedSearchAsset.baseAsset || selectedSearchAsset.name, symbol.replace(/USDT$/, ""))
+            + " · " + (inPool ? "已添加" : "未添加");
+        previewButton.textContent = "分析";
+        previewButton.disabled = searchActionBusy;
+        addButton.disabled = searchActionBusy || inPool;
+        addButton.textContent = inPool ? "已添加" : "添加";
+    }
+    function setActiveSearchResult(index, focusResult) {
+        var buttons = Array.from(document.querySelectorAll("#homeAssetSearchResults [data-search-index]"));
+        if (!buttons.length) { activeSearchResultIndex = -1; return; }
+        activeSearchResultIndex = Math.max(0, Math.min(index, buttons.length - 1));
+        buttons.forEach(function (button, buttonIndex) {
+            var active = buttonIndex === activeSearchResultIndex;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-selected", String(active));
+        });
+        if (focusResult) buttons[activeSearchResultIndex].focus();
+    }
+    function selectSearchResult(index) {
+        if (!searchResultItems[index]) return;
+        selectedSearchAsset = searchResultItems[index];
+        setActiveSearchResult(index, false);
+        renderSearchSelection();
+        setSearchPopoverOpen(true);
+    }
+    async function loadAssetPoolMembership() {
+        var items = await api("/api/asset-pool");
+        var values = Array.isArray(items) ? items : [];
+        assetPoolSymbols = new Set(values.map(function (item) { return symbolOf(item); }).filter(Boolean));
+        assetPoolCount = values.length;
+        renderSearchSelection();
+    }
     function renderSearchResults(items) {
         var target = document.getElementById("homeAssetSearchResults");
-        var values = Array.isArray(items) ? items.slice(0, 8) : [];
-        target.innerHTML = values.map(function (asset) {
+        searchResultItems = (Array.isArray(items) ? items : []).filter(function (asset) { return !!symbolOf(asset); }).slice(0, 8);
+        activeSearchResultIndex = -1;
+        target.innerHTML = searchResultItems.map(function (asset, index) {
             var symbol = symbolOf(asset);
-            if (!symbol) return "";
-            return '<button class="search-result" type="button" role="option" data-search-symbol="' + escapeHtml(symbol)
+            var inPool = assetPoolSymbols.has(symbol);
+            return '<button class="search-result" type="button" role="option" aria-selected="false" data-search-index="' + index
+                + '" data-search-symbol="' + escapeHtml(symbol)
                 + '"><span><strong>' + escapeHtml(symbol) + "</strong><small>" + escapeHtml(text(asset.baseAsset || asset.name, "市场资产"))
-                + "</small></span><em>分析</em></button>";
+                + "</small></span><em>" + (inPool ? "已添加" : "未添加") + "</em></button>";
         }).join("");
-        target.hidden = !target.innerHTML;
-        target.querySelectorAll("[data-search-symbol]").forEach(function (button) {
-            button.addEventListener("click", function () { window.location.href = "/analysis?asset=" + encodeURIComponent(button.dataset.searchSymbol); });
+        if (!target.innerHTML) target.innerHTML = '<div class="search-result"><span><strong>未找到资产</strong><small>可更换名称或交易对</small></span></div>';
+        setSearchPopoverOpen(true);
+        target.querySelectorAll("[data-search-index]").forEach(function (button) {
+            button.addEventListener("click", function () { selectSearchResult(Number(button.dataset.searchIndex)); });
         });
     }
     function bindSearch() {
         var input = document.getElementById("homeAssetSearch");
-        var results = document.getElementById("homeAssetSearchResults");
+        var popover = document.getElementById("homeAssetSearchPopover");
+        input.addEventListener("focus", function () { setSearchPopoverOpen(true); });
         input.addEventListener("input", function () {
             window.clearTimeout(searchTimer);
             var query = input.value.trim();
-            if (!query) { results.hidden = true; results.innerHTML = ""; return; }
+            selectedSearchAsset = null;
+            renderSearchSelection();
+            if (!query) { searchResultItems = []; document.getElementById("homeAssetSearchResults").innerHTML = ""; setSearchPopoverOpen(true); return; }
             searchTimer = window.setTimeout(async function () {
                 try { renderSearchResults(await api("/api/asset-pool/search?query=" + encodeURIComponent(query) + "&limit=8")); }
-                catch (error) { results.innerHTML = '<div class="search-result"><span><strong>搜索当前不可查看</strong><small>' + escapeHtml(error.message) + "</small></span></div>"; results.hidden = false; }
+                catch (error) { document.getElementById("homeAssetSearchResults").innerHTML = '<div class="search-result"><span><strong>搜索当前不可查看</strong><small>' + escapeHtml(error.message) + "</small></span></div>"; setSearchPopoverOpen(true); }
             }, 180);
         });
         input.addEventListener("keydown", function (event) {
-            if (event.key === "Escape") { results.hidden = true; input.blur(); }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                var step = event.key === "ArrowDown" ? 1 : -1;
+                var start = activeSearchResultIndex < 0 ? (step > 0 ? 0 : searchResultItems.length - 1) : activeSearchResultIndex + step;
+                setActiveSearchResult(start, false);
+            } else if (event.key === "Enter" && activeSearchResultIndex >= 0) {
+                event.preventDefault();
+                selectSearchResult(activeSearchResultIndex);
+            } else if (event.key === "Escape") {
+                setSearchPopoverOpen(false);
+                input.blur();
+            }
         });
-        document.addEventListener("click", function (event) { if (!event.target.closest(".asset-search")) results.hidden = true; });
+        document.getElementById("homeAssetSearchResults").addEventListener("keydown", function (event) {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveSearchResult(activeSearchResultIndex + (event.key === "ArrowDown" ? 1 : -1), true);
+            } else if (event.key === "Enter" && activeSearchResultIndex >= 0) {
+                event.preventDefault();
+                selectSearchResult(activeSearchResultIndex);
+                input.focus();
+            } else if (event.key === "Escape") {
+                setSearchPopoverOpen(false);
+                input.focus();
+            }
+        });
+        document.getElementById("homePreviewAsset").addEventListener("click", async function () {
+            if (!selectedSearchAsset || searchActionBusy) return;
+            searchActionBusy = true;
+            renderSearchSelection("分析中");
+            try {
+                var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
+                if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
+                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId) + "?returnTo="
+                    + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : "")));
+            } catch (error) {
+                searchActionBusy = false;
+                renderSearchSelection(error.message);
+                announce(error.message);
+            }
+        });
+        document.getElementById("homeAddAsset").addEventListener("click", async function () {
+            if (!selectedSearchAsset || searchActionBusy || assetPoolSymbols.has(symbolOf(selectedSearchAsset))) return;
+            searchActionBusy = true;
+            renderSearchSelection("添加中");
+            try {
+                await api("/api/asset-pool", { method: "POST", body: JSON.stringify({ symbol: symbolOf(selectedSearchAsset), focusEnabled: true }) });
+                await loadAssetPoolMembership();
+                searchActionBusy = false;
+                renderSearchSelection("已添加");
+                renderSearchResults(searchResultItems);
+                announce(symbolOf(selectedSearchAsset) + " 已添加");
+            } catch (error) {
+                searchActionBusy = false;
+                renderSearchSelection(error.message);
+                announce(error.message);
+            }
+        });
+        document.addEventListener("click", function (event) { if (!event.target.closest(".asset-search")) setSearchPopoverOpen(false); });
+        loadAssetPoolMembership().catch(function (error) {
+            document.getElementById("homeAssetPoolCount").textContent = "观察资产池 · 当前不可查看";
+            document.getElementById("homeAssetSearchStatus").textContent = error.message;
+        });
+        renderSearchSelection();
     }
     function bindTabs() {
-        document.querySelectorAll("[data-ai-role]").forEach(function (button) {
+        var tabs = Array.from(document.querySelectorAll("[data-ai-role]"));
+        function activate(button, focus) {
+            activeRole = button.dataset.aiRole;
+            tabs.forEach(function (item) {
+                var selected = item === button;
+                item.classList.toggle("is-active", selected);
+                item.setAttribute("aria-selected", String(selected));
+                item.tabIndex = selected ? 0 : -1;
+            });
+            if (focus) button.focus();
+            renderAi(currentHome);
+        }
+        tabs.forEach(function (button) {
             button.addEventListener("click", function () {
-                activeRole = button.dataset.aiRole;
-                document.querySelectorAll("[data-ai-role]").forEach(function (item) {
-                    var selected = item === button;
-                    item.classList.toggle("is-active", selected);
-                    item.setAttribute("aria-selected", String(selected));
-                });
-                renderAi(currentHome);
+                activate(button, false);
+            });
+            button.addEventListener("keydown", function (event) {
+                var index = tabs.indexOf(button);
+                var next = index;
+                if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+                else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+                else if (event.key === "Home") next = 0;
+                else if (event.key === "End") next = tabs.length - 1;
+                else return;
+                event.preventDefault();
+                activate(tabs[next], true);
             });
         });
     }

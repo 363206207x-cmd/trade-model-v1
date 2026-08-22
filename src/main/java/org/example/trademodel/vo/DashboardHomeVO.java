@@ -20,6 +20,7 @@ public class DashboardHomeVO {
     private List<EventRowVO> events = new ArrayList<>();
     private List<AssetVO> assets = new ArrayList<>();
     private List<PositionVO> positions = new ArrayList<>();
+    private PositionAggregateVO positionAggregate = new PositionAggregateVO();
     private ModuleStatesVO states = new ModuleStatesVO();
     private String selectedSymbol;
     private AssetVO selectedAssetContext;
@@ -82,6 +83,11 @@ public class DashboardHomeVO {
 
     public void setPositions(List<PositionVO> positions) {
         this.positions = positions;
+    }
+
+    public PositionAggregateVO getPositionAggregate() { return positionAggregate; }
+    public void setPositionAggregate(PositionAggregateVO value) {
+        this.positionAggregate = value == null ? new PositionAggregateVO() : value;
     }
 
     public ModuleStatesVO getStates() {
@@ -186,7 +192,7 @@ public class DashboardHomeVO {
         private String aiStatus = "WAITING_SYNC";
         private String aiStatusLabel = "等待同步";
         private String dataSourceText = "WAITING_SYNC";
-        private LocalDateTime updatedAt;
+        private Instant updatedAt;
 
         public String getPageTitle() {
             return pageTitle;
@@ -228,11 +234,11 @@ public class DashboardHomeVO {
             this.dataSourceText = dataSourceText;
         }
 
-        public LocalDateTime getUpdatedAt() {
+        public Instant getUpdatedAt() {
             return updatedAt;
         }
 
-        public void setUpdatedAt(LocalDateTime updatedAt) {
+        public void setUpdatedAt(Instant updatedAt) {
             this.updatedAt = updatedAt;
         }
     }
@@ -263,6 +269,8 @@ public class DashboardHomeVO {
         private StatusCardVO marketTrend = new StatusCardVO();
         private StatusCardVO riskLevel = new StatusCardVO();
         private StatusCardVO dataQuality = new StatusCardVO();
+        private StatusCardVO serviceAvailability = new StatusCardVO();
+        private StatusCardVO accountStatus = new StatusCardVO();
         private StatusCardVO aiConflict = new StatusCardVO();
         private StatusCardVO pendingReview = new StatusCardVO();
         private StatusCardVO confused = new StatusCardVO();
@@ -290,6 +298,22 @@ public class DashboardHomeVO {
 
         public void setDataQuality(StatusCardVO dataQuality) {
             this.dataQuality = dataQuality;
+        }
+
+        public StatusCardVO getServiceAvailability() {
+            return serviceAvailability;
+        }
+
+        public void setServiceAvailability(StatusCardVO serviceAvailability) {
+            this.serviceAvailability = serviceAvailability;
+        }
+
+        public StatusCardVO getAccountStatus() {
+            return accountStatus;
+        }
+
+        public void setAccountStatus(StatusCardVO accountStatus) {
+            this.accountStatus = accountStatus;
         }
 
         public StatusCardVO getAiConflict() {
@@ -498,6 +522,10 @@ public class DashboardHomeVO {
         private String aiDecisionResult;
         private Integer dataQualityScore;
         private String rankingReason;
+        private Boolean hasFinal = false;
+        private String finalMarketBias;
+        private String finalPlanMode;
+        private String finalPlanLifecycle;
         private String marketBias;
         private String marketBiasLabel;
         private Integer compositeScore;
@@ -604,6 +632,14 @@ public class DashboardHomeVO {
         public void setDataQualityScore(Integer dataQualityScore) { this.dataQualityScore = dataQualityScore; }
         public String getRankingReason() { return rankingReason; }
         public void setRankingReason(String rankingReason) { this.rankingReason = rankingReason; }
+        public Boolean getHasFinal() { return hasFinal; }
+        public void setHasFinal(Boolean hasFinal) { this.hasFinal = hasFinal; }
+        public String getFinalMarketBias() { return finalMarketBias; }
+        public void setFinalMarketBias(String finalMarketBias) { this.finalMarketBias = finalMarketBias; }
+        public String getFinalPlanMode() { return finalPlanMode; }
+        public void setFinalPlanMode(String finalPlanMode) { this.finalPlanMode = finalPlanMode; }
+        public String getFinalPlanLifecycle() { return finalPlanLifecycle; }
+        public void setFinalPlanLifecycle(String finalPlanLifecycle) { this.finalPlanLifecycle = finalPlanLifecycle; }
 
         public String getMarketBias() {
             return marketBias;
@@ -771,6 +807,7 @@ public class DashboardHomeVO {
         private String moduleState = "MISSING";
         private String warningState = "MISSING";
         private String dataState = "WAITING_MONITOR_DATA";
+        private String monitorTrustState = "SOURCE_UNAVAILABLE";
 
         @JsonSerialize(using = ToStringSerializer.class)
         public Long getPositionId() {
@@ -1005,6 +1042,8 @@ public class DashboardHomeVO {
         public void setWarningState(String warningState) { this.warningState = warningState; }
         public String getDataState() { return dataState; }
         public void setDataState(String dataState) { this.dataState = dataState; }
+        public String getMonitorTrustState() { return monitorTrustState; }
+        public void setMonitorTrustState(String monitorTrustState) { this.monitorTrustState = monitorTrustState; }
     }
 
     public static class ExecutionSuggestionVO {
@@ -1059,6 +1098,11 @@ public class DashboardHomeVO {
         private OffsetDateTime validFrom;
         private OffsetDateTime expiresAt;
         private String invalidCondition;
+        private String planLifecycleState;
+        private Integer planVersion;
+        private Boolean needsRevalidation;
+        private String revalidationReason;
+        private String revalidationRule;
         private Boolean notTradeInstruction = true;
         private String moduleState = "MISSING";
 
@@ -1221,6 +1265,17 @@ public class DashboardHomeVO {
         public void setInvalidCondition(String invalidCondition) {
             this.invalidCondition = invalidCondition;
         }
+
+        public String getPlanLifecycleState() { return planLifecycleState; }
+        public void setPlanLifecycleState(String planLifecycleState) { this.planLifecycleState = planLifecycleState; }
+        public Integer getPlanVersion() { return planVersion; }
+        public void setPlanVersion(Integer planVersion) { this.planVersion = planVersion; }
+        public Boolean getNeedsRevalidation() { return needsRevalidation; }
+        public void setNeedsRevalidation(Boolean needsRevalidation) { this.needsRevalidation = needsRevalidation; }
+        public String getRevalidationReason() { return revalidationReason; }
+        public void setRevalidationReason(String revalidationReason) { this.revalidationReason = revalidationReason; }
+        public String getRevalidationRule() { return revalidationRule; }
+        public void setRevalidationRule(String revalidationRule) { this.revalidationRule = revalidationRule; }
 
         public Boolean getNotTradeInstruction() { return notTradeInstruction; }
         public void setNotTradeInstruction(Boolean value) { this.notTradeInstruction = value; }
@@ -2042,13 +2097,13 @@ public class DashboardHomeVO {
 
     public static class DerivativesSummaryVO {
         private String status = "等待同步";
-        private String openInterestStructure = "暂无";
-        private String fundingRisk = "暂无";
-        private String liquidationRisk = "暂无";
-        private String crowdingDirection = "无明确";
+        private String openInterestStructure = "暂无法判断";
+        private String fundingRisk = "暂无法判断";
+        private String liquidationRisk = "暂无法判断";
+        private String crowdingDirection = "暂无法判断";
         private Instant dataTime;
-        private String source = "CoinGlass v4";
-        private String decisionImpact = "等待同步";
+        private String source;
+        private String decisionImpact = "不可用于判断";
         private List<String> reasonCodes = new ArrayList<>();
 
         public String getStatus() { return status; }
@@ -2196,6 +2251,21 @@ public class DashboardHomeVO {
 
         public void setProviderReadiness(ProviderReadinessVO providerReadiness) {
             this.providerReadiness = providerReadiness == null ? new ProviderReadinessVO() : providerReadiness;
+        }
+    }
+
+    public static class PositionAggregateVO {
+        private Integer activeCount;
+        private String highestTrustedRisk;
+        private String coverageState = "UNKNOWN";
+
+        public Integer getActiveCount() { return activeCount; }
+        public void setActiveCount(Integer value) { this.activeCount = value; }
+        public String getHighestTrustedRisk() { return highestTrustedRisk; }
+        public void setHighestTrustedRisk(String value) { this.highestTrustedRisk = value; }
+        public String getCoverageState() { return coverageState; }
+        public void setCoverageState(String value) {
+            this.coverageState = value == null ? "UNKNOWN" : value;
         }
     }
 

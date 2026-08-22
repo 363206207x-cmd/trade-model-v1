@@ -13,5 +13,9 @@ public interface UserPositionService {
 
     List<UserPositionVO> listOpenPositionsForUser(Long userId);
 
+    List<UserPositionVO> listClosedPositionsForUser(Long userId, int limit);
+
+    int countClosedPositionsForUser(Long userId);
+
     UserPositionVO findByIdForUser(Long id, Long userId);
 }

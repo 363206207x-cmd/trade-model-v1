@@ -123,6 +123,20 @@ class LocalRealDataStatusServiceTest {
     }
 
     @Test
+    void latestClosedBarAtUsesPersistedCloseTimeAndFailsClosedWithoutABar() {
+        LocalRealReadinessService readiness = new LocalRealReadinessService();
+        PersistedOhlcvBarDO persisted = new PersistedOhlcvBarDO();
+        persisted.setCloseTimeMs(Instant.parse("2026-08-20T09:56:00Z").toEpochMilli());
+        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(persisted, null);
+        LocalRealDataStatusService service = new LocalRealDataStatusService(
+                readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
+                realMarketEnvironmentService);
+
+        assertThat(service.latestClosedBarAt()).isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
+        assertThat(service.latestClosedBarAt()).isNull();
+    }
+
+    @Test
     void providerReadinessUsesCurrentBarAgeAndFailsClosedAfterFreshnessWindow() {
         Instant now = Instant.parse("2026-08-10T14:30:00Z");
         LocalRealReadinessService readiness = new LocalRealReadinessService();

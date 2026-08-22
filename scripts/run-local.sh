@@ -11,11 +11,12 @@ LOGIN_PAGE="${RUNTIME_DIR}/startup-login.html"
 DASHBOARD_PAGE="${RUNTIME_DIR}/startup-dashboard.html"
 APP_PID=""
 REAL_DATA_MODE=false
+UI_REVIEW_MODE=false
 
-if [[ "${1:-}" == "--real-data" ]]; then
-  REAL_DATA_MODE=true
-  shift
-fi
+case "${1:-}" in
+  --real-data) REAL_DATA_MODE=true; shift ;;
+  --ui-review) UI_REVIEW_MODE=true; shift ;;
+esac
 
 fail() {
   printf '%s\n' "LOCAL_STARTUP=FAIL" "BLOCKER=$1" >&2
@@ -138,6 +139,10 @@ export TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED=false
 export TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED=false
 export TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED=false
 export TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED=false
+if [[ "${UI_REVIEW_MODE}" == "true" ]]; then
+  [[ "${SPRING_PROFILES_ACTIVE:-}" != *prod* ]] || fail "UI_REVIEW_PROD_PROFILE_CONFLICT"
+  export SPRING_PROFILES_ACTIVE="ui-review"
+fi
 if [[ "${REAL_DATA_MODE}" == "true" ]]; then
   export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-local-real}"
   export TRADE_MODEL_PROVIDER_CALL_ENABLED=true
@@ -184,6 +189,7 @@ printf '%s\n' \
   "LOGIN_URL=${LOGIN_URL}" \
   "HOME_URL=${HOME_URL}" \
   "REAL_DATA_MODE=${REAL_DATA_MODE}" \
+  "UI_REVIEW_MODE=${UI_REVIEW_MODE}" \
   "USERNAME=${TRADE_MODEL_INITIAL_USERNAME}" \
   "LOCAL_CREDENTIALS_FILE=${CREDENTIALS_FILE}" \
   "JAVA_HOME=${JAVA_HOME}"

@@ -531,6 +531,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
                   "entry_price": 2000,
                   "quantity": 0.25,
                   "leverage": 2,
+                  "opened_at": "2024-01-01T10:00:00",
                   "source_type": "MANUAL_POSITION",
                   "stop_loss": 1900,
                   "take_profit": 2300
@@ -539,7 +540,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     private static String closeJson() {
-        return "{\"close_price\": 105, \"close_reason\": \"manual close\"}";
+        return "{\"close_price\": 105, \"closed_at\": \"2026-07-01T09:00:00\", "
+                + "\"close_reason\": \"manual close\"}";
     }
 
     private static String reviewFeedbackJson(String outcome, String suggestion) {

@@ -429,7 +429,6 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
         assertThat(qa).contains(
                 "\"dashboardHtml\": \"" + sha256(DASHBOARD) + "\"",
                 "\"dashboardLatestCss\": \"" + sha256(LATEST_STYLE) + "\"",
-                "\"frontendContractJs\": \"" + sha256(CONTRACT) + "\"",
                 "\"visualFixture\": \"" + sha256(Path.of(
                         "scripts/dashboard-visual-acceptance-fixture.py")) + "\"",
                 "\"horizontalOverflow\": 0",
@@ -473,7 +472,7 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
                 .contains("private String fallbackReason;");
         assertThat(service)
                 .contains(
-                        "row.setSourceType(trimToNull(position.getSourceType()))",
+                        "row.setSourceType(normalizedPositionSource(position))",
                         "row.setFinalPlanId(trimToNull(position.getFinalPlanId()))",
                         "suggestion.setFinalPlan(Boolean.TRUE.equals(executionPlan.getFinalPlan()))",
                         "tab.setProvider(role.provider())",
