@@ -154,6 +154,40 @@ Evidence: `docs/evidence/b1_2_3_1/README.md`.
 
 Evidence: `docs/evidence/b1_2_3_2/README.md`.
 
+## Global non-CoinGlass runtime implementation closure
+
+- Start Head: `acc0c0eafd1ac862fc4ca57cab54af25a9296723`.
+- Implementation Head: `4951bef07eaf659fce895f340391e44ac238caf7`.
+- Code repair is limited to Preview task terminal semantics and its shared
+  frontend mapper. No schema, state machine, AI authority, Position, Recheck,
+  authentication, Telegram, Figma or Mobile contract changed.
+- Staging runtime policy explicitly enabled Kraken OHLCV scheduling, retained
+  Binance and fallback as disabled, and completed missing authorized AI cost
+  inputs in root-owned `0600` configuration.
+- Six pool assets x four timeframes now have persisted real Kraken closed bars.
+  BTC Preview reached rule/decision processing and correctly failed closed
+  before model invocation at data quality 55 with unavailable derivatives
+  evidence.
+- OpenAI, Gemini and xAI application provider probes each returned HTTP 200
+  with the configured exact model. Connectivity is not represented as a
+  successful Three-AI decision.
+- Task center now reports one succeeded controlled Preview, two retained
+  historical terminal attempts and zero active tasks.
+- PostgreSQL V1 to V14, least privilege, backup/checksum, isolated restore,
+  service/database restart, scheduler recurrence, private HTTPS and zero public
+  application exposure passed.
+- Legal Position close and Recheck were not run because source rows do not
+  exist. Browser screenshots remain an Owner handoff because the controllable
+  browser is outside the Tailnet.
+
+Canonical evidence:
+`docs/evidence/global_non_coinglass_staging_closure/README.md`.
+
+`GLOBAL_NON_COINGLASS_STAGING_CLOSURE_DONE=YES` and
+`FIXABLE_NON_COINGLASS_BLOCKERS_AFTER=0`. The larger Knife/current product
+phase is not closed: `CURRENT_PHASE_DONE=NO`, `MERGE=NO`, and
+`PRODUCTION_DEPLOYMENT_ALLOWED=NO`.
+
 ## Phase Status
 
 - `KNIFE_B_1_IMPLEMENTATION_DONE = NO` (historical package did not close the verified residuals).

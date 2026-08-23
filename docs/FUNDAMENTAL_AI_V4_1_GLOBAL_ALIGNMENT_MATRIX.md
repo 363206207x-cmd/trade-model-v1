@@ -301,6 +301,33 @@ Canonical report:
 `docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`.
 Evidence: `docs/evidence/production_readiness_without_coinglass/`.
 
+## 2026-08-24 global non-CoinGlass private Staging closure
+
+This section supersedes prior non-CoinGlass runtime blockers while preserving
+their historical evidence.
+
+| Contract area | Current binding / runtime evidence | Status |
+|---|---|---|
+| Authoritative market data | Real Kraken closed bars, canonical symbols, PostgreSQL, all six pool assets x 5m/15m/1h/4h | PASS |
+| BTC Preview lineage | Persisted Kraken environment reaches Preview; Preview creates no Opportunity/Candidate/Final/Position | PASS |
+| Binance policy | provider disabled, fallback disabled, controlled external call count 0 | PASS |
+| Non-CoinGlass AI providers | OpenAI, Gemini and xAI exact-model application probes HTTP 200 | PASS_CONNECTIVITY |
+| Three-AI formal output | input gate blocks DQ 55 and unavailable derivatives evidence; no fake output | BLOCKED_COINGLASS_INPUT |
+| Task terminal semantics | queued/running only are active; one succeeded plus two historical terminal rows produce active count 0 | PASS |
+| PostgreSQL / backup / restore | V1 to V14, least privilege, fresh backup/checksum, isolated restore, DB/app restart | PASS |
+| Private staging | five formal routes 200; HTTPS tailnet-only; Funnel off; public app exposure 0 | PASS_HTTP_API |
+| Position close / Recheck | zero legal source rows; no data fabricated | BLOCKED_LEGAL_SOURCE |
+| Browser screenshots | Codex browser outside Tailnet; precise Owner capture checklist recorded | OWNER_HANDOFF |
+
+Fixable non-CoinGlass blockers moved from 4 to 0. CoinGlass remains excluded,
+and the formal Three-AI chain remains blocked by its missing derivatives input
+instead of being falsely reported as complete. Evidence:
+`docs/evidence/global_non_coinglass_staging_closure/README.md`.
+
+`GLOBAL_NON_COINGLASS_STAGING_CLOSURE_DONE=YES` is bounded to implementation
+and private runtime evidence. `CURRENT_PHASE_DONE=NO`, `MERGE=NO`, and
+`PRODUCTION_DEPLOYMENT_ALLOWED=NO` remain fixed.
+
 ## 2026-08-23 non-CoinGlass blocker closure
 
 Start Head: `c80af6bf20c1135e174ef636f28abd5f8e7f97af`.

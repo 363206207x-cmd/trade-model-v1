@@ -149,3 +149,72 @@ DEPLOYMENT_ALLOWED=NO
 ```
 
 Evidence: `docs/evidence/production_readiness_without_coinglass/`.
+
+## Superseding private Staging result, 2026-08-24
+
+The earlier `BLOCKED_MULTIPLE` non-CoinGlass runtime assessment is superseded
+for all currently fixable items by the private Staging closure at implementation
+Head `4951bef07eaf659fce895f340391e44ac238caf7`.
+
+| Gate | Superseding result | Evidence |
+|---|---|---|
+| Kraken release source | PASS | six pool assets x 5m/15m/1h/4h real persisted closed bars; multiple scheduler cycles |
+| Binance | PASS_DISABLED | enabled=false; fallback=false; external call count 0 |
+| OpenAI / Gemini / xAI connectivity | PASS | application probes HTTP 200 with exact configured models |
+| Three-AI formal decision | BLOCKED_COINGLASS_INPUT | real Preview DQ 55 and derivatives evidence unavailable; input gate preserved |
+| Preview / Home | PASS_FAIL_CLOSED | one Preview SUCCESS; Opportunity/Candidate/Final/Position remain 0; Home formal Top6 remains empty |
+| Task center | PASS | terminal rows excluded from active count; raw failures not exposed |
+| PostgreSQL / operations | PASS | V1 to V14, least privilege, backup/checksum/restore, app and DB restart |
+| Scheduler / observability | PASS | at least three Kraken cycles, health/readiness UP, recent service errors 0 |
+| HTTPS / exposure | PASS | tailnet-only Serve, Funnel off, public app exposure 0 |
+| Position close / Recheck | BLOCKED_LEGAL_SOURCE | no authorized Position or legal Message/PushSnapshot exists |
+| Offsite backup | BLOCKED_OWNER_INPUT | no authorized destination |
+| Browser screenshots | OWNER_HANDOFF | HTTP/API/session passed; controllable browser cannot enter Tailnet |
+
+Fresh finding count: P0 0; P1 4 closed / 0 open; P2 0; evidence gaps 5.
+All confirmed fixable non-CoinGlass P0/P1 findings are closed. The product is
+not declared production-ready because CoinGlass and external legal/Owner
+evidence remain open, PR #1195 is Draft/unmerged, and Owner acceptance is
+pending.
+
+Canonical evidence:
+`docs/evidence/global_non_coinglass_staging_closure/README.md`.
+
+```text
+GLOBAL_AUDIT_DONE=YES
+FIXABLE_NON_COINGLASS_BLOCKERS_BEFORE=4
+FIXABLE_NON_COINGLASS_BLOCKERS_AFTER=0
+KRAKEN_LIVE_CALL=PASS
+KRAKEN_OHLCV_INGESTION=PASS
+BTCUSDT_AUTHORITATIVE_OHLCV=PASS
+OHLCV_PREVIEW_LINEAGE=PASS
+BINANCE_POLICY=PASS_DISABLED
+BINANCE_EXTERNAL_CALL_COUNT=0
+OPENAI_LIVE_CALL=PASS
+GEMINI_LIVE_CALL=PASS
+XAI_LIVE_CALL=PASS
+THREE_AI_PROVIDER_CONNECTIVITY=PASS
+THREE_AI_RUNTIME_CHAIN=BLOCKED_COINGLASS_INPUT
+PREVIEW_RUNTIME=PASS
+OPPORTUNITY_RUNTIME=PASS_NO_OPPORTUNITY_CREATED
+HOME_RUNTIME=PASS_EMPTY_FORMAL_OPPORTUNITY_STATE
+TASK_CENTER_TERMINAL_SEMANTICS=PASS
+POSITION_FULL_CLOSE_E2E=BLOCKED_NO_OWNER_AUTHORIZED_POSITION
+RECHECK_REAL_PATH=BLOCKED_NO_LEGAL_SOURCE
+POSTGRESQL_MIGRATION=PASS_V1_V14
+POSTGRESQL_LEAST_PRIVILEGE=PASS
+BACKUP_RESTORE=PASS
+OFFSITE_BACKUP=BLOCKED_NO_AUTHORIZED_TARGET
+SCHEDULER_RUNTIME=PASS
+OBSERVABILITY=PASS
+PRIVATE_HTTPS=PASS
+PUBLIC_APP_EXPOSURE=0
+COINGLASS_CODE_PATH=REGRESSION_TEST_NORMAL
+COINGLASS_LIVE_CALL=NOT_EXECUTED_MISSING_PRIVATE_KEY
+COINGLASS_SNAPSHOT_FRESHNESS=NOT_VERIFIED
+COINGLASS_AI_RUN_CONSUMPTION=NOT_VERIFIED
+GLOBAL_NON_COINGLASS_STAGING_CLOSURE_DONE=YES
+CURRENT_PHASE_DONE=NO
+MERGE=NO
+PRODUCTION_DEPLOYMENT_ALLOWED=NO
+```
