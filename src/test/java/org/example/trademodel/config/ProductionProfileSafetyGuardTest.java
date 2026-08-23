@@ -325,6 +325,23 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsOhlcvSchedulerWhenOnlyOneKrakenOptInFlagIsEnabled() {
+        MockEnvironment providerOnly = ohlcvSchedulerEnvironment();
+        providerOnly.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(providerOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV ingestion requires explicit Kraken external-call opt-in");
+
+        MockEnvironment externalCallsOnly = ohlcvSchedulerEnvironment();
+        externalCallsOnly.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(externalCallsOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV ingestion requires explicitly enabled Kraken provider");
+    }
+
+    @Test
     void allowsBoundedExplicitOhlcvSchedulerOptIn() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
@@ -351,6 +368,27 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Binance OHLCV disabled due HTTP 451");
+    }
+
+    @Test
+    void rejectsEitherBinanceReleaseFlagIndependently() {
+        MockEnvironment providerOnly = ohlcvSchedulerEnvironment();
+        providerOnly.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        providerOnly.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        providerOnly.setProperty("trade-model.ohlcv.binance.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(providerOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Binance OHLCV disabled due HTTP 451");
+
+        MockEnvironment externalCallsOnly = ohlcvSchedulerEnvironment();
+        externalCallsOnly.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        externalCallsOnly.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        externalCallsOnly.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(externalCallsOnly))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Binance OHLCV disabled due HTTP 451");
     }
@@ -491,6 +529,16 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
+        return environment;
+    }
+
+    private MockEnvironment ohlcvSchedulerEnvironment() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         return environment;
     }
 }

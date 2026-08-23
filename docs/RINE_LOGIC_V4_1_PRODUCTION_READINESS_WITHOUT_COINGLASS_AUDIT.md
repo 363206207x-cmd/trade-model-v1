@@ -13,6 +13,12 @@ Release scope: `PRIVATE_SINGLE_USER_WEB`.
 > by account/location/region policy. No authorized remote P3H staging target is
 > configured. The current overall result is
 > `PRODUCTION_READINESS=BLOCKED_MULTIPLE`, not CoinGlass-only.
+>
+> **2026-08-23 safe-default correction:** the production profile no longer
+> enables Kraken or Kraken external calls by default. Kraken remains the
+> required release source, enabled only by explicit deployment injection of
+> both Kraken booleans. Existing local-live evidence is retained; remote
+> staging runtime remains `NOT_VERIFIED`.
 
 ## Audit Summary
 
@@ -30,7 +36,7 @@ The release is not production-ready. Independent non-CoinGlass blockers remain i
 | 3 UI-review isolation | PASS_FIXTURE_ONLY | Top3/all-position/detail/O07 rendering; no provider call or close POST. | Mapping proof only. |
 | 4 Staging user paths | BLOCKED | No authorized staging target. | Selection, Preview, analysis, full close, persistence, and cross-user runtime unverified. |
 | 5 Message / Recheck | BLOCKED | No legitimate `PUSH_SNAPSHOT` Message. | Real Recheck path and release policy unverified. |
-| 6 Live market data excluding CoinGlass | PASS_POLICY | Kraken required and persisted timestamp PASS; Binance disabled due HTTP 451. | Binance is excluded from release availability. |
+| 6 Live market data excluding CoinGlass | PASS_POLICY / STAGING_NOT_VERIFIED | Kraken required with both prod defaults disabled and explicit deployment opt-in; persisted local timestamp PASS; Binance disabled due HTTP 451. | Existing local evidence does not replace authorized staging runtime. |
 | 7 Three-AI live providers | BLOCKED | OpenAI/xAI PASS; Gemini account/location/region blocked; harness startup fixed and partial orchestration completes. | Complete three-role lineage remains unverified. |
 | 8 PostgreSQL / Flyway / permissions | BLOCKED | Disposable PostgreSQL V1 to V14 and restart PASS. | No staging upgrade copy or least-privilege role proof. |
 | 9 Backup / restore / rollback | BLOCKED | No authorized staging DB. | Recovery objective unverified. |

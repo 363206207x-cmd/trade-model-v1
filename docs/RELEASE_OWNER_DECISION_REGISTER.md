@@ -138,6 +138,21 @@ current `PRIVATE_SINGLE_USER_WEB` candidate. It does not authorize deployment.
 | Legacy routes | retained, authenticated, and unlinked from formal navigation |
 | Partial close writes | outside release scope; full close retained |
 
+### 2026-08-23 Kraken production-safe default correction
+
+| Decision | Owner record |
+|---|---|
+| Kraken production default | `DISABLED` for provider enablement and external calls |
+| Kraken release requirement | `EXPLICIT_DEPLOYMENT_INJECTION` of both booleans |
+| Kraken release role | required OHLCV source; primary remains `kraken` |
+| Binance release policy | `DISABLED_FOR_RELEASE_DUE_HTTP_451` |
+| Provider fallback | disabled |
+| Existing Kraken local-live evidence | retained as local/live-provider evidence only |
+| Authorized staging runtime | `NOT_VERIFIED_MISSING_CONFIGURATION` |
+
+This correction does not authorize deployment and does not change the current
+No-Go decision.
+
 Gemini remains blocked by provider account/location/region policy. No
 authorized remote P3H staging identity is configured. Current readiness is
 `PRODUCTION_READINESS=BLOCKED_MULTIPLE`; `DEPLOYMENT_ALLOWED=NO`.

@@ -1,0 +1,98 @@
+# Non-CoinGlass Production Final Gate Evidence
+
+Date: 2026-08-23
+Start Head: `b12e0796d77f3d2b5db59eadc4ac0ff8c5bf2d81`
+Phase A Implementation Head: the commit containing this evidence, reported externally
+Final Evidence Head: the commit containing this evidence, reported externally
+PR #1195: open, Draft, unmerged
+
+## Scope and change
+
+Phase A changes only the production-safe Kraken defaults, their contract tests,
+and the superseding audit wording. It does not change Provider selection,
+market logic, AI semantics, schema, UI, Telegram, Position Monitoring, or any
+trading capability.
+
+| Setting | Before | After |
+|---|---:|---:|
+| `TRADE_MODEL_KRAKEN_OHLCV_ENABLED` default | `true` | `false` |
+| `TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED` default | `true` | `false` |
+| `TRADE_MODEL_BINANCE_OHLCV_ENABLED` default | `false` | `false` |
+| `TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED` default | `false` | `false` |
+| `TRADE_MODEL_OHLCV_FALLBACK_ENABLED` default | `false` | `false` |
+
+An authorized deployment must explicitly inject:
+
+```text
+TRADE_MODEL_KRAKEN_OHLCV_ENABLED=true
+TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED=true
+TRADE_MODEL_BINANCE_OHLCV_ENABLED=false
+TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED=false
+TRADE_MODEL_OHLCV_FALLBACK_ENABLED=false
+```
+
+No secret value is part of this contract.
+
+## Phase A contract matrix
+
+| Contract | Evidence type | Result |
+|---|---|---|
+| All prod OHLCV external paths default off | `AUTOMATED_TEST` | PASS |
+| Missing either Kraken opt-in blocks preflight/ingestion | `AUTOMATED_TEST` | PASS |
+| Both explicit Kraken flags permit the release provider gate | `AUTOMATED_TEST` | PASS |
+| Either Binance release flag blocks | `AUTOMATED_TEST` | PASS |
+| Disabled scheduler performs zero Provider calls | `AUTOMATED_TEST` | PASS |
+| Kraken failure fails closed with zero Binance calls | `AUTOMATED_TEST` | PASS |
+| Existing persisted Kraken/live evidence | `LOCAL` / `LIVE_PROVIDER` | RETAINED, not restated as staging |
+| Gemini endpoint/model/client | `LOCKED_REGRESSION` | unchanged |
+| Gemini live connectivity | `LIVE_PROVIDER` | BLOCKED_ACCOUNT_OR_REGION |
+| CoinGlass live path | `NOT_EXECUTED` | missing private key |
+
+## Validation accounting
+
+- Directed tests: 288 tests, 0 failures, 0 errors, 0 skipped.
+- Local full Maven: 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
+- Exact-Head CI profile: recorded after push; duplicate `quality-gate` runs count as one category.
+- Product Source Gate: PASS before modification; rerun on final clean Head.
+- Workflow Contract: rerun on final clean Head.
+- `git diff --check`: rerun on final clean Head.
+
+## Authorized staging check
+
+Only configuration presence and validity may be inspected. No P3H value,
+secret, path content, credential, cookie, or authorization header is recorded.
+At task start the required remote staging configuration was not available, so
+no deploy, mutation, remote database action, or target runtime claim is made.
+
+| Gate | Status | Evidence type |
+|---|---|---|
+| Staging authorization | `NOT_VERIFIED_MISSING_CONFIGURATION` | `NOT_VERIFIED` |
+| Kraken staging runtime | `NOT_VERIFIED` | `NOT_VERIFIED` |
+| Staging user paths/full close | `NOT_VERIFIED` | `NOT_VERIFIED` |
+| Legal-source Recheck runtime | `NOT_VERIFIED_NO_LEGAL_SOURCE` | `NOT_VERIFIED` |
+| PostgreSQL staging upgrade/least privilege | `NOT_VERIFIED` | `NOT_VERIFIED` |
+| Backup/restore/rollback | `NOT_VERIFIED` | `NOT_VERIFIED` |
+| HTTPS/session/secrets/schedulers/observability | `NOT_VERIFIED` | `NOT_VERIFIED` |
+
+Repair loop used: `NO`.
+
+## Final status
+
+```text
+IMPLEMENTED_ON_DRAFT_BRANCH=YES
+EFFECTIVE_ON_MAIN=NO
+KRAKEN_PROD_DEFAULT=DISABLED
+KRAKEN_RELEASE_REQUIREMENT=EXPLICIT_DEPLOYMENT_INJECTION
+KRAKEN_LOCAL_LIVE_EVIDENCE=PASS_EXISTING_EVIDENCE
+KRAKEN_STAGING_RUNTIME=NOT_VERIFIED
+BINANCE_RELEASE_POLICY=DISABLED_DUE_451
+GEMINI_LIVE_CALL=BLOCKED_ACCOUNT_OR_REGION
+THREE_AI_PROVIDER_CONNECTIVITY=PARTIAL
+THREE_AI_NON_COINGLASS_LINEAGE=BLOCKED_GEMINI_ACCOUNT_OR_REGION
+STAGING_AUTHORIZATION=NOT_VERIFIED_MISSING_CONFIGURATION
+NON_COINGLASS_READINESS=BLOCKED
+PRODUCTION_READINESS=BLOCKED_MULTIPLE
+CURRENT_PHASE_DONE=NO
+MERGE=NO
+DEPLOYMENT_ALLOWED=NO
+```

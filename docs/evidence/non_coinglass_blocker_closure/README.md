@@ -5,6 +5,11 @@ Implementation Head: `8c5f6f11`
 Final evidence Head: the commit containing this index, reported externally
 PR #1195: open, Draft, unmerged
 
+> Superseded configuration detail: the current production-safe defaults are
+> both Kraken enablement flags `false`. Kraken is still the required release
+> provider and must be enabled by explicit deployment injection. See
+> `docs/evidence/non_coinglass_production_final_gate/README.md`.
+
 ## Evidence classification
 
 | Evidence | Label | Result |
@@ -55,7 +60,7 @@ partial real-provider evidence, not complete three-role lineage.
 | Gemini model/request/parse/fail-closed contracts | PASS |
 | AI readiness and bounded smoke | PASS |
 | AI review and v4.1 decision-chain orchestrators | PASS |
-| Kraken enabled / Binance disabled | PASS |
+| Kraken prod defaults disabled / explicit two-flag opt-in required / Binance disabled | PASS |
 | Kraken failure / Binance call count | PASS / 0 |
 | Explicit Binance 451 | PASS fail closed |
 | Persisted Kraken close time | PASS |

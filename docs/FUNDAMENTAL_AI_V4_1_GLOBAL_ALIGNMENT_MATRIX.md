@@ -313,6 +313,7 @@ PR #1195 remains Draft and unmerged.
 | Gemini | real `/v1/interactions` request consistently rejected by provider account/location/region policy; no impersonation or bypass | BLOCKED |
 | Three-AI harness | isolated H2 owns `schema.sql`; target Flyway override excluded; exact-model readiness verified before orchestration | PASS implementation / partial live |
 | Kraken/Binance | Kraken required; Binance and fallback disabled; enabled Binance rejected by preflight and production guard | PASS |
+| Kraken production defaults | Kraken provider and external calls default false; release requires explicit injection of both true; no authorized staging evidence | PASS contract / NOT_VERIFIED staging |
 | Full local regression | 4,791 tests, 0 failures, 0 errors, 14 controlled skips | PASS_LOCAL |
 | Remote P3H | 13 required authorization/configuration inputs absent | NOT_VERIFIED |
 | Release ownership | release/rollback/incident owner `363206207x-cmd`; current decision NO_GO | RECORDED |

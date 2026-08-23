@@ -90,7 +90,7 @@ class TargetRuntimePreflightTest {
     }
 
     @Test
-    void releasePreflightRequiresKrakenAndRejectsEnabledBinance() {
+    void releasePreflightRequiresBothExplicitKrakenFlagsAndRejectsEnabledBinance() {
         Map<String, String> environment = completeEnvironment();
         environment.put("TRADE_MODEL_BINANCE_OHLCV_ENABLED", "true");
         environment.put("TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED", "true");
@@ -100,6 +100,12 @@ class TargetRuntimePreflightTest {
         environment.put("TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED", "false");
         environment.put("TRADE_MODEL_KRAKEN_OHLCV_ENABLED", "false");
         TargetRuntimePreflight.Result krakenDisabled = TargetRuntimePreflight.evaluate(environment);
+        environment.put("TRADE_MODEL_KRAKEN_OHLCV_ENABLED", "true");
+        environment.put("TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED", "false");
+        TargetRuntimePreflight.Result externalCallsDisabled = TargetRuntimePreflight.evaluate(environment);
+        environment.put("TRADE_MODEL_KRAKEN_OHLCV_ENABLED", "false");
+        environment.put("TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED", "true");
+        TargetRuntimePreflight.Result providerDisabled = TargetRuntimePreflight.evaluate(environment);
 
         assertThat(binanceEnabled.passed()).isFalse();
         assertThat(binanceEnabled.lines()).contains(
@@ -111,18 +117,22 @@ class TargetRuntimePreflightTest {
                 "BINANCE_RELEASE_POLICY=DISABLED_DUE_451",
                 "MARKET_PROVIDER_PATH=MISSING",
                 "PREFLIGHT=BLOCKED");
+        assertThat(externalCallsDisabled.passed()).isFalse();
+        assertThat(externalCallsDisabled.lines()).contains("MARKET_PROVIDER_PATH=MISSING", "PREFLIGHT=BLOCKED");
+        assertThat(providerDisabled.passed()).isFalse();
+        assertThat(providerDisabled.lines()).contains("MARKET_PROVIDER_PATH=MISSING", "PREFLIGHT=BLOCKED");
     }
 
     @Test
-    void productionProfileDefaultsToKrakenOnlyReleasePath() throws Exception {
+    void productionProfileDefaultsAllExternalOhlcvPathsOff() throws Exception {
         String production = Files.readString(Path.of("src/main/resources/application-prod.yml"));
 
         assertThat(production).contains(
                 "primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}",
                 "fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:kraken}",
                 "fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:false}",
-                "enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:true}",
-                "external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:true}",
+                "enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}",
+                "external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:false}",
                 "enabled: ${TRADE_MODEL_BINANCE_OHLCV_ENABLED:false}",
                 "external-calls-enabled: ${TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED:false}");
     }

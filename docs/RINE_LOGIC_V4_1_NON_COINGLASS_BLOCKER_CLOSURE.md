@@ -7,6 +7,14 @@ Final evidence Head: the commit containing this document, reported in the PR and
 PR: #1195, open, Draft, unmerged
 Release scope: `PRIVATE_SINGLE_USER_WEB`
 
+> **2026-08-23 safe-default superseding correction:** production now keeps
+> Kraken as the required release OHLCV source while defaulting both
+> `TRADE_MODEL_KRAKEN_OHLCV_ENABLED` and
+> `TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED` to `false`. A deployment
+> must explicitly inject both values as `true`; otherwise preflight and the
+> production scheduler gate fail closed. Existing local-live Kraken evidence
+> remains valid, but it is not staging evidence.
+
 ## Decision
 
 The two implementation defects proven during Phase A are closed: the isolated
@@ -86,11 +94,14 @@ three-role lineage because real Gemini output is unavailable.
 
 ### Kraken and Binance
 
-The release profile now requires Kraken and disables Binance and provider
-fallback by default. Target preflight and production safety validation reject
-an enabled Binance path. A Kraken failure returns fail closed and performs zero
-Binance calls. Persisted Kraken close time remains the single global Home data
-timestamp, and changing selected assets does not alter Provider readiness.
+The release profile keeps Kraken as the primary and required OHLCV source, but
+defaults Kraken enablement and external calls to disabled. A deployment must
+explicitly inject both Kraken flags as true. Binance and provider fallback stay
+disabled by default. Target preflight and production safety validation reject
+missing Kraken opt-in and any enabled Binance path. A Kraken failure returns
+fail closed and performs zero Binance calls. Persisted Kraken close time remains
+the single global Home data timestamp, and changing selected assets does not
+alter Provider readiness.
 
 The historical Binance 451 capability tests remain normal regression evidence;
 the release policy does not attempt to bypass the regional restriction.
@@ -131,7 +142,7 @@ evidence.
 - Directed provider/orchestrator/Home contract tests: PASS.
 - Frontend state matrix: PASS.
 - Header/status timestamp matrix: PASS in UTC and Asia/Shanghai.
-- Full local Maven: 4,791 tests, 0 failures, 0 errors, 14 controlled skips.
+- Latest safe-default local Maven: 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
 - Product Source Gate: PASS.
 - Workflow Contract: PASS on the clean implementation Head.
 - JavaScript syntax: PASS.
@@ -153,6 +164,10 @@ THREE_AI_PROVIDER_CALLS=PASS_PARTIAL_REAL_PROVIDERS
 THREE_AI_NON_COINGLASS_LINEAGE=BLOCKED_GEMINI_ACCOUNT_OR_REGION
 THREE_AI_COMPLETE_RELEASE_CHAIN=BLOCKED_BY_GEMINI_AND_COINGLASS
 KRAKEN_RELEASE_SOURCE=PASS
+KRAKEN_PROD_DEFAULT=DISABLED
+KRAKEN_RELEASE_REQUIREMENT=EXPLICIT_DEPLOYMENT_INJECTION
+KRAKEN_LOCAL_LIVE_EVIDENCE=PASS_EXISTING_EVIDENCE
+KRAKEN_STAGING_RUNTIME=NOT_VERIFIED
 BINANCE_RELEASE_POLICY=DISABLED_DUE_451
 BINANCE_RELEASE_BLOCKER=CLOSED_BY_OWNER_POLICY
 NORMAL_RUNTIME_ACCEPTANCE=PASS_LOCAL_H2
@@ -186,4 +201,4 @@ DEPLOYMENT_ALLOWED=NO
 ```
 
 Evidence index:
-`docs/evidence/non_coinglass_blocker_closure/README.md`.
+`docs/evidence/non_coinglass_production_final_gate/README.md`.
