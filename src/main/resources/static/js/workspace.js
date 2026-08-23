@@ -14,6 +14,7 @@
     const failurePathView = frontendContract.failurePathView;
     const roleGate = frontendContract.roleGate;
     const analysisModeGate = frontendContract.analysisModeGate;
+    const asyncTaskView = frontendContract.asyncTaskView;
     let restoreFocus = null;
     let analysisAudit = null;
     let assetPoolItems = [];
@@ -212,6 +213,11 @@
         return '<span class="state-badge" data-state="' + escapeHtml(raw.toLowerCase()) + '">' + escapeHtml(label(raw)) + "</span>";
     }
 
+    function taskStateBadge(view) {
+        return '<span class="state-badge" data-state="' + escapeHtml(view.displayState.toLowerCase()) + '">'
+            + escapeHtml(view.displayLabel) + "</span>";
+    }
+
     function renderProviderStatus(provider) {
         const summary = factGrid([
             ["运行状态", label(provider?.runtimeReadinessStatus, "当前不可查看")],
@@ -286,9 +292,7 @@
         try {
             const tasks = await api("/api/workspace/tasks?limit=30") || [];
             latestTasks = tasks;
-            const activeTaskCount = tasks.filter(function (task) {
-                return task.state === "QUEUED" || task.state === "RUNNING" || task.state === "PARTIAL";
-            }).length;
+            const activeTaskCount = tasks.map(asyncTaskView).filter(function (view) { return view.active; }).length;
             const taskIndicator = document.querySelector(".task-indicator");
             document.getElementById("workspaceTaskCount").textContent = String(activeTaskCount);
             if (taskIndicator) taskIndicator.hidden = activeTaskCount === 0;
@@ -299,12 +303,11 @@
                 return tasks;
             }
             target.innerHTML = tasks.map(function (task) {
-                const retryable = task.state === "FAILED" || task.state === "PARTIAL";
-                const cancellable = task.state === "QUEUED" || task.state === "RUNNING" || task.state === "PARTIAL";
-                return '<article class="task-row"><div><strong>' + escapeHtml(label(task.taskType)) + '</strong><small>' + escapeHtml(formatTime(task.updatedAt || task.createdAt)) + '</small></div>' + stateBadge(task.state)
-                    + (task.errorMessage ? '<p>' + escapeHtml(task.errorMessage) + "</p>" : "")
-                    + (retryable ? '<button class="text-action" type="button" data-task-retry="' + escapeHtml(task.taskId) + '">重试</button>' : "")
-                    + (cancellable ? '<button class="text-action" type="button" data-task-cancel="' + escapeHtml(task.taskId) + '">取消</button>' : "")
+                const view = asyncTaskView(task);
+                return '<article class="task-row"><div><strong>' + escapeHtml(label(task.taskType)) + '</strong><small>' + escapeHtml(formatTime(task.updatedAt || task.createdAt)) + '</small></div>' + taskStateBadge(view)
+                    + (view.failureText ? '<p>' + escapeHtml(view.failureText) + "</p>" : "")
+                    + (view.retryable ? '<button class="text-action" type="button" data-task-retry="' + escapeHtml(task.taskId) + '">重试</button>' : "")
+                    + (view.cancellable ? '<button class="text-action" type="button" data-task-cancel="' + escapeHtml(task.taskId) + '">取消</button>' : "")
                     + "</article>";
             }).join("");
             target.querySelectorAll("[data-task-retry]").forEach(function (button) {

@@ -913,6 +913,40 @@
     return match ? match[1] + " " + match[2] : displayText(value, "--");
   }
 
+  function asyncTaskView(task) {
+    var source = task && typeof task === "object" ? task : {};
+    var state = String(source.state || "UNKNOWN").trim().toUpperCase();
+    var taskType = String(source.taskType || "").trim().toUpperCase();
+    var terminalPreviewPartial = state === "PARTIAL" && taskType === "ANALYSIS_PREVIEW";
+    var displayState = terminalPreviewPartial ? "FAILED" : state;
+    var labels = {
+      QUEUED: "排队中",
+      RUNNING: "执行中",
+      SUCCEEDED: "已完成",
+      FAILED: "失败",
+      CANCELLED: "已取消",
+      PARTIAL: "部分完成"
+    };
+    var errorCode = String(source.errorCode || "").toUpperCase();
+    var errorMessage = String(source.errorMessage || "").toUpperCase();
+    var marketDataUnavailable = errorCode.indexOf("AUTHORITATIVE_OHLCV") >= 0
+      || errorMessage.indexOf("AUTHORITATIVE_OHLCV") >= 0
+      || errorCode.indexOf("REAL_MARKET_ENVIRONMENT") >= 0
+      || errorMessage.indexOf("REAL_MARKET_ENVIRONMENT") >= 0;
+
+    return Object.freeze({
+      state: state,
+      displayState: displayState,
+      displayLabel: terminalPreviewPartial ? "分析失败" : (labels[displayState] || "当前不可查看"),
+      active: state === "QUEUED" || state === "RUNNING",
+      retryable: state === "FAILED" || state === "PARTIAL",
+      cancellable: state === "QUEUED" || state === "RUNNING",
+      failureText: marketDataUnavailable
+        ? "可信市场数据尚未就绪，分析未完成"
+        : (hasText(source.errorMessage) ? "分析未完成，请稍后重试" : "")
+    });
+  }
+
   global.TradeModelFrontendContract = Object.freeze({
     AI_ROLES: AI_ROLES,
     ASSET_STATES: ASSET_STATES,
@@ -966,6 +1000,7 @@
     readUrlParam: readUrlParam,
     replaceUrlParam: replaceUrlParam,
     formatUtcNaive: formatUtcNaive,
-    formatBusinessTimeCompact: formatBusinessTimeCompact
+    formatBusinessTimeCompact: formatBusinessTimeCompact,
+    asyncTaskView: asyncTaskView
   });
 })(window);

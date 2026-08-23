@@ -65,12 +65,51 @@ public class AssetPoolController {
         asyncTaskService.markRunning(task, "ANALYSIS");
         try {
             AssetAnalysisPreviewDTO result = assetPoolService.analyzePreviewForUser(userId, symbol, timeframe);
-            asyncTaskService.complete(task, result == null || !"SUCCESS".equalsIgnoreCase(result.status()), "COMPLETE");
+            if (previewSucceeded(result)) {
+                asyncTaskService.complete(task, false, "COMPLETE");
+            } else {
+                String reasonCode = result == null || result.reasonCode() == null
+                        ? "ANALYSIS_PREVIEW_FAILED" : result.reasonCode();
+                asyncTaskService.fail(task, reasonCode, previewFailureMessage(reasonCode));
+            }
             return ApiResponse.success(result);
         } catch (RuntimeException exception) {
-            asyncTaskService.fail(task, "ANALYSIS_PREVIEW_FAILED", exception.getMessage());
+            String reasonCode = previewExceptionReason(exception);
+            asyncTaskService.fail(task, reasonCode, previewFailureMessage(reasonCode));
             throw exception;
         }
+    }
+
+    private static boolean previewSucceeded(AssetAnalysisPreviewDTO result) {
+        if (result == null || result.status() == null) return false;
+        return switch (result.status().trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "EXECUTED", "RECOVERED_FAILED_EXECUTED",
+                    "RECOVERED_EXPIRED_LEASE_EXECUTED", "EXISTING_SUCCESS" -> true;
+            default -> false;
+        };
+    }
+
+    private static String previewFailureMessage(String reasonCode) {
+        String normalized = reasonCode == null
+                ? "" : reasonCode.trim().toUpperCase(java.util.Locale.ROOT);
+        if (normalized.contains("AUTHORITATIVE_OHLCV")
+                || normalized.contains("REAL_MARKET_ENVIRONMENT")) {
+            return "可信市场数据尚未就绪，分析未完成";
+        }
+        return "分析未完成，请稍后重试";
+    }
+
+    private static String previewExceptionReason(RuntimeException exception) {
+        String message = exception == null || exception.getMessage() == null
+                ? "" : exception.getMessage().trim().toUpperCase(java.util.Locale.ROOT);
+        if (message.contains("AUTHORITATIVE_OHLCV_UNAVAILABLE")) {
+            return "AUTHORITATIVE_OHLCV_UNAVAILABLE";
+        }
+        if (message.contains("REAL_MARKET_ENVIRONMENT_REQUIRED")
+                || message.contains("REAL_MARKET_PROVENANCE_INCOMPLETE")) {
+            return "REAL_MARKET_ENVIRONMENT_UNAVAILABLE";
+        }
+        return "ANALYSIS_PREVIEW_FAILED";
     }
 
     @PostMapping

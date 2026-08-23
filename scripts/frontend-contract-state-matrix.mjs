@@ -77,8 +77,36 @@ for (const value of [undefined, null, "", "UNKNOWN"]) {
   assert.equal(unknown.candidateAllowed, false);
 }
 
+const taskCases = [
+  [{ state: "QUEUED", taskType: "ANALYSIS_PREVIEW" }, true, false, true, "排队中"],
+  [{ state: "RUNNING", taskType: "ANALYSIS_PREVIEW" }, true, false, true, "执行中"],
+  [{ state: "SUCCEEDED", taskType: "ANALYSIS_PREVIEW" }, false, false, false, "已完成"],
+  [{ state: "FAILED", taskType: "ANALYSIS_PREVIEW" }, false, true, false, "失败"],
+  [{ state: "PARTIAL", taskType: "ANALYSIS_PREVIEW" }, false, true, false, "分析失败"]
+];
+for (const [input, active, retryable, cancellable, displayLabel] of taskCases) {
+  const view = contract.asyncTaskView(input);
+  assert.equal(view.active, active);
+  assert.equal(view.retryable, retryable);
+  assert.equal(view.cancellable, cancellable);
+  assert.equal(view.displayLabel, displayLabel);
+}
+const unavailableTask = contract.asyncTaskView({
+  state: "FAILED",
+  taskType: "ANALYSIS_PREVIEW",
+  errorCode: "AUTHORITATIVE_OHLCV_UNAVAILABLE",
+  errorMessage: "internal detail must not be shown"
+});
+assert.equal(unavailableTask.active, false);
+assert.equal(unavailableTask.failureText, "可信市场数据尚未就绪，分析未完成");
+const historicalTerminalTasks = [
+  { state: "PARTIAL", taskType: "ANALYSIS_PREVIEW" },
+  { state: "PARTIAL", taskType: "ANALYSIS_PREVIEW" }
+];
+assert.equal(historicalTerminalTasks.map(contract.asyncTaskView).filter((view) => view.active).length, 0);
+
 const workspace = fs.readFileSync(workspacePath, "utf8");
-for (const call of ["reviewResultLabel(review)", "failurePathView(", "roleGate(", "analysisModeGate("]) {
+for (const call of ["reviewResultLabel(review)", "failurePathView(", "roleGate(", "analysisModeGate(", "asyncTaskView(task)"]) {
   assert.ok(workspace.includes(call), `workspace.js must call ${call}`);
 }
 assert.ok(!workspace.includes("REJECT: \"拒绝候选\""), "legacy REJECT must not remain a formal mapping");
