@@ -326,3 +326,17 @@ and `DEPLOYMENT_ALLOWED=NO`.
 
 Canonical current report:
 `docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`.
+
+### SUPERSEDING_CURRENT_STATUS
+
+- Audited evidence baseline: `95a4b4ad0e18cf6141ab7a01537e69c45c8ea067`.
+- Preserved implementation head: `2ec8e649039a37af99bc0fbc17930774206670cf`.
+- The earlier "Three-AI database initialization failure" blocker has been closed.
+- Gemini remains `BLOCKED_ACCOUNT_OR_REGION`.
+- Three-AI provider connectivity remains `PARTIAL`.
+- CoinGlass remains `NOT_EXECUTED_MISSING_PRIVATE_KEY`.
+- Staging gates remain `NOT_VERIFIED`.
+- Current overall status: `PRODUCTION_READINESS=BLOCKED_MULTIPLE`.
+- `CURRENT_PHASE_DONE=NO`.
+- `MERGE=NO`.
+- `DEPLOYMENT_ALLOWED=NO`.

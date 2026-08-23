@@ -2,8 +2,9 @@
 
 Date: 2026-08-23
 Start Head: `b12e0796d77f3d2b5db59eadc4ac0ff8c5bf2d81`
-Phase A Implementation Head: `2ec8e649039a37af99bc0fbc17930774206670cf`
-Final Evidence Head: the commit containing this evidence, reported externally
+Implementation Head: `2ec8e649039a37af99bc0fbc17930774206670cf`
+Audited Evidence Baseline: `95a4b4ad0e18cf6141ab7a01537e69c45c8ea067`
+Docs-only Final Head: recorded after commit in the PR Description and final task result; not self-referenced here
 PR #1195: open, Draft, unmerged
 
 ## Scope and change
@@ -62,10 +63,12 @@ No secret value is part of this contract.
 
 ## Validation accounting
 
-- Directed tests: 288 tests, 0 failures, 0 errors, 0 skipped.
-- Local full Maven: 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
-- Exact-Head CI profile at `2ec8e649`: 938 tests, 0 failures, 0 errors, 0 skipped.
-- Required CI categories: `quality-gate` PASS and `workflow-contract` PASS;
+- Directed tests (`LOCAL`): 288 tests, 0 failures, 0 errors, 0 skipped.
+- Full Maven (`LOCAL`): 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
+- Preserved implementation-Head CI at `2ec8e649`: 938 tests, 0 failures, 0 errors, 0 skipped.
+- Docs-only Final Head exact CI is recorded from its actual GitHub workflow log
+  in the PR Description and final task result after this document is committed.
+- Required CI categories are `quality-gate` and `workflow-contract`;
   duplicate `quality-gate` runs count as one category.
 - Product Source Gate: PASS before modification; rerun on final clean Head.
 - Workflow Contract: rerun on final clean Head.
@@ -95,15 +98,35 @@ Repair loop used: `NO`.
 ```text
 IMPLEMENTED_ON_DRAFT_BRANCH=YES
 EFFECTIVE_ON_MAIN=NO
+KRAKEN_SAFE_DEFAULT_IMPLEMENTATION=PASS_PRESERVED
 KRAKEN_PROD_DEFAULT=DISABLED
 KRAKEN_RELEASE_REQUIREMENT=EXPLICIT_DEPLOYMENT_INJECTION
-KRAKEN_LOCAL_LIVE_EVIDENCE=PASS_EXISTING_EVIDENCE
+KRAKEN_RELEASE_SOURCE_POLICY=PASS
+KRAKEN_LOCAL_RUNTIME=PASS_LOCAL
 KRAKEN_STAGING_RUNTIME=NOT_VERIFIED
 BINANCE_RELEASE_POLICY=DISABLED_DUE_451
+OPENAI_LIVE_CALL=PASS
 GEMINI_LIVE_CALL=BLOCKED_ACCOUNT_OR_REGION
+XAI_LIVE_CALL=PASS
+THREE_AI_PROVIDER_CALLS=PARTIAL
 THREE_AI_PROVIDER_CONNECTIVITY=PARTIAL
 THREE_AI_NON_COINGLASS_LINEAGE=BLOCKED_GEMINI_ACCOUNT_OR_REGION
+THREE_AI_COMPLETE_RELEASE_CHAIN=BLOCKED_BY_GEMINI_AND_COINGLASS
 STAGING_AUTHORIZATION=NOT_VERIFIED_MISSING_CONFIGURATION
+POSITION_FULL_CLOSE_E2E=NOT_VERIFIED_NO_AUTHORIZED_STAGING
+RECHECK_REAL_PATH=NOT_VERIFIED_NO_LEGAL_SOURCE
+POSTGRESQL_STAGING_UPGRADE=NOT_VERIFIED
+POSTGRESQL_LEAST_PRIVILEGE=NOT_VERIFIED
+DATABASE_BACKUP=NOT_VERIFIED
+DATABASE_RESTORE=NOT_VERIFIED
+HTTPS_PROXY_SESSION=NOT_VERIFIED
+SECRET_INJECTION=NOT_VERIFIED
+SECRET_ROTATION_DRILL=NOT_VERIFIED
+SCHEDULER_STAGING_RUNTIME=NOT_VERIFIED
+OBSERVABILITY_STAGING_RUNTIME=NOT_VERIFIED
+COINGLASS_LIVE_CALL=NOT_EXECUTED_MISSING_PRIVATE_KEY
+COINGLASS_SNAPSHOT_FRESHNESS=NOT_VERIFIED
+COINGLASS_AI_RUN_CONSUMPTION=NOT_VERIFIED
 NON_COINGLASS_READINESS=BLOCKED
 PRODUCTION_READINESS=BLOCKED_MULTIPLE
 CURRENT_PHASE_DONE=NO
