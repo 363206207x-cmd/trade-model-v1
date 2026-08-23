@@ -143,6 +143,9 @@ evidence.
 - Frontend state matrix: PASS.
 - Header/status timestamp matrix: PASS in UTC and Asia/Shanghai.
 - Latest safe-default local Maven: 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
+- Safe-default implementation-Head CI profile: 938 tests, 0 failures, 0 errors, 0 skipped.
+- Required GitHub categories: `quality-gate` PASS and `workflow-contract` PASS;
+  duplicate `quality-gate` triggers count as one category.
 - Product Source Gate: PASS.
 - Workflow Contract: PASS on the clean implementation Head.
 - JavaScript syntax: PASS.

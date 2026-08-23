@@ -2,7 +2,7 @@
 
 Date: 2026-08-23
 Start Head: `b12e0796d77f3d2b5db59eadc4ac0ff8c5bf2d81`
-Phase A Implementation Head: the commit containing this evidence, reported externally
+Phase A Implementation Head: `2ec8e649039a37af99bc0fbc17930774206670cf`
 Final Evidence Head: the commit containing this evidence, reported externally
 PR #1195: open, Draft, unmerged
 
@@ -12,6 +12,18 @@ Phase A changes only the production-safe Kraken defaults, their contract tests,
 and the superseding audit wording. It does not change Provider selection,
 market logic, AI semantics, schema, UI, Telegram, Position Monitoring, or any
 trading capability.
+
+Changed files in the Phase A implementation and evidence package:
+
+- `src/main/resources/application-prod.yml`
+- `src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java`
+- `src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java`
+- `docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`
+- `docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`
+- `docs/evidence/non_coinglass_blocker_closure/README.md`
+- `docs/evidence/non_coinglass_production_final_gate/README.md`
+- `docs/RELEASE_OWNER_DECISION_REGISTER.md`
+- `docs/FUNDAMENTAL_AI_V4_1_GLOBAL_ALIGNMENT_MATRIX.md`
 
 | Setting | Before | After |
 |---|---:|---:|
@@ -52,7 +64,9 @@ No secret value is part of this contract.
 
 - Directed tests: 288 tests, 0 failures, 0 errors, 0 skipped.
 - Local full Maven: 4,793 tests, 0 failures, 0 errors, 14 controlled skips.
-- Exact-Head CI profile: recorded after push; duplicate `quality-gate` runs count as one category.
+- Exact-Head CI profile at `2ec8e649`: 938 tests, 0 failures, 0 errors, 0 skipped.
+- Required CI categories: `quality-gate` PASS and `workflow-contract` PASS;
+  duplicate `quality-gate` runs count as one category.
 - Product Source Gate: PASS before modification; rerun on final clean Head.
 - Workflow Contract: rerun on final clean Head.
 - `git diff --check`: rerun on final clean Head.
@@ -61,7 +75,7 @@ No secret value is part of this contract.
 
 Only configuration presence and validity may be inspected. No P3H value,
 secret, path content, credential, cookie, or authorization header is recorded.
-At task start the required remote staging configuration was not available, so
+All 13 required remote staging inputs were not set, so
 no deploy, mutation, remote database action, or target runtime claim is made.
 
 | Gate | Status | Evidence type |
