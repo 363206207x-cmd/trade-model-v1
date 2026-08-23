@@ -35,7 +35,6 @@ import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
 import org.example.trademodel.localreal.LocalRealAssetReadinessState;
-import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
@@ -123,7 +122,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DecisionResultMapper decisionResultMapper;
     private ExecutionPlanMapper executionPlanMapper;
     private PositionPlanSourceResolver positionPlanSourceResolver;
-    private LocalRealDataStatusService localRealDataStatusService;
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
     private AssetPoolService assetPoolService;
@@ -182,11 +180,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                       AnalysisRunMapper analysisRunMapper) {
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
         this.analysisRunMapper = analysisRunMapper;
-    }
-
-    @Autowired(required = false)
-    void setLocalRealDataStatusService(LocalRealDataStatusService localRealDataStatusService) {
-        this.localRealDataStatusService = localRealDataStatusService;
     }
 
     @Autowired(required = false)
@@ -307,8 +300,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
-        Instant globalDataUpdatedAt = localRealDataStatusService == null
-                ? null : localRealDataStatusService.latestClosedBarAt();
+        Instant globalDataUpdatedAt = latestPersistedClosedBarAt();
         DashboardHomeVO home = new DashboardHomeVO();
         home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
         home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness,
@@ -695,8 +687,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return card("dataQuality", "全局数据", globalDataUpdatedAt,
                 globalDataUpdatedAt == null ? "—" : null,
                 globalDataUpdatedAt == null ? "未取得正式全局更新时间"
-                        : "LocalRealDataStatusService.latestClosedBarAt",
+                        : "PersistedOhlcvBarMapper.selectLatestClosedBar",
                 globalDataUpdatedAt == null ? "SOURCE_UNAVAILABLE" : "AVAILABLE", null);
+    }
+
+    private Instant latestPersistedClosedBarAt() {
+        if (persistedOhlcvBarMapper == null) {
+            return null;
+        }
+        try {
+            PersistedOhlcvBarDO latest = persistedOhlcvBarMapper.selectLatestClosedBar();
+            return latest == null || latest.getCloseTimeMs() == null
+                    ? null : Instant.ofEpochMilli(latest.getCloseTimeMs());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private DashboardHomeVO.StatusCardVO accountStatusCard(PositionRowsResult positionRows) {

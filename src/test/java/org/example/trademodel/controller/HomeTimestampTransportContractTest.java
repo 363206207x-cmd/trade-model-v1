@@ -31,7 +31,10 @@ class HomeTimestampTransportContractTest {
                 "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"));
         assertThat(service)
                 .contains("globalDataUpdateCard(globalDataUpdatedAt)",
-                        "home.getHeader().setUpdatedAt(globalDataUpdatedAt)")
+                        "home.getHeader().setUpdatedAt(globalDataUpdatedAt)",
+                        "latestPersistedClosedBarAt()",
+                        "persistedOhlcvBarMapper.selectLatestClosedBar()")
+                .doesNotContain("localRealDataStatusService.latestClosedBarAt()")
                 .doesNotContain("LocalDateTime.ofInstant(globalDataUpdatedAt");
     }
 

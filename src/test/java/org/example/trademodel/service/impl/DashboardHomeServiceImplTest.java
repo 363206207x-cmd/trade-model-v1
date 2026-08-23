@@ -38,7 +38,6 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
-import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.localreal.LocalRealReadinessService;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorSourceContract;
@@ -153,9 +152,6 @@ class DashboardHomeServiceImplTest {
     private DecisionResultMapper decisionResultMapper;
     @Mock
     private ExecutionPlanMapper executionPlanMapper;
-    @Mock
-    private LocalRealDataStatusService localRealDataStatusService;
-
     private DashboardHomeServiceImpl service;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -174,7 +170,6 @@ class DashboardHomeServiceImplTest {
         );
         service.setAssetStateMapper(assetStateMapper);
         service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
-        service.setLocalRealDataStatusService(localRealDataStatusService);
         service.setOriginalPlanSources(decisionResultMapper, executionPlanMapper, analysisRunMapper);
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
         lenient().when(analysisRunMapper.selectAverageScoreByAnalysisId(anyString())).thenReturn(null);
@@ -467,8 +462,8 @@ class DashboardHomeServiceImplTest {
         market.setConnected(true);
         market.setReason("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        when(localRealDataStatusService.latestClosedBarAt())
-                .thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
+        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+                .thenReturn(persistedClosedBar(Instant.parse("2026-08-20T09:56:00Z")));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
@@ -491,8 +486,8 @@ class DashboardHomeServiceImplTest {
                 "Kraken public data / CONNECTED"
         );
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        when(localRealDataStatusService.latestClosedBarAt())
-                .thenReturn(Instant.parse("2026-08-20T09:56:00Z"));
+        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+                .thenReturn(persistedClosedBar(Instant.parse("2026-08-20T09:56:00Z")));
 
         DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
         DashboardHomeVO ethHome = service.getHomeForUser(USER_ID, "ETHUSDT", 6);
@@ -514,14 +509,14 @@ class DashboardHomeServiceImplTest {
                 "READINESS_CHANGED");
         assertThat(readiness.updatedAt()).isNotNull();
         service.setLocalRealReadinessService(readiness);
-        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(null);
+        when(persistedOhlcvBarMapper.selectLatestClosedBar()).thenReturn(null);
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
         assertThat(home.getSystemState().getDataQuality().getValueLabel()).isEqualTo("—");
         assertThat(home.getHeader().getUpdatedAt()).isNull();
-        verify(localRealDataStatusService).latestClosedBarAt();
+        verify(persistedOhlcvBarMapper).selectLatestClosedBar();
     }
 
     @Test
@@ -537,7 +532,7 @@ class DashboardHomeServiceImplTest {
                 null, false, "{\"state\":\"OBSERVING\"}");
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(btc, eth));
-        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(closedAt);
+        when(persistedOhlcvBarMapper.selectLatestClosedBar()).thenReturn(persistedClosedBar(closedAt));
 
         DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
         readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DASHBOARD_READY,
@@ -546,14 +541,15 @@ class DashboardHomeServiceImplTest {
 
         assertSameGlobalDataTime(btcHome, closedAt);
         assertSameGlobalDataTime(ethHome, closedAt);
-        verify(localRealDataStatusService, times(2)).latestClosedBarAt();
+        verify(persistedOhlcvBarMapper, times(2)).selectLatestClosedBar();
     }
 
     @Test
     void latestPersistedClosedBarChangeUpdatesStatusAndHeaderTogether() {
         Instant first = Instant.parse("2026-08-20T09:56:00Z");
         Instant second = Instant.parse("2026-08-20T10:01:00Z");
-        when(localRealDataStatusService.latestClosedBarAt()).thenReturn(first, second);
+        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+                .thenReturn(persistedClosedBar(first), persistedClosedBar(second));
 
         DashboardHomeVO firstHome = service.getHomeForUser(USER_ID, null, 6);
         DashboardHomeVO secondHome = service.getHomeForUser(USER_ID, null, 6);
@@ -3823,6 +3819,12 @@ class DashboardHomeServiceImplTest {
         run.setAnalysisId(analysisId);
         run.setSymbol(symbol);
         return run;
+    }
+
+    private PersistedOhlcvBarDO persistedClosedBar(Instant closedAt) {
+        PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
+        bar.setCloseTimeMs(closedAt == null ? null : closedAt.toEpochMilli());
+        return bar;
     }
 
     private DashboardHomeVO.AssetVO asset(DashboardHomeVO home, String symbol) {
