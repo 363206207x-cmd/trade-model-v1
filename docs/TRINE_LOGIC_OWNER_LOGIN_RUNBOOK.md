@@ -1,4 +1,4 @@
-# RINE LOGIC Owner Login Runbook
+# TRINE LOGIC Owner Login Runbook
 
 ## Login
 

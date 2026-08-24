@@ -1,4 +1,4 @@
-# RINE LOGIC v4.1 Production Readiness Final Gate
+# TRINE LOGIC v4.1 Production Readiness Final Gate
 
 Audit mode: evidence-only, excluding a CoinGlass live call.
 Historical audit implementation Head: `a39c3979f57f31e61ff56924c0135dce8570a44f`.
@@ -8,7 +8,7 @@ PR: #1195, open, Draft, unmerged.
 Release scope: `PRIVATE_SINGLE_USER_WEB`.
 
 > **2026-08-23 superseding correction:** the current closure is recorded in
-> `docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`. The Telegram
+> `docs/TRINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`. The Telegram
 > `currentRecheckId = null` change is authorized and is not a scope blocker.
 > Kraken is the required release source and Binance is disabled due HTTP 451.
 > The Three-AI harness startup defect is closed, while Gemini remains blocked

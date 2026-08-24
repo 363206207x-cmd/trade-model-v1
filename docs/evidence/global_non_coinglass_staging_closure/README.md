@@ -1,4 +1,4 @@
-# RINE LOGIC v4.1 Global Non-CoinGlass Staging Closure
+# TRINE LOGIC v4.1 Global Non-CoinGlass Staging Closure
 
 ## Scope and identity
 

@@ -24,18 +24,19 @@ class B123OwnerCopyAndPositionDetailContractTest {
             "src/main/java/org/example/trademodel/uireview/UiReviewDashboardHomeService.java");
 
     @Test
-    void formalWebUsesRineLogicShortTitlesAndEnglishOnlyTabButtons() throws Exception {
+    void formalWebUsesTrineLogicShortTitlesAndEnglishOnlyTabButtons() throws Exception {
         String home = Files.readString(HOME);
         String workspace = Files.readString(WORKSPACE);
         String login = Files.readString(LOGIN);
 
-        assertThat(home).contains("<title>RINE LOGIC</title>", ">RINE LOGIC</h1>",
+        assertThat(home).contains("<title>TRINE LOGIC</title>", ">TRINE LOGIC</h1>",
                 ">资产</h2>", ">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>");
-        assertThat(workspace).contains("' · RINE LOGIC'", ">RINE LOGIC</strong>",
+        assertThat(workspace).contains("' · TRINE LOGIC'", ">TRINE LOGIC</strong>",
                 "<h2 id=\"positionsHeading\">持仓监控</h2>");
-        assertThat(login).contains("<title>登录 · RINE LOGIC</title>", ">RINE LOGIC</h1>");
+        assertThat(login).contains("<title>登录 · TRINE LOGIC</title>", ">TRINE LOGIC</h1>");
         assertThat(home + workspace + login)
-                .doesNotContain("Fundamental AI", "个人复核入口", "多源证据决策系统",
+                .doesNotContain("<title>RINE LOGIC", ">RINE LOGIC", "=\"RINE LOGIC",
+                        "Fundamental AI", "个人复核入口", "多源证据决策系统",
                         "机会资产 ·", "持仓监控 · 基于已录入", "AI 分析工作区");
         assertThat(home + workspace).contains(">GPT</button>", ">Gemini</button>", ">Grok</button>");
     }

@@ -13,7 +13,7 @@ This residual closure changes only two semantic bindings:
 1. global Home data time ownership;
 2. risk-level and opportunity-state conclusion separation.
 
-It does not change Home layout, Position/close behavior, RINE LOGIC copy,
+It does not change Home layout, Position/close behavior, TRINE LOGIC copy,
 Three-AI, Recheck, authentication, Telegram, schema, enums, state machines,
 risk algorithms, or automatic-trading boundaries.
 

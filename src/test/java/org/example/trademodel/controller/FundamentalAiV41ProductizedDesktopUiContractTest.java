@@ -23,14 +23,14 @@ class FundamentalAiV41ProductizedDesktopUiContractTest {
         String workspace = Files.readString(Path.of("src/main/resources/templates/workspace.html"));
         String login = Files.readString(LOGIN);
 
-        assertThat(home).contains("<title>RINE LOGIC</title>", ">RINE LOGIC</h1>",
-                "aria-label=\"RINE LOGIC 首页\"")
-                .doesNotContain("Fundamental AI");
-        assertThat(workspace).contains("' · RINE LOGIC'", ">RINE LOGIC</strong>",
-                "aria-label=\"RINE LOGIC 首页\"")
-                .doesNotContain("Fundamental AI", "pageSubtitle");
-        assertThat(login).contains("登录 · RINE LOGIC", ">RINE LOGIC</h1>")
-                .doesNotContain("Fundamental AI", "个人复核入口", "多源证据决策系统");
+        assertThat(home).contains("<title>TRINE LOGIC</title>", ">TRINE LOGIC</h1>",
+                "aria-label=\"TRINE LOGIC 首页\"", "rail-brand-mark\">T</span>")
+                .doesNotContain("<title>RINE LOGIC", ">RINE LOGIC", "=\"RINE LOGIC", "Fundamental AI");
+        assertThat(workspace).contains("' · TRINE LOGIC'", ">TRINE LOGIC</strong>",
+                "aria-label=\"TRINE LOGIC 首页\"", "workspace-brand-mark\" aria-hidden=\"true\">T</span>")
+                .doesNotContain("' · RINE LOGIC'", ">RINE LOGIC", "=\"RINE LOGIC", "Fundamental AI", "pageSubtitle");
+        assertThat(login).contains("登录 · TRINE LOGIC", ">TRINE LOGIC</h1>")
+                .doesNotContain("登录 · RINE LOGIC", ">RINE LOGIC", "Fundamental AI", "个人复核入口", "多源证据决策系统");
     }
 
     @Test

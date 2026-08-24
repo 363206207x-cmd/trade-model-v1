@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
     <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
-    <meta name="description" content="RINE LOGIC 专业金融决策工作区">
-    <title th:text="${pageTitle + ' · RINE LOGIC'}">RINE LOGIC</title>
+    <meta name="description" content="TRINE LOGIC 专业金融决策工作区">
+    <title th:text="${pageTitle + ' · TRINE LOGIC'}">TRINE LOGIC</title>
     <link rel="stylesheet" th:href="@{/css/workspace.css}" href="/css/workspace.css">
 </head>
 <body data-component-family="AppShell"
       th:attr="data-page-key=${pageKey},data-resource-id=${resourceId == null ? '' : resourceId},data-ui-review-mode=${uiReviewMode}">
 <aside class="workspace-sidebar" data-component-family="SideNav" aria-label="主要导航">
-    <a class="workspace-brand" href="/dashboard" aria-label="RINE LOGIC 首页">
-        <span class="workspace-brand-mark" aria-hidden="true">R</span>
-        <span class="workspace-rail-label"><strong>RINE LOGIC</strong></span>
+    <a class="workspace-brand" href="/dashboard" aria-label="TRINE LOGIC 首页">
+        <span class="workspace-brand-mark" aria-hidden="true">T</span>
+        <span class="workspace-rail-label"><strong>TRINE LOGIC</strong></span>
     </a>
     <nav class="workspace-navigation" aria-label="产品页面">
         <a href="/dashboard" th:classappend="${activeNavigation == 'home'} ? ' is-active'"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="workspace-rail-label">首页</span></a>

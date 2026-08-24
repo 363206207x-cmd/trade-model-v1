@@ -1,4 +1,4 @@
-# RINE LOGIC v4.1 Non-CoinGlass Blocker Closure
+# TRINE LOGIC v4.1 Non-CoinGlass Blocker Closure
 
 Date: 2026-08-23
 Start Head: `c80af6bf20c1135e174ef636f28abd5f8e7f97af`

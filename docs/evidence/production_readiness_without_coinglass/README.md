@@ -1,4 +1,4 @@
-# RINE LOGIC v4.1 Production Readiness Evidence
+# TRINE LOGIC v4.1 Production Readiness Evidence
 
 Evidence package: Production Readiness Final Gate excluding a CoinGlass live call.
 

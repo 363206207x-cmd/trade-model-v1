@@ -1,15 +1,15 @@
 # B.1.2.3 UI Review Evidence
 
-Scope: RINE LOGIC Web copy/status ownership plus the two authorized Position
+Scope: TRINE LOGIC Web copy/status ownership plus the two authorized Position
 detail fixes. All screenshots use the isolated `ui-review` profile and are
 fixtures, not production ownership evidence.
 
 ## Screenshots
 
-- `b123-login-rine-logic.png`: formal login brand and removed slogans.
+- `b123-login-rine-logic.png`: archived pre-restoration login evidence; not current acceptance.
 - `b123-home-1440.png`: Home 1440x900, short titles, English-only role tabs.
 - `b123-home-1080.png`: Home 1080x900, no horizontal overflow or text clipping.
-- `b123-analysis.png`: Analysis PageHeader, RINE LOGIC document title, no subtitle.
+- `b123-analysis.png`: archived Analysis PageHeader evidence; not current brand acceptance.
 - `b123-positions.png`: full active Position list; one detail link per row; no close action.
 - `b123-position-7101.png`: BTCUSDT detail, original `/dashboard` return target, no self-link.
 - `b123-position-7101-o07.png`: controlled O07 bound to position 7101 / BTCUSDT.

@@ -206,7 +206,7 @@ PR #1195 remains Draft and unmerged.
 |---|---|---|---|
 | A1 detail self-link | shared Position renderer uses `showDetailLink=false` in detail mode | 7101/7102/7103 browser DOM + contract test | PASS |
 | A2 close allowlist | explicit `OPEN` / `PARTIALLY_CLOSED` allowlist, hidden by default | pure function + DOM matrix + 7999 Fail Closed | PASS |
-| Formal Web brand | login/Home/workspace production surfaces use `RINE LOGIC` | copy contract + browser evidence | PASS |
+| Formal Web brand | login/Home/workspace production surfaces use `TRINE LOGIC` | copy contract + browser evidence | PASS |
 | Short titles and tabs | Home short module names, Analysis PageHeader `分析`, visible tabs GPT/Gemini/Grok | DOM contract + browser evidence | PASS |
 | PageHeader cleanup | Controller no longer projects `pageSubtitle`; subtitle DOM removed | controller/template contract | PASS |
 | Status ownership | account uses all active positions; the original data-time binding still used readiness time at this Head | residual owner audit | PARTIAL |
@@ -298,7 +298,7 @@ Historical result at implementation Head `a39c3979`:
 `DEPLOYMENT_ALLOWED=NO`, `CURRENT_PHASE_DONE=NO`, and `MERGE=NO`.
 
 Canonical report:
-`docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`.
+`docs/TRINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`.
 Evidence: `docs/evidence/production_readiness_without_coinglass/`.
 
 ## 2026-08-24 global non-CoinGlass private Staging closure
@@ -352,7 +352,7 @@ called. Therefore `NON_COINGLASS_READINESS=BLOCKED` and
 and `DEPLOYMENT_ALLOWED=NO`.
 
 Canonical current report:
-`docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`.
+`docs/TRINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`.
 
 ### SUPERSEDING_CURRENT_STATUS
 

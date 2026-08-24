@@ -19,8 +19,8 @@ Changed files in the Phase A implementation and evidence package:
 - `src/main/resources/application-prod.yml`
 - `src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java`
 - `src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java`
-- `docs/RINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`
-- `docs/RINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`
+- `docs/TRINE_LOGIC_V4_1_NON_COINGLASS_BLOCKER_CLOSURE.md`
+- `docs/TRINE_LOGIC_V4_1_PRODUCTION_READINESS_WITHOUT_COINGLASS_AUDIT.md`
 - `docs/evidence/non_coinglass_blocker_closure/README.md`
 - `docs/evidence/non_coinglass_production_final_gate/README.md`
 - `docs/RELEASE_OWNER_DECISION_REGISTER.md`
