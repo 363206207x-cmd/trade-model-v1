@@ -126,7 +126,7 @@ class GlobalFrozenUiAlignmentContractTest {
                 .doesNotContain("renderDerivatives", "ai-derivatives-strip", "维持 Candidate",
                         "GPT Candidate · 非 Final", "Market Bias：", "Candidate Mode");
         assertThat(contract).contains(
-                "HIGH_RISK: Object.freeze({ label: \"高风险\"",
+                "HIGH_RISK: Object.freeze({ label: \"高风险观察\"",
                 "function positionSourceLabel(sourceType)",
                 "return \"系统计划\"", "return \"独立录入\"",
                 "label: \"状态待同步\"")
@@ -137,8 +137,9 @@ class GlobalFrozenUiAlignmentContractTest {
     void primaryPagesFollowFrozenIaAndExposeNoTelegramUi() throws Exception {
         String html = Files.readString(WORKSPACE);
         String script = Files.readString(WORKSPACE_JS);
-        assertOrdered(html, "<h2 id=\"positionsHeading\">持仓监控</h2>", "账户风险覆盖 · 基于已录入", "活动持仓",
+        assertOrdered(html, "<h2 id=\"positionsHeading\">持仓监控</h2>", "accountRiskCoverage", "活动持仓",
                 "positionStateFilter", "positionSort", "positionGrid");
+        assertThat(html).doesNotContain("账户风险覆盖 · 基于已录入");
         assertOrdered(html, "analysisAssetSearch", "analysisMode", "analysisDataQuality", "analysisTimeframes",
                 "analysisEvidence", "analysisScores", "AIRoleTabs");
         assertOrdered(html, "消息中心", "messageUnreadCount", "OPPORTUNITY_PLAN", "POSITION_RISK", "SYSTEM", "messageList");

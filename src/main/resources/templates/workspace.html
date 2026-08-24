@@ -67,7 +67,7 @@
 
         <section class="workspace-page" th:if="${pageKey == 'positions'}" aria-labelledby="positionsHeading">
             <header class="section-header"><div><h2 id="positionsHeading">持仓监控</h2></div><button class="button button-secondary populated-position-action" type="button" data-open-overlay="actual-position">录入持仓</button></header>
-            <div class="risk-aggregate" data-component-family="PositionRiskAggregate"><span>账户风险覆盖 · 基于已录入</span><strong id="accountRiskCoverage">等待评估</strong><small>仅在已录入持仓数据完整时显示完整覆盖。</small></div>
+            <div class="risk-aggregate" data-component-family="PositionRiskAggregate"><strong id="accountRiskCoverage">等待评估</strong><small>仅在已录入持仓数据完整时显示完整覆盖。</small></div>
             <nav class="filter-tabs" aria-label="持仓视图"><button class="is-active" type="button" aria-current="page" data-position-tab="active">活动持仓</button><button type="button" data-position-tab="history">历史持仓</button></nav>
             <section id="activePositionsPanel" data-position-panel="active">
                 <div class="position-toolbar" aria-label="持仓筛选与排序"><label>筛选<select id="positionStateFilter"><option value="ALL">全部活动持仓</option><option value="RISK">风险变化</option><option value="WAITING">等待监控</option></select></label><label>排序<select id="positionSort"><option value="RISK_DESC">风险从高到低</option><option value="OPENED_DESC">最近录入</option></select></label></div>

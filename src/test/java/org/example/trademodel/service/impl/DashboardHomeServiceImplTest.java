@@ -53,6 +53,7 @@ import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.OpportunityPriorityRankingService;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
@@ -149,6 +150,8 @@ class DashboardHomeServiceImplTest {
     @Mock
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     @Mock
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
+    @Mock
     private DecisionResultMapper decisionResultMapper;
     @Mock
     private ExecutionPlanMapper executionPlanMapper;
@@ -170,10 +173,13 @@ class DashboardHomeServiceImplTest {
         );
         service.setAssetStateMapper(assetStateMapper);
         service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
+        service.setPersistedOhlcvQueryService(persistedOhlcvQueryService);
         service.setOriginalPlanSources(decisionResultMapper, executionPlanMapper, analysisRunMapper);
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
         lenient().when(analysisRunMapper.selectAverageScoreByAnalysisId(anyString())).thenReturn(null);
         lenient().when(analysisRunMapper.countEvidenceByAnalysisId(anyString())).thenReturn(null);
+        lenient().when(persistedOhlcvQueryService.primarySourceProvider()).thenReturn("BINANCE_PUBLIC");
+        lenient().when(persistedOhlcvQueryService.primarySourceMarketType()).thenReturn("SPOT");
     }
 
     @Test
@@ -462,7 +468,7 @@ class DashboardHomeServiceImplTest {
         market.setConnected(true);
         market.setReason("LOCAL_REAL_PROVIDER_VERIFIED_FRESH");
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
                 .thenReturn(persistedClosedBar(Instant.parse("2026-08-20T09:56:00Z")));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
@@ -486,7 +492,7 @@ class DashboardHomeServiceImplTest {
                 "Kraken public data / CONNECTED"
         );
         when(providerReadinessService.getReadiness()).thenReturn(readiness);
-        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
                 .thenReturn(persistedClosedBar(Instant.parse("2026-08-20T09:56:00Z")));
 
         DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
@@ -509,14 +515,14 @@ class DashboardHomeServiceImplTest {
                 "READINESS_CHANGED");
         assertThat(readiness.updatedAt()).isNotNull();
         service.setLocalRealReadinessService(readiness);
-        when(persistedOhlcvBarMapper.selectLatestClosedBar()).thenReturn(null);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT")).thenReturn(null);
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
 
         assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
         assertThat(home.getSystemState().getDataQuality().getValueLabel()).isEqualTo("—");
         assertThat(home.getHeader().getUpdatedAt()).isNull();
-        verify(persistedOhlcvBarMapper).selectLatestClosedBar();
+        verify(persistedOhlcvBarMapper).selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT");
     }
 
     @Test
@@ -532,7 +538,8 @@ class DashboardHomeServiceImplTest {
                 null, false, "{\"state\":\"OBSERVING\"}");
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(btc, eth));
-        when(persistedOhlcvBarMapper.selectLatestClosedBar()).thenReturn(persistedClosedBar(closedAt));
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
+                .thenReturn(persistedClosedBar(closedAt));
 
         DashboardHomeVO btcHome = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
         readiness.transition(org.example.trademodel.localreal.LocalRealReadinessState.DASHBOARD_READY,
@@ -541,14 +548,15 @@ class DashboardHomeServiceImplTest {
 
         assertSameGlobalDataTime(btcHome, closedAt);
         assertSameGlobalDataTime(ethHome, closedAt);
-        verify(persistedOhlcvBarMapper, times(2)).selectLatestClosedBar();
+        verify(persistedOhlcvBarMapper, times(2))
+                .selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT");
     }
 
     @Test
     void latestPersistedClosedBarChangeUpdatesStatusAndHeaderTogether() {
         Instant first = Instant.parse("2026-08-20T09:56:00Z");
         Instant second = Instant.parse("2026-08-20T10:01:00Z");
-        when(persistedOhlcvBarMapper.selectLatestClosedBar())
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
                 .thenReturn(persistedClosedBar(first), persistedClosedBar(second));
 
         DashboardHomeVO firstHome = service.getHomeForUser(USER_ID, null, 6);
@@ -1695,7 +1703,8 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of());
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
-        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                        "BNBUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 1))
                 .thenReturn(List.of(bnb));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
@@ -1729,7 +1738,8 @@ class DashboardHomeServiceImplTest {
         lenient().when(decisionService.getLatestDecisionResultBySymbolForUser(USER_ID, "BNBUSDT"))
                 .thenReturn(bnbDecision);
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of());
-        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow("BNBUSDT", "5m", 1))
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                        "BNBUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 1))
                 .thenReturn(List.of(bnbBar));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 3);
@@ -1756,7 +1766,8 @@ class DashboardHomeServiceImplTest {
         when(assetStateMapper.selectBySymbol("BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", null));
         PersistedOhlcvBarDO marketBar = persistedBar("BTCUSDT", "64123.45", "FRESH", marketUpdatedAt);
-        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindow(eq("BTCUSDT"), anyString(), eq(1)))
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                        eq("BTCUSDT"), anyString(), eq("BINANCE_PUBLIC"), eq("SPOT"), eq(1)))
                 .thenReturn(List.of(marketBar));
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(decision));
@@ -1843,7 +1854,8 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getAssets()).isEmpty();
         assertThat(home.getStates().getAssets()).isNotEqualTo("READY");
-        verify(persistedOhlcvBarMapper, never()).selectLatestClosedWindow(anyString(), anyString(), anyInt());
+        verify(persistedOhlcvBarMapper, never()).selectLatestClosedWindowBySource(
+                anyString(), anyString(), anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -1852,7 +1864,8 @@ class DashboardHomeServiceImplTest {
                 "LEVEL_1", false, "{\"state\":\"CANDIDATE\"}");
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(decision));
-        when(persistedOhlcvBarMapper.selectLatestClosedWindow(eq("BTCUSDT"), anyString(), eq(1)))
+        when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                eq("BTCUSDT"), anyString(), eq("BINANCE_PUBLIC"), eq("SPOT"), eq(1)))
                 .thenThrow(new IllegalStateException("market read failed"));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
@@ -2897,8 +2910,8 @@ class DashboardHomeServiceImplTest {
                 .thenReturn(sourceState(decision.getSymbol(), null));
         PersistedOhlcvBarDO marketBar = persistedBar(
                 decision.getSymbol(), "64123.45", "FRESH", LocalDateTime.of(2026, 7, 21, 9, 30));
-        when(persistedOhlcvBarMapper.selectLatestClosedWindow(
-                eq(decision.getSymbol()), anyString(), eq(1)))
+        when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                eq(decision.getSymbol()), anyString(), eq("BINANCE_PUBLIC"), eq("SPOT"), eq(1)))
                 .thenReturn(List.of(marketBar));
     }
 

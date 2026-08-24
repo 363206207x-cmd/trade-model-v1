@@ -44,7 +44,7 @@ class LocalRealDataStatusServiceTest {
     void localRealStatusDoesNotExposeSecretsAndShowsAiDisabled() throws Exception {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         readiness.transition(LocalRealReadinessState.DEGRADED, "MARKET_WINDOW_INCOMPLETE");
-        when(ohlcvMapper.countAllClosedBars()).thenReturn(0L);
+        when(ohlcvMapper.countAllClosedBarsBySource("KRAKEN", "SPOT")).thenReturn(0L);
         when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(0);
         when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
         when(routedProvider.health()).thenReturn(Map.of());
@@ -87,7 +87,7 @@ class LocalRealDataStatusServiceTest {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         readiness.updateAsset("BTCUSDT", LocalRealAssetReadinessState.DEGRADED, "KRAKEN",
                 "INITIAL_ANALYSIS_INCOMPLETE");
-        when(ohlcvMapper.countAllClosedBars()).thenReturn(2424L);
+        when(ohlcvMapper.countAllClosedBarsBySource("KRAKEN", "SPOT")).thenReturn(2424L);
         when(analysisRunMapper.countLocalRealSuccessfulSymbols()).thenReturn(0);
         when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
         when(routedProvider.health()).thenReturn(Map.of());
@@ -96,7 +96,8 @@ class LocalRealDataStatusServiceTest {
         bar.setProvider("KRAKEN");
         bar.setFreshnessStatus("FRESH");
         bar.setCloseTimeMs(123L);
-        when(ohlcvMapper.selectLatestClosedBarBySymbol("BTCUSDT")).thenReturn(bar);
+        when(ohlcvMapper.selectLatestClosedBarBySymbolAndSource("BTCUSDT", "KRAKEN", "SPOT"))
+                .thenReturn(bar);
         MarketEnvironmentVO environment = new MarketEnvironmentVO();
         when(realMarketEnvironmentService.assess("BTCUSDT", "5m")).thenReturn(
                 new PersistedRealMarketEnvironmentAssessment(true, null, "KRAKEN",
@@ -127,7 +128,8 @@ class LocalRealDataStatusServiceTest {
         LocalRealReadinessService readiness = new LocalRealReadinessService();
         PersistedOhlcvBarDO persisted = new PersistedOhlcvBarDO();
         persisted.setCloseTimeMs(Instant.parse("2026-08-20T09:56:00Z").toEpochMilli());
-        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(persisted, null);
+        when(routedProvider.primaryProvider()).thenReturn("KRAKEN");
+        when(ohlcvMapper.selectLatestClosedBarBySource("KRAKEN", "SPOT")).thenReturn(persisted, null);
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService);
@@ -156,7 +158,7 @@ class LocalRealDataStatusServiceTest {
         PersistedOhlcvBarDO stale = readyBar(now.minusSeconds(12 * 60));
         PersistedOhlcvBarDO invalid = readyBar(now.minusSeconds(5 * 60));
         invalid.setSourceStatus("INVALID");
-        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(fresh, stale, invalid);
+        when(ohlcvMapper.selectLatestClosedBarBySource("KRAKEN", "SPOT")).thenReturn(fresh, stale, invalid);
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService, Clock.fixed(now, ZoneOffset.UTC));
@@ -197,7 +199,7 @@ class LocalRealDataStatusServiceTest {
                         "KRAKEN", "NOT_USED", null, null, false, null)));
         PersistedOhlcvBarDO fresh = readyBar(now.minusSeconds(5 * 60));
         fresh.setProvider("KRAKEN");
-        when(ohlcvMapper.selectLatestClosedBar()).thenReturn(fresh);
+        when(ohlcvMapper.selectLatestClosedBarBySource("KRAKEN", "SPOT")).thenReturn(fresh);
         LocalRealDataStatusService service = new LocalRealDataStatusService(
                 readiness, ohlcvMapper, analysisRunMapper, decisionResultMapper, routedProvider,
                 realMarketEnvironmentService, Clock.fixed(now, ZoneOffset.UTC));

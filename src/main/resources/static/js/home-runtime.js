@@ -31,7 +31,7 @@
         WAIT_CONFIRMATION: "等待人工确认", RECORD_CLOSE_REVIEW: "记录平仓并进入复盘",
         OPEN_MONITORING: "持续监控", WAITING_MONITOR_DATA: "等待监控数据", RISK_ESCALATED: "风险升级",
         OBSERVING: "观察中", CANDIDATE: "候选", WAITING_TRIGGER: "等待触发", TRIGGERED: "已触发",
-        HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
+        HIGH_RISK: "高风险观察", COOLING: "冷却中", CONFUSED: "冲突待解",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型", OBSERVATION: "观察", BLOCKED: "阻断",
         APPROVE: "通过", DOWNGRADE: "降级", REJECT_CANDIDATE: "拒绝候选", RISK_WARNING: "风险警告",
         UNCHANGED: "维持不变", SAME_FAMILY_DOWNGRADE: "方向不变，强度降低",

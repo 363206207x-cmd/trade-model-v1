@@ -103,6 +103,29 @@ class PersistedOhlcvBarMapperIntegrationTest {
     }
 
     @Test
+    void homeLatestAndCountQueriesDoNotMixProvidersAtTheSameTimestamp() {
+        LocalDateTime ingestedAt = LocalDateTime.of(2026, 8, 25, 8, 0);
+        insertBar("SOURCEUSDT", "5m", 1_000L, 1_999L, "100.00", true, 0,
+                "binance-batch", "binance-trace", ingestedAt, "BINANCE_PUBLIC", "SPOT");
+        insertBar("SOURCEUSDT", "5m", 1_000L, 1_999L, "200.00", true, 0,
+                "kraken-batch", "kraken-trace", ingestedAt.plusSeconds(1), "KRAKEN", "SPOT");
+
+        PersistedOhlcvBarDO binanceLatest = persistedOhlcvBarMapper.selectLatestClosedBarBySource(
+                "BINANCE_PUBLIC", "SPOT");
+        PersistedOhlcvBarDO binanceSymbolLatest =
+                persistedOhlcvBarMapper.selectLatestClosedBarBySymbolAndSource(
+                        "SOURCEUSDT", "BINANCE_PUBLIC", "SPOT");
+
+        assertThat(binanceLatest.getProvider()).isEqualTo("BINANCE_PUBLIC");
+        assertThat(binanceLatest.getSourceTraceId()).isEqualTo("binance-trace");
+        assertThat(binanceSymbolLatest.getSourceTraceId()).isEqualTo("binance-trace");
+        assertThat(persistedOhlcvBarMapper.countAllClosedBarsBySource("BINANCE_PUBLIC", "SPOT"))
+                .isEqualTo(1L);
+        assertThat(persistedOhlcvBarMapper.countClosedBarsBySymbolAndSource(
+                "SOURCEUSDT", "BINANCE_PUBLIC", "SPOT")).isEqualTo(1L);
+    }
+
+    @Test
     void selectLatestIngestionBatch_returnsNewestNonDeletedBatchMetadata() {
         insertBar("SOLUSDT", "15m", 20_000L, 34_999L, "150.00", true, 0, "batch-older", "trace-old",
                 LocalDateTime.of(2026, 5, 17, 10, 0, 0));

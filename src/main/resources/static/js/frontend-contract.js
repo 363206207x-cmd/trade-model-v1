@@ -12,7 +12,7 @@
     CANDIDATE: Object.freeze({ label: "待复核候选", tone: "info" }),
     WAITING_TRIGGER: Object.freeze({ label: "等待触发", tone: "warning" }),
     TRIGGERED: Object.freeze({ label: "条件已触发", tone: "info" }),
-    HIGH_RISK: Object.freeze({ label: "高风险", tone: "danger" }),
+    HIGH_RISK: Object.freeze({ label: "高风险观察", tone: "danger" }),
     INVALIDATED: Object.freeze({ label: "已失效", tone: "muted" }),
     COOLING: Object.freeze({ label: "冷却中", tone: "muted" }),
     CONFUSED: Object.freeze({ label: "冲突阻断", tone: "danger" })

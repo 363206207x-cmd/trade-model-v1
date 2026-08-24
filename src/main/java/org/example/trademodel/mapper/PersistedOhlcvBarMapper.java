@@ -117,6 +117,13 @@ public interface PersistedOhlcvBarMapper {
     @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE is_closed = TRUE AND is_deleted = 0")
     long countAllClosedBars();
 
+    @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE provider = #{provider} "
+            + "AND provider_market_type = #{providerMarketType} AND is_closed = TRUE AND is_deleted = 0")
+    long countAllClosedBarsBySource(
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType
+    );
+
     @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
             + "AND is_closed = TRUE AND is_deleted = 0")
     long countClosedBars(@Param("symbol") String symbol, @Param("timeframe") String timeframe);
@@ -125,10 +132,35 @@ public interface PersistedOhlcvBarMapper {
             + "AND is_closed = TRUE AND is_deleted = 0")
     long countClosedBarsBySymbol(@Param("symbol") String symbol);
 
+    @Select("SELECT COUNT(*) FROM tm_persisted_ohlcv_bar WHERE symbol = #{symbol} "
+            + "AND provider = #{provider} AND provider_market_type = #{providerMarketType} "
+            + "AND is_closed = TRUE AND is_deleted = 0")
+    long countClosedBarsBySymbolAndSource(
+            @Param("symbol") String symbol,
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType
+    );
+
     @Select(BASE_SELECT + "WHERE symbol = #{symbol} AND is_closed = TRUE AND is_deleted = 0 "
             + "ORDER BY close_time_ms DESC, id DESC LIMIT 1")
     PersistedOhlcvBarDO selectLatestClosedBarBySymbol(@Param("symbol") String symbol);
 
+    @Select(BASE_SELECT + "WHERE symbol = #{symbol} AND provider = #{provider} "
+            + "AND provider_market_type = #{providerMarketType} AND is_closed = TRUE AND is_deleted = 0 "
+            + "ORDER BY close_time_ms DESC, id DESC LIMIT 1")
+    PersistedOhlcvBarDO selectLatestClosedBarBySymbolAndSource(
+            @Param("symbol") String symbol,
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType
+    );
+
     @Select(BASE_SELECT + "WHERE is_closed = TRUE AND is_deleted = 0 ORDER BY close_time_ms DESC, id DESC LIMIT 1")
     PersistedOhlcvBarDO selectLatestClosedBar();
+
+    @Select(BASE_SELECT + "WHERE provider = #{provider} AND provider_market_type = #{providerMarketType} "
+            + "AND is_closed = TRUE AND is_deleted = 0 ORDER BY close_time_ms DESC, id DESC LIMIT 1")
+    PersistedOhlcvBarDO selectLatestClosedBarBySource(
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType
+    );
 }

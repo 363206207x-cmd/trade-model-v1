@@ -33,8 +33,9 @@ class HomeTimestampTransportContractTest {
                 .contains("globalDataUpdateCard(globalDataUpdatedAt)",
                         "home.getHeader().setUpdatedAt(globalDataUpdatedAt)",
                         "latestPersistedClosedBarAt()",
-                        "persistedOhlcvBarMapper.selectLatestClosedBar()")
+                        "persistedOhlcvBarMapper.selectLatestClosedBarBySource(provider, marketType)")
                 .doesNotContain("localRealDataStatusService.latestClosedBarAt()")
+                .doesNotContain("persistedOhlcvBarMapper.selectLatestClosedBar()")
                 .doesNotContain("LocalDateTime.ofInstant(globalDataUpdatedAt");
     }
 

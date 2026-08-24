@@ -74,7 +74,7 @@
         RUNTIME_METRIC_MISSING_FAIL_CLOSED: "运行指标缺失",
         OK: "正常", UP: "正常", DOWN: "不可用", DEGRADED: "降级", RUNNING: "运行中",
         OBSERVING: "观察中", CANDIDATE: "候选", WAITING_TRIGGER: "等待触发",
-        TRIGGERED: "已触发", HIGH_RISK: "高风险", COOLING: "冷却中", CONFUSED: "冲突待解",
+        TRIGGERED: "已触发", HIGH_RISK: "高风险观察", COOLING: "冷却中", CONFUSED: "冲突待解",
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
         REVIEW_PASSED: "复核通过", REVIEW_WAITING: "等待人工复核",

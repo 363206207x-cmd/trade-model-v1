@@ -45,6 +45,7 @@ import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.OpportunityPriorityRankingService;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
 import org.example.trademodel.service.UserPositionService;
@@ -128,6 +129,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private OpportunityPriorityRankingService opportunityPriorityRankingService;
     private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -212,6 +214,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     void setPersistedRealMarketEnvironmentService(
             PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService) {
         this.persistedRealMarketEnvironmentService = persistedRealMarketEnvironmentService;
+    }
+
+    @Autowired(required = false)
+    void setPersistedOhlcvQueryService(PersistedOhlcvQueryService persistedOhlcvQueryService) {
+        this.persistedOhlcvQueryService = persistedOhlcvQueryService;
     }
 
     @Autowired(required = false)
@@ -687,7 +694,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return card("dataQuality", "全局数据", globalDataUpdatedAt,
                 globalDataUpdatedAt == null ? "—" : null,
                 globalDataUpdatedAt == null ? "未取得正式全局更新时间"
-                        : "PersistedOhlcvBarMapper.selectLatestClosedBar",
+                        : "PersistedOhlcvBarMapper.selectLatestClosedBarBySource",
                 globalDataUpdatedAt == null ? "SOURCE_UNAVAILABLE" : "AVAILABLE", null);
     }
 
@@ -696,7 +703,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return null;
         }
         try {
-            PersistedOhlcvBarDO latest = persistedOhlcvBarMapper.selectLatestClosedBar();
+            PersistedOhlcvBarDO latest = latestClosedBarFromPrimarySource();
             return latest == null || latest.getCloseTimeMs() == null
                     ? null : Instant.ofEpochMilli(latest.getCloseTimeMs());
         } catch (RuntimeException ignored) {
@@ -1058,7 +1065,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PersistedOhlcvBarDO latest = null;
         try {
             for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
-                List<PersistedOhlcvBarDO> rows = persistedOhlcvBarMapper.selectLatestClosedWindow(symbol, timeframe, 1);
+                List<PersistedOhlcvBarDO> rows = latestClosedWindowFromPrimarySource(symbol, timeframe, 1);
                 PersistedOhlcvBarDO timeframeLatest = rows == null || rows.isEmpty() ? null : rows.get(0);
                 timeframeFreshness.put(timeframe, timeframeLatest == null
                         ? "NO_DATA" : firstNonBlank(timeframeLatest.getFreshnessStatus(), "UNKNOWN"));
@@ -1104,6 +1111,37 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setSourceProvider(providerLabel(latest.getProvider()));
         asset.setUpdatedAt(latestBusinessTime(latest));
         setFieldSource(asset, "updatedAt", asset.getUpdatedAt() == null ? "MISSING" : "REAL");
+    }
+
+    private PersistedOhlcvBarDO latestClosedBarFromPrimarySource() {
+        String provider = primaryPersistedOhlcvProvider();
+        String marketType = primaryPersistedOhlcvMarketType();
+        return provider == null || marketType == null || persistedOhlcvBarMapper == null
+                ? null
+                : persistedOhlcvBarMapper.selectLatestClosedBarBySource(provider, marketType);
+    }
+
+    private List<PersistedOhlcvBarDO> latestClosedWindowFromPrimarySource(
+            String symbol,
+            String timeframe,
+            int limit
+    ) {
+        String provider = primaryPersistedOhlcvProvider();
+        String marketType = primaryPersistedOhlcvMarketType();
+        return provider == null || marketType == null || persistedOhlcvBarMapper == null
+                ? List.of()
+                : persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                        symbol, timeframe, provider, marketType, limit);
+    }
+
+    private String primaryPersistedOhlcvProvider() {
+        return persistedOhlcvQueryService == null
+                ? null : trimToNull(persistedOhlcvQueryService.primarySourceProvider());
+    }
+
+    private String primaryPersistedOhlcvMarketType() {
+        return persistedOhlcvQueryService == null
+                ? null : trimToNull(persistedOhlcvQueryService.primarySourceMarketType());
     }
 
     private DashboardHomeVO.AssetVO assetBase(int slot, String normalizedSymbol) {

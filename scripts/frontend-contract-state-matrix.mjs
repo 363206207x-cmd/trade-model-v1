@@ -10,6 +10,8 @@ vm.runInContext(fs.readFileSync(contractPath, "utf8"), sandbox, { filename: cont
 
 const contract = sandbox.window.TradeModelFrontendContract;
 assert.ok(contract, "TradeModelFrontendContract must load");
+assert.equal(contract.ASSET_STATES.HIGH_RISK.label, "高风险观察");
+assert.equal(contract.userFacingValue("HIGH"), "高");
 
 assert.equal(contract.reviewResultLabel("APPROVE"), "通过");
 assert.equal(contract.reviewResultLabel("DOWNGRADE"), "降级");

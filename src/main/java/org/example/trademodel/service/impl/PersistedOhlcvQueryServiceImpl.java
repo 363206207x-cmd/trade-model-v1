@@ -40,6 +40,16 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
     }
 
     @Override
+    public String primarySourceProvider() {
+        return primaryProvider;
+    }
+
+    @Override
+    public String primarySourceMarketType() {
+        return "SPOT";
+    }
+
+    @Override
     public PersistedOhlcvReadinessResult evaluateReadiness(
             String symbol,
             String timeframe,

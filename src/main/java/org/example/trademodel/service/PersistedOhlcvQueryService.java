@@ -4,6 +4,14 @@ import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 
 public interface PersistedOhlcvQueryService {
 
+    default String primarySourceProvider() {
+        return null;
+    }
+
+    default String primarySourceMarketType() {
+        return null;
+    }
+
     PersistedOhlcvReadinessResult evaluateReadiness(
             String symbol,
             String timeframe,
