@@ -186,17 +186,20 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         if (!globallyEnabled || !ingestionEnabled) {
             return;
         }
-        if (!isTrue(property(environment, "trade-model.ohlcv.kraken.enabled"))) {
-            errors.add("production OHLCV ingestion requires explicitly enabled Kraken provider");
+        String primaryProvider = normalized(property(environment, "trade-model.ohlcv.provider.primary"));
+        validateExplicitOhlcvProvider(environment, errors, primaryProvider, "primary");
+
+        boolean fallbackEnabled = isTrue(property(environment, "trade-model.ohlcv.provider.fallback-enabled"));
+        String fallbackProvider = normalized(property(environment, "trade-model.ohlcv.provider.fallback"));
+        if (fallbackEnabled) {
+            if (primaryProvider.equals(fallbackProvider)) {
+                errors.add("production OHLCV fallback must differ from primary provider");
+            }
+            validateExplicitOhlcvProvider(environment, errors, fallbackProvider, "fallback");
         }
-        if (!isTrue(property(environment, "trade-model.ohlcv.kraken.external-calls-enabled"))) {
-            errors.add("production OHLCV ingestion requires explicit Kraken external-call opt-in");
-        }
-        if (isTrue(property(environment, "trade-model.ohlcv.binance.enabled"))
-                || isTrue(property(environment, "trade-model.ohlcv.binance.external-calls-enabled"))
-                || isTrue(property(environment, "trade-model.ohlcv.public-provider.enabled"))
+        if (isTrue(property(environment, "trade-model.ohlcv.public-provider.enabled"))
                 || isTrue(property(environment, "trade-model.ohlcv.public-provider.external-calls-enabled"))) {
-            errors.add("production release policy requires Binance OHLCV disabled due HTTP 451");
+            errors.add("production OHLCV ingestion must use an explicit named provider, not the generic public-provider alias");
         }
         String maxSymbolsValue = property(environment, "trade-model.schedulers.ohlcv-ingestion.max-symbols");
         if (!isPositiveInteger(maxSymbolsValue) || Integer.parseInt(trim(maxSymbolsValue)) > 20) {
@@ -209,6 +212,23 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
                 .toList());
         if (!timeframes.equals(Set.of("5m", "15m", "1h", "4h"))) {
             errors.add("production OHLCV ingestion must use exactly 5m,15m,1h,4h timeframes");
+        }
+    }
+
+    private static void validateExplicitOhlcvProvider(Environment environment,
+                                                      List<String> errors,
+                                                      String provider,
+                                                      String role) {
+        if (!Set.of("KRAKEN", "BINANCE").contains(provider)) {
+            errors.add("production OHLCV " + role + " provider must be KRAKEN or BINANCE");
+            return;
+        }
+        String prefix = "trade-model.ohlcv." + provider.toLowerCase(Locale.ROOT);
+        if (!isTrue(property(environment, prefix + ".enabled"))) {
+            errors.add("production OHLCV " + role + " requires explicitly enabled " + provider + " provider");
+        }
+        if (!isTrue(property(environment, prefix + ".external-calls-enabled"))) {
+            errors.add("production OHLCV " + role + " requires explicit " + provider + " external-call opt-in");
         }
     }
 
