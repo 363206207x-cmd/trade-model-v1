@@ -62,6 +62,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,6 +89,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @SpringBootTest(classes = TradeModelApplication.class)
+@TestPropertySource(properties = "trade-model.ohlcv.provider.primary=binance")
 @Transactional
 @Tag("core-regression")
 class AnalysisDecisionExecutionPlanIntegrationTest {
@@ -1076,7 +1078,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                     new BigDecimal("50000.00"), true));
         }
         OhlcvIngestionResult ingestion = persistedOhlcvIngestionService.ingest(new OhlcvIngestionBatch(
-                "TEST_PUBLIC_PROVIDER", "SPOT", "/controlled-test/klines", OhlcvSourceState.READY,
+                "BINANCE_PUBLIC", "SPOT", "/controlled-test/klines", OhlcvSourceState.READY,
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), "integration-fixture-v1", 1,
                 "trace-" + symbol, batchId, bars));
         assertThat(ingestion.ready()).isTrue();

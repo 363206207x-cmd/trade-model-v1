@@ -10,4 +10,15 @@ public interface PersistedOhlcvQueryService {
             int requiredWindowSize,
             long maxReadLagMs
     );
+
+    default PersistedOhlcvReadinessResult evaluateReadinessForSource(
+            String symbol,
+            String timeframe,
+            int requiredWindowSize,
+            long maxReadLagMs,
+            String provider,
+            String providerMarketType
+    ) {
+        throw new UnsupportedOperationException("SOURCE_OWNED_OHLCV_QUERY_NOT_IMPLEMENTED");
+    }
 }

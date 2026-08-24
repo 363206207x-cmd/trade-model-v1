@@ -171,7 +171,8 @@ class PersistedOhlcvIngestionServiceImplTest {
         assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.STALE);
         assertThat(result.freshnessStatus()).isEqualTo(OhlcvFreshnessStatus.STALE);
         assertThat(result.ready()).isFalse();
-        assertThat(queryService.evaluateReadiness("XRPUSDT", "5m", 1, interval * 20).getStatus())
+        assertThat(queryService.evaluateReadinessForSource(
+                "XRPUSDT", "5m", 1, interval * 20, "BINANCE", "SPOT").getStatus())
                 .isEqualTo(PersistedOhlcvReadinessStatus.STALE);
     }
 

@@ -7,12 +7,14 @@ import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryService {
@@ -20,6 +22,7 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
 
     private final PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private final Clock clock;
+    private String primaryProvider = "KRAKEN";
 
     @Autowired
     public PersistedOhlcvQueryServiceImpl(PersistedOhlcvBarMapper persistedOhlcvBarMapper) {
@@ -31,12 +34,30 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
+    @Value("${trade-model.ohlcv.provider.primary:kraken}")
+    void setPrimaryProvider(String primaryProvider) {
+        this.primaryProvider = persistedProvider(primaryProvider);
+    }
+
     @Override
     public PersistedOhlcvReadinessResult evaluateReadiness(
             String symbol,
             String timeframe,
             int requiredWindowSize,
             long maxReadLagMs
+    ) {
+        return evaluateReadinessForSource(symbol, timeframe, requiredWindowSize, maxReadLagMs,
+                primaryProvider, "SPOT");
+    }
+
+    @Override
+    public PersistedOhlcvReadinessResult evaluateReadinessForSource(
+            String symbol,
+            String timeframe,
+            int requiredWindowSize,
+            long maxReadLagMs,
+            String provider,
+            String providerMarketType
     ) {
         PersistedOhlcvReadinessResult result = baseResult(symbol, timeframe, requiredWindowSize);
         List<String> missingFields = new ArrayList<>();
@@ -52,6 +73,12 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
         if (maxReadLagMs <= 0) {
             missingFields.add("maxReadLagMs");
         }
+        if (!hasText(provider)) {
+            missingFields.add("provider");
+        }
+        if (!hasText(providerMarketType)) {
+            missingFields.add("providerMarketType");
+        }
         Long intervalMs = parseTimeframeMs(timeframe);
         if (intervalMs == null) {
             missingFields.add("timeframePolicy");
@@ -62,13 +89,15 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
                     "Persisted OHLCV readiness policy is not fully configured.", missingFields, List.of());
         }
 
-        List<PersistedOhlcvBarDO> bars = persistedOhlcvBarMapper
-                .selectLatestClosedWindow(symbol, timeframe, requiredWindowSize);
+        String persistedProvider = persistedProvider(provider);
+        String persistedMarketType = providerMarketType.trim().toUpperCase(Locale.ROOT);
+        List<PersistedOhlcvBarDO> bars = persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, timeframe, persistedProvider, persistedMarketType, requiredWindowSize);
         result.setBars(bars);
         if (bars == null || bars.isEmpty()) {
             return finish(result, PersistedOhlcvReadinessStatus.MISSING,
                     PersistedOhlcvStaleReasonCode.NO_BARS_FOR_SYMBOL_TIMEFRAME,
-                    "No closed persisted OHLCV bars exist for symbol/timeframe.",
+                    "No closed persisted OHLCV bars exist for the requested source.",
                     List.of("persistedOhlcvWindow", "klineItems"), bars);
         }
 
@@ -147,6 +176,14 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
                 PersistedOhlcvStaleReasonCode.NONE,
                 "Persisted OHLCV window is fresh, closed, contiguous, source-owned, and quality OK.",
                 List.of(), bars);
+    }
+
+    private static String persistedProvider(String provider) {
+        if (!hasText(provider)) {
+            return "";
+        }
+        String normalized = provider.trim().toUpperCase(Locale.ROOT);
+        return "BINANCE".equals(normalized) ? "BINANCE_PUBLIC" : normalized;
     }
 
     private PersistedOhlcvReadinessResult baseResult(String symbol, String timeframe, int requiredWindowSize) {
@@ -314,7 +351,7 @@ public class PersistedOhlcvQueryServiceImpl implements PersistedOhlcvQueryServic
         }
     }
 
-    private boolean hasText(String value) {
+    private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }
 }
