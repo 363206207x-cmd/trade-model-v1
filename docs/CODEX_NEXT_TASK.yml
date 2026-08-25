@@ -1,55 +1,55 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "Fundamental AI frontend interaction runtime closure authorization"
+active_block: "TRINE LOGIC private multi-user registration and data-isolation authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "Fundamental AI Frontend Interaction Runtime Closure Authorization"
-branch: "codex/frontend-interaction-runtime-closure-authorization"
+module: "TRINE LOGIC Multi-User Account Registration Authorization"
+branch: "codex/multi-user-account-registration-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FRONTEND_INTERACTION_RUNTIME_CLOSURE"
+authorized_next_product_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
 
-current_package_phase: "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION"
-current_package_name: "Fundamental AI Frontend Interaction Runtime Closure Authorization"
-current_package_active_block: "Desktop runtime interaction ownership and exact permission gate"
+current_package_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION"
+current_package_name: "TRINE LOGIC Multi-User Account Registration Authorization"
+current_package_active_block: "Private registration, account lifecycle and authenticated-user ownership permission gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/frontend-interaction-runtime-closure-authorization"
+current_package_branch: "codex/multi-user-account-registration-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement interaction closure on this branch"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement multi-user capability on this branch"
 current_package_allowed_scope:
-  - "Register the exact Desktop interaction runtime closure package"
-  - "Map existing Home search, Asset Pool, analysis preview, route and overlay owners"
+  - "Register the exact private multi-user registration and data-isolation package"
+  - "Map the existing tm_user, Session, CSRF and business-object owners"
   - "Update delivery state, exact-package machine permissions and authorization validation"
   - "Validate fail-closed package denial without changing application, API, schema, Figma or Mobile"
 current_package_blocked_scope:
   - "Java, runtime configuration, API, schema, templates, CSS, JavaScript, Figma or Mobile changes"
-  - "Interaction implementation, deployment, new providers, broad backend refactor or quality-threshold changes"
-  - "Secrets, fake data, automatic trading or automatic position mutation"
+  - "Registration implementation, migration, deployment, new providers or unrelated backend refactor"
+  - "Secrets, public exposure, fake data, automatic trading or automatic position mutation"
 
-authorized_next_package_phase: "FRONTEND_INTERACTION_RUNTIME_CLOSURE"
-authorized_next_package_name: "Fundamental AI Frontend Interaction Runtime Closure"
-authorized_next_package_active_block: "Home search selection/actions and existing Desktop runtime interaction closure"
+authorized_next_package_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+authorized_next_package_name: "TRINE LOGIC Multi-User Account Registration Closure"
+authorized_next_package_active_block: "Private registration, OWNER/USER lifecycle and authenticated-user data isolation"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/frontend-interaction-runtime-closure"
-authorized_next_package_risk: "B_RISK_DESKTOP_RUNTIME_INTERACTION"
+authorized_next_package_branch: "codex/multi-user-account-registration-closure"
+authorized_next_package_risk: "B_RISK_AUTH_AND_DATA_OWNERSHIP"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
 authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
-authorized_next_package_next_action: "From authorization-effective merged main, repair Home search selection/actions and close only source-defined Desktop runtime interaction gaps"
+authorized_next_package_next_action: "From authorization-effective merged main, implement only the frozen private registration, account lifecycle and data-isolation contract"
 
-blocked_package_phase: "UNSCOPED_INTERACTION_SCHEMA_PROVIDER_FIGMA_MOBILE_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_FRONTEND_INTERACTION_RUNTIME_CLOSURE_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_FRONTEND_INTERACTION_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "UNSCOPED_PUBLIC_AUTH_PROVIDER_FIGMA_MOBILE_PRODUCTION_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_MULTI_USER_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
   - "V4_1_TARGET_RUNTIME_REMEDIATION_EFFECTIVE_MERGED_MAIN"
@@ -57,6 +57,9 @@ next_task_authorization_conditions:
   - "LOCAL_REAL_IMPLEMENTATION_EFFECTIVE_MERGED_MAIN"
   - "FRONTEND_INTERACTION_SOURCE_AND_OWNERSHIP_MAPPED"
   - "FRONTEND_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "FRONTEND_INTERACTION_RUNTIME_CLOSURE_EFFECTIVE_MERGED_MAIN"
+  - "MULTI_USER_SOURCE_AND_OWNERSHIP_MAPPED"
+  - "MULTI_USER_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -90,13 +93,15 @@ v4_1_telegram_implementation_status: "COMPLETE"
 v4_1_telegram_live_acceptance_status: "PENDING_PRIVATE_RUNTIME_ACCEPTANCE"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
-frontend_interaction_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-frontend_interaction_implementation_status: "NOT_STARTED"
-authorized_next_package: "FRONTEND_INTERACTION_RUNTIME_CLOSURE"
-scope: "DESKTOP_RUNTIME_INTERACTION_CLOSURE_ONLY"
+frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
+frontend_interaction_implementation_status: "COMPLETE"
+multi_user_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+multi_user_implementation_status: "NOT_STARTED"
+authorized_next_package: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+scope: "PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk authorization package; successor is bounded B-risk Desktop runtime interaction closure"
+risk: "A-risk authorization package; successor is bounded B-risk authentication and data-ownership closure"
 
 pr_1179_number: "1179"
 pr_1179_status: "MERGED"
@@ -104,46 +109,47 @@ pr_1179_merge_commit: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
 pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
 pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
 
-current_pr: "Fundamental AI Frontend Interaction Runtime Closure Authorization / PENDING_REVIEW"
-current_package_pr: "Fundamental AI Frontend Interaction Runtime Closure Authorization Package"
+current_pr: "TRINE LOGIC Multi-User Account Registration Authorization / PENDING_REVIEW"
+current_package_pr: "TRINE LOGIC Multi-User Account Registration Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only authorization package after all gates pass"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "FRONTEND_INTERACTION_RUNTIME_CLOSURE"
+next_business_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization package; only then request FRONTEND_INTERACTION_RUNTIME_CLOSURE"
+next_allowed_action: "Merge this authorization package; only then request MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
 
-product_phase: "Fundamental AI Frontend Interaction Runtime Closure Authorization"
+product_phase: "TRINE LOGIC Multi-User Account Registration Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "approved Desktop runtime interaction closure authorization"
+product_module: "private multi-user registration and authenticated-user data-isolation authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "HOME_SEARCH_AND_ASSET_POOL_OWNERSHIP"
-  - "ANALYSIS_PREVIEW_OWNERSHIP"
-  - "DESKTOP_ROUTE_AND_OVERLAY_OWNERSHIP"
+  - "USER_IDENTITY_AND_SESSION_OWNERSHIP"
+  - "ACCOUNT_LIFECYCLE_AND_ROLE_BOUNDARY"
+  - "USER_OWNED_DATA_ISOLATION"
+  - "MIGRATION_AND_ROLLBACK_CONTRACT"
   - "OBJECT_OWNERSHIP"
   - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_SOURCE_MAPPING.md"
-  - "docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_OWNERSHIP_MAP.md"
-  - "docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md"
-  - "docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION_VALIDATION.md"
+  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_SOURCE_MAPPING.md"
+  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_OWNERSHIP_MAP.md"
+  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md"
+  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "EXISTING_CATALOG_SEARCH_TRUTH"
-  - "ASSET_POOL_SINGLE_MEMBERSHIP_OWNER"
-  - "ANALYSIS_PREVIEW_NON_PERSISTENCE_BOUNDARY"
-  - "EXISTING_DESKTOP_ROUTE_OWNERS"
-  - "FAIL_CLOSED_REAL_DATA"
+  - "EXISTING_TM_USER_AND_SESSION_OWNER"
+  - "GLOBAL_SHARED_USER_OWNED_OWNER_ONLY_CLASSIFICATION"
+  - "AUTHENTICATED_USER_SCOPE"
+  - "OWNER_ACCOUNT_PRESERVATION"
+  - "BACKUP_AND_ROLLBACK_PRECONDITION"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -157,45 +163,46 @@ required_product_sources:
   - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
   - PS-HOME-INTERACTION
-  - PS-FUNDAMENTAL-AI-FRONTEND-INTERACTION-RUNTIME-CLOSURE-AUTHORIZATION
+  - PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  The sole v4.1 Product Source remains unchanged. The exact successor closes only source-defined Desktop interaction gaps while preserving current authoritative Home and route data.
+  The sole v4.1 Product Source and all trading safety boundaries remain unchanged. The exact successor extends the existing private user owner with registration, OWNER/USER lifecycle and strict authenticated-user data isolation.
 
 design_interaction_mapping: |
-  The approved current Desktop Home structure is preserved. The successor may wire existing controls only; Canonical Figma, layout, module order, 70:30 and Mobile remain unchanged.
+  The approved current Desktop Home structure is preserved. Registration and Owner administration may use existing route/component patterns; Canonical Figma, Home layout and Mobile remain unchanged.
 
 data_source_mapping: |
-  Reuse the existing catalog search, Asset Pool, analysis preview, Dashboard, Position, Final, Three-AI, Message and route owners. No second source of truth is created.
+  Reuse tm_user, Spring Security Session/CSRF, public market, Asset Pool, config, Position, Analysis, Final, Message and audit owners. Public facts stay GLOBAL_SHARED; private facts become USER_OWNED; administration is OWNER_ONLY.
 
 current_implementation_gap: |
-  The current Home search supports typing and results but lacks explicit result selection and usable preview/add actions. Other visible Desktop controls require one bounded runtime walkthrough and source-defined closure.
+  The merged runtime supports one private Owner account but not bounded registration, OWNER/USER administration or complete authenticated-user isolation across personal objects.
 
 allowed_scope:
-  - "Frontend interaction source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
+  - "Multi-user source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "Explicit Home search-result selection with keyboard and mouse support"
-  - "Existing analysis preview and Asset Pool add/membership actions"
-  - "Source-defined Desktop route, action and overlay wiring only"
-  - "Focused controller, interaction, route and browser runtime validation"
+  - "Private frontend registration up to 10 active accounts including the unique Owner"
+  - "Existing tm_user role/enabled lifecycle, concurrent Session and OWNER-only administration"
+  - "Authenticated-user ownership for watch pool, config, positions, analyses, plans, messages and audits"
+  - "Forward migration preserving tm_user.id=1/xuchao with backup and rollback evidence"
+  - "Focused migration, authorization, isolation, controller and browser runtime validation"
 
 authorized_next_blocked_scope:
-  - "Schema or product-contract redesign, new provider architecture or broad backend refactor"
-  - "CoinGlass changes, AI enablement, quality-gate reduction or fake data"
-  - "Figma, Mobile, deployment, automatic trading or automatic position mutation"
+  - "Public registration/exposure, a second Owner, hard delete or duplicate owner architecture"
+  - "CoinGlass, provider, Telegram delivery-rule, AI, quality-threshold or fake-data changes"
+  - "Figma, Mobile, Production deployment, automatic trading or automatic position mutation"
 
 blocked_scope:
   - "Any implementation inside this authorization package"
-  - "Any package except FRONTEND_INTERACTION_RUNTIME_CLOSURE"
+  - "Any package except MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
 
 forbidden_scope:
   - "Application code, runtime configuration, Java, API, schema, template, CSS, JavaScript, Figma or Mobile changes in the authorization diff"
-  - "Reading, printing or committing secrets; lowering quality threshold; fabricating opportunity, position, Final or AI data"
+  - "Reading, printing or committing secrets; public exposure; owner-scope fallback; lowering quality threshold; fabricating opportunity, position, Final or AI data"
 
 real_scenario_requirement: |
-  This authorization performs no runtime scenario. The successor must use the running local application and real existing data states, and must fail closed when Opportunity, Final, UserPosition or AI objects are absent.
+  This authorization performs no runtime scenario. The successor must prove registration, unique Owner, account limit, role enforcement, force logout, disabled-user denial, cross-user isolation, existing Owner-data preservation, backup and rollback on a private Staging environment.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -211,17 +218,17 @@ hard_boundaries:
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and registered local-real authorization hash pass"
-  - "Local-real implementation remains blocked before merge and exact successor is allowed only after clean/synced merged main"
-  - "Typo, expanded, schema-redesign, provider-architecture, auto-trading, Mobile and Figma packages fail closed"
+  - "Unique active v4.1 Product Source and registered multi-user authorization hash pass"
+  - "Multi-user implementation remains blocked before merge and exact successor is allowed only after clean/synced merged main"
+  - "Typo, public-auth, provider, production, auto-trading, Mobile and Figma packages fail closed"
   - "Application/API/Schema/Figma/Mobile changed-file count is zero"
-  - "Workflow, authorization, duplicate-skeleton, Maven, secret and diff checks pass"
+  - "Workflow, authorization, ownership, duplicate-skeleton, secret and diff checks pass"
 
 stop_conditions:
-  - "Main differs from 56028b21ac3d4ff9d1ee1368b6a144ad77382e19 before authorization branch creation"
+  - "Main differs from merged PR #1195 commit 8d5526d7f2fcf718e440239ee6ce15ee4cd57cec before authorization branch creation"
   - "A Product Source conflict, secret exposure or duplicate owner is found"
   - "The authorization diff includes application, API, schema, business-test, template, CSS, JavaScript, Figma or Mobile changes"
-  - "The exact local-real successor is not the only package permitted after merged-main effectivity"
+  - "The exact multi-user successor is not the only package permitted after merged-main effectivity"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"

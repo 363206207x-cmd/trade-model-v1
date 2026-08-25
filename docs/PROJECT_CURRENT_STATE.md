@@ -8,13 +8,37 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: Fundamental AI Frontend Interaction Runtime Closure Authorization
-Product Phase Status: FRONTEND_INTERACTION_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact Desktop runtime interaction closure permission; no application implementation is included here
-Next Business Phase: FRONTEND_INTERACTION_RUNTIME_CLOSURE
+Product Phase: TRINE LOGIC Multi-User Account Registration Authorization
+Product Phase Status: MULTI_USER_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact private registration and authenticated-user data-isolation permission; no application implementation is included here
+Next Business Phase: MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE
 Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC Multi-User Account Registration Authorization
+
+PR #1195 is complete and effective on merged main through merge commit
+`8d5526d7f2fcf718e440239ee6ce15ee4cd57cec`. Its frontend runtime closure is
+deployed to private Staging, while the service still has one preserved Owner
+account and no authorized multi-user implementation.
+
+This docs/gate-only package authorizes exactly
+`MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE` after clean synchronized merged-main
+validation. It freezes a maximum of 10 active accounts, unique `xuchao` OWNER,
+new `USER` accounts, BCrypt/Session/CSRF, concurrent sessions, OWNER-only force
+logout/disable/re-enable, no hard delete and frontend registration while the
+limit permits it.
+
+Public market facts remain `GLOBAL_SHARED`. Personal watch pool, config,
+positions, analyses, plans, messages and audits become `USER_OWNED` and must be
+scoped by the authenticated principal. Administration is `OWNER_ONLY`.
+Existing `tm_user.id=1` and its personal data must be preserved with a verified
+backup and rollback point before migration. The package does not authorize
+Figma, Mobile, Telegram rule changes, CoinGlass, public exposure, Production
+deployment, fake data or automatic trading. Capability movement is `NONE`.
 
 ---
 
