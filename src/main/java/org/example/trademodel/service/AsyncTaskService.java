@@ -113,8 +113,7 @@ public class AsyncTaskService {
             throw new IllegalArgumentException("task not found");
         }
         AsyncTaskStateEnum state = AsyncTaskStateEnum.valueOf(required(task.getState(), "state"));
-        if (state != AsyncTaskStateEnum.QUEUED && state != AsyncTaskStateEnum.RUNNING
-                && state != AsyncTaskStateEnum.PARTIAL) {
+        if (state != AsyncTaskStateEnum.QUEUED && state != AsyncTaskStateEnum.RUNNING) {
             throw new IllegalStateException("task is not cancellable");
         }
         return transition(task, AsyncTaskStateEnum.CANCELLED, "CANCELLED", null, null, true);

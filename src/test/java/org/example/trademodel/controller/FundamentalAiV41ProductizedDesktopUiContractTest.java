@@ -19,22 +19,18 @@ class FundamentalAiV41ProductizedDesktopUiContractTest {
 
     @Test
     void visibleBrandAndHomeHierarchyUseTheProductizedContract() throws Exception {
-        String dashboard = Files.readString(DASHBOARD);
+        String home = Files.readString(Path.of("src/main/resources/templates/home.html"));
+        String workspace = Files.readString(Path.of("src/main/resources/templates/workspace.html"));
         String login = Files.readString(LOGIN);
-        String analysis = Files.readString(ANALYSIS);
 
-        assertThat(dashboard).contains(
-                "<title>Fundamental AI</title>",
-                "首页总览",
-                "查看当前机会、参与条件与真实持仓状态",
-                "Fundamental AI",
-                "多源证据决策系统",
-                "当前重点机会",
-                "AI分析解释",
-                "冲突与最终调整");
-        assertThat(login).contains("登录 · Fundamental AI", "Fundamental AI",
-                "多源证据决策系统").doesNotContain("TRINE LOGIC");
-        assertThat(analysis).contains("分析详情 · Fundamental AI");
+        assertThat(home).contains("<title>TRINE LOGIC</title>", ">TRINE LOGIC</h1>",
+                "aria-label=\"TRINE LOGIC 首页\"", "rail-brand-mark\">T</span>")
+                .doesNotContain("<title>RINE LOGIC", ">RINE LOGIC", "=\"RINE LOGIC", "Fundamental AI");
+        assertThat(workspace).contains("' · TRINE LOGIC'", ">TRINE LOGIC</strong>",
+                "aria-label=\"TRINE LOGIC 首页\"", "workspace-brand-mark\" aria-hidden=\"true\">T</span>")
+                .doesNotContain("' · RINE LOGIC'", ">RINE LOGIC", "=\"RINE LOGIC", "Fundamental AI", "pageSubtitle");
+        assertThat(login).contains("登录 · TRINE LOGIC", ">TRINE LOGIC</h1>")
+                .doesNotContain("登录 · RINE LOGIC", ">RINE LOGIC", "Fundamental AI", "个人复核入口", "多源证据决策系统");
     }
 
     @Test

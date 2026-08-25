@@ -135,13 +135,27 @@ public class PersistentAssetPoolService implements AssetPoolService {
                 result == null ? null : result.getAnalysisId(),
                 result == null ? null : result.getTraceId(),
                 result == null ? "FAILED" : result.getStatus(),
-                result == null ? "ANALYSIS_RESULT_MISSING" : result.getReasonCode(),
+                previewReasonCode(result),
                 true,
                 false,
                 false,
                 false,
                 false,
                 result == null ? null : result.getAnalysis());
+    }
+
+    static String previewReasonCode(AnalysisRunResult result) {
+        if (result == null) return "ANALYSIS_RESULT_MISSING";
+        String message = result.getMessage() == null
+                ? "" : result.getMessage().trim().toUpperCase(Locale.ROOT);
+        if (message.contains("AUTHORITATIVE_OHLCV_UNAVAILABLE")) {
+            return "AUTHORITATIVE_OHLCV_UNAVAILABLE";
+        }
+        if (message.contains("REAL_MARKET_ENVIRONMENT_REQUIRED")
+                || message.contains("REAL_MARKET_PROVENANCE_INCOMPLETE")) {
+            return "REAL_MARKET_ENVIRONMENT_UNAVAILABLE";
+        }
+        return result.getReasonCode();
     }
 
     @Override

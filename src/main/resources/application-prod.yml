@@ -98,15 +98,15 @@ trade-model:
   ohlcv:
     provider:
       primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}
-      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:binance}
-      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:true}
+      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:kraken}
+      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:false}
     kraken:
       enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:false}
       base-url: ${TRADE_MODEL_KRAKEN_OHLCV_BASE_URL:https://api.kraken.com}
     binance:
-      enabled: ${TRADE_MODEL_BINANCE_OHLCV_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}}
-      external-calls-enabled: ${TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED:${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}}
+      enabled: ${TRADE_MODEL_BINANCE_OHLCV_ENABLED:false}
+      external-calls-enabled: ${TRADE_MODEL_BINANCE_OHLCV_EXTERNAL_CALLS_ENABLED:false}
     public-provider:
       enabled: ${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}

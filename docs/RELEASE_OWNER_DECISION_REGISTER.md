@@ -7,7 +7,7 @@ Status date: 2026-07-09
 
 Production deployment readiness: BLOCKED
 Deployment decision: DO NOT DEPLOY
-Release owner status: MISSING_EVIDENCE
+Release owner status: RECORDED_2026_08_23
 
 ## Scope
 
@@ -23,6 +23,9 @@ This package records the release-owner decision register and waiver policy for r
 - `docs/V1_PROGRESS_SOURCE_OF_TRUTH.md`
 
 ## Existing Owner / Waiver Evidence
+
+Historical snapshot from the original PDR-LIVE18 package; superseded for the
+current private single-user candidate by the 2026-08-23 section below.
 
 No explicit release-owner approval, provider waiver, deployment timing approval, rollback owner approval, or incident owner approval was found in the reviewed status-source documents.
 
@@ -54,9 +57,9 @@ Current classification:
 | HTTPS / proxy auth smoke | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Provide TLS/redirect/HSTS/forwarded-header/authenticated dashboard-review smoke through intended proxy, or an explicit private-only staging exception for candidate only. |
 | Real secret-store injection | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Provide redacted secret-store names/versions/injection evidence with no values. |
 | Credential rotation drill | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Run and record admin, datasource, Binance/API, and AI provider credential rotation drills, or owner-approved staged rotation plan for candidate only. |
-| OpenAI | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
-| Gemini | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
-| xAI / Grok | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE; if REQUIRED_PASS, provide redacted smoke PASS. |
+| OpenAI | LIVE_PROVIDER_PASS_2026_08_23 | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Controlled redacted connectivity passed; choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE and require application-lineage evidence when enabled. |
+| Gemini | LIVE_PROVIDER_HTTP_400_2026_08_23 | REQUIRED_PASS | YES | YES | Correct the provider request/runtime configuration in a separately authorized task, then provide redacted connectivity and application-lineage PASS. |
+| xAI / Grok | LIVE_PROVIDER_PASS_2026_08_23 | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Controlled redacted connectivity passed; choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, or DISABLED_FOR_RELEASE and require application-lineage evidence when enabled. |
 | External context / news / macro / ETF | SKIPPED_MISSING_SECRET | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Choose REQUIRED_PASS, OPTIONAL_WITH_WAIVER, DISABLED_FOR_RELEASE, or NOT_APPLICABLE; if required, provide controlled PASS evidence. |
 | Release timing | MISSING_EVIDENCE | RELEASE_OWNER_DECISION_REQUIRED | YES | YES | Release owner must approve target window, rollback cutoff, and go/no-go criteria. |
 | Rollback owner | MISSING_EVIDENCE | REQUIRED_PASS | YES | YES | Name rollback owner and confirm backup/restore authority and rollback decision path. |
@@ -91,7 +94,7 @@ This package creates the decision register and waiver policy. It does not approv
 3. HTTPS/proxy auth smoke remains `MISSING_EVIDENCE`.
 4. Real secret-store injection remains `MISSING_EVIDENCE`.
 5. Credential rotation drill remains `MISSING_EVIDENCE`.
-6. OpenAI, Gemini, and xAI/Grok remain `SKIPPED_MISSING_SECRET` and unclassified by owner decision.
+6. OpenAI and xAI/Grok controlled live connectivity passed on 2026-08-23, but remain unclassified by owner decision and lack complete application-lineage evidence; Gemini returned HTTP 400 and remains blocked.
 7. External context/news/macro/ETF providers remain `SKIPPED_MISSING_SECRET` or missing harness evidence and unclassified by owner decision.
 8. Release timing, rollback owner, and incident owner remain undecided.
 
@@ -112,3 +115,44 @@ Proceed to a release-owner decision capture package if a release owner can provi
 - No order execution or auto-trading behavior was introduced.
 - No external Push was sent.
 - No fake positions or fake review records were created.
+
+## 2026-08-23 private single-user release policy
+
+This section supersedes the missing Owner classifications above for the
+current `PRIVATE_SINGLE_USER_WEB` candidate. It does not authorize deployment.
+
+| Decision | Owner record |
+|---|---|
+| Release owner | repository Owner `363206207x-cmd` |
+| Rollback owner | repository Owner `363206207x-cmd` |
+| Incident owner | repository Owner `363206207x-cmd` |
+| Go/No-Go | `NO_GO_PENDING_TECHNICAL_GATES_AND_COINGLASS` |
+| Kraken | `REQUIRED_PASS` |
+| OpenAI/GPT | `REQUIRED_PASS` |
+| Gemini | `REQUIRED_PASS` |
+| xAI/Grok | `REQUIRED_PASS` |
+| CoinGlass | `DEFERRED_MISSING_PRIVATE_KEY` |
+| Binance | `DISABLED_FOR_RELEASE_DUE_HTTP_451` |
+| External news/macro/ETF/context | `DISABLED_FOR_RELEASE` unless separately configured and independently PASS |
+| Recheck | `DEFERRED_UNTIL_LEGAL_SOURCE` when no natural in-app `PUSH_SNAPSHOT` exists |
+| Legacy routes | retained, authenticated, and unlinked from formal navigation |
+| Partial close writes | outside release scope; full close retained |
+
+### 2026-08-23 Kraken production-safe default correction
+
+| Decision | Owner record |
+|---|---|
+| Kraken production default | `DISABLED` for provider enablement and external calls |
+| Kraken release requirement | `EXPLICIT_DEPLOYMENT_INJECTION` of both booleans |
+| Kraken release role | required OHLCV source; primary remains `kraken` |
+| Binance release policy | `DISABLED_FOR_RELEASE_DUE_HTTP_451` |
+| Provider fallback | disabled |
+| Existing Kraken local-live evidence | retained as local/live-provider evidence only |
+| Authorized staging runtime | `NOT_VERIFIED_MISSING_CONFIGURATION` |
+
+This correction does not authorize deployment and does not change the current
+No-Go decision.
+
+Gemini remains blocked by provider account/location/region policy. No
+authorized remote P3H staging identity is configured. Current readiness is
+`PRODUCTION_READINESS=BLOCKED_MULTIPLE`; `DEPLOYMENT_ALLOWED=NO`.

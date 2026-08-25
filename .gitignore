@@ -1,6 +1,13 @@
 # Maven/Java build output
 target/
 
+# Frontend build output and dependency caches
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
 # Local Maven repositories/cache
 .m2-local/
 .m2/
@@ -29,6 +36,12 @@ data/replay/real/
 !.env.example
 *.local-secret
 *.secret
+*.pem
+*.crt
+*.pfx
+*.jks
+*.keystore
+*.csr
 backups/
 backup/
 *.dump

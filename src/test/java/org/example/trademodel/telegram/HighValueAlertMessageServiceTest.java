@@ -9,13 +9,20 @@ import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.mapper.MessageMapper;
+import org.example.trademodel.mapper.PushRecheckLogMapper;
 import org.example.trademodel.mapper.PushSnapshotMapper;
 import org.example.trademodel.opportunitylog.OpportunityLogDTO;
 import org.example.trademodel.positionmonitor.PositionMonitorResultDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.service.MessageFactService;
 import org.example.trademodel.service.OpportunityTransitionResult;
+import org.example.trademodel.service.PushRecheckCoreTransactionService;
+import org.example.trademodel.service.RecheckResult;
+import org.example.trademodel.service.WorkspacePushRecheckService;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
+import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
+import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +47,10 @@ class HighValueAlertMessageServiceTest {
     @Mock private AssetPoolService assetPoolService;
     @Mock private PushSnapshotMapper pushSnapshotMapper;
     @Mock private ExecutionPlanMapper executionPlanMapper;
+    @Mock private MessageMapper messageMapper;
+    @Mock private PushRecheckLogMapper pushRecheckLogMapper;
+    @Mock private PushRecheckCoreTransactionService coreTransactionService;
+    @Mock private AnalysisRunOrchestrator analysisRunOrchestrator;
 
     private HighValueAlertMessageService service;
 
@@ -105,7 +116,7 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getCategory()).isEqualTo("HIGH_PERMISSION_OPPORTUNITY");
         assertThat(message.getSourceType()).isEqualTo("PUSH_SNAPSHOT");
         assertThat(message.getSourceId()).isEqualTo("99");
-        assertThat(message.getCurrentRecheckId()).isEqualTo("99");
+        assertThat(message.getCurrentRecheckId()).isNull();
         assertThat(message.getPlanId()).isEqualTo("plan-9");
         assertThat(message.getDedupeKey()).startsWith("TG1|OPPORTUNITY_READY|TRIGGERED|3|");
         assertThat(message.getBody()).contains(
@@ -125,12 +136,63 @@ class HighValueAlertMessageServiceTest {
                 "证据冲突", "等待规则与数据重新验证", LocalDateTime.of(2026, 8, 16, 12, 0), null));
 
         assertThat(message.getCategory()).isEqualTo("OPPORTUNITY_PLAN_SAFETY_CHANGE");
-        assertThat(message.getCurrentRecheckId()).isEqualTo("99");
+        assertThat(message.getCurrentRecheckId()).isNull();
         assertThat(message.getDedupeKey()).startsWith("TG1|HOT_RESET|CONFUSED|4|");
         assertThat(message.getTraceId()).isEqualTo("trace-9");
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
         assertThat(message.getBody()).contains("当前状态：暂不视为有效机会", "恢复条件");
+    }
+
+    @Test
+    void productionMessageIdentityResolvesOwnedSnapshotAndWritesRealRecheckOnlyAfterOpen() {
+        when(messageFactService.recordIfAbsent(any())).thenAnswer(invocation -> {
+            MessageDO message = invocation.getArgument(0);
+            message.setMessageId("message-prod");
+            return message;
+        });
+        MessageDO message = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
+                41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
+                "PUSH_SNAPSHOT", "99", "analysis-9", "plan-9", "opportunity-9", "99",
+                "SOLUSDT", "trace-9", "DRIFTED", 3,
+                "价格偏离", "重新校验", LocalDateTime.of(2026, 8, 16, 12, 0), null));
+        assertThat(message.getCurrentRecheckId()).isNull();
+
+        when(messageMapper.selectByIdForUser("message-prod", 41L)).thenReturn(message);
+        TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
+        snapshot.setPushId(99L);
+        snapshot.setAnalysisId("analysis-9");
+        snapshot.setTraceId("trace-9");
+        snapshot.setSymbol("SOLUSDT");
+        snapshot.setTimeframe("15m");
+        when(pushSnapshotMapper.selectByPushId(99L)).thenReturn(snapshot);
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId("plan-9");
+        plan.setAnalysisId("analysis-9");
+        when(executionPlanMapper.selectByPlanId("plan-9")).thenReturn(plan);
+        TmPushRecheckLogDO recheck = new TmPushRecheckLogDO();
+        recheck.setLogId(701L);
+        recheck.setPushId(99L);
+        recheck.setTriggerSource("PUSH_OPEN");
+        recheck.setExecutionStatus("COMPLETED");
+        recheck.setRecheckStatus("REVIEW_PASSED");
+        when(coreTransactionService.execute(41L, "message-prod", 99L, null, 1))
+                .thenReturn(new PushRecheckCoreTransactionService.AttemptResult(
+                        new RecheckResult(), recheck, true));
+
+        WorkspacePushRecheckService workspace = new WorkspacePushRecheckService(
+                messageMapper, pushSnapshotMapper, pushRecheckLogMapper, executionPlanMapper,
+                coreTransactionService, analysisRunOrchestrator);
+        WorkspacePushRecheckService.Projection result = workspace.open(
+                41L, "message-prod", "push-snapshot-99");
+
+        assertThat(result.messageId()).isEqualTo("message-prod");
+        assertThat(result.pushSnapshotId()).isEqualTo("push-snapshot-99");
+        assertThat(result.pushId()).isEqualTo(99L);
+        assertThat(result.recheckId()).isEqualTo(701L);
+        assertThat(result.analysisId()).isEqualTo("analysis-9");
+        assertThat(result.planId()).isEqualTo("plan-9");
+        verify(coreTransactionService).execute(41L, "message-prod", 99L, null, 1);
     }
 
     @Test

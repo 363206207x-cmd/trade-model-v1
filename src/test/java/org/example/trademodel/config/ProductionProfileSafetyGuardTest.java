@@ -310,7 +310,7 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
-    void rejectsOhlcvSchedulerWithoutExplicitPublicProviderOptIn() {
+    void rejectsOhlcvSchedulerWithoutExplicitKrakenOptIn() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.schedulers.enabled", "true");
@@ -320,8 +320,25 @@ class ProductionProfileSafetyGuardTest {
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production OHLCV ingestion requires explicitly enabled public provider")
-                .hasMessageContaining("production OHLCV ingestion requires explicit external-call opt-in");
+                .hasMessageContaining("production OHLCV primary requires explicitly enabled KRAKEN provider")
+                .hasMessageContaining("production OHLCV primary requires explicit KRAKEN external-call opt-in");
+    }
+
+    @Test
+    void rejectsOhlcvSchedulerWhenOnlyOneKrakenOptInFlagIsEnabled() {
+        MockEnvironment providerOnly = ohlcvSchedulerEnvironment();
+        providerOnly.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(providerOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV primary requires explicit KRAKEN external-call opt-in");
+
+        MockEnvironment externalCallsOnly = ohlcvSchedulerEnvironment();
+        externalCallsOnly.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(externalCallsOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV primary requires explicitly enabled KRAKEN provider");
     }
 
     @Test
@@ -332,10 +349,55 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
-        environment.setProperty("trade-model.ohlcv.public-provider.enabled", "true");
-        environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
 
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void allowsExplicitBinancePrimaryWithKrakenFallback() {
+        MockEnvironment environment = ohlcvSchedulerEnvironment();
+        environment.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        environment.setProperty("trade-model.ohlcv.provider.fallback", "kraken");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBinancePrimaryUnlessBothExplicitFlagsAreEnabled() {
+        MockEnvironment providerOnly = ohlcvSchedulerEnvironment();
+        providerOnly.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        providerOnly.setProperty("trade-model.ohlcv.binance.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(providerOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV primary requires explicit BINANCE external-call opt-in");
+
+        MockEnvironment externalCallsOnly = ohlcvSchedulerEnvironment();
+        externalCallsOnly.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        externalCallsOnly.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(externalCallsOnly))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production OHLCV primary requires explicitly enabled BINANCE provider");
+    }
+
+    @Test
+    void rejectsAmbiguousGenericPublicProviderFlags() {
+        MockEnvironment environment = ohlcvSchedulerEnvironment();
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.public-provider.enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must use an explicit named provider");
     }
 
     @Test
@@ -469,11 +531,28 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.provider-call.external-calls-enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.enabled", "false");
         environment.setProperty("trade-model.ohlcv.public-provider.external-calls-enabled", "false");
+        environment.setProperty("trade-model.ohlcv.provider.primary", "kraken");
+        environment.setProperty("trade-model.ohlcv.provider.fallback", "kraken");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "false");
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "false");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "false");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "false");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "false");
         environment.setProperty("trade-model.providers.coinglass.enabled", "false");
         environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "false");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
+        return environment;
+    }
+
+    private MockEnvironment ohlcvSchedulerEnvironment() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         return environment;
     }
 }

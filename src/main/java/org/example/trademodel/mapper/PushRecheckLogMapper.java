@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.messagepush.PushRecheckReadinessProjection;
 
@@ -32,6 +33,22 @@ public interface PushRecheckLogMapper {
 
     @Select("SELECT * FROM tm_push_recheck_log WHERE push_id = #{pushId} ORDER BY log_id DESC LIMIT 1")
     TmPushRecheckLogDO selectLatestByPushId(@Param("pushId") Long pushId);
+
+    @Select("SELECT * FROM tm_push_recheck_log WHERE push_id = #{pushId} AND trigger_source = #{triggerSource} "
+            + "ORDER BY log_id DESC LIMIT 1")
+    TmPushRecheckLogDO selectLatestByPushIdAndTriggerSource(@Param("pushId") Long pushId,
+                                                            @Param("triggerSource") String triggerSource);
+
+    @Select("SELECT * FROM tm_push_recheck_log WHERE log_id = #{logId}")
+    TmPushRecheckLogDO selectByLogId(@Param("logId") Long logId);
+
+    @Update("UPDATE tm_push_recheck_log SET execution_error_code = 'SAFETY_MESSAGE_FAILED' "
+            + "WHERE log_id = #{logId} AND execution_status = 'COMPLETED'")
+    int markSafetyMessageFailure(@Param("logId") Long logId);
+
+    @Select("SELECT COUNT(*) FROM tm_push_recheck_log WHERE push_id = #{pushId} AND trigger_source = #{triggerSource}")
+    int countByPushIdAndTriggerSource(@Param("pushId") Long pushId,
+                                      @Param("triggerSource") String triggerSource);
 
     @Select("SELECT log_id AS logId, recheck_status AS recheckStatus, recheck_time AS recheckTime, "
             + "execution_status AS executionStatus, fail_reason_json AS failReasonJson "

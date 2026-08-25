@@ -524,18 +524,24 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
     }
 
     private static List<Map<String, Object>> inputEvidence(AiDecisionChainRequest request) {
-        if (request == null || request.getInput() == null
-                || !(request.getInput().get("evidence") instanceof List<?> rows)) {
-            return List.of();
-        }
+        if (request == null || request.getInput() == null) return List.of();
         List<Map<String, Object>> evidence = new ArrayList<>();
+        appendInputEvidence(evidence, request.getInput().get("evidence"));
+        Object derivatives = request.getInput().get("derivativesContext");
+        if (derivatives instanceof Map<?, ?> derivativeContext) {
+            appendInputEvidence(evidence, derivativeContext.get("derivedEvidence"));
+        }
+        return List.copyOf(evidence);
+    }
+
+    private static void appendInputEvidence(List<Map<String, Object>> evidence, Object candidateRows) {
+        if (!(candidateRows instanceof List<?> rows)) return;
         for (Object row : rows) {
             if (!(row instanceof Map<?, ?> raw)) continue;
             Map<String, Object> mapped = new LinkedHashMap<>();
             raw.forEach((key, value) -> mapped.put(String.valueOf(key), value));
             evidence.add(java.util.Collections.unmodifiableMap(mapped));
         }
-        return List.copyOf(evidence);
     }
 
     private static Set<String> allowedEvidenceRefs(AiDecisionChainRequest request) {

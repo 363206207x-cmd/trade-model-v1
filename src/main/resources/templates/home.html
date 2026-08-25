@@ -5,37 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
     <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
-    <meta name="description" content="Fundamental AI 专业金融决策首页">
-    <title>Fundamental AI</title>
+    <meta name="description" content="TRINE LOGIC 专业金融决策首页">
+    <title>TRINE LOGIC</title>
     <link rel="stylesheet" th:href="@{/css/home.css}" href="/css/home.css">
 </head>
 <body class="approved-home" data-page-key="home" data-figma-node="636:708">
 <aside class="home-rail" aria-label="主要导航" data-component-family="SideNav">
-    <a class="rail-brand" href="/dashboard" aria-label="Fundamental AI 首页" title="Fundamental AI">F</a>
+    <a class="rail-brand" href="/dashboard" aria-label="TRINE LOGIC 首页"><span class="rail-brand-mark">T</span><span class="rail-label"><strong>TRINE LOGIC</strong></span></a>
     <nav class="rail-nav" aria-label="产品页面">
-        <a class="is-active" href="/dashboard" aria-label="首页" title="首页"><span aria-hidden="true">⌂</span></a>
-        <a href="/positions" aria-label="持仓" title="持仓"><span aria-hidden="true">▦</span></a>
-        <a href="/analysis" aria-label="AI分析" title="AI分析"><span aria-hidden="true">✦</span></a>
-        <a href="/messages" aria-label="消息" title="消息"><span aria-hidden="true">▤</span></a>
-        <a href="/me" aria-label="我的" title="我的"><span aria-hidden="true">○</span></a>
+        <a class="is-active" href="/dashboard" aria-label="首页"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="rail-label">首页</span></a>
+        <a href="/positions" aria-label="持仓"><svg aria-hidden="true"><use href="/icons/app-shell.svg#positions"/></svg><span class="rail-label">持仓</span></a>
+        <a href="/analysis" aria-label="分析"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="rail-label">分析</span></a>
+        <a href="/messages" aria-label="消息"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="rail-label">消息</span></a>
+        <a href="/me" aria-label="我的"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="rail-label">我的</span></a>
     </nav>
-    <form class="rail-logout" th:action="@{/logout}" method="post">
-        <button type="submit" aria-label="退出登录" title="退出登录"><span aria-hidden="true">↪</span></button>
-    </form>
+    <div class="rail-footer"><a href="/asset-pool"><svg aria-hidden="true"><use href="/icons/app-shell.svg#pool"/></svg><span class="rail-label">资产池</span></a><a href="/calendar"><svg aria-hidden="true"><use href="/icons/app-shell.svg#calendar"/></svg><span class="rail-label">事件日历</span></a><a href="#systemStatusStrip"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></a><form th:action="@{/logout}" method="post"><button type="submit" aria-label="退出登录"><svg aria-hidden="true"><use href="/icons/app-shell.svg#logout"/></svg><span class="rail-label">退出登录</span></button></form></div>
 </aside>
 <div class="home-stage">
     <header class="home-page-header" data-component-family="PageHeader">
-        <div class="home-title-block"><h1>Fundamental AI</h1><span class="selected-context" id="selectedAssetContext">尚未选择机会资产</span></div>
-        <div class="header-context" aria-live="polite"><span id="headerDataSource">数据状态同步中</span><time id="headerUpdatedAt">更新时间待同步</time></div>
+        <div class="home-title-block"><h1>TRINE LOGIC</h1><span class="selected-context" id="selectedAssetContext">尚未选择机会资产</span></div>
+        <div class="header-context" aria-live="polite"><time id="headerUpdatedAt">—</time></div>
     </header>
     <main class="home-main" id="homeMain" tabindex="-1">
         <div class="sr-only" id="homeLiveRegion" aria-live="polite"></div>
-        <section class="system-status-strip" aria-label="系统状态" data-component-family="SystemStatusBar">
-            <span><small>市场趋势</small><strong id="statusMarket">等待同步</strong></span>
-            <span><small>风险等级</small><strong id="statusRisk">等待同步</strong></span>
-            <span><small>数据质量</small><strong id="statusQuality">等待同步</strong></span>
-            <span><small>AI 系统</small><strong id="statusAi">等待同步</strong></span>
-            <span><small>机会</small><strong id="statusOpportunity">等待同步</strong></span>
+        <section class="system-status-strip" id="systemStatusStrip" aria-label="系统状态" data-component-family="SystemStatusBar">
+            <span><small>环境</small><strong id="statusEnvironment">等待同步</strong></span>
+            <span><small>系统</small><strong id="statusSystem">等待同步</strong></span>
+            <span><small>数据</small><strong id="statusData">等待同步</strong></span>
+            <span><small>服务</small><strong id="statusService">等待同步</strong></span>
+            <span><small>账户·已录入</small><strong id="statusAccount">等待同步</strong></span>
             <span><small>Hot Reset</small><strong id="statusReset">等待同步</strong></span>
         </section>
         <section class="signal-strip" aria-label="告警与事件">
@@ -45,41 +43,52 @@
         </section>
         <section class="opportunity-section" aria-labelledby="opportunityHeading" data-component-family="OpportunityGrid">
             <header class="section-heading opportunity-heading">
-                <h2 id="opportunityHeading">机会资产 · 0</h2>
+                <h2 id="opportunityHeading">资产</h2>
                 <div class="asset-search" data-component-family="AssetSearch">
-                    <label class="sr-only" for="homeAssetSearch">搜索资产</label><span aria-hidden="true">⌕</span>
-                    <input id="homeAssetSearch" type="search" autocomplete="off" placeholder="搜索资产">
-                    <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" hidden></div>
+                    <label class="sr-only" for="homeAssetSearch">搜索资产</label><svg aria-hidden="true"><use href="/icons/app-shell.svg#search"/></svg>
+                    <input id="homeAssetSearch" type="search" autocomplete="off" placeholder="搜索资产" aria-controls="homeAssetSearchPopover" aria-expanded="false" aria-autocomplete="list">
+                    <div class="asset-search-popover" id="homeAssetSearchPopover" data-overlay-code="O02" hidden>
+                        <div class="asset-search-results" id="homeAssetSearchResults" role="listbox" aria-label="市场资产搜索结果"></div>
+                        <div class="asset-search-selection" id="homeAssetSearchSelection" aria-live="polite">
+                            <div class="selected-asset-copy"><strong id="homeSelectedSearchSymbol">尚未选择资产</strong><small id="homeSelectedSearchState">未选择搜索结果</small></div>
+                            <small class="pool-count" id="homeAssetPoolCount">观察资产池 · 同步中</small>
+                            <div class="search-actions">
+                                <button class="search-action search-action-secondary" id="homePreviewAsset" type="button" disabled>分析</button>
+                                <button class="search-action search-action-primary" id="homeAddAsset" type="button" disabled>添加</button>
+                            </div>
+                            <small class="search-action-status" id="homeAssetSearchStatus"></small>
+                        </div>
+                    </div>
                 </div>
             </header>
             <div class="opportunity-grid" id="opportunityGrid" aria-live="polite"></div>
-            <div class="section-empty" id="opportunityEmpty" hidden><strong>当前没有进入重点机会的资产</strong><span>资产池仍会持续分析，新的有效机会将按优先级进入这里。</span></div>
+            <div class="section-empty" id="opportunityEmpty" hidden><strong>暂无重点机会</strong></div>
         </section>
         <div class="decision-row" data-position-plan-ratio="70:30">
             <section class="module position-module" aria-labelledby="positionHeading" data-component-family="PositionCard">
                 <header class="module-header position-header">
-                    <h2 id="positionHeading">持仓监控 · 基于已录入</h2>
+                    <h2 id="positionHeading">持仓监控</h2>
                     <div class="position-header-actions"><span id="positionAggregate">活动 0 · 最高风险 暂无评估 · 等待评估</span><a href="/positions">查看全部</a></div>
                 </header>
                 <div class="position-list" id="positionList"></div>
-                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无手动录入持仓</strong><span>录入真实开仓事实后，系统才会进入持续监控。</span></div><a class="secondary-action" href="/positions">录入持仓</a></div>
+                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无持仓</strong></div><a class="secondary-action" href="/positions">录入持仓</a></div>
             </section>
             <section class="module plan-module" aria-labelledby="planHeading" data-component-family="PlanSummaryCard">
-                <header class="module-header"><div><h2 id="planHeading">最终执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
+                <header class="module-header"><div><h2 id="planHeading">执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
                 <div class="plan-content" id="planContent"></div>
             </section>
         </div>
         <section class="module ai-workspace" aria-labelledby="aiWorkspaceHeading" data-component-family="AIWorkspace">
             <header class="ai-header">
-                <div><h2 id="aiWorkspaceHeading">AI 分析工作区</h2><span id="aiContext">等待分析上下文</span></div>
+                <div><h2 id="aiWorkspaceHeading">AI 分析</h2><span id="aiContext">等待分析上下文</span></div>
                 <div class="ai-tabs" role="tablist" aria-label="AI 分析角色" data-component-family="AIRoleTabs">
-                    <button class="is-active" type="button" role="tab" aria-selected="true" data-ai-role="GPT_FINAL">GPT 综合判断</button>
-                    <button type="button" role="tab" aria-selected="false" data-ai-role="GEMINI_REVIEW">Gemini 冲突复核</button>
-                    <button type="button" role="tab" aria-selected="false" data-ai-role="GROK_CHALLENGE">Grok 反方挑战</button>
+                    <button class="is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-ai-role="GPT_FINAL" aria-label="GPT 综合判断">GPT</button>
+                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GEMINI_REVIEW" aria-label="Gemini 冲突复核">Gemini</button>
+                    <button type="button" role="tab" aria-selected="false" tabindex="-1" data-ai-role="GROK_CHALLENGE" aria-label="Grok 反方挑战">Grok</button>
                 </div>
             </header>
             <div class="ai-layout" id="aiLayout"><article class="ai-role-panel" id="aiRolePanel"></article><aside class="conflict-summary" id="conflictSummary" hidden aria-label="冲突摘要"></aside></div>
-            <footer class="ai-footer"><div id="aiMetadata">角色状态待同步</div><a id="auditChainLink" href="/analysis">查看完整审计链</a></footer>
+            <footer class="ai-footer"><div id="aiMetadata">角色状态待同步</div><a id="auditChainLink" aria-disabled="true">审计链尚未形成</a></footer>
         </section>
     </main>
 </div>

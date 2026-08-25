@@ -70,6 +70,7 @@ class UserPositionServiceImplTest {
         assertThat(row.getEntryPrice()).isEqualByComparingTo("100.50");
         assertThat(row.getQuantity()).isEqualByComparingTo("0.25");
         assertThat(row.getLeverage()).isEqualByComparingTo("2");
+        assertThat(row.getOpenedAt()).isEqualTo(LocalDateTime.of(2024, 1, 1, 10, 0));
         assertThat(row.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
         assertThat(row.getFinalPlanId()).isNull();
         assertThat(row.getManualReviewRequired()).isTrue();
@@ -118,6 +119,12 @@ class UserPositionServiceImplTest {
         assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, badLeverage))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("leverage");
+
+        CreateUserPositionReq futureOpenedAt = validOpenRequest();
+        futureOpenedAt.setOpenedAt(LocalDateTime.now().plusDays(1));
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, futureOpenedAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("opened_at");
 
         verify(userPositionMapper, never()).insert(any());
     }
@@ -227,10 +234,12 @@ class UserPositionServiceImplTest {
         when(userPositionMapper.selectByIdAndUserId(8L, USER_ID))
                 .thenReturn(partiallyClosed, closedAfterPartial);
         when(userPositionMapper.manualCloseByIdAndUserId(
-                eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+                eq(7L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
+                eq(new BigDecimal("105.25")), eq("manual exit"), any()))
                 .thenReturn(1);
         when(userPositionMapper.manualCloseByIdAndUserId(
-                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any()))
+                eq(8L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
+                eq(new BigDecimal("106.25")), eq("manual exit"), any()))
                 .thenReturn(1);
 
         UserPositionVO vo = service.manualCloseForUser(7L, USER_ID, closeRequest("105.25", "manual exit"));
@@ -244,9 +253,11 @@ class UserPositionServiceImplTest {
         assertThat(partialVo.getStatus()).isEqualTo("CLOSED");
         assertThat(partialVo.getClosePrice()).isEqualByComparingTo("106.25");
         verify(userPositionMapper).manualCloseByIdAndUserId(
-                eq(7L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any());
+                eq(7L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
+                eq(new BigDecimal("105.25")), eq("manual exit"), any());
         verify(userPositionMapper).manualCloseByIdAndUserId(
-                eq(8L), eq(USER_ID), any(), eq(new BigDecimal("106.25")), eq("manual exit"), any());
+                eq(8L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
+                eq(new BigDecimal("106.25")), eq("manual exit"), any());
     }
 
     @Test
@@ -399,6 +410,7 @@ class UserPositionServiceImplTest {
         request.setLeverage(new BigDecimal("2"));
         request.setStopLoss(new BigDecimal("95.00"));
         request.setTakeProfit(new BigDecimal("120.00"));
+        request.setOpenedAt(LocalDateTime.of(2024, 1, 1, 10, 0));
         request.setSourceType("MANUAL_INDEPENDENT");
         request.setSourceRefId("manual-note-1");
         return request;
@@ -408,6 +420,7 @@ class UserPositionServiceImplTest {
         CloseUserPositionReq request = new CloseUserPositionReq();
         request.setClosePrice(new BigDecimal(price));
         request.setCloseReason(reason);
+        request.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
         return request;
     }
 

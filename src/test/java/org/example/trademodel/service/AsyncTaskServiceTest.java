@@ -63,10 +63,13 @@ class AsyncTaskServiceTest {
     void retryLimitAndTerminalCancelFailClosed() {
         when(mapper.selectForUser("task-limit", 41L)).thenReturn(persisted("FAILED", 2, 2));
         when(mapper.selectForUser("task-done", 41L)).thenReturn(persisted("SUCCEEDED", 0, 2));
+        when(mapper.selectForUser("task-partial", 41L)).thenReturn(persisted("PARTIAL", 0, 2));
 
         assertThatThrownBy(() -> service.retryForUser(41L, "task-limit"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("retry limit");
         assertThatThrownBy(() -> service.cancelForUser(41L, "task-done"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("not cancellable");
+        assertThatThrownBy(() -> service.cancelForUser(41L, "task-partial"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("not cancellable");
     }
 
@@ -89,7 +92,8 @@ class AsyncTaskServiceTest {
     private static AsyncTaskDO persisted(String state, int retryCount, int maxRetries) {
         AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId(state.equals("FAILED") && retryCount == 2 ? "task-limit"
-                : state.equals("SUCCEEDED") ? "task-done" : "task-1");
+                : state.equals("SUCCEEDED") ? "task-done"
+                : state.equals("PARTIAL") ? "task-partial" : "task-1");
         task.setOwnerType("USER");
         task.setOwnerId(41L);
         task.setTaskType("POOL_SCAN");

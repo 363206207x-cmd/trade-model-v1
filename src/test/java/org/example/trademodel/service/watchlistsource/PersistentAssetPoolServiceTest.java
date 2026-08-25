@@ -88,6 +88,8 @@ class PersistentAssetPoolServiceTest {
         assertThat(writes.getValue().getAssetId()).isEqualTo(101L);
         assertThat(writes.getValue().getSourceType()).isEqualTo("USER_ADDED");
         assertThat(writes.getValue().getActive()).isTrue();
+        assertThat(writes.getValue().getWatchStatus()).isEqualTo("OBSERVING");
+        verifyNoInteractions(analysisRunOrchestrator);
 
         service.removeForUser(9L, "eth-usdt");
 

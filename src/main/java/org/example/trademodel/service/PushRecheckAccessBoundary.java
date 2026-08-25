@@ -41,6 +41,21 @@ public class PushRecheckAccessBoundary {
         }
     }
 
+    public void requireOwnerScopedPushOpenExecution(RecheckExecutionCommand command) {
+        if (command == null
+                || !"PUSH_OPEN".equals(command.getTriggerSource())
+                || !blank(command.getDispatchBatchId())
+                || !blank(command.getDispatchInstructionId())
+                || command.getRetryAttempt() == null
+                || command.getRetryAttempt() <= 0
+                || command.getMaxAttempts() != null
+                || command.getRetryBackoffMinutes() != null
+                || (command.getRetryAttempt() == 1 && command.getReplayFromLogId() != null)
+                || (command.getRetryAttempt() > 1 && command.getReplayFromLogId() == null)) {
+            throw new PushRecheckAccessDeniedException("INVALID_OWNER_SCOPED_PUSH_OPEN_COMMAND");
+        }
+    }
+
     public PushRecheckAccessDeniedException disabledGlobalOperation(Operation operation) {
         return new PushRecheckAccessDeniedException(
                 operation == null

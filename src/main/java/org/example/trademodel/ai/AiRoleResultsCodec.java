@@ -202,11 +202,14 @@ public class AiRoleResultsCodec {
         if (result.getCallStatus() != null) rolePayload.put("callStatus", result.getCallStatus().name());
         rolePayload.put("analysisId", sanitize(defaultText(result.getAnalysisId(), analysisId), 128));
         rolePayload.put("traceId", sanitize(defaultText(result.getTraceId(), traceId), 128));
-        rolePayload.put("roleState", enumName(defaultRoleState(result)));
+        AiRoleState roleState = defaultRoleState(result);
+        rolePayload.put("roleState", enumName(roleState));
         rolePayload.put("dataState", enumName(defaultDataState(result)));
         rolePayload.put("generatedAt", result.getGeneratedAt() == null
                 ? java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
                 : result.getGeneratedAt().toString());
+        rolePayload.put("resultAvailable", result.successful()
+                && (roleState == AiRoleState.READY || roleState == AiRoleState.PARTIAL));
         if (result.successful()) rolePayload.put("stance", stance);
         if (result.successful() && conflictLevel != null) rolePayload.put("conflictLevel", sanitize(conflictLevel, 64));
         rolePayload.set("reasonCodes", objectMapper.valueToTree(List.of()));

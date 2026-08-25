@@ -90,6 +90,7 @@ class AiRoleResultsCodecTest {
             assertThat(role.path("analysisId").asText()).isEqualTo("analysis-1");
             assertThat(role.path("traceId").asText()).isEqualTo("trace-1");
             assertThat(role.path("roleState").asText()).isEqualTo("READY");
+            assertThat(role.path("resultAvailable").asBoolean()).isTrue();
             assertThat(role.path("generatedAt").asText()).isNotBlank();
         });
         assertThat(root.path("roles").path("GPT_FINAL").path("supportingEvidence").isArray()).isTrue();
@@ -111,6 +112,7 @@ class AiRoleResultsCodecTest {
         JsonNode gemini = root.path("roles").path("GEMINI_REVIEW");
 
         assertThat(gemini.path("roleState").asText()).isEqualTo("UNAVAILABLE");
+        assertThat(gemini.path("resultAvailable").asBoolean()).isFalse();
         assertThat(gemini.path("dataState").asText()).isEqualTo("SOURCE_UNAVAILABLE");
         assertThat(gemini.path("evidenceGapsState").asText()).isEqualTo("SOURCE_UNAVAILABLE");
         assertThat(gemini.path("evidenceGaps").isArray()).isTrue();

@@ -253,6 +253,56 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
+    void coinglassDerivedEvidenceOutsideGenericWindowRemainsTraceable() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenReturn(new AiCallLogDO());
+        AiDecisionChainResult providerResult = success(
+                AiDecisionChainRole.GPT_FINAL, AiProviderName.OPENAI);
+        providerResult.setPayloadJson("""
+                {"supportingEvidence":[{"evidenceId":"coinglass-oi-1",
+                 "type":"OPEN_INTEREST_PRICE_CONFIRMATION","source":"PROVIDER_SNAPSHOT",
+                 "currentValue":"1.8","change":"+1.8%","direction":"BULLISH",
+                 "strength":85.0,"confidence":82.0,"observedAt":"2026-08-20T06:26:00",
+                 "freshness":"FRESH","analysisId":"analysis-1"}],"opposingEvidence":[],
+                 "biasAdjustment":{"before":"BULLISH","after":"BULLISH","reason":"衍生品证据确认"},
+                 "candidateSummary":{"entrySource":"coinglass-oi-1","stopSource":"coinglass-oi-1",
+                 "targetSource":"coinglass-oi-1","invalidationSource":"coinglass-oi-1",
+                 "expectedRiskRewardSource":"coinglass-oi-1"}}
+                """);
+        when(gpt.executeDecisionChain(any(), anyLong())).thenReturn(providerResult);
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, new AiOrchestratorProperties());
+        AiDecisionChainRequest request = request(AiDecisionChainRole.GPT_FINAL);
+        request.setInput(Map.of(
+                "evidence", List.of(),
+                "derivativesContext", Map.of("derivedEvidence", List.of(Map.ofEntries(
+                        Map.entry("evidenceId", "coinglass-oi-1"),
+                        Map.entry("type", "OPEN_INTEREST_PRICE_CONFIRMATION"),
+                        Map.entry("source", "PROVIDER_SNAPSHOT"),
+                        Map.entry("sourceReference", "sourceField=openInterestChange5m"),
+                        Map.entry("sourceTraceId", "coinglass-trace-1"),
+                        Map.entry("currentValue", "1.8"),
+                        Map.entry("changeFromBaseline", "+1.8%"),
+                        Map.entry("direction", "BULLISH"),
+                        Map.entry("strength", 85.0),
+                        Map.entry("confidence", 82.0),
+                        Map.entry("observedAt", "2026-08-20T06:26:00"),
+                        Map.entry("freshness", "FRESH"),
+                        Map.entry("analysisId", "analysis-1")))),
+                "decisionBundle", Map.of("ruleDirection", "BULLISH")));
+
+        AiDecisionChainResult result = service.invoke(request);
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getFallbackReason()).isNull();
+    }
+
+    @Test
     void externalEventChallengeMustMatchReferencedSourceTimeAndWindow() {
         AiProviderClient grok = client(AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);

@@ -40,6 +40,7 @@ public record AiRoleResultsPayload(
             String roleState,
             String dataState,
             String generatedAt,
+            Boolean resultAvailable,
             String stance,
             String conflictLevel,
             List<String> reasonCodes,
@@ -110,7 +111,7 @@ public record AiRoleResultsPayload(
                            String fallbackReason,
                            Boolean manualReviewRequired) {
             this(role, provider, sourceRole, callStatus,
-                    null, null, null, null, null,
+                    null, null, null, null, null, null,
                     stance, conflictLevel, reasonCodes, summary, fallback, fallbackReason,
                     manualReviewRequired,
                     null, List.of(), null, List.of(), null, null, null, null,

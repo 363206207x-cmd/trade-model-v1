@@ -2,9 +2,9 @@
   "use strict";
 
   var AI_ROLES = Object.freeze([
-    Object.freeze({ role: "GPT_FINAL", label: "证据综合与候选形成" }),
-    Object.freeze({ role: "GEMINI_REVIEW", label: "证据与风险复核" }),
-    Object.freeze({ role: "GROK_CHALLENGE", label: "失败路径与压力测试" })
+    Object.freeze({ role: "GPT_FINAL", label: "GPT 综合判断" }),
+    Object.freeze({ role: "GEMINI_REVIEW", label: "Gemini 冲突复核" }),
+    Object.freeze({ role: "GROK_CHALLENGE", label: "Grok 反方挑战" })
   ]);
 
   var ASSET_STATES = Object.freeze({
@@ -12,7 +12,7 @@
     CANDIDATE: Object.freeze({ label: "待复核候选", tone: "info" }),
     WAITING_TRIGGER: Object.freeze({ label: "等待触发", tone: "warning" }),
     TRIGGERED: Object.freeze({ label: "条件已触发", tone: "info" }),
-    HIGH_RISK: Object.freeze({ label: "高风险", tone: "danger" }),
+    HIGH_RISK: Object.freeze({ label: "高风险观察", tone: "danger" }),
     INVALIDATED: Object.freeze({ label: "已失效", tone: "muted" }),
     COOLING: Object.freeze({ label: "冷却中", tone: "muted" }),
     CONFUSED: Object.freeze({ label: "冲突阻断", tone: "danger" })
@@ -374,6 +374,17 @@
     "READY", "PARTIAL", "FALLBACK", "UNAVAILABLE", "ERROR"
   ]);
 
+  var REVIEW_RESULT_LABELS = Object.freeze({
+    APPROVE: "通过",
+    DOWNGRADE: "降级",
+    REJECT_CANDIDATE: "拒绝候选",
+    RISK_WARNING: "风险警告"
+  });
+
+  var ANALYSIS_MODES = Object.freeze([
+    "ANALYSIS_PREVIEW", "OPPORTUNITY_DECISION"
+  ]);
+
   var STRUCTURED_AI_COLLECTIONS = Object.freeze([
     Object.freeze({ key: "supportingEvidence", state: "supportingEvidenceState" }),
     Object.freeze({ key: "opposingEvidence", state: "opposingEvidenceState" }),
@@ -429,12 +440,12 @@
     var normalized = String(value || "").trim().toUpperCase();
     return PLAN_MODE_VIEWS[normalized]
       ? PLAN_MODE_VIEWS[normalized].typeLabel
-      : "当前不可查看";
+      : "—";
   }
 
   function opportunityTypeLabel(value) {
     var normalized = String(value || "").trim().toUpperCase();
-    return OPPORTUNITY_TYPE_LABELS[normalized] || "当前不可查看";
+    return OPPORTUNITY_TYPE_LABELS[normalized] || "—";
   }
 
   function userFacingValue(value) {
@@ -442,6 +453,7 @@
     var text = String(value);
     var exact = USER_FACING_VALUE_LABELS[text.trim().toUpperCase()];
     if (exact) return exact;
+    if (/^[A-Z][A-Z0-9_]*$/.test(text.trim())) return "—";
     Object.keys(USER_FACING_VALUE_LABELS)
       .sort(function (left, right) { return right.length - left.length; })
       .forEach(function (code) {
@@ -520,6 +532,158 @@
     return ROLE_STATES.indexOf(normalized) >= 0 ? normalized : "UNAVAILABLE";
   }
 
+  function reviewResultLabel(reviewResult) {
+    var normalized = String(reviewResult || "").trim().toUpperCase();
+    return REVIEW_RESULT_LABELS[normalized] || "当前不可查看";
+  }
+
+  function failurePathView(failurePathState, failurePaths) {
+    var state = String(failurePathState || "").trim().toUpperCase();
+    var paths = Array.isArray(failurePaths) ? failurePaths : [];
+    var complete = paths.every(function (path) {
+      return path && typeof path === "object"
+        && hasText(path.triggerCondition)
+        && hasText(path.causalPath)
+        && hasText(path.invalidatingEvidence);
+    });
+    if (state === "FOUND") {
+      return paths.length > 0 && complete
+        ? {
+            valid: true,
+            state: state,
+            label: "已发现可验证失败路径",
+            paths: paths.slice(),
+            failClosed: false
+          }
+        : {
+            valid: false,
+            state: state,
+            label: "失败路径数据不完整",
+            paths: [],
+            failClosed: true
+          };
+    }
+    if (state === "NO_VERIFIABLE_FAILURE_PATH" && paths.length === 0) {
+      return {
+        valid: true,
+        state: state,
+        label: "未发现可验证失败路径",
+        paths: [],
+        failClosed: false
+      };
+    }
+    if (["INSUFFICIENT_DATA", "SOURCE_UNAVAILABLE", "STALE"].indexOf(state) >= 0
+        && paths.length === 0) {
+      return {
+        valid: true,
+        state: state,
+        label: collectionStateLabel(state),
+        paths: [],
+        failClosed: false
+      };
+    }
+    return {
+      valid: false,
+      state: state || "SOURCE_UNAVAILABLE",
+      label: paths.length > 0 ? "失败路径状态与内容不一致" : "失败路径当前不可查看",
+      paths: [],
+      failClosed: true
+    };
+  }
+
+  function collectionContract(entry) {
+    var descriptor = entry && typeof entry === "object"
+      ? entry
+      : { state: entry, size: 0 };
+    var state = String(descriptor.state || "").trim().toUpperCase();
+    var size = Number.isInteger(descriptor.size)
+      ? descriptor.size
+      : Array.isArray(descriptor.items) ? descriptor.items.length : 0;
+    if (state === "FOUND") return size > 0;
+    if (["NONE_FOUND", "INSUFFICIENT_DATA", "SOURCE_UNAVAILABLE", "STALE"].indexOf(state) >= 0) {
+      return size === 0;
+    }
+    if (state === "NO_VERIFIABLE_FAILURE_PATH") return descriptor.failurePath === true && size === 0;
+    return false;
+  }
+
+  function roleGate(roleState, resultAvailable, collectionStates) {
+    var state = normalizeRoleState(roleState);
+    if (resultAvailable !== true) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: "角色结果当前不可查看"
+      });
+    }
+    if (["FALLBACK", "UNAVAILABLE", "ERROR"].indexOf(state) >= 0) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    var collections = Array.isArray(collectionStates) ? collectionStates : [];
+    if (!collections.every(collectionContract)) {
+      return Object.freeze({
+        allowed: false,
+        renderMode: "FAIL_CLOSED",
+        roleState: state,
+        message: "集合状态与内容不一致"
+      });
+    }
+    if (state === "PARTIAL") {
+      return Object.freeze({
+        allowed: true,
+        renderMode: "PARTIAL",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    if (state === "READY") {
+      return Object.freeze({
+        allowed: true,
+        renderMode: "READY",
+        roleState: state,
+        message: roleStateView(state).label
+      });
+    }
+    return Object.freeze({
+      allowed: false,
+      renderMode: "FAIL_CLOSED",
+      roleState: state,
+      message: "角色状态当前不可查看"
+    });
+  }
+
+  function analysisModeGate(analysisMode) {
+    var mode = String(analysisMode || "").trim().toUpperCase();
+    if (ANALYSIS_MODES.indexOf(mode) < 0) {
+      return Object.freeze({
+        valid: false,
+        mode: null,
+        label: "分析模式当前不可查看",
+        message: "缺少可验证的正式分析模式",
+        candidateAllowed: false,
+        candidateReviewAllowed: false,
+        opportunityFailurePathsAllowed: false
+      });
+    }
+    return Object.freeze({
+      valid: true,
+      mode: mode,
+      label: mode === "ANALYSIS_PREVIEW" ? "按需分析预览" : "机会决策",
+      message: mode === "ANALYSIS_PREVIEW"
+        ? "按需查看当前资产的分析结果。"
+        : "查看当前机会的完整决策结果。",
+      candidateAllowed: mode === "OPPORTUNITY_DECISION",
+      candidateReviewAllowed: mode === "OPPORTUNITY_DECISION",
+      opportunityFailurePathsAllowed: mode === "OPPORTUNITY_DECISION"
+    });
+  }
+
   function parseApiEnvelope(envelope) {
     var valid = envelope
       && typeof envelope === "object"
@@ -543,7 +707,7 @@
     }
     return {
       code: code ? code.toLowerCase() : "unknown",
-      label: displayText(returnedLabel, "状态待同步"),
+      label: "状态待同步",
       tone: "neutral"
     };
   }
@@ -647,7 +811,7 @@
           plan.originalPlanLabel,
           "原执行计划，仅用于持仓复核和复盘对照"
         ),
-        reason: "系统建议，仅供人工复核"
+        reason: "系统建议"
       };
     }
 
@@ -674,9 +838,18 @@
 
     return {
       visible: true,
-      statusLabel: displayText(plan.statusLabel, "执行建议，仅供人工复核"),
-      reason: "系统建议，仅供人工复核"
+      statusLabel: displayText(plan.statusLabel, "执行建议"),
+      reason: "系统建议"
     };
+  }
+
+  function positionSourceLabel(sourceType) {
+    var source = String(sourceType || "").trim().toUpperCase();
+    if (source === "SYSTEM_PLAN_POSITION") return "系统计划";
+    if (source === "MANUAL_POSITION" || source === "MANUAL_INDEPENDENT" || source === "MANUAL") {
+      return "独立录入";
+    }
+    return "来源不可用";
   }
 
   function csrfHeaders(headers, root) {
@@ -740,6 +913,40 @@
     return match ? match[1] + " " + match[2] : displayText(value, "--");
   }
 
+  function asyncTaskView(task) {
+    var source = task && typeof task === "object" ? task : {};
+    var state = String(source.state || "UNKNOWN").trim().toUpperCase();
+    var taskType = String(source.taskType || "").trim().toUpperCase();
+    var terminalPreviewPartial = state === "PARTIAL" && taskType === "ANALYSIS_PREVIEW";
+    var displayState = terminalPreviewPartial ? "FAILED" : state;
+    var labels = {
+      QUEUED: "排队中",
+      RUNNING: "执行中",
+      SUCCEEDED: "已完成",
+      FAILED: "失败",
+      CANCELLED: "已取消",
+      PARTIAL: "部分完成"
+    };
+    var errorCode = String(source.errorCode || "").toUpperCase();
+    var errorMessage = String(source.errorMessage || "").toUpperCase();
+    var marketDataUnavailable = errorCode.indexOf("AUTHORITATIVE_OHLCV") >= 0
+      || errorMessage.indexOf("AUTHORITATIVE_OHLCV") >= 0
+      || errorCode.indexOf("REAL_MARKET_ENVIRONMENT") >= 0
+      || errorMessage.indexOf("REAL_MARKET_ENVIRONMENT") >= 0;
+
+    return Object.freeze({
+      state: state,
+      displayState: displayState,
+      displayLabel: terminalPreviewPartial ? "分析失败" : (labels[displayState] || "当前不可查看"),
+      active: state === "QUEUED" || state === "RUNNING",
+      retryable: state === "FAILED" || state === "PARTIAL",
+      cancellable: state === "QUEUED" || state === "RUNNING",
+      failureText: marketDataUnavailable
+        ? "可信市场数据尚未就绪，分析未完成"
+        : (hasText(source.errorMessage) ? "分析未完成，请稍后重试" : "")
+    });
+  }
+
   global.TradeModelFrontendContract = Object.freeze({
     AI_ROLES: AI_ROLES,
     ASSET_STATES: ASSET_STATES,
@@ -777,17 +984,23 @@
     dataStateView: dataStateView,
     collectionStateLabel: collectionStateLabel,
     normalizeRoleState: normalizeRoleState,
+    reviewResultLabel: reviewResultLabel,
+    failurePathView: failurePathView,
+    roleGate: roleGate,
+    analysisModeGate: analysisModeGate,
     parseApiEnvelope: parseApiEnvelope,
     assetStateView: assetStateView,
     normalizeAiTabs: normalizeAiTabs,
     aiAnalysisState: aiAnalysisState,
     aiAnalysisStateView: aiAnalysisStateView,
     executionPlanAccess: executionPlanAccess,
+    positionSourceLabel: positionSourceLabel,
     csrfHeaders: csrfHeaders,
     clearTextFields: clearTextFields,
     readUrlParam: readUrlParam,
     replaceUrlParam: replaceUrlParam,
     formatUtcNaive: formatUtcNaive,
-    formatBusinessTimeCompact: formatBusinessTimeCompact
+    formatBusinessTimeCompact: formatBusinessTimeCompact,
+    asyncTaskView: asyncTaskView
   });
 })(window);

@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -93,8 +94,9 @@ public class LocalRealDataStatusService {
     }
 
     public Map<String, Object> status() {
-        long closedBars = ohlcvMapper.countAllClosedBars();
-        PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBar();
+        String persistedProvider = primaryPersistedProvider();
+        long closedBars = ohlcvMapper.countAllClosedBarsBySource(persistedProvider, "SPOT");
+        PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySource(persistedProvider, "SPOT");
         int completedAssets = value(analysisRunMapper.countLocalRealSuccessfulSymbols());
         long readyAssets = readiness.readyAssetCount();
         int trackedAssetCount = trackedSymbols().size();
@@ -123,8 +125,7 @@ public class LocalRealDataStatusService {
                 .map(LocalRealAssetReadiness::symbol).toList());
         market.put("timeframeCount", LocalRealDataCoordinator.TIMEFRAMES.size());
         market.put("closedBarCount", closedBars);
-        market.put("latestClosedBarAt", latest == null || latest.getCloseTimeMs() == null
-                ? null : java.time.Instant.ofEpochMilli(latest.getCloseTimeMs()));
+        market.put("latestClosedBarAt", closedBarAt(latest));
         market.put("freshnessStatus", providerReadiness.freshnessStatus());
         market.put("assets", assets);
         response.put("marketData", market);
@@ -150,11 +151,17 @@ public class LocalRealDataStatusService {
     }
 
     public ProviderReadinessSnapshot providerReadinessSnapshot() {
-        PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBar();
+        PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySource(
+                primaryPersistedProvider(), "SPOT");
         int completedAssets = value(analysisRunMapper.countLocalRealSuccessfulSymbols());
         long readyAssets = readiness.readyAssetCount();
         return providerReadinessSnapshot(
                 latest, completedAssets, readyAssets, trackedSymbols().size(), providerStatuses());
+    }
+
+    public Instant latestClosedBarAt() {
+        return closedBarAt(ohlcvMapper.selectLatestClosedBarBySource(
+                primaryPersistedProvider(), "SPOT"));
     }
 
     private ProviderReadinessSnapshot providerReadinessSnapshot(PersistedOhlcvBarDO latest,
@@ -187,7 +194,7 @@ public class LocalRealDataStatusService {
                                                     String provider,
                                                     String freshness) {
         return latest != null
-                && provider.equalsIgnoreCase(latest.getProvider())
+                && persistedProvider(provider).equalsIgnoreCase(latest.getProvider())
                 && "READY".equalsIgnoreCase(latest.getSourceStatus())
                 && "FRESH".equals(freshness);
     }
@@ -250,9 +257,20 @@ public class LocalRealDataStatusService {
                 ? "UNKNOWN" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
+    private String primaryPersistedProvider() {
+        return persistedProvider(routedProvider.primaryProvider());
+    }
+
+    private static String persistedProvider(String provider) {
+        String normalized = normalizeProvider(provider);
+        return "BINANCE".equals(normalized) ? "BINANCE_PUBLIC" : normalized;
+    }
+
     private List<Map<String, Object>> assetStatuses() {
         return trackedSymbols().stream().map(symbol -> {
-            PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySymbol(symbol);
+            String persistedProvider = primaryPersistedProvider();
+            PersistedOhlcvBarDO latest = ohlcvMapper.selectLatestClosedBarBySymbolAndSource(
+                    symbol, persistedProvider, "SPOT");
             LocalRealAssetReadiness item = readiness.asset(symbol);
             PersistedRealMarketEnvironmentAssessment marketAssessment =
                     realMarketEnvironmentService == null ? null : realMarketEnvironmentService.assess(symbol, "5m");
@@ -267,9 +285,9 @@ public class LocalRealDataStatusService {
             asset.put("realMarketEnvironment", marketAssessment != null && marketAssessment.ready());
             asset.put("analysisStatus", analysisStatus(latestAnalysis));
             asset.put("latestAnalysisFailureCode", latestAnalysisFailureCode(latestAnalysis));
-            asset.put("closedBarCount", ohlcvMapper.countClosedBarsBySymbol(symbol));
-            asset.put("latestClosedBarAt", latest == null || latest.getCloseTimeMs() == null
-                    ? null : java.time.Instant.ofEpochMilli(latest.getCloseTimeMs()));
+            asset.put("closedBarCount", ohlcvMapper.countClosedBarsBySymbolAndSource(
+                    symbol, persistedProvider, "SPOT"));
+            asset.put("latestClosedBarAt", closedBarAt(latest));
             return asset;
         }).toList();
     }
@@ -298,6 +316,11 @@ public class LocalRealDataStatusService {
 
     private static int value(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private static Instant closedBarAt(PersistedOhlcvBarDO bar) {
+        return bar == null || bar.getCloseTimeMs() == null
+                ? null : Instant.ofEpochMilli(bar.getCloseTimeMs());
     }
 
     private static String marketDataStatus(PersistedOhlcvBarDO latest,

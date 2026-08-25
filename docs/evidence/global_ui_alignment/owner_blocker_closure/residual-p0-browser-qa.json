@@ -1,0 +1,69 @@
+{
+  "profile": "ui-review",
+  "fixture": true,
+  "sourceHashes": {
+    "homeHtml": "5784457f547bc7c9b4ed8af0022da3ca66d8b7636277352ccbc6e17d67e43b07",
+    "homeCss": "dbd0cb6e01da8008c8ac0457d828a33736759df5b75e6ffa3548e4db4bfd54b3",
+    "homeRuntimeJs": "529e02ed1ad880700fd5293dfa9f06dea4e908f4d506bb8865fc765260d56060",
+    "frontendContractJs": "627fa657495d5ec7a1a718973bbc2f713ed6a7d9875dc6ef147eaa3c50f726e7"
+  },
+  "browserSurface": "1280x720",
+  "exact1440CurrentHeadCapture": "NOT_VERIFIED_BROWSER_SURFACE_FIXED_AT_1280",
+  "consoleErrorCount": "NOT_VERIFIED_BROWSER_TAB_AUTH_BOUNDARY",
+  "home": {
+    "horizontalOverflowCount": 0,
+    "textClippingCount": 0,
+    "statusCount": 6,
+    "statusLabels": ["环境", "系统", "数据", "服务", "账户·已录入", "Hot Reset"],
+    "homeDerivativesStripCount": 0,
+    "visibleDecisionWorkspaceCount": 0,
+    "visibleAiRoleCount": 1,
+    "brokenPositionDetailLinkCount": 0
+  },
+  "statusOwnership": {
+    "selectedAssetA": {
+      "asset": "BTCUSDT",
+      "opportunityState": "等待触发",
+      "risk": "高",
+      "systemSlots": ["趋势环境", "— / 尚未形成系统级评估", "新鲜", "正常", "极高·3笔·覆盖完整", "关闭"]
+    },
+    "selectedAssetB": {
+      "asset": "ETHUSDT",
+      "opportunityState": "待复核候选",
+      "risk": "低",
+      "systemSlots": ["趋势环境", "— / 尚未形成系统级评估", "新鲜", "正常", "极高·3笔·覆盖完整", "关闭"]
+    },
+    "systemOwnedSlotsUnchanged": true
+  },
+  "opportunityRiskOwnership": [
+    {"state": "等待触发", "risk": "高"},
+    {"state": "高风险", "risk": "高"},
+    {"state": "高风险", "risk": "极高"}
+  ],
+  "riskLevelStateSlotLeakageCount": 0,
+  "positions": {
+    "VERIFIED_FRESH": {"detailLinks": 3, "sources": ["系统计划", "独立录入", "系统计划"]},
+    "PENDING": {"state": "等待监控数据", "stateCount": 1, "detail": "/positions/7101", "markPrice": false, "pnl": false, "judgment": false, "conclusion": false},
+    "STALE": {"state": "监控数据已过期", "stateCount": 1, "detail": "/positions/7101", "markPrice": false, "pnl": false, "judgment": false, "conclusion": false},
+    "INVALID": {"state": "当前不可查看", "stateCount": 1, "detail": "/positions/7101", "markPrice": false, "pnl": false, "judgment": false, "conclusion": false},
+    "SOURCE_UNAVAILABLE": {"state": "监控来源不可用", "stateCount": 1, "detail": "/positions/7101", "markPrice": false, "pnl": false, "judgment": false, "conclusion": false}
+  },
+  "gpt": {
+    "primary": ["方向判断：弱偏多", "等待触发", "预备型"],
+    "candidateNotFinal": true,
+    "englishInternalFieldCount": 0,
+    "manualConfirmationCount": 0
+  },
+  "gemini": {
+    "APPROVE": {"primary": "通过", "beforeAfterCount": 0},
+    "DOWNGRADE": {"primary": "降级", "beforeAfterCount": 0},
+    "REJECT_CANDIDATE": {"primary": "拒绝候选", "beforeAfterCount": 0},
+    "RISK_WARNING": {"primary": "风险警告", "beforeAfterCount": 0},
+    "ILLEGAL_WAITING_TRIGGER_BEFORE_AFTER": {"unavailableStripCount": 1, "beforeAfterCount": 0, "payloadRewritten": false}
+  },
+  "grok": {
+    "FOUND": {"found": true, "completePath": true},
+    "NO_VERIFIABLE_FAILURE_PATH": {"notFound": true},
+    "FOUND_EMPTY": {"failClosed": true, "foundCopyCount": 0, "notFoundCopyCount": 0}
+  }
+}

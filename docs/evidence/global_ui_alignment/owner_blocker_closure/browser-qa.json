@@ -1,0 +1,92 @@
+{
+  "baselineHead": "af58dc7e7ae6c33f87daf78986fbfafc538a8340",
+  "browserStatus": "PASS",
+  "home": {
+    "1440": {
+      "opportunityColumns": 6,
+      "opportunityCardWidth": 214.664,
+      "positionWidth": 918.4,
+      "planWidth": 393.6,
+      "horizontalOverflow": 0,
+      "criticalTextClipping": 0
+    },
+    "1280": {
+      "opportunityColumns": 3,
+      "opportunityCardWidth": 384,
+      "horizontalOverflow": 0,
+      "criticalTextClipping": 0
+    },
+    "1080": {
+      "opportunityColumns": 3,
+      "opportunityCardWidth": 321.33,
+      "accountSummary": "极高·3笔·部分覆盖",
+      "accountSummaryFits": true,
+      "accountSummaryTextOverflow": "clip",
+      "horizontalOverflow": 0,
+      "criticalTextClipping": 0
+    }
+  },
+  "positionStates": {
+    "VERIFIED_FRESH": {
+      "openingFacts": ["开仓价", "标记价格", "盈亏", "开仓时间"],
+      "judgmentCount": 1,
+      "conclusionCount": 1
+    },
+    "PENDING": {
+      "stateText": "等待监控数据",
+      "stateTextCount": 1,
+      "openingFacts": ["开仓价", "开仓时间"],
+      "markPriceVisible": false,
+      "pnlVisible": false,
+      "judgmentCount": 0,
+      "conclusionCount": 0
+    },
+    "STALE": {
+      "stateText": "监控数据已过期",
+      "stateTextCount": 1,
+      "openingFacts": ["开仓价", "开仓时间"],
+      "markPriceVisible": false,
+      "pnlVisible": false,
+      "judgmentCount": 0,
+      "conclusionCount": 0
+    },
+    "INVALID": {
+      "stateText": "当前不可查看",
+      "stateTextCount": 1,
+      "openingFacts": ["开仓价", "开仓时间"],
+      "markPriceVisible": false,
+      "pnlVisible": false,
+      "judgmentCount": 0,
+      "conclusionCount": 0
+    },
+    "SOURCE_UNAVAILABLE": {
+      "stateText": "监控来源不可用",
+      "stateTextCount": 1,
+      "openingFacts": ["开仓价", "开仓时间"],
+      "markPriceVisible": false,
+      "pnlVisible": false,
+      "judgmentCount": 0,
+      "conclusionCount": 0
+    }
+  },
+  "taskPages": {
+    "systemStatusBarCount": 0,
+    "inactiveTaskIndicatorHidden": true,
+    "collapsedRailVisibleLabelCount": 0
+  },
+  "settings": {
+    "clean": {"hidden": true, "disabled": true, "dirtyClass": false},
+    "dirty": {"hidden": false, "disabled": false, "dirtyClass": true, "backgroundColor": "rgb(23, 92, 211)"}
+  },
+  "plan": {
+    "CURRENT": {"revalidationHidden": false, "revalidationDisabled": false, "candidateUsedAsFinal": false},
+    "NEEDS_REVALIDATION": {"revalidationHidden": false, "revalidationDisabled": false, "candidateUsedAsFinal": false},
+    "UNAVAILABLE": {"revalidationHidden": true, "revalidationDisabled": true, "candidateUsedAsFinal": false}
+  },
+  "lifecycle": {
+    "oldCopyCount": 0,
+    "approvedCopyCount": 2
+  },
+  "consoleErrors": 0,
+  "textClippingCount": 0
+}
