@@ -694,8 +694,8 @@ class V1BusinessStressTest {
             when(userPositionMapper.selectByIdAndUserId(scenario.id(), USER_ID)).thenReturn(position);
             when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("BTCUSDT", scenario.currentPrice())));
             ExecutionPlanDO plan = monitorPlan(planId);
-            lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
-            lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
+            lenient().when(executionPlanMapper.selectByPlanIdForUser(planId, USER_ID)).thenReturn(plan);
+            lenient().when(analysisRunMapper.selectReadableByUser(plan.getAnalysisId(), USER_ID))
                     .thenReturn(analysisRun(plan.getAnalysisId(), "BTCUSDT"));
             lenient().when(analysisRunMapper.countEvidenceByAnalysisId(plan.getAnalysisId())).thenReturn(3);
             lenient().when(analysisRunMapper.countScoresByAnalysisId(plan.getAnalysisId())).thenReturn(8);
@@ -708,7 +708,7 @@ class V1BusinessStressTest {
             currentDecision.setMultiTfConvergence("ALIGNED");
             currentDecision.setDataQualityScore(90);
             currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
-            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTCUSDT"))
                     .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(scenario.id(), USER_ID);
         }

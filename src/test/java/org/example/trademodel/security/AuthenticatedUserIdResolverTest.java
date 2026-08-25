@@ -109,6 +109,7 @@ class AuthenticatedUserIdResolverTest {
         PersonalUserDO user = new PersonalUserDO();
         user.setId(id);
         user.setUsername(username);
+        user.setEnabled(true);
         return user;
     }
 }

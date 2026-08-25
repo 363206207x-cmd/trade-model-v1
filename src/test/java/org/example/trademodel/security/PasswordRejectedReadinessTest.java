@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:password_rejected_readiness;DB_CLOSE_DELAY=-1;MODE=MySQL",
         "trade-model.auth.enabled=true",
-        "trade-model.auth.initial-username=operator",
+        "trade-model.auth.initial-username=xuchao",
         "trade-model.auth.initial-password=short",
         "trade-model.schedulers.enabled=false",
         "trade-model.analysis.scheduler.enabled=false",

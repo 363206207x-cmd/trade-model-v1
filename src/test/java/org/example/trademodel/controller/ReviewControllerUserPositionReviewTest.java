@@ -8,6 +8,7 @@ import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
@@ -52,6 +53,8 @@ class ReviewControllerUserPositionReviewTest {
     private OpportunityLogService opportunityLogService;
     @Mock
     private AuthenticatedUserIdResolver authenticatedUserIdResolver;
+    @Mock
+    private AnalysisRunMapper analysisRunMapper;
 
     private MockMvc mockMvc;
 
@@ -65,7 +68,8 @@ class ReviewControllerUserPositionReviewTest {
                 positionMonitorLogService,
                 userPositionReviewAdapter,
                 opportunityLogService,
-                authenticatedUserIdResolver))
+                authenticatedUserIdResolver,
+                analysisRunMapper))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

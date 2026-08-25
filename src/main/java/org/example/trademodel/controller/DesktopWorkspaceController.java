@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Controller
 public class DesktopWorkspaceController {
@@ -80,6 +81,11 @@ public class DesktopWorkspaceController {
         return page(model, "me", "我的", "me", null);
     }
 
+    @GetMapping("/me/accounts")
+    public String accounts(Model model) {
+        return page(model, "accounts", "账户管理", "me", null);
+    }
+
     private String page(Model model, String pageKey, String title,
                         String activeNavigation, Object resourceId) {
         model.addAttribute("pageKey", pageKey);
@@ -87,6 +93,9 @@ public class DesktopWorkspaceController {
         model.addAttribute("activeNavigation", activeNavigation);
         model.addAttribute("resourceId", resourceId);
         model.addAttribute("uiReviewMode", uiReviewMode);
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        model.addAttribute("ownerUser", authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_OWNER".equals(authority.getAuthority())));
         return "workspace";
     }
 }

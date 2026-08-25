@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>账户安全 · TRINE LOGIC</title>
+    <link rel="stylesheet" th:href="@{/css/login.css}" href="/css/login.css">
+</head>
+<body>
+<main class="login-shell">
+    <section class="login-panel" aria-labelledby="security-title">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <h1 id="security-title">账户安全</h1>
+        <p class="login-caption" th:text="${username}">username</p>
+        <div class="login-message login-message-error" th:if="${passwordError}" th:text="${passwordError}" role="alert"></div>
+        <form class="login-form" th:action="@{/me/security}" method="post">
+            <label for="currentPassword">当前密码</label>
+            <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" maxlength="128" required autofocus>
+            <label for="newPassword">新密码</label>
+            <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <label for="passwordConfirmation">确认新密码</label>
+            <input id="passwordConfirmation" name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <label class="password-visibility"><input type="checkbox" data-password-toggle data-password-targets="currentPassword,newPassword,passwordConfirmation"> 显示密码</label>
+            <button type="submit">更新密码</button>
+        </form>
+        <p class="login-secondary-action"><a href="/me">返回我的</a></p>
+    </section>
+</main>
+<script th:src="@{/js/auth-forms.js}" src="/js/auth-forms.js" defer></script>
+</body>
+</html>

@@ -65,7 +65,7 @@ class UserPositionReviewAdapterTest {
                 analysisRunMapper,
                 positionMonitorLogService,
                 reviewService);
-        lenient().when(analysisRunMapper.selectById(anyString())).thenAnswer(invocation ->
+        lenient().when(analysisRunMapper.selectReadableByUser(anyString(), eq(USER_ID))).thenAnswer(invocation ->
                 analysisRun(invocation.getArgument(0), "BTCUSDT"));
     }
 
@@ -73,7 +73,8 @@ class UserPositionReviewAdapterTest {
     void closedLongWinReadsPlanRealFieldsAllLogsAndProducesSafeAlignedSummary() throws Exception {
         UserPositionDO position = closedPosition(1L, "LONG", "plan-1", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(1L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(plan("plan-1", "ana-1", "100", "95", "120"));
+        when(executionPlanMapper.selectByPlanIdForUser("plan-1", USER_ID))
+                .thenReturn(plan("plan-1", "ana-1", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 1L)).thenReturn(List.of(
                 log(11L, "LOGIC_VALID", "CONTINUE_HOLD", "LOW", LocalDateTime.of(2026, 6, 22, 8, 30)),
                 log(12L, "LOGIC_WEAKENED", "NO_ADD_POSITION", "MEDIUM", LocalDateTime.of(2026, 6, 22, 9, 0))));
@@ -111,7 +112,8 @@ class UserPositionReviewAdapterTest {
     void closedLongLossPlanInvalidationAndIgnoredWarningAreDetected() {
         UserPositionDO position = closedPosition(2L, "LONG", "plan-2", "100", "90", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(2L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-2")).thenReturn(plan("plan-2", "ana-2", "100", "95", "120"));
+        when(executionPlanMapper.selectByPlanIdForUser("plan-2", USER_ID))
+                .thenReturn(plan("plan-2", "ana-2", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 2L)).thenReturn(List.of(
                 log(21L, "PLAN_INVALIDATED", "WAIT_CONFIRMATION", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 0)),
                 log(22L, "HIGH_RISK_OBSERVATION", "REDUCE_POSITION", "HIGH", LocalDateTime.of(2026, 6, 22, 9, 30))));
@@ -185,7 +187,7 @@ class UserPositionReviewAdapterTest {
                 PositionMonitorSourceContract.analysisReference("ana-13"),
                 "100", "111", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(13L, USER_ID)).thenReturn(byAnalysis);
-        when(executionPlanMapper.selectOnlyByAnalysisId("ana-13"))
+        when(executionPlanMapper.selectOnlyByAnalysisIdForUser("ana-13", USER_ID))
                 .thenReturn(plan("plan-from-analysis", "ana-13", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 13L)).thenReturn(List.of());
         assertThat(adapter.buildSummaryForUser(USER_ID, 13L).getExecutionPlanId()).isEqualTo("plan-from-analysis");
@@ -204,7 +206,8 @@ class UserPositionReviewAdapterTest {
     void executionDeviationDeviatedAndNotComputableAreSeparated() {
         UserPositionDO deviated = closedPosition(15L, "LONG", "plan-15", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(15L, USER_ID)).thenReturn(deviated);
-        when(executionPlanMapper.selectByPlanId("plan-15")).thenReturn(plan("plan-15", "ana-15", "103", "95", "120"));
+        when(executionPlanMapper.selectByPlanIdForUser("plan-15", USER_ID))
+                .thenReturn(plan("plan-15", "ana-15", "103", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 15L)).thenReturn(List.of());
         UserPositionReviewSummaryDTO result = adapter.buildSummaryForUser(USER_ID, 15L);
         assertThat(result.getExecutionDeviationStatus()).isEqualTo("DEVIATED");
@@ -213,7 +216,7 @@ class UserPositionReviewAdapterTest {
         UserPositionDO notComputable = closedPosition(16L, "LONG", "plan-16", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(16L, USER_ID)).thenReturn(notComputable);
         ExecutionPlanDO plan = plan("plan-16", "ana-16", "zone", "stop", "take profit text");
-        when(executionPlanMapper.selectByPlanId("plan-16")).thenReturn(plan);
+        when(executionPlanMapper.selectByPlanIdForUser("plan-16", USER_ID)).thenReturn(plan);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 16L)).thenReturn(List.of());
         assertThat(adapter.buildSummaryForUser(USER_ID, 16L).getExecutionDeviationStatus()).isEqualTo("NOT_COMPUTABLE");
     }
@@ -241,7 +244,7 @@ class UserPositionReviewAdapterTest {
     void feedbackRecordsThroughExistingReviewServiceAndDerivesAnalysisIdServerSide() {
         UserPositionDO position = closedPosition(19L, "LONG", "plan-19", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(19L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-19"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-19", USER_ID))
                 .thenReturn(plan("plan-19", "ana-server-19", "100", "95", "120"));
         ReviewStateVO state = new ReviewStateVO();
         state.setReviewId("review-19");
@@ -289,9 +292,9 @@ class UserPositionReviewAdapterTest {
     void closedPositionCrossSymbolTypedPlanFailsClosed() {
         UserPositionDO position = closedPosition(21L, "LONG", "plan-foreign", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(21L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-foreign"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-foreign", USER_ID))
                 .thenReturn(plan("plan-foreign", "ana-foreign", "100", "95", "120"));
-        when(analysisRunMapper.selectById("ana-foreign"))
+        when(analysisRunMapper.selectReadableByUser("ana-foreign", USER_ID))
                 .thenReturn(analysisRun("ana-foreign", "ETHUSDT"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 21L)).thenReturn(List.of());
 
@@ -302,9 +305,9 @@ class UserPositionReviewAdapterTest {
     void closedPositionMissingAnalysisRunFailsClosed() {
         UserPositionDO position = closedPosition(22L, "LONG", "plan-no-run", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(22L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-no-run"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-no-run", USER_ID))
                 .thenReturn(plan("plan-no-run", "ana-no-run", "100", "95", "120"));
-        when(analysisRunMapper.selectById("ana-no-run")).thenReturn(null);
+        when(analysisRunMapper.selectReadableByUser("ana-no-run", USER_ID)).thenReturn(null);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 22L)).thenReturn(List.of());
 
         assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 22L), 22L);
@@ -314,9 +317,9 @@ class UserPositionReviewAdapterTest {
     void closedPositionPlanRunAnalysisMismatchFailsClosed() {
         UserPositionDO position = closedPosition(23L, "LONG", "plan-run-mismatch", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(23L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-run-mismatch"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-run-mismatch", USER_ID))
                 .thenReturn(plan("plan-run-mismatch", "ana-plan", "100", "95", "120"));
-        when(analysisRunMapper.selectById("ana-plan"))
+        when(analysisRunMapper.selectReadableByUser("ana-plan", USER_ID))
                 .thenReturn(analysisRun("ana-other", "BTCUSDT"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 23L)).thenReturn(List.of());
 
@@ -329,18 +332,18 @@ class UserPositionReviewAdapterTest {
                 PositionMonitorSourceContract.analysisReference("ana-ambiguous"),
                 "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(24L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectOnlyByAnalysisId("ana-ambiguous")).thenReturn(null);
+        when(executionPlanMapper.selectOnlyByAnalysisIdForUser("ana-ambiguous", USER_ID)).thenReturn(null);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 24L)).thenReturn(List.of());
 
         assertUnverifiedPlanSummary(adapter.buildSummaryForUser(USER_ID, 24L), 24L);
-        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisIdForUser(anyString(), eq(USER_ID));
     }
 
     @Test
     void closedPositionExactVerifiedPlanStillBuildsReview() {
         UserPositionDO position = closedPosition(25L, "LONG", "plan-exact", "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(25L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-exact"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-exact", USER_ID))
                 .thenReturn(plan("plan-exact", "ana-exact", "100", "95", "120"));
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 25L)).thenReturn(List.of());
 
@@ -357,9 +360,9 @@ class UserPositionReviewAdapterTest {
         UserPositionDO position = closedPosition(26L, "LONG", "plan-foreign-feedback",
                 "100", "112", "95", "120");
         when(userPositionMapper.selectByIdAndUserId(26L, USER_ID)).thenReturn(position);
-        when(executionPlanMapper.selectByPlanId("plan-foreign-feedback"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-foreign-feedback", USER_ID))
                 .thenReturn(plan("plan-foreign-feedback", "ana-foreign-feedback", "100", "95", "120"));
-        when(analysisRunMapper.selectById("ana-foreign-feedback"))
+        when(analysisRunMapper.selectReadableByUser("ana-foreign-feedback", USER_ID))
                 .thenReturn(analysisRun("ana-foreign-feedback", "ETHUSDT"));
         when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenAnswer(invocation -> {
             WriteReviewResultReq request = invocation.getArgument(2);
@@ -387,10 +390,10 @@ class UserPositionReviewAdapterTest {
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         when(userPositionMapper.selectByIdAndUserId(27L, USER_ID)).thenReturn(position);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 27L)).thenReturn(List.of(monitorA));
-        when(executionPlanMapper.selectByPlanId("plan-A"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-A", USER_ID))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
-        lenient().when(executionPlanMapper.selectOnlyByAnalysisId("analysis-X")).thenReturn(null);
-        lenient().when(executionPlanMapper.selectLatestByAnalysisId("analysis-X"))
+        lenient().when(executionPlanMapper.selectOnlyByAnalysisIdForUser("analysis-X", USER_ID)).thenReturn(null);
+        lenient().when(executionPlanMapper.selectLatestByAnalysisIdForUser("analysis-X", USER_ID))
                 .thenReturn(plan("plan-B", "analysis-X", "B-entry", "B-stop", "B-tp"));
 
         UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 27L);
@@ -404,9 +407,9 @@ class UserPositionReviewAdapterTest {
             assertThat(log.getAnalysisId()).isEqualTo("analysis-X");
             assertThat(log.getExecutionPlanId()).isEqualTo("plan-A");
         });
-        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
-        verify(executionPlanMapper, never()).selectLatestByAnalysisId(anyString());
-        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisIdForUser(anyString(), eq(USER_ID));
+        verify(executionPlanMapper, never()).selectLatestByAnalysisIdForUser(anyString(), eq(USER_ID));
+        verify(executionPlanMapper, never()).selectByPlanIdForUser("plan-B", USER_ID);
     }
 
     @Test
@@ -418,7 +421,7 @@ class UserPositionReviewAdapterTest {
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         when(userPositionMapper.selectByIdAndUserId(28L, USER_ID)).thenReturn(position);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 28L)).thenReturn(List.of(monitorA));
-        when(executionPlanMapper.selectByPlanId("plan-A"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-A", USER_ID))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
         when(reviewService.saveOrUpdateForUserPosition(anyLong(), anyLong(), any())).thenAnswer(invocation -> {
             WriteReviewResultReq request = invocation.getArgument(2);
@@ -438,8 +441,8 @@ class UserPositionReviewAdapterTest {
         assertThat(summary.getAnalysisId()).isEqualTo("analysis-X");
         assertThat(feedback.getAnalysisId()).isEqualTo("analysis-X");
         assertThat(captor.getValue().getAnalysisId()).isEqualTo(summary.getAnalysisId());
-        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(anyString());
-        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisIdForUser(anyString(), eq(USER_ID));
+        verify(executionPlanMapper, never()).selectByPlanIdForUser("plan-B", USER_ID);
     }
 
     @Test
@@ -451,7 +454,7 @@ class UserPositionReviewAdapterTest {
                 LocalDateTime.of(2026, 6, 22, 9, 0));
         when(userPositionMapper.selectByIdAndUserId(29L, USER_ID)).thenReturn(position);
         when(positionMonitorLogService.listAllByPositionIdForUserReview(USER_ID, 29L)).thenReturn(List.of(guessedB));
-        when(executionPlanMapper.selectByPlanId("plan-A"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-A", USER_ID))
                 .thenReturn(plan("plan-A", "analysis-X", "A-entry", "A-stop", "A-tp"));
 
         UserPositionReviewSummaryDTO summary = adapter.buildSummaryForUser(USER_ID, 29L);
@@ -463,7 +466,7 @@ class UserPositionReviewAdapterTest {
             assertThat(log.getAnalysisId()).isNull();
             assertThat(log.getExecutionPlanId()).isNull();
         });
-        verify(executionPlanMapper, never()).selectByPlanId("plan-B");
+        verify(executionPlanMapper, never()).selectByPlanIdForUser("plan-B", USER_ID);
     }
 
     @Test
@@ -484,7 +487,7 @@ class UserPositionReviewAdapterTest {
             assertThat(log.getAnalysisId()).isNull();
             assertThat(log.getExecutionPlanId()).isNull();
         });
-        verify(executionPlanMapper, never()).selectByPlanId(anyString());
+        verify(executionPlanMapper, never()).selectByPlanIdForUser(anyString(), eq(USER_ID));
     }
 
     private static UserPositionDO positionWithStatus(Long id, String status) {

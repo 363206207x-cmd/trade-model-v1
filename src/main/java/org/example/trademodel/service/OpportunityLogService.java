@@ -26,6 +26,8 @@ public interface OpportunityLogService {
 
     OpportunityLogPublicDTO findPublicById(String opportunityId);
 
+    OpportunityLogPublicDTO findPublicByIdForUser(String opportunityId, Long userId);
+
     List<OpportunityLogPublicDTO> queryPublic(String analysisId,
                                                String decisionId,
                                                String executionPlanId,
@@ -35,6 +37,20 @@ public interface OpportunityLogService {
                                                LocalDateTime from,
                                                LocalDateTime to,
                                                int limit);
+
+    List<OpportunityLogPublicDTO> queryPublicForUser(Long userId, String symbol,
+                                                     LocalDateTime from, LocalDateTime to, int limit);
+
+    List<OpportunityLogPublicDTO> queryPublicForUser(Long userId,
+                                                      String analysisId,
+                                                      String decisionId,
+                                                      String executionPlanId,
+                                                      String symbol,
+                                                      String opportunityStatus,
+                                                      String lifecycleStatus,
+                                                      LocalDateTime from,
+                                                      LocalDateTime to,
+                                                      int limit);
 
     OpportunityLogDTO findByIdForUser(String opportunityId, Long userId);
 
@@ -62,4 +78,7 @@ public interface OpportunityLogService {
                                            int limit);
 
     OpportunityLogStatsDTO getStats(String symbol, LocalDateTime from, LocalDateTime to);
+
+    OpportunityLogStatsDTO getStatsForUser(Long userId, String symbol,
+                                            LocalDateTime from, LocalDateTime to);
 }

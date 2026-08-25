@@ -56,6 +56,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -98,6 +99,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
                 .load();
         assertThat(flyway.migrate().success).isTrue();
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+        ensureCanonicalOwner(jdbcUrl, username, password);
         sessions = sqlSessions();
     }
 
@@ -351,7 +353,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         PositionMonitorLogMapper monitorLogMapper = session.getMapper(PositionMonitorLogMapper.class);
 
         MonitorService monitorService = mock(MonitorService.class);
-        when(monitorService.getRecentAlerts(anyInt())).thenReturn(List.of());
+        when(monitorService.getRecentAlertsForUser(anyLong(), anyInt())).thenReturn(List.of());
         PositionSyncService positionSyncService = mock(PositionSyncService.class);
         ProviderReadinessService readinessService = mock(ProviderReadinessService.class);
         when(readinessService.getReadiness()).thenReturn(new ProviderReadinessVO());
@@ -370,7 +372,7 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         service.setAssetStateMapper(stateMapper);
         service.setPlanValidityClock(Clock.fixed(now, ZoneOffset.UTC));
         AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
-        when(resolver.requireCurrentUserId()).thenReturn(17L);
+        when(resolver.requireCurrentUserId()).thenReturn(1L);
         return new DashboardHomeController(service, resolver);
     }
 
@@ -388,6 +390,8 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setCreatedAt(time);
         row.setUpdatedAt(time);
         row.setVersionNo(1);
+        row.setOwnerType("USER");
+        row.setOwnerId(1L);
         return row;
     }
 
@@ -464,11 +468,14 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
         row.setLastTriggerSource("MANUAL_API");
         row.setLastUpdateTime(time);
         row.setTraceId(traceId);
+        row.setOwnerType("USER");
+        row.setOwnerId(1L);
         return row;
     }
 
     private static UserPositionDO userPosition(String planId) {
         UserPositionDO row = new UserPositionDO();
+        row.setUserId(1L);
         row.setAssetSymbol("BTCUSDT");
         row.setSide("LONG");
         row.setStatus("OPEN");
@@ -566,6 +573,22 @@ class ControlledPostgreSqlDashboardPlanValidityEvidenceTest {
             statement.executeUpdate("DELETE FROM tm_user_position");
         }
         assertThat(session.getMapper(UserPositionMapper.class).listClaimedOpenForSystemMonitoring()).isEmpty();
+    }
+
+    private static void ensureCanonicalOwner(String jdbcUrl, String username, String password) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO tm_user(
+                      id, username, password_hash, role, enabled, session_version,
+                      created_at, updated_at, owner_slot
+                    ) VALUES (1, 'xuchao', '{noop}controlled-test-only', 'OWNER', TRUE, 0,
+                      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+                    ON CONFLICT (id) DO NOTHING
+                    """);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to seed controlled PostgreSQL Owner", exception);
+        }
     }
 
     private static SqlSessionFactory sqlSessions() {

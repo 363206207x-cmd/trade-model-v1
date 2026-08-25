@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -137,7 +138,7 @@ class OpportunityLogServiceImplTest {
         OpportunityLogDO row = pendingLong();
         row.setPushPresent(false);
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 30))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -158,7 +159,7 @@ class OpportunityLogServiceImplTest {
     void evaluateForUser_positionOpenedAtTargetHit_isOwnerScopedExecutionEvidence() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 0))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -179,7 +180,7 @@ class OpportunityLogServiceImplTest {
     void evaluateForUser_positionOpenedAfterInvalidationHit_isNotExecutedEvidence() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of(userPosition(77L, "plan-1",
                 LocalDateTime.of(2026, 6, 23, 11, 30))));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -199,7 +200,7 @@ class OpportunityLogServiceImplTest {
         OpportunityLogDO row = pendingLong();
         UserPositionDO position = userPosition(77L, "plan-1", null);
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of(position));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
                 .thenReturn(List.of(bar(1, "100", "121", "98", "118")));
@@ -302,34 +303,39 @@ class OpportunityLogServiceImplTest {
     }
 
     @Test
-    void publicEvaluationIsIdenticalAcrossUsersAndNeverReadsPrivateSources() {
+    void publicEvaluationIsScopedToTheAnalysisOwnerAndNeverReadsPrivateSources() {
         OpportunityLogDO userASource = resolvedTargetFirst();
-        userASource.setPushId(91L);
-        userASource.setPushPresent(true);
-        userASource.setUserPositionId(501L);
-        userASource.setUserPositionPresent(true);
-        userASource.setRiskBlockedEvidence(true);
-        OpportunityLogDO userBSource = resolvedTargetFirst();
         OpportunityLogPublicDTO publicProjection = publicProjection();
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-1", USER_A_ID))
+                .thenReturn(publicProjection);
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1"))
-                .thenReturn(userASource, userBSource);
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-1")).thenReturn(publicProjection);
+                .thenReturn(userASource);
 
         OpportunityLogPublicDTO userA = service.evaluatePublicOpportunityForUser(
                 "opp-1", USER_A_ID, userASource.getAnchorTime().plusHours(2));
-        OpportunityLogPublicDTO userB = service.evaluatePublicOpportunityForUser(
-                "opp-1", USER_B_ID, userBSource.getAnchorTime().plusHours(2));
 
         assertThat(userA).isEqualTo(publicProjection);
-        assertThat(userB).isEqualTo(publicProjection);
         verifyNoInteractions(userPositionMapper, pushSnapshotMapper, pushRecheckLogMapper, accountRiskSnapshotMapper);
+    }
+
+    @Test
+    void publicEvaluationRejectsAnotherUsersOpportunityBeforeEvaluation() {
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-1", USER_B_ID))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> service.evaluatePublicOpportunityForUser(
+                "opp-1", USER_B_ID, LocalDateTime.now()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not owned");
+
+        verify(opportunityLogMapper, never()).selectPublicEvaluationSourceByOpportunityId(any());
     }
 
     @Test
     void evaluateForUser_multipleExactPositionsRequireReviewWithoutPersistingOwnerState() {
         OpportunityLogDO row = pendingLong();
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
                 .thenReturn(List.of(userPosition(1L, "plan-1"), userPosition(2L, "plan-1")));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -394,7 +400,7 @@ class OpportunityLogServiceImplTest {
         row.setUserPositionId(88L);
         row.setUserPositionPresent(true);
         row.setReasonCodes("TARGET_FIRST,MULTIPLE_LINKED_USER_POSITIONS");
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID)).thenReturn(List.of());
         when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_A_ID)).thenReturn(List.of());
 
@@ -414,7 +420,7 @@ class OpportunityLogServiceImplTest {
         row.setUserPositionPresent(true);
         UserPositionDO owned = userPosition(17L, "plan-1", LocalDateTime.of(2026, 6, 23, 10, 30));
         owned.setUserId(USER_A_ID);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
                 .thenReturn(List.of(owned));
 
@@ -432,7 +438,7 @@ class OpportunityLogServiceImplTest {
         UserPositionDO owned = userPosition(17L, "plan-1", LocalDateTime.of(2026, 6, 23, 10, 30));
         owned.setUserId(USER_A_ID);
         when(opportunityLogMapper.selectPublicEvaluationSourceByOpportunityId("opp-1")).thenReturn(row);
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
                 .thenReturn(List.of(owned));
         when(persistedOhlcvBarMapper.selectClosedBarsBetween(eq("BTCUSDT"), eq("1h"), anyLong(), anyLong(), eq(2001)))
@@ -453,7 +459,7 @@ class OpportunityLogServiceImplTest {
         row.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
         row.setEvaluationAsOf(LocalDateTime.of(2026, 6, 23, 11, 30));
         row.setReasonCodes("MULTIPLE_LINKED_USER_POSITIONS");
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_B_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_B_ID)).thenReturn(List.of());
         when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_B_ID)).thenReturn(List.of());
 
@@ -471,7 +477,7 @@ class OpportunityLogServiceImplTest {
     void userScopedFindNeverExposesSharedEvaluationTimestampWithoutOwnerProvenance() {
         OpportunityLogDO row = resolvedTargetFirst();
         row.setEvaluationAsOf(LocalDateTime.of(2026, 6, 23, 11, 30));
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_B_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_B_ID)).thenReturn(List.of());
         when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_B_ID)).thenReturn(List.of());
 
@@ -490,7 +496,7 @@ class OpportunityLogServiceImplTest {
         row.setUserPositionPresent(true);
         row.setEvaluationAsOf(LocalDateTime.of(2026, 6, 23, 11, 30));
         row.setReasonCodes("TARGET_FIRST,LINKED_USER_POSITION_OPENED_AFTER_OUTCOME");
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_B_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_B_ID)).thenReturn(List.of());
         when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_B_ID)).thenReturn(List.of());
 
@@ -514,7 +520,7 @@ class OpportunityLogServiceImplTest {
         closedPending.setOpportunityId("opp-closed-pending");
         closedPending.setLifecycleStatus("CLOSED_PENDING");
         closedPending.setEvaluationAsOf(LocalDateTime.of(2026, 6, 23, 12, 0));
-        when(opportunityLogMapper.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogMapper.queryForUser(anyLong(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(active, closedPending));
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_B_ID)).thenReturn(List.of());
         when(userPositionMapper.listByExactSourceRefIdAndUserId("ana-1", USER_B_ID)).thenReturn(List.of());
@@ -534,7 +540,7 @@ class OpportunityLogServiceImplTest {
     @Test
     void userScopedQueryAppliesLifecycleFilterAfterOwnerProjection() {
         OpportunityLogDO row = resolvedTargetFirst();
-        when(opportunityLogMapper.query(any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(opportunityLogMapper.queryForUser(anyLong(), any(), any(), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(row));
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
                 .thenReturn(List.of(userPosition(1L, "plan-1"), userPosition(2L, "plan-1")));
@@ -548,8 +554,8 @@ class OpportunityLogServiceImplTest {
                     assertThat(dto.getLifecycleStatus()).isEqualTo(OpportunityLogStatus.REVIEW_REQUIRED);
                     assertThat(dto.getOpportunityStatus()).isNull();
                 });
-        verify(opportunityLogMapper).query(
-                isNull(), isNull(), isNull(), eq("BTCUSDT"), isNull(), isNull(), isNull(), isNull(), eq(200));
+        verify(opportunityLogMapper).queryForUser(
+                eq(USER_A_ID), isNull(), isNull(), isNull(), eq("BTCUSDT"), isNull(), isNull(), eq(200));
     }
 
     @Test
@@ -558,7 +564,7 @@ class OpportunityLogServiceImplTest {
         row.setUserPositionId(88L);
         row.setUserPositionPresent(true);
         row.setEvaluationAsOf(LocalDateTime.of(2026, 6, 23, 11, 30));
-        when(opportunityLogMapper.selectByOpportunityId("opp-1")).thenReturn(row);
+        when(opportunityLogMapper.selectByOpportunityIdForUser("opp-1", USER_A_ID)).thenReturn(row);
         when(userPositionMapper.listByExactSourceRefIdAndUserId("plan-1", USER_A_ID))
                 .thenThrow(new IllegalStateException("lookup unavailable"));
 

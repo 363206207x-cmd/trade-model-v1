@@ -17,10 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.LinkedHashMap;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/opportunities")
@@ -44,14 +42,8 @@ public class OpportunityController {
     public ApiResponse<List<OpportunityVO>> list(@RequestParam(defaultValue = "100") int limit) {
         Long userId = userIdResolver.requireCurrentUserId();
         int safeLimit = Math.max(1, Math.min(500, limit));
-        Map<String, OpportunityVO> rows = new LinkedHashMap<>();
-        stateMapper.listOwnedByUser(userId, safeLimit).stream()
+        return ApiResponse.success(stateMapper.listOwnedByUser(userId, safeLimit).stream()
                 .map(OpportunityVO::from)
-                .forEach(row -> rows.putIfAbsent(row.opportunityId(), row));
-        stateMapper.listEffectiveSystemForUser(userId, safeLimit).stream()
-                .map(OpportunityVO::from)
-                .forEach(row -> rows.putIfAbsent(row.opportunityId(), row));
-        return ApiResponse.success(rows.values().stream()
                 .sorted(Comparator.comparing(OpportunityVO::updatedAt,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(safeLimit)

@@ -7,6 +7,7 @@ import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -45,6 +46,8 @@ class ReviewControllerOpportunityStatsTest {
     private OpportunityLogService opportunityLogService;
     @Mock
     private AuthenticatedUserIdResolver authenticatedUserIdResolver;
+    @Mock
+    private AnalysisRunMapper analysisRunMapper;
 
     private MockMvc mockMvc;
 
@@ -57,11 +60,13 @@ class ReviewControllerOpportunityStatsTest {
                 positionMonitorLogService,
                 userPositionReviewAdapter,
                 opportunityLogService,
-                authenticatedUserIdResolver)).build();
+                authenticatedUserIdResolver,
+                analysisRunMapper)).build();
     }
 
     @Test
     void statsEndpointReturnsReviewOnlyOpportunityStats() throws Exception {
+        when(authenticatedUserIdResolver.requireCurrentUserId()).thenReturn(7L);
         OpportunityLogStatsDTO stats = new OpportunityLogStatsDTO();
         stats.setTotalCount(3);
         stats.setResolvedCount(2);
@@ -70,7 +75,7 @@ class ReviewControllerOpportunityStatsTest {
         stats.setMissedInvalidCount(1);
         stats.setValidRate(new BigDecimal("0.50000000"));
         stats.setGeneratedAt(LocalDateTime.of(2026, 6, 23, 12, 0));
-        when(opportunityLogService.getStats(eq("BTCUSDT"), any(), any())).thenReturn(stats);
+        when(opportunityLogService.getStatsForUser(eq(7L), eq("BTCUSDT"), any(), any())).thenReturn(stats);
 
         mockMvc.perform(get("/api/review/opportunities/stats")
                         .param("symbol", "BTCUSDT")
@@ -92,6 +97,6 @@ class ReviewControllerOpportunityStatsTest {
                 .andExpect(jsonPath("$.data.orderAction").doesNotExist())
                 .andExpect(jsonPath("$.data.executionAction").doesNotExist());
 
-        verify(opportunityLogService).getStats(eq("BTCUSDT"), any(), any());
+        verify(opportunityLogService).getStatsForUser(eq(7L), eq("BTCUSDT"), any(), any());
     }
 }

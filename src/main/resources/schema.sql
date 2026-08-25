@@ -578,7 +578,7 @@ CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_positio
 
 CREATE TABLE IF NOT EXISTS tm_user_position (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT,
+    user_id BIGINT NOT NULL,
     asset_symbol VARCHAR(32) NOT NULL,
     side VARCHAR(10) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -1552,12 +1552,46 @@ CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_role ON tm_ai_call_log(ai_role, st
 
 CREATE TABLE IF NOT EXISTS tm_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(64) NOT NULL,
+    username VARCHAR_IGNORECASE(64) NOT NULL,
     password_hash VARCHAR(100) NOT NULL,
+    role VARCHAR(16) NOT NULL DEFAULT 'USER',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    session_version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP,
-    CONSTRAINT uq_tm_user_username UNIQUE (username)
+    disabled_at TIMESTAMP,
+    owner_slot SMALLINT,
+    CONSTRAINT uq_tm_user_username UNIQUE (username),
+    CONSTRAINT uk_tm_user_owner_slot UNIQUE (owner_slot),
+    CONSTRAINT ck_tm_user_role CHECK (role IN ('OWNER', 'USER')),
+    CONSTRAINT ck_tm_user_owner_identity CHECK (
+        (role = 'OWNER' AND LOWER(username) = 'xuchao' AND owner_slot = 1 AND enabled = TRUE)
+        OR (role = 'USER' AND owner_slot IS NULL)
+    )
 );
+
+CREATE TABLE IF NOT EXISTS tm_user_registration_guard (
+    id SMALLINT PRIMARY KEY,
+    max_active_accounts INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_tm_user_registration_guard_singleton CHECK (id = 1),
+    CONSTRAINT ck_tm_user_registration_guard_limit CHECK (max_active_accounts = 10)
+);
+MERGE INTO tm_user_registration_guard KEY(id) VALUES (1, 10, CURRENT_TIMESTAMP);
+
+CREATE TABLE IF NOT EXISTS tm_owner_password_setup_token (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_tm_owner_password_setup_hash UNIQUE (token_hash),
+    CONSTRAINT fk_tm_owner_password_setup_user FOREIGN KEY (user_id) REFERENCES tm_user(id)
+);
+CREATE INDEX IF NOT EXISTS idx_tm_owner_password_setup_user_time
+    ON tm_owner_password_setup_token(user_id, created_at);
 
 ALTER TABLE tm_user_position
     ADD CONSTRAINT IF NOT EXISTS fk_tm_user_position_user

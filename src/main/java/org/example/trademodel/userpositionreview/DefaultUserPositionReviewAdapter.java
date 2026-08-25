@@ -175,7 +175,7 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
                 continue;
             }
             PositionPlanSourceResolver.Resolution monitorSource = positionPlanSourceResolver
-                    .resolveTrustedMonitorSource(position.getId(), position.getAssetSymbol(),
+                    .resolveTrustedMonitorSourceForUser(userId, position.getId(), position.getAssetSymbol(),
                             position.getSourceRefId(), log.getAnalysisId(), log.getExecutionPlanId());
             if (monitorSource.verified()) {
                 PositionMonitorLogSourceViewPolicy.markVerified(
@@ -193,8 +193,8 @@ public class DefaultUserPositionReviewAdapter implements UserPositionReviewAdapt
 
         PositionPlanSourceResolver.Resolution source = latestTrustedSource;
         if (source == null) {
-            source = positionPlanSourceResolver.resolveTypedReference(
-                    position.getId(), position.getAssetSymbol(), position.getSourceRefId());
+            source = positionPlanSourceResolver.resolveTypedReferenceForUser(
+                    userId, position.getId(), position.getAssetSymbol(), position.getSourceRefId());
             if (!source.verified()) {
                 failureReason = source.failureReason();
             }

@@ -114,11 +114,12 @@ class PositionMonitorServiceImplTest {
         lenient().when(positionMonitorLogService.listByPositionIdForSystem(anyLong(), eq(1))).thenReturn(List.of());
         lenient().when(positionMonitorLogService.recordMonitorRunForSystem(any())).thenAnswer(invocation ->
                 monitorLog(invocation.getArgument(0)));
-        lenient().when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(any())).thenAnswer(invocation -> {
-            String symbol = invocation.getArgument(0);
+        lenient().when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(anyLong(), any()))
+                .thenAnswer(invocation -> {
+            String symbol = invocation.getArgument(1);
             return decision("monitor-" + symbol, symbol, "RANGE");
         });
-        lenient().when(analysisRunMapper.selectById(any())).thenAnswer(invocation -> {
+        lenient().when(analysisRunMapper.selectReadableByUser(any(), anyLong())).thenAnswer(invocation -> {
             String analysisId = invocation.getArgument(0);
             String symbol = analysisId != null && analysisId.startsWith("monitor-")
                     ? analysisId.substring("monitor-".length()) : "BTC";
@@ -273,7 +274,8 @@ class PositionMonitorServiceImplTest {
         UserPositionDO position = position(111L, "LONG", "OPEN", "plan-reversal", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-reversal", "ana-111", "VALID", true));
         DecisionResultVO decision = decision("ana-111", "BTC", "STRONG_BEARISH");
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(decision);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTC"))
+                .thenReturn(decision);
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(111L, USER_ID);
 
@@ -288,7 +290,8 @@ class PositionMonitorServiceImplTest {
     void missingCurrentRuleDirectionPersistsNoSemanticResultAndReturnsWaitingState() {
         UserPositionDO position = position(112L, "LONG", "OPEN", "plan-no-direction", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-no-direction", "ana-112", "VALID", true));
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(null);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTC"))
+                .thenReturn(null);
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(112L, USER_ID);
 
@@ -317,8 +320,9 @@ class PositionMonitorServiceImplTest {
         staleDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
         AnalysisRunDO staleRun = analysisRun("ana-stale-evidence", "BTC");
         staleRun.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(staleDecision);
-        when(analysisRunMapper.selectById("ana-stale-evidence")).thenReturn(staleRun);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTC"))
+                .thenReturn(staleDecision);
+        when(analysisRunMapper.selectReadableByUser("ana-stale-evidence", USER_ID)).thenReturn(staleRun);
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(113L, USER_ID);
 
@@ -446,9 +450,9 @@ class PositionMonitorServiceImplTest {
         assertThat(result.getAnalysisId()).isNull();
         assertThat(result.getExecutionPlanId()).isNull();
         assertThat(result.getReasonCodes()).contains("PLAN_SOURCE_UNVERIFIED");
-        verify(executionPlanMapper, never()).selectLatestByAnalysisId(any());
-        verify(executionPlanMapper, never()).selectOnlyByAnalysisId(any());
-        verify(executionPlanMapper, never()).selectByPlanId(any());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisIdForUser(any(), anyLong());
+        verify(executionPlanMapper, never()).selectOnlyByAnalysisIdForUser(any(), anyLong());
+        verify(executionPlanMapper, never()).selectByPlanIdForUser(any(), anyLong());
     }
 
     @Test
@@ -456,7 +460,7 @@ class PositionMonitorServiceImplTest {
         UserPositionDO position = position(132L, "LONG", "OPEN", null, "90", "120");
         position.setSourceRefId("plan-A-without-type");
         arrange(position, "100", risk("LOW", false), null);
-        lenient().when(executionPlanMapper.selectByPlanId("plan-A-without-type"))
+        lenient().when(executionPlanMapper.selectByPlanIdForUser("plan-A-without-type", USER_ID))
                 .thenReturn(plan("plan-A-without-type", "analysis-A", "VALID", true));
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(132L, USER_ID);
@@ -469,7 +473,7 @@ class PositionMonitorServiceImplTest {
         assertThat(captor.getValue().getExecutionPlanId()).isNull();
         assertThat(result.getMonitorConclusion()).isNull();
         assertThat(result.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
-        verify(executionPlanMapper, never()).selectByPlanId(any());
+        verify(executionPlanMapper, never()).selectByPlanIdForUser(any(), anyLong());
     }
 
     @Test
@@ -478,8 +482,9 @@ class PositionMonitorServiceImplTest {
         position.setSourceRefId(PositionMonitorSourceContract.analysisReference("analysis-A"));
         arrange(position, "100", risk("LOW", false), null);
         ExecutionPlanDO planA = plan("plan-A", "analysis-A", "VALID", true);
-        when(executionPlanMapper.selectOnlyByAnalysisId("analysis-A")).thenReturn(planA);
-        when(analysisRunMapper.selectById("analysis-A")).thenReturn(analysisRun("analysis-A", "BTC"));
+        when(executionPlanMapper.selectOnlyByAnalysisIdForUser("analysis-A", USER_ID)).thenReturn(planA);
+        when(analysisRunMapper.selectReadableByUser("analysis-A", USER_ID))
+                .thenReturn(analysisRun("analysis-A", "BTC"));
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(133L, USER_ID);
 
@@ -489,14 +494,15 @@ class PositionMonitorServiceImplTest {
         assertThat(captor.getValue().getAnalysisId()).isEqualTo("monitor-BTC");
         assertThat(captor.getValue().getExecutionPlanId()).isEqualTo("plan-A");
         assertThat(result.getAnalysisId()).isEqualTo("monitor-BTC");
-        verify(executionPlanMapper, never()).selectLatestByAnalysisId(any());
+        verify(executionPlanMapper, never()).selectLatestByAnalysisIdForUser(any(), anyLong());
     }
 
     @Test
     void monitorSourceSymbolMismatchFailsClosedBeforeLogWrite() {
         UserPositionDO position = position(134L, "LONG", "OPEN", "plan-A", "90", "120");
         arrange(position, "100", risk("LOW", false), plan("plan-A", "analysis-A", "VALID", true));
-        when(analysisRunMapper.selectById("analysis-A")).thenReturn(analysisRun("analysis-A", "ETH"));
+        when(analysisRunMapper.selectReadableByUser("analysis-A", USER_ID))
+                .thenReturn(analysisRun("analysis-A", "ETH"));
 
         PositionMonitorResultDTO result = service.monitorUserPositionForUser(134L, USER_ID);
 
@@ -600,7 +606,7 @@ class PositionMonitorServiceImplTest {
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(open, partial));
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk("LOW", false));
-        when(executionPlanMapper.selectByPlanId("plan-batch-open"))
+        lenient().when(executionPlanMapper.selectByPlanIdForUser("plan-batch-open", USER_ID))
                 .thenReturn(plan("plan-batch-open", "ana-21", "VALID", true));
         when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.empty());
 
@@ -626,12 +632,14 @@ class PositionMonitorServiceImplTest {
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(ownerA, ownerB));
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
         when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
-        when(executionPlanMapper.selectByPlanId("plan-owner-a"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-owner-a", 101L))
                 .thenReturn(plan("plan-owner-a", "ana-owner-a", "VALID", true));
-        when(executionPlanMapper.selectByPlanId("plan-owner-b"))
+        when(executionPlanMapper.selectByPlanIdForUser("plan-owner-b", 202L))
                 .thenReturn(plan("plan-owner-b", "ana-owner-b", "VALID", true));
-        when(analysisRunMapper.selectById("ana-owner-a")).thenReturn(analysisRun("ana-owner-a", "BTC"));
-        when(analysisRunMapper.selectById("ana-owner-b")).thenReturn(analysisRun("ana-owner-b", "ETH"));
+        when(analysisRunMapper.selectReadableByUser("ana-owner-a", 101L))
+                .thenReturn(analysisRun("ana-owner-a", "BTC"));
+        when(analysisRunMapper.selectReadableByUser("ana-owner-b", 202L))
+                .thenReturn(analysisRun("ana-owner-b", "ETH"));
 
         PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
 
@@ -811,11 +819,11 @@ class PositionMonitorServiceImplTest {
         when(marketQuoteClient.fetch24hTicker(position.getAssetSymbol())).thenReturn(Optional.of(quote(currentPrice)));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk);
         if (plan != null) {
-            when(executionPlanMapper.selectByPlanId(plan.getPlanId())).thenReturn(plan);
-            when(analysisRunMapper.selectById(plan.getAnalysisId()))
+            when(executionPlanMapper.selectByPlanIdForUser(plan.getPlanId(), USER_ID)).thenReturn(plan);
+            when(analysisRunMapper.selectReadableByUser(plan.getAnalysisId(), USER_ID))
                     .thenReturn(analysisRun(plan.getAnalysisId(), position.getAssetSymbol()));
-            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(
-                    position.getAssetSymbol().toUpperCase()))
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(
+                    USER_ID, position.getAssetSymbol().toUpperCase()))
                     .thenReturn(decision(plan.getAnalysisId(), position.getAssetSymbol(),
                             "SHORT".equals(position.getSide()) ? "BEARISH" : "BULLISH"));
         }

@@ -23,6 +23,8 @@ public interface MissedOpportunityService {
 
     MissedOpportunityDO findByMissedId(String missedId);
 
+    MissedOpportunityDO findByMissedIdForUser(Long userId, String missedId);
+
     List<MissedOpportunityDO> listByDecisionId(String decisionId);
 
     List<MissedOpportunityDO> listBySymbol(String symbol, int limit);
@@ -33,5 +35,10 @@ public interface MissedOpportunityService {
 
     List<MissedOpportunityDO> query(String analysisId, String symbol, LocalDate bizDate, int limit);
 
+    List<MissedOpportunityDO> queryForUser(Long userId, String analysisId, String symbol,
+                                           LocalDate bizDate, int limit);
+
     int countByBizDate(LocalDate bizDate);
+
+    int countByBizDateForUser(Long userId, LocalDate bizDate);
 }

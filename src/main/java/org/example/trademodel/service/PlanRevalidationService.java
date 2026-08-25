@@ -55,7 +55,7 @@ public class PlanRevalidationService {
         if (triggerType != PlanRevalidationTriggerTypeEnum.MANUAL_REVALIDATION) {
             throw new IllegalArgumentException("user requests must use MANUAL_REVALIDATION");
         }
-        ExecutionPlanDO plan = planMapper.selectByPlanId(planId);
+        ExecutionPlanDO plan = planMapper.selectByPlanIdForUser(planId, userId);
         if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())) {
             throw new IllegalArgumentException("validated final plan is required");
         }
@@ -149,8 +149,10 @@ public class PlanRevalidationService {
         return record;
     }
 
-    public List<PlanRevalidationRecordDO> list(String planId, int limit) {
-        return recordMapper.listByPlanId(required(planId, "planId"), Math.max(1, Math.min(limit, 50)));
+    public List<PlanRevalidationRecordDO> list(Long userId, String planId, int limit) {
+        if (userId == null || userId <= 0) throw new IllegalArgumentException("userId is required");
+        return recordMapper.listByPlanIdForUser(required(planId, "planId"), userId,
+                Math.max(1, Math.min(limit, 50)));
     }
 
     private static String required(String value, String field) {

@@ -209,7 +209,7 @@ class ProductionProfileSafetyGuardTest {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.auth.initial-password", unsafePassword);
         PersonalUserBootstrap bootstrap = new PersonalUserBootstrap(
-                true, "operator", unsafePassword, mock(PersonalUserMapper.class),
+                true, "xuchao", unsafePassword, mock(PersonalUserMapper.class),
                 new BCryptPasswordEncoder());
 
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))

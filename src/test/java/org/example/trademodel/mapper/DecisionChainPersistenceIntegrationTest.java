@@ -126,24 +126,34 @@ class DecisionChainPersistenceIntegrationTest {
     @Test
     void finalPlanCanOnlyBeLinkedByManuallyCreatedUserPosition() {
         schemaSeedsSixDefaultAssetsAndEnforcesCandidateResolverFinalRelationships();
+        Long userId = insertUser("decision-chain-position-owner");
 
         jdbcTemplate.update("""
                 INSERT INTO tm_user_position(
-                  asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                  user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                   source_type, final_plan_id
-                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'SYSTEM_PLAN_POSITION', ?)
-                """, timestamp(), "final-plan-chain-db");
+                ) VALUES (?, 'CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'SYSTEM_PLAN_POSITION', ?)
+                """, userId, timestamp(), "final-plan-chain-db");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM tm_user_position WHERE final_plan_id='final-plan-chain-db'",
                 Integer.class)).isEqualTo(1);
 
         assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO tm_user_position(
-                  asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                  user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                   source_type, final_plan_id
-                ) VALUES ('CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'MANUAL_INDEPENDENT', ?)
-                """, timestamp(), "final-plan-chain-db"))
+                ) VALUES (?, 'CHAINDBUSDT', 'LONG', 'OPEN', 100, 1, 1, ?, 'MANUAL_INDEPENDENT', ?)
+                """, userId, timestamp(), "final-plan-chain-db"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private Long insertUser(String username) {
+        jdbcTemplate.update("""
+                INSERT INTO tm_user(username, password_hash, created_at, updated_at)
+                VALUES (?, '{noop}not-a-real-password', ?, ?)
+                """, username, timestamp(), timestamp());
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tm_user WHERE username = ?", Long.class, username);
     }
 
     @Test

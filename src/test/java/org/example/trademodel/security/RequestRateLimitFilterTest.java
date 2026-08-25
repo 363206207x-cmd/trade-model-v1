@@ -11,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -32,19 +31,38 @@ class RequestRateLimitFilterTest {
 
     @Test
     void blocksExcessiveRequestsWithoutPrintingSecrets(CapturedOutput output) throws Exception {
-        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
+        mockMvc.perform(get("/register"))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
+        mockMvc.perform(get("/register"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/dashboard/home").with(user("operator").roles("OPERATOR")))
+        mockMvc.perform(get("/register"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(content().json("{\"code\":429,\"msg\":\"rate limit exceeded\"}"));
 
         assertThat(output).contains("RATE_LIMIT_BLOCKED");
-        assertThat(output).contains("path=/api/dashboard/home");
+        assertThat(output).contains("path=/register");
         assertThat(output).doesNotContain("operator-secret");
+    }
+
+    @Test
+    void rateLimitsThePublicRegistrationRoute() throws Exception {
+        mockMvc.perform(get("/register").with(request -> {
+                    request.setRemoteAddr("203.0.113.10");
+                    return request;
+                }))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/register").with(request -> {
+                    request.setRemoteAddr("203.0.113.10");
+                    return request;
+                }))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/register").with(request -> {
+                    request.setRemoteAddr("203.0.113.10");
+                    return request;
+                }))
+                .andExpect(status().isTooManyRequests());
     }
 }

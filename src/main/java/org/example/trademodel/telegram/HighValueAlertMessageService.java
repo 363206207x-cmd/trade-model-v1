@@ -180,7 +180,8 @@ public class HighValueAlertMessageService {
         int severity = positionSeverity(log);
         String state = strongestPositionState(log);
         ExecutionPlanDO sourcePlan = hasText(position.getFinalPlanId())
-                ? executionPlanMapper.selectByPlanId(position.getFinalPlanId()) : null;
+                ? executionPlanMapper.selectByPlanIdForUser(
+                        position.getFinalPlanId(), position.getUserId()) : null;
         MessageDO message = base(position.getUserId(), "POSITION_LOGIC_RISK_CHANGE",
                 "POSITION_MONITOR", String.valueOf(log.getLogId()), log.getAnalysisId(),
                 position.getId(), position.getFinalPlanId(), position.getAssetSymbol(),

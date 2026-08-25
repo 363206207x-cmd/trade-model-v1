@@ -147,7 +147,8 @@ class UserPositionServiceImplTest {
         plan.setPlanId("final-plan-1");
         plan.setFinalPlan(true);
         plan.setRuleValidationStatus("PASS");
-        when(executionPlanMapper.selectValidatedFinalByPlanIdAndSymbol("final-plan-1", "BTCUSDT"))
+        when(executionPlanMapper.selectValidatedFinalByPlanIdAndSymbolForUser(
+                "final-plan-1", "BTCUSDT", USER_ID))
                 .thenReturn(plan);
 
         UserPositionVO result = service.manualOpenForUser(USER_ID, request);

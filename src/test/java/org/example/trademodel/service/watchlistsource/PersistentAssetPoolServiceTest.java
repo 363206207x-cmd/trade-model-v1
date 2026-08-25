@@ -129,20 +129,25 @@ class PersistentAssetPoolServiceTest {
         AssetPoolItemDO btcDefault = row("SYSTEM", 0L, "BTCUSDT", true, true, 10, "DEFAULT");
         AssetPoolItemDO overriddenBtc = row("USER", 9L, "BTCUSDT", true, true, 20, "USER_OVERRIDE");
         AssetPoolItemDO customLink = row("USER", 9L, "LINKUSDT", true, true, 30, "USER_ADDED");
+        AssetPoolItemDO restoredBtc = row("USER", 9L, "BTCUSDT", true, true, 10, "USER_OVERRIDE");
         AssetPoolItemDO stoppedLink = row("USER", 9L, "LINKUSDT", false, false, 30, "USER_OVERRIDE");
         stoppedLink.setWatchStatus("TRACKING_STOPPED");
         when(mapper.listSystemDefaults()).thenReturn(List.of(btcDefault));
         when(mapper.listUserOverrides(9L)).thenReturn(
-                List.of(overriddenBtc, customLink), List.of(stoppedLink));
+                List.of(overriddenBtc, customLink),
+                List.of(overriddenBtc, customLink),
+                List.of(restoredBtc, stoppedLink));
 
         List<AssetPoolAssetDTO> result = service.resetDefaults(9L);
 
-        verify(mapper).deleteUserOverride(9L, "BTCUSDT");
         ArgumentCaptor<AssetPoolItemDO> write = ArgumentCaptor.forClass(AssetPoolItemDO.class);
-        verify(mapper).upsert(write.capture());
-        assertThat(write.getValue().getSymbol()).isEqualTo("LINKUSDT");
-        assertThat(write.getValue().getActive()).isFalse();
-        assertThat(write.getValue().getWatchStatus()).isEqualTo("TRACKING_STOPPED");
+        verify(mapper, org.mockito.Mockito.times(2)).upsert(write.capture());
+        assertThat(write.getAllValues()).extracting(AssetPoolItemDO::getSymbol)
+                .containsExactly("BTCUSDT", "LINKUSDT");
+        assertThat(write.getAllValues().get(0).getActive()).isTrue();
+        assertThat(write.getAllValues().get(0).getWatchStatus()).isEqualTo("OBSERVING");
+        assertThat(write.getAllValues().get(1).getActive()).isFalse();
+        assertThat(write.getAllValues().get(1).getWatchStatus()).isEqualTo("TRACKING_STOPPED");
         assertThat(result).extracting(AssetPoolAssetDTO::symbol).containsExactly("BTCUSDT");
     }
 

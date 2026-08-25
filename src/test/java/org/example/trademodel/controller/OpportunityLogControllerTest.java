@@ -49,7 +49,7 @@ class OpportunityLogControllerTest {
 
     @Test
     void findEndpointReturnsReviewOnlyOpportunityLog() throws Exception {
-        when(opportunityLogService.findPublicById("opp-1")).thenReturn(publicDto());
+        when(opportunityLogService.findPublicByIdForUser("opp-1", USER_ID)).thenReturn(publicDto());
 
         mockMvc.perform(get("/api/opportunity-log/opp-1"))
                 .andExpect(status().isOk())
@@ -80,7 +80,7 @@ class OpportunityLogControllerTest {
 
     @Test
     void queryEndpointDelegatesReadOnlyFilters() throws Exception {
-        when(opportunityLogService.queryPublic(eq("ana-1"), isNull(), isNull(), eq("BTCUSDT"),
+        when(opportunityLogService.queryPublicForUser(eq(USER_ID), eq("ana-1"), isNull(), isNull(), eq("BTCUSDT"),
                 eq(OpportunityLogStatus.MISSED_VALID), isNull(), any(), any(), eq(25)))
                 .thenReturn(List.of(publicDto()));
 

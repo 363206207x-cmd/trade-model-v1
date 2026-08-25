@@ -253,7 +253,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         LightSystemStatusVO systemStatus = safeSystemStatus();
         DecisionReadResult decisionRead = safeDecisionRead(userId, Math.max(effectiveLimit, DEFAULT_LIMIT));
         List<DecisionResultVO> decisions = decisionRead.rows();
-        List<MonitorAlertDO> alerts = safeAlerts();
+        List<MonitorAlertDO> alerts = safeAlerts(userId);
         PositionReadResult positionRead = safePositionRead(userId);
         List<UserPositionVO> positions = positionRead.rows();
         PositionSyncStatusVO positionSyncStatus = safePositionSyncStatus();
@@ -286,8 +286,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             selectedDecisionReadFailed = lookup.failed();
         }
         List<DashboardHomeVO.AssetVO> assets = rankingEnabled
-                ? buildRankedAssets(rankingRead.rows(), effectiveLimit)
-                : buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
+                ? buildRankedAssets(userId, rankingRead.rows(), effectiveLimit)
+                : buildAssets(userId, decisions, selectedDecision, normalizedSelected,
+                        focusSymbols, effectiveLimit);
         if (!rankingEnabled && normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
             String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
             if (firstRenderableSymbol != null) {
@@ -298,12 +299,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     selectedDecision = lookup.decision();
                     selectedDecisionReadFailed = selectedDecisionReadFailed || lookup.failed();
                 }
-                assets = buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
+                assets = buildAssets(userId, decisions, selectedDecision, normalizedSelected,
+                        focusSymbols, effectiveLimit);
             }
         }
 
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
-        PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
+        PushInboxContext pushInboxContext = buildPushInbox(userId, positions, effectiveLimit);
 
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
@@ -322,7 +324,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
         DashboardHomeVO.AssetVO selectedContext = selectedAsset != null
                 ? selectedAsset
-                : selectedDecision == null ? null : assetFromDecision(0, selectedDecision);
+                : selectedDecision == null ? null : assetFromDecision(userId, 0, selectedDecision);
         home.setSelectedAssetContext(selectedContext);
         home.setSelectedContextState(selectedAsset != null ? "RANKED"
                 : selectedContext != null ? "EXITED_TOP6" : "NO_ACTIVE_CONTEXT");
@@ -333,7 +335,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(selectedDecision);
+        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(userId, selectedDecision);
         home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
@@ -624,7 +626,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "PRIVATE_SOURCE_UNAVAILABLE",
                 null
         ));
-        Integer confusedCount = directionalBlockCount(systemStatus, decisions);
+        Integer confusedCount = directionalBlockCount(decisions);
         state.setConfused(card(
                 "confused",
                 "冲突阻断",
@@ -782,13 +784,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return List.of(row);
     }
 
-    private List<DashboardHomeVO.AssetVO> buildAssets(List<DecisionResultVO> decisions,
+    private List<DashboardHomeVO.AssetVO> buildAssets(Long userId,
+                                                      List<DecisionResultVO> decisions,
                                                       DecisionResultVO selectedDecision,
                                                       String selectedSymbol,
                                                       List<String> focusSymbols,
-                                                      int limit) {
+        int limit) {
         if (assetPoolService == null) {
-            return buildLegacyConstructorAssets(decisions, selectedDecision, limit);
+            return buildLegacyConstructorAssets(userId, decisions, selectedDecision, limit);
         }
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         String normalizedSelected = normalizeSymbol(selectedSymbol);
@@ -808,13 +811,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     ? selectedDecision : findDecision(decisions, symbol);
             DashboardHomeVO.AssetVO asset = decision == null
                     ? assetPlaceholder(assets.size() + 1, symbol)
-                    : assetFromDecision(assets.size() + 1, decision);
+                    : assetFromDecision(userId, assets.size() + 1, decision);
             assets.add(asset);
         }
         return assets;
     }
 
     private List<DashboardHomeVO.AssetVO> buildRankedAssets(
+            Long userId,
             List<HomeTopAssetProjection> projections,
             int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
@@ -831,7 +835,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     || !usedSymbols.add(normalizeSymbol(projection.symbol()))) {
                 continue;
             }
-            DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            DashboardHomeVO.AssetVO asset = assetFromDecision(
+                    userId, assets.size() + 1, projection.sourceDecision());
             asset.setAssetId(projection.assetId());
             asset.setName(projection.name());
             asset.setAnalysisId(projection.analysisId());
@@ -847,7 +852,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             asset.setAiDecisionResult(projection.aiDecisionResult());
             asset.setDataQualityScore(projection.dataQuality());
             asset.setRankingReason(projection.rankingReason());
-            applyCardFinalProjection(asset, projection.sourceDecision());
+            applyCardFinalProjection(userId, asset, projection.sourceDecision());
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
                 setFieldSource(asset, "score", "DERIVED");
@@ -857,12 +862,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return assets;
     }
 
-    private void applyCardFinalProjection(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
+    private void applyCardFinalProjection(Long userId, DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
         asset.setHasFinal(false);
         if (executionPlanMapper == null || analysisRunMapper == null || opportunityLogService == null) {
             return;
         }
-        AssetExecutionPlanResolution resolution = resolveAssetExecutionPlan(decision);
+        AssetExecutionPlanResolution resolution = resolveAssetExecutionPlan(userId, decision);
         if (!resolution.verified() || resolution.executionPlan() == null) {
             return;
         }
@@ -883,7 +888,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setFinalPlanLifecycle(lifecycle);
     }
 
-    private List<DashboardHomeVO.AssetVO> buildLegacyConstructorAssets(List<DecisionResultVO> decisions,
+    private List<DashboardHomeVO.AssetVO> buildLegacyConstructorAssets(
+                                                                        Long userId,
+                                                                        List<DecisionResultVO> decisions,
                                                                         DecisionResultVO selectedDecision,
                                                                         int limit) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
@@ -892,7 +899,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (assets.size() >= limit) break;
             String symbol = normalizeSymbol(decision.getSymbol());
             if (symbol == null || !used.add(symbol)) continue;
-            assets.add(assetFromDecision(assets.size() + 1, decision));
+            assets.add(assetFromDecision(userId, assets.size() + 1, decision));
         }
         String selectedDecisionSymbol = selectedDecision == null
                 ? null : normalizeSymbol(selectedDecision.getSymbol());
@@ -902,7 +909,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 used.remove(removed.getRawSymbol());
             }
             used.add(selectedDecisionSymbol);
-            assets.add(assetFromDecision(assets.size() + 1, selectedDecision));
+            assets.add(assetFromDecision(userId, assets.size() + 1, selectedDecision));
         }
         return assets;
     }
@@ -961,10 +968,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && !"DEFAULT_SLOT".equalsIgnoreCase(asset.getSlotType());
     }
 
-    private DashboardHomeVO.AssetVO assetFromDecision(int slot, DecisionResultVO decision) {
+    private DashboardHomeVO.AssetVO assetFromDecision(
+            Long userId, int slot, DecisionResultVO decision) {
         DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(decision.getSymbol()));
         asset.setSlotType("DECISION");
-        asset.setAnalysisId(authoritativeAnalysisId(decision, asset));
+        asset.setAnalysisId(authoritativeAnalysisId(userId, decision, asset));
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
         setFieldSource(asset, "direction", hasText(asset.getMarketBias()) ? "DERIVED" : "MISSING");
@@ -991,7 +999,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setRiskLabel(riskLabel(decision.getRiskLevel()));
         setFieldSource(asset, "riskLevel", hasText(asset.getRiskLevel()) ? "DERIVED" : "MISSING");
         AssetStateResolution stateResolution = authoritativeAssetStateResolution(
-                normalizeSymbol(decision.getSymbol()), decision.getAssetStateSnapshot());
+                userId, normalizeSymbol(decision.getSymbol()), decision.getAssetStateSnapshot());
         String assetState = stateResolution.value();
         asset.setAssetState(assetState);
         asset.setAssetStateLabel(assetStateLabel(assetState));
@@ -1021,7 +1029,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return asset;
     }
 
-    private String authoritativeAnalysisId(DecisionResultVO decision, DashboardHomeVO.AssetVO asset) {
+    private String authoritativeAnalysisId(Long userId,
+                                           DecisionResultVO decision,
+                                           DashboardHomeVO.AssetVO asset) {
         if (decision == null || asset == null || analysisRunMapper == null
                 || !hasText(decision.getAnalysisId())) {
             return null;
@@ -1031,7 +1041,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return null;
         }
         try {
-            AnalysisRunDO run = analysisRunMapper.selectById(decision.getAnalysisId());
+            AnalysisRunDO run = userId == null
+                    ? analysisRunMapper.selectById(decision.getAnalysisId())
+                    : analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), userId);
             if (run == null
                     || !decision.getAnalysisId().equals(run.getAnalysisId())
                     || !hasText(run.getSymbol())
@@ -1254,7 +1266,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     && positionPlanSourceResolver != null
                     && Objects.equals(position.getId(), latestMonitorLog.getPositionId())) {
                 PositionPlanSourceResolver.Resolution trustedSource = positionPlanSourceResolver
-                        .resolveTrustedMonitorSource(position.getId(), position.getAssetSymbol(),
+                        .resolveTrustedMonitorSourceForUser(userId, position.getId(), position.getAssetSymbol(),
                                 position.getSourceRefId(), latestMonitorLog.getAnalysisId(),
                                 latestMonitorLog.getExecutionPlanId());
                 if (trustedSource.verified()) {
@@ -1652,7 +1664,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         position.setSourceTraceId(null);
     }
 
-    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(DecisionResultVO selectedDecision) {
+    private DashboardHomeVO.ExecutionSuggestionVO buildExecutionSuggestion(Long userId, DecisionResultVO selectedDecision) {
         DashboardHomeVO.ExecutionSuggestionVO suggestion = new DashboardHomeVO.ExecutionSuggestionVO();
         suggestion.setPositionMode(false);
         suggestion.setPositionMonitor(null);
@@ -1678,14 +1690,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "数据质量不足，暂不交易 / 事件观望");
             return suggestion;
         }
-        String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
+        String assetState = authoritativeAssetState(userId, normalizeSymbol(decision.getSymbol()),
                 decision.getAssetStateSnapshot());
         if (!planAllowedAssetState(assetState)) {
             blockSuggestion(suggestion, "ASSET_STATE_BLOCKED", "当前暂无完整执行计划",
                     "当前资产状态不允许形成新计划");
             return suggestion;
         }
-        SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(decision);
+        SnapshotTraceStatus snapshotTraceStatus = executionSnapshotTraceStatus(userId, decision);
         if (snapshotTraceStatus == SnapshotTraceStatus.MISMATCH) {
             blockSuggestion(suggestion, "STATE_SNAPSHOT_MISMATCH", "当前暂无完整执行计划",
                     "状态已更新，原计划需重新分析");
@@ -1713,7 +1725,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "决策缺少精确身份，不能关联执行计划");
             return suggestion;
         }
-        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
+        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(userId, decision);
         if (assetPlan.state() == ExactPlanIdentityState.MISSING) {
             blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
                     assetPlan.reason());
@@ -1838,7 +1850,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {
+    private AssetExecutionPlanResolution resolveAssetExecutionPlan(Long userId, DecisionResultVO decision) {
         String analysisId = trimToNull(decision != null ? decision.getAnalysisId() : null);
         String decisionId = trimToNull(decision != null ? decision.getDecisionId() : null);
         String symbol = normalizeSymbol(decision != null ? decision.getSymbol() : null);
@@ -1849,8 +1861,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return AssetExecutionPlanResolution.error("执行计划精确身份读取能力不可用");
         }
         try {
-            List<OpportunityLogDTO> relations = opportunityLogService.queryForSystem(
-                    analysisId, decisionId, null, symbol, null, null, null, null, 2);
+            List<OpportunityLogDTO> relations = opportunityLogService.queryForUser(
+                    userId, analysisId, decisionId, null, symbol, null, null, null, null, 2);
             if (relations == null || relations.isEmpty()) {
                 return AssetExecutionPlanResolution.missing("未找到决策与执行计划的精确持久化关系");
             }
@@ -1873,7 +1885,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 return AssetExecutionPlanResolution.error("同一决策关联了多个执行计划身份");
             }
             String planId = planIds.iterator().next();
-            ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(planId);
+            ExecutionPlanDO plan = executionPlanMapper.selectByPlanIdForUser(planId, userId);
             if (plan == null) {
                 return AssetExecutionPlanResolution.missing("精确执行计划记录不存在");
             }
@@ -1881,7 +1893,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     || !analysisId.equals(trimToNull(plan.getAnalysisId()))) {
                 return AssetExecutionPlanResolution.error("执行计划记录与精确关系不一致");
             }
-            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+            AnalysisRunDO run = analysisRunMapper.selectReadableByUser(analysisId, userId);
             if (run == null
                     || !analysisId.equals(trimToNull(run.getAnalysisId()))
                     || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
@@ -2225,7 +2237,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return worthOpening ? "是" : "否";
     }
 
-    private PushInboxContext buildPushInbox(List<UserPositionVO> positions, int limit) {
+    private PushInboxContext buildPushInbox(Long userId, List<UserPositionVO> positions, int limit) {
         DashboardHomeVO.PushInboxVO inbox = new DashboardHomeVO.PushInboxVO();
         boolean hasOpenPosition = hasOpenManualPosition(positions);
         inbox.setHasOpenPosition(hasOpenPosition);
@@ -2238,8 +2250,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         int invalidated = 0;
         List<DashboardHomeVO.PushItemVO> items = new ArrayList<>();
         try {
-            List<OpportunityLogPublicDTO> publicRows = opportunityLogService.queryPublic(
-                    null, null, null, null, null, null, null, null, limit);
+            List<OpportunityLogPublicDTO> publicRows = opportunityLogService.queryPublicForUser(
+                    userId, null, null, null, limit);
             for (OpportunityLogPublicDTO row : publicRows == null
                     ? List.<OpportunityLogPublicDTO>of()
                     : publicRows) {
@@ -2311,7 +2323,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         diagnostics.setAiCall(hasText(selectedDecision != null ? selectedDecision.getAiRoleResults() : null) ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setPushRecheck(pushInboxContext.readOk() ? "CONNECTED" : "UNKNOWN");
         diagnostics.setTelegram("WAITING_SYNC");
-        diagnostics.setConfused(directionalBlockCount(systemStatus, decisions) != null ? "CONNECTED" : "UNKNOWN");
+        diagnostics.setConfused(directionalBlockCount(decisions) != null ? "CONNECTED" : "UNKNOWN");
         diagnostics.setHotReset(systemStatus != null && systemStatus.getHotResetFired() != null ? "CONNECTED" : "WAITING_SYNC");
         diagnostics.setOpportunityLog("UNKNOWN");
         diagnostics.setReview("UNKNOWN");
@@ -2429,9 +2441,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private List<MonitorAlertDO> safeAlerts() {
+    private List<MonitorAlertDO> safeAlerts(Long userId) {
         try {
-            List<MonitorAlertDO> alerts = monitorService.getRecentAlerts(2);
+            List<MonitorAlertDO> alerts = userId == null
+                    ? monitorService.getRecentAlerts(2)
+                    : monitorService.getRecentAlertsForUser(userId, 2);
             return alerts != null ? alerts : List.of();
         } catch (RuntimeException ignored) {
             return List.of();
@@ -2545,13 +2559,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return count > 0 ? Math.round((float) sum / count) : null;
     }
 
-    private Integer directionalBlockCount(LightSystemStatusVO systemStatus, List<DecisionResultVO> decisions) {
-        if (systemStatus == null) {
-            return null;
-        }
-        if (systemStatus.getConfusedCount() != null) {
-            return systemStatus.getConfusedCount();
-        }
+    private Integer directionalBlockCount(List<DecisionResultVO> decisions) {
         if (decisions == null) {
             return null;
         }
@@ -2646,14 +2654,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private String authoritativeAssetState(String symbol, String compatibilitySnapshot) {
-        return authoritativeAssetStateResolution(symbol, compatibilitySnapshot).value();
+    private String authoritativeAssetState(
+            Long userId, String symbol, String compatibilitySnapshot) {
+        return authoritativeAssetStateResolution(userId, symbol, compatibilitySnapshot).value();
     }
 
-    private AssetStateResolution authoritativeAssetStateResolution(String symbol, String compatibilitySnapshot) {
+    private AssetStateResolution authoritativeAssetStateResolution(
+            Long userId, String symbol, String compatibilitySnapshot) {
         if (assetStateMapper != null && hasText(symbol)) {
             try {
-                AssetStateDO row = assetStateMapper.selectBySymbol(symbol);
+                AssetStateDO row = userId == null || userId <= 0
+                        ? assetStateMapper.selectBySymbol(symbol)
+                        : assetStateMapper.selectLatestByUserAndSymbol(userId, symbol);
                 String state = row != null && row.getState() != null
                         ? recognizedAssetStateValue(row.getState().name()) : null;
                 if (state != null) return new AssetStateResolution(state, "REAL");
@@ -2848,20 +2860,31 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 + " ~ " + OFFSET_PLAN_TIME_FORMAT.format(validity.expiresAt());
     }
 
-    private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision) {
-        return executionSnapshotTraceStatus(decision, null);
+    private SnapshotTraceStatus executionSnapshotTraceStatus(Long userId, DecisionResultVO decision) {
+        return executionSnapshotTraceStatus(userId, decision, null);
     }
 
     private SnapshotTraceStatus executionSnapshotTraceStatus(DecisionResultVO decision, AnalysisRunDO resolvedRun) {
+        return executionSnapshotTraceStatus(null, decision, resolvedRun);
+    }
+
+    private SnapshotTraceStatus executionSnapshotTraceStatus(Long userId,
+                                                              DecisionResultVO decision,
+                                                              AnalysisRunDO resolvedRun) {
         if (decision == null || !hasText(decision.getAnalysisId()) || !hasText(decision.getSymbol())
                 || assetStateMapper == null || (resolvedRun == null && analysisRunMapper == null)) {
             return SnapshotTraceStatus.UNVERIFIED;
         }
         try {
-            AssetStateDO state = assetStateMapper.selectBySymbol(normalizeSymbol(decision.getSymbol()));
+            String symbol = normalizeSymbol(decision.getSymbol());
+            AssetStateDO state = userId == null
+                    ? assetStateMapper.selectBySymbol(symbol)
+                    : assetStateMapper.selectLatestByUserAndSymbol(userId, symbol);
             AnalysisRunDO run = resolvedRun != null
                     ? resolvedRun
-                    : analysisRunMapper.selectById(decision.getAnalysisId());
+                    : userId == null
+                    ? analysisRunMapper.selectById(decision.getAnalysisId())
+                    : analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), userId);
             String stateTraceId = state != null ? trimToNull(state.getTraceId()) : null;
             String decisionTraceId = run != null ? trimToNull(run.getTraceId()) : null;
             if (stateTraceId == null || decisionTraceId == null) return SnapshotTraceStatus.UNVERIFIED;

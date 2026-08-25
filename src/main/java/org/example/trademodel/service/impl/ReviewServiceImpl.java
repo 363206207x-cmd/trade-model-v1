@@ -90,6 +90,35 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
+    public ReviewStateVO saveOrUpdateForUserAnalysis(Long userId, WriteReviewResultReq req) {
+        requirePositive(userId, "userId");
+        String analysisId = requireAnalysisId(req);
+        if (analysisRunMapper.selectReadableByUser(analysisId, userId) == null) {
+            throw new IllegalArgumentException("analysis not found or not owned");
+        }
+        String reviewScopeKey = userAnalysisScopeKey(userId, analysisId);
+        LocalDateTime now = LocalDateTime.now();
+        ReviewContent content = reviewContent(req);
+        ReviewResultDO existing = reviewResultMapper.selectByUserAnalysisScope(
+                analysisId, userId, reviewScopeKey);
+        if (existing == null) {
+            ReviewResultDO row = newRow(analysisId, userId, null, reviewScopeKey, content, now);
+            applyDecisionChainTrace(row, analysisId, null);
+            reviewResultMapper.insert(row);
+        } else {
+            applyContent(existing, content, now);
+            applyDecisionChainTrace(existing, analysisId, null);
+            reviewResultMapper.updateContentByUserAnalysisScope(existing);
+        }
+        writeRuleVersionLog(analysisId, content.errorType(), content.actualOutcome(),
+                content.adjustmentSuggestion(), now);
+        ReviewResultDO saved = reviewResultMapper.selectByUserAnalysisScope(
+                analysisId, userId, reviewScopeKey);
+        return saved == null ? null : toVo(saved);
+    }
+
+    @Override
+    @Transactional
     public ReviewStateVO saveOrUpdateForUserPosition(
             Long userId, Long userPositionId, WriteReviewResultReq req) {
         requirePositive(userId, "userId");
@@ -131,6 +160,20 @@ public class ReviewServiceImpl implements ReviewService {
             return null;
         }
         ReviewResultDO row = reviewResultMapper.selectByAnalysisId(analysisId.trim());
+        return row == null ? null : toVo(row);
+    }
+
+    @Override
+    public ReviewStateVO getStateByAnalysisIdForUser(Long userId, String analysisId) {
+        requirePositive(userId, "userId");
+        if (analysisId == null || analysisId.isBlank()) return null;
+        String normalized = analysisId.trim();
+        if (analysisRunMapper.selectReadableByUser(normalized, userId) == null) return null;
+        ReviewResultDO row = reviewResultMapper.selectByUserAnalysisScope(
+                normalized, userId, userAnalysisScopeKey(userId, normalized));
+        if (row == null) {
+            row = reviewResultMapper.selectLegacySharedByUserAnalysis(normalized, userId);
+        }
         return row == null ? null : toVo(row);
     }
 
@@ -233,15 +276,27 @@ public class ReviewServiceImpl implements ReviewService {
         return "USER:" + userId + ":POSITION:" + userPositionId;
     }
 
+    private static String userAnalysisScopeKey(Long userId, String analysisId) {
+        return "USER:" + userId + ":ANALYSIS:" + analysisId;
+    }
+
     private void applyDecisionChainTrace(ReviewResultDO row,
                                          String analysisId,
                                          UserPositionDO position) {
         if (executionPlanMapper == null) {
             return;
         }
-        ExecutionPlanDO plan = position != null && position.getFinalPlanId() != null
-                ? executionPlanMapper.selectByPlanId(position.getFinalPlanId())
-                : executionPlanMapper.selectLatestByAnalysisId(analysisId);
+        Long userId = row.getUserId();
+        ExecutionPlanDO plan;
+        if (position != null && position.getFinalPlanId() != null) {
+            plan = userId == null
+                    ? executionPlanMapper.selectByPlanId(position.getFinalPlanId())
+                    : executionPlanMapper.selectByPlanIdForUser(position.getFinalPlanId(), userId);
+        } else {
+            plan = userId == null
+                    ? executionPlanMapper.selectLatestByAnalysisId(analysisId)
+                    : executionPlanMapper.selectLatestByAnalysisIdForUser(analysisId, userId);
+        }
         if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())
                 || !"PASS".equals(plan.getRuleValidationStatus())) {
             return;

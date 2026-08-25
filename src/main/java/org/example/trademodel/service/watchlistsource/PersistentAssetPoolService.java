@@ -253,7 +253,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
         for (AssetPoolItemDO systemDefault : safe(mapper.listSystemDefaults())) {
             String symbol = normalizeSymbol(systemDefault.getSymbol());
             AssetPoolItemDO existing = overrides.get(symbol);
-            if (existing == null || Boolean.TRUE.equals(existing.getActive())) {
+            if (existing != null && Boolean.TRUE.equals(existing.getActive())) {
                 continue;
             }
             mapper.upsert(defaultOverride(userId, systemDefault, existing, true, "OBSERVING", now));
@@ -269,11 +269,19 @@ public class PersistentAssetPoolService implements AssetPoolService {
                 .map(row -> normalizeSymbol(row.getSymbol()))
                 .collect(Collectors.toSet());
         LocalDateTime now = LocalDateTime.now();
+        Map<String, AssetPoolItemDO> systemDefaults = safe(mapper.listSystemDefaults()).stream()
+                .collect(Collectors.toMap(row -> normalizeSymbol(row.getSymbol()), row -> row,
+                        (left, right) -> right, LinkedHashMap::new));
+        Map<String, AssetPoolItemDO> overrides = safe(mapper.listUserOverrides(userId)).stream()
+                .collect(Collectors.toMap(row -> normalizeSymbol(row.getSymbol()), row -> row,
+                        (left, right) -> right, LinkedHashMap::new));
+        for (Map.Entry<String, AssetPoolItemDO> entry : systemDefaults.entrySet()) {
+            mapper.upsert(defaultOverride(userId, entry.getValue(), overrides.get(entry.getKey()),
+                    true, "OBSERVING", now));
+        }
         for (AssetPoolItemDO override : safe(mapper.listUserOverrides(userId))) {
             String symbol = normalizeSymbol(override.getSymbol());
-            if (defaultSymbols.contains(symbol)) {
-                mapper.deleteUserOverride(userId, symbol);
-            } else if (Boolean.TRUE.equals(override.getActive())) {
+            if (!defaultSymbols.contains(symbol) && Boolean.TRUE.equals(override.getActive())) {
                 mapper.upsert(defaultOverride(
                         userId, override, override, false, "TRACKING_STOPPED", now));
             }

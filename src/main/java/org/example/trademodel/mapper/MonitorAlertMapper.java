@@ -67,6 +67,29 @@ public interface MonitorAlertMapper {
             databaseId = "postgresql")
     List<MonitorAlertDO> selectRecent(@Param("limit") int limit);
 
+    @Select("SELECT alert.id, alert.analysis_id, alert.asset_symbol, alert.alert_type, alert.alert_level, "
+            + "alert.alert_message, alert.status, "
+            + "CASE WHEN alert.cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(alert.cooldown_until, 'yyyy-MM-dd HH:mm:ss') END AS cooldown_until, "
+            + "alert.suppress_reason, alert.trace_id, alert.rule_version, alert.created_by, alert.updated_by, "
+            + "FORMATDATETIME(alert.created_at, 'yyyy-MM-dd HH:mm:ss') AS created_at, "
+            + "FORMATDATETIME(alert.updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
+            + "alert.is_deleted, alert.version_no FROM tm_monitor_alert alert "
+            + "INNER JOIN tm_analysis_run run ON run.analysis_id = alert.analysis_id "
+            + "WHERE alert.is_deleted = 0 AND run.owner_type = 'USER' AND run.owner_id = #{userId} "
+            + "ORDER BY alert.created_at DESC LIMIT #{limit}")
+    @Select(value = "SELECT alert.id, alert.analysis_id, alert.asset_symbol, alert.alert_type, alert.alert_level, "
+            + "alert.alert_message, alert.status, "
+            + "CASE WHEN alert.cooldown_until IS NULL THEN NULL ELSE TO_CHAR(alert.cooldown_until, 'YYYY-MM-DD HH24:MI:SS') END AS cooldown_until, "
+            + "alert.suppress_reason, alert.trace_id, alert.rule_version, alert.created_by, alert.updated_by, "
+            + "TO_CHAR(alert.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at, "
+            + "TO_CHAR(alert.updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at, "
+            + "alert.is_deleted, alert.version_no FROM tm_monitor_alert alert "
+            + "INNER JOIN tm_analysis_run run ON run.analysis_id = alert.analysis_id "
+            + "WHERE alert.is_deleted = 0 AND run.owner_type = 'USER' AND run.owner_id = #{userId} "
+            + "ORDER BY alert.created_at DESC LIMIT #{limit}", databaseId = "postgresql")
+    List<MonitorAlertDO> selectRecentForUser(@Param("userId") Long userId,
+                                             @Param("limit") int limit);
+
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
             + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd HH:mm:ss') END AS cooldown_until, "
             + "suppress_reason, trace_id, rule_version, created_by, updated_by, "

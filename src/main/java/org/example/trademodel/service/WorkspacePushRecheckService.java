@@ -120,7 +120,7 @@ public class WorkspacePushRecheckService {
             throw notFound();
         }
         if (!blank(message.getPlanId())) {
-            ExecutionPlanDO plan = executionPlanMapper.selectByPlanId(message.getPlanId());
+            ExecutionPlanDO plan = executionPlanMapper.selectByPlanIdForUser(message.getPlanId(), userId);
             if (plan == null || !same(plan.getAnalysisId(), snapshot.getAnalysisId())) throw notFound();
         }
         return new OwnedTarget(message, snapshot, pushId, snapshotIdentity(pushId));

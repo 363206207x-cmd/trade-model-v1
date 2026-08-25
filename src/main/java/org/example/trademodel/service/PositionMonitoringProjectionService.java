@@ -77,8 +77,8 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
             applyUnavailable(view, includeLiveMonitor ? trustState(monitor, asOf) : "CLOSED");
         }
         if (trusted) {
-            PositionPlanSourceResolver.Resolution source = sourceResolver.resolveTrustedMonitorSource(
-                    position.getId(), position.getAssetSymbol(), position.getSourceRefId(),
+            PositionPlanSourceResolver.Resolution source = sourceResolver.resolveTrustedMonitorSourceForUser(
+                    userId, position.getId(), position.getAssetSymbol(), position.getSourceRefId(),
                     monitor.getAnalysisId(), monitor.getExecutionPlanId());
             if (source.verified()) {
                 view.setSourceAnalysisId(source.analysisId());

@@ -135,8 +135,8 @@ class MessagePushReadServiceTest {
 
     @Test
     void emptyAndErrorAreDistinctAndErrorNeverCarriesAnEmptySuccessList() {
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of());
@@ -146,8 +146,8 @@ class MessagePushReadServiceTest {
         assertThat(empty.state()).isEqualTo(MessageReadState.EMPTY);
         assertThat(empty.items()).isEmpty();
 
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT))
                 .thenThrow(new IllegalStateException("database unavailable"));
 
@@ -160,7 +160,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void absentPublicOpportunityIsMissingWithoutConsultingPrivateSources() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-missing")).thenReturn(null);
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-missing", USER_ID)).thenReturn(null);
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-missing");
 
@@ -171,7 +171,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void mismatchedPublicOpportunityIdentityIsError() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-expected"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-expected", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-other", OpportunityLogStatus.RESOLVED, OpportunityLogStatus.MISSED_VALID));
 
@@ -193,7 +193,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void completePublicOpportunityReturnsReadyWithoutReadingPrivateState() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-ready"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-ready", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-public-ready", OpportunityLogStatus.RESOLVED, OpportunityLogStatus.MISSED_VALID));
 
@@ -213,7 +213,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void completePublicOpportunityUsesNormalizedPublicState() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-normalized"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-normalized", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-public-normalized", "resolved", "missed_valid"));
 
@@ -231,7 +231,7 @@ class MessagePushReadServiceTest {
     void resolvedOpportunityMissingPublicMarketEvidenceIsPartial() {
         OpportunityLogPublicDTO complete = publicOpportunity(
                 "opp-public-evidence", OpportunityLogStatus.RESOLVED, OpportunityLogStatus.MISSED_VALID);
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-evidence"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-evidence", USER_ID))
                 .thenReturn(withPublicEvidence(complete, complete.targetPrice(), null));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-evidence");
@@ -248,7 +248,7 @@ class MessagePushReadServiceTest {
                 "opp-public-invalid-evidence",
                 OpportunityLogStatus.RESOLVED,
                 OpportunityLogStatus.MISSED_VALID);
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-invalid-evidence"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-invalid-evidence", USER_ID))
                 .thenReturn(withPublicEvidence(
                         complete,
                         new BigDecimal("90"),
@@ -266,7 +266,7 @@ class MessagePushReadServiceTest {
     void incompletePublicOpportunityIsPartialAndCannotBecomeReady() {
         OpportunityLogPublicDTO opportunity = publicOpportunity(
                 "opp-public-partial", null, null);
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-partial"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-partial", USER_ID))
                 .thenReturn(opportunity);
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-public-partial");
@@ -279,7 +279,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void unknownPublicLifecycleIsErrorAndCannotPassThrough() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-lifecycle-invalid"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-lifecycle-invalid", USER_ID))
                 .thenReturn(publicOpportunity("opp-lifecycle-invalid", "PRIVATE_RECHECK_READY", null));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-lifecycle-invalid");
@@ -290,7 +290,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void pendingPublicEvaluationIsPartialWithoutPrivateRecheckOracle() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-pending"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-pending", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-pending", OpportunityLogStatus.PENDING_EVALUATION, null));
 
@@ -304,7 +304,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void invalidPublicStatusIsError() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-status-invalid"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-status-invalid", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-status-invalid", OpportunityLogStatus.RESOLVED, "BLOCKED_BY_RISK_VALID"));
 
@@ -316,7 +316,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void publicStateConflictIsError() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-state-conflict"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-state-conflict", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-state-conflict",
                         OpportunityLogStatus.PENDING_EVALUATION,
@@ -329,24 +329,27 @@ class MessagePushReadServiceTest {
     }
 
     @Test
-    void samePublicOpportunityIsIdenticalAcrossUsersWithDifferentPrivateState() {
+    void opportunityMessageIsVisibleOnlyToTheOwningUser() {
         OpportunityLogPublicDTO opportunity = publicOpportunity(
                 "opp-cross-user", OpportunityLogStatus.RESOLVED, OpportunityLogStatus.MISSED_VALID);
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-cross-user"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-cross-user", 11L))
                 .thenReturn(opportunity);
 
         PushDetailDTO userA = service.findPushDetailForUser(11L, "opp-cross-user");
         PushDetailDTO userB = service.findPushDetailForUser(22L, "opp-cross-user");
 
-        assertThat(userA).isEqualTo(userB);
-        verify(opportunityLogMapper, org.mockito.Mockito.times(2))
-                .selectPublicApiByOpportunityId("opp-cross-user");
+        assertThat(userA.state()).isEqualTo(MessageReadState.READY);
+        assertThat(userB.state()).isEqualTo(MessageReadState.MISSING);
+        verify(opportunityLogMapper)
+                .selectPublicApiByOpportunityIdForUser("opp-cross-user", 11L);
+        verify(opportunityLogMapper)
+                .selectPublicApiByOpportunityIdForUser("opp-cross-user", 22L);
         verifyNoInteractions(positionMonitorLogMapper, userPositionMapper);
     }
 
     @Test
     void opportunityPublicProjectionNeverSerializesRiskDerivedStatusOrPrivateFields() throws Exception {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-projection"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-projection", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-public-projection",
                         OpportunityLogStatus.RESOLVED,
@@ -379,7 +382,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void missingPublicStatusReturnsPartialWithoutReadingPrivateStatus() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-missing-public-status"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-missing-public-status", USER_ID))
                 .thenReturn(publicOpportunity("opp-missing-public-status", null, null));
 
         PushDetailDTO detail = service.findPushDetailForUser(USER_ID, "opp-missing-public-status");
@@ -396,7 +399,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void missingPublicTimestampReturnsPartialBeforeAnyPrivateRead() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-missing-public-time"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-missing-public-time", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-missing-public-time",
                         OpportunityLogStatus.PENDING_EVALUATION,
@@ -419,7 +422,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void missingPublicDescriptionReturnsPartialBeforeAnyPrivateRead() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-missing-public-description"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-missing-public-description", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-missing-public-description",
                         OpportunityLogStatus.PENDING_EVALUATION,
@@ -443,7 +446,7 @@ class MessagePushReadServiceTest {
 
     @Test
     void safeTerminalOpportunityStatusTakesPrecedenceOverLifecycleStatus() {
-        when(opportunityLogMapper.selectPublicApiByOpportunityId("opp-public-terminal"))
+        when(opportunityLogMapper.selectPublicApiByOpportunityIdForUser("opp-public-terminal", USER_ID))
                 .thenReturn(publicOpportunity(
                         "opp-public-terminal",
                         OpportunityLogStatus.RESOLVED,
@@ -463,8 +466,8 @@ class MessagePushReadServiceTest {
     void positionRiskListUsesAuthoritativeOwnedPositionSymbol() {
         PositionMonitorLogDO risk = validMonitor(301L, 401L);
         UserPositionDO position = ownedPosition(401L, "BTCUSDT");
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
@@ -485,8 +488,8 @@ class MessagePushReadServiceTest {
     void incompletePositionRiskListCannotBecomeReady() {
         PositionMonitorLogDO risk = positionRisk(302L, 402L);
         UserPositionDO position = ownedPosition(402L, "BTCUSDT");
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
@@ -505,8 +508,8 @@ class MessagePushReadServiceTest {
     void invalidPositionRiskListReturnsError() {
         PositionMonitorLogDO risk = validMonitor(303L, 403L);
         risk.setRiskLevel("CRITICAL");
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
@@ -578,8 +581,8 @@ class MessagePushReadServiceTest {
     @Test
     void positionRiskListIdentityMismatchIsError() {
         PositionMonitorLogDO risk = validMonitor(304L, 404L);
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(risk));
@@ -887,8 +890,8 @@ class MessagePushReadServiceTest {
             PositionMonitorLogDO original,
             PositionMonitorLogDO latest,
             UserPositionDO position) {
-        when(opportunityLogMapper.queryPublicApi(
-                null, null, null, null, null, null, null, null,
+        when(opportunityLogMapper.queryPublicApiForUser(
+                USER_ID, null, null, null,
                 MessagePushReadService.DEFAULT_LIMIT)).thenReturn(List.of());
         when(positionMonitorLogMapper.listRiskByUserId(USER_ID, MessagePushReadService.DEFAULT_LIMIT))
                 .thenReturn(List.of(original));

@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,6 +64,19 @@ class MissedOpportunityServiceImplTest {
 
         assertThat(rows).hasSize(1);
         verify(missedOpportunityMapper).listByQuery("a-9", "BTCUSDT", date, 200);
+    }
+
+    @Test
+    void userQueryRequiresOwnerAndDelegatesOnlyToScopedMapper() {
+        LocalDate date = LocalDate.now();
+        when(missedOpportunityMapper.listByQueryForUser(
+                41L, "a-9", "BTCUSDT", date, 20))
+                .thenReturn(List.of(new MissedOpportunityDO()));
+
+        assertThat(service.queryForUser(41L, " a-9 ", " btcusdt ", date, 0)).hasSize(1);
+        verify(missedOpportunityMapper).listByQueryForUser(
+                41L, "a-9", "BTCUSDT", date, 20);
+        verify(missedOpportunityMapper, never()).listByQuery(any(), any(), any(), anyInt());
     }
 
     private static DecisionBundleVO baseDecision() {

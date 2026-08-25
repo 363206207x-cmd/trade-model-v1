@@ -2,7 +2,9 @@ package org.example.trademodel.positionmonitorlog;
 
 import org.example.trademodel.TradeModelApplication;
 import org.example.trademodel.entity.PositionMonitorLogDO;
+import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.junit.jupiter.api.Tag;
@@ -25,11 +27,14 @@ class PositionMonitorLogMapperIntegrationTest {
     @Autowired
     private UserPositionMapper userPositionMapper;
     @Autowired
+    private PersonalUserMapper personalUserMapper;
+    @Autowired
     private PositionMonitorLogMapper positionMonitorLogMapper;
 
     @Test
     void insertSelectAndListMonitorLogsPreserveFieldsAndSortDescending() {
-        UserPositionDO position = userPosition("OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        UserPositionDO position = userPosition(
+                userId("monitor-log-owner-a"), "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
         userPositionMapper.insert(position);
 
         PositionMonitorLogDO older = log(position.getId(), "ana-p0-4", "LOGIC_VALID", "LOW", "CONTINUE_HOLD",
@@ -73,7 +78,8 @@ class PositionMonitorLogMapperIntegrationTest {
 
     @Test
     void untrustedRowsPersistRawObservationOnlyAndDatabaseRejectsInventedSemantics() {
-        UserPositionDO position = userPosition("OPEN", LocalDateTime.of(2026, 6, 22, 9, 0));
+        UserPositionDO position = userPosition(
+                userId("monitor-log-owner-b"), "OPEN", LocalDateTime.of(2026, 6, 22, 9, 0));
         userPositionMapper.insert(position);
         LocalDateTime observedAt = LocalDateTime.of(2026, 6, 22, 9, 10);
         PositionMonitorLogDO pending = new PositionMonitorLogDO();
@@ -129,8 +135,18 @@ class PositionMonitorLogMapperIntegrationTest {
         return row;
     }
 
-    private static UserPositionDO userPosition(String status, LocalDateTime openedAt) {
+    private Long userId(String username) {
+        PersonalUserDO user = new PersonalUserDO();
+        user.setUsername(username);
+        user.setPasswordHash("{noop}not-a-real-password");
+        user.setCreatedAt(LocalDateTime.now());
+        personalUserMapper.insert(user);
+        return user.getId();
+    }
+
+    private static UserPositionDO userPosition(Long userId, String status, LocalDateTime openedAt) {
         UserPositionDO row = new UserPositionDO();
+        row.setUserId(userId);
         row.setAssetSymbol("BTCUSDT");
         row.setSide("LONG");
         row.setStatus(status);

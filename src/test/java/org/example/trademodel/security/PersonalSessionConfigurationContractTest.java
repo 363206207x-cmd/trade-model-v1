@@ -45,8 +45,10 @@ class PersonalSessionConfigurationContractTest {
                 "autocomplete=\"username\"",
                 "autocomplete=\"current-password\"",
                 "th:action=\"@{/login}\"",
-                "method=\"post\"");
-        assertThat(login).doesNotContain("注册", "OAuth", "JWT");
+                "method=\"post\"",
+                "th:if=\"${registrationOpen}\"",
+                "href=\"/register\"");
+        assertThat(login).doesNotContain("OAuth", "JWT");
         assertThat(css).contains("font-size: 16px", "width: min(100%, 392px)", "overflow-wrap: anywhere");
         assertThat(dashboard).contains("name=\"_csrf\"", "csrfHeaders(", "th:action=\"@{/logout}\"");
         assertThat(review).contains("name=\"_csrf\"", "name=\"_csrf_header\"");

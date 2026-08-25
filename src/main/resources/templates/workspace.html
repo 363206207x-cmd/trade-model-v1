@@ -178,10 +178,26 @@
         <section class="workspace-page" th:if="${pageKey == 'me'}" aria-labelledby="settingsHeading">
             <header class="section-header"><div><h2 id="settingsHeading">个人设置</h2></div><button class="button button-primary settings-save" type="button" id="saveSettings" hidden disabled>保存更改</button></header>
             <div class="settings-layout">
-                <nav class="settings-anchors" aria-label="设置分区"><a href="#risk-preference">风险偏好</a><a href="#asset-pool-sources">资产池与数据源</a></nav>
+                <nav class="settings-anchors" aria-label="设置分区"><a href="#risk-preference">风险偏好</a><a href="#asset-pool-sources">资产池与数据源</a><a href="/me/security">账户安全</a><a th:if="${ownerUser}" href="/me/accounts">账户管理</a></nav>
                 <div class="surface settings-surface">
                     <form class="settings-form" data-component-family="RiskPreferenceForm" id="riskPreferenceForm"><section id="risk-preference"><h3>风险偏好</h3><label>风险偏好<select name="riskPreference"><option value="CONSERVATIVE">保守</option><option value="BALANCED">平衡</option><option value="AGGRESSIVE">积极</option></select></label></section><section id="asset-pool-sources"><h3>资产池与数据源</h3><label>默认资产池<select name="defaultPoolMode"><option value="SYSTEM_DEFAULT">系统默认</option><option value="USER_CUSTOM">用户自定义</option></select></label><div class="provider-panel" data-component-family="ProviderStatusPanel"><div id="providerStatus" class="content-state">等待可信状态</div></div></section></form>
                 </div>
+            </div>
+        </section>
+
+        <section class="workspace-page" th:if="${pageKey == 'accounts'}" aria-labelledby="accountsHeading">
+            <header class="section-header">
+                <div><h2 id="accountsHeading">账户管理</h2></div>
+                <button class="button button-secondary" type="button" id="createOwnerPasswordSetupLink">生成一次性密码设置链接</button>
+            </header>
+            <p class="muted">最多启用 10 个账户。Owner 仅可管理 USER；账户不会被硬删除。</p>
+            <div class="login-message login-message-info" id="ownerPasswordSetupLink" hidden></div>
+            <div class="table-shell" data-component-family="OwnerAccountTable">
+                <table>
+                    <thead><tr><th>账户</th><th>角色</th><th>状态</th><th>会话代次</th><th>最近登录</th><th class="align-right">操作</th></tr></thead>
+                    <tbody id="ownerAccountRows"></tbody>
+                </table>
+                <div class="empty-state" id="ownerAccountEmpty" hidden><strong>暂无账户数据</strong></div>
             </div>
         </section>
     </main>

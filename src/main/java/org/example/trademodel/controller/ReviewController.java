@@ -11,6 +11,7 @@ import org.example.trademodel.service.ReviewAggregateService;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.RuleVersionLogQueryService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.userpositionreview.UserPositionReviewAdapter;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackReq;
 import org.example.trademodel.userpositionreview.UserPositionReviewFeedbackResultDTO;
@@ -45,6 +46,7 @@ public class ReviewController {
     private final UserPositionReviewAdapter userPositionReviewAdapter;
     private final OpportunityLogService opportunityLogService;
     private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
+    private final AnalysisRunMapper analysisRunMapper;
 
     @Autowired
     public ReviewController(ReviewService reviewService,
@@ -53,7 +55,8 @@ public class ReviewController {
                             PositionMonitorLogService positionMonitorLogService,
                             UserPositionReviewAdapter userPositionReviewAdapter,
                             OpportunityLogService opportunityLogService,
-                            AuthenticatedUserIdResolver authenticatedUserIdResolver) {
+                            AuthenticatedUserIdResolver authenticatedUserIdResolver,
+                            AnalysisRunMapper analysisRunMapper) {
         this.reviewService = reviewService;
         this.reviewAggregateService = reviewAggregateService;
         this.ruleVersionLogQueryService = ruleVersionLogQueryService;
@@ -61,6 +64,7 @@ public class ReviewController {
         this.userPositionReviewAdapter = userPositionReviewAdapter;
         this.opportunityLogService = opportunityLogService;
         this.authenticatedUserIdResolver = authenticatedUserIdResolver;
+        this.analysisRunMapper = analysisRunMapper;
     }
 
     /**
@@ -69,6 +73,7 @@ public class ReviewController {
      */
     @GetMapping("/aggregate/{analysisId}")
     public ResponseEntity<ApiResponse<ReviewAggregateVO>> getAggregate(@PathVariable String analysisId) {
+        if (!ownsAnalysis(analysisId)) return missingAnalysis(analysisId);
         return reviewAggregateService.getAggregateByAnalysisId(analysisId)
                 .map(v -> ResponseEntity.ok(ApiResponse.success(v)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -80,6 +85,10 @@ public class ReviewController {
      */
     @GetMapping("/aggregate/{analysisId}/summary")
     public ResponseEntity<ApiResponse<ReviewAggregateSummaryVO>> getAggregateSummary(@PathVariable String analysisId) {
+        if (!ownsAnalysis(analysisId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.notFound("analysis not found: " + analysisId));
+        }
         return reviewAggregateService.getAggregateSummaryByAnalysisId(analysisId)
                 .map(v -> ResponseEntity.ok(ApiResponse.success(v)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -95,6 +104,10 @@ public class ReviewController {
             @RequestParam(defaultValue = "pushRecheck") String section,
             @RequestParam(defaultValue = "20") int limit) {
         try {
+            if (!ownsAnalysis(analysisId)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.notFound("analysis not found: " + analysisId));
+            }
             return reviewAggregateService.getAggregateDetailByAnalysisId(analysisId, section, limit)
                     .map(v -> ResponseEntity.ok(ApiResponse.success(v)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -120,6 +133,7 @@ public class ReviewController {
             @RequestParam(required = false) String createdAtFrom,
             @RequestParam(required = false) String createdAtTo,
             @RequestParam(required = false, defaultValue = "20") int limit) {
+        authenticatedUserIdResolver.requireOwner();
         java.util.List<ReviewAggregateVO.RuleVersionLogSummary> rows = ruleVersionLogQueryService.query(
                 analysisId, ruleVersion, operator, rollbackFlag, errorType,
                 changeCategory, keyword, createdAtFrom, createdAtTo, limit);
@@ -164,7 +178,8 @@ public class ReviewController {
             @RequestParam(required = false) String symbol,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
-        return ResponseEntity.ok(ApiResponse.success(opportunityLogService.getStats(symbol, from, to)));
+        return ResponseEntity.ok(ApiResponse.success(opportunityLogService.getStatsForUser(
+                authenticatedUserIdResolver.requireCurrentUserId(), symbol, from, to)));
     }
 
     /**
@@ -172,7 +187,12 @@ public class ReviewController {
      */
     @GetMapping("/state/{analysisId}")
     public ResponseEntity<ApiResponse<ReviewStateVO>> getState(@PathVariable String analysisId) {
-        ReviewStateVO vo = reviewService.getStateByAnalysisId(analysisId);
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        if (!ownsAnalysis(analysisId, userId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.notFound("analysis not found: " + analysisId));
+        }
+        ReviewStateVO vo = reviewService.getStateByAnalysisIdForUser(userId, analysisId);
         return ResponseEntity.ok(ApiResponse.success(vo));
     }
 
@@ -181,7 +201,26 @@ public class ReviewController {
      */
     @PostMapping("/save")
     public ResponseEntity<ApiResponse<ReviewStateVO>> saveReview(@Valid @RequestBody WriteReviewResultReq req) {
-        ReviewStateVO vo = reviewService.saveOrUpdate(req);
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        if (!ownsAnalysis(req.getAnalysisId(), userId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.notFound("analysis not found: " + req.getAnalysisId()));
+        }
+        ReviewStateVO vo = reviewService.saveOrUpdateForUserAnalysis(userId, req);
         return ResponseEntity.ok(ApiResponse.success(vo));
+    }
+
+    private boolean ownsAnalysis(String analysisId) {
+        return ownsAnalysis(analysisId, authenticatedUserIdResolver.requireCurrentUserId());
+    }
+
+    private boolean ownsAnalysis(String analysisId, Long userId) {
+        if (analysisId == null || analysisId.isBlank()) return false;
+        return analysisRunMapper.selectReadableByUser(analysisId.trim(), userId) != null;
+    }
+
+    private ResponseEntity<ApiResponse<ReviewAggregateVO>> missingAnalysis(String analysisId) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.notFound("analysis not found: " + analysisId));
     }
 }

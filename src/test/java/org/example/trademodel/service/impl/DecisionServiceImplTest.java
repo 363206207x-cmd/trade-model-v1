@@ -232,7 +232,8 @@ class DecisionServiceImplTest {
         UserPositionDO pushRecheckCreatedSurface = manualUserPosition("ETHUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 20));
         pushRecheckCreatedSurface.setSourceType("PUSH_RECHECK");
 
-        when(decisionResultMapper.findLatestDecisionResultsJoined(10)).thenReturn(List.of(manualDecision, executionPlanOnlyDecision));
+        when(decisionResultMapper.findLatestDecisionResultsJoinedForUser(USER_ID, 10))
+                .thenReturn(List.of(manualDecision, executionPlanOnlyDecision));
         when(userPositionMapper.listOpenByUserId(USER_ID))
                 .thenReturn(List.of(manualOpen, manualClosed, pushRecheckCreatedSurface));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
@@ -265,7 +266,8 @@ class DecisionServiceImplTest {
         LocalDateTime openedAt = LocalDateTime.of(2026, 6, 22, 8, 30);
         DecisionResultVO row = new DecisionResultVO();
         row.setSymbol("BTCUSDT");
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTCUSDT"))
+                .thenReturn(row);
         when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(
                 manualUserPosition("btcusdt", "OPEN", openedAt)
         ));
@@ -293,7 +295,8 @@ class DecisionServiceImplTest {
         UserPositionDO closed = manualUserPosition("BTCUSDT", "CLOSED", LocalDateTime.of(2026, 6, 22, 8, 30));
         UserPositionDO synced = manualUserPosition("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 35));
         synced.setSourceType("POSITION_SYNC");
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT")).thenReturn(row);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTCUSDT"))
+                .thenReturn(row);
         when(userPositionMapper.listOpenByUserId(USER_ID)).thenReturn(List.of(closed, synced));
         when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
 

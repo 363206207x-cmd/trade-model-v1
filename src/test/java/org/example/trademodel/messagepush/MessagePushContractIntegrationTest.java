@@ -3,12 +3,14 @@ package org.example.trademodel.messagepush;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.OpportunityLogDO;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.entity.PositionMonitorLogDO;
 import org.example.trademodel.entity.TmPushRecheckLogDO;
 import org.example.trademodel.entity.TmPushSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.PositionMonitorLogMapper;
 import org.example.trademodel.mapper.PushRecheckLogMapper;
@@ -63,6 +65,8 @@ class MessagePushContractIntegrationTest {
     private PushRecheckLogMapper pushRecheckLogMapper;
     @Autowired
     private OpportunityLogMapper opportunityLogMapper;
+    @Autowired
+    private AnalysisRunMapper analysisRunMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
@@ -133,6 +137,7 @@ class MessagePushContractIntegrationTest {
 
     @Test
     void opportunityPushDetailReturnsOnlyTheServerSidePublicProjection() throws Exception {
+        insertOwnedAnalysis(userAId);
         TmPushSnapshotDO push = insertPushSnapshot();
         OpportunityLogDO opportunity = insertOpportunity(push);
         insertPushRecheck(push);
@@ -222,22 +227,19 @@ class MessagePushContractIntegrationTest {
 
         mockMvc.perform(get("/api/messages/{messageId}/push-detail", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sourceIdentity.sourceType").value("OPPORTUNITY"))
-                .andExpect(jsonPath("$.data.publicLifecycle").value("PENDING_EVALUATION"))
-                .andExpect(jsonPath("$.data.publicStatus").isEmpty())
-                .andExpect(jsonPath("$.data.sourceIdentity.positionId").doesNotExist());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.data.state").value("MISSING"));
 
-        String previewBody = mockMvc.perform(
-                        get("/api/dashboard/recheck-preview-status")
-                                .param("pushId", String.valueOf(push.getPushId()))
-                .with(user(USER_A).roles("OPERATOR")))
+        mockMvc.perform(get("/api/messages")
+                        .with(user(USER_B).roles("OPERATOR")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RECHECK_PREVIEW_MISSING_FAIL_CLOSED"))
-                .andExpect(jsonPath("$.reason").value("RAW_PUSH_RECHECK_READ_DISABLED"))
-                .andExpect(jsonPath("$.pushId").doesNotExist())
-                .andExpect(jsonPath("$.latestLogAvailable").doesNotExist())
-                .andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("$.data.state").value("EMPTY"))
+                .andExpect(jsonPath("$.data.items").isEmpty());
+
+        mockMvc.perform(get("/api/dashboard/recheck-preview-status")
+                        .param("pushId", String.valueOf(push.getPushId()))
+                        .with(user(USER_A).roles("OPERATOR")))
+                .andExpect(status().isForbidden());
         String latestBody = mockMvc.perform(
                         get("/api/push/recheck/{pushId}/latest", push.getPushId())
                         .with(user(USER_A).roles("OPERATOR")))
@@ -251,7 +253,7 @@ class MessagePushContractIntegrationTest {
                 .andExpect(jsonPath("$.code").value(404))
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(previewBody + latestBody + logsBody).doesNotContain(
+        assertThat(latestBody + logsBody).doesNotContain(
                 "currentAccountRiskAllowed",
                 "failReasonJson",
                 "PRIVATE_ACCOUNT_RISK_REASON",
@@ -418,6 +420,35 @@ class MessagePushContractIntegrationTest {
         row.setCreateTime(row.getPushCreateTime());
         pushSnapshotMapper.insert(row);
         return row;
+    }
+
+    private void insertOwnedAnalysis(Long userId) {
+        LocalDateTime at = LocalDateTime.of(2026, 7, 29, 10, 0);
+        AnalysisRunDO row = new AnalysisRunDO();
+        row.setAnalysisId("ana-message-opportunity");
+        row.setSymbol("SOLUSDT");
+        row.setTimeframe("1h");
+        row.setAnalysisTime(at);
+        row.setRuleVersion("v1");
+        row.setDataQualityScore(88);
+        row.setTraceId("trace-message-opportunity");
+        row.setStatus("SUCCESS");
+        row.setIdempotencyKey("idem-message-opportunity");
+        row.setRequestId("request-message-opportunity");
+        row.setTriggerType("MANUAL");
+        row.setInputSnapshotJson("{}");
+        row.setInputSnapshotHash("hash-message-opportunity");
+        row.setAttemptCount(1);
+        row.setStartedAt(at.minusMinutes(1));
+        row.setCompletedAt(at);
+        row.setCreatedAt(at.minusMinutes(1));
+        row.setUpdatedAt(at);
+        row.setVersionNo(1);
+        row.setOwnerType("USER");
+        row.setOwnerId(userId);
+        row.setPreview(false);
+        row.setAnalysisMode("OPPORTUNITY_DECISION");
+        analysisRunMapper.insert(row);
     }
 
     private OpportunityLogDO insertOpportunity(TmPushSnapshotDO push) {

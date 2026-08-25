@@ -218,8 +218,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.addAll(derivativesAssessment.reasonCodes());
         }
 
-        PlanContext planContext = resolvePlanContext(position, reasons);
-        MonitorEvidenceContext monitorEvidence = resolveMonitorEvidenceContext(assetSymbol, markPrice);
+        PlanContext planContext = resolvePlanContext(position, userId, reasons);
+        MonitorEvidenceContext monitorEvidence = resolveMonitorEvidenceContext(
+                assetSymbol, markPrice, userId);
         if (monitorEvidence.reasonCode() != null) {
             reasons.add(monitorEvidence.reasonCode());
         }
@@ -604,9 +605,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         };
     }
 
-    private PlanContext resolvePlanContext(UserPositionDO position, Set<String> reasons) {
-        PositionPlanSourceResolver.Resolution resolution = positionPlanSourceResolver.resolveTypedReference(
-                position.getId(), position.getAssetSymbol(), position.getSourceRefId());
+    private PlanContext resolvePlanContext(UserPositionDO position, Long userId, Set<String> reasons) {
+        PositionPlanSourceResolver.Resolution resolution = positionPlanSourceResolver.resolveTypedReferenceForUser(
+                userId, position.getId(), position.getAssetSymbol(), position.getSourceRefId());
         if (!resolution.verified()) {
             return unverifiedPlanContext(reasons);
         }
@@ -698,13 +699,17 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     }
 
     private MonitorEvidenceContext resolveMonitorEvidenceContext(
-            String assetSymbol, MarkPriceContext markPrice) {
+            String assetSymbol, MarkPriceContext markPrice, Long userId) {
         String normalizedSymbol = normalizeSymbol(assetSymbol);
         if (normalizedSymbol == null || decisionResultMapper == null || analysisRunMapper == null) {
             return MonitorEvidenceContext.pending(null, "MONITOR_REQUIRED_CONTEXT_UNAVAILABLE");
         }
         try {
-            DecisionResultVO decision = decisionResultMapper.findLatestDecisionResultBySymbolJoined(normalizedSymbol);
+            if (userId == null || userId <= 0) {
+                return MonitorEvidenceContext.pending(null, "MONITOR_USER_CONTEXT_UNAVAILABLE");
+            }
+            DecisionResultVO decision = decisionResultMapper
+                    .findLatestDecisionResultBySymbolJoinedForUser(userId, normalizedSymbol);
             if (decision == null) {
                 return MonitorEvidenceContext.pending(null, "MONITOR_RESULT_MISSING");
             }
@@ -713,7 +718,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                     || !normalizedSymbol.equals(normalizeSymbol(decision.getSymbol()))) {
                 return MonitorEvidenceContext.invalid(analysisId, "MONITOR_RESULT_IDENTITY_INVALID");
             }
-            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+            AnalysisRunDO run = analysisRunMapper.selectReadableByUser(analysisId, userId);
             if (run == null) {
                 return MonitorEvidenceContext.pending(analysisId, "MONITOR_ANALYSIS_CONTEXT_MISSING");
             }

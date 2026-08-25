@@ -43,7 +43,7 @@ class PlanRevalidationServiceTest {
     @Test
     void userRequestCanOnlyCreateManualRevalidation() {
         ExecutionPlanDO plan = finalPlan();
-        when(planMapper.selectByPlanId("plan-1")).thenReturn(plan);
+        when(planMapper.selectByPlanIdForUser("plan-1", 41L)).thenReturn(plan);
         when(planMapper.markNeedsRevalidation(eq("plan-1"), eq("USER_REQUESTED"), any())).thenReturn(1);
 
         PlanRevalidationRecordDO record = service.request(
@@ -65,7 +65,7 @@ class PlanRevalidationServiceTest {
         assertThatThrownBy(() -> service.request(41L, "plan-1", "EVENT_WINDOW", "USER_REQUESTED"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("MANUAL_REVALIDATION");
-        verify(planMapper, never()).selectByPlanId(any());
+        verify(planMapper, never()).selectByPlanIdForUser(any(), any());
     }
 
     @Test

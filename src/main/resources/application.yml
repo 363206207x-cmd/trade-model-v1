@@ -57,6 +57,10 @@ management:
       show-details: never
       show-components: never
 
+registration:
+  enabled: ${TRADE_MODEL_REGISTRATION_ENABLED:true}
+  max-active-users: ${TRADE_MODEL_REGISTRATION_MAX_ACTIVE_USERS:10}
+
 trade-model:
   telegram:
     enabled: ${TRADE_MODEL_TELEGRAM_ENABLED:false}

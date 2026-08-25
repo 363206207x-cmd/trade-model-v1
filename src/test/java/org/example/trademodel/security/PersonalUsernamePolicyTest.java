@@ -35,4 +35,24 @@ class PersonalUsernamePolicyTest {
     void rejectsSeparatorsControlsUnicodeAndInvisibleCharacters(String username) {
         assertThat(PersonalUsernamePolicy.isValid(PersonalUsernamePolicy.normalize(username))).isFalse();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "user.name", "user_name", "user-name", "A1b"})
+    void acceptsFrozenRegistrationFormat(String username) {
+        assertThat(PersonalUsernamePolicy.isRegistrationValid(
+                PersonalUsernamePolicy.normalize(username))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ab", "user@example.com", "name with space", "用户", "a_very_long_registration_username_33"})
+    void rejectsRegistrationValuesOutsideFrozenFormat(String username) {
+        assertThat(PersonalUsernamePolicy.isRegistrationValid(
+                PersonalUsernamePolicy.normalize(username))).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"xuchao", "OWNER", "admin", "Administrator", "root", "system", "operator"})
+    void reservesOwnerAndSystemIdentitiesFromPublicRegistration(String username) {
+        assertThat(PersonalUsernamePolicy.isReservedRegistrationUsername(username)).isTrue();
+    }
 }

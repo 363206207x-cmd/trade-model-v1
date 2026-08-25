@@ -1759,6 +1759,60 @@
         loadSettings();
     }
 
+    async function loadOwnerAccounts() {
+        const rows = document.getElementById("ownerAccountRows");
+        const emptyState = document.getElementById("ownerAccountEmpty");
+        if (!rows) return;
+        try {
+            const accounts = await api("/api/owner/accounts");
+            rows.innerHTML = (accounts || []).map(function (account) {
+                const actions = account.role === "USER"
+                    ? '<button class="button button-quiet" type="button" data-account-action="force-logout" data-account-id="' + escapeHtml(account.id) + '">强制退出</button>'
+                      + '<button class="button button-secondary" type="button" data-account-action="' + (account.enabled ? "disable" : "enable") + '" data-account-id="' + escapeHtml(account.id) + '">' + (account.enabled ? "停用" : "重新启用") + '</button>'
+                    : '<span class="muted">唯一 Owner</span>';
+                return '<tr><td><strong>' + escapeHtml(account.username) + '</strong></td><td>' + escapeHtml(account.role) + '</td>'
+                    + '<td>' + escapeHtml(account.enabled ? "已启用" : "已停用") + '</td>'
+                    + '<td>' + escapeHtml(account.sessionVersion) + '</td>'
+                    + '<td>' + escapeHtml(account.lastLoginAt ? formatTime(account.lastLoginAt) : "—") + '</td>'
+                    + '<td class="align-right"><div class="toolbar-actions">' + actions + '</div></td></tr>';
+            }).join("");
+            if (emptyState) emptyState.hidden = Boolean(accounts && accounts.length);
+            rows.querySelectorAll("[data-account-action]").forEach(function (button) {
+                button.addEventListener("click", async function () {
+                    button.disabled = true;
+                    try {
+                        await api("/api/owner/accounts/" + encodeURIComponent(button.dataset.accountId) + "/" + button.dataset.accountAction, { method: "POST" });
+                        await loadOwnerAccounts();
+                        announce("账户状态已更新");
+                    } catch (error) {
+                        announce(error.message);
+                        button.disabled = false;
+                    }
+                });
+            });
+        } catch (_) {
+            empty(rows, "账户当前不可查看", "请确认 Owner 权限后重试。");
+        }
+    }
+
+    function bindOwnerAccounts() {
+        document.getElementById("createOwnerPasswordSetupLink")?.addEventListener("click", async function () {
+            const target = document.getElementById("ownerPasswordSetupLink");
+            try {
+                const result = await api("/api/owner/password-setup-link", { method: "POST" });
+                target.innerHTML = '';
+                const link = document.createElement("a");
+                link.href = result.path;
+                link.textContent = "打开一次性密码设置页（15 分钟内有效）";
+                target.appendChild(link);
+                target.hidden = false;
+            } catch (error) {
+                announce(error.message);
+            }
+        });
+        loadOwnerAccounts();
+    }
+
     function initialize() {
         bindOverlays();
         bindPositionForms();
@@ -1784,6 +1838,7 @@
         if (pageKey === "calendar") loadCalendar();
         if (pageKey === "audit") loadAudit();
         if (pageKey === "me") bindSettings();
+        if (pageKey === "accounts") bindOwnerAccounts();
     }
 
     initialize();

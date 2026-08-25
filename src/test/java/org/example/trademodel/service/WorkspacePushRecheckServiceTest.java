@@ -263,7 +263,7 @@ class WorkspacePushRecheckServiceTest {
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-1");
         plan.setAnalysisId("analysis-1");
-        lenient().when(executionPlanMapper.selectByPlanId("plan-1")).thenReturn(plan);
+        lenient().when(executionPlanMapper.selectByPlanIdForUser("plan-1", 7L)).thenReturn(plan);
     }
 
     private static TmPushRecheckLogDO log(Long id, String executionStatus) {

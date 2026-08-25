@@ -88,7 +88,7 @@ public class WorkspaceRuntimeController {
         userIdResolver.requireCurrentUserId();
         ExecutionPlanDO plan = uiReviewPlanFixture == null ? null : uiReviewPlanFixture.find(planId);
         if (plan == null) {
-            plan = executionPlanMapper.selectByPlanId(planId);
+            plan = executionPlanMapper.selectByPlanIdForUser(planId, userIdResolver.requireCurrentUserId());
         }
         if (!isValidatedFinal(plan)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -100,8 +100,8 @@ public class WorkspaceRuntimeController {
     @GetMapping("/plan-revalidations")
     public ApiResponse<List<PlanRevalidationRecordDO>> revalidations(@RequestParam String planId,
                                                                      @RequestParam(defaultValue = "20") int limit) {
-        userIdResolver.requireCurrentUserId();
-        return ApiResponse.success(planRevalidationService.list(planId, limit));
+        return ApiResponse.success(planRevalidationService.list(
+                userIdResolver.requireCurrentUserId(), planId, limit));
     }
 
     @PostMapping("/plan-revalidations")

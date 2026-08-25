@@ -145,7 +145,9 @@ public class DecisionServiceImpl implements DecisionService {
         long methodStart = System.currentTimeMillis();
         int safeLimit = normalizeDashboardSummaryLimit(limit);
         long queryStart = System.currentTimeMillis();
-        List<DecisionResultVO> results = decisionResultMapper.findLatestDecisionResultsJoined(safeLimit);
+        List<DecisionResultVO> results = userId == null
+                ? decisionResultMapper.findLatestDecisionResultsJoined(safeLimit)
+                : decisionResultMapper.findLatestDecisionResultsJoinedForUser(userId, safeLimit);
         long queryCostMs = System.currentTimeMillis() - queryStart;
         System.out.println("[PERF] db_latest_decisions_joined=" + queryCostMs + " ms");
         if (results == null) {
@@ -194,7 +196,9 @@ public class DecisionServiceImpl implements DecisionService {
             return null;
         }
         long methodStart = System.currentTimeMillis();
-        DecisionResultVO row = decisionResultMapper.findLatestDecisionResultBySymbolJoined(normalized);
+        DecisionResultVO row = userId == null
+                ? decisionResultMapper.findLatestDecisionResultBySymbolJoined(normalized)
+                : decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(userId, normalized);
         if (row == null) {
             runtimeMetricService.recordDuration("decision.getLatestDecisionResultBySymbol", System.currentTimeMillis() - methodStart);
             return null;

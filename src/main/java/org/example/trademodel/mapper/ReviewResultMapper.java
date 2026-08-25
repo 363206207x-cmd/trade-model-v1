@@ -31,6 +31,22 @@ public interface ReviewResultMapper {
 
     @Select("SELECT " + COLUMNS + " FROM tm_review_result "
             + "WHERE analysis_id = #{analysisId} AND user_id = #{userId} "
+            + "AND user_position_id IS NULL AND review_scope_key = #{reviewScopeKey}")
+    ReviewResultDO selectByUserAnalysisScope(@Param("analysisId") String analysisId,
+                                             @Param("userId") Long userId,
+                                             @Param("reviewScopeKey") String reviewScopeKey);
+
+    @Select("SELECT " + COLUMNS + " FROM tm_review_result review "
+            + "WHERE review.analysis_id = #{analysisId} AND review.review_scope_key = 'SHARED' "
+            + "AND review.user_id IS NULL AND review.user_position_id IS NULL "
+            + "AND EXISTS (SELECT 1 FROM tm_analysis_run analysis "
+            + "WHERE analysis.analysis_id = review.analysis_id AND analysis.owner_type = 'USER' "
+            + "AND analysis.owner_id = #{userId})")
+    ReviewResultDO selectLegacySharedByUserAnalysis(@Param("analysisId") String analysisId,
+                                                    @Param("userId") Long userId);
+
+    @Select("SELECT " + COLUMNS + " FROM tm_review_result "
+            + "WHERE analysis_id = #{analysisId} AND user_id = #{userId} "
             + "AND user_position_id = #{userPositionId} AND review_scope_key = #{reviewScopeKey}")
     ReviewResultDO selectByUserPositionScope(@Param("analysisId") String analysisId,
                                              @Param("userId") Long userId,
@@ -42,15 +58,25 @@ public interface ReviewResultMapper {
             + "ORDER BY update_time DESC, create_time DESC, id DESC LIMIT #{limit}")
     List<ReviewResultDO> listRecent(@Param("limit") int limit);
 
-    @Select("SELECT " + COLUMNS + " FROM tm_review_result "
-            + "WHERE user_id = #{userId} AND review_scope_key <> 'SHARED' "
-            + "ORDER BY update_time DESC, create_time DESC, id DESC LIMIT #{limit}")
+    @Select("SELECT " + COLUMNS + " FROM tm_review_result review "
+            + "WHERE (review.user_id = #{userId} AND review.review_scope_key <> 'SHARED') "
+            + "OR (review.user_id IS NULL AND review.user_position_id IS NULL "
+            + "AND review.review_scope_key = 'SHARED' "
+            + "AND EXISTS (SELECT 1 FROM tm_analysis_run analysis "
+            + "WHERE analysis.analysis_id = review.analysis_id AND analysis.owner_type = 'USER' "
+            + "AND analysis.owner_id = #{userId})) "
+            + "ORDER BY review.update_time DESC, review.create_time DESC, review.id DESC LIMIT #{limit}")
     List<ReviewResultDO> listRecentByUserId(@Param("userId") Long userId, @Param("limit") int limit);
 
-    @Select("SELECT " + COLUMNS + " FROM tm_review_result "
-            + "WHERE analysis_id = #{analysisId} AND ("
-            + "(review_scope_key = 'SHARED' AND user_id IS NULL) OR user_id = #{userId}) "
-            + "ORDER BY create_time ASC, id ASC")
+    @Select("SELECT " + COLUMNS + " FROM tm_review_result review "
+            + "WHERE review.analysis_id = #{analysisId} "
+            + "AND ((review.user_id = #{userId} AND review.review_scope_key <> 'SHARED') "
+            + "OR (review.user_id IS NULL AND review.user_position_id IS NULL "
+            + "AND review.review_scope_key = 'SHARED' "
+            + "AND EXISTS (SELECT 1 FROM tm_analysis_run analysis "
+            + "WHERE analysis.analysis_id = review.analysis_id AND analysis.owner_type = 'USER' "
+            + "AND analysis.owner_id = #{userId}))) "
+            + "ORDER BY review.create_time ASC, review.id ASC")
     List<ReviewResultDO> listByAnalysisIdForUser(@Param("analysisId") String analysisId,
                                                  @Param("userId") Long userId);
 
@@ -76,6 +102,19 @@ public interface ReviewResultMapper {
             + "WHERE analysis_id = #{analysisId} AND review_scope_key = 'SHARED' "
             + "AND user_id IS NULL AND user_position_id IS NULL")
     int updateContentByAnalysisId(ReviewResultDO row);
+
+    @Update("UPDATE tm_review_result SET review_type = #{reviewType}, outcome = #{outcome}, "
+            + "execution_deviation = #{executionDeviation}, ai_assessment = #{aiAssessment}, "
+            + "rule_assessment = #{ruleAssessment}, rule_feedback = #{ruleFeedback}, metrics_json = #{metricsJson}, "
+            + "final_plan_id = #{finalPlanId}, candidate_id = #{candidateId}, trace_id = #{traceId}, "
+            + "opportunity_id = #{opportunityId}, resolver_result_id = #{resolverResultId}, "
+            + "validation_result_id = #{validationResultId}, contract_version = #{contractVersion}, "
+            + "error_type = #{errorType}, actual_outcome = #{actualOutcome}, "
+            + "adjustment_suggestion = #{adjustmentSuggestion}, missed_reason = #{missedReason}, "
+            + "later_outcome = #{laterOutcome}, update_time = #{updateTime} "
+            + "WHERE analysis_id = #{analysisId} AND user_id = #{userId} "
+            + "AND user_position_id IS NULL AND review_scope_key = #{reviewScopeKey}")
+    int updateContentByUserAnalysisScope(ReviewResultDO row);
 
     @Update("UPDATE tm_review_result SET review_type = #{reviewType}, outcome = #{outcome}, "
             + "execution_deviation = #{executionDeviation}, ai_assessment = #{aiAssessment}, "

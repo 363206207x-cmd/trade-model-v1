@@ -2,6 +2,7 @@ package org.example.trademodel.controller;
 
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.entity.MissedOpportunityDO;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.MissedOpportunityService;
 import org.example.trademodel.service.MissedReasonViewParser;
 import org.example.trademodel.vo.MissedOpportunityQueryItemVO;
@@ -39,9 +40,12 @@ public class MissedOpportunityController {
     private static final String TRADING_BOUNDARY_BLOCKED = "TRADING_BOUNDARY_BLOCKED_FAIL_CLOSED";
 
     private final MissedOpportunityService missedOpportunityService;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
-    public MissedOpportunityController(MissedOpportunityService missedOpportunityService) {
+    public MissedOpportunityController(MissedOpportunityService missedOpportunityService,
+                                       AuthenticatedUserIdResolver userIdResolver) {
         this.missedOpportunityService = missedOpportunityService;
+        this.userIdResolver = userIdResolver;
     }
 
     @GetMapping("/query")
@@ -51,14 +55,17 @@ public class MissedOpportunityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bizDate,
             @RequestParam(required = false) String missedId,
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
+        Long userId = userIdResolver.requireCurrentUserId();
         if (missedId != null && !missedId.trim().isEmpty()) {
-            MissedOpportunityDO row = missedOpportunityService.findByMissedId(missedId.trim());
+            MissedOpportunityDO row = missedOpportunityService.findByMissedIdForUser(
+                    userId, missedId.trim());
             if (row == null) {
                 return ApiResponse.success(Collections.emptyList());
             }
             return ApiResponse.success(List.of(toQueryItem(row)));
         }
-        List<MissedOpportunityDO> rows = missedOpportunityService.query(analysisId, symbol, bizDate, safeLimit(limit));
+        List<MissedOpportunityDO> rows = missedOpportunityService.queryForUser(
+                userId, analysisId, symbol, bizDate, safeLimit(limit));
         List<MissedOpportunityQueryItemVO> data = rows.stream()
                 .map(MissedOpportunityController::toQueryItem)
                 .collect(Collectors.toList());
@@ -72,6 +79,7 @@ public class MissedOpportunityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bizDate,
             @RequestParam(required = false) String missedId,
             @RequestParam(required = false, defaultValue = "5") Integer limit) {
+        Long userId = userIdResolver.requireCurrentUserId();
         String normalizedAnalysisId = trimToNull(analysisId);
         String normalizedSymbol = normalizeSymbol(symbol);
         String normalizedMissedId = trimToNull(missedId);
@@ -84,17 +92,19 @@ public class MissedOpportunityController {
 
         List<MissedOpportunityDO> rows;
         try {
-            int count = missedOpportunityService.countByBizDate(scopedBizDate);
+            int count = missedOpportunityService.countByBizDateForUser(userId, scopedBizDate);
             status.put("todayMissedCount", count);
             status.put("countAvailable", true);
             if (normalizedMissedId != null) {
-                MissedOpportunityDO row = missedOpportunityService.findByMissedId(normalizedMissedId);
+                MissedOpportunityDO row = missedOpportunityService.findByMissedIdForUser(
+                        userId, normalizedMissedId);
                 rows = row == null ? Collections.emptyList() : List.of(row);
             } else {
                 LocalDate queryBizDate = (normalizedAnalysisId == null && normalizedSymbol == null)
                         ? scopedBizDate
                         : bizDate;
-                rows = missedOpportunityService.query(normalizedAnalysisId, normalizedSymbol, queryBizDate, safeLimit(limit));
+                rows = missedOpportunityService.queryForUser(
+                        userId, normalizedAnalysisId, normalizedSymbol, queryBizDate, safeLimit(limit));
             }
             status.put("queryAvailable", true);
         } catch (Exception ignored) {

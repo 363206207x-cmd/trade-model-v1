@@ -17,6 +17,10 @@ public class AuthenticatedUserIdResolver {
     }
 
     public Long requireCurrentUserId() {
+        return requireCurrentUser().getId();
+    }
+
+    public PersonalUserDO requireCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken
@@ -31,6 +35,17 @@ public class AuthenticatedUserIdResolver {
         if (user == null || user.getId() == null || user.getId() <= 0) {
             throw new AuthenticatedUserResolutionException();
         }
-        return user.getId();
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new AuthenticatedUserResolutionException();
+        }
+        return user;
+    }
+
+    public PersonalUserDO requireOwner() {
+        PersonalUserDO user = requireCurrentUser();
+        if (!"OWNER".equals(user.getRole())) {
+            throw new AuthenticatedUserResolutionException();
+        }
+        return user;
     }
 }

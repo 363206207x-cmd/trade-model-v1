@@ -23,14 +23,8 @@ public interface OpportunityStateTransitionMapper {
 
     @Select("SELECT transition.* FROM tm_opportunity_state_transition transition "
             + "JOIN tm_asset_state opportunity ON opportunity.opportunity_id = transition.opportunity_id "
-            + "WHERE transition.opportunity_id = #{opportunityId} AND ("
-            + "(opportunity.owner_type = 'USER' AND opportunity.owner_id = #{userId}) OR "
-            + "(opportunity.owner_type = 'SYSTEM' AND opportunity.owner_id = 0 AND opportunity.pool_item_id IN ("
-            + "SELECT system_pool.id FROM tm_asset_pool_item system_pool "
-            + "WHERE system_pool.owner_type = 'SYSTEM' AND system_pool.owner_id = 0 "
-            + "AND system_pool.active = TRUE AND NOT EXISTS (SELECT 1 FROM tm_asset_pool_item user_override "
-            + "WHERE user_override.owner_type = 'USER' AND user_override.owner_id = #{userId} "
-            + "AND user_override.symbol = system_pool.symbol AND user_override.active = FALSE))))) "
+            + "WHERE transition.opportunity_id = #{opportunityId} "
+            + "AND opportunity.owner_type = 'USER' AND opportunity.owner_id = #{userId} "
             + "ORDER BY transition.occurred_at DESC, transition.transition_id DESC LIMIT #{limit}")
     List<OpportunityStateTransitionDO> listReadableByUser(@Param("opportunityId") String opportunityId,
                                                           @Param("userId") Long userId,

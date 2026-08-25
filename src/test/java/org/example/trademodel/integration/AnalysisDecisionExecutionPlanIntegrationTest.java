@@ -96,6 +96,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     private static final String ANALYSIS_ID = "ana-int-decision-plan-1";
     private static final String SYMBOL = "BTCUSDT";
+    private static final Long USER_ID = 41L;
     private static final Instant PLAN_VALIDITY_NOW = Instant.parse("2026-07-20T11:49:00Z");
     private static final DateTimeFormatter PLAN_VALIDITY_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
@@ -385,9 +386,14 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(joined.getInvalidCondition()).isEqualTo("plan invalidation wins");
         assertThat(joined.getExecutionPlanSummary()).isEqualTo("plan invalidation wins");
 
-        DashboardHomeVO home = dashboardHomeService.getHome(SYMBOL, 6);
+        DashboardHomeVO home = dashboardHomeService.getHomeForUser(USER_ID, SYMBOL, 6, null);
 
         assertThat(home.getSelectedSymbol()).isEqualTo(SYMBOL);
+        assertThat(home.getExecutionSuggestion().getStatus())
+                .describedAs("execution suggestion status; blockedReason=%s",
+                        home.getExecutionSuggestion().getBlockedReason())
+                .isEqualTo("USABLE_REVIEW_PLAN");
+        assertThat(home.getExecutionSuggestion().getModuleState()).isEqualTo("READY");
         assertThat(home.getExecutionSuggestion().getDirection()).isEqualTo("BULLISH");
         assertThat(home.getExecutionSuggestion().getEntryZone()).isEqualTo("63000-64000 USDT");
         assertThat(home.getExecutionSuggestion().getStopLoss()).isEqualTo("60800 USDT");
@@ -673,8 +679,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         run.setCreatedAt(now);
         run.setUpdatedAt(now);
         run.setVersionNo(1);
-        run.setOwnerType("SYSTEM");
-        run.setOwnerId(0L);
+        run.setOwnerType("USER");
+        run.setOwnerId(USER_ID);
         run.setAssetId(assetId);
         run.setPreview(false);
         analysisRunMapper.insert(run);
@@ -682,8 +688,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         AssetStateDO state = new AssetStateDO();
         state.setSymbol(SYMBOL);
         state.setTimeframe("1h");
-        state.setOwnerType("SYSTEM");
-        state.setOwnerId(0L);
+        state.setOwnerType("USER");
+        state.setOwnerId(USER_ID);
         state.setAssetId(assetId);
         state.setPoolItemId(poolItemId);
         state.setState(org.example.trademodel.enums.AssetStateEnum.CANDIDATE);
@@ -699,7 +705,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         state.setRuleVersion("rules-test");
         assetStateMapper.mergeUpsertCore(state);
         assetStateService.recordOpportunityProjection(
-                new OpportunityStateIdentity("SYSTEM", 0L, assetId, SYMBOL, "1h"),
+                new OpportunityStateIdentity("USER", USER_ID, assetId, SYMBOL, "1h"),
                 poolItemId,
                 ANALYSIS_ID,
                 traceId,
@@ -961,6 +967,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         plan.setValidationResultId(validationId);
         plan.setValidationReasons("[\"SOURCE_GATE_PASS\",\"RULE_DIRECTION_PRESERVED\"]");
         plan.setSourceStatus("VALID");
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setPlanVersion(1);
         plan.setManualReviewRequired(true);
         plan.setNotTradeInstruction(true);
         plan.setNotExecutable(true);
@@ -1000,8 +1008,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         TmAccountRiskSnapshotDO snapshot = new TmAccountRiskSnapshotDO();
         snapshot.setAnalysisId(ANALYSIS_ID);
         snapshot.setSymbol(SYMBOL);
-        snapshot.setOwnerType("SYSTEM");
-        snapshot.setOwnerId(0L);
+        snapshot.setOwnerType("USER");
+        snapshot.setOwnerId(USER_ID);
         snapshot.setAccountRiskStatus("ALLOWED");
         snapshot.setRiskLevelSnapshot("LOW");
         snapshot.setRiskAllowed(true);

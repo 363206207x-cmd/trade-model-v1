@@ -21,6 +21,12 @@
         <div class="login-message login-message-success" th:if="${loggedOut}" role="status" aria-live="polite">
             已安全退出。
         </div>
+        <div class="login-message login-message-success" th:if="${registered}" role="status" aria-live="polite">
+            注册成功，请登录。
+        </div>
+        <div class="login-message login-message-success" th:if="${passwordUpdated}" role="status" aria-live="polite">
+            密码已更新，旧会话已失效，请重新登录。
+        </div>
 
         <form class="login-form" th:action="@{/login}" method="post">
             <label for="username">用户名</label>
@@ -32,6 +38,8 @@
 
             <button type="submit">登录</button>
         </form>
+        <p class="login-secondary-action" th:if="${registrationOpen}">还没有账户？<a href="/register">注册账户</a></p>
+        <p class="login-secondary-action" th:unless="${registrationOpen}">当前账户名额已满。</p>
     </section>
 </main>
 </body>

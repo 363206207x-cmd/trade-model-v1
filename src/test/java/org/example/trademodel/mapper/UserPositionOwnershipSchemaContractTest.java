@@ -29,12 +29,12 @@ class UserPositionOwnershipSchemaContractTest {
     private DataSource dataSource;
 
     @Test
-    void h2SchemaHasNullableCanonicalOwnerForeignKeyAndOrderedIndex() throws Exception {
+    void h2SchemaHasRequiredCanonicalOwnerForeignKeyAndOrderedIndex() throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet columns = metadata.getColumns(null, null, "TM_USER_POSITION", "USER_ID")) {
                 assertThat(columns.next()).isTrue();
-                assertThat(columns.getInt("NULLABLE")).isEqualTo(DatabaseMetaData.columnNullable);
+                assertThat(columns.getInt("NULLABLE")).isEqualTo(DatabaseMetaData.columnNoNulls);
                 assertThat(columns.getString("TYPE_NAME")).containsIgnoringCase("BIGINT");
             }
 

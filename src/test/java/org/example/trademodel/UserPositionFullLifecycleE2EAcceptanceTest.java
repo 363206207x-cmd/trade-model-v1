@@ -81,7 +81,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
         AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         ExecutionPlanDO executionPlan = executionPlan();
-        when(executionPlanMapper.selectByPlanId(PLAN_ID)).thenReturn(executionPlan);
+        when(executionPlanMapper.selectByPlanIdForUser(PLAN_ID, USER_ID)).thenReturn(executionPlan);
         ExecutionPlanDO latestSiblingPlanB = executionPlan();
         latestSiblingPlanB.setPlanId("plan-latest-sibling-B");
         latestSiblingPlanB.setEntryZone("B-entry");
@@ -97,7 +97,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         analysisRun.setDataQualityScore(90);
         analysisRun.setStatus("SUCCESS");
         analysisRun.setCompletedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
-        when(analysisRunMapper.selectById(ANALYSIS_ID)).thenReturn(analysisRun);
+        when(analysisRunMapper.selectReadableByUser(ANALYSIS_ID, USER_ID)).thenReturn(analysisRun);
         when(analysisRunMapper.countEvidenceByAnalysisId(ANALYSIS_ID)).thenReturn(3);
         when(analysisRunMapper.countScoresByAnalysisId(ANALYSIS_ID)).thenReturn(8);
 
@@ -116,7 +116,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         currentDecision.setMultiTfConvergence("ALIGNED");
         currentDecision.setDataQualityScore(90);
         currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
-        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT"))
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, "BTCUSDT"))
                 .thenReturn(currentDecision);
         InMemoryPositionMonitorLogService monitorLogService = new InMemoryPositionMonitorLogService();
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);

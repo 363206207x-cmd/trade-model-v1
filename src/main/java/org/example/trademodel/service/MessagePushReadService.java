@@ -74,8 +74,8 @@ public class MessagePushReadService {
         int safeLimit = sanitizeLimit(limit);
         try {
             List<OpportunityLogPublicDTO> opportunities = safeList(
-                    opportunityLogMapper.queryPublicApi(
-                            null, null, null, null, null, null, null, null, safeLimit));
+                    opportunityLogMapper.queryPublicApiForUser(
+                            userId, null, null, null, safeLimit));
             List<PositionMonitorLogDO> positionRisks = safeList(
                     positionMonitorLogMapper.listRiskByUserId(userId, safeLimit));
             List<MessageListDTO.MessageItem> items = new ArrayList<>();
@@ -133,7 +133,7 @@ public class MessagePushReadService {
         }
         try {
             if (OPPORTUNITY_ID.matcher(messageId).matches()) {
-                return opportunityDetail(messageId);
+                return opportunityDetail(userId, messageId);
             }
             if (NUMERIC_ID.matcher(messageId).matches()) {
                 return positionRiskDetail(userId, messageId);
@@ -144,9 +144,9 @@ public class MessagePushReadService {
         }
     }
 
-    private PushDetailDTO opportunityDetail(String messageId) {
+    private PushDetailDTO opportunityDetail(Long userId, String messageId) {
         OpportunityLogPublicDTO opportunity = opportunityLogMapper
-                .selectPublicApiByOpportunityId(messageId);
+                .selectPublicApiByOpportunityIdForUser(messageId, userId);
         PublicOpportunityProjectionPolicy.Evaluation evaluation =
                 PublicOpportunityProjectionPolicy.evaluate(opportunity, messageId);
         if (evaluation.state() == MessageReadState.MISSING) {

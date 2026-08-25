@@ -73,7 +73,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String html = Files.readString(WORKSPACE);
         Set<String> families = captures(html, "data-component-family=\"([^\"]+)\"");
 
-        assertThat(families).hasSize(51).contains(
+        assertThat(families).hasSize(52).contains(
                 "AppShell", "SideNav", "PageHeader", "StateBadge",
                 "EmptyState", "AsyncTaskIndicator", "Drawer", "Modal", "AuditMetaDisclosure",
                 "AssetSearch", "SearchResultItem", "AssetPoolToolbar", "AssetPoolTable",
@@ -87,7 +87,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "AtTimeLaterCompare", "ResponsibilityChain", "MessageListItem",
                 "OriginalSnapshotCard", "RecheckResultHero",
                 "RecheckActionBar", "EventCalendar", "EventWindowBadge", "FocusedDetailShell",
-                "RiskPreferenceForm", "ProviderStatusPanel", "AuditChainStepper");
+                "RiskPreferenceForm", "ProviderStatusPanel", "OwnerAccountTable", "AuditChainStepper");
         assertThat(html).doesNotContain("SystemStatusBar", "workspace-system-status",
                 "ChannelDeliveryStatus", "TelegramBindingPanel", "analysisFailurePanel", "analysisFailures");
         assertThat(html).doesNotContain("data-detached-instance=\"true\"");
@@ -130,9 +130,10 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "/api/review/center", "/api/ai/audit-chain", "/api/workspace/messages",
                 "/api/workspace/rechecks/", "/api/workspace/plans/", "/api/workspace/events",
                 "/api/user-config", "等待监控数据", "当前不可查看", "暂无数据",
-                "notTradeInstruction")
+                "notTradeInstruction", "formatTime(account.lastLoginAt)")
                 .doesNotContain("/api/dashboard/home?limit=6", "/api/user-positions/open")
-                .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER");
+                .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
+                        "dateTime(account.lastLoginAt)");
         assertThat(html).contains(
                 "录入持仓", "记录平仓", "开始预览", "加入资产池持续跟踪")
                 .doesNotContain("Preview 不创建机会")

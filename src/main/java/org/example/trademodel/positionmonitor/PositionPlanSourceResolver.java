@@ -23,13 +23,20 @@ public final class PositionPlanSourceResolver {
     public Resolution resolveTypedReference(Long positionId,
                                             String positionSymbol,
                                             String typedSourceRefId) {
+        return resolveTypedReferenceForUser(null, positionId, positionSymbol, typedSourceRefId);
+    }
+
+    public Resolution resolveTypedReferenceForUser(Long userId,
+                                                   Long positionId,
+                                                   String positionSymbol,
+                                                   String typedSourceRefId) {
         SourceReference reference = PositionMonitorSourceContract.parse(typedSourceRefId);
         if (reference == null) {
             return Resolution.unverified("TYPED_SOURCE_REFERENCE_REQUIRED");
         }
         return reference.type() == SourceType.EXECUTION_PLAN
-                ? resolve(positionId, positionSymbol, reference.id(), null)
-                : resolve(positionId, positionSymbol, null, reference.id());
+                ? resolve(userId, positionId, positionSymbol, reference.id(), null)
+                : resolve(userId, positionId, positionSymbol, null, reference.id());
     }
 
     public Resolution resolveTrustedMonitorSource(Long positionId,
@@ -37,6 +44,16 @@ public final class PositionPlanSourceResolver {
                                                   String positionTypedSourceRefId,
                                                   String monitorAnalysisId,
                                                   String monitorExecutionPlanId) {
+        return resolveTrustedMonitorSourceForUser(null, positionId, positionSymbol,
+                positionTypedSourceRefId, monitorAnalysisId, monitorExecutionPlanId);
+    }
+
+    public Resolution resolveTrustedMonitorSourceForUser(Long userId,
+                                                         Long positionId,
+                                                         String positionSymbol,
+                                                         String positionTypedSourceRefId,
+                                                         String monitorAnalysisId,
+                                                         String monitorExecutionPlanId) {
         SourceReference positionSource = PositionMonitorSourceContract.parse(positionTypedSourceRefId);
         if (positionSource == null) {
             return Resolution.unverified("TYPED_SOURCE_REFERENCE_REQUIRED");
@@ -53,7 +70,7 @@ public final class PositionPlanSourceResolver {
                 && !positionSource.id().equals(executionPlanId)) {
             return Resolution.unverified("POSITION_MONITOR_PLAN_MISMATCH");
         }
-        Resolution originalPlan = resolve(positionId, positionSymbol, executionPlanId, null);
+        Resolution originalPlan = resolve(userId, positionId, positionSymbol, executionPlanId, null);
         if (!originalPlan.verified()) {
             return originalPlan;
         }
@@ -62,7 +79,9 @@ public final class PositionPlanSourceResolver {
             return Resolution.unverified("POSITION_MONITOR_ANALYSIS_MISMATCH");
         }
         try {
-            AnalysisRunDO monitorRun = analysisRunMapper.selectById(analysisId);
+            AnalysisRunDO monitorRun = userId == null
+                    ? analysisRunMapper.selectById(analysisId)
+                    : analysisRunMapper.selectReadableByUser(analysisId, userId);
             if (monitorRun == null || !analysisId.equals(trimToNull(monitorRun.getAnalysisId()))) {
                 return Resolution.unverified("MONITOR_ANALYSIS_RUN_MISSING");
             }
@@ -77,7 +96,8 @@ public final class PositionPlanSourceResolver {
         }
     }
 
-    private Resolution resolve(Long positionId,
+    private Resolution resolve(Long userId,
+                               Long positionId,
                                String positionSymbol,
                                String requestedPlanId,
                                String requestedAnalysisId) {
@@ -88,9 +108,16 @@ public final class PositionPlanSourceResolver {
             return Resolution.unverified("PLAN_SOURCE_READ_MODEL_UNAVAILABLE");
         }
         try {
-            ExecutionPlanDO plan = requestedPlanId != null
-                    ? executionPlanMapper.selectByPlanId(requestedPlanId)
-                    : executionPlanMapper.selectOnlyByAnalysisId(requestedAnalysisId);
+            ExecutionPlanDO plan;
+            if (requestedPlanId != null) {
+                plan = userId == null
+                        ? executionPlanMapper.selectByPlanId(requestedPlanId)
+                        : executionPlanMapper.selectByPlanIdForUser(requestedPlanId, userId);
+            } else {
+                plan = userId == null
+                        ? executionPlanMapper.selectOnlyByAnalysisId(requestedAnalysisId)
+                        : executionPlanMapper.selectOnlyByAnalysisIdForUser(requestedAnalysisId, userId);
+            }
             String planId = trimToNull(plan == null ? null : plan.getPlanId());
             String analysisId = trimToNull(plan == null ? null : plan.getAnalysisId());
             if (planId == null || analysisId == null) {
@@ -104,7 +131,9 @@ public final class PositionPlanSourceResolver {
                 return Resolution.unverified("MONITOR_PLAN_ANALYSIS_MISMATCH");
             }
 
-            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+            AnalysisRunDO run = userId == null
+                    ? analysisRunMapper.selectById(analysisId)
+                    : analysisRunMapper.selectReadableByUser(analysisId, userId);
             if (run == null) {
                 return Resolution.unverified("ANALYSIS_RUN_MISSING");
             }

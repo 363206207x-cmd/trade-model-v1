@@ -10,9 +10,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PackagedJarExistingV13RestartTest {
 
     @Test
-    void controlledHarnessRestartsTheSameJarAgainstTheExistingV13Database() throws Exception {
+    void controlledHarnessRestartsTheSameJarAgainstTheExistingV15Database() throws Exception {
         String script = Files.readString(Path.of("scripts/standard-release-postgresql-smoke.sh"));
         assertThat(script.split("start_app", -1).length - 1).isGreaterThanOrEqualTo(3);
-        assertThat(script).contains("PACKAGED_JAR_EXISTING_V14_RESTART=PASS");
+        assertThat(script).contains("PACKAGED_JAR_EXISTING_V15_RESTART=PASS");
     }
 }

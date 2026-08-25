@@ -47,14 +47,24 @@ class AuthAccessControlSecurityTest {
 
     @BeforeEach
     void ensureCanonicalOperator() {
-        if (personalUserMapper.findByUsername("operator") != null) {
-            return;
+        if (personalUserMapper.findByUsername("operator") == null) {
+            PersonalUserDO user = new PersonalUserDO();
+            user.setUsername("operator");
+            user.setPasswordHash("{noop}test-only-password");
+            user.setCreatedAt(LocalDateTime.now());
+            personalUserMapper.insert(user);
         }
-        PersonalUserDO user = new PersonalUserDO();
-        user.setUsername("operator");
-        user.setPasswordHash("{noop}test-only-password");
-        user.setCreatedAt(LocalDateTime.now());
-        personalUserMapper.insert(user);
+        if (personalUserMapper.findByUsername("xuchao") == null) {
+            PersonalUserDO owner = new PersonalUserDO();
+            owner.setUsername("xuchao");
+            owner.setPasswordHash("{noop}test-only-owner-password");
+            owner.setRole("OWNER");
+            owner.setEnabled(true);
+            owner.setSessionVersion(0L);
+            owner.setCreatedAt(LocalDateTime.now());
+            owner.setUpdatedAt(LocalDateTime.now());
+            personalUserMapper.insert(owner);
+        }
     }
 
     @Test
@@ -125,7 +135,7 @@ class AuthAccessControlSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(put("/api/config/scan-profile")
-                        .with(user("operator").roles("OPERATOR"))
+                        .with(user("xuchao").roles("OWNER"))
                         .with(csrf())
                         .contentType("application/json")
                         .content("""
@@ -139,7 +149,7 @@ class AuthAccessControlSecurityTest {
                                 """))
                 .andExpect(status().isOk());
 
-        assertThat(ruleVersionLogMapper.queryLogs(null, null, "operator", null, null,
+        assertThat(ruleVersionLogMapper.queryLogs(null, null, "xuchao", null, null,
                 "SCAN_PROFILE_CONFIG", null, null, null, 10)).isNotEmpty();
     }
 

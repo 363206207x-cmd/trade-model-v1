@@ -49,7 +49,7 @@ fi
 jar_listing="$(jar tf "${jar_path}")"
 grep -F 'BOOT-INF/lib/flyway-core-' <<<"${jar_listing}" >/dev/null
 grep -F 'BOOT-INF/lib/flyway-database-postgresql-' <<<"${jar_listing}" >/dev/null
-for version in $(seq 1 14); do
+for version in $(seq 1 15); do
   grep -F "BOOT-INF/classes/db/migration/V${version}__" <<<"${jar_listing}" >/dev/null
 done
 printf '%s\n' "STANDARD_JAR_FLYWAY_CONTENT=PASS"
@@ -86,7 +86,7 @@ export POSITION_PROVIDER_TYPE=BINANCE
 export BINANCE_API_KEY="controlled-smoke-key"
 export BINANCE_API_SECRET="controlled-smoke-secret"
 export TRADE_MODEL_AUTH_ENABLED=true
-export TRADE_MODEL_INITIAL_USERNAME="standard-jar-operator"
+export TRADE_MODEL_INITIAL_USERNAME="xuchao"
 export TRADE_MODEL_SESSION_COOKIE_SECURE=true
 export TRADE_MODEL_PRODUCTION_ALLOW_PUBLIC_BIND=false
 export TRADE_MODEL_PRODUCTION_SCHEDULER_POLICY=LOCKED_DOWN
@@ -166,20 +166,20 @@ SMOKE_ALLOW_EXTERNAL_CALLS=false \
 printf '%s\n' "PACKAGED_JAR_LOGIN_SESSION_LOGOUT=PASS"
 migration_count="$(docker exec "${container}" psql -U "${db_user}" -d "${database}" -Atc \
   "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL")"
-if [[ "${migration_count}" != "14" ]]; then
-  printf '%s\n' "POSTGRESQL_V1_V14=FAILED"
+if [[ "${migration_count}" != "15" ]]; then
+  printf '%s\n' "POSTGRESQL_V1_V15=FAILED"
   exit 1
 fi
-printf '%s\n' "POSTGRESQL_V1_V14=14/14_PASS"
+printf '%s\n' "POSTGRESQL_V1_V15=15/15_PASS"
 stop_app
 
 start_app
 if ! wait_ready; then
   print_startup_failure
-  printf '%s\n' "PACKAGED_JAR_EXISTING_V14_RESTART=FAILED"
+  printf '%s\n' "PACKAGED_JAR_EXISTING_V15_RESTART=FAILED"
   exit 1
 fi
-printf '%s\n' "PACKAGED_JAR_EXISTING_V14_RESTART=PASS"
+printf '%s\n' "PACKAGED_JAR_EXISTING_V15_RESTART=PASS"
 stop_app
 
 docker exec "${container}" psql -U "${db_user}" -d "${database}" -v ON_ERROR_STOP=1 -c \

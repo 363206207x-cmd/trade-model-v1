@@ -82,6 +82,12 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
     }
 
     @Override
+    public MissedOpportunityDO findByMissedIdForUser(Long userId, String missedId) {
+        return missedOpportunityMapper.selectByMissedIdForUser(
+                trimToNull(missedId), requireUserId(userId));
+    }
+
+    @Override
     public List<MissedOpportunityDO> listByDecisionId(String decisionId) {
         return missedOpportunityMapper.listByDecisionId(decisionId);
     }
@@ -107,8 +113,21 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
     }
 
     @Override
+    public List<MissedOpportunityDO> queryForUser(Long userId, String analysisId, String symbol,
+                                                  LocalDate bizDate, int limit) {
+        return missedOpportunityMapper.listByQueryForUser(
+                requireUserId(userId), trimToNull(analysisId), normalizeSymbol(symbol),
+                bizDate, sanitizeLimit(limit));
+    }
+
+    @Override
     public int countByBizDate(LocalDate bizDate) {
         return missedOpportunityMapper.countByBizDate(bizDate);
+    }
+
+    @Override
+    public int countByBizDateForUser(Long userId, LocalDate bizDate) {
+        return missedOpportunityMapper.countByBizDateForUser(requireUserId(userId), bizDate);
     }
 
     private static int sanitizeLimit(int limit) {
@@ -124,5 +143,12 @@ public class MissedOpportunityServiceImpl implements MissedOpportunityService {
         }
         String t = value.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    private static Long requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        return userId;
     }
 }

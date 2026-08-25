@@ -652,8 +652,8 @@ class V1HistoricalReplayValidationTest {
             when(positionMapper.selectByIdAndUserId(point.id(), USER_ID)).thenReturn(position);
             when(quoteClient.fetch24hTicker(SYMBOL)).thenReturn(Optional.of(quote(point.currentPrice())));
             ExecutionPlanDO plan = monitorPlan(planId);
-            lenient().when(planMapper.selectByPlanId(planId)).thenReturn(plan);
-            lenient().when(analysisRunMapper.selectById(plan.getAnalysisId()))
+            lenient().when(planMapper.selectByPlanIdForUser(planId, USER_ID)).thenReturn(plan);
+            lenient().when(analysisRunMapper.selectReadableByUser(plan.getAnalysisId(), USER_ID))
                     .thenReturn(analysisRun(plan.getAnalysisId(), SYMBOL));
             lenient().when(analysisRunMapper.countEvidenceByAnalysisId(plan.getAnalysisId())).thenReturn(3);
             lenient().when(analysisRunMapper.countScoresByAnalysisId(plan.getAnalysisId())).thenReturn(8);
@@ -666,7 +666,7 @@ class V1HistoricalReplayValidationTest {
             currentDecision.setMultiTfConvergence("ALIGNED");
             currentDecision.setDataQualityScore(90);
             currentDecision.setCreateTime(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
-            when(decisionResultMapper.findLatestDecisionResultBySymbolJoined(SYMBOL))
+            when(decisionResultMapper.findLatestDecisionResultBySymbolJoinedForUser(USER_ID, SYMBOL))
                     .thenReturn(currentDecision);
             return service.monitorUserPositionForUser(point.id(), USER_ID);
         }

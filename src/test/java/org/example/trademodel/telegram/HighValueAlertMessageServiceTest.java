@@ -169,7 +169,7 @@ class HighValueAlertMessageServiceTest {
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
         plan.setAnalysisId("analysis-9");
-        when(executionPlanMapper.selectByPlanId("plan-9")).thenReturn(plan);
+        when(executionPlanMapper.selectByPlanIdForUser("plan-9", 41L)).thenReturn(plan);
         TmPushRecheckLogDO recheck = new TmPushRecheckLogDO();
         recheck.setLogId(701L);
         recheck.setPushId(99L);

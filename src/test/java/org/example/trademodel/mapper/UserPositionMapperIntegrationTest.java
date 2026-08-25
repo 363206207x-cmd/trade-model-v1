@@ -86,14 +86,14 @@ class UserPositionMapperIntegrationTest {
     }
 
     @Test
-    void ownerQueriesIsolateSameSymbolAndQuarantineUnclaimedRows() {
+    void ownerQueriesIsolateSameSymbolAndRejectMissingOwner() {
         Long userA = userId("mapper-owner-isolation-a");
         Long userB = userId("mapper-owner-isolation-b");
         UserPositionDO ownedA = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
         ownedA.setUserId(userA);
         UserPositionDO ownedB = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
         ownedB.setUserId(userB);
-        UserPositionDO unclaimed = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 2));
+        UserPositionDO missingOwner = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 2));
         UserPositionDO partialA = row(
                 "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 3));
         partialA.setUserId(userA);
@@ -102,7 +102,8 @@ class UserPositionMapperIntegrationTest {
         partialB.setUserId(userB);
         userPositionMapper.insert(ownedA);
         userPositionMapper.insert(ownedB);
-        userPositionMapper.insert(unclaimed);
+        assertThatThrownBy(() -> userPositionMapper.insert(missingOwner))
+                .isInstanceOf(RuntimeException.class);
         userPositionMapper.insert(partialA);
         userPositionMapper.insert(partialB);
 
@@ -113,11 +114,9 @@ class UserPositionMapperIntegrationTest {
                 .extracting(UserPositionDO::getId)
                 .containsExactly(partialB.getId(), ownedB.getId());
         assertThat(userPositionMapper.selectByIdAndUserId(ownedB.getId(), userA)).isNull();
-        assertThat(userPositionMapper.selectByIdAndUserId(unclaimed.getId(), userA)).isNull();
         assertThat(userPositionMapper.listClaimedOpenForSystemMonitoring())
                 .extracting(UserPositionDO::getId)
-                .contains(ownedA.getId(), ownedB.getId(), partialA.getId(), partialB.getId())
-                .doesNotContain(unclaimed.getId());
+                .contains(ownedA.getId(), ownedB.getId(), partialA.getId(), partialB.getId());
     }
 
     @Test
@@ -129,15 +128,12 @@ class UserPositionMapperIntegrationTest {
         UserPositionDO partialA = row(
                 "BTCUSDT", "PARTIALLY_CLOSED", LocalDateTime.of(2026, 6, 22, 8, 1));
         partialA.setUserId(userA);
-        UserPositionDO unclaimed = row("SOLUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 1));
         userPositionMapper.insert(ownedA);
         userPositionMapper.insert(partialA);
-        userPositionMapper.insert(unclaimed);
         LocalDateTime closedAt = LocalDateTime.of(2026, 6, 22, 9, 0);
 
         assertThat(close(ownedA.getId(), userB, closedAt)).isZero();
         assertThat(close(partialA.getId(), userB, closedAt)).isZero();
-        assertThat(close(unclaimed.getId(), userA, closedAt)).isZero();
         assertThat(close(ownedA.getId(), userA, closedAt)).isEqualTo(1);
         assertThat(close(partialA.getId(), userA, closedAt)).isEqualTo(1);
         assertThat(close(ownedA.getId(), userA, closedAt.plusMinutes(1))).isZero();

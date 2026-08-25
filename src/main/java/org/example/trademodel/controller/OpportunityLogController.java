@@ -33,8 +33,8 @@ public class OpportunityLogController {
 
     @GetMapping("/{opportunityId}")
     public ResponseEntity<ApiResponse<OpportunityLogPublicDTO>> findById(@PathVariable String opportunityId) {
-        authenticatedUserIdResolver.requireCurrentUserId();
-        OpportunityLogPublicDTO dto = opportunityLogService.findPublicById(opportunityId);
+        OpportunityLogPublicDTO dto = opportunityLogService.findPublicByIdForUser(
+                opportunityId, authenticatedUserIdResolver.requireCurrentUserId());
         if (dto == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.notFound("opportunity not found: " + opportunityId));
@@ -53,8 +53,8 @@ public class OpportunityLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(required = false, defaultValue = "50") int limit) {
-        authenticatedUserIdResolver.requireCurrentUserId();
-        List<OpportunityLogPublicDTO> rows = opportunityLogService.queryPublic(
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        List<OpportunityLogPublicDTO> rows = opportunityLogService.queryPublicForUser(userId,
                 analysisId, decisionId, executionPlanId, symbol, opportunityStatus, lifecycleStatus,
                 from, to, limit);
         return ResponseEntity.ok(ApiResponse.success(rows));

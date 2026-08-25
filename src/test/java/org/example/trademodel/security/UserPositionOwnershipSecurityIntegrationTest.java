@@ -2,11 +2,13 @@ package org.example.trademodel.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.OpportunityLogDO;
 import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.entity.ReviewResultDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.OpportunityLogMapper;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.PersonalUserMapper;
 import org.example.trademodel.mapper.ReviewResultMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
@@ -54,23 +56,26 @@ class UserPositionOwnershipSecurityIntegrationTest {
     @Autowired
     private OpportunityLogMapper opportunityLogMapper;
     @Autowired
+    private AnalysisRunMapper analysisRunMapper;
+    @Autowired
     private ReviewResultMapper reviewResultMapper;
 
     private Long userAId;
     private Long userBId;
     private UserPositionDO openA;
     private UserPositionDO openB;
-    private UserPositionDO unclaimed;
+    private UserPositionDO legacyOwnerPosition;
     private UserPositionDO closedA;
     private UserPositionDO closedB;
 
     @BeforeEach
     void setUpOwnershipFixture() {
+        Long ownerId = insertUser("xuchao", "OWNER");
         userAId = insertUser(USER_A);
         userBId = insertUser(USER_B);
         openA = insertPosition(userAId, "BTCUSDT", "OPEN", 1);
         openB = insertPosition(userBId, "BTCUSDT", "OPEN", 2);
-        unclaimed = insertPosition(null, "LEGACYUSDT", "OPEN", 3);
+        legacyOwnerPosition = insertPosition(ownerId, "LEGACYUSDT", "OPEN", 3);
         closedA = insertPosition(userAId, "AONLYUSDT", "CLOSED", 4);
         closedB = insertPosition(userBId, "BONLYUSDT", "CLOSED", 5);
     }
@@ -106,7 +111,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.msg").value("UserPosition not found"));
-        mockMvc.perform(get("/api/user-positions/{id}", unclaimed.getId())
+        mockMvc.perform(get("/api/user-positions/{id}", legacyOwnerPosition.getId())
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/user-positions/{id}", Long.MAX_VALUE)
@@ -297,23 +302,23 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     @Test
-    void unclaimedLegacyPositionIsQuarantinedFromEveryUserOperation() throws Exception {
-        mockMvc.perform(post("/api/user-positions/{id}/manual-close", unclaimed.getId())
+    void ownerMigratedLegacyPositionIsIsolatedFromEveryOtherUserOperation() throws Exception {
+        mockMvc.perform(post("/api/user-positions/{id}/manual-close", legacyOwnerPosition.getId())
                         .with(user(USER_A).roles("OPERATOR")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(closeJson()))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(post("/api/position-monitor/user-positions/{id}/run", unclaimed.getId())
+        mockMvc.perform(post("/api/position-monitor/user-positions/{id}/run", legacyOwnerPosition.getId())
                         .with(user(USER_A).roles("OPERATOR")).with(csrf()))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/review/positions/{id}/monitor-logs", unclaimed.getId())
+        mockMvc.perform(get("/api/review/positions/{id}/monitor-logs", legacyOwnerPosition.getId())
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/review/user-positions/{id}/summary", unclaimed.getId())
+        mockMvc.perform(get("/api/review/user-positions/{id}/summary", legacyOwnerPosition.getId())
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/dashboard/home")
                         .param("selectedSymbol", "LEGACYUSDT")
-                        .param("positionId", String.valueOf(unclaimed.getId()))
+                        .param("positionId", String.valueOf(legacyOwnerPosition.getId()))
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.positionSelectionStatus").value("POSITION_NOT_FOUND"));
@@ -338,22 +343,16 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     @Test
-    void userPositionDerivedOpportunityLogIsSanitizedIntoTheSameSharedProjectionForEveryUser() throws Exception {
+    void userPositionDerivedOpportunityLogIsVisibleOnlyThroughTheOwningAnalysis() throws Exception {
         UserPositionDO linkedB = insertPosition(
                 userBId, "SOLUSDT", "OPEN", 6, "plan-owned-by-b");
+        insertOwnedAnalysis(userBId, "ana-owner-isolation", "SOLUSDT");
         OpportunityLogDO opportunity = resolvedOpportunity(linkedB);
         opportunityLogMapper.insert(opportunity);
 
-        String userAResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
-                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
-                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
-                .andExpect(jsonPath("$.data.pushId").doesNotExist())
-                .andExpect(jsonPath("$.data.riskBlockedEvidence").doesNotExist())
-                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
-                .andReturn().getResponse().getContentAsString();
+                .andExpect(status().isNotFound());
 
         String userBResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
@@ -366,8 +365,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(objectMapper.readTree(userAResponse).path("data"))
-                .isEqualTo(objectMapper.readTree(userBResponse).path("data"));
+        assertThat(objectMapper.readTree(userBResponse).path("data").path("userPositionId").isMissingNode())
+                .isTrue();
     }
 
     @Test
@@ -375,23 +374,20 @@ class UserPositionOwnershipSecurityIntegrationTest {
         OpportunityLogDO opportunity = resolvedOpportunity(openB);
         opportunity.setOpportunityId("opp-owner-review-isolation");
         opportunity.setOpportunityKey("ana-owner-review:dec-owner-review");
+        opportunity.setAnalysisId("ana-owner-review");
+        opportunity.setDecisionId("dec-owner-review");
         opportunity.setUserPositionId(null);
         opportunity.setUserPositionPresent(false);
         opportunity.setLifecycleStatus(OpportunityLogStatus.REVIEW_REQUIRED);
         opportunity.setOpportunityStatus(null);
         opportunity.setResolvedAt(null);
         opportunity.setReasonCodes("MULTIPLE_LINKED_USER_POSITIONS");
+        insertOwnedAnalysis(userBId, "ana-owner-review", "BTCUSDT");
         opportunityLogMapper.insert(opportunity);
 
-        String userAResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
+        mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_A).roles("OPERATOR")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.lifecycleStatus").value(OpportunityLogStatus.RESOLVED))
-                .andExpect(jsonPath("$.data.opportunityStatus").value(OpportunityLogStatus.MISSED_VALID))
-                .andExpect(jsonPath("$.data.userPositionId").doesNotExist())
-                .andExpect(jsonPath("$.data.pushId").doesNotExist())
-                .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
-                .andReturn().getResponse().getContentAsString();
+                .andExpect(status().isNotFound());
 
         String userBResponse = mockMvc.perform(get("/api/opportunity-log/{id}", opportunity.getOpportunityId())
                         .with(user(USER_B).roles("OPERATOR")))
@@ -403,8 +399,8 @@ class UserPositionOwnershipSecurityIntegrationTest {
                 .andExpect(jsonPath("$.data.reasonCodes").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(objectMapper.readTree(userAResponse).path("data"))
-                .isEqualTo(objectMapper.readTree(userBResponse).path("data"));
+        assertThat(objectMapper.readTree(userBResponse).path("data").path("reasonCodes").isMissingNode())
+                .isTrue();
     }
 
     @Test
@@ -444,12 +440,42 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     private Long insertUser(String username) {
+        return insertUser(username, "USER");
+    }
+
+    private Long insertUser(String username, String role) {
         PersonalUserDO user = new PersonalUserDO();
         user.setUsername(username);
         user.setPasswordHash("{noop}test-only-password");
+        user.setRole(role);
+        user.setEnabled(true);
+        user.setSessionVersion(0L);
         user.setCreatedAt(LocalDateTime.now());
         personalUserMapper.insert(user);
         return user.getId();
+    }
+
+    private void insertOwnedAnalysis(Long userId, String analysisId, String symbol) {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 1, 8, 0);
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTimeframe("1h");
+        run.setAnalysisTime(now);
+        run.setRuleVersion("ownership-test");
+        run.setTraceId("trace-" + analysisId);
+        run.setStatus("SUCCESS");
+        run.setAttemptCount(1);
+        run.setStartedAt(now);
+        run.setCompletedAt(now);
+        run.setCreatedAt(now);
+        run.setUpdatedAt(now);
+        run.setVersionNo(1);
+        run.setOwnerType("USER");
+        run.setOwnerId(userId);
+        run.setPreview(false);
+        run.setAnalysisMode("OPPORTUNITY_DECISION");
+        analysisRunMapper.insert(run);
     }
 
     private UserPositionDO insertPosition(Long userId, String symbol, String status, int minute) {

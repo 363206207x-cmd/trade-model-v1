@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>注册 · TRINE LOGIC</title>
+    <link rel="stylesheet" th:href="@{/css/login.css}" href="/css/login.css">
+</head>
+<body>
+<main class="login-shell">
+    <section class="login-panel" aria-labelledby="register-title">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <h1 id="register-title">注册 TRINE LOGIC</h1>
+        <div class="login-message login-message-error" th:if="${registrationError}" th:text="${registrationError}" role="alert"></div>
+        <div class="login-message login-message-info" th:unless="${registrationOpen}">当前账户名额已满，暂时不能注册。</div>
+        <form class="login-form" th:if="${registrationOpen}" th:action="@{/register}" method="post">
+            <label for="username">用户名</label>
+            <input id="username" name="username" type="text" autocomplete="username"
+                   minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}"
+                   th:value="${submittedUsername}" required autofocus>
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <label for="passwordConfirmation">确认密码</label>
+            <input id="passwordConfirmation" name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <label class="password-visibility"><input type="checkbox" data-password-toggle data-password-targets="password,passwordConfirmation"> 显示密码</label>
+            <button type="submit">创建账户</button>
+        </form>
+        <p class="login-secondary-action"><a href="/login">返回登录</a></p>
+    </section>
+</main>
+<script th:src="@{/js/auth-forms.js}" src="/js/auth-forms.js" defer></script>
+</body>
+</html>

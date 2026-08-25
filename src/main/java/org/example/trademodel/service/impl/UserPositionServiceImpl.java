@@ -62,7 +62,8 @@ public class UserPositionServiceImpl implements UserPositionService {
         BigDecimal leverage = requirePositive(request.getLeverage(), "leverage");
         BigDecimal stopLoss = optionalPositive(request.getStopLoss(), "stop_loss");
         BigDecimal takeProfit = optionalPositive(request.getTakeProfit(), "take_profit");
-        String finalPlanId = validateFinalPlanReference(sourceType, request.getFinalPlanId(), assetSymbol);
+        String finalPlanId = validateFinalPlanReference(
+                userId, sourceType, request.getFinalPlanId(), assetSymbol);
         LocalDateTime now = UtcLocalTimePolicy.now(clock);
         LocalDateTime openedAt = request.getOpenedAt();
         if (openedAt == null) {
@@ -282,7 +283,8 @@ public class UserPositionServiceImpl implements UserPositionService {
         }
     }
 
-    private String validateFinalPlanReference(UserPositionSourceTypeEnum sourceType,
+    private String validateFinalPlanReference(Long userId,
+                                              UserPositionSourceTypeEnum sourceType,
                                               String requestedPlanId,
                                               String assetSymbol) {
         String finalPlanId = trimToNull(requestedPlanId);
@@ -299,8 +301,8 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (executionPlanMapper == null) {
             throw new IllegalStateException("FinalExecutionPlan validation is unavailable");
         }
-        ExecutionPlanDO plan = executionPlanMapper.selectValidatedFinalByPlanIdAndSymbol(
-                finalPlanId, assetSymbol);
+        ExecutionPlanDO plan = executionPlanMapper.selectValidatedFinalByPlanIdAndSymbolForUser(
+                finalPlanId, assetSymbol, userId);
         if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())
                 || !"PASS".equals(plan.getRuleValidationStatus())) {
             throw new IllegalArgumentException("final_plan_id must reference a rule-validated FinalExecutionPlan for the same asset");

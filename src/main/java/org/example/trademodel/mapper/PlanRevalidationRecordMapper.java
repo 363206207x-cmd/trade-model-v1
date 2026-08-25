@@ -29,6 +29,14 @@ public interface PlanRevalidationRecordMapper {
     List<PlanRevalidationRecordDO> listByPlanId(@Param("planId") String planId,
                                                 @Param("limit") int limit);
 
+    @Select("SELECT record.* FROM tm_plan_revalidation_record record "
+            + "INNER JOIN tm_analysis_run ar ON ar.analysis_id = record.analysis_id "
+            + "WHERE record.plan_id = #{planId} AND ar.owner_type = 'USER' AND ar.owner_id = #{userId} "
+            + "ORDER BY record.created_at DESC, record.record_id DESC LIMIT #{limit}")
+    List<PlanRevalidationRecordDO> listByPlanIdForUser(@Param("planId") String planId,
+                                                       @Param("userId") Long userId,
+                                                       @Param("limit") int limit);
+
     @Update("UPDATE tm_plan_revalidation_record SET state = #{state}, result_plan_version = #{resultPlanVersion}, "
             + "result_plan_id = #{resultPlanId}, result_summary = #{resultSummary}, completed_at = #{completedAt}, "
             + "updated_at = #{updatedAt} WHERE record_id = #{recordId} AND state IN ('QUEUED', 'RUNNING', 'PARTIAL')")

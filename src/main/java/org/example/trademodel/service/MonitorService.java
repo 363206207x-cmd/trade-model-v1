@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface MonitorService {
     List<MonitorAlertDO> getRecentAlerts(int limit);
+
+    List<MonitorAlertDO> getRecentAlertsForUser(Long userId, int limit);
 }

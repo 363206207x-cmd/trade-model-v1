@@ -123,6 +123,9 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     @Transactional
     public OpportunityLogDTO evaluateOpportunityForUser(String opportunityId, Long userId, LocalDateTime asOf) {
         requireUserId(userId);
+        if (opportunityLogMapper.selectByOpportunityIdForUser(opportunityId, userId) == null) {
+            throw new IllegalArgumentException("opportunity not found or not owned");
+        }
         evaluateSharedOpportunity(opportunityId, asOf);
         return findByIdForUser(opportunityId, userId);
     }
@@ -207,7 +210,7 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     @Override
     public OpportunityLogDTO findByIdForUser(String opportunityId, Long userId) {
         requireUserId(userId);
-        OpportunityLogDO row = opportunityLogMapper.selectByOpportunityId(opportunityId);
+        OpportunityLogDO row = opportunityLogMapper.selectByOpportunityIdForUser(opportunityId, userId);
         return row == null ? null : toUserScopedDto(row, userId);
     }
 
@@ -221,13 +224,22 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
     public OpportunityLogPublicDTO evaluatePublicOpportunityForUser(
             String opportunityId, Long userId, LocalDateTime asOf) {
         requireUserId(userId);
+        if (opportunityLogMapper.selectPublicApiByOpportunityIdForUser(opportunityId, userId) == null) {
+            throw new IllegalArgumentException("opportunity not found or not owned");
+        }
         evaluateSharedOpportunity(opportunityId, asOf);
-        return findPublicById(opportunityId);
+        return findPublicByIdForUser(opportunityId, userId);
     }
 
     @Override
     public OpportunityLogPublicDTO findPublicById(String opportunityId) {
         return opportunityLogMapper.selectPublicApiByOpportunityId(opportunityId);
+    }
+
+    @Override
+    public OpportunityLogPublicDTO findPublicByIdForUser(String opportunityId, Long userId) {
+        requireUserId(userId);
+        return opportunityLogMapper.selectPublicApiByOpportunityIdForUser(opportunityId, userId);
     }
 
     @Override
@@ -241,6 +253,39 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
                                                      LocalDateTime to,
                                                      int limit) {
         return opportunityLogMapper.queryPublicApi(
+                trimToNull(analysisId),
+                trimToNull(decisionId),
+                trimToNull(executionPlanId),
+                trimToNull(symbol),
+                trimToNull(opportunityStatus),
+                trimToNull(lifecycleStatus),
+                from,
+                to,
+                sanitizeLimit(limit));
+    }
+
+    @Override
+    public List<OpportunityLogPublicDTO> queryPublicForUser(Long userId, String symbol,
+                                                            LocalDateTime from, LocalDateTime to, int limit) {
+        requireUserId(userId);
+        return opportunityLogMapper.queryPublicApiForUser(
+                userId, trimToNull(symbol), from, to, sanitizeLimit(limit));
+    }
+
+    @Override
+    public List<OpportunityLogPublicDTO> queryPublicForUser(Long userId,
+                                                            String analysisId,
+                                                            String decisionId,
+                                                            String executionPlanId,
+                                                            String symbol,
+                                                            String opportunityStatus,
+                                                            String lifecycleStatus,
+                                                            LocalDateTime from,
+                                                            LocalDateTime to,
+                                                            int limit) {
+        requireUserId(userId);
+        return opportunityLogMapper.queryPublicApiWithFiltersForUser(
+                userId,
                 trimToNull(analysisId),
                 trimToNull(decisionId),
                 trimToNull(executionPlanId),
@@ -268,9 +313,8 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         String lifecycleFilter = trimToNull(lifecycleStatus);
         int sanitizedLimit = sanitizeLimit(limit);
         int sourceLimit = statusFilter == null && lifecycleFilter == null ? sanitizedLimit : MAX_QUERY_LIMIT;
-        return opportunityLogMapper.query(trimToNull(analysisId), trimToNull(decisionId),
-                        trimToNull(executionPlanId), trimToNull(symbol), null, null,
-                        from, to, sourceLimit)
+        return opportunityLogMapper.queryForUser(userId, trimToNull(analysisId), trimToNull(decisionId),
+                        trimToNull(executionPlanId), trimToNull(symbol), from, to, sourceLimit)
                 .stream()
                 .map(row -> toUserScopedDto(row, userId))
                 .filter(dto -> statusFilter == null || statusFilter.equals(dto.getOpportunityStatus()))
@@ -321,6 +365,34 @@ public class OpportunityLogServiceImpl implements OpportunityLogService {
         stats.setStatusCounts(statusCounts);
         stats.setSourceCounts(sourceCounts);
         return stats;
+    }
+
+    @Override
+    public OpportunityLogStatsDTO getStatsForUser(Long userId, String symbol,
+                                                   LocalDateTime from, LocalDateTime to) {
+        requireUserId(userId);
+        List<OpportunityLogDTO> rows = queryForUser(userId, null, null, null, symbol,
+                null, null, from, to, MAX_QUERY_LIMIT);
+        OpportunityLogStatsDTO stats = new OpportunityLogStatsDTO();
+        stats.setTotalCount(rows.size());
+        stats.setResolvedCount((int) rows.stream().filter(row -> "RESOLVED".equals(row.getLifecycleStatus())).count());
+        stats.setPendingCount(rows.size() - stats.getResolvedCount());
+        stats.setExecutedValidCount(countStatus(rows, "EXECUTED_VALID"));
+        stats.setExecutedInvalidCount(countStatus(rows, "EXECUTED_INVALID"));
+        stats.setMissedValidCount(countStatus(rows, "MISSED_VALID"));
+        stats.setMissedInvalidCount(countStatus(rows, "MISSED_INVALID"));
+        stats.setPushedNotFilledValidCount(countStatus(rows, "PUSHED_NOT_FILLED_VALID"));
+        stats.setBlockedByRiskValidCount(countStatus(rows, "BLOCKED_BY_RISK_VALID"));
+        Map<String, Integer> statusCounts = new LinkedHashMap<>();
+        rows.stream().map(OpportunityLogDTO::getOpportunityStatus).filter(Objects::nonNull)
+                .forEach(status -> statusCounts.merge(status, 1, Integer::sum));
+        stats.setStatusCounts(statusCounts);
+        stats.setGeneratedAt(LocalDateTime.now());
+        return stats;
+    }
+
+    private static int countStatus(List<OpportunityLogDTO> rows, String status) {
+        return (int) rows.stream().filter(row -> status.equals(row.getOpportunityStatus())).count();
     }
 
     private OpportunityLogDO baseRow(AnalysisRunDO run, DecisionResult decision, ExecutionPlanDO plan,

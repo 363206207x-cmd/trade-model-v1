@@ -277,7 +277,7 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth, sol, bnb));
-        when(monitorService.getRecentAlerts(2)).thenReturn(List.of(alert));
+        when(monitorService.getRecentAlertsForUser(USER_ID, 2)).thenReturn(List.of(alert));
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(position, nonManualPosition));
         when(positionSyncService.getPositionSyncStatus()).thenReturn(sync);
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
@@ -392,8 +392,8 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLightSystemStatus()).thenReturn(system);
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(nonManualPosition));
-        when(opportunityLogService.queryPublic(
-                any(), any(), any(), any(), any(), any(), any(), any(), eq(6)))
+        when(opportunityLogService.queryPublicForUser(
+                eq(USER_ID), any(), any(), any(), eq(6)))
                 .thenReturn(List.of(
                         publicOpportunity("opp-pending", OpportunityLogStatus.PENDING_EVALUATION, null),
                         publicOpportunity("opp-valid", OpportunityLogStatus.RESOLVED,
@@ -614,8 +614,8 @@ class DashboardHomeServiceImplTest {
                 "resolved",
                 "missed_valid",
                 publicTime);
-        when(opportunityLogService.queryPublic(
-                any(), any(), any(), any(), any(), any(), any(), any(), eq(6)))
+        when(opportunityLogService.queryPublicForUser(
+                eq(USER_ID), any(), any(), any(), eq(6)))
                 .thenReturn(List.of(opportunity));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
@@ -1484,9 +1484,9 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
         String traceId = "trace-" + decision.getAnalysisId();
-        when(assetStateMapper.selectBySymbol("BTCUSDT"))
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", traceId));
-        when(analysisRunMapper.selectById(decision.getAnalysisId()))
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID))
                 .thenReturn(sourceRun(decision.getAnalysisId(), "BTCUSDT", traceId));
         UserPositionVO position = activeManualPosition(331L, "BTCUSDT", null);
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
@@ -1610,9 +1610,9 @@ class DashboardHomeServiceImplTest {
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
                 .thenReturn(List.of(btc, eth, solWithoutIdentity));
-        when(analysisRunMapper.selectById("analysis-btc-exact"))
+        when(analysisRunMapper.selectReadableByUser("analysis-btc-exact", USER_ID))
                 .thenReturn(analysisRun("analysis-btc-exact", "BTC/USDT"));
-        when(analysisRunMapper.selectById("analysis-eth-exact"))
+        when(analysisRunMapper.selectReadableByUser("analysis-eth-exact", USER_ID))
                 .thenReturn(analysisRun("analysis-eth-exact", "ETHUSDT"));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 3);
@@ -1630,7 +1630,7 @@ class DashboardHomeServiceImplTest {
         btc.setAnalysisId("analysis-orphan");
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc));
-        when(analysisRunMapper.selectById("analysis-orphan")).thenReturn(null);
+        when(analysisRunMapper.selectReadableByUser("analysis-orphan", USER_ID)).thenReturn(null);
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
 
@@ -1646,7 +1646,7 @@ class DashboardHomeServiceImplTest {
         btc.setAnalysisId("analysis-symbol-mismatch");
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc));
-        when(analysisRunMapper.selectById("analysis-symbol-mismatch"))
+        when(analysisRunMapper.selectReadableByUser("analysis-symbol-mismatch", USER_ID))
                 .thenReturn(analysisRun("analysis-symbol-mismatch", "ETHUSDT"));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 1);
@@ -1667,6 +1667,7 @@ class DashboardHomeServiceImplTest {
 
         assertThat(asset(home, "BTC/USDT").getAnalysisId()).isNull();
         verify(analysisRunMapper, never()).selectById(anyString());
+        verify(analysisRunMapper, never()).selectReadableByUser(anyString(), any());
         verify(analysisRunMapper, never()).selectLatestBySymbol(anyString());
     }
 
@@ -1680,9 +1681,9 @@ class DashboardHomeServiceImplTest {
         eth.setAnalysisId("analysis-eth-valid");
 
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(btc, eth));
-        when(analysisRunMapper.selectById("analysis-btc-failing"))
+        when(analysisRunMapper.selectReadableByUser("analysis-btc-failing", USER_ID))
                 .thenThrow(new IllegalStateException("isolated lookup failure"));
-        when(analysisRunMapper.selectById("analysis-eth-valid"))
+        when(analysisRunMapper.selectReadableByUser("analysis-eth-valid", USER_ID))
                 .thenReturn(analysisRun("analysis-eth-valid", "ETHUSDT"));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 2);
@@ -1760,10 +1761,10 @@ class DashboardHomeServiceImplTest {
         decision.setConfusedScore(25);
         decision.setCreateTime(decisionUpdatedAt);
         AnalysisRunDO run = analysisRun(decision.getAnalysisId(), "BTCUSDT");
-        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
         when(analysisRunMapper.selectAverageScoreByAnalysisId(decision.getAnalysisId())).thenReturn(86.4);
         when(analysisRunMapper.countEvidenceByAnalysisId(decision.getAnalysisId())).thenReturn(7);
-        when(assetStateMapper.selectBySymbol("BTCUSDT"))
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", null));
         PersistedOhlcvBarDO marketBar = persistedBar("BTCUSDT", "64123.45", "FRESH", marketUpdatedAt);
         lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
@@ -2431,7 +2432,7 @@ class DashboardHomeServiceImplTest {
             AssetStateDO row = new AssetStateDO();
             row.setSymbol("BTCUSDT");
             row.setState(states[i]);
-            when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(row);
+            when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT")).thenReturn(row);
 
             DashboardHomeVO.AssetVO asset = asset(service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
 
@@ -2449,7 +2450,7 @@ class DashboardHomeServiceImplTest {
         AssetStateDO state = new AssetStateDO();
         state.setSymbol("BTCUSDT");
         state.setState(AssetStateEnum.WAITING_TRIGGER);
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT")).thenReturn(state);
 
         DashboardHomeVO.AssetVO high = asset(
                 service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
@@ -2475,7 +2476,7 @@ class DashboardHomeServiceImplTest {
         assertThat(highRiskOpportunity.getCurrentConclusion()).isEqualTo("高风险观察");
 
         decision.setRiskLevel("HIGH");
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(null);
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT")).thenReturn(null);
         DashboardHomeVO.AssetVO missingOpportunityState = asset(
                 service.getHomeForUser(USER_ID, "BTCUSDT", 6), "BTC/USDT");
 
@@ -2517,9 +2518,9 @@ class DashboardHomeServiceImplTest {
         decision.setDataQualityScore(70);
         setActivePlanValidity(decision);
         String traceId = "trace-" + decision.getAnalysisId();
-        when(assetStateMapper.selectBySymbol(decision.getSymbol()))
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, decision.getSymbol()))
                 .thenReturn(sourceState(decision.getSymbol(), traceId));
-        when(analysisRunMapper.selectById(decision.getAnalysisId()))
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID))
                 .thenReturn(sourceRun(decision.getAnalysisId(), decision.getSymbol(), traceId));
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
@@ -2704,8 +2705,8 @@ class DashboardHomeServiceImplTest {
         when(decisionService.getLightSystemStatus()).thenThrow(new IllegalStateException("status unavailable"));
         DashboardHomeVO.StatusCardVO unavailable = service.getHomeForUser(USER_ID, "BTCUSDT", 6)
                 .getSystemState().getConfused();
-        assertThat(unavailable.getValue()).isNull();
-        assertThat(unavailable.getStatus()).isEqualTo("WAITING_SYNC");
+        assertThat(unavailable.getValue()).isEqualTo(1);
+        assertThat(unavailable.getStatus()).isEqualTo("CONNECTED");
     }
 
     @Test
@@ -2719,8 +2720,8 @@ class DashboardHomeServiceImplTest {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(decision.getAnalysisId());
         run.setTraceId("trace-original-plan");
-        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
-        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT")).thenReturn(state);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
         DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
@@ -2903,10 +2904,10 @@ class DashboardHomeServiceImplTest {
 
     private void stubCompleteAssetProjection(DecisionResultVO decision) {
         AnalysisRunDO run = analysisRun(decision.getAnalysisId(), decision.getSymbol());
-        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
         when(analysisRunMapper.selectAverageScoreByAnalysisId(decision.getAnalysisId())).thenReturn(86.4);
         when(analysisRunMapper.countEvidenceByAnalysisId(decision.getAnalysisId())).thenReturn(7);
-        when(assetStateMapper.selectBySymbol(decision.getSymbol()))
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, decision.getSymbol()))
                 .thenReturn(sourceState(decision.getSymbol(), null));
         PersistedOhlcvBarDO marketBar = persistedBar(
                 decision.getSymbol(), "64123.45", "FRESH", LocalDateTime.of(2026, 7, 21, 9, 30));
@@ -3103,11 +3104,13 @@ class DashboardHomeServiceImplTest {
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         copyExactPlanFields(plan, sourceDecision);
         if (resolveByAnalysisId) {
-            when(executionPlanMapper.selectOnlyByAnalysisId(sourceDecision.getAnalysisId())).thenReturn(plan);
+            when(executionPlanMapper.selectOnlyByAnalysisIdForUser(
+                    sourceDecision.getAnalysisId(), USER_ID)).thenReturn(plan);
         } else {
-            when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+            when(executionPlanMapper.selectByPlanIdForUser(planId, USER_ID)).thenReturn(plan);
         }
-        lenient().when(executionPlanMapper.selectLatestByAnalysisId(sourceDecision.getAnalysisId()))
+        lenient().when(executionPlanMapper.selectLatestByAnalysisIdForUser(
+                        sourceDecision.getAnalysisId(), USER_ID))
                 .thenReturn(plan);
         allowExactAssetPlanRelation(sourceDecision, plan);
         lenient().when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(sourceDecision.getAnalysisId(), planId))
@@ -3117,13 +3120,17 @@ class DashboardHomeServiceImplTest {
         run.setAnalysisId(sourceDecision.getAnalysisId());
         run.setSymbol(sourceDecision.getSymbol());
         run.setTraceId(sourceTraceId);
-        when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+        lenient().when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+        lenient().when(analysisRunMapper.selectReadableByUser(sourceDecision.getAnalysisId(), USER_ID))
+                .thenReturn(run);
 
         AssetStateDO state = new AssetStateDO();
         state.setSymbol(sourceDecision.getSymbol());
         state.setState(AssetStateEnum.CANDIDATE);
         state.setTraceId(currentStateTraceId);
         lenient().when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+        lenient().when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, sourceDecision.getSymbol()))
+                .thenReturn(state);
         return plan;
     }
 
@@ -3186,9 +3193,10 @@ class DashboardHomeServiceImplTest {
         ExecutionPlanDO plan = validExecutionPlan(planId, analysisId);
         copyExactPlanFields(plan, sourceDecision);
         planMutation.accept(plan);
-        lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
-        when(analysisRunMapper.selectById(analysisId))
-                .thenReturn(sourceRun(analysisId, "BTCUSDT", traceId));
+        lenient().when(executionPlanMapper.selectByPlanIdForUser(planId, USER_ID)).thenReturn(plan);
+        AnalysisRunDO run = sourceRun(analysisId, "BTCUSDT", traceId);
+        lenient().when(analysisRunMapper.selectById(analysisId)).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(analysisId, USER_ID)).thenReturn(run);
 
         PositionMonitorServiceImpl monitorService = new PositionMonitorServiceImpl(
                 monitorPositionMapper,
@@ -3219,7 +3227,7 @@ class DashboardHomeServiceImplTest {
                 .thenReturn(sourceDecision);
         when(userPositionService.listOpenPositionsForUser(USER_ID)).thenReturn(List.of(positionVO));
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(sourceDecision));
-        when(assetStateMapper.selectBySymbol("BTCUSDT"))
+        when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, "BTCUSDT"))
                 .thenReturn(sourceState("BTCUSDT", traceId));
 
         DashboardHomeVO.ExecutionSuggestionVO suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
@@ -3326,8 +3334,10 @@ class DashboardHomeServiceImplTest {
         run.setAnalysisId(decision.getAnalysisId());
         run.setSymbol(decision.getSymbol());
         run.setTraceId(traceId);
-        when(assetStateMapper.selectBySymbol(decision.getSymbol())).thenReturn(state);
-        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        lenient().when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, decision.getSymbol()))
+                .thenReturn(state);
+        lenient().when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID))
+                .thenReturn(run);
         return allowAssetExecutionPlan(decision, "plan-" + decision.getAnalysisId());
     }
 
@@ -3346,11 +3356,19 @@ class DashboardHomeServiceImplTest {
         relation.setSymbol(decision.getSymbol());
         relation.setSourceType("AUTHORITATIVE_ANALYSIS");
         relation.setTraceId("trace-" + decision.getAnalysisId());
-        lenient().when(opportunityLogService.queryForSystem(
-                        decision.getAnalysisId(), decision.getDecisionId(), null, decision.getSymbol(),
-                        null, null, null, null, 2))
+        lenient().when(opportunityLogService.queryForUser(
+                        USER_ID, decision.getAnalysisId(), decision.getDecisionId(), null,
+                        decision.getSymbol(), null, null, null, null, 2))
                 .thenReturn(List.of(relation));
         lenient().when(executionPlanMapper.selectByPlanId(plan.getPlanId())).thenReturn(plan);
+        lenient().when(executionPlanMapper.selectByPlanIdForUser(plan.getPlanId(), USER_ID))
+                .thenReturn(plan);
+        AnalysisRunDO scopedRun = new AnalysisRunDO();
+        scopedRun.setAnalysisId(decision.getAnalysisId());
+        scopedRun.setSymbol(decision.getSymbol());
+        scopedRun.setTraceId("trace-" + decision.getAnalysisId());
+        lenient().when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID))
+                .thenReturn(scopedRun);
     }
 
     private void allowResolvedOriginalPlan(UserPositionVO position,
@@ -3366,19 +3384,23 @@ class DashboardHomeServiceImplTest {
 
         ExecutionPlanDO plan = validExecutionPlan(planId, sourceDecision.getAnalysisId());
         copyExactPlanFields(plan, sourceDecision);
-        lenient().when(executionPlanMapper.selectByPlanId(planId)).thenReturn(plan);
+        lenient().when(executionPlanMapper.selectByPlanIdForUser(planId, USER_ID)).thenReturn(plan);
 
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(sourceDecision.getAnalysisId());
         run.setSymbol(sourceDecision.getSymbol());
         run.setTraceId(traceId);
-        when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+        lenient().when(analysisRunMapper.selectById(sourceDecision.getAnalysisId())).thenReturn(run);
+        lenient().when(analysisRunMapper.selectReadableByUser(sourceDecision.getAnalysisId(), USER_ID))
+                .thenReturn(run);
 
         AssetStateDO state = new AssetStateDO();
         state.setSymbol(sourceDecision.getSymbol());
         state.setState(AssetStateEnum.CANDIDATE);
         state.setTraceId(traceId);
-        when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+        lenient().when(assetStateMapper.selectBySymbol(sourceDecision.getSymbol())).thenReturn(state);
+        lenient().when(assetStateMapper.selectLatestByUserAndSymbol(USER_ID, sourceDecision.getSymbol()))
+                .thenReturn(state);
     }
 
     private record OriginalPlanFixture(UserPositionVO position,

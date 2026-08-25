@@ -27,9 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:personal-login-session;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
-        "trade-model.auth.initial-username=operator",
-        "trade-model.auth.initial-password=operator-secret-123",
+        "trade-model.auth.initial-username=xuchao",
+        "trade-model.auth.initial-password=owner-login-session-secret",
         "trade-model.security.rate-limit.requests-per-minute=1000"
 })
 @AutoConfigureMockMvc
@@ -78,7 +79,7 @@ class PersonalLoginSessionSecurityTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("autocomplete=\"current-password\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("width=device-width, initial-scale=1")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("登录")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("注册"))))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("注册账户")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("OAuth"))));
     }
 

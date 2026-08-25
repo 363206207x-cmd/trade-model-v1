@@ -1,6 +1,7 @@
 package org.example.trademodel.controller;
 
 import org.example.trademodel.entity.MissedOpportunityDO;
+import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.MissedOpportunityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,20 +30,25 @@ class MissedOpportunityControllerTest {
 
     @Mock
     private MissedOpportunityService missedOpportunityService;
+    @Mock
+    private AuthenticatedUserIdResolver userIdResolver;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new MissedOpportunityController(missedOpportunityService)).build();
+        when(userIdResolver.requireCurrentUserId()).thenReturn(41L);
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new MissedOpportunityController(missedOpportunityService, userIdResolver)).build();
     }
 
     @Test
     void reviewArchiveStatusEndpointReturnsReviewOnlyReadyStatus() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
         MissedOpportunityDO row = row("mo-ready", "ana-ready", "BTCUSDT", bizDate, validReasonJson(), "trace-ready");
-        when(missedOpportunityService.countByBizDate(bizDate)).thenReturn(1);
-        when(missedOpportunityService.query("ana-ready", "BTCUSDT", bizDate, 5)).thenReturn(List.of(row));
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate)).thenReturn(1);
+        when(missedOpportunityService.queryForUser(41L, "ana-ready", "BTCUSDT", bizDate, 5))
+                .thenReturn(List.of(row));
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                         .param("analysisId", "ana-ready")
@@ -103,8 +109,9 @@ class MissedOpportunityControllerTest {
     @Test
     void reviewArchiveStatusEndpointFailsClosedWhenArchiveIsEmpty() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
-        when(missedOpportunityService.countByBizDate(bizDate)).thenReturn(0);
-        when(missedOpportunityService.query(null, null, bizDate, 5)).thenReturn(Collections.emptyList());
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate)).thenReturn(0);
+        when(missedOpportunityService.queryForUser(41L, null, null, bizDate, 5))
+                .thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                 .param("bizDate", "2026-06-11"))
@@ -127,8 +134,9 @@ class MissedOpportunityControllerTest {
     @Test
     void reviewArchiveStatusEndpointReturnsCountOnlyPartialWhenCountExistsButRowsAreUnavailable() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
-        when(missedOpportunityService.countByBizDate(bizDate)).thenReturn(3);
-        when(missedOpportunityService.query(null, null, bizDate, 5)).thenReturn(Collections.emptyList());
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate)).thenReturn(3);
+        when(missedOpportunityService.queryForUser(41L, null, null, bizDate, 5))
+                .thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                 .param("bizDate", "2026-06-11"))
@@ -144,7 +152,8 @@ class MissedOpportunityControllerTest {
     @Test
     void reviewArchiveStatusEndpointFailsClosedWhenReadPathThrows() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
-        when(missedOpportunityService.countByBizDate(bizDate)).thenThrow(new IllegalStateException("read unavailable"));
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate))
+                .thenThrow(new IllegalStateException("read unavailable"));
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                         .param("bizDate", "2026-06-11"))
@@ -171,8 +180,9 @@ class MissedOpportunityControllerTest {
     void reviewArchiveStatusEndpointFailsClosedWhenReasonParsingFails() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
         MissedOpportunityDO row = row("mo-bad-json", "ana-bad-json", "BTCUSDT", bizDate, "{bad-json", "trace-bad-json");
-        when(missedOpportunityService.countByBizDate(bizDate)).thenReturn(1);
-        when(missedOpportunityService.query("ana-bad-json", "BTCUSDT", bizDate, 5)).thenReturn(List.of(row));
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate)).thenReturn(1);
+        when(missedOpportunityService.queryForUser(41L, "ana-bad-json", "BTCUSDT", bizDate, 5))
+                .thenReturn(List.of(row));
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                         .param("analysisId", "ana-bad-json")
@@ -190,8 +200,9 @@ class MissedOpportunityControllerTest {
     void reviewArchiveStatusEndpointDoesNotExposeExecutableCandidatePointOrTradingFields() throws Exception {
         LocalDate bizDate = LocalDate.of(2026, 6, 11);
         MissedOpportunityDO row = row("mo-safe", "ana-safe", "BTCUSDT", bizDate, validReasonJson(), "trace-safe");
-        when(missedOpportunityService.countByBizDate(bizDate)).thenReturn(1);
-        when(missedOpportunityService.query("ana-safe", "BTCUSDT", bizDate, 5)).thenReturn(List.of(row));
+        when(missedOpportunityService.countByBizDateForUser(41L, bizDate)).thenReturn(1);
+        when(missedOpportunityService.queryForUser(41L, "ana-safe", "BTCUSDT", bizDate, 5))
+                .thenReturn(List.of(row));
 
         mockMvc.perform(get("/api/missed-opportunity/review-archive-status")
                         .param("analysisId", "ana-safe")

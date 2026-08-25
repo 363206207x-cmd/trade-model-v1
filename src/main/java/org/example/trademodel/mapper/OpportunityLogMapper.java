@@ -134,6 +134,11 @@ public interface OpportunityLogMapper {
     @Select(BASE_SELECT + "WHERE opportunity_id = #{opportunityId}")
     OpportunityLogDO selectByOpportunityId(@Param("opportunityId") String opportunityId);
 
+    @Select(BASE_SELECT + "WHERE opportunity_id = #{opportunityId} AND analysis_id IN ("
+            + "SELECT analysis_id FROM tm_analysis_run WHERE owner_type = 'USER' AND owner_id = #{userId})")
+    OpportunityLogDO selectByOpportunityIdForUser(@Param("opportunityId") String opportunityId,
+                                                  @Param("userId") Long userId);
+
     @Select(BASE_SELECT + "WHERE opportunity_id = #{opportunityId} AND push_id IS NOT NULL"
             + SHARED_STATE_PREDICATE)
     OpportunityLogDO selectPushBackedSharedByOpportunityId(@Param("opportunityId") String opportunityId);
@@ -156,6 +161,14 @@ public interface OpportunityLogMapper {
             + PUBLIC_PROJECTION_PREDICATE)
     OpportunityLogPublicDTO selectPublicApiByOpportunityId(
             @Param("opportunityId") String opportunityId);
+
+    @Select(PUBLIC_API_SELECT + "WHERE opportunity_id = #{opportunityId} "
+            + "AND analysis_id IN (SELECT analysis_id FROM tm_analysis_run "
+            + "WHERE owner_type = 'USER' AND owner_id = #{userId})"
+            + PUBLIC_PROJECTION_PREDICATE)
+    OpportunityLogPublicDTO selectPublicApiByOpportunityIdForUser(
+            @Param("opportunityId") String opportunityId,
+            @Param("userId") Long userId);
 
     @Select(PUBLIC_EVALUATION_SELECT + "WHERE opportunity_id = #{opportunityId}"
             + PUBLIC_PROJECTION_PREDICATE)
@@ -193,6 +206,55 @@ public interface OpportunityLogMapper {
             @Param("to") LocalDateTime to,
             @Param("limit") int limit);
 
+    @Select({
+            "<script>",
+            PUBLIC_API_SELECT,
+            "WHERE analysis_id IN (SELECT analysis_id FROM tm_analysis_run WHERE owner_type = 'USER' AND owner_id = #{userId})",
+            PUBLIC_PROJECTION_PREDICATE,
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}",
+            "</script>"
+    })
+    List<OpportunityLogPublicDTO> queryPublicApiForUser(@Param("userId") Long userId,
+                                                        @Param("symbol") String symbol,
+                                                        @Param("from") LocalDateTime from,
+                                                        @Param("to") LocalDateTime to,
+                                                        @Param("limit") int limit);
+
+    @Select({
+            "<script>",
+            PUBLIC_API_SELECT,
+            "WHERE analysis_id IN (SELECT analysis_id FROM tm_analysis_run WHERE owner_type = 'USER' AND owner_id = #{userId})",
+            PUBLIC_PROJECTION_PREDICATE,
+            "<if test='analysisId != null and analysisId != \"\"'> AND analysis_id = #{analysisId}</if>",
+            "<if test='decisionId != null and decisionId != \"\"'> AND decision_id = #{decisionId}</if>",
+            "<if test='executionPlanId != null and executionPlanId != \"\"'> AND execution_plan_id = #{executionPlanId}</if>",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='opportunityStatus != null and opportunityStatus != \"\"'> AND (",
+            PUBLIC_STATUS_EXPRESSION,
+            ") = #{opportunityStatus}</if>",
+            "<if test='lifecycleStatus != null and lifecycleStatus != \"\"'> AND (",
+            PUBLIC_LIFECYCLE_EXPRESSION,
+            ") = #{lifecycleStatus}</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}",
+            "</script>"
+    })
+    List<OpportunityLogPublicDTO> queryPublicApiWithFiltersForUser(
+            @Param("userId") Long userId,
+            @Param("analysisId") String analysisId,
+            @Param("decisionId") String decisionId,
+            @Param("executionPlanId") String executionPlanId,
+            @Param("symbol") String symbol,
+            @Param("opportunityStatus") String opportunityStatus,
+            @Param("lifecycleStatus") String lifecycleStatus,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("limit") int limit);
+
     @Select(BASE_SELECT + "WHERE opportunity_key = #{opportunityKey}")
     OpportunityLogDO selectByOpportunityKey(@Param("opportunityKey") String opportunityKey);
 
@@ -220,6 +282,28 @@ public interface OpportunityLogMapper {
                                  @Param("from") LocalDateTime from,
                                  @Param("to") LocalDateTime to,
                                  @Param("limit") int limit);
+
+    @Select({
+            "<script>",
+            BASE_SELECT,
+            "WHERE analysis_id IN (SELECT analysis_id FROM tm_analysis_run WHERE owner_type = 'USER' AND owner_id = #{userId})",
+            "<if test='analysisId != null and analysisId != \"\"'> AND analysis_id = #{analysisId}</if>",
+            "<if test='decisionId != null and decisionId != \"\"'> AND decision_id = #{decisionId}</if>",
+            "<if test='executionPlanId != null and executionPlanId != \"\"'> AND execution_plan_id = #{executionPlanId}</if>",
+            "<if test='symbol != null and symbol != \"\"'> AND UPPER(TRIM(symbol)) = UPPER(TRIM(#{symbol}))</if>",
+            "<if test='from != null'> AND anchor_time &gt;= #{from}</if>",
+            "<if test='to != null'> AND anchor_time &lt;= #{to}</if>",
+            "ORDER BY anchor_time DESC, opportunity_id DESC LIMIT #{limit}",
+            "</script>"
+    })
+    List<OpportunityLogDO> queryForUser(@Param("userId") Long userId,
+                                        @Param("analysisId") String analysisId,
+                                        @Param("decisionId") String decisionId,
+                                        @Param("executionPlanId") String executionPlanId,
+                                        @Param("symbol") String symbol,
+                                        @Param("from") LocalDateTime from,
+                                        @Param("to") LocalDateTime to,
+                                        @Param("limit") int limit);
 
     @Select({
             "<script>",

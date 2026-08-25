@@ -33,4 +33,16 @@ public class MonitorServiceImpl implements MonitorService {
         runtimeMetricService.recordDuration("monitor.getRecentAlerts", methodCostMs);
         return result;
     }
+
+    @Override
+    public List<MonitorAlertDO> getRecentAlertsForUser(Long userId, int limit) {
+        long methodStart = System.currentTimeMillis();
+        if (userId == null || userId <= 0 || limit <= 0) {
+            return Collections.emptyList();
+        }
+        List<MonitorAlertDO> result = monitorAlertMapper.selectRecentForUser(userId, limit);
+        runtimeMetricService.recordDuration(
+                "monitor.getRecentAlertsForUser", System.currentTimeMillis() - methodStart);
+        return result;
+    }
 }

@@ -32,8 +32,42 @@ public interface ExecutionPlanMapper {
             """)
     ExecutionPlanDO selectOnlyByAnalysisId(@Param("analysisId") String analysisId);
 
+    @Select("SELECT ep.* FROM tm_execution_plan ep INNER JOIN tm_analysis_run ar ON ar.analysis_id = ep.analysis_id "
+            + "WHERE ep.analysis_id = #{analysisId} AND ar.owner_type = 'USER' AND ar.owner_id = #{userId} "
+            + "AND (SELECT COUNT(*) FROM tm_execution_plan scoped "
+            + "INNER JOIN tm_analysis_run scoped_run ON scoped_run.analysis_id = scoped.analysis_id "
+            + "WHERE scoped.analysis_id = #{analysisId} AND scoped_run.owner_type = 'USER' "
+            + "AND scoped_run.owner_id = #{userId}) = 1 LIMIT 1")
+    ExecutionPlanDO selectOnlyByAnalysisIdForUser(@Param("analysisId") String analysisId,
+                                                   @Param("userId") Long userId);
+
     @Select("SELECT * FROM tm_execution_plan WHERE plan_id = #{planId} ORDER BY create_time DESC LIMIT 1")
     ExecutionPlanDO selectByPlanId(@Param("planId") String planId);
+
+    @Select("SELECT ep.* FROM tm_execution_plan ep INNER JOIN tm_analysis_run ar ON ar.analysis_id = ep.analysis_id "
+            + "WHERE ep.plan_id = #{planId} AND ar.owner_type = 'USER' AND ar.owner_id = #{userId} "
+            + "ORDER BY ep.create_time DESC LIMIT 1")
+    ExecutionPlanDO selectByPlanIdForUser(@Param("planId") String planId,
+                                          @Param("userId") Long userId);
+
+    @Select("SELECT ep.* FROM tm_execution_plan ep "
+            + "INNER JOIN tm_decision_result d ON d.analysis_id = ep.analysis_id "
+            + "INNER JOIN tm_analysis_run ar ON ar.analysis_id = ep.analysis_id "
+            + "WHERE ep.plan_id = #{planId} AND ep.final_plan = TRUE "
+            + "AND ep.rule_validation_status = 'PASS' AND ep.candidate_id IS NOT NULL "
+            + "AND UPPER(TRIM(d.symbol)) = #{normalizedSymbol} "
+            + "AND ar.owner_type = 'USER' AND ar.owner_id = #{userId} "
+            + "ORDER BY ep.create_time DESC LIMIT 1")
+    ExecutionPlanDO selectValidatedFinalByPlanIdAndSymbolForUser(
+            @Param("planId") String planId,
+            @Param("normalizedSymbol") String normalizedSymbol,
+            @Param("userId") Long userId);
+
+    @Select("SELECT ep.* FROM tm_execution_plan ep INNER JOIN tm_analysis_run ar ON ar.analysis_id = ep.analysis_id "
+            + "WHERE ep.analysis_id = #{analysisId} AND ar.owner_type = 'USER' AND ar.owner_id = #{userId} "
+            + "ORDER BY ep.create_time DESC LIMIT 1")
+    ExecutionPlanDO selectLatestByAnalysisIdForUser(@Param("analysisId") String analysisId,
+                                                     @Param("userId") Long userId);
 
     @Select("SELECT * FROM tm_execution_plan WHERE candidate_id = #{candidateId} "
             + "ORDER BY create_time DESC, plan_id DESC LIMIT 1")
