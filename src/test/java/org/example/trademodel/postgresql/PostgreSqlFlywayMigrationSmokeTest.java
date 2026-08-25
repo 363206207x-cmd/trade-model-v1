@@ -872,32 +872,32 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     .isInstanceOf(java.sql.SQLException.class);
             assertThat(statement.executeUpdate("""
                     INSERT INTO tm_user_position(
-                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                       source_type, final_plan_id
-                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                    ) VALUES (1, 'V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
                       CURRENT_TIMESTAMP, 'SYSTEM_PLAN_POSITION', 'final-plan-v11-chain')
                     """)).isEqualTo(1);
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO tm_user_position(
-                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                       source_type, final_plan_id
-                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                    ) VALUES (1, 'V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
                       CURRENT_TIMESTAMP, 'SYSTEM_PLAN_POSITION', NULL)
                     """))
                     .isInstanceOf(java.sql.SQLException.class);
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO tm_user_position(
-                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                       source_type, final_plan_id
-                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                    ) VALUES (1, 'V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
                       CURRENT_TIMESTAMP, 'MANUAL_POSITION', 'final-plan-v11-chain')
                     """))
                     .isInstanceOf(java.sql.SQLException.class);
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("""
                     INSERT INTO tm_user_position(
-                      asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
+                      user_id, asset_symbol, side, status, entry_price, quantity, leverage, opened_at,
                       source_type, final_plan_id
-                    ) VALUES ('V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
+                    ) VALUES (1, 'V11CHAINUSDT', 'LONG', 'OPEN', 100, 1, 1,
                       CURRENT_TIMESTAMP, 'AUTO', 'final-plan-v11-chain')
                     """))
                     .isInstanceOf(java.sql.SQLException.class);

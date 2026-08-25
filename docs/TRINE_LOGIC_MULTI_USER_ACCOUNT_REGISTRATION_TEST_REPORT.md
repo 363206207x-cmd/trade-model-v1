@@ -20,6 +20,7 @@ Implementation baseline:
 | Product Source Gate | PASS |
 | PostgreSQL 16 standard release smoke | PASS |
 | PostgreSQL V1 to V15 | `15/15_PASS` |
+| Focused PostgreSQL migration contract rerun | PASS |
 | Existing V15 restart | PASS |
 | Checksum and migration failure readiness | PASS_FAIL_CLOSED |
 | Packaged JAR form login / Session / CSRF / logout | PASS |
@@ -79,6 +80,15 @@ The standard release JAR was exercised against a disposable PostgreSQL 16
 database. Flyway applied V1-V15, restarted cleanly at V15, rejected checksum
 and migration failures through readiness, and passed form-login Session/CSRF
 and logout checks. The disposable database was removed after validation.
+
+The first exact-head `quality-gate` run against implementation commit
+`08d6a3a91386448ce714fabaa0950635cb7781ca` exposed a migration-test fixture
+that inserted a V11 `tm_user_position` without the V15-required `user_id`.
+The fixture now uses the preserved Owner (`user_id=1`), so the assertions once
+again exercise the intended V11 plan/source constraints instead of failing at
+the V15 ownership constraint. The focused PostgreSQL 16 migration test and the
+Java 17 full Maven suite pass after this test-only correction; application and
+migration code are unchanged by the correction.
 
 ## Remaining Acceptance Gates
 
