@@ -15,10 +15,12 @@
 4. Confirm only `OWNER_PASSWORD_RESET=PASS` is printed.
 5. Restart `rine-logic.service` and verify login with `xuchao`.
 
-The command rejects missing or duplicate accounts, never creates an account,
-does not accept a password argument, and updates only the existing configured
-Owner. It also keeps the root-owned bootstrap secret aligned because the
-production preflight still requires that existing setting.
+The command rejects a missing, duplicate or non-canonical Owner, never creates
+an account, does not accept a password argument, and updates only the existing
+`id=1` configured Owner even when ordinary users exist. It increments the
+Owner's `session_version` so prior Owner sessions expire, and keeps the
+root-owned bootstrap secret aligned because the production preflight still
+requires that existing setting.
 
 ## Recovery and backup notes
 

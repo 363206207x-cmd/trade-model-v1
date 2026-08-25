@@ -77,15 +77,21 @@ public final class PersonalOwnerPasswordResetTool {
             long userId;
             String storedUsername;
             try (PreparedStatement statement = connection.prepareStatement(
-                    "SELECT id, username FROM tm_user ORDER BY id FOR UPDATE");
+                    "SELECT id, username, enabled, owner_slot FROM tm_user "
+                            + "WHERE role = 'OWNER' ORDER BY id FOR UPDATE");
                  ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     throw new IllegalStateException("OWNER_MISSING");
                 }
                 userId = resultSet.getLong("id");
                 storedUsername = resultSet.getString("username");
+                boolean enabled = resultSet.getBoolean("enabled");
+                int ownerSlot = resultSet.getInt("owner_slot");
                 if (resultSet.next()) {
                     throw new IllegalStateException("MULTIPLE_OWNERS_REJECTED");
+                }
+                if (userId != 1L || !enabled || ownerSlot != 1) {
+                    throw new IllegalStateException("CANONICAL_OWNER_INVALID");
                 }
             }
             if (!username.equals(PersonalUsernamePolicy.normalize(storedUsername))) {
@@ -93,7 +99,9 @@ public final class PersonalOwnerPasswordResetTool {
             }
             String encoded = encoder.encode(new String(first));
             try (PreparedStatement statement = connection.prepareStatement(
-                    "UPDATE tm_user SET password_hash = ? WHERE id = ? AND username = ?")) {
+                    "UPDATE tm_user SET password_hash = ?, session_version = session_version + 1, "
+                            + "updated_at = CURRENT_TIMESTAMP WHERE id = ? AND username = ? "
+                            + "AND role = 'OWNER' AND enabled = TRUE AND owner_slot = 1")) {
                 statement.setString(1, encoded);
                 statement.setLong(2, userId);
                 statement.setString(3, storedUsername);

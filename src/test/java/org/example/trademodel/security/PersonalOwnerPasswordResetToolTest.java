@@ -22,18 +22,28 @@ class PersonalOwnerPasswordResetToolTest {
     Path tempDir;
 
     @Test
-    void resetsOnlyExistingSingleConfiguredOwnerAndPreservesIdentity() throws Exception {
+    void resetsOnlyCanonicalOwnerPreservesOtherUsersAndInvalidatesOwnerSessions() throws Exception {
         PasswordEncoder encoder = SecurityConfig.passwordEncoder();
         try (Connection connection = database("success")) {
-            insert(connection, 9L, "xuchao", encoder.encode("old-secret-47!"));
+            String ownerHash = encoder.encode("old-secret-47!");
+            String userHash = encoder.encode("user-secret-48!");
+            insert(connection, 1L, "xuchao", ownerHash, "OWNER", true, 7L, 1);
+            insert(connection, 2L, "ordinary", userHash, "USER", true, 3L, null);
 
             PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     connection, "xuchao", VALID.clone(), VALID.clone(), encoder);
 
-            assertThat(count(connection)).isEqualTo(1);
-            assertThat(userId(connection)).isEqualTo(9L);
-            assertThat(username(connection)).isEqualTo("xuchao");
-            assertThat(encoder.matches(new String(VALID), passwordHash(connection))).isTrue();
+            assertThat(count(connection)).isEqualTo(2);
+            assertThat(ownerCount(connection)).isEqualTo(1);
+            assertThat(value(connection, 1L, "id", Long.class)).isEqualTo(1L);
+            assertThat(value(connection, 1L, "username", String.class)).isEqualTo("xuchao");
+            assertThat(value(connection, 1L, "role", String.class)).isEqualTo("OWNER");
+            assertThat(value(connection, 1L, "session_version", Long.class)).isEqualTo(8L);
+            assertThat(encoder.matches(new String(VALID), value(connection, 1L, "password_hash", String.class)))
+                    .isTrue();
+            assertThat(value(connection, 2L, "password_hash", String.class)).isEqualTo(userHash);
+            assertThat(value(connection, 2L, "role", String.class)).isEqualTo("USER");
+            assertThat(value(connection, 2L, "session_version", Long.class)).isEqualTo(3L);
         }
     }
 
@@ -41,7 +51,7 @@ class PersonalOwnerPasswordResetToolTest {
     void rejectsMismatchMissingOwnerDuplicateOwnerAndWrongConfiguredIdentity() throws Exception {
         PasswordEncoder encoder = SecurityConfig.passwordEncoder();
         try (Connection mismatch = database("mismatch")) {
-            insert(mismatch, 1L, "xuchao", encoder.encode("old-secret-47!"));
+            insertOwner(mismatch, 1L, "xuchao", encoder.encode("old-secret-47!"));
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     mismatch, "xuchao", VALID.clone(), "different meadow quartz harbor 47!".toCharArray(), encoder))
                     .hasMessage("PASSWORD_MISMATCH");
@@ -52,17 +62,23 @@ class PersonalOwnerPasswordResetToolTest {
                     .hasMessage("OWNER_MISSING");
         }
         try (Connection duplicate = database("duplicate")) {
-            insert(duplicate, 1L, "xuchao", encoder.encode("old-secret-47!"));
-            insert(duplicate, 2L, "other", encoder.encode("old-secret-48!"));
+            insertOwner(duplicate, 1L, "xuchao", encoder.encode("old-secret-47!"));
+            insertOwner(duplicate, 2L, "other", encoder.encode("old-secret-48!"));
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     duplicate, "xuchao", VALID.clone(), VALID.clone(), encoder))
                     .hasMessage("MULTIPLE_OWNERS_REJECTED");
         }
         try (Connection wrong = database("wrong")) {
-            insert(wrong, 1L, "owner", encoder.encode("old-secret-47!"));
+            insertOwner(wrong, 1L, "owner", encoder.encode("old-secret-47!"));
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     wrong, "xuchao", VALID.clone(), VALID.clone(), encoder))
                     .hasMessage("CONFIGURED_OWNER_NOT_FOUND");
+        }
+        try (Connection wrongId = database("wrong-id")) {
+            insertOwner(wrongId, 9L, "xuchao", encoder.encode("old-secret-47!"));
+            assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
+                    wrongId, "xuchao", VALID.clone(), VALID.clone(), encoder))
+                    .hasMessage("CANONICAL_OWNER_INVALID");
         }
     }
 
@@ -70,7 +86,7 @@ class PersonalOwnerPasswordResetToolTest {
     void rejectsWeakOrOwnerDerivedPassphrases() throws Exception {
         PasswordEncoder encoder = SecurityConfig.passwordEncoder();
         try (Connection connection = database("policy")) {
-            insert(connection, 1L, "xuchao", encoder.encode("old-secret-47!"));
+            insertOwner(connection, 1L, "xuchao", encoder.encode("old-secret-47!"));
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     connection, "xuchao", "tiny".toCharArray(), "tiny".toCharArray(), encoder))
                     .hasMessage("PASSWORD_POLICY_REJECTED");
@@ -100,16 +116,29 @@ class PersonalOwnerPasswordResetToolTest {
 
     private Connection database(String name) throws Exception {
         Connection connection = DriverManager.getConnection("jdbc:h2:mem:owner-reset-" + name + ";DB_CLOSE_DELAY=-1");
-        connection.createStatement().execute("CREATE TABLE tm_user (id BIGINT PRIMARY KEY, username VARCHAR(64), password_hash VARCHAR(100))");
+        connection.createStatement().execute("CREATE TABLE tm_user (id BIGINT PRIMARY KEY, "
+                + "username VARCHAR(64), password_hash VARCHAR(100), role VARCHAR(16), enabled BOOLEAN, "
+                + "session_version BIGINT, updated_at TIMESTAMP, owner_slot SMALLINT)");
         return connection;
     }
 
-    private void insert(Connection connection, long id, String username, String hash) throws Exception {
+    private void insertOwner(Connection connection, long id, String username, String hash) throws Exception {
+        insert(connection, id, username, hash, "OWNER", true, 0L, 1);
+    }
+
+    private void insert(Connection connection, long id, String username, String hash, String role,
+                        boolean enabled, long sessionVersion, Integer ownerSlot) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO tm_user(id, username, password_hash) VALUES (?, ?, ?)")) {
+                "INSERT INTO tm_user(id, username, password_hash, role, enabled, session_version, updated_at, owner_slot) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)")) {
             statement.setLong(1, id);
             statement.setString(2, username);
             statement.setString(3, hash);
+            statement.setString(4, role);
+            statement.setBoolean(5, enabled);
+            statement.setLong(6, sessionVersion);
+            if (ownerSlot == null) statement.setNull(7, java.sql.Types.SMALLINT);
+            else statement.setInt(7, ownerSlot);
             statement.executeUpdate();
         }
     }
@@ -121,24 +150,22 @@ class PersonalOwnerPasswordResetToolTest {
         }
     }
 
-    private long userId(Connection connection) throws Exception {
-        try (ResultSet result = connection.createStatement().executeQuery("SELECT id FROM tm_user")) {
+    private int ownerCount(Connection connection) throws Exception {
+        try (ResultSet result = connection.createStatement()
+                .executeQuery("SELECT COUNT(*) FROM tm_user WHERE role = 'OWNER'")) {
             result.next();
-            return result.getLong(1);
+            return result.getInt(1);
         }
     }
 
-    private String username(Connection connection) throws Exception {
-        try (ResultSet result = connection.createStatement().executeQuery("SELECT username FROM tm_user")) {
-            result.next();
-            return result.getString(1);
-        }
-    }
-
-    private String passwordHash(Connection connection) throws Exception {
-        try (ResultSet result = connection.createStatement().executeQuery("SELECT password_hash FROM tm_user")) {
-            result.next();
-            return result.getString(1);
+    private <T> T value(Connection connection, long id, String column, Class<T> type) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + column + " FROM tm_user WHERE id = ?")) {
+            statement.setLong(1, id);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getObject(1, type);
+            }
         }
     }
 }
