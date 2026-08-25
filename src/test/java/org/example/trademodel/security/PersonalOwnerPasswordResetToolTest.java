@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Map;
 
 import org.example.trademodel.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,24 @@ class PersonalOwnerPasswordResetToolTest {
         assertThat(Files.getPosixFilePermissions(config).toString())
                 .contains("OWNER_READ", "OWNER_WRITE")
                 .doesNotContain("GROUP_READ", "OTHERS_READ");
+    }
+
+    @Test
+    void resolvesOnlyTheProductionDatasourceContractUsedByStaging() {
+        PersonalOwnerPasswordResetTool.DataSourceSettings settings =
+                PersonalOwnerPasswordResetTool.resolveDataSourceSettings(Map.of(
+                        "PROD_DATASOURCE_URL", "jdbc:postgresql://database/rine_logic_staging",
+                        "PROD_DATASOURCE_USERNAME", "application",
+                        "PROD_DATASOURCE_PASSWORD", "test-only-value"));
+
+        assertThat(settings.url()).isEqualTo("jdbc:postgresql://database/rine_logic_staging");
+        assertThat(settings.username()).isEqualTo("application");
+        assertThat(settings.password()).isEqualTo("test-only-value");
+        assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resolveDataSourceSettings(Map.of(
+                "SPRING_DATASOURCE_URL", "jdbc:postgresql://wrong/alias",
+                "SPRING_DATASOURCE_USERNAME", "wrong",
+                "SPRING_DATASOURCE_PASSWORD", "wrong")))
+                .hasMessage("PROD_DATASOURCE_URL_MISSING");
     }
 
     private Connection database(String name) throws Exception {

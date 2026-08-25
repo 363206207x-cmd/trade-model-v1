@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,16 +42,16 @@ public final class PersonalOwnerPasswordResetTool {
         char[] first = console.readPassword("New Owner password: ");
         char[] second = console.readPassword("Repeat Owner password: ");
         try {
-            String username = requiredEnvironment("TRADE_MODEL_INITIAL_USERNAME");
-            String jdbcUrl = requiredEnvironment("SPRING_DATASOURCE_URL");
-            String jdbcUsername = requiredEnvironment("SPRING_DATASOURCE_USERNAME");
-            String jdbcPassword = requiredEnvironment("SPRING_DATASOURCE_PASSWORD");
-            Path runtimeConfig = Path.of(requiredEnvironment("RINE_LOGIC_ACTIVE_ENV_FILE"));
-            if (!jdbcUrl.startsWith("jdbc:postgresql:")) {
+            Map<String, String> environment = System.getenv();
+            String username = requiredEnvironment(environment, "TRADE_MODEL_INITIAL_USERNAME");
+            DataSourceSettings dataSource = resolveDataSourceSettings(environment);
+            Path runtimeConfig = Path.of(requiredEnvironment(environment, "RINE_LOGIC_ACTIVE_ENV_FILE"));
+            if (!dataSource.url().startsWith("jdbc:postgresql:")) {
                 fail("POSTGRESQL_REQUIRED");
             }
             PasswordEncoder encoder = SecurityConfig.passwordEncoder();
-            try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUsername, jdbcPassword)) {
+            try (Connection connection = DriverManager.getConnection(
+                    dataSource.url(), dataSource.username(), dataSource.password())) {
                 resetExistingSingleOwner(connection, username, first, second, encoder);
             }
             updateRuntimeBootstrapSecret(runtimeConfig, username, first);
@@ -178,12 +179,22 @@ public final class PersonalOwnerPasswordResetTool {
         }
     }
 
-    private static String requiredEnvironment(String name) {
-        String value = System.getenv(name);
+    static DataSourceSettings resolveDataSourceSettings(Map<String, String> environment) {
+        return new DataSourceSettings(
+                requiredEnvironment(environment, "PROD_DATASOURCE_URL"),
+                requiredEnvironment(environment, "PROD_DATASOURCE_USERNAME"),
+                requiredEnvironment(environment, "PROD_DATASOURCE_PASSWORD"));
+    }
+
+    private static String requiredEnvironment(Map<String, String> environment, String name) {
+        String value = environment.get(name);
         if (value == null || value.isBlank()) {
             throw new IllegalStateException(name + "_MISSING");
         }
         return value;
+    }
+
+    record DataSourceSettings(String url, String username, String password) {
     }
 
     private static String shellQuote(String value) {
