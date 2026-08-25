@@ -246,7 +246,8 @@ public class HotResetServiceImpl implements HotResetService {
                     new HighValueAlertMessageService.SafetyChangeInput(
                             event.getOwnerId(), HighValueAlertPolicy.SafetyChangeType.HOT_RESET,
                             "HOT_RESET", eventId, command.getAnalysisId(), planId,
-                            opportunityId, latestPushId(command.getAnalysisId()), normalizedSymbol, command.getTraceId(),
+                            opportunityId, latestPushId(command.getAnalysisId()), normalizedSymbol,
+                            command.getTimeframe(), preState.name(), command.getTraceId(),
                             postState.name(), 4, event.getTriggerReasonText(),
                             "等待重建分析、规则校验和计划重新验证完成", occurredAt, null));
         }

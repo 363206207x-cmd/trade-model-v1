@@ -125,11 +125,21 @@ public class HighValueAlertMessageService {
         message.setCurrentRecheckId(null);
         message.setTitle("【机会达到人工复核条件】");
         message.setBody("资产：" + safe(run.getSymbol())
+                + "\n周期：" + safe(run.getTimeframe())
                 + "\n方向：" + readableBias(plan.getFinalMarketBias())
                 + "\n计划模式：" + readablePlanMode(qualification.finalPlanMode())
                 + "\n机会状态：" + readableOpportunityState(qualification.opportunityState())
+                + "\n入场区：" + concise(plan.getEntryZone())
+                + "\n触发条件：" + concise(plan.getTriggerCondition())
+                + "\n止损区：" + concise(firstText(plan.getStopLoss(), plan.getStopLogic()))
+                + "\n失效条件：" + concise(firstText(plan.getInvalidCondition(), plan.getAbandonCondition()))
+                + "\n目标/仓位管理：" + concise(joinFacts(plan.getTakeProfitRules(), plan.getTargetLogic(),
+                        plan.getPositionSuggestion(), plan.getReducePositionCondition()))
                 + "\n主要依据：" + concise(firstText(decision == null ? null : decision.getEvidenceSummary(), plan.getEntryLogic()))
                 + "\n主要风险：" + concise(plan.getRiskExplanation())
+                + "\n数据来源：" + concise(firstText(plan.getSourceRefsJson(), plan.getSourceStatus()))
+                + "\n数据时间：" + format(plan.getExecutionFeasibilityObservedAt())
+                + "\n来源有效至：" + format(plan.getExecutionFeasibilityFreshUntil())
                 + "\n有效至：" + format(plan.getValidUntil())
                 + "\n操作：打开系统重新校验");
         message.setDedupeKey(TelegramDedupeKey.create("OPPORTUNITY_READY",
@@ -148,10 +158,16 @@ public class HighValueAlertMessageService {
         message.setCurrentRecheckId(null);
         message.setTitle("【原计划需要重新验证】");
         message.setBody("资产：" + safe(input.symbol())
-                + "\n变化：" + readableSafetyChange(input.changeType())
-                + "\n原因：" + concise(input.reason())
-                + "\n当前状态：暂不视为有效机会"
-                + "\n恢复条件：" + concise(input.recoveryCondition()));
+                + "\n周期：" + safe(input.timeframe())
+                + "\n变化类型：" + readableSafetyChange(input.changeType())
+                + "\n原状态：" + safe(input.previousState())
+                + "\n当前状态：" + safe(input.state())
+                + "\n准确原因：" + concise(input.reason())
+                + "\n当前有效性：需重新校验，当前不作为可执行机会"
+                + "\n恢复/重新校验条件：" + concise(input.recoveryCondition())
+                + "\n发生时间：" + format(input.occurredAt())
+                + "\n有效至：" + format(input.expiresAt())
+                + "\n操作：打开系统重新校验");
         String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
         String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
         if (!hasText(subjectId)) return null;
@@ -188,14 +204,23 @@ public class HighValueAlertMessageService {
                 log.getTraceId(), log.getFreshUntil());
         message.setTitle("【持仓逻辑发生重要变化】");
         message.setBody("资产：" + safe(position.getAssetSymbol())
+                + "\n方向：" + readableDirection(position.getSide())
+                + "\n实际入场价：" + safeNumber(position.getEntryPrice())
+                + "\n可信当前价：" + safeNumber(firstNumber(result.getMarkPrice(), log.getCurrentPrice()))
                 + "\n当前变化：" + readableEntryLogic(log.getEntryLogicStatus())
                 + "\n原入场逻辑：" + concise(sourcePlan == null
                         ? "手动持仓未关联系统计划，请核对原始录入依据" : sourcePlan.getEntryLogic())
                 + "\n反转状态：" + readableReversal(log.getReversalStatus())
                 + "\n风险：" + readableRisk(log.getRiskLevel(), log.getRiskTrend())
-                + "\n主要原因：" + readableRiskReason(log.getRiskChangeReason())
+                + "\n准确原因：" + concise(joinFacts(readableRiskReason(log.getRiskChangeReason()), log.getReason()))
+                + "\n止损/目标距离：" + positionProximity(position, result)
+                + "\n监控结论：" + readableMonitorConclusion(log.getMonitorConclusion())
+                + "\n建议动作：" + concise(firstText(result.getSuggestedManualActionText(),
+                        firstText(log.getSuggestedAction(), result.getSuggestedAction())))
                 + "\n最近监控：" + format(log.getCreatedAt())
-                + "\n建议：打开持仓详情人工处理");
+                + "\n来源时效：" + concise(joinFacts(firstText(result.getMarkPriceSource(), log.getMarkPriceSource()),
+                        "观测于 " + format(log.getObservedAt()), "有效至 " + format(log.getFreshUntil())))
+                + "\n操作：打开持仓详情");
         message.setDedupeKey(TelegramDedupeKey.create("POSITION_RISK_CHANGE", state, severity,
                 telegramProperties.getCooldownMinutes(), position.getUserId(),
                 "USER_POSITION", String.valueOf(position.getId()), now));
@@ -266,7 +291,22 @@ public class HighValueAlertMessageService {
         return value.trim();
     }
     private static String firstText(String first, String second) { return hasText(first) ? first : second; }
+    private static java.math.BigDecimal firstNumber(java.math.BigDecimal first, java.math.BigDecimal second) {
+        return first != null ? first : second;
+    }
     private static String safe(String value) { return hasText(value) ? value.trim() : "当前不可查看"; }
+    private static String safeNumber(java.math.BigDecimal value) {
+        return value == null ? "当前不可查看" : value.stripTrailingZeros().toPlainString();
+    }
+    private static String joinFacts(String... values) {
+        if (values == null) return null;
+        return java.util.Arrays.stream(values)
+                .filter(HighValueAlertMessageService::hasText)
+                .map(String::trim)
+                .distinct()
+                .reduce((left, right) -> left + "；" + right)
+                .orElse(null);
+    }
     private static String concise(String value) {
         if (!hasText(value)) return "暂无可验证摘要，请回到系统查看";
         String normalized = value.replaceAll("\\s+", " ").trim();
@@ -341,6 +381,38 @@ public class HighValueAlertMessageService {
         };
     }
 
+    private static String readableDirection(String value) {
+        return switch (normalize(value)) {
+            case "LONG", "BUY" -> "做多";
+            case "SHORT", "SELL" -> "做空";
+            default -> "当前不可查看";
+        };
+    }
+
+    private static String readableMonitorConclusion(String value) {
+        return switch (normalize(value)) {
+            case "LOGIC_VALID" -> "逻辑仍成立";
+            case "LOGIC_WEAKENED" -> "逻辑弱化";
+            case "PLAN_INVALIDATED" -> "计划失效";
+            case "NEAR_STOP_LOSS" -> "接近止损";
+            case "NEAR_TAKE_PROFIT" -> "接近止盈";
+            case "HIGH_RISK_OBSERVATION" -> "高风险观察";
+            case "WAIT_USER_CONFIRM_CLOSE" -> "等待用户确认平仓";
+            default -> "当前不可查看";
+        };
+    }
+
+    private static String positionProximity(UserPositionDO position, PositionMonitorResultDTO result) {
+        String state;
+        if (result.isStopLossBreached()) state = "已触及实际止损";
+        else if (result.isTakeProfitReached()) state = "已触及实际目标";
+        else if (result.isNearStopLoss()) state = "接近实际止损";
+        else if (result.isNearTakeProfit()) state = "接近实际目标";
+        else state = "未报告接近状态";
+        return state + "；止损 " + safeNumber(position.getStopLoss())
+                + "；目标 " + safeNumber(position.getTakeProfit());
+    }
+
     public record SafetyChangeInput(Long userId,
                                     HighValueAlertPolicy.SafetyChangeType changeType,
                                     String sourceType,
@@ -350,6 +422,8 @@ public class HighValueAlertMessageService {
                                     String opportunityId,
                                     String pushSnapshotId,
                                     String symbol,
+                                    String timeframe,
+                                    String previousState,
                                     String traceId,
                                     String state,
                                     int severity,

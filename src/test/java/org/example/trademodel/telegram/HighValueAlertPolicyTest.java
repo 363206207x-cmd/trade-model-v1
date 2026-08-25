@@ -37,6 +37,9 @@ class HighValueAlertPolicyTest {
         HighValueAlertPolicy.OpportunityQualification base = opportunity("CONFIRMATION");
         assertThat(policy.allowsOpportunity(copy(base, false, false, true, true, true, "TRIGGERED"))).isFalse();
         assertThat(policy.allowsOpportunity(copy(base, false, false, true, true, false, "CONFUSED"))).isFalse();
+        assertThat(policy.allowsOpportunity(copy(base, false, false, true, true, false, "HIGH_RISK"))).isFalse();
+        assertThat(policy.allowsOpportunity(copy(base, false, false, true, true, false, "INVALIDATED"))).isFalse();
+        assertThat(policy.allowsOpportunity(copy(base, false, false, true, true, false, "COOLING"))).isFalse();
         assertThat(policy.allowsSafetyChange(safety(HighValueAlertPolicy.SafetyChangeType.PLAN_EXPIRED))).isTrue();
         assertThat(policy.allowsSafetyChange(safety(HighValueAlertPolicy.SafetyChangeType.CONFUSED))).isTrue();
         assertThat(policy.allowsSafetyChange(safety(HighValueAlertPolicy.SafetyChangeType.HOT_RESET))).isTrue();

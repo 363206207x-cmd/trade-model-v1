@@ -369,7 +369,7 @@ public class PushRecheckServiceImpl implements PushRecheckService {
                 String.valueOf(snapshot.getPushId()),
                 snapshot.getAnalysisId(), plan == null ? null : plan.getPlanId(),
                 plan == null ? null : plan.getOpportunityId(), String.valueOf(snapshot.getPushId()),
-                snapshot.getSymbol(), snapshot.getTraceId(),
+                snapshot.getSymbol(), snapshot.getTimeframe(), snapshot.getPushStatus(), snapshot.getTraceId(),
                 status.name(), severity, message,
                 recoveryCondition(status), occurredAt, snapshot.getExpiresAt()));
     }

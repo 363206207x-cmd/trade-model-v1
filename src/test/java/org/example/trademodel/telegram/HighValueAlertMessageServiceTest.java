@@ -75,6 +75,7 @@ class HighValueAlertMessageServiceTest {
         run.setOwnerId(41L);
         run.setAssetId(9L);
         run.setSymbol("SOLUSDT");
+        run.setTimeframe("15m");
         run.setPreview(false);
 
         DecisionResult decision = new DecisionResult();
@@ -95,7 +96,15 @@ class HighValueAlertMessageServiceTest {
         plan.setValidUntil(LocalDateTime.of(2026, 8, 16, 13, 0));
         plan.setDataQuality(90);
         plan.setEntryLogic("多源证据一致");
+        plan.setEntryZone("100-101");
+        plan.setTriggerCondition("15m 收盘确认");
+        plan.setStopLoss("98");
+        plan.setInvalidCondition("结构跌破 98");
+        plan.setTakeProfitRules("分批止盈");
+        plan.setPositionSuggestion("小仓位人工确认");
         plan.setRiskExplanation("仅供人工复核，需关注流动性变化");
+        plan.setSourceRefsJson("BINANCE:BTCUSDT:15m");
+        plan.setExecutionFeasibilityObservedAt(LocalDateTime.of(2026, 8, 16, 11, 59));
         plan.setNotTradeInstruction(true);
         plan.setNotOrderExecution(true);
 
@@ -120,8 +129,11 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getPlanId()).isEqualTo("plan-9");
         assertThat(message.getDedupeKey()).startsWith("TG1|OPPORTUNITY_READY|TRIGGERED|3|");
         assertThat(message.getBody()).contains(
-                "资产：SOLUSDT", "方向：偏多", "计划模式：确认型",
-                "机会状态：已触发", "操作：打开系统重新校验");
+                "资产：SOLUSDT", "周期：15m", "方向：偏多", "计划模式：确认型",
+                "机会状态：已触发", "入场区：100-101", "触发条件：15m 收盘确认",
+                "止损区：98", "失效条件：结构跌破 98", "目标/仓位管理：分批止盈；小仓位人工确认",
+                "数据来源：BINANCE:BTCUSDT:15m", "数据时间：2026-08-16 11:59 UTC",
+                "来源有效至：2026-08-16 12:05 UTC", "操作：打开系统重新校验");
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
         verify(messageFactService).recordIfAbsent(message);
@@ -132,7 +144,7 @@ class HighValueAlertMessageServiceTest {
         MessageDO message = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.HOT_RESET,
                 "HOT_RESET", "reset-9", "analysis-9", "plan-9", "opportunity-9", "99",
-                "SOLUSDT", "trace-9", "CONFUSED", 4,
+                "SOLUSDT", "15m", "TRIGGERED", "trace-9", "CONFUSED", 4,
                 "证据冲突", "等待规则与数据重新验证", LocalDateTime.of(2026, 8, 16, 12, 0), null));
 
         assertThat(message.getCategory()).isEqualTo("OPPORTUNITY_PLAN_SAFETY_CHANGE");
@@ -141,7 +153,9 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getTraceId()).isEqualTo("trace-9");
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
-        assertThat(message.getBody()).contains("当前状态：暂不视为有效机会", "恢复条件");
+        assertThat(message.getBody()).contains(
+                "周期：15m", "原状态：TRIGGERED", "当前状态：CONFUSED",
+                "当前有效性：需重新校验，当前不作为可执行机会", "发生时间：2026-08-16 12:00 UTC");
     }
 
     @Test
@@ -154,7 +168,7 @@ class HighValueAlertMessageServiceTest {
         MessageDO message = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
                 "PUSH_SNAPSHOT", "99", "analysis-9", "plan-9", "opportunity-9", "99",
-                "SOLUSDT", "trace-9", "DRIFTED", 3,
+                "SOLUSDT", "15m", "READY", "trace-9", "DRIFTED", 3,
                 "价格偏离", "重新校验", LocalDateTime.of(2026, 8, 16, 12, 0), null));
         assertThat(message.getCurrentRecheckId()).isNull();
 
@@ -200,12 +214,12 @@ class HighValueAlertMessageServiceTest {
         MessageDO first = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
                 "PUSH_RECHECK", "recheck-1", "analysis-1", "plan-1", "opportunity-1", "snapshot-1",
-                "BTCUSDT", "trace-1", "DRIFTED", 3, "drift", "revalidate",
+                "BTCUSDT", "15m", "READY", "trace-1", "DRIFTED", 3, "drift", "revalidate",
                 LocalDateTime.of(2026, 8, 16, 12, 0), null));
         MessageDO second = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
                 "PUSH_RECHECK", "recheck-2", "analysis-2", "plan-1", "opportunity-1", "snapshot-2",
-                "BTCUSDT", "trace-2", "DRIFTED", 3, "drift", "revalidate",
+                "BTCUSDT", "15m", "READY", "trace-2", "DRIFTED", 3, "drift", "revalidate",
                 LocalDateTime.of(2026, 8, 16, 12, 30), null));
 
         assertThat(first.getSourceId()).isNotEqualTo(second.getSourceId());
@@ -219,18 +233,35 @@ class HighValueAlertMessageServiceTest {
         position.setId(91L);
         position.setUserId(41L);
         position.setAssetSymbol("BTCUSDT");
+        position.setSide("LONG");
+        position.setEntryPrice(new java.math.BigDecimal("100"));
+        position.setStopLoss(new java.math.BigDecimal("95"));
+        position.setTakeProfit(new java.math.BigDecimal("110"));
         position.setStatus("OPEN");
         position.setSourceType("MANUAL_POSITION");
         PositionMonitorLogDTO log = trustedLog();
+        log.setCurrentPrice(new java.math.BigDecimal("102"));
+        log.setMarkPriceSource("BINANCE");
+        log.setReason("反向证据增加且接近止损区域");
+        log.setSuggestedAction("TIGHTEN_STOP");
+        PositionMonitorResultDTO result = new PositionMonitorResultDTO();
+        result.setMarkPrice(new java.math.BigDecimal("102"));
+        result.setMarkPriceSource("BINANCE");
+        result.setNearStopLoss(true);
+        result.setSuggestedManualActionText("收紧止损并人工复核");
 
-        MessageDO message = service.recordPosition(position, log, new PositionMonitorResultDTO());
+        MessageDO message = service.recordPosition(position, log, result);
 
         assertThat(message.getCategory()).isEqualTo("POSITION_LOGIC_RISK_CHANGE");
         assertThat(message.getPositionId()).isEqualTo(91L);
         assertThat(message.getSourceType()).isEqualTo("POSITION_MONITOR");
         assertThat(message.getBody()).contains(
+                "方向：做多", "实际入场价：100", "可信当前价：102",
                 "当前变化：入场逻辑弱化", "反转状态：强反转", "风险：高，正在升级",
-                "建议：打开持仓详情人工处理");
+                "止损/目标距离：接近实际止损；止损 95；目标 110",
+                "监控结论：高风险观察", "建议动作：收紧止损并人工复核",
+                "来源时效：BINANCE；观测于 2026-08-16 11:59 UTC；有效至 2026-08-16 12:05 UTC",
+                "操作：打开持仓详情");
         assertThat(message.getDedupeKey()).startsWith("TG1|POSITION_RISK_CHANGE|STRONG_REVERSAL|4|");
     }
 
