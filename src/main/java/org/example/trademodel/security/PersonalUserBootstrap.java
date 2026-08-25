@@ -129,7 +129,8 @@ public class PersonalUserBootstrap implements ApplicationRunner, HealthIndicator
                 transition(BootstrapState.BOOTSTRAP_FAILED, "CANONICAL_OWNER_USERNAME_REQUIRED");
                 return;
             }
-            InitialPasswordPolicy.Validation passwordValidation = InitialPasswordPolicy.validate(initialPassword);
+            InitialPasswordPolicy.Validation passwordValidation =
+                    InitialPasswordPolicy.validate(initialPassword, username);
             if (!passwordValidation.accepted()) {
                 transition(BootstrapState.PASSWORD_POLICY_REJECTED,
                         passwordValidation.reasonCode().name());

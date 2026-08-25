@@ -196,11 +196,11 @@ class ProductionProfileSafetyGuardTest {
     @Test
     void validStrongPasswordStillPasses() {
         MockEnvironment environment = safeEnvironment();
-        environment.setProperty("trade-model.auth.initial-password", "A9!real-operator-secret-2026");
+        environment.setProperty("trade-model.auth.initial-password", "Valid8!A");
 
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
                 .doesNotThrowAnyException();
-        assertThat(InitialPasswordPolicy.validate("A9!real-operator-secret-2026").accepted()).isTrue();
+        assertThat(InitialPasswordPolicy.validate("Valid8!A", "operator").accepted()).isTrue();
     }
 
     @Test
@@ -499,7 +499,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("binance.api.secret", "configured-secret");
         environment.setProperty("trade-model.auth.enabled", "true");
         environment.setProperty("trade-model.auth.initial-username", "operator");
-        environment.setProperty("trade-model.auth.initial-password", "configured-initial-password");
+        environment.setProperty("trade-model.auth.initial-password", "Valid8!A");
         environment.setProperty("server.servlet.session.cookie.http-only", "true");
         environment.setProperty("server.servlet.session.cookie.same-site", "lax");
         environment.setProperty("server.servlet.session.cookie.secure", "true");

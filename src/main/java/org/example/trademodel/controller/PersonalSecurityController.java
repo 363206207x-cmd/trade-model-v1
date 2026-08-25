@@ -44,7 +44,8 @@ public class PersonalSecurityController {
                     newPassword, passwordConfirmation);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             model.addAttribute("username", currentUser.getUsername());
-            model.addAttribute("passwordError", "当前密码不正确，或新密码不符合 8 至 128 位要求。");
+            model.addAttribute("passwordError",
+                    "当前密码不正确，或新密码必须正好8个字符，且不能使用默认密码或与用户名相同。");
             return "me-security";
         }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

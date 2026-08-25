@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:actuator-health-security;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=Health-operator-secret-2026!",
+        "trade-model.auth.initial-password=Ownr8!Aa",
         "management.endpoints.web.exposure.include=health",
         "management.endpoint.health.probes.enabled=true",
         "management.endpoint.health.show-details=never",

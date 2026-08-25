@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.datasource.url=jdbc:h2:mem:multi-user-registration-disabled;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=owner-disabled-registration-secret",
+        "trade-model.auth.initial-password=Ownr8!Aa",
         "registration.enabled=false"
 })
 @Transactional
@@ -25,7 +25,7 @@ class MultiUserRegistrationDisabledIntegrationTest {
     void disabledRegistrationFailsClosedWithoutChangingTheOwner() {
         assertThat(accountService.registrationAvailability().open()).isFalse();
         assertThat(accountService.registrationAvailability().enabledAccounts()).isEqualTo(1);
-        assertThatThrownBy(() -> accountService.register("blocked_user", "12345678"))
+        assertThatThrownBy(() -> accountService.register("blocked_user", "User8!Aa"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("disabled");
         assertThat(accountService.listAccounts())

@@ -14,8 +14,9 @@ store and must never enter Git, frontend code, logs, screenshots or reports.
 
 Generate a bootstrap password with
 `bash scripts/generate-runtime-password.sh --env-file <new-private-path>`.
-The tool refuses overwrite and creates the file with mode 0600. Validate the
-full target configuration with `bash scripts/target-runtime-preflight.sh`.
+The tool generates exactly 8 characters, never prints the value, refuses
+overwrite and creates the file with mode 0600. Validate the full target
+configuration with `bash scripts/target-runtime-preflight.sh`.
 
 ## Provider And AI Enablement
 

@@ -20,8 +20,8 @@ class PasswordPolicySingleOwnerTest {
         String generatorScript = Files.readString(Path.of("scripts/generate-runtime-password.sh"));
         String preflightScript = Files.readString(Path.of("scripts/target-runtime-preflight.sh"));
 
-        assertThat(bootstrap).contains("InitialPasswordPolicy.validate(initialPassword)");
-        assertThat(generator).contains("InitialPasswordPolicy.validate(password)");
+        assertThat(bootstrap).contains("InitialPasswordPolicy.validate(initialPassword, username)");
+        assertThat(generator).contains("InitialPasswordPolicy.validate(password,");
         assertThat(preflight).contains("InitialPasswordPolicy.validate(");
         assertThat(generatorScript).contains("RuntimePasswordTool generate")
                 .doesNotContain("PASSWORD_REGEX", "MIN_PASSWORD_LENGTH");

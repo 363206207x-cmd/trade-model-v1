@@ -13,7 +13,7 @@ import java.util.Collections;
 import java.util.List;
 
 public final class RuntimePasswordTool {
-    private static final int DEFAULT_LENGTH = 24;
+    private static final int DEFAULT_LENGTH = 8;
     private static final String UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
     private static final String LOWER = "abcdefghijkmnopqrstuvwxyz";
     private static final String DIGIT = "23456789";
@@ -27,7 +27,8 @@ public final class RuntimePasswordTool {
         String mode = args.length == 0 ? "validate" : args[0];
         if ("validate".equals(mode)) {
             InitialPasswordPolicy.Validation validation = InitialPasswordPolicy.validate(
-                    System.getenv("TRADE_MODEL_INITIAL_PASSWORD"));
+                    System.getenv("TRADE_MODEL_INITIAL_PASSWORD"),
+                    System.getenv("TRADE_MODEL_INITIAL_USERNAME"));
             if (validation.accepted()) {
                 System.out.println("PASSWORD_POLICY=PASS");
                 return;
@@ -37,7 +38,7 @@ public final class RuntimePasswordTool {
             System.exit(1);
         }
         if (!"generate".equals(mode)) {
-            System.err.println("USAGE=generate [--length N] [--env-file PATH] | validate");
+            System.err.println("USAGE=generate [--length 8] --env-file PATH | validate");
             System.exit(2);
         }
 
@@ -53,13 +54,11 @@ public final class RuntimePasswordTool {
             }
         }
         String password = generate(length, new SecureRandom());
-        if (!InitialPasswordPolicy.validate(password).accepted()) {
+        if (!InitialPasswordPolicy.validate(password, System.getenv("TRADE_MODEL_INITIAL_USERNAME")).accepted()) {
             throw new IllegalStateException("GENERATED_PASSWORD_POLICY_REJECTED");
         }
         if (envFile == null) {
-            System.out.println("RUNTIME_PASSWORD=" + password);
-            System.err.println("PASSWORD_DISPLAYED_ONCE=STORE_IN_PASSWORD_MANAGER_NOW");
-            return;
+            throw new IllegalArgumentException("PASSWORD_ENV_FILE_REQUIRED");
         }
         writeEnvFile(envFile, password);
         System.out.println("PASSWORD_ENV_FILE=CREATED");
@@ -67,7 +66,10 @@ public final class RuntimePasswordTool {
     }
 
     static String generate(int requestedLength, SecureRandom random) {
-        int length = Math.max(InitialPasswordPolicy.minimumLength(), requestedLength);
+        if (requestedLength != InitialPasswordPolicy.minimumLength()) {
+            throw new IllegalArgumentException("PASSWORD_LENGTH_MUST_EQUAL_8");
+        }
+        int length = requestedLength;
         List<Character> characters = new ArrayList<>(length);
         characters.add(randomCharacter(UPPER, random));
         characters.add(randomCharacter(LOWER, random));

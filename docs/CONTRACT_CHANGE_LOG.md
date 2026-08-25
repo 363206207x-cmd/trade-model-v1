@@ -1,5 +1,17 @@
 # Contract Change Log
 
+## v4.1-owner-exact-8-password-policy
+
+Date: 2026-08-26
+Changed by: Product Owner / Codex
+Reason: Replace the prior 8-through-128 password range and the Owner recovery tool's separate composition rules with one Owner-approved policy for every password creation and reset path.
+Before: Registration allowed 8 through 128 characters; bootstrap required at least 12; Owner recovery required at least 16 plus four words, two digits and a symbol.
+After: Passwords must be exactly 8 characters; leading/trailing whitespace, blank values, known defaults and username-equal values are rejected; no composition rule is required.
+Does this change phase order: No.
+Does this change done criteria: No.
+Does this weaken safety boundaries: No; BCrypt, hidden input, confirmation, rate limiting, Session security, Tailnet-only access and zero public exposure remain unchanged.
+Human confirmation required: Explicitly confirmed by the Product Owner in this task.
+
 ## v1.0
 
 Initial active project delivery contract.

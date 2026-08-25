@@ -10,7 +10,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TargetRuntimePreflightTest {
-    private static final String SECRET = "A9!target-runtime-secret-2026";
+    private static final String SECRET = "PreF8!Aa";
 
     @Test
     void completeTargetRuntimeConfigurationPassesWithoutEmittingValues() {
@@ -51,6 +51,27 @@ class TargetRuntimePreflightTest {
                 "GEMINI_INPUT_COST=EXPLICIT_ZERO",
                 "XAI_EXACT_MODEL=INVALID",
                 "PREFLIGHT=BLOCKED");
+    }
+
+    @Test
+    void bootstrapPasswordPreflightRequiresExactlyEightAndRejectsUsernameEquality() {
+        Map<String, String> environment = completeEnvironment();
+
+        environment.put("TRADE_MODEL_INITIAL_PASSWORD", "1234567");
+        assertThat(TargetRuntimePreflight.evaluate(environment).lines())
+                .contains("PASSWORD_REASON_CODE=PASSWORD_TOO_SHORT", "PREFLIGHT=BLOCKED");
+
+        environment.put("TRADE_MODEL_INITIAL_PASSWORD", "123456789");
+        assertThat(TargetRuntimePreflight.evaluate(environment).lines())
+                .contains("PASSWORD_REASON_CODE=PASSWORD_TOO_LONG", "PREFLIGHT=BLOCKED");
+
+        environment.put("TRADE_MODEL_INITIAL_PASSWORD", "operator");
+        assertThat(TargetRuntimePreflight.evaluate(environment).lines())
+                .contains("PASSWORD_REASON_CODE=PASSWORD_MATCHES_USERNAME", "PREFLIGHT=BLOCKED");
+
+        environment.put("TRADE_MODEL_INITIAL_PASSWORD", SECRET);
+        assertThat(TargetRuntimePreflight.evaluate(environment).lines())
+                .contains("PASSWORD_POLICY=PASS", "PREFLIGHT=PASS");
     }
 
     @Test

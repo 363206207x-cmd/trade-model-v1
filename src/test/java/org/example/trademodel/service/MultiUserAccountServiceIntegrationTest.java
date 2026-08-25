@@ -22,10 +22,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.datasource.url=jdbc:h2:mem:multi-user-service;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=owner-integration-secret"
+        "trade-model.auth.initial-password=Ownr8!Aa"
 })
 @Transactional
 class MultiUserAccountServiceIntegrationTest {
+    private static final String USER_PASSWORD = "User8!Aa";
+    private static final String NEXT_PASSWORD = "Next8!Ab";
+
     @Autowired
     private MultiUserAccountService accountService;
 
@@ -46,12 +49,12 @@ class MultiUserAccountServiceIntegrationTest {
 
     @Test
     void registrationCreatesOneUserWithPrivateDefaultsAndNoTelegramBinding() {
-        PersonalUserDO registered = accountService.register("Alice_01", "12345678");
+        PersonalUserDO registered = accountService.register("Alice_01", USER_PASSWORD);
 
         assertThat(registered.getUsername()).isEqualTo("alice_01");
         assertThat(registered.getRole()).isEqualTo("USER");
         assertThat(registered.getEnabled()).isTrue();
-        assertThat(passwordEncoder.matches("12345678", registered.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches(USER_PASSWORD, registered.getPasswordHash())).isTrue();
 
         UserConfigDO config = userConfigMapper.findByUserId(String.valueOf(registered.getId()));
         assertThat(config).isNotNull();
@@ -86,7 +89,7 @@ class MultiUserAccountServiceIntegrationTest {
         assertThat(jdbcTemplate.update("DELETE FROM tm_user WHERE id = 1")).isEqualTo(1);
 
         assertThat(accountService.registrationAvailability().open()).isFalse();
-        assertThatThrownBy(() -> accountService.register("ownerless_user", "12345678"))
+        assertThatThrownBy(() -> accountService.register("ownerless_user", USER_PASSWORD))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("canonical owner");
         assertThat(userMapper.findByUsername("ownerless_user")).isNull();
@@ -94,37 +97,43 @@ class MultiUserAccountServiceIntegrationTest {
 
     @Test
     void usernamePasswordAndCapacityContractsFailClosed() {
-        assertThatThrownBy(() -> accountService.register("xuchao", "12345678"))
+        assertThatThrownBy(() -> accountService.register("xuchao", USER_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> accountService.register("SYSTEM", "12345678"))
+        assertThatThrownBy(() -> accountService.register("SYSTEM", USER_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> accountService.register("ab", "12345678"))
+        assertThatThrownBy(() -> accountService.register("ab", USER_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> accountService.register("a".repeat(33), "12345678"))
+        assertThatThrownBy(() -> accountService.register("a".repeat(33), USER_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> accountService.register("user@example.com", "12345678"))
+        assertThatThrownBy(() -> accountService.register("user@example.com", USER_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> accountService.register("short-password", "1234567"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> accountService.register("long-password", "x".repeat(129)))
+        assertThatThrownBy(() -> accountService.register("long-password", "123456789"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> accountService.register("default-password", "12345678"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> accountService.register("space-password", " User8!A"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> accountService.register("samepass", "samepass"))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        accountService.register("duplicate", "12345678");
+        accountService.register("duplicate", USER_PASSWORD);
         assertThatThrownBy(() -> accountService.register("DUPLICATE", "abcdefgh"))
                 .isInstanceOf(IllegalArgumentException.class);
 
         for (int index = 1; index <= 8; index++) {
-            accountService.register("capacity_" + index, "12345678");
+            accountService.register("capacity_" + index, USER_PASSWORD);
         }
         assertThat(userMapper.countEnabled()).isEqualTo(10);
         assertThat(accountService.registrationAvailability().open()).isFalse();
-        assertThatThrownBy(() -> accountService.register("capacity_blocked", "12345678"))
+        assertThatThrownBy(() -> accountService.register("capacity_blocked", USER_PASSWORD))
                 .isInstanceOf(IllegalStateException.class);
 
         Long disabledId = userMapper.findByUsername("capacity_1").getId();
         accountService.disableUser(disabledId);
         assertThat(accountService.registrationAvailability().open()).isTrue();
-        accountService.register("capacity_replacement", "12345678");
+        accountService.register("capacity_replacement", USER_PASSWORD);
         assertThatThrownBy(() -> accountService.enableUser(disabledId))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> accountService.disableUser(userMapper.findByUsername("xuchao").getId()))
@@ -144,36 +153,36 @@ class MultiUserAccountServiceIntegrationTest {
                 String.class, ownerBefore.getId());
         assertThat(storedHash).hasSize(64).doesNotContain(token);
 
-        accountService.completeOwnerPasswordSetup(token, "new-owner-password", "new-owner-password");
+        accountService.completeOwnerPasswordSetup(token, "Ownr9!Bb", "Ownr9!Bb");
         PersonalUserDO ownerAfter = userMapper.findByUsername("xuchao");
-        assertThat(passwordEncoder.matches("new-owner-password", ownerAfter.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("Ownr9!Bb", ownerAfter.getPasswordHash())).isTrue();
         assertThat(ownerAfter.getSessionVersion()).isEqualTo(ownerBefore.getSessionVersion() + 1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT used_at FROM tm_owner_password_setup_token WHERE user_id = ?",
                 LocalDateTime.class, ownerBefore.getId())).isNotNull();
         assertThatThrownBy(() -> accountService.completeOwnerPasswordSetup(
-                token, "another-password", "another-password"))
+                token, "Ownr7!Cc", "Ownr7!Cc"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void ownPasswordChangeRequiresCurrentPasswordAndInvalidatesPriorSessions() {
-        PersonalUserDO user = accountService.register("password_user", "12345678");
+        PersonalUserDO user = accountService.register("password_user", USER_PASSWORD);
         long versionBefore = userMapper.findById(user.getId()).getSessionVersion();
 
         assertThatThrownBy(() -> accountService.changeOwnPassword(
-                user.getId(), "wrong-password", "abcdefgh", "abcdefgh"))
+                user.getId(), "wrong-password", NEXT_PASSWORD, NEXT_PASSWORD))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> accountService.changeOwnPassword(
-                user.getId(), "12345678", "1234567", "1234567"))
+                user.getId(), USER_PASSWORD, "1234567", "1234567"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> accountService.changeOwnPassword(
-                user.getId(), "12345678", "abcdefgh", "different"))
+                user.getId(), USER_PASSWORD, NEXT_PASSWORD, "different"))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        accountService.changeOwnPassword(user.getId(), "12345678", "abcdefgh", "abcdefgh");
+        accountService.changeOwnPassword(user.getId(), USER_PASSWORD, NEXT_PASSWORD, NEXT_PASSWORD);
         PersonalUserDO updated = userMapper.findById(user.getId());
-        assertThat(passwordEncoder.matches("abcdefgh", updated.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches(NEXT_PASSWORD, updated.getPasswordHash())).isTrue();
         assertThat(updated.getSessionVersion()).isEqualTo(versionBefore + 1);
     }
 
@@ -186,13 +195,13 @@ class MultiUserAccountServiceIntegrationTest {
         String secondToken = secondPath.substring(secondPath.indexOf("token=") + 6);
 
         assertThatThrownBy(() -> accountService.completeOwnerPasswordSetup(
-                firstToken, "new-owner-password", "new-owner-password"))
+                firstToken, "Ownr9!Bb", "Ownr9!Bb"))
                 .isInstanceOf(IllegalArgumentException.class);
 
         jdbcTemplate.update("UPDATE tm_owner_password_setup_token SET expires_at = ? WHERE user_id = ? AND used_at IS NULL",
                 LocalDateTime.of(2000, 1, 1, 0, 0), ownerId);
         assertThatThrownBy(() -> accountService.completeOwnerPasswordSetup(
-                secondToken, "new-owner-password", "new-owner-password"))
+                secondToken, "Ownr9!Bb", "Ownr9!Bb"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

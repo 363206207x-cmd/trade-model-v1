@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.url=jdbc:h2:mem:multi-user-concurrency;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=owner-concurrency-secret"
+        "trade-model.auth.initial-password=Ownr8!Aa"
 })
 @DirtiesContext
 class MultiUserRegistrationConcurrencyIntegrationTest {
@@ -31,7 +31,7 @@ class MultiUserRegistrationConcurrencyIntegrationTest {
     @Test
     void databaseGuardAllowsExactlyOneConcurrentRegistrationIntoLastSlot() throws Exception {
         for (int index = 1; index <= 8; index++) {
-            accountService.register("existing_" + index, "12345678");
+            accountService.register("existing_" + index, "User8!Aa");
         }
         assertThat(userMapper.countEnabled()).isEqualTo(9);
 
@@ -58,7 +58,7 @@ class MultiUserRegistrationConcurrencyIntegrationTest {
 
     private boolean register(String username) {
         try {
-            accountService.register(username, "12345678");
+            accountService.register(username, "User8!Aa");
             return true;
         } catch (IllegalStateException expectedAtCapacity) {
             return false;

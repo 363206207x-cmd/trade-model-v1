@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:multi-user-isolation;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=owner-isolation-secret"
+        "trade-model.auth.initial-password=Ownr8!Aa"
 })
 @AutoConfigureMockMvc
 @Transactional
@@ -75,8 +75,8 @@ class MultiUserDataIsolationIntegrationTest {
 
     @Test
     void userOwnedFactsArePrivateWhilePublicMarketFactsRemainShared() throws Exception {
-        PersonalUserDO alice = accountService.register("isolation_alice", "alice-pass-123");
-        PersonalUserDO bob = accountService.register("isolation_bob", "bob-pass-12345");
+        PersonalUserDO alice = accountService.register("isolation_alice", "Alice8!A");
+        PersonalUserDO bob = accountService.register("isolation_bob", "Bob8!Abc");
         LocalDateTime now = LocalDateTime.of(2026, 8, 25, 12, 0);
 
         userConfigMapper.findByUserId(String.valueOf(alice.getId())).setRiskPreference("CONSERVATIVE");
@@ -172,8 +172,8 @@ class MultiUserDataIsolationIntegrationTest {
                 "BTCUSDT", "5m", "BINANCE", "SPOT", 1))
                 .singleElement().extracting("closePrice").isEqualTo(new BigDecimal("101.00000000"));
 
-        MockHttpSession aliceSession = login("isolation_alice", "alice-pass-123");
-        MockHttpSession bobSession = login("isolation_bob", "bob-pass-12345");
+        MockHttpSession aliceSession = login("isolation_alice", "Alice8!A");
+        MockHttpSession bobSession = login("isolation_bob", "Bob8!Abc");
         mockMvc.perform(get("/api/analysis/runs/analysis-alice").session(aliceSession))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/analysis/runs/analysis-alice").session(bobSession))

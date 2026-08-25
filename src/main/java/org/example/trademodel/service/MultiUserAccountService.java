@@ -81,7 +81,7 @@ public class MultiUserAccountService {
         if (PersonalUsernamePolicy.isReservedRegistrationUsername(username)) {
             throw new IllegalArgumentException("username is already registered or reserved");
         }
-        RegistrationPasswordPolicy.requireValid(password);
+        RegistrationPasswordPolicy.requireValid(password, username);
         int limit = effectiveLimit(userMapper.lockRegistrationGuard());
         requireCanonicalOwner();
         if (userMapper.countEnabled() >= limit) {
@@ -154,7 +154,7 @@ public class MultiUserAccountService {
         if (!passwordEquals(newPassword, confirmation)) {
             throw new IllegalArgumentException("password confirmation does not match");
         }
-        RegistrationPasswordPolicy.requireValid(newPassword);
+        RegistrationPasswordPolicy.requireValid(newPassword, user.getUsername());
         if (userMapper.updatePassword(userId, passwordEncoder.encode(newPassword),
                 UtcLocalTimePolicy.now(clock)) != 1) {
             throw new IllegalStateException("password was not updated exactly once");
@@ -188,7 +188,6 @@ public class MultiUserAccountService {
         if (token == null || token.isBlank() || !passwordEquals(password, confirmation)) {
             throw new IllegalArgumentException("password setup request is invalid");
         }
-        RegistrationPasswordPolicy.requireValid(password);
         LocalDateTime now = UtcLocalTimePolicy.now(clock);
         OwnerPasswordSetupTokenDO row = tokenMapper.lockUsable(hashToken(token), now);
         if (row == null) {
@@ -198,6 +197,7 @@ public class MultiUserAccountService {
         if (owner == null || !"OWNER".equals(owner.getRole())) {
             throw new IllegalStateException("password setup owner is unavailable");
         }
+        RegistrationPasswordPolicy.requireValid(password, owner.getUsername());
         if (userMapper.updatePassword(owner.getId(), passwordEncoder.encode(password), now) != 1
                 || tokenMapper.markUsed(row.getId(), now) != 1) {
             throw new IllegalStateException("password setup was not completed exactly once");

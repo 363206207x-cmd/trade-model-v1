@@ -67,7 +67,9 @@ public class RegistrationController {
         if (message != null && message.contains("capacity")) return "注册人数已满";
         if (message != null && message.contains("already")) return "用户名已存在";
         if (message != null && message.contains("username format")) return "用户名格式不正确";
-        if (message != null && message.contains("shorter than 8")) return "密码至少需要8个字符";
+        if (message != null && message.contains("password policy rejected")) {
+            return "密码必须正好8个字符，不能使用默认密码，也不能与用户名相同。";
+        }
         return "注册失败，请重新尝试";
     }
 }

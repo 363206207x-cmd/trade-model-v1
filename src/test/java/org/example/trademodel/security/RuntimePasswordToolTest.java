@@ -12,22 +12,35 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(OutputCaptureExtension.class)
 class RuntimePasswordToolTest {
 
     @Test
-    void generatedPasswordsAlwaysPassCanonicalPolicyAndContainBroadCharacterMix() {
+    void generatedPasswordsAlwaysUseTheExactCanonicalLength() {
         SecureRandom random = new SecureRandom();
         for (int attempt = 0; attempt < 200; attempt++) {
-            String value = RuntimePasswordTool.generate(24, random);
-            assertThat(value).hasSize(24)
-                    .matches(".*[A-Z].*")
-                    .matches(".*[a-z].*")
-                    .matches(".*[0-9].*")
-                    .matches(".*[!@#$%^&*_+=-].*");
+            String value = RuntimePasswordTool.generate(8, random);
+            assertThat(value).hasSize(8);
             assertThat(InitialPasswordPolicy.validate(value).accepted()).isTrue();
         }
+    }
+
+    @Test
+    void generatorRejectsEveryRequestedLengthOtherThanEight() {
+        SecureRandom random = new SecureRandom();
+        assertThatThrownBy(() -> RuntimePasswordTool.generate(7, random))
+                .hasMessage("PASSWORD_LENGTH_MUST_EQUAL_8");
+        assertThatThrownBy(() -> RuntimePasswordTool.generate(9, random))
+                .hasMessage("PASSWORD_LENGTH_MUST_EQUAL_8");
+    }
+
+    @Test
+    void generatorNeverPrintsAPasswordWhenNoPrivateFileIsProvided(CapturedOutput output) {
+        assertThatThrownBy(() -> RuntimePasswordTool.main(new String[]{"generate"}))
+                .hasMessage("PASSWORD_ENV_FILE_REQUIRED");
+        assertThat(output).doesNotContain("RUNTIME_PASSWORD=", "PASSWORD_DISPLAYED_ONCE");
     }
 
     @Test

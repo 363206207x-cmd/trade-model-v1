@@ -19,9 +19,11 @@
                    minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}"
                    th:value="${submittedUsername}" required autofocus>
             <label for="password">密码</label>
-            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <input id="password" name="password" type="password" autocomplete="new-password"
+                   minlength="8" maxlength="8" aria-describedby="password-policy" required>
+            <p id="password-policy" class="login-caption">密码必须正好8个字符，不能使用默认密码，也不能与用户名相同。</p>
             <label for="passwordConfirmation">确认密码</label>
-            <input id="passwordConfirmation" name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <input id="passwordConfirmation" name="passwordConfirmation" type="password" autocomplete="new-password" minlength="8" maxlength="8" required>
             <label class="password-visibility"><input type="checkbox" data-password-toggle data-password-targets="password,passwordConfirmation"> 显示密码</label>
             <button type="submit">创建账户</button>
         </form>

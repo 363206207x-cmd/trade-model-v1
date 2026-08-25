@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
 class PersonalUserBootstrapTest {
-    private static final String PASSWORD = "bootstrap-secret-123";
+    private static final String PASSWORD = "Ownr8!Aa";
     private static final Clock FIXED_CLOCK = Clock.fixed(
             Instant.parse("2026-07-20T04:05:06Z"), ZoneOffset.UTC);
 
@@ -112,6 +112,13 @@ class PersonalUserBootstrapTest {
                 .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_POLICY_REJECTED);
         assertThat(weak.readiness().reasonCode()).isEqualTo("PASSWORD_TOO_SHORT");
         assertThat(weak.health().getStatus().getCode()).isEqualTo("DOWN");
+
+        PersonalUserBootstrap longPassword = new PersonalUserBootstrap(
+                true, "xuchao", "123456789", mapper, new BCryptPasswordEncoder(), FIXED_CLOCK);
+        longPassword.run(mock(ApplicationArguments.class));
+        assertThat(longPassword.readiness().state())
+                .isEqualTo(PersonalUserBootstrap.BootstrapState.PASSWORD_POLICY_REJECTED);
+        assertThat(longPassword.readiness().reasonCode()).isEqualTo("PASSWORD_TOO_LONG");
     }
 
     @Test

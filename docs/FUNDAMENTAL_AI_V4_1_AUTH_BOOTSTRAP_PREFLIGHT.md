@@ -8,8 +8,8 @@ Status: `IMPLEMENTED_PENDING_INDEPENDENT_AUDIT`
 Bootstrap, password validation preflight and generated-password verification
 all call it. No shell regex duplicates the policy.
 
-Canonical reasons are `PASSWORD_MISSING`, `PASSWORD_TOO_SHORT`,
-`PASSWORD_UNSAFE_VALUE`, and `PASSWORD_TEMPLATE_VALUE`.
+Canonical reasons include missing, surrounding whitespace, too short, too
+long, unsafe/default, template and username-equal rejection.
 
 ## Bootstrap States
 
@@ -25,11 +25,10 @@ Canonical reasons are `PASSWORD_MISSING`, `PASSWORD_TOO_SHORT`,
 ## Secure Password Tool
 
 `scripts/generate-runtime-password.sh` uses Java `SecureRandom` through the
-application-owned tool. Default length is 24 and the generated value is
+application-owned tool. The fixed length is 8 and the generated value is
 validated by the canonical policy.
 
-- With no file option, the value is displayed once with a password-manager
-  warning.
+- The tool never prints the generated password and requires `--env-file`.
 - `--env-file <path>` creates a new 0600 file atomically and refuses overwrite.
 - Temporary files are removed on both success and failure.
 

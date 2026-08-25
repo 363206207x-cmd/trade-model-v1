@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PersonalOwnerPasswordResetToolTest {
-    private static final char[] VALID = "orbit meadow quartz harbor 47!".toCharArray();
+    private static final char[] VALID = "abcdefgh".toCharArray();
 
     @TempDir
     Path tempDir;
@@ -84,16 +84,18 @@ class PersonalOwnerPasswordResetToolTest {
     }
 
     @Test
-    void rejectsWeakOrOwnerDerivedPassphrases() throws Exception {
+    void rejectsPasswordsOutsideTheExactEightCharacterPolicy() throws Exception {
         PasswordEncoder encoder = SecurityConfig.passwordEncoder();
         try (Connection connection = database("policy")) {
             insertOwner(connection, 1L, "xuchao", encoder.encode("old-secret-47!"));
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
                     connection, "xuchao", "tiny".toCharArray(), "tiny".toCharArray(), encoder))
                     .hasMessage("PASSWORD_POLICY_REJECTED");
-            char[] ownerDerived = "xuchao meadow quartz harbor 47!".toCharArray();
             assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
-                    connection, "xuchao", ownerDerived, ownerDerived.clone(), encoder))
+                    connection, "xuchao", "abcdefghi".toCharArray(), "abcdefghi".toCharArray(), encoder))
+                    .hasMessage("PASSWORD_POLICY_REJECTED");
+            assertThatThrownBy(() -> PersonalOwnerPasswordResetTool.resetExistingSingleOwner(
+                    connection, "xuchao", "12345678".toCharArray(), "12345678".toCharArray(), encoder))
                     .hasMessage("PASSWORD_POLICY_REJECTED");
         }
     }
@@ -108,7 +110,7 @@ class PersonalOwnerPasswordResetToolTest {
 
         String content = Files.readString(config);
         assertThat(content).contains("TRADE_MODEL_INITIAL_USERNAME='xuchao'")
-                .contains("TRADE_MODEL_INITIAL_PASSWORD='orbit meadow quartz harbor 47!'")
+                .contains("TRADE_MODEL_INITIAL_PASSWORD='abcdefgh'")
                 .contains("UNCHANGED=true");
         assertThat(Files.getPosixFilePermissions(config).toString())
                 .contains("OWNER_READ", "OWNER_WRITE")

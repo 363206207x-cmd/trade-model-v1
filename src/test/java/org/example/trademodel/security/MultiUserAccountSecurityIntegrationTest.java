@@ -28,13 +28,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:multi-user-security;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
         "trade-model.auth.enabled=true",
         "trade-model.auth.initial-username=xuchao",
-        "trade-model.auth.initial-password=owner-security-secret",
+        "trade-model.auth.initial-password=Ownr8!Aa",
         "trade-model.security.rate-limit.requests-per-minute=1000"
 })
 @AutoConfigureMockMvc
 @Transactional
 class MultiUserAccountSecurityIntegrationTest {
-    private static final String OWNER_PASSWORD = "owner-security-secret";
+    private static final String OWNER_PASSWORD = "Ownr8!Aa";
+    private static final String USER_PASSWORD = "User8!Aa";
+    private static final String NEXT_PASSWORD = "Next8!Ab";
 
     @Autowired
     private MockMvc mockMvc;
@@ -51,35 +53,52 @@ class MultiUserAccountSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("创建账户")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("maxlength=\"32\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("maxlength=\"8\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("密码必须正好8个字符")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("pattern=\"[A-Za-z0-9._-]{3,32}\"")));
 
         mockMvc.perform(post("/register")
                         .param("username", "web_user")
-                        .param("password", "12345678")
-                        .param("passwordConfirmation", "12345678"))
+                        .param("password", USER_PASSWORD)
+                        .param("passwordConfirmation", USER_PASSWORD))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/register").with(csrf())
                         .param("username", "web_user")
-                        .param("password", "12345678")
-                        .param("passwordConfirmation", "12345678"))
+                        .param("password", USER_PASSWORD)
+                        .param("passwordConfirmation", USER_PASSWORD))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?registered=true"));
         assertThat(userMapper.findByUsername("web_user")).isNotNull();
 
         mockMvc.perform(post("/register").with(csrf())
                         .param("username", "mismatch_user")
-                        .param("password", "12345678")
+                        .param("password", USER_PASSWORD)
                         .param("passwordConfirmation", "abcdefgh"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("两次输入的密码不一致")));
+
+        for (String rejected : java.util.List.of("1234567", "123456789", "12345678")) {
+            mockMvc.perform(post("/register").with(csrf())
+                            .param("username", "policy_" + rejected.length())
+                            .param("password", rejected)
+                            .param("passwordConfirmation", rejected))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("密码必须正好8个字符")));
+        }
+        mockMvc.perform(post("/register").with(csrf())
+                        .param("username", "samepass")
+                        .param("password", "samepass")
+                        .param("passwordConfirmation", "samepass"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("不能与用户名相同")));
     }
 
     @Test
     void concurrentSessionsRemainValidUntilOwnerForceLogout() throws Exception {
-        PersonalUserDO user = accountService.register("session_user", "12345678");
-        MockHttpSession first = login("session_user", "12345678");
-        MockHttpSession second = login("session_user", "12345678");
+        PersonalUserDO user = accountService.register("session_user", USER_PASSWORD);
+        MockHttpSession first = login("session_user", USER_PASSWORD);
+        MockHttpSession second = login("session_user", USER_PASSWORD);
 
         mockMvc.perform(get("/dashboard").session(first)).andExpect(status().isOk());
         mockMvc.perform(get("/dashboard").session(second)).andExpect(status().isOk());
@@ -99,8 +118,8 @@ class MultiUserAccountSecurityIntegrationTest {
 
     @Test
     void disableBlocksLoginAndReenableRestoresItWithoutDeletingAccount() throws Exception {
-        PersonalUserDO user = accountService.register("lifecycle_user", "12345678");
-        MockHttpSession userSession = login("lifecycle_user", "12345678");
+        PersonalUserDO user = accountService.register("lifecycle_user", USER_PASSWORD);
+        MockHttpSession userSession = login("lifecycle_user", USER_PASSWORD);
         MockHttpSession owner = login("xuchao", OWNER_PASSWORD);
 
         mockMvc.perform(post("/api/owner/accounts/{id}/disable", user.getId())
@@ -108,21 +127,21 @@ class MultiUserAccountSecurityIntegrationTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/dashboard").session(userSession))
                 .andExpect(status().is3xxRedirection());
-        mockMvc.perform(formLogin().user("lifecycle_user").password("12345678"))
+        mockMvc.perform(formLogin().user("lifecycle_user").password(USER_PASSWORD))
                 .andExpect(unauthenticated());
         assertThat(userMapper.findById(user.getId())).isNotNull();
 
         mockMvc.perform(post("/api/owner/accounts/{id}/enable", user.getId())
                         .session(owner).with(csrf()))
                 .andExpect(status().isOk());
-        mockMvc.perform(formLogin().user("lifecycle_user").password("12345678"))
+        mockMvc.perform(formLogin().user("lifecycle_user").password(USER_PASSWORD))
                 .andExpect(authenticated().withUsername("lifecycle_user"));
     }
 
     @Test
     void ownerAdministrationIsOwnerOnlyAndSecondUserDoesNotReplaceOwnerSession() throws Exception {
-        accountService.register("ordinary_user", "12345678");
-        MockHttpSession user = login("ordinary_user", "12345678");
+        accountService.register("ordinary_user", USER_PASSWORD);
+        MockHttpSession user = login("ordinary_user", USER_PASSWORD);
         MockHttpSession owner = login("xuchao", OWNER_PASSWORD);
 
         mockMvc.perform(get("/me/accounts").session(user)).andExpect(status().isForbidden());
@@ -138,8 +157,8 @@ class MultiUserAccountSecurityIntegrationTest {
 
     @Test
     void ordinaryUsersCannotReadOrMutateGlobalProviderConfiguration() throws Exception {
-        accountService.register("provider_user", "12345678");
-        MockHttpSession user = login("provider_user", "12345678");
+        accountService.register("provider_user", USER_PASSWORD);
+        MockHttpSession user = login("provider_user", USER_PASSWORD);
         MockHttpSession owner = login("xuchao", OWNER_PASSWORD);
 
         for (String path : java.util.List.of(
@@ -168,23 +187,25 @@ class MultiUserAccountSecurityIntegrationTest {
 
     @Test
     void selfPasswordChangeRequiresCsrfAndInvalidatesOnlyThatUsersSessions() throws Exception {
-        accountService.register("password_web_user", "12345678");
-        MockHttpSession first = login("password_web_user", "12345678");
-        MockHttpSession second = login("password_web_user", "12345678");
+        accountService.register("password_web_user", USER_PASSWORD);
+        MockHttpSession first = login("password_web_user", USER_PASSWORD);
+        MockHttpSession second = login("password_web_user", USER_PASSWORD);
         MockHttpSession owner = login("xuchao", OWNER_PASSWORD);
 
         mockMvc.perform(get("/me/security").session(first))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("账户安全")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("账户安全")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("maxlength=\"8\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("新密码必须正好8个字符")));
         mockMvc.perform(post("/me/security").session(first)
-                        .param("currentPassword", "12345678")
-                        .param("newPassword", "abcdefgh")
-                        .param("passwordConfirmation", "abcdefgh"))
+                        .param("currentPassword", USER_PASSWORD)
+                        .param("newPassword", NEXT_PASSWORD)
+                        .param("passwordConfirmation", NEXT_PASSWORD))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/me/security").session(first).with(csrf())
-                        .param("currentPassword", "12345678")
-                        .param("newPassword", "abcdefgh")
-                        .param("passwordConfirmation", "abcdefgh"))
+                        .param("currentPassword", USER_PASSWORD)
+                        .param("newPassword", NEXT_PASSWORD)
+                        .param("passwordConfirmation", NEXT_PASSWORD))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?passwordUpdated=true"));
 
@@ -192,9 +213,9 @@ class MultiUserAccountSecurityIntegrationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?expired=true"));
         mockMvc.perform(get("/dashboard").session(owner)).andExpect(status().isOk());
-        mockMvc.perform(formLogin().user("password_web_user").password("12345678"))
+        mockMvc.perform(formLogin().user("password_web_user").password(USER_PASSWORD))
                 .andExpect(unauthenticated());
-        mockMvc.perform(formLogin().user("password_web_user").password("abcdefgh"))
+        mockMvc.perform(formLogin().user("password_web_user").password(NEXT_PASSWORD))
                 .andExpect(authenticated().withUsername("password_web_user"));
     }
 

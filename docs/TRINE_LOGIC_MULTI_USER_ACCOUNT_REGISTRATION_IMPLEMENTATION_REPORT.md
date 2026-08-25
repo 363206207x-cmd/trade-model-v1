@@ -20,7 +20,7 @@ Historical product-task baseline:
 - Usernames are trimmed, normalized to lower case, validated against the
   frozen 3-32 character policy and protected by a case-insensitive database
   unique index.
-- Passwords are 8-128 characters and persisted only as BCrypt hashes.
+- Passwords are exactly 8 characters and persisted only as BCrypt hashes.
 - A singleton registration-guard row is locked inside the registration and
   re-enable transactions. The database limit and configured limit are both
   applied, with an effective maximum of 10 enabled accounts.

@@ -31,7 +31,8 @@ public class OwnerPasswordSetupController {
             return "redirect:/login?passwordUpdated=true";
         } catch (IllegalArgumentException | IllegalStateException exception) {
             model.addAttribute("setupToken", token);
-            model.addAttribute("setupError", "链接无效或已过期，或密码不符合 8 至 128 位要求。");
+            model.addAttribute("setupError",
+                    "链接无效或已过期，或密码必须正好8个字符，且不能使用默认密码或与用户名相同。");
             return "owner-password-setup";
         }
     }

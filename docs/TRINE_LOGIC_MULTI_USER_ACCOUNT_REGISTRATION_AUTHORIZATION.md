@@ -17,8 +17,9 @@ implementation.
 - The service remains private and Tailscale-only; public exposure stays zero.
 - At most 10 active accounts may exist, including `xuchao`.
 - `xuchao` remains the single `OWNER`; newly registered accounts are `USER`.
-- Username is unique. Password length is 8 through 128 characters, with no
-  additional composition rule.
+- Username is unique. Passwords are exactly 8 characters, with no uppercase,
+  lowercase, digit, symbol or word-count composition rule. Leading/trailing
+  whitespace, blank values, known defaults and username-equal values are rejected.
 - Authentication continues to use BCrypt, server-side Session and CSRF.
 - Concurrent sessions are allowed.
 - The Owner may force logout, disable and re-enable a `USER`.

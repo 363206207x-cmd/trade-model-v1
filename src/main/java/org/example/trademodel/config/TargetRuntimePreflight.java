@@ -48,7 +48,8 @@ public final class TargetRuntimePreflight {
         passed &= requiredBoolean(environment, lines, "TRADE_MODEL_AUTH_ENABLED", true, "AUTH_ENABLED");
         passed &= configured(environment, lines, "TRADE_MODEL_INITIAL_USERNAME", "BOOTSTRAP_USERNAME");
         InitialPasswordPolicy.Validation password = InitialPasswordPolicy.validate(
-                environment.get("TRADE_MODEL_INITIAL_PASSWORD"));
+                environment.get("TRADE_MODEL_INITIAL_PASSWORD"),
+                environment.get("TRADE_MODEL_INITIAL_USERNAME"));
         lines.add("PASSWORD_POLICY=" + (password.accepted() ? "PASS" : "REJECTED"));
         if (!password.accepted()) {
             lines.add("PASSWORD_REASON_CODE=" + password.reasonCode().name());

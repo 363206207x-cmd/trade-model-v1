@@ -15,19 +15,13 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.example.trademodel.config.SecurityConfig;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /** Root-operated recovery tool for the existing single personal account. */
 public final class PersonalOwnerPasswordResetTool {
-    private static final Pattern WORD = Pattern.compile("\\p{L}{2,}");
-    private static final int MIN_LENGTH = 16;
-
     private PersonalOwnerPasswordResetTool() {
     }
 
@@ -157,24 +151,7 @@ public final class PersonalOwnerPasswordResetTool {
             throw new IllegalArgumentException("PASSWORD_MISMATCH");
         }
         String value = new String(first);
-        if (!InitialPasswordPolicy.validate(value).accepted() || value.length() < MIN_LENGTH) {
-            throw new IllegalArgumentException("PASSWORD_POLICY_REJECTED");
-        }
-        long digits = value.chars().filter(Character::isDigit).count();
-        boolean symbol = value.chars().anyMatch(character ->
-                !Character.isLetterOrDigit(character) && !Character.isWhitespace(character));
-        Matcher words = WORD.matcher(value);
-        int wordCount = 0;
-        while (words.find()) {
-            wordCount++;
-        }
-        String normalized = value.toLowerCase(Locale.ROOT);
-        if (digits < 2 || !symbol || wordCount < 4
-                || normalized.contains(username.toLowerCase(Locale.ROOT))
-                || normalized.contains("rine logic")
-                || normalized.contains("rine-logic")
-                || normalized.contains("rinelogic")
-                || normalized.contains("100.97.230.66")) {
+        if (!InitialPasswordPolicy.validate(value, username).accepted()) {
             throw new IllegalArgumentException("PASSWORD_POLICY_REJECTED");
         }
     }
