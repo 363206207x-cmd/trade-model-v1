@@ -88,6 +88,8 @@ emit_resolved_task_state() {
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
   printf 'FRONTEND_INTERACTION_IMPLEMENTATION_STATUS: %s\n' "${frontend_interaction_implementation_status:-UNDECLARED}"
+  printf 'MULTI_USER_AUTHORIZATION_STATUS: %s\n' "${multi_user_authorization_runtime_status:-BLOCKED}"
+  printf 'MULTI_USER_IMPLEMENTATION_STATUS: %s\n' "${multi_user_implementation_status:-UNDECLARED}"
   printf 'P1A_COMPLETION_STATUS: %s\n' "${p1a_completion_status:-BLOCKED}"
   printf 'AUTHORIZATION_STATUS: %s\n' "${authorization_status:-BLOCKED}"
   printf 'RESOLVED_FROM_STATE: YES\n'
@@ -229,6 +231,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
       resolved_handoff_stage="FRONTEND_INTERACTION_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="MULTI_USER_AUTHORIZATION_REVIEW"
     fi
     if [[ "${current_package_pr_count:-0}" == "1" && "${current_package_pr_draft:-UNKNOWN}" == "false" ]]; then
       resolved_handoff_stage="CURRENT_PACKAGE_FINAL_MERGE_PATH"
@@ -250,6 +254,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
         resolved_handoff_stage="FRONTEND_INTERACTION_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="MULTI_USER_AUTHORIZATION_FINAL_MERGE_PATH"
       fi
     fi
     resolved_edit_permission="$current_package_repository_edits_allowed"
@@ -307,6 +313,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
   elif [[ "$authorized_next_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
     resolved_handoff_stage="FRONTEND_INTERACTION_RUNTIME_CLOSURE"
+  elif [[ "$authorized_next_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE" ]]; then
+    resolved_handoff_stage="MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
   fi
   resolved_edit_permission="$authorized_next_repository_edits_allowed"
   resolved_implementation_permission="$authorized_next_implementation_allowed"
@@ -897,7 +905,97 @@ evaluate_frontend_interaction_transition() {
   frontend_interaction_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
+evaluate_multi_user_transition() {
+  local current_phase="$1" current_status="$2" current_mode="$3" next_phase="$4" next_mode="$5"
+  local completion_state="$6" synced_main_status="$7" source_gate_status="$8"
+  local merged_main_validation_status="$9" repository_edits_allowed="${10}"
+  local implementation_allowed="${11}" implementation_pr_allowed="${12}"
+  local declared_authorization_status="${13}" predecessor_status="${14}"
+
+  effective_task_mode="$current_mode"
+  p1a_transition_allowed="YES"
+  p1a_completion_status="PASS"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
+  v4_1_target_runtime_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_telegram_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  local_real_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  frontend_interaction_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  multi_user_authorization_runtime_status="BLOCKED"
+
+  [[ "$current_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]] || return 0
+  [[ "$current_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || return 0
+  [[ "$next_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE" ]] || return 0
+  [[ "$next_mode" == "IMPLEMENTATION" ]] || return 0
+
+  if [[ "$predecessor_status" != "COMPLETE" ]]; then
+    next_task_authorization_status="BLOCKED_FRONTEND_INTERACTION_IMPLEMENTATION_NOT_COMPLETE"
+    return 0
+  fi
+  if [[ "$current_status" != "COMPLETED" ]]; then
+    next_task_authorization_status="BLOCKED_MULTI_USER_AUTHORIZATION_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$declared_authorization_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_MULTI_USER_SCOPE_NOT_AUTHORIZED"
+    return 0
+  fi
+  if ! is_true_flag "$repository_edits_allowed" \
+    || ! is_true_flag "$implementation_allowed" \
+    || ! is_true_flag "$implementation_pr_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    next_task_authorization_status="BLOCKED_MULTI_USER_PERMISSIONS_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$completion_state" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_MULTI_USER_AUTHORIZATION_MERGED_MAIN"
+    multi_user_authorization_runtime_status="PENDING_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "$synced_main_status" != "YES" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH"
+    return 0
+  fi
+  if [[ "$source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "$merged_main_validation_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_MULTI_USER_AUTHORIZATION_MERGED_MAIN_VALIDATION"
+    return 0
+  fi
+
+  effective_task_mode="$next_mode"
+  next_transition_allowed="YES"
+  authorization_status="AUTHORIZED"
+  next_task_authorization_status="ALLOWED"
+  multi_user_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE" ]]; then
+    evaluate_multi_user_transition \
+      "$current_package_phase" \
+      "$current_package_status" \
+      "$current_task_mode" \
+      "$authorized_next_package_phase" \
+      "$authorized_next_task_mode" \
+      "$completion_effective_state" \
+      "$clean_synced_main" \
+      "$product_source_gate_status" \
+      "$p0_merged_main_validation_status" \
+      "$authorized_next_repository_edits_allowed" \
+      "$authorized_next_implementation_allowed" \
+      "$authorized_next_implementation_pr_allowed" \
+      "$multi_user_authorization_declared_status" \
+      "$frontend_interaction_implementation_status"
+    return 0
+  fi
+
   if [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
     evaluate_frontend_interaction_transition \
@@ -1316,6 +1414,8 @@ load_task_package_contract() {
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
   frontend_interaction_implementation_status="$(yaml_value "$TASK_FILE" frontend_interaction_implementation_status)"
+  multi_user_authorization_declared_status="$(yaml_value "$TASK_FILE" multi_user_authorization_status)"
+  multi_user_implementation_status="$(yaml_value "$TASK_FILE" multi_user_implementation_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
 
@@ -1360,7 +1460,9 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      if [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]]; then
+        frontend_interaction_implementation_status="IN_PROGRESS"
+      elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
         local_real_implementation_status="IN_PROGRESS"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
         v4_1_telegram_implementation_status="IN_PROGRESS"
@@ -1455,7 +1557,10 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      if [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]]; then
+        multi_user_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="MULTI_USER_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
         frontend_interaction_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="FRONTEND_INTERACTION_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
@@ -1719,6 +1824,8 @@ local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_a
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
 frontend_interaction_implementation_status="$(yaml_value "$TASK_FILE" frontend_interaction_implementation_status)"
+multi_user_authorization_declared_status="$(yaml_value "$TASK_FILE" multi_user_authorization_status)"
+multi_user_implementation_status="$(yaml_value "$TASK_FILE" multi_user_implementation_status)"
 authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
 p1b_scope="$(yaml_value "$TASK_FILE" scope)"
 audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
@@ -1883,6 +1990,27 @@ if [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZ
     || "$frontend_interaction_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
     || "$frontend_interaction_implementation_status" != "NOT_STARTED" \
     || "$p1b_scope" != "DESKTOP_RUNTIME_INTERACTION_CLOSURE_ONLY" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+fi
+if [[ "$current_package_phase" == "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION" ]]; then
+  if [[ "$current_package_status" != "COMPLETED" \
+    || "$current_package_mode" != "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" \
+    || "$authorized_next_package_phase" != "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE" \
+    || "$authorized_next_package_mode" != "IMPLEMENTATION" \
+    || "$v4_1_design_status" != "FROZEN" \
+    || "$frontend_interaction_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$frontend_interaction_implementation_status" != "COMPLETE" \
+    || "$multi_user_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$multi_user_implementation_status" != "NOT_STARTED" \
+    || "$p1b_scope" != "PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$authorized_next_repository_edits_allowed" \
     || ! is_true_flag "$authorized_next_implementation_allowed" \
@@ -2229,6 +2357,8 @@ printf 'LOCAL_REAL_DECLARED_AUTHORIZATION_STATUS: %s\n' "${local_real_authorizat
 printf 'LOCAL_REAL_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
 printf 'FRONTEND_INTERACTION_DECLARED_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_declared_status:-UNDECLARED}"
 printf 'FRONTEND_INTERACTION_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${frontend_interaction_implementation_status:-UNDECLARED}"
+printf 'MULTI_USER_DECLARED_AUTHORIZATION_STATUS: %s\n' "${multi_user_authorization_declared_status:-UNDECLARED}"
+printf 'MULTI_USER_DECLARED_IMPLEMENTATION_STATUS: %s\n' "${multi_user_implementation_status:-UNDECLARED}"
 printf 'PRODUCT_SOURCE_GATE_STATUS: %s\n' "$product_source_gate_status"
 printf 'PRODUCT_AUDIT_ALLOWED: %s\n' "$product_audit_allowed"
 printf 'READ_ONLY_PRODUCT_AUDIT_STATUS: %s\n' "$read_only_product_audit_status"

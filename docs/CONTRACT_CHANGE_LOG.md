@@ -577,3 +577,24 @@ validation remain required before implementation permission becomes effective.
   application/API/Schema/Figma/Desktop/Mobile change is included.
 - Safety: Product Source semantics, fail-closed behavior and all no-automatic-
   trading/position-mutation boundaries remain frozen.
+## multi-user-account-registration-authorization
+
+- Date: `2026-08-25`
+- Change type: docs/gate-only exact-package implementation authorization.
+- Predecessor: PR #1195 is effective on merged main at
+  `8d5526d7f2fcf718e440239ee6ce15ee4cd57cec`.
+- Exact authorized successor: `MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE`.
+- Account contract: private/Tailscale-only, at most 10 active accounts,
+  `xuchao` as unique OWNER, new accounts as USER, BCrypt/Session/CSRF,
+  concurrent sessions, OWNER force logout/disable/re-enable and no hard delete.
+- Ownership: public market facts are `GLOBAL_SHARED`; watch pool, config,
+  positions, analyses, plans, messages and personal audits are `USER_OWNED`;
+  administration is `OWNER_ONLY`.
+- Migration: preserve `tm_user.id=1` and current personal data; require a
+  readable backup and rollback point before any forward ownership migration.
+- Effectivity: implementation and successor PR creation remain blocked until
+  this authorization is merged and validated on clean/synced main.
+- Capability movement: none. No application, API, Schema, Figma, Mobile,
+  runtime, Staging or Production change is included.
+- Safety: no public exposure, fake data, automatic trading, position mutation,
+  CoinGlass work, Telegram rule change or duplicate business owner.
