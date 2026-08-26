@@ -5,6 +5,7 @@ import org.example.trademodel.entity.MessageDO;
 import org.example.trademodel.mapper.ChannelDeliveryMapper;
 import org.example.trademodel.service.UserConfigService;
 import org.example.trademodel.entity.UserConfigDO;
+import org.example.trademodel.telegram.HighValueAlertPolicy;
 import org.example.trademodel.telegram.TelegramDedupeKey;
 import org.example.trademodel.telegram.TelegramDeliveryStatus;
 import org.example.trademodel.telegram.TelegramProperties;
@@ -50,6 +51,7 @@ public class ChannelDeliveryService {
         if (message == null) {
             throw new IllegalArgumentException("message not found");
         }
+        HighValueAlertPolicy.TelegramDeliveryIdentity identity = requireTelegramEligibility(message);
         LocalDateTime now = LocalDateTime.now(clock);
         ChannelDeliveryDO row = new ChannelDeliveryDO();
         row.setDeliveryId("delivery-" + UUID.randomUUID());
@@ -58,6 +60,10 @@ public class ChannelDeliveryService {
         row.setChannel("TELEGRAM");
         row.setStatus(bound ? "QUEUED" : "SUPPRESSED");
         row.setAttemptCount(0);
+        row.setCooldownKey(TelegramDedupeKey.deliveryCooldownKey(
+                identity.telegramCategory(), identity.changeState(), message.getUserId(),
+                identity.subjectType(), identity.subjectId()));
+        row.setSeverityRank(identity.severityRank());
         row.setNextAttemptAt(bound ? now : null);
         row.setErrorCode(bound ? null : "TELEGRAM_NOT_BOUND");
         row.setErrorMessage(bound ? null : "Telegram binding is not available");
@@ -70,12 +76,15 @@ public class ChannelDeliveryService {
     public ChannelDeliveryDO queueTelegram(Long userId, String messageId) {
         MessageDO message = messageFactService.findForUser(userId, messageId);
         if (message == null) throw new IllegalArgumentException("message not found");
+        HighValueAlertPolicy.TelegramDeliveryIdentity identity = requireTelegramEligibility(message);
         ChannelDeliveryDO existing = mapper.selectByMessageAndChannel(messageId, "TELEGRAM");
         if (existing != null) return existing;
 
         LocalDateTime now = LocalDateTime.now(clock);
-        int severity = TelegramDedupeKey.severity(message.getDedupeKey());
-        String cooldownKey = TelegramDedupeKey.cooldownKey(message.getCategory(), message.getDedupeKey());
+        int severity = identity.severityRank();
+        String cooldownKey = TelegramDedupeKey.deliveryCooldownKey(
+                identity.telegramCategory(), identity.changeState(), message.getUserId(),
+                identity.subjectType(), identity.subjectId());
         int cooldownMinutes = cooldownMinutes(userId);
         ChannelDeliveryDO recent = mapper.selectRecentActiveCooldown(
                 userId, cooldownKey, now.minusMinutes(cooldownMinutes));
@@ -177,8 +186,14 @@ public class ChannelDeliveryService {
     public boolean requeueTelegramForMessage(Long userId, String messageId) {
         MessageDO message = messageFactService.findForUser(userId, messageId);
         if (message == null) throw new IllegalArgumentException("message not found");
+        if (HighValueAlertPolicy.telegramDeliveryIdentity(message).isEmpty()) return false;
         ChannelDeliveryDO delivery = mapper.selectByMessageAndChannel(messageId, "TELEGRAM");
         return delivery != null && requeue(userId, delivery.getDeliveryId());
+    }
+
+    private static HighValueAlertPolicy.TelegramDeliveryIdentity requireTelegramEligibility(MessageDO message) {
+        return HighValueAlertPolicy.telegramDeliveryIdentity(message)
+                .orElseThrow(() -> new IllegalArgumentException("Telegram message category is not eligible"));
     }
 
     private ChannelDeliveryDO baseRow(MessageDO message, LocalDateTime now, int severity, String cooldownKey) {

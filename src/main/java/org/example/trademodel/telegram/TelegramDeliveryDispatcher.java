@@ -73,6 +73,10 @@ public class TelegramDeliveryDispatcher {
             terminal(delivery, "MESSAGE_NOT_FOUND", "Committed message could not be loaded", 0);
             return;
         }
+        if (HighValueAlertPolicy.telegramDeliveryIdentity(message).isEmpty()) {
+            suppressIneligible(delivery);
+            return;
+        }
         LocalDateTime now = LocalDateTime.now(clock);
         if (message.getExpiresAt() != null && !now.isBefore(message.getExpiresAt())) {
             suppressExpired(delivery, now);
@@ -147,6 +151,16 @@ public class TelegramDeliveryDispatcher {
         delivery.setErrorCode("MESSAGE_EXPIRED");
         delivery.setErrorMessage("Telegram alert expired before delivery");
         delivery.setUpdatedAt(now);
+        completeKnownOutcome(delivery);
+    }
+
+    private void suppressIneligible(ChannelDeliveryDO delivery) {
+        delivery.setStatus(TelegramDeliveryStatus.SUPPRESSED.name());
+        delivery.setNextAttemptAt(null);
+        delivery.setRetryAfterSeconds(null);
+        delivery.setErrorCode("TELEGRAM_CATEGORY_NOT_ELIGIBLE");
+        delivery.setErrorMessage("Message is not eligible for the first-release Telegram delivery scope");
+        delivery.setUpdatedAt(LocalDateTime.now(clock));
         completeKnownOutcome(delivery);
     }
 

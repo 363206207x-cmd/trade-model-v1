@@ -104,7 +104,7 @@ assert_false_permissions FUNDAMENTAL_AI_V4_1_TELEGRAM_FIGMA
 
 base_ref="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
 changed_files="$({ git diff --name-only "$base_ref"; git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | awk 'NF && !seen[$0]++')"
-allowed_files=(
+authorization_allowed_files=(
   docs/ACTIVE_MAINLINE_STATUS.yml
   docs/CODEX_NEXT_TASK.yml
   docs/CONTRACT_CHANGE_LOG.md
@@ -123,6 +123,36 @@ allowed_files=(
   scripts/validate-multi-user-account-registration-authorization.sh
   scripts/validate-v4-1-telegram-remediation-authorization.sh
 )
+
+implementation_allowed_files=(
+  docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_SHORT_ALERT_IMPLEMENTATION_REPORT.md
+  scripts/validate-v4-1-telegram-remediation-authorization.sh
+  src/main/java/org/example/trademodel/mapper/MessageMapper.java
+  src/main/java/org/example/trademodel/service/ChannelDeliveryService.java
+  src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java
+  src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java
+  src/main/java/org/example/trademodel/telegram/TelegramDedupeKey.java
+  src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java
+  src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java
+  src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java
+  src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java
+  src/test/java/org/example/trademodel/service/MessageFactServiceTest.java
+  src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
+  src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java
+)
+
+if git cat-file -e "$base_ref:$authorization_doc" 2>/dev/null; then
+  allowed_files=("${implementation_allowed_files[@]}")
+  authorization_scope="AUTHORIZED_IMPLEMENTATION"
+else
+  allowed_files=("${authorization_allowed_files[@]}")
+  authorization_scope="AUTHORIZATION_DOCS_GATE"
+fi
+
 while IFS= read -r changed_file; do
   [[ -n "$changed_file" ]] || continue
   allowed="NO"
@@ -138,7 +168,8 @@ while IFS= read -r changed_file; do
   fi
 done <<<"$changed_files"
 
-if grep -Eq '^(src/|pom\.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$|.*application[^/]*\.ya?ml$)' <<<"$changed_files"; then
+if [[ "$authorization_scope" == "AUTHORIZATION_DOCS_GATE" ]] \
+  && grep -Eq '^(src/|pom\.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$|.*application[^/]*\.ya?ml$)' <<<"$changed_files"; then
   echo "TELEGRAM_REMEDIATION_AUTHORIZATION_VALIDATION=BLOCKED application-api-schema-ui-config-change" >&2
   exit 1
 fi
