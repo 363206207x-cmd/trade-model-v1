@@ -60,6 +60,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION|docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md|9495b72acce68a11565b0b9f5ee6a0e657eb79fb5ebd9a6317bd16d2d2782ca8|V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION|docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md|c994167bb2824ecbc3b2778ecf977ba5ef9adbcdb71c4dfc9da5926987add64e|LOCAL_REAL_READINESS_AND_CURRENT_HOME_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-FRONTEND-INTERACTION-RUNTIME-CLOSURE-AUTHORIZATION|docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md|116a559ab8ee5a60d4233237a26bc88203b52380ad67a78d4019c025ebd54ea5|DESKTOP_RUNTIME_INTERACTION_CLOSURE_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION|docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md|417a93357663953de338fdb64ec9961c85589589c4feb4c0d0328dcaa198a7d7|PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_AUTHORIZATION -->
@@ -249,6 +250,23 @@ existing owners.
 This subordinate authorization does not create a second v4.1 Product Source.
 Its exact Telegram successor remains blocked until this record is effective on
 clean, synchronized merged main.
+
+### PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC Telegram Two-Category Remediation Authorization |
+| Repository path | `docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md` |
+| Repository SHA-256 | `9495b72acce68a11565b0b9f5ee6a0e657eb79fb5ebd9a6317bd16d2d2782ca8` |
+| Version/date | Owner first-release narrowing authorization candidate `2026-08-26`; effective only after merged-main validation |
+| Authority | Remediation delivery authorization subordinate to frozen v4.1 Section 15.2 |
+| Applicable modules | Exact `FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION` package only |
+| Required concepts | all three in-app Message categories retained; Telegram Delivery narrowed to CONFIRMATION Final and trusted material active-position change; safety changes in-app only; missing source facts fail closed; existing owners reused |
+| Forbidden reinterpretations | no Section 15.2 rewrite, third Telegram first-release category, `REDUCED` delivery, untrusted position delivery, second owner, automatic position scheduling, real send, secret access, deployment, Figma/Mobile or automatic trading |
+
+This subordinate record narrows only the Owner's first-release Telegram
+delivery surface. It neither reduces the frozen in-application Message contract
+nor reopens the historical Telegram implementation completion claim.
 
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 

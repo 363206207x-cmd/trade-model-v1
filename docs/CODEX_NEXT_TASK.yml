@@ -1,65 +1,63 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "TRINE LOGIC private multi-user registration and data-isolation authorization"
+active_block: "TRINE LOGIC Telegram two-category remediation authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "TRINE LOGIC Multi-User Account Registration Authorization"
-branch: "codex/multi-user-account-registration-authorization"
+module: "TRINE LOGIC Telegram Remediation Authorization Bootstrap"
+branch: "codex/telegram-two-category-remediation-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 
-current_package_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_AUTHORIZATION"
-current_package_name: "TRINE LOGIC Multi-User Account Registration Authorization"
-current_package_active_block: "Private registration, account lifecycle and authenticated-user ownership permission gate"
+current_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION"
+current_package_name: "TRINE LOGIC Telegram Two-Category Remediation Authorization"
+current_package_active_block: "Owner first-release Telegram Delivery narrowing and exact-package permission gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/multi-user-account-registration-authorization"
+current_package_branch: "codex/telegram-two-category-remediation-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement multi-user capability on this branch"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement Telegram remediation on this branch"
 current_package_allowed_scope:
-  - "Register the exact private multi-user registration and data-isolation package"
-  - "Map the existing tm_user, Session, CSRF and business-object owners"
+  - "Register the exact Telegram remediation implementation package"
+  - "Record that all three in-app Message categories remain while first-release Telegram Delivery is narrowed to two categories"
+  - "Map the existing Message, ChannelDelivery, Final, UserPosition and trusted PositionMonitor owners"
   - "Update delivery state, exact-package machine permissions and authorization validation"
-  - "Validate fail-closed package denial without changing application, API, schema, Figma or Mobile"
 current_package_blocked_scope:
-  - "Java, runtime configuration, API, schema, templates, CSS, JavaScript, Figma or Mobile changes"
-  - "Registration implementation, migration, deployment, new providers or unrelated backend refactor"
-  - "Secrets, public exposure, fake data, automatic trading or automatic position mutation"
+  - "Java, runtime configuration, API, Schema, template, CSS, JavaScript, Figma or Mobile changes"
+  - "Telegram policy, template, allowlist, cooldown, dedupe, switch activation, real send or deployment"
+  - "Secrets, fake data, automatic position scheduling, automatic trading or automatic position mutation"
 
-authorized_next_package_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
-authorized_next_package_name: "TRINE LOGIC Multi-User Account Registration Closure"
-authorized_next_package_active_block: "Private registration, OWNER/USER lifecycle and authenticated-user data isolation"
+authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+authorized_next_package_name: "TRINE LOGIC Telegram Two-Category Short-Alert Remediation"
+authorized_next_package_active_block: "Existing Message-to-ChannelDelivery Telegram policy remediation only"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/multi-user-account-registration-closure"
-authorized_next_package_risk: "B_RISK_AUTH_AND_DATA_OWNERSHIP"
+authorized_next_package_branch: "codex/frontend-interaction-runtime-closure"
+authorized_next_package_risk: "C_RISK_EXTERNAL_NOTIFICATION_CHANNEL"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
 authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
-authorized_next_package_next_action: "From authorization-effective merged main, implement only the frozen private registration, account lifecycle and data-isolation contract"
+authorized_next_package_next_action: "From authorization-effective merged main, remediate only the Owner-approved two-category Telegram Delivery policy on the existing pipeline"
 
-blocked_package_phase: "UNSCOPED_PUBLIC_AUTH_PROVIDER_FIGMA_MOBILE_PRODUCTION_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_MULTI_USER_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "UNSCOPED_TELEGRAM_PRODUCTION_FIGMA_MOBILE_PROVIDER_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
-  - "V4_1_TARGET_RUNTIME_REMEDIATION_EFFECTIVE_MERGED_MAIN"
-  - "V4_1_TELEGRAM_IMPLEMENTATION_EFFECTIVE_MERGED_MAIN"
-  - "LOCAL_REAL_IMPLEMENTATION_EFFECTIVE_MERGED_MAIN"
-  - "FRONTEND_INTERACTION_SOURCE_AND_OWNERSHIP_MAPPED"
-  - "FRONTEND_INTERACTION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
-  - "FRONTEND_INTERACTION_RUNTIME_CLOSURE_EFFECTIVE_MERGED_MAIN"
-  - "MULTI_USER_SOURCE_AND_OWNERSHIP_MAPPED"
-  - "MULTI_USER_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "V4_1_TELEGRAM_HISTORICAL_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_COMPLETE"
+  - "THREE_IN_APP_MESSAGE_CATEGORIES_RETAINED"
+  - "OWNER_FIRST_RELEASE_TWO_CATEGORY_NARROWING_REGISTERED"
+  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERS_REUSED"
+  - "V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -91,65 +89,60 @@ v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
 v4_1_telegram_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_telegram_implementation_status: "COMPLETE"
 v4_1_telegram_live_acceptance_status: "PENDING_PRIVATE_RUNTIME_ACCEPTANCE"
+v4_1_telegram_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_telegram_remediation_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 frontend_interaction_implementation_status: "COMPLETE"
-multi_user_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"
 multi_user_implementation_status: "NOT_STARTED"
-authorized_next_package: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
-scope: "PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_ONLY"
+authorized_next_package: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+scope: "V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk authorization package; successor is bounded B-risk authentication and data-ownership closure"
+risk: "A-risk docs/gate authorization; successor remains C-risk external-notification remediation"
 
-pr_1179_number: "1179"
-pr_1179_status: "MERGED"
-pr_1179_merge_commit: "3a6f56afaf6fbba3d094d532f7f9555a23ac30a1"
-pr_1179_branch: "codex/v4-1-frontend-runtime-alignment"
-pr_1179_disposition: "EFFECTIVE_MERGED_MAIN"
-
-current_pr: "TRINE LOGIC Multi-User Account Registration Authorization / PENDING_REVIEW"
-current_package_pr: "TRINE LOGIC Multi-User Account Registration Authorization Package"
+current_pr: "TRINE LOGIC Telegram Two-Category Remediation Authorization / PENDING_REVIEW"
+current_package_pr: "TRINE LOGIC Telegram Two-Category Remediation Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
 block_next_business_phase_only: true
-a_risk_auto_merge_rule: "enabled for this docs/contract/workflow-only authorization package after all gates pass"
+a_risk_auto_merge_rule: "disabled for this task by explicit Owner merge-approval requirement"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+next_business_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Merge this authorization package; only then request MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+next_allowed_action: "Owner review and merge of this authorization PR; only then request the exact Telegram remediation package"
 
-product_phase: "TRINE LOGIC Multi-User Account Registration Authorization"
+product_phase: "TRINE LOGIC Telegram Two-Category Remediation Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "private multi-user registration and authenticated-user data-isolation authorization"
+product_module: "Telegram first-release Delivery narrowing authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "USER_IDENTITY_AND_SESSION_OWNERSHIP"
-  - "ACCOUNT_LIFECYCLE_AND_ROLE_BOUNDARY"
-  - "USER_OWNED_DATA_ISOLATION"
-  - "MIGRATION_AND_ROLLBACK_CONTRACT"
-  - "OBJECT_OWNERSHIP"
+  - "MESSAGE_CATEGORY_PRESERVATION"
+  - "TELEGRAM_FIRST_RELEASE_NARROWING"
+  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERSHIP"
+  - "FINAL_AND_POSITION_TRUST_GATES"
   - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_SOURCE_MAPPING.md"
-  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_OWNERSHIP_MAP.md"
-  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md"
-  - "docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION_VALIDATION.md"
+  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_SOURCE_MAPPING.md"
+  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_OWNERSHIP_MAP.md"
+  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md"
+  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "EXISTING_TM_USER_AND_SESSION_OWNER"
-  - "GLOBAL_SHARED_USER_OWNED_OWNER_ONLY_CLASSIFICATION"
-  - "AUTHENTICATED_USER_SCOPE"
-  - "OWNER_ACCOUNT_PRESERVATION"
-  - "BACKUP_AND_ROLLBACK_PRECONDITION"
+  - "THREE_IN_APP_MESSAGE_CATEGORIES"
+  - "TWO_TELEGRAM_DELIVERY_CATEGORIES"
+  - "EXISTING_MESSAGE_CHANNEL_DELIVERY_OWNER"
+  - "EXISTING_FINAL_AND_POSITION_TRUST_OWNER"
+  - "FAIL_CLOSED_MISSING_DATA"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -158,51 +151,49 @@ product_source_gate:
   command: "bash scripts/product-source-gate.sh"
 
 required_product_sources:
-  - PS-V1-ARCHITECTURE
-  - PS-POSITION-MONITORING
-  - PS-AI-CONFLICT-RECHECK-REVIEW
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-HOME-INTERACTION
-  - PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION
+  - PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
+  - PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION
+  - PS-POSITION-MONITORING
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  The sole v4.1 Product Source and all trading safety boundaries remain unchanged. The exact successor extends the existing private user owner with registration, OWNER/USER lifecycle and strict authenticated-user data isolation.
+  Frozen Section 15.2 retains all three in-app Message categories. The Owner first release narrows Telegram Delivery to CONFIRMATION Final alerts and trusted material active-position alerts only; safety-change Messages remain in-app and the frozen capability ceiling is unchanged.
 
 design_interaction_mapping: |
-  The approved current Desktop Home structure is preserved. Registration and Owner administration may use existing route/component patterns; Canonical Figma, Home layout and Mobile remain unchanged.
+  No page, component, route, overlay, Figma or Mobile interaction changes are included. The successor may only alter existing Telegram short-alert content and delivery qualification; current application navigation remains unchanged.
 
 data_source_mapping: |
-  Reuse tm_user, Spring Security Session/CSRF, public market, Asset Pool, config, Position, Analysis, Final, Message and audit owners. Public facts stay GLOBAL_SHARED; private facts become USER_OWNED; administration is OWNER_ONLY.
+  Reuse persisted Message and ChannelDelivery facts. Opportunity alerts read a validated CONFIRMATION FinalExecutionPlan and real required plan fields, with PushSnapshot optional. Position alerts read OPEN/PARTIALLY_CLOSED UserPosition plus VERIFIED/FRESH PositionMonitor facts. Missing or untrusted facts fail closed.
 
 current_implementation_gap: |
-  The merged runtime supports one private Owner account but not bounded registration, OWNER/USER administration or complete authenticated-user isolation across personal objects.
+  Merged main recognizes the historical Telegram implementation as COMPLETE but machine state does not recognize a new Owner-narrowed remediation authorization. Current delivery policy can still include the frozen third Telegram category or broader opportunity eligibility and therefore needs a separately authorized bounded remediation.
 
 allowed_scope:
-  - "Multi-user source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
+  - "Telegram remediation source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "Private frontend registration up to 10 active accounts including the unique Owner"
-  - "Existing tm_user role/enabled lifecycle, concurrent Session and OWNER-only administration"
-  - "Authenticated-user ownership for watch pool, config, positions, analyses, plans, messages and audits"
-  - "Forward migration preserving tm_user.id=1/xuchao with backup and rollback evidence"
-  - "Focused migration, authorization, isolation, controller and browser runtime validation"
+  - "Keep three in-app Message categories but allow only two first-release Telegram Delivery categories"
+  - "CONFIRMATION Final only; REDUCED suppressed; optional existing PushSnapshot; required Final fields fail closed"
+  - "Active trusted position material-change alerts using existing risk/trend/stop/target/STRONG_REVERSAL facts"
+  - "Existing-switch defaults off, stable cooldown identity and visible fixed-disclaimer removal with internal safety retained"
+  - "Focused tests and audit evidence on the existing Message-to-ChannelDelivery pipeline"
 
 authorized_next_blocked_scope:
-  - "Public registration/exposure, a second Owner, hard delete or duplicate owner architecture"
-  - "CoinGlass, provider, Telegram delivery-rule, AI, quality-threshold or fake-data changes"
-  - "Figma, Mobile, Production deployment, automatic trading or automatic position mutation"
+  - "Safety-change Telegram Delivery, untrusted position Delivery, REDUCED Delivery or invented source facts"
+  - "Automatic position scheduling, Home/login/market/OHLCV/CoinGlass/API/Schema/provider changes"
+  - "Real Telegram send, switch activation, secret access, Figma, Mobile, Staging, Production or automatic trading"
 
 blocked_scope:
-  - "Any implementation inside this authorization package"
-  - "Any package except MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE"
+  - "Any Telegram implementation inside this authorization package"
+  - "Any package except FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
 
 forbidden_scope:
-  - "Application code, runtime configuration, Java, API, schema, template, CSS, JavaScript, Figma or Mobile changes in the authorization diff"
-  - "Reading, printing or committing secrets; public exposure; owner-scope fallback; lowering quality threshold; fabricating opportunity, position, Final or AI data"
+  - "Application code, runtime configuration, Java, API, Schema, template, CSS, JavaScript, Figma or Mobile changes in the authorization diff"
+  - "Reading, printing or committing secrets; sending Telegram; deploying; fabricating Final, position or monitor facts; automatic trading"
 
 real_scenario_requirement: |
-  This authorization performs no runtime scenario. The successor must prove registration, unique Owner, account limit, role enforcement, force logout, disabled-user denial, cross-user isolation, existing Owner-data preservation, backup and rollback on a private Staging environment.
+  This authorization performs no runtime scenario and sends no Telegram message. The successor must validate its bounded policy with focused tests first; real sending and deployment remain separately blocked.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -218,17 +209,18 @@ hard_boundaries:
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and registered multi-user authorization hash pass"
-  - "Multi-user implementation remains blocked before merge and exact successor is allowed only after clean/synced merged main"
-  - "Typo, public-auth, provider, production, auto-trading, Mobile and Figma packages fail closed"
-  - "Application/API/Schema/Figma/Mobile changed-file count is zero"
+  - "Unique active v4.1 Product Source and registered Telegram remediation authorization hash pass"
+  - "Exact remediation implementation remains blocked before merge and is uniquely allowed after clean/synced merged main"
+  - "Typo, expanded, production, auto-trading, Mobile and Figma packages fail closed"
+  - "Application/API/Schema/config/Figma/Mobile changed-file count is zero"
   - "Workflow, authorization, ownership, duplicate-skeleton, secret and diff checks pass"
 
 stop_conditions:
-  - "Main differs from merged PR #1195 commit 8d5526d7f2fcf718e440239ee6ce15ee4cd57cec before authorization branch creation"
   - "A Product Source conflict, secret exposure or duplicate owner is found"
-  - "The authorization diff includes application, API, schema, business-test, template, CSS, JavaScript, Figma or Mobile changes"
-  - "The exact multi-user successor is not the only package permitted after merged-main effectivity"
+  - "The authorization diff includes application, API, Schema, business-test, template, CSS, JavaScript, Figma or Mobile changes"
+  - "Product Source Gate, Workflow Contract or authorization validation fails"
+  - "The exact Telegram successor is not the only package permitted after merged-main effectivity"
+  - "Authorization would require implementation or merge in this task"
 
 paused_governance_pr: "#1156"
 paused_governance_status: "CLOSED_PAUSED_TECHNICAL_DEBT"

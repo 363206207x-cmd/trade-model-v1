@@ -8,13 +8,37 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC Multi-User Account Registration Authorization
-Product Phase Status: MULTI_USER_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact private registration and authenticated-user data-isolation permission; no application implementation is included here
-Next Business Phase: MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after this authorization is merged and validated on clean/synced main
+Product Phase: TRINE LOGIC Telegram Two-Category Remediation Authorization
+Product Phase Status: V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact Owner-narrowed Telegram remediation permission; no application implementation is included here
+Next Business Phase: FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION
+Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after Owner-approved merge and clean/synced-main validation
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC Telegram Two-Category Remediation Authorization
+
+Merged main retains the historical Telegram authorization and implementation
+as effective/complete. This new docs/gate-only record does not reopen or erase
+that history; it authorizes one bounded remediation for the Owner's first
+release.
+
+Frozen v4.1 Section 15.2 continues to define three in-application Message
+categories. The first-release Telegram channel is narrower: only validated
+`CONFIRMATION` Final short alerts and trusted material active-position change
+short alerts may create Telegram ChannelDelivery. Opportunity/plan safety
+changes remain in-app Messages only. `REDUCED`, missing Final fields,
+untrusted monitor data and inactive positions fail closed.
+
+The exact successor is
+`FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION`. It reuses
+the existing Message and ChannelDelivery owners, does not authorize a position
+scheduler, real send, secret access, Staging/Production deployment, Figma,
+Mobile, API, Schema, provider, CoinGlass or automatic trading. Capability
+movement in this authorization is `NONE`; implementation remains blocked until
+Owner approval and merged-main effectivity.
 
 ---
 
@@ -24,6 +48,9 @@ PR #1195 is complete and effective on merged main through merge commit
 `8d5526d7f2fcf718e440239ee6ce15ee4cd57cec`. Its frontend runtime closure is
 deployed to private Staging, while the service still has one preserved Owner
 account and no authorized multi-user implementation.
+
+The multi-user authorization is effective on merged main; its implementation
+remains `NOT_STARTED` and is not part of this Telegram authorization package.
 
 This docs/gate-only package authorizes exactly
 `MULTI_USER_ACCOUNT_REGISTRATION_CLOSURE` after clean synchronized merged-main

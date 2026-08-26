@@ -24,32 +24,39 @@ grep -Fq 'GLOBAL_SHARED' docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_OWNERS
 grep -Fq 'USER_OWNED' docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_OWNERSHIP_MAP.md
 grep -Fq 'OWNER_ONLY' docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_OWNERSHIP_MAP.md
 grep -Fq 'PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION' docs/PRODUCT_SOURCE_OF_TRUTH.md
-grep -Fq "current_package_phase: \"$authorization_package\"" docs/CODEX_NEXT_TASK.yml
-grep -Fq "authorized_next_package_phase: \"$exact_package\"" docs/CODEX_NEXT_TASK.yml
 
 bash scripts/product-source-gate.sh --task-file docs/CODEX_NEXT_TASK.yml >/dev/null
 
-premerge_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_pending \
-  bash scripts/v1-state.sh --request-package "$exact_package")"
-grep -Fq 'AUTHORIZATION_STATUS: BLOCKED' <<<"$premerge_output"
-grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$premerge_output"
+current_package_phase="$(awk -F': ' '$1 == "current_package_phase" {gsub(/"/, "", $2); print $2; exit}' docs/CODEX_NEXT_TASK.yml)"
+if [[ "$current_package_phase" == "$authorization_package" ]]; then
+  grep -Fq "authorized_next_package_phase: \"$exact_package\"" docs/CODEX_NEXT_TASK.yml
 
-merged_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_merged_validated \
-  bash scripts/v1-state.sh --request-package "$exact_package")"
-grep -Fq 'AUTHORIZATION_STATUS: AUTHORIZED' <<<"$merged_output"
-grep -Fq "AUTHORIZED_PACKAGE: $exact_package" <<<"$merged_output"
-grep -Fq 'IMPLEMENTATION_ALLOWED: true' <<<"$merged_output"
-grep -Fq 'REPOSITORY_EDITS_ALLOWED: true' <<<"$merged_output"
-grep -Fq 'PR_CREATION_ALLOWED: true' <<<"$merged_output"
-grep -Fq 'CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: false' <<<"$merged_output"
-grep -Fq 'MOBILE_IMPLEMENTATION_ALLOWED: false' <<<"$merged_output"
+  premerge_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_pending \
+    bash scripts/v1-state.sh --request-package "$exact_package")"
+  grep -Fq 'AUTHORIZATION_STATUS: BLOCKED' <<<"$premerge_output"
+  grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$premerge_output"
 
-set +e
-wrong_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_merged_validated \
-  bash scripts/v1-state.sh --request-package MULTI_USER_ACCOUNT_REGISTRATION_CLOSUR 2>&1)"
-set -e
-grep -Fq 'RESOLUTION_STATUS: BLOCKED' <<<"$wrong_output"
-grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$wrong_output"
+  merged_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_merged_validated \
+    bash scripts/v1-state.sh --request-package "$exact_package")"
+  grep -Fq 'AUTHORIZATION_STATUS: AUTHORIZED' <<<"$merged_output"
+  grep -Fq "AUTHORIZED_PACKAGE: $exact_package" <<<"$merged_output"
+  grep -Fq 'IMPLEMENTATION_ALLOWED: true' <<<"$merged_output"
+  grep -Fq 'REPOSITORY_EDITS_ALLOWED: true' <<<"$merged_output"
+  grep -Fq 'PR_CREATION_ALLOWED: true' <<<"$merged_output"
+  grep -Fq 'CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: false' <<<"$merged_output"
+  grep -Fq 'MOBILE_IMPLEMENTATION_ALLOWED: false' <<<"$merged_output"
+
+  set +e
+  wrong_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_merged_validated \
+    bash scripts/v1-state.sh --request-package MULTI_USER_ACCOUNT_REGISTRATION_CLOSUR 2>&1)"
+  set -e
+  grep -Fq 'RESOLUTION_STATUS: BLOCKED' <<<"$wrong_output"
+  grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$wrong_output"
+else
+  grep -Fq 'multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"' docs/CODEX_NEXT_TASK.yml
+  grep -Fq 'multi_user_implementation_status: "NOT_STARTED"' docs/CODEX_NEXT_TASK.yml
+  grep -Fq 'multi-user authorization is effective on merged main' docs/PROJECT_CURRENT_STATE.md
+fi
 
 changed_files="$({ git diff --name-only; git diff --cached --name-only; } | sort -u)"
 if grep -Eq '^(src/|pom.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$)' <<<"$changed_files"; then
