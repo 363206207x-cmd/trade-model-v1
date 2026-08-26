@@ -147,6 +147,22 @@ class TelegramDeliveryDispatcherTest {
     }
 
     @Test
+    void legacyIneligibleDeliveryIsSuppressedBeforeBotCall() {
+        ChannelDeliveryDO delivery = delivery(1);
+        MessageDO legacy = message();
+        legacy.setTitle("【持仓逻辑发生重要变化】");
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(legacy);
+
+        dispatcher.dispatchOne(delivery);
+
+        assertThat(delivery.getStatus()).isEqualTo("SUPPRESSED");
+        assertThat(delivery.getErrorCode()).isEqualTo("TELEGRAM_CATEGORY_NOT_ELIGIBLE");
+        assertThat(delivery.getNextAttemptAt()).isNull();
+        verify(client, never()).sendMessage(any());
+        verify(deliveryService).completeClaim(delivery);
+    }
+
+    @Test
     void dispatchCycleRecoversCrashClaimsBeforeClaimingDueRows() {
         when(readiness.canAttemptDelivery()).thenReturn(true);
         when(messageMapper.listTelegramDeliveryOrphans(20)).thenReturn(List.of());
@@ -194,9 +210,8 @@ class TelegramDeliveryDispatcherTest {
     }
 
     private static MessageDO message() {
-        MessageDO message = new MessageDO();
+        MessageDO message = HighValueAlertPolicyTest.eligiblePositionMessage("RISK_HIGH");
         message.setMessageId("message-1");
-        message.setUserId(41L);
         return message;
     }
 }

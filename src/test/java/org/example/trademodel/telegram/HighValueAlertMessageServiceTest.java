@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -53,21 +54,22 @@ class HighValueAlertMessageServiceTest {
     @Mock private AnalysisRunOrchestrator analysisRunOrchestrator;
 
     private HighValueAlertMessageService service;
+    private TelegramProperties telegramProperties;
 
     @BeforeEach
     void setUp() {
-        TelegramProperties telegram = new TelegramProperties();
-        telegram.setCooldownMinutes(15);
+        telegramProperties = new TelegramProperties();
+        telegramProperties.setCooldownMinutes(15);
         org.mockito.Mockito.lenient().when(messageFactService.recordIfAbsent(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         service = new HighValueAlertMessageService(
                 messageFactService, assetPoolService, pushSnapshotMapper, executionPlanMapper,
-                FundamentalAiV41Properties.contractFixture(), telegram, new HighValueAlertPolicy(),
+                FundamentalAiV41Properties.contractFixture(), telegramProperties, new HighValueAlertPolicy(),
                 Clock.fixed(Instant.parse("2026-08-16T12:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test
-    void validatedFinalOpportunityWithSnapshotCreatesCanonicalMessage() {
+    void validatedConfirmationFinalWithSnapshotCreatesShortCanonicalMessage() {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId("analysis-9");
         run.setTraceId("trace-9");
@@ -82,11 +84,15 @@ class HighValueAlertMessageServiceTest {
 
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
+        plan.setAnalysisId("analysis-9");
+        plan.setOpportunityId("opportunity-9");
+        plan.setTraceId("trace-9");
         plan.setFinalPlan(true);
         plan.setFinalPlanMode("CONFIRMATION");
         plan.setFinalMarketBias("LONG");
         plan.setRuleValidationStatus("PASS");
         plan.setChainStatus("FINAL_VALIDATED");
+        plan.setPlanLifecycleState("CURRENT");
         plan.setSourceGateComplete(true);
         plan.setSourceGateStatus("PASS");
         plan.setSourceStatus("VERIFIED");
@@ -94,8 +100,10 @@ class HighValueAlertMessageServiceTest {
         plan.setExecutionFeasibilityFreshUntil(LocalDateTime.of(2026, 8, 16, 12, 5));
         plan.setValidUntil(LocalDateTime.of(2026, 8, 16, 13, 0));
         plan.setDataQuality(90);
-        plan.setEntryLogic("多源证据一致");
-        plan.setRiskExplanation("仅供人工复核，需关注流动性变化");
+        plan.setEntryZone("142 - 145");
+        plan.setTriggerCondition("15m 收盘确认");
+        plan.setStopLoss("138");
+        plan.setTakeProfitRules("150 / 156 分批止盈");
         plan.setNotTradeInstruction(true);
         plan.setNotOrderExecution(true);
 
@@ -107,6 +115,7 @@ class HighValueAlertMessageServiceTest {
         persistedLog.setOpportunityId("opportunity-9");
         TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
         snapshot.setPushId(99L);
+        snapshot.setExpiresAt(LocalDateTime.of(2026, 8, 16, 12, 30));
 
         when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
         when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of(snapshot));
@@ -118,13 +127,80 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getSourceId()).isEqualTo("99");
         assertThat(message.getCurrentRecheckId()).isNull();
         assertThat(message.getPlanId()).isEqualTo("plan-9");
-        assertThat(message.getDedupeKey()).startsWith("TG1|OPPORTUNITY_READY|TRIGGERED|3|");
+        assertThat(message.getTitle()).isEqualTo("【可复核执行计划】");
+        assertThat(message.getDedupeKey()).startsWith("TG1|OPPORTUNITY_READY|CONFIRMATION|3|");
         assertThat(message.getBody()).contains(
-                "资产：SOLUSDT", "方向：偏多", "计划模式：确认型",
-                "机会状态：已触发", "操作：打开系统重新校验");
+                "SOLUSDT  ·  偏多  ·  确认型", "入场：142 - 145", "触发：15m 收盘确认",
+                "止损：138", "目标：150 / 156 分批止盈", "操作：打开系统重新校验");
+        assertThat(message.getBody()).doesNotContain("主要依据", "主要风险", "不构成交易指令");
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
         verify(messageFactService).recordIfAbsent(message);
+    }
+
+    @Test
+    void completeConfirmationFinalWithoutSnapshotUsesPlanIdentityAndNoFakeRecheck() {
+        AnalysisRunDO run = qualifiedRun();
+        ExecutionPlanDO plan = qualifiedPlan();
+        OpportunityTransitionResult opportunity = qualifiedOpportunity();
+        OpportunityLogDTO persistedLog = new OpportunityLogDTO();
+        persistedLog.setOpportunityId("opportunity-9");
+        when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
+        when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of());
+
+        MessageDO message = service.recordOpportunity(run, new DecisionResult(), plan, opportunity, persistedLog);
+
+        assertThat(message.getSourceType()).isEqualTo("FINAL_PLAN");
+        assertThat(message.getSourceId()).isEqualTo("plan-9");
+        assertThat(message.getCurrentRecheckId()).isNull();
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(message)).isPresent();
+    }
+
+    @Test
+    void realSnapshotExpiryCanOwnValidityButMissingBothExpiriesFailsClosed() {
+        AnalysisRunDO run = qualifiedRun();
+        ExecutionPlanDO plan = qualifiedPlan();
+        plan.setValidUntil(null);
+        OpportunityLogDTO persistedLog = new OpportunityLogDTO();
+        persistedLog.setOpportunityId("opportunity-9");
+        TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
+        snapshot.setPushId(99L);
+        snapshot.setExpiresAt(LocalDateTime.of(2026, 8, 16, 12, 30));
+        when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
+        when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of(snapshot));
+
+        MessageDO message = service.recordOpportunity(
+                run, new DecisionResult(), plan, qualifiedOpportunity(), persistedLog);
+        assertThat(message.getExpiresAt()).isEqualTo(snapshot.getExpiresAt());
+        assertThat(message.getBody()).contains("有效至：2026-08-16 12:30 UTC");
+
+        snapshot.setExpiresAt(null);
+        assertThat(service.recordOpportunity(
+                run, new DecisionResult(), plan, qualifiedOpportunity(), persistedLog)).isNull();
+    }
+
+    @Test
+    void reducedCannotUseLegacyOptInAndMissingPlanFactsFailClosed() {
+        AnalysisRunDO run = qualifiedRun();
+        OpportunityTransitionResult opportunity = qualifiedOpportunity();
+        OpportunityLogDTO persistedLog = new OpportunityLogDTO();
+        persistedLog.setOpportunityId("opportunity-9");
+        when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
+        when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of());
+        telegramProperties.setAllowHighQualityReduced(true);
+
+        ExecutionPlanDO reduced = qualifiedPlan();
+        reduced.setFinalPlanMode("REDUCED");
+        assertThat(service.recordOpportunity(run, new DecisionResult(), reduced, opportunity, persistedLog)).isNull();
+
+        ExecutionPlanDO missingStop = qualifiedPlan();
+        missingStop.setStopLoss(null);
+        assertThat(service.recordOpportunity(run, new DecisionResult(), missingStop, opportunity, persistedLog)).isNull();
+
+        ExecutionPlanDO missingTarget = qualifiedPlan();
+        missingTarget.setTakeProfitRules(null);
+        missingTarget.setTargetLogic(null);
+        assertThat(service.recordOpportunity(run, new DecisionResult(), missingTarget, opportunity, persistedLog)).isNull();
     }
 
     @Test
@@ -169,6 +245,8 @@ class HighValueAlertMessageServiceTest {
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
         plan.setAnalysisId("analysis-9");
+        plan.setOpportunityId("opportunity-9");
+        plan.setTraceId("trace-9");
         when(executionPlanMapper.selectByPlanId("plan-9")).thenReturn(plan);
         TmPushRecheckLogDO recheck = new TmPushRecheckLogDO();
         recheck.setLogId(701L);
@@ -196,7 +274,7 @@ class HighValueAlertMessageServiceTest {
     }
 
     @Test
-    void samePlanUsesStableExactAndCooldownIdentityAcrossDifferentRecheckEvidence() {
+    void safetyMessagesKeepTheirTg1FactsButNeverBecomeTelegramDeliveries() {
         MessageDO first = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
                 "PUSH_RECHECK", "recheck-1", "analysis-1", "plan-1", "opportunity-1", "snapshot-1",
@@ -209,44 +287,193 @@ class HighValueAlertMessageServiceTest {
                 LocalDateTime.of(2026, 8, 16, 12, 30), null));
 
         assertThat(first.getSourceId()).isNotEqualTo(second.getSourceId());
-        assertThat(TelegramDedupeKey.cooldownKey(first.getCategory(), first.getDedupeKey()))
-                .isEqualTo(TelegramDedupeKey.cooldownKey(second.getCategory(), second.getDedupeKey()));
+        assertThat(first.getDedupeKey()).startsWith("TG1|EXECUTION_DRIFT|DRIFTED|");
+        assertThat(second.getDedupeKey()).startsWith("TG1|EXECUTION_DRIFT|DRIFTED|");
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(first)).isEmpty();
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(second)).isEmpty();
     }
 
     @Test
-    void verifiedFreshManualPositionMaterialChangeCreatesRiskMessage() {
-        UserPositionDO position = new UserPositionDO();
-        position.setId(91L);
-        position.setUserId(41L);
-        position.setAssetSymbol("BTCUSDT");
-        position.setStatus("OPEN");
-        position.setSourceType("MANUAL_POSITION");
+    void verifiedFreshManualPositionUsesHighestConcreteChangeAndShortTemplate() {
+        UserPositionDO position = position();
         PositionMonitorLogDTO log = trustedLog();
+        PositionMonitorResultDTO result = trustedResult();
+        result.setStopLossBreached(true);
+        result.setTakeProfitReached(true);
 
-        MessageDO message = service.recordPosition(position, log, new PositionMonitorResultDTO());
+        MessageDO message = service.recordPosition(position, log, result);
 
         assertThat(message.getCategory()).isEqualTo("POSITION_LOGIC_RISK_CHANGE");
         assertThat(message.getPositionId()).isEqualTo(91L);
         assertThat(message.getSourceType()).isEqualTo("POSITION_MONITOR");
+        assertThat(message.getTitle()).isEqualTo("【持仓需关注】");
         assertThat(message.getBody()).contains(
-                "当前变化：入场逻辑弱化", "反转状态：强反转", "风险：高，正在升级",
-                "建议：打开持仓详情人工处理");
-        assertThat(message.getDedupeKey()).startsWith("TG1|POSITION_RISK_CHANGE|STRONG_REVERSAL|4|");
+                "BTCUSDT  ·  做多", "变化：触及止损", "入场：100", "现价：99",
+                "止损：95  目标：110", "操作：打开持仓详情");
+        assertThat(message.getBody()).doesNotContain("建议动作", "不构成交易指令");
+        assertThat(message.getDedupeKey()).startsWith("TG1|POSITION_RISK_CHANGE|STOP_LOSS_BREACHED|4|");
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(message)).isPresent();
+    }
+
+    @Test
+    void weakenedAndPlanInvalidatedInAppMessagesRemainButAreNotTelegramEligible() {
+        UserPositionDO position = position();
+        PositionMonitorLogDTO log = trustedLog();
+        log.setReversalStatus("NO_REVERSAL");
+        log.setRiskLevel("MEDIUM");
+        log.setRiskTrend("STABLE");
+        log.setMonitorConclusion("PLAN_INVALIDATED");
+        PositionMonitorResultDTO result = trustedResult();
+        result.setReversalStatus("NO_REVERSAL");
+        result.setRiskLevel("MEDIUM");
+        result.setRiskTrend("STABLE");
+        result.setMonitorConclusion("PLAN_INVALIDATED");
+
+        MessageDO message = service.recordPosition(position, log, result);
+
+        assertThat(message).isNotNull();
+        assertThat(message.getTitle()).isEqualTo("【持仓逻辑发生重要变化】");
+        assertThat(message.getDedupeKey()).startsWith("TG1|POSITION_RISK_CHANGE|PLAN_INVALIDATED|");
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(message)).isEmpty();
+    }
+
+    @Test
+    void riskAlertMayShowUnsetBoundariesButStopEventCannotBorrowMissingStop() {
+        UserPositionDO position = position();
+        position.setStopLoss(null);
+        position.setTakeProfit(null);
+        PositionMonitorLogDTO log = trustedLog();
+        log.setReversalStatus("NO_REVERSAL");
+        log.setRiskLevel("HIGH");
+        log.setRiskTrend("STABLE");
+        PositionMonitorResultDTO risk = trustedResult();
+        risk.setReversalStatus("NO_REVERSAL");
+        risk.setRiskLevel("HIGH");
+        risk.setRiskTrend("STABLE");
+        risk.setStopLossBreached(true);
+
+        MessageDO message = service.recordPosition(position, log, risk);
+
+        assertThat(message.getDedupeKey()).contains("|RISK_HIGH|");
+        assertThat(message.getBody()).contains("变化：风险高", "止损：未设置  目标：未设置");
+        assertThat(message.getBody()).doesNotContain("触及止损");
+    }
+
+    @Test
+    void partiallyClosedRemainsActiveWhileClosedPositionCannotCreateMessage() {
+        UserPositionDO position = position();
+        position.setStatus("PARTIALLY_CLOSED");
+        PositionMonitorResultDTO result = trustedResult();
+        result.setStopLossBreached(false);
+        assertThat(service.recordPosition(position, trustedLog(), result)).isNotNull();
+
+        position.setStatus("CLOSED");
+        assertThat(service.recordPosition(position, trustedLog(), result)).isNull();
+    }
+
+    @Test
+    void missingEntryOrUntrustedCurrentPriceKeepsInAppFactButBlocksTelegram() {
+        UserPositionDO position = position();
+        position.setEntryPrice(null);
+        PositionMonitorResultDTO missingEntry = trustedResult();
+        MessageDO inAppOnly = service.recordPosition(position, trustedLog(), missingEntry);
+        assertThat(inAppOnly).isNotNull();
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(inAppOnly)).isEmpty();
+
+        position.setEntryPrice(new BigDecimal("100"));
+        PositionMonitorResultDTO stalePrice = trustedResult();
+        stalePrice.setMarkPriceFresh(false);
+        MessageDO staleInAppOnly = service.recordPosition(position, trustedLog(), stalePrice);
+        assertThat(staleInAppOnly).isNotNull();
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(staleInAppOnly)).isEmpty();
     }
 
     @Test
     void pendingStaleAndNonMaterialPositionResultsCreateNoMessage() {
+        UserPositionDO position = position();
+        PositionMonitorLogDTO pending = trustedLog();
+        pending.setMonitorSourceStatus("PENDING_VERIFICATION");
+
+        assertThat(service.recordPosition(position, pending, trustedResult())).isNull();
+        verify(messageFactService, never()).recordIfAbsent(any());
+    }
+
+    private static AnalysisRunDO qualifiedRun() {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId("analysis-9");
+        run.setTraceId("trace-9");
+        run.setOwnerType("USER");
+        run.setOwnerId(41L);
+        run.setAssetId(9L);
+        run.setSymbol("SOLUSDT");
+        run.setPreview(false);
+        return run;
+    }
+
+    private static ExecutionPlanDO qualifiedPlan() {
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setPlanId("plan-9");
+        plan.setAnalysisId("analysis-9");
+        plan.setOpportunityId("opportunity-9");
+        plan.setTraceId("trace-9");
+        plan.setFinalPlan(true);
+        plan.setFinalPlanMode("CONFIRMATION");
+        plan.setFinalMarketBias("LONG");
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setRuleValidationStatus("PASS");
+        plan.setChainStatus("FINAL_VALIDATED");
+        plan.setSourceGateComplete(true);
+        plan.setSourceGateStatus("PASS");
+        plan.setSourceStatus("VERIFIED");
+        plan.setExecutionFeasibilityStatus("PASS");
+        plan.setExecutionFeasibilityFreshUntil(LocalDateTime.of(2026, 8, 16, 12, 5));
+        plan.setValidUntil(LocalDateTime.of(2026, 8, 16, 13, 0));
+        plan.setDataQuality(90);
+        plan.setEntryZone("142 - 145");
+        plan.setTriggerCondition("15m 收盘确认");
+        plan.setStopLoss("138");
+        plan.setTakeProfitRules("150 / 156 分批止盈");
+        plan.setNotTradeInstruction(true);
+        plan.setNotOrderExecution(true);
+        return plan;
+    }
+
+    private static OpportunityTransitionResult qualifiedOpportunity() {
+        return new OpportunityTransitionResult(
+                "opportunity-9", "SOLUSDT", AssetStateEnum.CANDIDATE,
+                AssetStateEnum.TRIGGERED, true, false, "TRIGGER_CONFIRMED",
+                "ANALYSIS", "MANUAL_REVIEW", LocalDateTime.of(2026, 8, 16, 12, 0));
+    }
+
+    private static UserPositionDO position() {
         UserPositionDO position = new UserPositionDO();
         position.setId(91L);
         position.setUserId(41L);
         position.setAssetSymbol("BTCUSDT");
+        position.setSide("LONG");
         position.setStatus("OPEN");
         position.setSourceType("MANUAL_POSITION");
-        PositionMonitorLogDTO pending = trustedLog();
-        pending.setMonitorSourceStatus("PENDING_VERIFICATION");
+        position.setEntryPrice(new BigDecimal("100"));
+        position.setStopLoss(new BigDecimal("95"));
+        position.setTakeProfit(new BigDecimal("110"));
+        return position;
+    }
 
-        assertThat(service.recordPosition(position, pending, new PositionMonitorResultDTO())).isNull();
-        verify(messageFactService, never()).recordIfAbsent(any());
+    private static PositionMonitorResultDTO trustedResult() {
+        PositionMonitorResultDTO result = new PositionMonitorResultDTO();
+        result.setPositionId(91L);
+        result.setMonitorLogId(201L);
+        result.setMarkPrice(new BigDecimal("99"));
+        result.setCurrentPrice(new BigDecimal("99"));
+        result.setMarkPriceSource("BINANCE");
+        result.setMarkPriceObservedAt(LocalDateTime.of(2026, 8, 16, 11, 59));
+        result.setMarkPriceFresh(true);
+        result.setEntryLogicStatus("WEAKENED");
+        result.setReversalStatus("STRONG_REVERSAL");
+        result.setRiskLevel("HIGH");
+        result.setRiskTrend("INCREASED");
+        result.setMonitorConclusion("HIGH_RISK_OBSERVATION");
+        return result;
     }
 
     private static PositionMonitorLogDTO trustedLog() {
@@ -259,6 +486,7 @@ class HighValueAlertMessageServiceTest {
         log.setObservedAt(LocalDateTime.of(2026, 8, 16, 11, 59));
         log.setFreshUntil(LocalDateTime.of(2026, 8, 16, 12, 5));
         log.setCreatedAt(LocalDateTime.of(2026, 8, 16, 12, 0));
+        log.setCurrentPrice(new BigDecimal("99"));
         log.setEntryLogicStatus("WEAKENED");
         log.setReversalStatus("STRONG_REVERSAL");
         log.setRiskLevel("HIGH");

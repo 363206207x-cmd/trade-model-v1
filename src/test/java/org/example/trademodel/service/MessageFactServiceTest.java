@@ -4,11 +4,14 @@ import org.example.trademodel.entity.ChannelDeliveryDO;
 import org.example.trademodel.entity.MessageDO;
 import org.example.trademodel.mapper.ChannelDeliveryMapper;
 import org.example.trademodel.mapper.MessageMapper;
+import org.example.trademodel.telegram.TelegramDedupeKey;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,7 +62,7 @@ class MessageFactServiceTest {
     void telegramIsOnlyADeliveryChannelAndNeverChangesMessageFact() {
         MessageFactService messageService = new MessageFactService(messageMapper);
         ChannelDeliveryService deliveryService = new ChannelDeliveryService(deliveryMapper, messageService);
-        MessageDO fact = message("HIGH_PERMISSION_OPPORTUNITY", "opportunity:opp-1");
+        MessageDO fact = eligibleOpportunity();
         fact.setMessageId("message-1");
         when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(fact);
         when(deliveryMapper.insert(any())).thenReturn(1);
@@ -86,6 +89,24 @@ class MessageFactServiceTest {
         message.setDedupeKey(dedupeKey);
         message.setBusinessState("ACTIVE");
         message.setReadState("UNREAD");
+        return message;
+    }
+
+    private static MessageDO eligibleOpportunity() {
+        MessageDO message = message("HIGH_PERMISSION_OPPORTUNITY", TelegramDedupeKey.create(
+                "OPPORTUNITY_READY", "CONFIRMATION", 3, 15,
+                41L, "FINAL_PLAN", "plan-1", LocalDateTime.of(2026, 8, 16, 12, 0)));
+        message.setSourceType("FINAL_PLAN");
+        message.setSourceId("plan-1");
+        message.setPlanId("plan-1");
+        message.setAnalysisId("analysis-1");
+        message.setTraceId("trace-1");
+        message.setTitle("【可复核执行计划】");
+        message.setBody("BTCUSDT  ·  偏多  ·  确认型\n\n入场：100\n触发：收盘确认\n止损：98\n"
+                + "目标：105\n有效至：2026-08-16 13:00 UTC\n\n操作：打开系统重新校验");
+        message.setExpiresAt(LocalDateTime.of(2026, 8, 16, 13, 0));
+        message.setNotTradeInstruction(true);
+        message.setNotOrderExecution(true);
         return message;
     }
 }
