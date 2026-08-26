@@ -258,9 +258,9 @@ trade-model:
       requests-per-minute: ${TRADE_MODEL_SECURITY_RATE_LIMIT_RPM:1200}
       window-ms: ${TRADE_MODEL_SECURITY_RATE_LIMIT_WINDOW_MS:60000}
   schedulers:
-    enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:true}
+    enabled: ${TRADE_MODEL_SCHEDULERS_ENABLED:false}
     push-recheck:
-      enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:true}
+      enabled: ${TRADE_MODEL_PUSH_RECHECK_SCHEDULER_ENABLED:false}
     position-sync:
       enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:false}
     position-monitor:
@@ -268,7 +268,7 @@ trade-model:
       initial-delay-ms: ${TRADE_MODEL_POSITION_MONITOR_INITIAL_DELAY_MS:15000}
       fixed-rate-ms: ${TRADE_MODEL_POSITION_MONITOR_FIXED_RATE_MS:30000}
     market-data:
-      enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:true}
+      enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:false}
     ohlcv-ingestion:
       enabled: ${TRADE_MODEL_OHLCV_INGESTION_SCHEDULER_ENABLED:false}
       initial-delay-ms: ${TRADE_MODEL_OHLCV_INGESTION_INITIAL_DELAY_MS:60000}
@@ -277,8 +277,10 @@ trade-model:
       timeframes: ${TRADE_MODEL_OHLCV_INGESTION_TIMEFRAMES:5m,15m,1h,4h}
       bar-limit: ${TRADE_MODEL_OHLCV_INGESTION_BAR_LIMIT:100}
       max-symbols: ${TRADE_MODEL_OHLCV_INGESTION_MAX_SYMBOLS:6}
+      retry-base-seconds: ${TRADE_MODEL_OHLCV_INGESTION_RETRY_BASE_SECONDS:15}
+      retry-max-seconds: ${TRADE_MODEL_OHLCV_INGESTION_RETRY_MAX_SECONDS:300}
     watchlist:
-      enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:true}
+      enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:false}
   analysis:
     scheduler:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
@@ -287,6 +289,9 @@ trade-model:
       # Compatibility-only binding. Persistent analysis symbols come from Asset Pool.
       symbols: ${TRADE_MODEL_ANALYSIS_SCHEDULER_SYMBOLS:}
       timeframes: ${TRADE_MODEL_ANALYSIS_SCHEDULER_TIMEFRAMES:5m,15m,1h,4h}
+      decision-timeframe: ${TRADE_MODEL_ANALYSIS_DECISION_TIMEFRAME:5m}
+      required-market-timeframes: ${TRADE_MODEL_ANALYSIS_REQUIRED_MARKET_TIMEFRAMES:5m,15m,1h,4h}
+      required-closed-bars: ${TRADE_MODEL_ANALYSIS_REQUIRED_CLOSED_BARS:100}
       observing-interval-seconds: ${TRADE_MODEL_ANALYSIS_OBSERVING_INTERVAL_SECONDS:900}
       candidate-interval-seconds: ${TRADE_MODEL_ANALYSIS_CANDIDATE_INTERVAL_SECONDS:300}
       waiting-trigger-interval-seconds: ${TRADE_MODEL_ANALYSIS_WAITING_TRIGGER_INTERVAL_SECONDS:120}
@@ -305,9 +310,9 @@ trade-model:
       enabled: ${TRADE_MODEL_PUBLIC_OHLCV_PROVIDER_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_PUBLIC_OHLCV_EXTERNAL_CALLS_ENABLED:false}
     provider:
-      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}
-      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:binance}
-      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:true}
+      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:binance}
+      fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:kraken}
+      fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:false}
     kraken:
       enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}
       external-calls-enabled: ${TRADE_MODEL_KRAKEN_OHLCV_EXTERNAL_CALLS_ENABLED:false}

@@ -297,16 +297,81 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
-    void rejectsProductionPositionMonitorSchedulerEnabled() {
+    void allowsExplicitProductionPositionMonitorAtFrozenThirtySecondCadence() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.schedulers.enabled", "true");
         environment.setProperty("trade-model.schedulers.position-monitor.enabled", "true");
         environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.position-monitor.fixed-rate-ms", "30000");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsProductionPositionMonitorAtNonContractCadence() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.position-monitor.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.position-monitor.fixed-rate-ms", "60000");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production position-monitor scheduler must remain default-off");
+                .hasMessageContaining("trade-model.schedulers.position-monitor.fixed-rate-ms must equal 30000");
+    }
+
+    @Test
+    void allowsExplicitCoreProductionLoopOnlyAtFrozenCadencesAndBinanceSource() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.market-data.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "false");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.observing-interval-seconds", "900");
+        environment.setProperty("trade-model.analysis.scheduler.candidate-interval-seconds", "300");
+        environment.setProperty("trade-model.analysis.scheduler.waiting-trigger-interval-seconds", "120");
+        environment.setProperty("trade-model.analysis.scheduler.triggered-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.fixed-delay-ms", "60000");
+        environment.setProperty("trade-model.analysis.scheduler.decision-timeframe", "5m");
+        environment.setProperty("trade-model.analysis.scheduler.required-closed-bars", "100");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsCoreLoopWithFallbackOrWrongStateCadence() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.market-data.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        environment.setProperty("trade-model.ohlcv.provider.fallback", "kraken");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.observing-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.candidate-interval-seconds", "300");
+        environment.setProperty("trade-model.analysis.scheduler.waiting-trigger-interval-seconds", "120");
+        environment.setProperty("trade-model.analysis.scheduler.triggered-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.fixed-delay-ms", "60000");
+        environment.setProperty("trade-model.analysis.scheduler.decision-timeframe", "5m");
+        environment.setProperty("trade-model.analysis.scheduler.required-closed-bars", "100");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("core production opportunity loop forbids OHLCV fallback")
+                .hasMessageContaining("trade-model.analysis.scheduler.observing-interval-seconds must equal 900");
     }
 
     @Test

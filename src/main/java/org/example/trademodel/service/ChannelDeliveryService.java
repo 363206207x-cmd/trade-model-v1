@@ -53,6 +53,15 @@ public class ChannelDeliveryService {
         }
         HighValueAlertPolicy.TelegramDeliveryIdentity identity = requireTelegramEligibility(message);
         LocalDateTime now = LocalDateTime.now(clock);
+        String cooldownKey = TelegramDedupeKey.deliveryCooldownKey(
+                identity.telegramCategory(), identity.changeState(), message.getUserId(),
+                identity.subjectType(), identity.subjectId());
+        ChannelDeliveryDO existing = mapper.selectByMessageAndChannel(messageId, "TELEGRAM");
+        if (existing != null) return existing;
+        if (lifetimePlan(identity)) {
+            existing = mapper.selectExistingLifetimeDelivery(userId, cooldownKey);
+            if (existing != null) return existing;
+        }
         ChannelDeliveryDO row = new ChannelDeliveryDO();
         row.setDeliveryId("delivery-" + UUID.randomUUID());
         row.setMessageId(messageId);
@@ -60,9 +69,7 @@ public class ChannelDeliveryService {
         row.setChannel("TELEGRAM");
         row.setStatus(bound ? "QUEUED" : "SUPPRESSED");
         row.setAttemptCount(0);
-        row.setCooldownKey(TelegramDedupeKey.deliveryCooldownKey(
-                identity.telegramCategory(), identity.changeState(), message.getUserId(),
-                identity.subjectType(), identity.subjectId()));
+        row.setCooldownKey(cooldownKey);
         row.setSeverityRank(identity.severityRank());
         row.setNextAttemptAt(bound ? now : null);
         row.setErrorCode(bound ? null : "TELEGRAM_NOT_BOUND");
@@ -85,6 +92,10 @@ public class ChannelDeliveryService {
         String cooldownKey = TelegramDedupeKey.deliveryCooldownKey(
                 identity.telegramCategory(), identity.changeState(), message.getUserId(),
                 identity.subjectType(), identity.subjectId());
+        if (lifetimePlan(identity)) {
+            ChannelDeliveryDO lifetime = mapper.selectExistingLifetimeDelivery(userId, cooldownKey);
+            if (lifetime != null) return lifetime;
+        }
         int cooldownMinutes = cooldownMinutes(userId);
         ChannelDeliveryDO recent = mapper.selectRecentActiveCooldown(
                 userId, cooldownKey, now.minusMinutes(cooldownMinutes));
@@ -231,5 +242,12 @@ public class ChannelDeliveryService {
 
     private static boolean isSent(ChannelDeliveryDO row) {
         return row != null && TelegramDeliveryStatus.SENT.name().equals(row.getStatus());
+    }
+
+    private static boolean lifetimePlan(HighValueAlertPolicy.TelegramDeliveryIdentity identity) {
+        return identity != null
+                && "EXECUTABLE_FINAL_PLAN".equals(identity.telegramCategory())
+                && "CONFIRMATION".equals(identity.changeState())
+                && "FINAL_PLAN".equals(identity.subjectType());
     }
 }

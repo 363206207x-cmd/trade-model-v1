@@ -27,6 +27,12 @@ public interface MessageMapper {
     @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND dedupe_key = #{dedupeKey} LIMIT 1")
     MessageDO selectByDedupeKey(@Param("userId") Long userId, @Param("dedupeKey") String dedupeKey);
 
+    @Select("SELECT * FROM tm_message WHERE user_id = #{userId} "
+            + "AND category = 'HIGH_PERMISSION_OPPORTUNITY' AND plan_id = #{planId} "
+            + "ORDER BY created_at ASC, message_id ASC LIMIT 1")
+    MessageDO selectOpportunityByPlanId(@Param("userId") Long userId,
+                                        @Param("planId") String planId);
+
     @Select("SELECT * FROM tm_message WHERE user_id = #{userId} AND current_recheck_id = #{recheckId} "
             + "ORDER BY created_at DESC LIMIT 1")
     MessageDO selectByRecheckIdForUser(@Param("recheckId") String recheckId,

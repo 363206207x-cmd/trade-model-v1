@@ -17,7 +17,7 @@ public class PositionMonitorScheduler {
 
     public PositionMonitorScheduler(
             PositionMonitorService positionMonitorService,
-            @Value("${trade-model.schedulers.enabled:true}") boolean schedulersEnabled,
+            @Value("${trade-model.schedulers.enabled:false}") boolean schedulersEnabled,
             @Value("${trade-model.schedulers.position-monitor.enabled:false}") boolean positionMonitorSchedulerEnabled) {
         this.positionMonitorService = positionMonitorService;
         this.schedulersEnabled = schedulersEnabled;

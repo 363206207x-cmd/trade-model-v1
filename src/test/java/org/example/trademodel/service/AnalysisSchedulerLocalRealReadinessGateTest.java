@@ -2,7 +2,6 @@ package org.example.trademodel.service;
 
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
 import org.example.trademodel.analysisrun.AnalysisRunProperties;
-import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
@@ -41,32 +40,32 @@ class AnalysisSchedulerLocalRealReadinessGateTest {
         properties.getScheduler().setTimeframes(List.of("5m", "15m", "1h", "4h"));
         properties.getScheduler().setRequiredMarketTimeframes(List.of("5m", "15m", "1h", "4h"));
         properties.getScheduler().setRequiredClosedBars(100);
-        when(assetPoolService.listScanSymbols()).thenReturn(List.of("BTCUSDT"));
         service = new AnalysisSchedulerService(orchestrator, properties,
                 Clock.fixed(Instant.parse("2026-07-13T00:00:00Z"), ZoneOffset.UTC), assetPoolService);
         service.setPersistedOhlcvQueryService(queryService);
     }
 
     @Test
-    void analysisWaitsForAllRequiredTimeframes() {
-        when(queryService.evaluateReadiness(eq("BTCUSDT"), any(), eq(100), anyLong()))
+    void analysisWaitsForAllRequiredBinanceTimeframes() {
+        when(queryService.evaluateReadinessForSource(
+                eq("BTCUSDT"), any(), eq(100), anyLong(), eq("BINANCE_PUBLIC"), eq("SPOT")))
                 .thenReturn(readiness(PersistedOhlcvReadinessStatus.FRESH));
-        when(queryService.evaluateReadiness(eq("BTCUSDT"), eq("1h"), eq(100), anyLong()))
+        when(queryService.evaluateReadinessForSource(
+                eq("BTCUSDT"), eq("1h"), eq(100), anyLong(), eq("BINANCE_PUBLIC"), eq("SPOT")))
                 .thenReturn(readiness(PersistedOhlcvReadinessStatus.PARTIAL));
 
-        assertThat(service.runScheduledCycle()).isEmpty();
+        assertThat(service.marketDataReady("BTCUSDT")).isFalse();
         verify(orchestrator, never()).run(any());
     }
 
     @Test
-    void schedulerUsesPersistedKrakenBarsAndAnalysisRunSucceedsAfterRealBarsReady() {
-        when(queryService.evaluateReadiness(eq("BTCUSDT"), any(), eq(100), anyLong()))
+    void schedulerReadinessUsesPersistedBinanceBarsAfterRealBarsAreReady() {
+        when(queryService.evaluateReadinessForSource(
+                eq("BTCUSDT"), any(), eq(100), anyLong(), eq("BINANCE_PUBLIC"), eq("SPOT")))
                 .thenReturn(readiness(PersistedOhlcvReadinessStatus.FRESH));
-        AnalysisRunResult result = org.mockito.Mockito.mock(AnalysisRunResult.class);
-        when(orchestrator.run(any())).thenReturn(result);
 
-        assertThat(service.runScheduledCycle()).containsExactly(result, result, result, result);
-        verify(orchestrator, org.mockito.Mockito.times(4)).run(any());
+        assertThat(service.marketDataReady("BTCUSDT")).isTrue();
+        verify(orchestrator, never()).run(any());
     }
 
     private static PersistedOhlcvReadinessResult readiness(PersistedOhlcvReadinessStatus status) {

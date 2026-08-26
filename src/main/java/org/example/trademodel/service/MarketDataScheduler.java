@@ -22,8 +22,8 @@ public class MarketDataScheduler {
 
     public MarketDataScheduler(AnalysisSchedulerService analysisSchedulerService,
                                AnalysisRunProperties properties,
-                               @Value("${trade-model.schedulers.enabled:true}") boolean schedulersEnabled,
-                               @Value("${trade-model.schedulers.market-data.enabled:true}") boolean marketDataSchedulerEnabled) {
+                               @Value("${trade-model.schedulers.enabled:false}") boolean schedulersEnabled,
+                               @Value("${trade-model.schedulers.market-data.enabled:false}") boolean marketDataSchedulerEnabled) {
         this.analysisSchedulerService = analysisSchedulerService;
         this.properties = properties;
         this.schedulersEnabled = schedulersEnabled;

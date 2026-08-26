@@ -37,7 +37,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             new SchedulerPolicyItem("market-data", "trade-model.schedulers.market-data.enabled", false),
             new SchedulerPolicyItem("ohlcv-ingestion", "trade-model.schedulers.ohlcv-ingestion.enabled", false),
             new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
-            new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", true),
+            new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", false),
             new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false),
             new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", true)
     );
@@ -124,6 +124,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
 
         validateProductionSchedulerPolicy(environment, errors);
+        validateCoreProductionLoopPolicy(environment, errors);
         validateOhlcvIngestionPolicy(environment, errors);
         validateProviderCallPolicy(environment, errors);
         validateCoinGlassPolicy(environment, errors);
@@ -212,6 +213,59 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
                 .toList());
         if (!timeframes.equals(Set.of("5m", "15m", "1h", "4h"))) {
             errors.add("production OHLCV ingestion must use exactly 5m,15m,1h,4h timeframes");
+        }
+    }
+
+    private static void validateCoreProductionLoopPolicy(Environment environment, List<String> errors) {
+        boolean globallyEnabled = isTrue(property(environment, "trade-model.schedulers.enabled"));
+        boolean marketEnabled = isTrue(property(environment, "trade-model.schedulers.market-data.enabled"));
+        boolean analysisEnabled = isTrue(property(environment, "trade-model.analysis.scheduler.enabled"));
+        boolean ingestionEnabled = isTrue(property(environment,
+                "trade-model.schedulers.ohlcv-ingestion.enabled"));
+        if (marketEnabled || analysisEnabled) {
+            if (!globallyEnabled || !marketEnabled || !analysisEnabled || !ingestionEnabled) {
+                errors.add("core production opportunity loop requires global, market-data, analysis, and OHLCV schedulers");
+            }
+            if (!"BINANCE".equals(normalized(property(environment,
+                    "trade-model.ohlcv.provider.primary")))) {
+                errors.add("core production opportunity loop requires Binance primary OHLCV");
+            }
+            if (isTrue(property(environment, "trade-model.ohlcv.provider.fallback-enabled"))) {
+                errors.add("core production opportunity loop forbids OHLCV fallback");
+            }
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.observing-interval-seconds", 900L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.candidate-interval-seconds", 300L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.waiting-trigger-interval-seconds", 120L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.triggered-interval-seconds", 60L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.fixed-delay-ms", 60000L);
+            if (!"5M".equals(normalized(property(environment,
+                    "trade-model.analysis.scheduler.decision-timeframe")))) {
+                errors.add("core production opportunity loop decision timeframe must be 5m");
+            }
+            if (!isPositiveInteger(property(environment,
+                    "trade-model.analysis.scheduler.required-closed-bars"))
+                    || Integer.parseInt(trim(property(environment,
+                    "trade-model.analysis.scheduler.required-closed-bars"))) < 100) {
+                errors.add("core production opportunity loop requires at least 100 closed bars");
+            }
+        }
+        if (isTrue(property(environment, "trade-model.schedulers.position-monitor.enabled"))) {
+            if (!globallyEnabled) {
+                errors.add("production position monitor requires the global scheduler opt-in");
+            }
+            requireExactLong(environment, errors,
+                    "trade-model.schedulers.position-monitor.fixed-rate-ms", 30000L);
+        }
+    }
+
+    private static void requireExactLong(Environment environment, List<String> errors,
+                                         String property, long expected) {
+        try {
+            if (Long.parseLong(trim(property(environment, property))) != expected) {
+                errors.add(property + " must equal " + expected);
+            }
+        } catch (NumberFormatException ex) {
+            errors.add(property + " must equal " + expected);
         }
     }
 

@@ -112,7 +112,7 @@ assert_false_permissions FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_FIGMA
 
 base_ref="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD)"
 changed_files="$({ git diff --name-only "$base_ref"; git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard; } | awk 'NF && !seen[$0]++')"
-allowed_files=(
+authorization_allowed_files=(
   docs/ACTIVE_MAINLINE_STATUS.yml
   docs/CODEX_NEXT_TASK.yml
   docs/CONTRACT_CHANGE_LOG.md
@@ -130,6 +130,64 @@ allowed_files=(
   scripts/v1-state.sh
   scripts/validate-v4-1-core-production-loop-authorization.sh
 )
+
+implementation_allowed_files=(
+  docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_IMPLEMENTATION_REPORT.md
+  docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_SHORT_ALERT_IMPLEMENTATION_REPORT.md
+  scripts/validate-v4-1-core-production-loop-authorization.sh
+  scripts/validate-v4-1-telegram-remediation-authorization.sh
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunCommand.java
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunProperties.java
+  src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java
+  src/main/java/org/example/trademodel/mapper/AssetStateMapper.java
+  src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java
+  src/main/java/org/example/trademodel/mapper/ExecutionPlanMapper.java
+  src/main/java/org/example/trademodel/mapper/MessageMapper.java
+  src/main/java/org/example/trademodel/service/AnalysisSchedulerService.java
+  src/main/java/org/example/trademodel/service/AssetStateService.java
+  src/main/java/org/example/trademodel/service/ChannelDeliveryService.java
+  src/main/java/org/example/trademodel/service/MarketDataScheduler.java
+  src/main/java/org/example/trademodel/service/MessageFactService.java
+  src/main/java/org/example/trademodel/service/PersistedOhlcvIngestionScheduler.java
+  src/main/java/org/example/trademodel/service/PositionMonitorScheduler.java
+  src/main/java/org/example/trademodel/service/impl/AssetStateServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/PositionMonitorServiceImpl.java
+  src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java
+  src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java
+  src/main/java/org/example/trademodel/telegram/TelegramDedupeKey.java
+  src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java
+  src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java
+  src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java
+  src/main/resources/application-prod.yml
+  src/main/resources/application.yml
+  src/test/java/org/example/trademodel/analysisrun/AnalysisSchedulerServiceTest.java
+  src/test/java/org/example/trademodel/config/LocalSmokeSchedulerGateTest.java
+  src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java
+  src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java
+  src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java
+  src/test/java/org/example/trademodel/mapper/AssetStateMapperIntegrationTest.java
+  src/test/java/org/example/trademodel/positionmonitor/PositionMonitorServiceImplTest.java
+  src/test/java/org/example/trademodel/service/AnalysisSchedulerLocalRealReadinessGateTest.java
+  src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java
+  src/test/java/org/example/trademodel/service/MessageFactServiceTest.java
+  src/test/java/org/example/trademodel/service/PersistedOhlcvIngestionSchedulerTest.java
+  src/test/java/org/example/trademodel/service/impl/AssetStateServiceImplTest.java
+  src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
+  src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java
+  src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java
+)
+
+if git cat-file -e "$base_ref:$authorization_doc" 2>/dev/null; then
+  allowed_files=("${implementation_allowed_files[@]}")
+  authorization_scope="AUTHORIZED_IMPLEMENTATION"
+else
+  allowed_files=("${authorization_allowed_files[@]}")
+  authorization_scope="AUTHORIZATION_DOCS_GATE"
+fi
+
 while IFS= read -r changed_file; do
   [[ -n "$changed_file" ]] || continue
   allowed="NO"
@@ -145,8 +203,14 @@ while IFS= read -r changed_file; do
   fi
 done <<<"$changed_files"
 
-if grep -Eq '^(src/|pom\.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$|.*application[^/]*\.ya?ml$)' <<<"$changed_files"; then
+if [[ "$authorization_scope" == "AUTHORIZATION_DOCS_GATE" ]] \
+  && grep -Eq '^(src/|pom\.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$|.*application[^/]*\.ya?ml$)' <<<"$changed_files"; then
   echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED application-api-schema-ui-config-change" >&2
+  exit 1
+fi
+
+if grep -Eq '(^|/)db/migration/|\.sql$|\.html$|\.css$|\.js$' <<<"$changed_files"; then
+  echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED schema-or-ui-change" >&2
   exit 1
 fi
 
@@ -165,7 +229,9 @@ echo "TELEGRAM_FIRST_RELEASE_CATEGORIES_RETAINED=2"
 echo "PREMERGE_EXACT_PACKAGE_BLOCKED=PASS"
 echo "MERGED_MAIN_EXACT_PACKAGE_ALLOWED=PASS"
 echo "WRONG_AND_EXPANDED_PACKAGES_BLOCKED=PASS"
-echo "APPLICATION_API_SCHEMA_CONFIG_CHANGE_COUNT=0"
+echo "AUTHORIZATION_SCOPE=$authorization_scope"
+echo "UNAUTHORIZED_APPLICATION_API_SCHEMA_UI_CONFIG_CHANGE_COUNT=0"
+echo "DATABASE_SCHEMA_CHANGE_COUNT=0"
 echo "SCHEDULER_SWITCH_CHANGES=0"
 echo "TELEGRAM_SWITCH_CHANGES=0"
 echo "TELEGRAM_REAL_SEND_ATTEMPTS=0"

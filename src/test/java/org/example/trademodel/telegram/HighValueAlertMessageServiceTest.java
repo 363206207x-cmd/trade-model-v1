@@ -157,6 +157,27 @@ class HighValueAlertMessageServiceTest {
     }
 
     @Test
+    void repeatedAnalysisForSamePlanReusesOriginalMessageAcrossLifetime() {
+        AnalysisRunDO run = qualifiedRun();
+        ExecutionPlanDO plan = qualifiedPlan();
+        OpportunityTransitionResult opportunity = qualifiedOpportunity();
+        OpportunityLogDTO persistedLog = new OpportunityLogDTO();
+        persistedLog.setOpportunityId("opportunity-9");
+        MessageDO original = new MessageDO();
+        original.setMessageId("message-plan-9");
+        original.setPlanId("plan-9");
+        when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
+        when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of());
+        when(messageFactService.findOpportunityForPlan(41L, "plan-9")).thenReturn(original);
+
+        MessageDO repeated = service.recordOpportunity(
+                run, new DecisionResult(), plan, opportunity, persistedLog);
+
+        assertThat(repeated).isSameAs(original);
+        verify(messageFactService, never()).recordIfAbsent(any());
+    }
+
+    @Test
     void realSnapshotExpiryCanOwnValidityButMissingBothExpiriesFailsClosed() {
         AnalysisRunDO run = qualifiedRun();
         ExecutionPlanDO plan = qualifiedPlan();

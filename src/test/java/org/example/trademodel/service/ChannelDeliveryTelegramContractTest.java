@@ -243,6 +243,63 @@ class ChannelDeliveryTelegramContractTest {
     }
 
     @Test
+    void samePlanAfterCooldownOrRestartReusesItsSingleLifetimeDelivery() {
+        MessageDO firstMessage = eligiblePlanMessage("message-plan-1", "plan-1");
+        MessageDO laterMessage = eligiblePlanMessage("message-plan-later", "plan-1");
+        ChannelDeliveryDO persisted = new ChannelDeliveryDO();
+        persisted.setDeliveryId("delivery-plan-1");
+        persisted.setMessageId("message-plan-1");
+        persisted.setStatus("SENT");
+        when(messageFactService.findForUser(41L, "message-plan-1")).thenReturn(firstMessage);
+        when(messageFactService.findForUser(41L, "message-plan-later")).thenReturn(laterMessage);
+        when(readinessService.canAttemptDelivery()).thenReturn(true);
+        when(mapper.selectExistingLifetimeDelivery(anyLong(), anyString()))
+                .thenReturn(null, persisted);
+
+        ChannelDeliveryDO first = service.queueTelegram(41L, "message-plan-1");
+        ChannelDeliveryDO duplicate = service.queueTelegram(41L, "message-plan-later");
+
+        assertThat(first.getStatus()).isEqualTo("QUEUED");
+        assertThat(duplicate).isSameAs(persisted);
+        verify(mapper, times(1)).insert(any());
+        verify(mapper, times(2)).selectExistingLifetimeDelivery(anyLong(), anyString());
+    }
+
+    @Test
+    void providerRetryingPlanReusesOriginalDeliveryButNewPlanMayQueue() {
+        MessageDO retryMessage = eligiblePlanMessage("message-plan-retry", "plan-1");
+        MessageDO newPlanMessage = eligiblePlanMessage("message-plan-2", "plan-2");
+        ChannelDeliveryDO retrying = new ChannelDeliveryDO();
+        retrying.setDeliveryId("delivery-plan-1");
+        retrying.setStatus("RETRYING");
+        when(messageFactService.findForUser(41L, "message-plan-retry")).thenReturn(retryMessage);
+        when(messageFactService.findForUser(41L, "message-plan-2")).thenReturn(newPlanMessage);
+        when(mapper.selectExistingLifetimeDelivery(anyLong(), anyString()))
+                .thenReturn(retrying, null);
+        when(readinessService.canAttemptDelivery()).thenReturn(true);
+
+        assertThat(service.queueTelegram(41L, "message-plan-retry")).isSameAs(retrying);
+        ChannelDeliveryDO newPlan = service.queueTelegram(41L, "message-plan-2");
+
+        assertThat(newPlan.getStatus()).isEqualTo("QUEUED");
+        verify(mapper, times(1)).insert(any());
+    }
+
+    @Test
+    void suppressedPlanDeliveryStillOwnsTheSingleLifetimeIdentity() {
+        MessageDO message = eligiblePlanMessage("message-plan-later", "plan-1");
+        ChannelDeliveryDO suppressed = new ChannelDeliveryDO();
+        suppressed.setDeliveryId("delivery-plan-original");
+        suppressed.setStatus("SUPPRESSED");
+        when(messageFactService.findForUser(41L, "message-plan-later")).thenReturn(message);
+        when(mapper.selectExistingLifetimeDelivery(anyLong(), anyString())).thenReturn(suppressed);
+
+        assertThat(service.queueTelegram(41L, "message-plan-later")).isSameAs(suppressed);
+
+        verify(mapper, never()).insert(any());
+    }
+
+    @Test
     void ineligibleSafetyMessageCannotQueueOrRequeue() {
         MessageDO safety = message(3);
         safety.setCategory("OPPORTUNITY_PLAN_SAFETY_CHANGE");
@@ -317,6 +374,30 @@ class ChannelDeliveryTelegramContractTest {
         message.setDedupeKey(TelegramDedupeKey.create(
                 "POSITION_RISK_CHANGE", state, 3, 15,
                 41L, "USER_POSITION", "91", LocalDateTime.of(2026, 8, 16, 12, 0)));
+        return message;
+    }
+
+    private static MessageDO eligiblePlanMessage(String messageId, String planId) {
+        MessageDO message = new MessageDO();
+        message.setMessageId(messageId);
+        message.setUserId(41L);
+        message.setCategory("HIGH_PERMISSION_OPPORTUNITY");
+        message.setSourceType("FINAL_PLAN");
+        message.setSourceId(planId);
+        message.setPlanId(planId);
+        message.setAnalysisId("analysis-" + planId);
+        message.setSymbol("BTCUSDT");
+        message.setTraceId("trace-" + planId);
+        message.setTitle("【可复核执行计划】");
+        message.setBody("BTCUSDT  ·  偏多  ·  确认型\n\n入场：100 - 101\n触发：15m 收盘确认"
+                + "\n止损：98\n目标：105\n有效至：2026-08-16 13:00 UTC"
+                + "\n\n操作：打开系统重新校验");
+        message.setExpiresAt(LocalDateTime.of(2026, 8, 16, 13, 0));
+        message.setNotTradeInstruction(true);
+        message.setNotOrderExecution(true);
+        message.setDedupeKey(TelegramDedupeKey.createPlanLifetime(
+                "OPPORTUNITY_READY", "CONFIRMATION", 3,
+                41L, "FINAL_PLAN", planId));
         return message;
     }
 

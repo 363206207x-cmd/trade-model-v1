@@ -59,8 +59,10 @@ class AnalysisRunControllerTest {
         assertThat(byRequest.getStatusCode().value()).isEqualTo(200);
         assertThat(byRequest.getBody().getData().getRequestId()).isEqualTo("req-controller");
         assertThat(scheduler.getStatusCode().value()).isEqualTo(200);
-        assertThat(scheduler.getBody().getData()).containsEntry("reviewOnly", true);
+        assertThat(scheduler.getBody().getData()).containsEntry("assetPoolOnly", true);
+        assertThat(scheduler.getBody().getData()).containsEntry("persistentScanClaim", true);
         assertThat(scheduler.getBody().getData()).containsEntry("notAutoTrading", true);
+        assertThat(scheduler.getBody().getData()).containsEntry("notOrderExecution", true);
     }
 
     @Test

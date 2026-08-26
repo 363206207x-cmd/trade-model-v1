@@ -133,6 +133,10 @@ public class HighValueAlertMessageService {
                         plan != null && Boolean.TRUE.equals(plan.getNotOrderExecution()));
         if (!policy.allowsOpportunity(qualification)) return null;
 
+        MessageDO existingPlanMessage = messageFactService.findOpportunityForPlan(
+                run.getOwnerId(), plan.getPlanId());
+        if (existingPlanMessage != null) return existingPlanMessage;
+
         String sourceType = snapshot == null ? "FINAL_PLAN" : "PUSH_SNAPSHOT";
         String sourceId = snapshot == null ? plan.getPlanId() : String.valueOf(snapshot.getPushId());
         MessageDO message = base(run.getOwnerId(), "HIGH_PERMISSION_OPPORTUNITY", sourceType,
@@ -147,9 +151,9 @@ public class HighValueAlertMessageService {
                 + "\n目标：" + target.trim()
                 + "\n有效至：" + format(effectiveExpiry)
                 + "\n\n操作：打开系统重新校验");
-        message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.OPPORTUNITY_EVENT,
-                "CONFIRMATION", 3, telegramProperties.getCooldownMinutes(),
-                run.getOwnerId(), "FINAL_PLAN", plan.getPlanId(), now));
+        message.setDedupeKey(TelegramDedupeKey.createPlanLifetime(HighValueAlertPolicy.OPPORTUNITY_EVENT,
+                "CONFIRMATION", 3,
+                run.getOwnerId(), "FINAL_PLAN", plan.getPlanId()));
         return messageFactService.recordIfAbsent(message);
     }
 

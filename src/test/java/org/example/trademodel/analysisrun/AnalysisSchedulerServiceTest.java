@@ -2,10 +2,22 @@ package org.example.trademodel.analysisrun;
 
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
+import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.service.AnalysisSchedulerService;
+import org.example.trademodel.service.AssetStateService;
+import org.example.trademodel.service.OpportunityStateIdentity;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
+import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.service.watchlistsource.AssetPoolScanTarget;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -17,9 +29,17 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 class AnalysisSchedulerServiceTest {
@@ -34,24 +54,30 @@ class AnalysisSchedulerServiceTest {
         assertThat(properties.getScheduler().getTimeframes())
                 .containsExactly("5m", "15m", "1h", "4h");
         assertThat(service.status()).containsEntry("enabled", false)
-                .containsEntry("inMemoryCacheRemoved", true)
-                .containsEntry("manualThreadRemoved", true);
+                .containsEntry("assetPoolOnly", true)
+                .containsEntry("persistentScanClaim", true)
+                .containsEntry("notAutoTrading", true);
     }
 
     @Test
-    void enabledSchedulerRoutesEverySymbolTimeframeThroughOrchestrator() {
-        CapturingOrchestrator orchestrator = new CapturingOrchestrator();
-        AnalysisRunProperties properties = new AnalysisRunProperties();
-        properties.getScheduler().setEnabled(true);
-        properties.getScheduler().setSymbols(List.of("BTCUSDT", "ETHUSDT"));
-        properties.getScheduler().setTimeframes(List.of("5m", "15m", "1h", "4h"));
-        AnalysisSchedulerService service = scheduler(orchestrator, properties, List.of("BTCUSDT", "ETHUSDT"));
+    void enabledSchedulerRunsLightweightScanBeforePromotionAnalysis() {
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, null, true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 1_000L);
 
-        List<AnalysisRunResult> results = service.runScheduledCycle();
+        List<AnalysisRunResult> results = fixture.service.runScheduledCycle();
 
-        assertThat(results).hasSize(8);
-        assertThat(orchestrator.commands).extracting(AnalysisRunCommand::getTriggerType)
-                .containsOnly(AnalysisRunTriggerType.SCHEDULED);
+        assertThat(results).hasSize(1);
+        assertThat(fixture.orchestrator.commands).singleElement().satisfies(command -> {
+            assertThat(command.getTriggerType()).isEqualTo(AnalysisRunTriggerType.ASSET_POOL_SCAN);
+            assertThat(command.getOwnerType()).isEqualTo("USER");
+            assertThat(command.getOwnerId()).isEqualTo(42L);
+            assertThat(command.getAssetId()).isEqualTo(9001L);
+            assertThat(command.getTimeframe()).isEqualTo("5m");
+        });
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("PROMOTION_SIGNAL:EXECUTED"), eq(null),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(1_000L), anyString(),
+                eq(true), eq(true));
     }
 
     @Test
@@ -70,35 +96,211 @@ class AnalysisSchedulerServiceTest {
 
     @Test
     void schedulerPreservesPoolOwnerAndUsesConfiguredStateCadence() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.WAITING_TRIGGER,
+                scanAudit("5m=FLAT;15m=FLAT;1h=FLAT;4h=FLAT", 2_000L), true);
+        fixture.stubFreshTrends("FLAT", "FLAT", "FLAT", "FLAT", 2_000L);
+
+        List<AnalysisRunResult> results = fixture.service.runScheduledCycle();
+
+        assertThat(results).isEmpty();
+        verify(fixture.assetStateService).claimScheduledScan(
+                any(), eq(77L), any(), eq(120L), anyString(), eq("rules-v1"));
+        assertThat(fixture.orchestrator.commands).isEmpty();
+    }
+
+    @Test
+    void ordinaryObservingScanDoesNotCallFullAnalysis() {
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, null, true);
+        fixture.stubFreshTrends("UP", "DOWN", "FLAT", "UP", 3_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).isEmpty();
+
+        assertThat(fixture.orchestrator.commands).isEmpty();
+        assertThat(fixture.service.status()).containsEntry("lightweightScanCount", 1L)
+                .containsEntry("fullAnalysisRequestCount", 0L);
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("NO_MATERIAL_CHANGE"), eq(null),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(3_000L), eq(null),
+                eq(false), eq(false));
+    }
+
+    @Test
+    void allPoolTargetsIncludingNonTopSixAreVisitedAndOneFailureIsIsolated() {
         CapturingOrchestrator orchestrator = new CapturingOrchestrator();
         AnalysisRunProperties properties = new AnalysisRunProperties();
         properties.getScheduler().setEnabled(true);
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         AssetStateMapper assetStateMapper = mock(AssetStateMapper.class);
-        AssetPoolScanTarget target = new AssetPoolScanTarget("USER", 42L, 9001L, "BTCUSDT");
-        when(assetPoolService.listScanTargets()).thenReturn(List.of(target));
-        LocalDateTime now = LocalDateTime.of(2026, 8, 12, 0, 0);
-        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
-                .thenReturn(state(AssetStateEnum.CANDIDATE, now.minusSeconds(100)));
-        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "15m"))
-                .thenReturn(state(AssetStateEnum.OBSERVING, now.minusSeconds(100)));
-        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "1h"))
-                .thenReturn(state(AssetStateEnum.TRIGGERED, now.minusSeconds(61)));
+        PersistedOhlcvQueryService query = mock(PersistedOhlcvQueryService.class);
+        AssetStateService assetStateService = mock(AssetStateService.class);
+        RuleConfigService rules = mock(RuleConfigService.class);
+        List<AssetPoolScanTarget> targets = java.util.stream.IntStream.rangeClosed(1, 8)
+                .mapToObj(index -> new AssetPoolScanTarget(
+                        "USER", 42L, (long) index, index == 1 ? "BADUSDT" : "ASSET" + index + "USDT"))
+                .toList();
+        when(assetPoolService.listScanTargets()).thenReturn(targets);
+        when(assetPoolService.listScanSymbols()).thenReturn(
+                targets.stream().map(AssetPoolScanTarget::symbol).toList());
+        when(assetPoolService.resolvePoolItemId(anyString(), anyLong(), anyLong(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        when(assetStateMapper.selectByIdentity(anyString(), anyLong(), anyString(), eq("5m")))
+                .thenAnswer(invocation -> {
+                    if ("BADUSDT".equals(invocation.getArgument(2))) {
+                        throw new IllegalStateException("isolated failure");
+                    }
+                    return state(AssetStateEnum.OBSERVING, LocalDateTime.ofInstant(
+                            Instant.parse("2026-08-11T23:00:00Z"), ZoneOffset.UTC));
+                });
+        when(rules.resolveActiveRuleVersion()).thenReturn("rules-v1");
+        when(assetStateService.claimScheduledScan(
+                any(), anyLong(), any(), eq(900L), anyString(), eq("rules-v1")))
+                .thenReturn(null);
         AnalysisSchedulerService service = new AnalysisSchedulerService(
                 orchestrator, properties,
                 Clock.fixed(Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC),
                 assetPoolService, assetStateMapper);
+        service.setPersistedOhlcvQueryService(query);
+        service.setScheduledScanDependencies(
+                assetStateService, rules, new CoinGlassProperties(),
+                FundamentalAiV41Properties.contractFixture());
 
-        List<AnalysisRunResult> results = service.runScheduledCycle();
+        assertThat(service.runScheduledCycle()).isEmpty();
 
-        assertThat(results).hasSize(2);
-        assertThat(orchestrator.commands).extracting(AnalysisRunCommand::getTimeframe)
-                .containsExactly("1h", "4h");
-        assertThat(orchestrator.commands).allSatisfy(command -> {
-            assertThat(command.getOwnerType()).isEqualTo("USER");
-            assertThat(command.getOwnerId()).isEqualTo(42L);
-            assertThat(command.getAssetId()).isEqualTo(9001L);
-        });
+        verify(assetStateService, org.mockito.Mockito.times(7)).claimScheduledScan(
+                any(), anyLong(), any(), eq(900L), anyString(), eq("rules-v1"));
+        assertThat(orchestrator.commands).isEmpty();
+    }
+
+    @Test
+    void triggeredMinutePollWithUnchangedEvidenceCallsNoFullAnalysis() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.TRIGGERED,
+                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 3_500L, "FINAL_MISSING"), true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 4_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).isEmpty();
+
+        assertThat(fixture.orchestrator.commands).isEmpty();
+        assertThat(fixture.service.status()).containsEntry("triggeredLightweightCount", 1L)
+                .containsEntry("triggeredFullAnalysisRequestCount", 0L);
+    }
+
+    @Test
+    void triggeredMaterialEvidenceChangeMayRequestOneFullAnalysis() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.TRIGGERED,
+                scanAudit("5m=DOWN;15m=DOWN;1h=DOWN;4h=DOWN", 4_500L, "FINAL_MISSING"), true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 5_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+
+        assertThat(fixture.orchestrator.commands).hasSize(1);
+        assertThat(fixture.service.status()).containsEntry("triggeredFullAnalysisRequestCount", 1L);
+    }
+
+    @Test
+    void triggeredPlanLifecycleChangeRequestsRuleOwnedReanalysis() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.TRIGGERED,
+                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 5_000L, "READY"), true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 5_000L);
+        ExecutionPlanDO needsRevalidation = new ExecutionPlanDO();
+        needsRevalidation.setPlanLifecycleState("NEEDS_REVALIDATION");
+        when(fixture.executionPlanMapper.selectLatestFinalByOpportunityId("opp-test"))
+                .thenReturn(needsRevalidation);
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+
+        assertThat(fixture.orchestrator.commands).hasSize(1);
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("TRIGGERED_MATERIAL_EVIDENCE_CHANGE:EXECUTED"), eq(null),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"),
+                org.mockito.ArgumentMatchers.contains("PLAN=LIFECYCLE_NEEDS_REVALIDATION"),
+                eq(5_000L), anyString(), eq(true), eq(true));
+    }
+
+    @Test
+    void failedFullAnalysisDoesNotAdvanceSuccessAndRemainsRetryable() {
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, null, true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 5_250L);
+        fixture.orchestrator.results.add(AnalysisRunResult.failed(run("ana-failed", "FAILED"), "provider failed"));
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+
+        assertThat(fixture.orchestrator.commands).hasSize(2);
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("PROMOTION_SIGNAL:FAILED"), anyString(),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(5_250L),
+                anyString(), eq(true), eq(false));
+    }
+
+    @Test
+    void newHotResetHasPriorityOverOrdinaryLightweightOutcome() {
+        LocalDateTime started = LocalDateTime.ofInstant(
+                Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC);
+        String previous = scanAudit(
+                "5m=UP;15m=DOWN;1h=FLAT;4h=UP", 5_400L, "NOT_REQUIRED",
+                "2026-08-11T23:00");
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, previous, true);
+        fixture.stubFreshTrends("UP", "DOWN", "FLAT", "UP", 5_400L);
+        when(fixture.assetStateService.claimScheduledScan(any(), eq(77L), any(), eq(900L),
+                anyString(), eq("rules-v1"))).thenReturn(new AssetStateService.ScheduledScanClaim(
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m"),
+                "opp-test", AssetStateEnum.OBSERVING, "analysis-before", "HIGH",
+                LocalDateTime.of(2026, 8, 11, 23, 30), "trace-hot-reset", "rules-v1",
+                started.minusMinutes(15), started, started.plusMinutes(15), previous));
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("HOT_RESET_RECALCULATION:EXECUTED"), eq(null),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(5_400L),
+                anyString(), eq(true), eq(true));
+    }
+
+    @Test
+    void candidateNewClosedCandleAllowsLegalRecalculation() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.CANDIDATE,
+                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 5_500L), true);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 6_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+        assertThat(fixture.orchestrator.commands).hasSize(1);
+    }
+
+    @Test
+    void staleSourceFailsClosedBeforeFullAnalysis() {
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.CANDIDATE, null, true);
+        PersistedOhlcvReadinessResult stale = new PersistedOhlcvReadinessResult();
+        stale.setStatus(PersistedOhlcvReadinessStatus.STALE);
+        stale.setStaleReasonCode(PersistedOhlcvStaleReasonCode.LATEST_BAR_TOO_OLD);
+        when(fixture.query.evaluateReadinessForSource(
+                anyString(), anyString(), eq(100), anyLong(),
+                eq("BINANCE_PUBLIC"), eq("SPOT"))).thenReturn(stale);
+
+        assertThat(fixture.service.runScheduledCycle()).isEmpty();
+
+        assertThat(fixture.orchestrator.commands).isEmpty();
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("DATA_NOT_READY"), eq("LATEST_BAR_TOO_OLD"),
+                eq("NOT_FRESH"), eq(null), eq(null), eq(null), eq(false), eq(false));
+    }
+
+    @Test
+    void missingCoinGlassBlocksFullAutomaticOpportunityChain() {
+        SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, null, false);
+        fixture.stubFreshTrends("UP", "UP", "UP", "UP", 7_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).isEmpty();
+
+        assertThat(fixture.orchestrator.commands).isEmpty();
+        verify(fixture.assetStateService).completeScheduledScan(
+                any(), any(), eq("BLOCKED_EXTERNAL_CREDENTIAL"), eq("COINGLASS_NOT_CONFIGURED"),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(7_000L), eq(null),
+                eq(false), eq(false));
     }
 
     @Test
@@ -123,7 +325,7 @@ class AnalysisSchedulerServiceTest {
 
         assertThat(response.getCode()).isEqualTo(500);
         assertThat(response.getData()).isNull();
-        assertThat(response.getMsg()).contains("CONCURRENT_TRIGGER_BLOCKED");
+        assertThat(response.getMsg()).contains("IDEMPOTENCY_IN_PROGRESS");
     }
 
     @Test
@@ -138,6 +340,137 @@ class AnalysisSchedulerServiceTest {
         assertThat(response.getMsg()).isEqualTo("EXISTING_SUCCESS");
         assertThat(response.getData()).isNotNull();
         assertThat(response.getData().getAnalysisId()).isEqualTo("ana-existing-success");
+    }
+
+    private static SchedulerFixture schedulerFixture(AssetStateEnum state,
+                                                     String previousExtJson,
+                                                     boolean coinGlassConfigured) {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator();
+        AnalysisRunProperties properties = new AnalysisRunProperties();
+        properties.getScheduler().setEnabled(true);
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        AssetStateMapper assetStateMapper = mock(AssetStateMapper.class);
+        PersistedOhlcvQueryService query = mock(PersistedOhlcvQueryService.class);
+        ExecutionPlanMapper executionPlanMapper = mock(ExecutionPlanMapper.class);
+        AssetStateService assetStateService = mock(AssetStateService.class);
+        RuleConfigService rules = mock(RuleConfigService.class);
+        AssetPoolScanTarget target = new AssetPoolScanTarget("USER", 42L, 9001L, "BTCUSDT");
+        when(assetPoolService.listScanTargets()).thenReturn(List.of(target));
+        when(assetPoolService.listScanSymbols()).thenReturn(List.of(target.symbol()));
+        when(assetPoolService.resolvePoolItemId("USER", 42L, 9001L, "BTCUSDT")).thenReturn(77L);
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(state(state, LocalDateTime.ofInstant(
+                        Instant.parse("2026-08-11T23:00:00Z"), ZoneOffset.UTC)));
+        when(rules.resolveActiveRuleVersion()).thenReturn("rules-v1");
+        when(assetStateService.claimScheduledScan(
+                any(), eq(77L), any(), eq(properties.getScheduler().intervalSeconds(state.name())),
+                anyString(), eq("rules-v1")))
+                .thenAnswer(invocation -> scheduledClaim(
+                        target, state, previousExtJson,
+                        invocation.getArgument(2), invocation.getArgument(4)));
+        when(assetStateService.completeScheduledScan(
+                any(), any(), anyString(), any(), any(), any(), any(), any(), anyBoolean(), anyBoolean()))
+                .thenReturn(true);
+
+        CoinGlassProperties coinGlass = new CoinGlassProperties();
+        if (coinGlassConfigured) {
+            coinGlass.setEnabled(true);
+            coinGlass.setExternalCallsEnabled(true);
+            coinGlass.setApiKey("configured-test-key");
+            coinGlass.setAdvertisedRpm(300);
+        }
+        AnalysisSchedulerService service = new AnalysisSchedulerService(
+                orchestrator, properties,
+                Clock.fixed(Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC),
+                assetPoolService, assetStateMapper);
+        service.setPersistedOhlcvQueryService(query);
+        service.setScheduledScanDependencies(
+                assetStateService, rules, coinGlass, FundamentalAiV41Properties.contractFixture());
+        service.setExecutionPlanMapper(executionPlanMapper);
+        return new SchedulerFixture(
+                service, orchestrator, assetStateService, query, executionPlanMapper);
+    }
+
+    private static AssetStateService.ScheduledScanClaim scheduledClaim(
+            AssetPoolScanTarget target,
+            AssetStateEnum state,
+            String previousExtJson,
+            LocalDateTime startedAt,
+            String traceId) {
+        OpportunityStateIdentity identity = new OpportunityStateIdentity(
+                target.ownerType(), target.ownerId(), target.assetId(), target.symbol(), "5m");
+        return new AssetStateService.ScheduledScanClaim(
+                identity, "opp-test", state, "analysis-before", "HIGH",
+                null, traceId, "rules-v1", startedAt, startedAt,
+                startedAt.plusMinutes(1), previousExtJson);
+    }
+
+    private static PersistedOhlcvReadinessResult freshReadiness(
+            String timeframe, String trend, long latestClose) {
+        PersistedOhlcvBarDO newest = bar(
+                timeframe, latestClose, "DOWN".equals(trend) ? "90" : "110");
+        PersistedOhlcvBarDO oldest = bar(
+                timeframe, latestClose - 1L, "UP".equals(trend) ? "100" : "110");
+        PersistedOhlcvReadinessResult result = new PersistedOhlcvReadinessResult();
+        result.setSymbol("BTCUSDT");
+        result.setTimeframe(timeframe);
+        result.setRequiredWindowSize(100);
+        result.setStatus(PersistedOhlcvReadinessStatus.FRESH);
+        result.setStaleReasonCode(PersistedOhlcvStaleReasonCode.NONE);
+        result.setBars(List.of(newest, oldest));
+        result.setLatestCloseTimeMs(latestClose);
+        return result;
+    }
+
+    private static PersistedOhlcvBarDO bar(String timeframe, long closeTime, String close) {
+        PersistedOhlcvBarDO row = new PersistedOhlcvBarDO();
+        row.setSymbol("BTCUSDT");
+        row.setTimeframe(timeframe);
+        row.setCloseTimeMs(closeTime);
+        row.setClosePrice(new BigDecimal(close));
+        return row;
+    }
+
+    private static String scanAudit(String signature, long latestFullClose) {
+        return scanAudit(signature, latestFullClose, "NOT_REQUIRED");
+    }
+
+    private static String scanAudit(String signature, long latestFullClose, String planStatus) {
+        return scanAudit(signature, latestFullClose, planStatus, null);
+    }
+
+    private static String scanAudit(String signature, long latestFullClose,
+                                    String planStatus, String latestFullHotResetAt) {
+        String fullSignature = signature + ";RISK=HIGH;PLAN=" + planStatus;
+        String hotReset = latestFullHotResetAt == null ? ""
+                : ",\"latestFullHotResetAt\":\"" + latestFullHotResetAt + "\"";
+        return "{\"schedulerScan\":{\"structureSignature\":\"" + fullSignature
+                + "\",\"latestFullStructureSignature\":\"" + fullSignature
+                + "\",\"latestFullAnalysisCloseTimeMs\":" + latestFullClose + hotReset + "}}";
+    }
+
+    private record SchedulerFixture(AnalysisSchedulerService service,
+                                    CapturingOrchestrator orchestrator,
+                                    AssetStateService assetStateService,
+                                    PersistedOhlcvQueryService query,
+                                    ExecutionPlanMapper executionPlanMapper) {
+        void stubFreshTrends(String fiveMinute, String fifteenMinute,
+                             String oneHour, String fourHour, long latestClose) {
+            when(query.evaluateReadinessForSource(
+                    anyString(), anyString(), eq(100), anyLong(),
+                    eq("BINANCE_PUBLIC"), eq("SPOT")))
+                    .thenAnswer(invocation -> {
+                        String timeframe = invocation.getArgument(1);
+                        String trend = switch (timeframe) {
+                            case "5m" -> fiveMinute;
+                            case "15m" -> fifteenMinute;
+                            case "1h" -> oneHour;
+                            case "4h" -> fourHour;
+                            default -> "FLAT";
+                        };
+                        return freshReadiness(timeframe, trend, latestClose);
+                    });
+        }
     }
 
     private static class CapturingOrchestrator implements AnalysisRunOrchestrator {

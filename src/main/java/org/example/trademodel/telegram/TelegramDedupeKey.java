@@ -24,6 +24,14 @@ public final class TelegramDedupeKey {
                 fingerprint(userId + "|" + safe(sourceType) + "|" + safeIdentity(sourceId)));
     }
 
+    /** Stable business-lifetime identity used only for one Final plan notification. */
+    public static String createPlanLifetime(String eventType, String state, int severity,
+                                            Long userId, String sourceType, String sourceId) {
+        return String.join("|", PREFIX, safe(eventType), safe(state), String.valueOf(Math.max(0, severity)),
+                "LIFETIME", safe(sourceType),
+                fingerprint(userId + "|" + safe(sourceType) + "|" + safeIdentity(sourceId)));
+    }
+
     public static boolean managed(String value) {
         return value != null && value.startsWith(PREFIX + "|");
     }

@@ -41,6 +41,9 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionMonitorService;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
+import org.example.trademodel.market.util.BinanceUsdtSymbol;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.telegram.HighValueAlertMessageService;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
@@ -69,6 +72,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class PositionMonitorServiceImpl implements PositionMonitorService {
@@ -87,6 +91,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private DerivativesSnapshotReadPort derivativesSnapshotReadPort;
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private HighValueAlertMessageService highValueAlertMessageService;
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private final Set<Long> activeSystemMonitorClaims = ConcurrentHashMap.newKeySet();
 
     public PositionMonitorServiceImpl(UserPositionMapper userPositionMapper,
                                       MarketPriceSnapshotService marketPriceSnapshotService,
@@ -155,6 +161,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         this.highValueAlertMessageService = value;
     }
 
+    @Autowired(required = false)
+    public void setPersistedOhlcvQueryService(PersistedOhlcvQueryService value) {
+        this.persistedOhlcvQueryService = value;
+    }
+
     @Override
     public PositionMonitorResultDTO monitorUserPositionForUser(Long positionId, Long userId) {
         if (positionId == null || positionId <= 0) {
@@ -178,6 +189,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         List<PositionMonitorBatchResultDTO.FailureItem> failures = new ArrayList<>();
         int blockedCount = 0;
         for (UserPositionDO position : positions) {
+            Long positionId = position == null ? null : position.getId();
+            if (positionId == null || !activeSystemMonitorClaims.add(positionId)) {
+                failures.add(new PositionMonitorBatchResultDTO.FailureItem(
+                        positionId, position == null ? null : position.getAssetSymbol(),
+                        "POSITION_MONITOR_ALREADY_RUNNING"));
+                continue;
+            }
             try {
                 PositionMonitorResultDTO result = monitorActivePosition(
                         position, position == null ? null : position.getUserId(), true);
@@ -191,6 +209,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                         position == null ? null : position.getId(),
                         position == null ? null : position.getAssetSymbol(),
                         ex.getMessage()));
+            } catch (RuntimeException ex) {
+                failures.add(new PositionMonitorBatchResultDTO.FailureItem(
+                        position == null ? null : position.getId(),
+                        position == null ? null : position.getAssetSymbol(),
+                        "POSITION_MONITOR_FAILED:" + ex.getClass().getSimpleName()));
+            } finally {
+                activeSystemMonitorClaims.remove(positionId);
             }
         }
         PositionMonitorBatchResultDTO batch = new PositionMonitorBatchResultDTO();
@@ -210,6 +235,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             throw new IllegalArgumentException("UserPosition side must be LONG or SHORT");
         }
         String assetSymbol = requireText(position.getAssetSymbol(), "asset_symbol");
+        if (systemScope) {
+            requireBinanceClosedWindows(assetSymbol);
+        }
         MarkPriceContext markPrice = readMarkPrice(assetSymbol);
         DerivativesBusinessAssessment derivativesAssessment = readDerivativesAssessment(
                 position, side, markPrice.price());
@@ -408,6 +436,33 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             highValueAlertMessageService.recordPosition(position, log, result);
         }
         return result;
+    }
+
+    private void requireBinanceClosedWindows(String symbol) {
+        if (persistedOhlcvQueryService == null) {
+            throw new PositionMonitorDataUnavailableException("PERSISTED_OHLCV_QUERY_UNAVAILABLE");
+        }
+        String marketSymbol = BinanceUsdtSymbol.toUsdtPair(symbol);
+        for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
+            PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadinessForSource(
+                    marketSymbol, timeframe, 100, maxReadLagMs(timeframe), "BINANCE_PUBLIC", "SPOT");
+            if (readiness == null || !readiness.isFresh()) {
+                String reason = readiness == null || readiness.getStaleReasonCode() == null
+                        ? "PERSISTED_OHLCV_NOT_READY" : readiness.getStaleReasonCode().name();
+                throw new PositionMonitorDataUnavailableException(
+                        "AUTHORITATIVE_OHLCV_UNAVAILABLE:" + timeframe + ":" + reason);
+            }
+        }
+    }
+
+    private static long maxReadLagMs(String timeframe) {
+        return switch (timeframe) {
+            case "5m" -> 11L * 60_000L;
+            case "15m" -> 31L * 60_000L;
+            case "1h" -> 121L * 60_000L;
+            case "4h" -> 481L * 60_000L;
+            default -> 0L;
+        };
     }
 
     private DerivativesBusinessAssessment readDerivativesAssessment(UserPositionDO position, String side,
