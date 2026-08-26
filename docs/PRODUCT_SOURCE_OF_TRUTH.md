@@ -61,6 +61,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION|docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md|5e254094531ea5dfcc33d8455ecb6f75551f5c22cf5e891b48787eca3b519323|V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION|docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md|baa4bbd0282e8660a46150b0e9cc0c48d437372f6904b455d4079eedb3a880db|V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION|docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md|c994167bb2824ecbc3b2778ecf977ba5ef9adbcdb71c4dfc9da5926987add64e|LOCAL_REAL_READINESS_AND_CURRENT_HOME_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-FRONTEND-INTERACTION-RUNTIME-CLOSURE-AUTHORIZATION|docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md|116a559ab8ee5a60d4233237a26bc88203b52380ad67a78d4019c025ebd54ea5|DESKTOP_RUNTIME_INTERACTION_CLOSURE_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION|docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md|417a93357663953de338fdb64ec9961c85589589c4feb4c0d0328dcaa198a7d7|PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_AUTHORIZATION -->
@@ -267,6 +268,23 @@ clean, synchronized merged main.
 This subordinate record narrows only the Owner's first-release Telegram
 delivery surface. It neither reduces the frozen in-application Message contract
 nor reopens the historical Telegram implementation completion claim.
+
+### PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC Core Production Loop Automation Authorization |
+| Repository path | `docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md` |
+| Repository SHA-256 | `baa4bbd0282e8660a46150b0e9cc0c48d437372f6904b455d4079eedb3a880db` |
+| Version/date | Owner authorization candidate `2026-08-27`; effective only after merged-main validation |
+| Authority | Runtime-loop authorization subordinate to the sole canonical v4.1 Product Source |
+| Applicable modules | Exact `FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION` package only |
+| Required concepts | Asset Pool sole source; state-sensitive 15m/5m/2m/lightweight-1m opportunity loop; promotion-gated full analysis; Binance public SPOT closed 5m/15m/1h/4h OHLCV; active-position 30s monitoring; existing-owner reuse; production opt-in defaults off; preserved Message/Telegram narrowing and lifetime confirmation idempotency |
+| Forbidden reinterpretations | no second scheduler/business/Telegram owner, cadence-only Schema field, cross-provider fallback, open/fixture candle as real, unconditional high-cost AI loop, automatic position mutation/trading, switch activation, secret access, Figma/Mobile, Staging or Production deployment in this authorization package |
+
+Closed PR #1201 and its preserved Head are non-effective audit/recovery
+evidence for the successor. This authorization does not make that branch
+current, copy its rules, or create a parallel Telegram implementation.
 
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 

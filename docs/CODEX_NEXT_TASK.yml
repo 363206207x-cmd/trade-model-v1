@@ -1,63 +1,65 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "TRINE LOGIC Telegram two-category remediation authorization"
+active_block: "TRINE LOGIC core production-loop automation authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "TRINE LOGIC Telegram Remediation Authorization Bootstrap"
-branch: "codex/telegram-two-category-remediation-authorization"
+module: "TRINE LOGIC Core Production Loop Automation Authorization Bootstrap"
+branch: "codex/core-production-loop-automation-authorization"
 task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_task_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+authorized_next_product_phase: "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
 
-current_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION"
-current_package_name: "TRINE LOGIC Telegram Two-Category Remediation Authorization"
-current_package_active_block: "Owner first-release Telegram Delivery narrowing and exact-package permission gate"
+current_package_phase: "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION"
+current_package_name: "TRINE LOGIC Core Production Loop Automation Authorization"
+current_package_active_block: "State-sensitive opportunity and active-position runtime loop permission gate"
 current_package_mode: "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/telegram-two-category-remediation-authorization"
+current_package_branch: "codex/core-production-loop-automation-authorization"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
 current_package_implementation_pr_allowed: true
-current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement Telegram remediation on this branch"
+current_package_next_action: "Review and merge only this docs/gate authorization package; do not implement or deploy the core loop on this branch"
 current_package_allowed_scope:
-  - "Register the exact Telegram remediation implementation package"
-  - "Record that all three in-app Message categories remain while first-release Telegram Delivery is narrowed to two categories"
-  - "Map the existing Message, ChannelDelivery, Final, UserPosition and trusted PositionMonitor owners"
+  - "Register the exact core production-loop automation implementation package"
+  - "Freeze state-sensitive cadence, promotion gate, source-owned OHLCV and active-position monitor boundaries"
+  - "Map existing Asset Pool, Opportunity, Analysis, Final, Position, Monitor, Review, Message and ChannelDelivery owners"
   - "Update delivery state, exact-package machine permissions and authorization validation"
 current_package_blocked_scope:
   - "Java, runtime configuration, API, Schema, template, CSS, JavaScript, Figma or Mobile changes"
-  - "Telegram policy, template, allowlist, cooldown, dedupe, switch activation, real send or deployment"
-  - "Secrets, fake data, automatic position scheduling, automatic trading or automatic position mutation"
+  - "Scheduler implementation, switch activation, Telegram send, provider call, secret access or deployment"
+  - "Fake data, duplicate owner, automatic position mutation, order execution or automatic trading"
 
-authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
-authorized_next_package_name: "TRINE LOGIC Telegram Two-Category Short-Alert Remediation"
-authorized_next_package_active_block: "Existing Message-to-ChannelDelivery Telegram policy remediation only"
+authorized_next_package_phase: "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
+authorized_next_package_name: "TRINE LOGIC Core Production Loop Automation"
+authorized_next_package_active_block: "Existing-owner runtime scheduling, promotion, provider-truth, monitoring and bounded Telegram integration"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/frontend-interaction-runtime-closure"
-authorized_next_package_risk: "C_RISK_EXTERNAL_NOTIFICATION_CHANNEL"
+authorized_next_package_branch: "codex/core-production-loop-automation"
+authorized_next_package_risk: "C_RISK_RUNTIME_AUTOMATION_PROVIDER_AND_EXTERNAL_NOTIFICATION"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
 authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
-authorized_next_package_next_action: "From authorization-effective merged main, remediate only the Owner-approved two-category Telegram Delivery policy on the existing pipeline"
+authorized_next_package_next_action: "From authorization-effective merged main, implement and independently audit only the frozen core production loop"
 
-blocked_package_phase: "UNSCOPED_TELEGRAM_PRODUCTION_FIGMA_MOBILE_PROVIDER_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "UNSCOPED_PRODUCTION_DEPLOYMENT_FIGMA_MOBILE_PRIVATE_EXCHANGE_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE"
-  - "V4_1_TELEGRAM_HISTORICAL_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
-  - "V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_COMPLETE"
-  - "THREE_IN_APP_MESSAGE_CATEGORIES_RETAINED"
-  - "OWNER_FIRST_RELEASE_TWO_CATEGORY_NARROWING_REGISTERED"
-  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERS_REUSED"
-  - "V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
+  - "ASSET_POOL_SOLE_CONTINUOUS_OPPORTUNITY_SOURCE"
+  - "STATE_SENSITIVE_CADENCES_REGISTERED"
+  - "PROMOTION_GATED_FULL_ANALYSIS"
+  - "BINANCE_PUBLIC_SPOT_CLOSED_OHLCV_5M_15M_1H_4H"
+  - "ACTIVE_POSITION_MONITOR_30S_WITHOUT_MUTATION"
+  - "EXISTING_BUSINESS_OWNERS_REUSED"
+  - "THREE_IN_APP_AND_TWO_TELEGRAM_CATEGORIES_RETAINED"
+  - "V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "LOCAL_ORIGIN_MAIN_MATCH"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -89,60 +91,65 @@ v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
 v4_1_telegram_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_telegram_implementation_status: "COMPLETE"
 v4_1_telegram_live_acceptance_status: "PENDING_PRIVATE_RUNTIME_ACCEPTANCE"
-v4_1_telegram_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_telegram_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_telegram_remediation_implementation_status: "NOT_STARTED"
+v4_1_core_production_loop_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_core_production_loop_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 frontend_interaction_implementation_status: "COMPLETE"
 multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"
 multi_user_implementation_status: "NOT_STARTED"
-authorized_next_package: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
-scope: "V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_ONLY"
+authorized_next_package: "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
+scope: "V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk docs/gate authorization; successor remains C-risk external-notification remediation"
+risk: "A-risk docs/gate authorization; successor is bounded C-risk runtime automation without trading"
 
-current_pr: "TRINE LOGIC Telegram Two-Category Remediation Authorization / PENDING_REVIEW"
-current_package_pr: "TRINE LOGIC Telegram Two-Category Remediation Authorization Package"
+current_pr: "TRINE LOGIC Core Production Loop Automation Authorization / PENDING_REVIEW"
+current_package_pr: "TRINE LOGIC Core Production Loop Automation Authorization Package"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
-closed_technical_debt_prs: "#1156 CLOSED / UNMERGED / CLOSED_PAUSED_TECHNICAL_DEBT / NOT_EFFECTIVE"
+closed_technical_debt_prs: "#1156 CLOSED_PAUSED_TECHNICAL_DEBT; #1201 CLOSED_UNMERGED_PRESERVED_AUDIT_EVIDENCE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "disabled for this task by explicit Owner merge-approval requirement"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+next_business_phase: "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Owner review and merge of this authorization PR; only then request the exact Telegram remediation package"
+next_allowed_action: "Owner review and merge of this authorization PR; only then request the exact core production-loop package"
 
-product_phase: "TRINE LOGIC Telegram Two-Category Remediation Authorization"
+product_phase: "TRINE LOGIC Core Production Loop Automation Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Telegram first-release Delivery narrowing authorization"
+product_module: "Core production-loop automation authorization"
 
 audit_scope_modules:
   - "PRODUCT_SOURCE"
-  - "MESSAGE_CATEGORY_PRESERVATION"
-  - "TELEGRAM_FIRST_RELEASE_NARROWING"
-  - "MESSAGE_AND_CHANNEL_DELIVERY_OWNERSHIP"
-  - "FINAL_AND_POSITION_TRUST_GATES"
+  - "ASSET_POOL_AND_OPPORTUNITY_SCHEDULING"
+  - "PROMOTION_AND_ANALYSIS_GATE"
+  - "SOURCE_OWNED_OHLCV"
+  - "POSITION_MONITORING_CADENCE"
+  - "TELEGRAM_SUCCESSOR_INTEGRATION_BOUNDARY"
+  - "OBJECT_OWNERSHIP"
   - "EXACT_PACKAGE_AUTHORIZATION"
   - "PRODUCT_WORKFLOW"
 
 audit_scope_paths:
   - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
-  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_SOURCE_MAPPING.md"
-  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_OWNERSHIP_MAP.md"
-  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md"
-  - "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION_VALIDATION.md"
+  - "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md"
+  - "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md"
+  - "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md"
+  - "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md"
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "THREE_IN_APP_MESSAGE_CATEGORIES"
-  - "TWO_TELEGRAM_DELIVERY_CATEGORIES"
-  - "EXISTING_MESSAGE_CHANNEL_DELIVERY_OWNER"
-  - "EXISTING_FINAL_AND_POSITION_TRUST_OWNER"
-  - "FAIL_CLOSED_MISSING_DATA"
+  - "ASSET_POOL_SOLE_SOURCE"
+  - "OPPORTUNITY_STATE_AND_PLAN_MODE_SEPARATION"
+  - "PROMOTION_GATED_ANALYSIS"
+  - "BINANCE_SOURCE_OWNED_CLOSED_OHLCV"
+  - "MANUAL_USER_POSITION_AND_TRUSTED_MONITOR"
+  - "MESSAGE_CHANNEL_DELIVERY_PRESERVATION"
   - "DUPLICATE_SKELETON_PREVENTION"
   - "EXACT_PACKAGE_AUTHORIZATION"
 
@@ -152,48 +159,51 @@ product_source_gate:
 
 required_product_sources:
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
+  - PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION
   - PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION
   - PS-POSITION-MONITORING
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  Frozen Section 15.2 retains all three in-app Message categories. The Owner first release narrows Telegram Delivery to CONFIRMATION Final alerts and trusted material active-position alerts only; safety-change Messages remain in-app and the frozen capability ceiling is unchanged.
+  Reuse the frozen Asset Pool-to-Review chain. State-sensitive opportunity scans are observing 15m, candidate 5m, waiting_trigger 2m and triggered lightweight 1m; active real positions are monitored every 30s. Full Analysis and Three AI remain promotion/checkpoint-gated. Opportunity state, Plan Mode, Final and UserPosition remain separate.
 
 design_interaction_mapping: |
-  No page, component, route, overlay, Figma or Mobile interaction changes are included. The successor may only alter existing Telegram short-alert content and delivery qualification; current application navigation remains unchanged.
+  No page, component, route, overlay, Figma, Desktop or Mobile interaction changes are included. Existing truthful fail-closed states remain the only user-visible projection.
 
 data_source_mapping: |
-  Reuse persisted Message and ChannelDelivery facts. Opportunity alerts read a validated CONFIRMATION FinalExecutionPlan and real required plan fields, with PushSnapshot optional. Position alerts read OPEN/PARTIALLY_CLOSED UserPosition plus VERIFIED/FRESH PositionMonitor facts. Missing or untrusted facts fail closed.
+  Reuse AssetPool/PoolItem, Opportunity/StateLog, AnalysisRun, Evidence/Score/Decision, Candidate/Resolver/Validation/Final, UserPosition, PositionMonitorLog, Review, Message and ChannelDelivery. Binance public SPOT closed 5m/15m/1h/4h OHLCV is source-owned and never mixed or silently replaced. Missing facts fail closed.
 
 current_implementation_gap: |
-  Merged main recognizes the historical Telegram implementation as COMPLETE but machine state does not recognize a new Owner-narrowed remediation authorization. Current delivery policy can still include the frozen third Telegram category or broader opportunity eligibility and therefore needs a separately authorized bounded remediation.
+  Merged main does not recognize the exact core production-loop package or freeze its production cadences and integration boundaries. PR #1201 is closed/unmerged and remains audit evidence only. A bounded successor must integrate compatible behavior through existing owners without copying old rules or creating a second stack.
 
 allowed_scope:
-  - "Telegram remediation source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
+  - "Core-loop source mapping, ownership, authorization, delivery state, machine gate, gate tests and validation documentation only"
 
 authorized_next_allowed_scope:
-  - "Keep three in-app Message categories but allow only two first-release Telegram Delivery categories"
-  - "CONFIRMATION Final only; REDUCED suppressed; optional existing PushSnapshot; required Final fields fail closed"
-  - "Active trusted position material-change alerts using existing risk/trend/stop/target/STRONG_REVERSAL facts"
-  - "Existing-switch defaults off, stable cooldown identity and visible fixed-disclaimer removal with internal safety retained"
-  - "Focused tests and audit evidence on the existing Message-to-ChannelDelivery pipeline"
+  - "Asset Pool-wide lightweight scans with observing 15m, candidate 5m, waiting_trigger 2m and triggered lightweight 1m cadences"
+  - "Promotion/material-change-gated full Analysis and checkpoint-gated Three AI through existing owners"
+  - "Binance public SPOT source-owned closed 5m/15m/1h/4h OHLCV with no provider mixing or fallback"
+  - "OPEN/PARTIALLY_CLOSED UserPosition monitoring every 30s without automatic mutation"
+  - "Explicit production opt-in with repository scheduler and Telegram defaults remaining off"
+  - "Audit compatible PR #1201 evidence into the existing Message/ChannelDelivery path; preserve three in-app and two Telegram categories"
+  - "Same user + planId + CONFIRMATION lifetime delivery idempotency"
 
 authorized_next_blocked_scope:
-  - "Safety-change Telegram Delivery, untrusted position Delivery, REDUCED Delivery or invented source facts"
-  - "Automatic position scheduling, Home/login/market/OHLCV/CoinGlass/API/Schema/provider changes"
-  - "Real Telegram send, switch activation, secret access, Figma, Mobile, Staging, Production or automatic trading"
+  - "A cadence-only nextScanAt Schema field, second scheduler/business owner or parallel Telegram stack"
+  - "Cross-provider candle mixing, open/fixture candle as real, quality-threshold reduction or unconditional high-cost AI execution"
+  - "Automatic open/close/add/reduce/reverse/order, Push Recheck trading authorization or plan-as-position"
+  - "Figma, Mobile, Production deployment or private exchange API"
 
 blocked_scope:
-  - "Any Telegram implementation inside this authorization package"
-  - "Any package except FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
+  - "Any runtime implementation inside this authorization package"
+  - "Any package except FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
 
 forbidden_scope:
   - "Application code, runtime configuration, Java, API, Schema, template, CSS, JavaScript, Figma or Mobile changes in the authorization diff"
-  - "Reading, printing or committing secrets; sending Telegram; deploying; fabricating Final, position or monitor facts; automatic trading"
+  - "Enabling schedulers/Telegram, provider calls, secret access, real send, Staging/Production deployment, fake data or automatic trading"
 
 real_scenario_requirement: |
-  This authorization performs no runtime scenario and sends no Telegram message. The successor must validate its bounded policy with focused tests first; real sending and deployment remain separately blocked.
+  This authorization performs no runtime scenario, provider call, scheduler execution or Telegram send. The successor must prove source-owned closed data, state cadence, idempotency, position safety and no-trading behavior before any separately authorized deployment.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -209,9 +219,9 @@ hard_boundaries:
   mobile_implementation: "BLOCKED"
 
 checks:
-  - "Unique active v4.1 Product Source and registered Telegram remediation authorization hash pass"
-  - "Exact remediation implementation remains blocked before merge and is uniquely allowed after clean/synced merged main"
-  - "Typo, expanded, production, auto-trading, Mobile and Figma packages fail closed"
+  - "Unique active v4.1 Product Source and registered core-loop authorization hash pass"
+  - "Exact core-loop implementation remains blocked before merge and is uniquely allowed after clean/synced merged main"
+  - "Typo, expanded, Production, auto-trading, Mobile and Figma packages fail closed"
   - "Application/API/Schema/config/Figma/Mobile changed-file count is zero"
   - "Workflow, authorization, ownership, duplicate-skeleton, secret and diff checks pass"
 
@@ -219,7 +229,7 @@ stop_conditions:
   - "A Product Source conflict, secret exposure or duplicate owner is found"
   - "The authorization diff includes application, API, Schema, business-test, template, CSS, JavaScript, Figma or Mobile changes"
   - "Product Source Gate, Workflow Contract or authorization validation fails"
-  - "The exact Telegram successor is not the only package permitted after merged-main effectivity"
+  - "The exact core-loop successor is not the only package permitted after merged-main effectivity"
   - "Authorization would require implementation or merge in this task"
 
 paused_governance_pr: "#1156"
