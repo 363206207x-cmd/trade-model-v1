@@ -598,3 +598,31 @@ validation remain required before implementation permission becomes effective.
   runtime, Staging or Production change is included.
 - Safety: no public exposure, fake data, automatic trading, position mutation,
   CoinGlass work, Telegram rule change or duplicate business owner.
+
+---
+
+## telegram-two-category-remediation-authorization
+
+- Date: `2026-08-26`
+- Change type: docs/gate-only exact-package remediation authorization; no
+  Telegram implementation.
+- Historical state: the original Telegram authorization remains effective and
+  its implementation remains recorded as complete; this amendment does not
+  rewrite that history.
+- Exact authorized successor:
+  `FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION`.
+- Product contract: frozen Section 15.2 continues to retain all three in-app
+  Message categories.
+- Owner first-release narrowing: Telegram Delivery is limited to validated
+  `CONFIRMATION` Final short alerts and trusted material active-position
+  change short alerts. Opportunity/plan safety changes remain in-app only;
+  `REDUCED`, missing Final fields and untrusted position data fail closed.
+- Ownership: reuse the existing Message, ChannelDelivery, FinalExecutionPlan,
+  UserPosition and PositionMonitor owners; no duplicate business skeleton.
+- Effectivity: implementation and successor PR creation remain blocked until
+  this authorization is Owner-approved, merged and validated on clean/synced
+  main.
+- Capability movement: none. No Java, API, Schema, runtime config, Figma,
+  Mobile, secret access, real send, Staging or Production deployment.
+- Safety: no automatic position scheduler, open, close, add, reduce, reverse,
+  order or trade.
