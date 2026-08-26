@@ -626,3 +626,35 @@ validation remain required before implementation permission becomes effective.
   Mobile, secret access, real send, Staging or Production deployment.
 - Safety: no automatic position scheduler, open, close, add, reduce, reverse,
   order or trade.
+
+---
+
+## core-production-loop-automation-authorization
+
+- Date: `2026-08-27`
+- Change type: docs/gate-only exact-package runtime-loop authorization; no
+  implementation or deployment.
+- Exact authorized successor:
+  `FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION`.
+- Opportunity cadence: observing 15m, candidate 5m, waiting_trigger 2m and
+  triggered lightweight 1m, with full Analysis/Three-AI work remaining
+  promotion/checkpoint-gated.
+- Position cadence: real OPEN/PARTIALLY_CLOSED UserPosition monitoring every
+  30 seconds through existing owners, with no automatic position mutation.
+- Provider contract: Binance public SPOT, source-owned closed 5m/15m/1h/4h
+  OHLCV; no provider mixing, open/fixture candle as real or silent fallback.
+- Ownership: reuse Asset Pool, Opportunity, Analysis, Final, UserPosition,
+  PositionMonitor, Review, Message and ChannelDelivery; no `nextScanAt`
+  schema field or parallel scheduler/Telegram stack.
+- PR #1201: closed/unmerged Head
+  `b158b7a89a4fdb9bd2254a210ecd258e26032161` remains successor audit evidence
+  only and is not effective current code.
+- Telegram: preserve three in-app and two Owner-first-release Telegram
+  categories; one user + planId + CONFIRMATION has at most one lifetime
+  delivery.
+- Effectivity: implementation and successor PR creation remain blocked until
+  Owner review, merge and clean/synced-main validation.
+- Capability movement: none. No Java, API, Schema, runtime config, provider
+  call, switch activation, secret access, Figma, Mobile, Staging or Production
+  deployment.
+- Safety: automatic trading capability remains zero.

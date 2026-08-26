@@ -321,6 +321,10 @@ require_file "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_SOURCE_MAPPING.
 require_file "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_OWNERSHIP_MAP.md"
 require_file "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md"
 require_file "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION_VALIDATION.md"
+require_file "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md"
+require_file "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md"
+require_file "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md"
+require_file "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md"
 require_file "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 require_contains "docs/P1A_HOME_ALIGNMENT_AUDIT.md" "P1A_COMPLETION_STATUS: COMPLETED"
 require_contains "docs/P1B_AUTHORIZATION_SCOPE.md" "HOME_READ_PROJECTION_ONLY"
@@ -362,6 +366,12 @@ require_contains "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATI
 require_contains "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md" "three in-application Message categories remain available"
 require_contains "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md" "Only these two categories may be connected"
 require_contains "docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
+require_contains "scripts/v1-state.sh" "V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS"
+require_contains "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md" "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
+require_contains "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md" "observing"
+require_contains "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md" "OPEN"
+require_contains "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md" 'Automatic trading capability count remains `0`'
+require_contains "docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md" "Duplicate Skeleton Gate"
 require_contains "scripts/v1-auto.sh" "complete-pr"
 require_contains "scripts/v1-pr-complete.sh" "GH_NOT_AVAILABLE_FOR_PR_MERGE"
 require_contains "scripts/v1-pr-complete.sh" "A_RISK_SCOPE_OK"
@@ -429,6 +439,8 @@ v4_1_telegram_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_
 v4_1_telegram_live_acceptance_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_telegram_live_acceptance_status)"
 v4_1_telegram_remediation_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_telegram_remediation_authorization_status)"
 v4_1_telegram_remediation_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_telegram_remediation_implementation_status)"
+v4_1_core_production_loop_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_core_production_loop_authorization_status)"
+v4_1_core_production_loop_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_core_production_loop_implementation_status)"
 local_real_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_implementation_status)"
 frontend_interaction_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml frontend_interaction_authorization_status)"
@@ -483,8 +495,10 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || fail "v4.1 target runtime status mismatch"
 [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "v4.1 Telegram authorization must remain effective"
 [[ "$v4_1_telegram_implementation_status" == "COMPLETE" ]] || fail "v4.1 Telegram integration must remain complete"
-[[ "$v4_1_telegram_remediation_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "v4.1 Telegram remediation authorization must remain pending merged-main effectivity"
+[[ "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "v4.1 Telegram remediation authorization must remain effective on merged main"
 [[ "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 Telegram remediation implementation must remain not started"
+[[ "$v4_1_core_production_loop_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "v4.1 core production-loop authorization must remain pending merged-main effectivity"
+[[ "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 core production-loop implementation must remain not started"
 [[ "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "local-real authorization must remain effective on merged main"
 [[ "$local_real_implementation_status" == "COMPLETE" ]] || fail "local-real implementation must remain complete"
 [[ "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "frontend interaction authorization must be effective on merged main"
@@ -492,9 +506,9 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Telegram remediation authorization declaration mismatch"
+[[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "core production-loop authorization declaration mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION" ]] || fail "authorized next package phase mismatch"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
@@ -504,18 +518,20 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
 [[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_ONLY" ]] || fail "scope must remain V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_ONLY"
+[[ "$p1b_scope" == "V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_ONLY" ]] || fail "scope must remain V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_blocked_scope" ]] || fail "current package runtime scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
   UNIQUE_V4_1_PRODUCT_SOURCE_ACTIVE \
-  V4_1_TELEGRAM_HISTORICAL_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
-  V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_COMPLETE \
-  THREE_IN_APP_MESSAGE_CATEGORIES_RETAINED \
-  OWNER_FIRST_RELEASE_TWO_CATEGORY_NARROWING_REGISTERED \
-  MESSAGE_AND_CHANNEL_DELIVERY_OWNERS_REUSED \
-  V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
+  ASSET_POOL_SOLE_CONTINUOUS_OPPORTUNITY_SOURCE \
+  STATE_SENSITIVE_CADENCES_REGISTERED \
+  PROMOTION_GATED_FULL_ANALYSIS \
+  BINANCE_PUBLIC_SPOT_CLOSED_OHLCV_5M_15M_1H_4H \
+  ACTIVE_POSITION_MONITOR_30S_WITHOUT_MUTATION \
+  EXISTING_BUSINESS_OWNERS_REUSED \
+  THREE_IN_APP_AND_TWO_TELEGRAM_CATEGORIES_RETAINED \
+  V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   LOCAL_ORIGIN_MAIN_MATCH \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
@@ -564,17 +580,17 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_REVIEW" \
-  || fail "Telegram remediation authorization review stage mismatch"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_REVIEW" \
+  || fail "core production-loop authorization review stage mismatch"
 printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_FINAL_MERGE_PATH" \
   || fail "ready authorization did not resolve final merge path"
 
-assert_handoff_blocked predecessor_incomplete BLOCKED_V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_NOT_COMPLETE
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked predecessor_incomplete BLOCKED_V4_1_DECISION_CHAIN_IMPLEMENTATION_NOT_COMPLETE
+assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_MERGED_MAIN
 assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_LOCAL_ORIGIN_MAIN_MATCH
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
@@ -592,6 +608,8 @@ for v4_1_expected in \
   "V4_1_TELEGRAM_IMPLEMENTATION_STATUS: COMPLETE" \
   "V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "V4_1_TELEGRAM_REMEDIATION_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_CORE_PRODUCTION_LOOP_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "LOCAL_REAL_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "LOCAL_REAL_IMPLEMENTATION_STATUS: COMPLETE" \
   "FRONTEND_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -610,10 +628,10 @@ for v4_1_expected in \
     || fail "v4.1 handoff omitted: $v4_1_expected"
 done
 
-assert_handoff_blocked v4_1_unauthorized BLOCKED_V4_1_TELEGRAM_REMEDIATION_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked v4_1_permission_missing BLOCKED_V4_1_TELEGRAM_REMEDIATION_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked v4_1_unauthorized BLOCKED_V4_1_CORE_PRODUCTION_LOOP_SCOPE_NOT_AUTHORIZED
+assert_handoff_blocked v4_1_permission_missing BLOCKED_V4_1_CORE_PRODUCTION_LOOP_PERMISSIONS_INCOMPLETE
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
-  --request-package FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATON
+  --request-package FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATON
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package FUNDAMENTAL_AI_V4_1_AUTO_TRADING
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -695,9 +713,9 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "Telegram remediation authorization final gate stage mismatch"
-assert_chain_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_NOT_COMPLETE \
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_FINAL_MERGE_PATH" \
+  || fail "core production-loop authorization final gate stage mismatch"
+assert_chain_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_DECISION_CHAIN_IMPLEMENTATION_NOT_COMPLETE \
   --request-package "$authorized_next_package_phase"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
   AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION GH_QUERY --request-package "$authorized_next_package_phase"
@@ -714,11 +732,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_TELEGRAM_REMEDIATION_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_CORE_PRODUCTION_LOOP_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_TELEGRAM_REMEDIATION_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_CORE_PRODUCTION_LOOP_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -756,15 +774,15 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_TELEGRAM_HISTORICAL_IMPLEMENTATION_NOT_COMPLETE \
+assert_outer_blocked V4_1_PREDECESSOR_NOT_COMPLETE predecessor_incomplete BLOCKED_V4_1_DECISION_CHAIN_IMPLEMENTATION_NOT_COMPLETE \
   --request-package "$authorized_next_package_phase"
 assert_outer_allowed V4_1_AUTHORIZATION_EFFECTIVE authorization_merged_validated IMPLEMENTATION \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_TELEGRAM_REMEDIATION_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_V4_1_CORE_PRODUCTION_LOOP_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_TELEGRAM_REMEDIATION_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_V4_1_CORE_PRODUCTION_LOOP_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \
@@ -850,8 +868,8 @@ bash scripts/validate-frontend-interaction-runtime-closure-authorization.sh >/de
 bash scripts/validate-multi-user-account-registration-authorization.sh >/dev/null \
   || fail "multi-user authorization validation failed"
 
-bash scripts/validate-v4-1-telegram-remediation-authorization.sh >/dev/null \
-  || fail "Telegram remediation authorization validation failed"
+bash scripts/validate-v4-1-core-production-loop-authorization.sh >/dev/null \
+  || fail "core production-loop authorization validation failed"
 
 changed_files="$({ git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git diff --name-only origin/main...HEAD 2>/dev/null || true; git diff --name-only HEAD~1..HEAD 2>/dev/null || true; } | sort -u)"
 if echo "$changed_files" | grep -Eq 'src/main/java|src/test/java'; then

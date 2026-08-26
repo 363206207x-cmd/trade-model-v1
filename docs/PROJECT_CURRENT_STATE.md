@@ -8,13 +8,43 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC Telegram Two-Category Remediation Authorization
-Product Phase Status: V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact Owner-narrowed Telegram remediation permission; no application implementation is included here
-Next Business Phase: FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION
+Product Phase: TRINE LOGIC Core Production Loop Automation Authorization
+Product Phase Status: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact core production-loop automation permission; no application implementation is included here
+Next Business Phase: FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION
 Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after Owner-approved merge and clean/synced-main validation
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC Core Production Loop Automation Authorization
+
+PR #1201 is closed without merge and its remote branch/commits remain
+preserved at Head `b158b7a89a4fdb9bd2254a210ecd258e26032161` for successor audit evidence.
+It is not effective merged code and is not copied into this authorization.
+
+This docs/gate-only package registers exactly
+`FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION`. It freezes the bounded
+runtime contract: Asset Pool is the sole continuous opportunity source;
+observing/candidate/waiting-triggered/triggered use 15m/5m/2m/lightweight-1m
+cadences; full Analysis and Three AI remain promotion/checkpoint-gated;
+Binance public SPOT closed 5m/15m/1h/4h OHLCV remains source-owned; and real
+OPEN/PARTIALLY_CLOSED positions are monitored every 30 seconds without
+automatic mutation.
+
+The successor must reuse existing Analysis, Opportunity, Final, UserPosition,
+PositionMonitor, Review, Message and ChannelDelivery owners. It may audit and
+integrate compatible #1201 behavior into the existing Telegram pipeline, but
+may not create a parallel stack. Three in-app Message categories and the two
+Owner-first-release Telegram categories remain unchanged; one user + planId +
+CONFIRMATION has at most one lifetime Telegram Delivery.
+
+Repository scheduler and Telegram defaults stay off. This package makes no
+Java, API, Schema, runtime-config, Figma or Mobile change; accesses no secret;
+runs no provider or scheduler; sends no message; performs no deployment; and
+adds no trading capability. Capability movement is `NONE` until the separate
+implementation is reviewed, merged and accepted.
 
 ---
 
