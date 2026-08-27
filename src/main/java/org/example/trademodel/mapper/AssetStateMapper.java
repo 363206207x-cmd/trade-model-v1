@@ -80,8 +80,7 @@ public interface AssetStateMapper {
     @Update("UPDATE tm_asset_state SET ext_json = #{row.extJson}, updated_at = #{row.updatedAt} "
             + "WHERE owner_type = #{row.ownerType} AND owner_id = #{row.ownerId} "
             + "AND symbol = #{row.symbol} AND timeframe = #{row.timeframe} "
-            + "AND (trace_id = #{claimTraceId} OR (#{analysisTraceId} IS NOT NULL "
-            + "AND trace_id = #{analysisTraceId}))")
+            + "AND (trace_id = #{claimTraceId} OR trace_id = #{analysisTraceId})")
     int completeScheduledScanAudit(@Param("row") AssetStateDO row,
                                    @Param("claimTraceId") String claimTraceId,
                                    @Param("analysisTraceId") String analysisTraceId);

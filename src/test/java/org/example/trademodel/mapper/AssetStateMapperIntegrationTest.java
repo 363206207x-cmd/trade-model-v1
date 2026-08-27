@@ -141,6 +141,34 @@ class AssetStateMapperIntegrationTest {
         assertThat(persisted.getState()).isEqualTo(AssetStateEnum.TRIGGERED);
     }
 
+    @Test
+    void scanAuditCanCompleteAgainstClaimWhenAnalysisTraceIsNull() {
+        LocalDateTime started = LocalDateTime.of(2026, 8, 12, 10, 30);
+        AssetStateDO initial = row(
+                "CLAIMAUDITUSDT", AssetStateEnum.OBSERVING, 0, 0, started, "claim-trace");
+        initial.setOwnerType("SYSTEM");
+        initial.setOwnerId(0L);
+        initial.setTimeframe("5m");
+        assetStateMapper.mergeUpsertCore(initial);
+
+        AssetStateDO audit = new AssetStateDO();
+        audit.setOwnerType("SYSTEM");
+        audit.setOwnerId(0L);
+        audit.setSymbol("CLAIMAUDITUSDT");
+        audit.setTimeframe("5m");
+        audit.setExtJson("{\"schedulerScan\":{\"result\":\"NO_MATERIAL_CHANGE\"}}");
+        audit.setUpdatedAt(started.plusSeconds(1));
+
+        int updated = assetStateMapper.completeScheduledScanAudit(
+                audit, "claim-trace", null);
+
+        assertThat(updated).isEqualTo(1);
+        AssetStateDO persisted = assetStateMapper.selectByIdentity(
+                "SYSTEM", 0L, "CLAIMAUDITUSDT", "5m");
+        assertThat(persisted.getExtJson()).contains("\"result\":\"NO_MATERIAL_CHANGE\"");
+        assertThat(persisted.getTraceId()).isEqualTo("claim-trace");
+    }
+
     private static AssetStateDO row(String symbol, AssetStateEnum state, Integer confusedScore,
                                     Integer confusedLowStreak, LocalDateTime updateTime, String traceId) {
         AssetStateDO row = new AssetStateDO();

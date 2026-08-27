@@ -119,6 +119,22 @@ and timeframe with bounded retry backoff.
 - Scan claims and lifetime delivery lookups are persisted, so restart does not
   erase idempotency.
 
+## PostgreSQL Runtime Remediation
+
+The first private Staging natural-run attempt exposed one PostgreSQL-only SQL
+parameter inference defect after a lightweight scan was successfully claimed.
+`completeScheduledScanAudit` expressed the optional analysis trace as a standalone
+`? IS NOT NULL` parameter before comparing a second placeholder with `trace_id`.
+PostgreSQL could not infer the standalone null parameter type, so completion audit
+writes failed closed with `BadSqlGrammarException`.
+
+The mapper now compares both optional identities directly with the typed
+`trace_id` column. A null analysis trace remains false under SQL null semantics,
+while the claim trace remains the primary completion owner. No schema, state,
+cadence, source, or business rule changed. Focused mapper integration coverage now
+proves completion against the claim trace when the analysis trace is null, and the
+existing resulting-analysis-trace path remains covered.
+
 ## Automated Validation
 
 Focused coverage includes full-pool and non-Top-6 scanning, state cadences,
@@ -131,8 +147,8 @@ opt-in safety.
 
 Java 17 full Maven local run:
 
-- tests: 4857
-- passed: 4843
+- tests: 4858
+- passed: 4844
 - failures: 0
 - errors: 0
 - skipped: 14 (Docker/Testcontainers unavailable on the local runner)
