@@ -139,6 +139,7 @@ implementation_allowed_files=(
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunCommand.java
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunProperties.java
   src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java
+  src/main/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProvider.java
   src/main/java/org/example/trademodel/mapper/AssetStateMapper.java
   src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java
   src/main/java/org/example/trademodel/mapper/ExecutionPlanMapper.java
@@ -159,13 +160,17 @@ implementation_allowed_files=(
   src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java
   src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java
   src/main/resources/application-prod.yml
+  src/main/resources/application-local-real.yml
   src/main/resources/application.yml
   src/test/java/org/example/trademodel/analysisrun/AnalysisSchedulerServiceTest.java
   src/test/java/org/example/trademodel/config/LocalSmokeSchedulerGateTest.java
   src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java
   src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java
   src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java
+  src/test/java/org/example/trademodel/localreal/LocalRealProfileContractTest.java
   src/test/java/org/example/trademodel/mapper/AssetStateMapperIntegrationTest.java
+  src/test/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProviderTest.java
+  src/test/java/org/example/trademodel/market/client/impl/RoutedPublicOhlcvProviderTest.java
   src/test/java/org/example/trademodel/positionmonitor/PositionMonitorServiceImplTest.java
   src/test/java/org/example/trademodel/service/AnalysisSchedulerLocalRealReadinessGateTest.java
   src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java

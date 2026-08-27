@@ -182,6 +182,23 @@ class PersistedOhlcvIngestionSchedulerTest {
         verify(ingestionService, never()).ingest(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void schedulerPassesTargetLimitAndDoesNotIngestAnIncompleteSettledWindow() {
+        when(provider.fetchClosedBars(eq("BTCUSDT"), eq("5m"), eq(100), anyString()))
+                .thenReturn(new PublicOhlcvProviderResult(
+                        OhlcvSourceState.WAITING_SYNC,
+                        "PUBLIC_OHLCV_INSUFFICIENT_SETTLED_BARS",
+                        null));
+        PersistedOhlcvIngestionScheduler scheduler = scheduler(true, true);
+
+        OhlcvIngestionResult result = scheduler.ingestOne("BTCUSDT", "5m");
+
+        assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.WAITING_SYNC);
+        assertThat(result.reasonCodes()).containsExactly("PUBLIC_OHLCV_INSUFFICIENT_SETTLED_BARS");
+        verify(provider).fetchClosedBars(eq("BTCUSDT"), eq("5m"), eq(100), anyString());
+        verify(ingestionService, never()).ingest(org.mockito.ArgumentMatchers.any());
+    }
+
     private PersistedOhlcvIngestionScheduler scheduler(boolean global, boolean enabled) {
         return new PersistedOhlcvIngestionScheduler(provider, ingestionService, global, enabled,
                 "BTCUSDT", "5m,15m,1h,4h", 100, 2);

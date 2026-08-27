@@ -212,6 +212,7 @@ class TelegramDeliveryDispatcherTest {
     private static MessageDO message() {
         MessageDO message = HighValueAlertPolicyTest.eligiblePositionMessage("RISK_HIGH");
         message.setMessageId("message-1");
+        message.setExpiresAt(LocalDateTime.now(Clock.systemUTC()).plusMinutes(5));
         return message;
     }
 }

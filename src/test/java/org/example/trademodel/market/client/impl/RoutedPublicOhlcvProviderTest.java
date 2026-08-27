@@ -95,6 +95,27 @@ class RoutedPublicOhlcvProviderTest {
         verify(binance, never()).fetchClosedBars("BTCUSDT", "5m", 100, "run-release");
     }
 
+    @Test
+    void binanceWaitingSyncPassesTargetLimitAndCannotFallbackWhenDisabled() {
+        KrakenPublicOhlcvProvider kraken = mock(KrakenPublicOhlcvProvider.class);
+        BinancePublicOhlcvProvider binance = mock(BinancePublicOhlcvProvider.class);
+        when(binance.fetchClosedBars("BTCUSDT", "5m", 100, "run-core"))
+                .thenReturn(new PublicOhlcvProviderResult(
+                        OhlcvSourceState.WAITING_SYNC,
+                        "PUBLIC_OHLCV_INSUFFICIENT_SETTLED_BARS",
+                        null));
+        RoutedPublicOhlcvProvider routed = new RoutedPublicOhlcvProvider(
+                kraken, binance, "binance", "kraken", false);
+
+        PublicOhlcvProviderResult result = routed.fetchClosedBars(
+                "BTCUSDT", "5m", 100, "run-core");
+
+        assertThat(result.sourceState()).isEqualTo(OhlcvSourceState.WAITING_SYNC);
+        assertThat(result.reasonCode()).isEqualTo("PUBLIC_OHLCV_INSUFFICIENT_SETTLED_BARS");
+        verify(binance).fetchClosedBars("BTCUSDT", "5m", 100, "run-core");
+        verify(kraken, never()).fetchClosedBars("BTCUSDT", "5m", 100, "run-core");
+    }
+
     private static PublicOhlcvProviderResult failed(String reason) {
         return new PublicOhlcvProviderResult(OhlcvSourceState.ERROR, reason, null);
     }
