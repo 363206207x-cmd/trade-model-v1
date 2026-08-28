@@ -39,7 +39,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
             new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", false),
             new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false),
-            new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", true)
+            new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", false)
     );
 
     private final Environment environment;
@@ -127,6 +127,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         validateCoreProductionLoopPolicy(environment, errors);
         validateOhlcvIngestionPolicy(environment, errors);
         validateProviderCallPolicy(environment, errors);
+        validateProviderScanPolicy(environment, errors);
         validateCoinGlassPolicy(environment, errors);
         validateProductionRateLimit(environment, errors);
 
@@ -301,6 +302,40 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
     }
 
+    private static void validateProviderScanPolicy(Environment environment, List<String> errors) {
+        if (!isTrue(property(environment, "trade-model.provider-call.scheduler-enabled"))) {
+            return;
+        }
+        if (!isTrue(property(environment, "trade-model.schedulers.enabled"))) {
+            errors.add("production provider-call scheduler requires the global scheduler opt-in");
+        }
+        if (!"EXPLICIT_OPT_IN".equals(normalized(property(environment,
+                "trade-model.production.scheduler-policy")))) {
+            errors.add("production provider-call scheduler requires EXPLICIT_OPT_IN policy");
+        }
+        if (!"PROD_ALLOWED_EXPLICIT_OPT_IN".equals(normalized(property(environment,
+                "trade-model.production.scheduler-approval.provider-scan")))) {
+            errors.add("production provider-call scheduler requires explicit provider-scan approval");
+        }
+        if (!isTrue(property(environment, "trade-model.providers.coinglass.enabled"))) {
+            errors.add("production provider-call scheduler requires explicitly enabled CoinGlass provider");
+        }
+        if (!isTrue(property(environment, "trade-model.providers.coinglass.external-calls-enabled"))) {
+            errors.add("production provider-call scheduler requires CoinGlass external-call opt-in");
+        }
+        if (isBlank(property(environment, "trade-model.providers.coinglass.api-key"))) {
+            errors.add("production provider-call scheduler requires CoinGlass API key");
+        }
+        String serverAddress = normalizedAddress(property(environment, "server.address"));
+        if (!isLoopbackBind(serverAddress)
+                || isTrue(property(environment, "trade-model.production.allow-public-bind"))) {
+            errors.add("production provider-call scheduler requires private loopback binding with public exposure disabled");
+        }
+        if (!isFalse(property(environment, "trade-model.production.tailscale-funnel-enabled"))) {
+            errors.add("production provider-call scheduler requires explicitly disabled Tailscale Funnel");
+        }
+    }
+
     private static void validateCoinGlassPolicy(Environment environment, List<String> errors) {
         boolean enabled = isTrue(property(environment, "trade-model.providers.coinglass.enabled"));
         boolean externalEnabled = isTrue(property(environment,
@@ -398,8 +433,18 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         return "0.0.0.0".equals(serverAddress) || "::".equals(serverAddress);
     }
 
+    private static boolean isLoopbackBind(String serverAddress) {
+        return "127.0.0.1".equals(serverAddress)
+                || "localhost".equals(serverAddress)
+                || "::1".equals(serverAddress);
+    }
+
     private static boolean isTrue(String value) {
         return "true".equalsIgnoreCase(trim(value));
+    }
+
+    private static boolean isFalse(String value) {
+        return "false".equalsIgnoreCase(trim(value));
     }
 
     private static boolean hasUnsafeActuatorExposure(String exposure) {
