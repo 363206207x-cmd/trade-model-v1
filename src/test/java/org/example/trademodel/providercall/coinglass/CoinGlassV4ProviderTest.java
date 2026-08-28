@@ -18,8 +18,15 @@ import org.example.trademodel.providercall.ProviderSnapshotMetadata;
 import org.example.trademodel.providercall.SnapshotCacheService;
 import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.instrument.CanonicalInstrumentId;
+import org.example.trademodel.providercall.instrument.ContractType;
+import org.example.trademodel.providercall.instrument.MarketType;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMapping;
+import org.example.trademodel.providercall.instrument.ProviderSymbolMappingRegistry;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -140,6 +147,30 @@ class CoinGlassV4ProviderTest {
         assertThat(response.ready()).isTrue();
         assertThat(response.payload().weightedFundingRate()).isEqualByComparingTo("0.009229");
         assertThat(response.providerDataTime()).isEqualTo(Instant.parse("2026-07-10T09:59:00Z"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ADAUSDT", "SOLUSDT"})
+    void negativeFundingRemainsSignedFreshAndReady(String symbol) {
+        TestContext context = fundingContext("funding-negative-success.json");
+
+        ProviderCallResult<CoinGlassFundingSnapshot> result = context.fundingService.get(
+                symbol, AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "trace-negative-" + symbol);
+
+        assertThat(result.ready()).isTrue();
+        assertThat(result.metadata().provider()).isEqualTo("COINGLASS");
+        assertThat(result.metadata().providerSymbol()).isEqualTo(symbol);
+        assertThat(result.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
+        assertThat(result.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.FRESH);
+        assertThat(result.metadata().providerDataTime()).isEqualTo(Instant.parse("2026-07-10T09:59:00Z"));
+        assertThat(result.metadata().fallbackUsed()).isFalse();
+        assertThat(result.payload().symbol()).isEqualTo(symbol);
+        assertThat(result.payload().weightedFundingRate()).isEqualByComparingTo("-0.001234");
+        assertThat(result.payload().weightedFundingRate()).isNegative().isNotZero();
+        assertThat(result.payload().fieldSources().get("weightedFundingRate"))
+                .isEqualTo(CoinGlassV4ResponseValidator.FUNDING_CAPABILITY + ":data.latest.close");
+        assertThat(context.transport.lastUri.getQuery())
+                .contains("symbol=" + symbol.substring(0, symbol.length() - 4), "interval=1m", "limit=1");
     }
 
     @Test
@@ -395,7 +426,27 @@ class CoinGlassV4ProviderTest {
         return context(responses.toArray(CoinGlassV4HttpTransport.CoinGlassHttpResponse[]::new));
     }
 
+    private static TestContext fundingContext(String fixture) {
+        CoinGlassSymbolMapper mapper = new CoinGlassSymbolMapper(new ProviderSymbolMappingRegistry(List.of(
+                fundingMapping("ADA"), fundingMapping("SOL"))));
+        return context(mapper, response(200, fixture, Map.of(
+                "API-KEY-MAX-LIMIT", List.of("300"), "API-KEY-USE-LIMIT", List.of("1"))));
+    }
+
+    private static ProviderSymbolMapping fundingMapping(String baseAsset) {
+        CanonicalInstrumentId instrument = new CanonicalInstrumentId(baseAsset, "USDT",
+                MarketType.PERPETUAL, "BINANCE", ContractType.LINEAR);
+        return new ProviderSymbolMapping("COINGLASS", instrument, baseAsset + "USDT", true,
+                "COINGLASS_V4_V1");
+    }
+
     private static TestContext context(CoinGlassV4HttpTransport.CoinGlassHttpResponse... responses) {
+        return context(new CoinGlassSymbolMapper(), responses);
+    }
+
+    private static TestContext context(
+            CoinGlassSymbolMapper mapper,
+            CoinGlassV4HttpTransport.CoinGlassHttpResponse... responses) {
         MutableClock clock = new MutableClock(NOW);
         CoinGlassProperties coinGlassProperties = new CoinGlassProperties();
         coinGlassProperties.setEnabled(true);
@@ -408,7 +459,7 @@ class CoinGlassV4ProviderTest {
                 new ObjectMapper(), clock);
         CoinGlassProviderHealthService health = new CoinGlassProviderHealthService();
         CoinGlassV4ProviderAdapter adapter = new CoinGlassV4ProviderAdapter(coinGlassProperties, client,
-                new CoinGlassSymbolMapper(), new CoinGlassV4ResponseValidator(), health);
+                mapper, new CoinGlassV4ResponseValidator(), health);
 
         ProviderCallProperties coordinatorProperties = new ProviderCallProperties();
         coordinatorProperties.setEnabled(true);
@@ -419,7 +470,6 @@ class CoinGlassV4ProviderTest {
         ProviderCallCoordinator coordinator = new ProviderCallCoordinator(coordinatorProperties,
                 new SnapshotCacheService(), singleFlight, budget, new ProviderCircuitBreaker(3, 60, clock),
                 new ProviderCallAuditLog(), clock);
-        CoinGlassSymbolMapper mapper = new CoinGlassSymbolMapper();
         CoinGlassOpenInterestSnapshotService oiService = new CoinGlassOpenInterestSnapshotService(
                 coordinator, coinGlassProperties, mapper, adapter);
         CoinGlassFundingSnapshotService fundingService = new CoinGlassFundingSnapshotService(
@@ -433,7 +483,7 @@ class CoinGlassV4ProviderTest {
         CoinGlassDerivativesSnapshotService derivativesService = new CoinGlassDerivativesSnapshotService(
                 coinGlassProperties, oiService, fundingService, liquidationService, longShortService, assembler);
         return new TestContext(coinGlassProperties, transport, coordinator, adapter, health, oiService,
-                assembler, derivativesService);
+                fundingService, assembler, derivativesService);
     }
 
     private static CoinGlassV4HttpTransport.CoinGlassHttpResponse response(
@@ -485,6 +535,7 @@ class CoinGlassV4ProviderTest {
             CoinGlassV4ProviderAdapter adapter,
             CoinGlassProviderHealthService health,
             CoinGlassOpenInterestSnapshotService oiService,
+            CoinGlassFundingSnapshotService fundingService,
             CoinGlassDerivativesSnapshotAssembler assembler,
             CoinGlassDerivativesSnapshotService derivativesService
     ) {

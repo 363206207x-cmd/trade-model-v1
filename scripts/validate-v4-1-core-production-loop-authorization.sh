@@ -172,6 +172,7 @@ implementation_allowed_files=(
   src/test/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProviderTest.java
   src/test/java/org/example/trademodel/market/client/impl/RoutedPublicOhlcvProviderTest.java
   src/test/java/org/example/trademodel/positionmonitor/PositionMonitorServiceImplTest.java
+  src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderTest.java
   src/test/java/org/example/trademodel/service/AnalysisSchedulerLocalRealReadinessGateTest.java
   src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java
   src/test/java/org/example/trademodel/service/MessageFactServiceTest.java
@@ -183,6 +184,7 @@ implementation_allowed_files=(
   src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java
   src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java
   src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java
+  src/test/resources/provider/coinglass/v4/funding-negative-success.json
 )
 
 if git cat-file -e "$base_ref:$authorization_doc" 2>/dev/null; then

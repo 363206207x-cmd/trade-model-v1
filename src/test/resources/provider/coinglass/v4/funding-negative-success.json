@@ -1,0 +1,14 @@
+{
+  "_fixture": "synthetic contract fixture based on CoinGlass v4 official OI Weighted Funding Rate History schema",
+  "code": "0",
+  "msg": "success",
+  "data": [
+    {
+      "time": 1783677540000,
+      "open": "-0.001100",
+      "high": "0.000200",
+      "low": "-0.001500",
+      "close": "-0.001234"
+    }
+  ]
+}
