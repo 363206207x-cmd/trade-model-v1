@@ -152,6 +152,8 @@ implementation_allowed_files=(
   src/main/java/org/example/trademodel/service/PersistedOhlcvIngestionScheduler.java
   src/main/java/org/example/trademodel/service/PositionMonitorScheduler.java
   src/main/java/org/example/trademodel/service/impl/AssetStateServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java
   src/main/java/org/example/trademodel/service/impl/PositionMonitorServiceImpl.java
   src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java
   src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java
@@ -162,11 +164,14 @@ implementation_allowed_files=(
   src/main/resources/application-prod.yml
   src/main/resources/application-local-real.yml
   src/main/resources/application.yml
+  src/main/resources/static/js/home-runtime.js
   src/test/java/org/example/trademodel/analysisrun/AnalysisSchedulerServiceTest.java
   src/test/java/org/example/trademodel/config/LocalSmokeSchedulerGateTest.java
   src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java
   src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java
   src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java
+  src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java
+  src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java
   src/test/java/org/example/trademodel/localreal/LocalRealProfileContractTest.java
   src/test/java/org/example/trademodel/mapper/AssetStateMapperIntegrationTest.java
   src/test/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProviderTest.java
@@ -178,6 +183,8 @@ implementation_allowed_files=(
   src/test/java/org/example/trademodel/service/MessageFactServiceTest.java
   src/test/java/org/example/trademodel/service/PersistedOhlcvIngestionSchedulerTest.java
   src/test/java/org/example/trademodel/service/impl/AssetStateServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
   src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java
@@ -216,10 +223,19 @@ if [[ "$authorization_scope" == "AUTHORIZATION_DOCS_GATE" ]] \
   exit 1
 fi
 
-if grep -Eq '(^|/)db/migration/|\.sql$|\.html$|\.css$|\.js$' <<<"$changed_files"; then
+if grep -Eq '(^|/)db/migration/|\.sql$|\.html$|\.css$' <<<"$changed_files"; then
   echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED schema-or-ui-change" >&2
   exit 1
 fi
+
+while IFS= read -r changed_file; do
+  [[ -n "$changed_file" ]] || continue
+  if [[ "$changed_file" == *.js ]] \
+    && [[ "$changed_file" != "src/main/resources/static/js/home-runtime.js" ]]; then
+    echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED unauthorized-js=$changed_file" >&2
+    exit 1
+  fi
+done <<<"$changed_files"
 
 if ! git diff --quiet "$base_ref" -- docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md; then
   echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED frozen-product-source-changed" >&2

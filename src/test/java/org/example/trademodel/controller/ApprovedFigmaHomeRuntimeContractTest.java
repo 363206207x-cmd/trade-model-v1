@@ -75,8 +75,11 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(script).contains(
                 "/api/dashboard/home?", "/api/asset-pool/search?query=",
-                "filter(validOpportunity)", ".slice(0, 6)",
+                "function validOpportunityCard(asset)", "function validObservationCard(asset)",
+                "validOpportunityCard(asset) || validObservationCard(asset)", ".slice(0, 6)",
                 "has(asset && asset.opportunityScore)",
+                "String(asset && asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
+                "!has(asset && asset.opportunityId)", "!has(asset && asset.primaryOpportunityId)",
                 "finalVisible ? label(asset.finalMarketBias", "finalVisible ? label(asset.finalPlanMode",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
@@ -141,15 +144,20 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
-    void homeOpportunityProjectionRemainsIndependentFromPoolMembershipAndPreview() throws Exception {
+    void homeProjectionSeparatesOpportunityAndObservationCardsWithoutPreviewOrPoolInference() throws Exception {
         String script = Files.readString(SCRIPT);
 
         assertThat(script).contains(
-                "var assets = all.filter(validOpportunity)", ".slice(0, 6)",
+                "var assets = all.filter(function (asset)",
+                "validOpportunityCard(asset) || validObservationCard(asset)",
+                "String(asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
+                ".slice(0, 6)",
                 "setText(\"opportunityHeading\", \"资产\")",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",
                 "has(asset && asset.opportunityScore)",
+                "function observationCard(asset, selected)",
+                "function opportunityDataNotice(asset)", "周期冲突", "数据过期",
                 "await api(\"/api/asset-pool\", { method: \"POST\"",
                 "await api(\"/api/asset-pool/search/\"",
                 "window.location.assign(\"/analysis/\"")

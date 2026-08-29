@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
@@ -280,13 +281,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 ? selectedProjection == null ? null : selectedProjection.sourceDecision()
                 : findDecision(decisions, normalizedSelected);
         boolean selectedDecisionReadFailed = false;
-        if (selectedDecision == null && normalizedSelected != null) {
+        if (selectedDecision == null && normalizedSelected != null
+                && (selectedProjection == null || hasText(selectedProjection.analysisId()))) {
             DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
-            selectedDecision = lookup.decision();
+            selectedDecision = selectedProjection == null
+                    ? lookup.decision()
+                    : validatedObservationDecision(userId, selectedProjection, lookup.decision());
             selectedDecisionReadFailed = lookup.failed();
         }
         List<DashboardHomeVO.AssetVO> assets = rankingEnabled
-                ? buildRankedAssets(rankingRead.rows(), effectiveLimit)
+                ? buildRankedAssets(rankingRead.rows(), effectiveLimit, userId)
                 : buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
         if (!rankingEnabled && normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
             String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
@@ -333,7 +337,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(selectedDecision);
+        DecisionResultVO executionDecision = (selectedProjection != null
+                && selectedProjection.sourceDecision() == null)
+                || (selectedProjection != null
+                && "HIGH_RISK".equalsIgnoreCase(selectedProjection.opportunityState()))
+                ? null : selectedDecision;
+        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(executionDecision);
         home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
@@ -816,7 +825,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private List<DashboardHomeVO.AssetVO> buildRankedAssets(
             List<HomeTopAssetProjection> projections,
-            int limit) {
+            int limit,
+            Long userId) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         Set<Long> usedAssetIds = new LinkedHashSet<>();
         Set<String> usedSymbols = new LinkedHashSet<>();
@@ -825,29 +835,42 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (assets.size() >= limit) {
                 break;
             }
-            if (projection == null || projection.sourceDecision() == null
-                    || projection.assetId() == null
-                    || !usedAssetIds.add(projection.assetId())
-                    || !usedSymbols.add(normalizeSymbol(projection.symbol()))) {
+            String symbol = projection == null ? null : normalizeSymbol(projection.symbol());
+            if (projection == null || projection.assetId() == null || symbol == null
+                    || usedAssetIds.contains(projection.assetId()) || usedSymbols.contains(symbol)) {
                 continue;
             }
-            DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            DashboardHomeVO.AssetVO asset = projection.sourceDecision() == null
+                    ? assetFromObservation(assets.size() + 1, projection, userId)
+                    : assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            if (asset == null) {
+                continue;
+            }
+            usedAssetIds.add(projection.assetId());
+            usedSymbols.add(symbol);
             asset.setAssetId(projection.assetId());
             asset.setName(projection.name());
-            asset.setAnalysisId(projection.analysisId());
-            asset.setOpportunityId(projection.opportunityId());
-            asset.setOpportunityState(projection.opportunityState());
-            asset.setPrimaryOpportunityId(projection.primaryOpportunityId());
-            asset.setPrimaryTimeframe(projection.primaryTimeframe());
-            asset.setPrimaryPlanMode(projection.primaryPlanMode());
-            asset.setSecondaryOpportunityCount(projection.secondaryOpportunityCount());
-            asset.setTimeframeConflictState(projection.timeframeConflictState());
-            asset.setOpportunityScore(projection.opportunityScore());
-            asset.setPlanMode(projection.planMode());
-            asset.setAiDecisionResult(projection.aiDecisionResult());
-            asset.setDataQualityScore(projection.dataQuality());
-            asset.setRankingReason(projection.rankingReason());
-            applyCardFinalProjection(asset, projection.sourceDecision());
+            if (projection.sourceDecision() != null) {
+                asset.setAnalysisId(projection.analysisId());
+                asset.setOpportunityId(projection.opportunityId());
+                asset.setOpportunityState(projection.opportunityState());
+                asset.setPrimaryOpportunityId(projection.primaryOpportunityId());
+                asset.setPrimaryTimeframe(projection.primaryTimeframe());
+                asset.setPrimaryPlanMode(projection.primaryPlanMode());
+                asset.setSecondaryOpportunityCount(projection.secondaryOpportunityCount());
+                asset.setTimeframeConflictState(projection.timeframeConflictState());
+                asset.setOpportunityScore(projection.opportunityScore());
+                asset.setPlanMode(projection.planMode());
+                asset.setAiDecisionResult(projection.aiDecisionResult());
+                asset.setDataQualityScore(projection.dataQuality());
+                asset.setRankingReason(projection.rankingReason());
+            }
+            if (!"HIGH_RISK".equalsIgnoreCase(projection.opportunityState())
+                    && projection.sourceDecision() != null) {
+                applyCardFinalProjection(asset, projection.sourceDecision());
+            } else {
+                clearCardFinalProjection(asset);
+            }
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
                 setFieldSource(asset, "score", "DERIVED");
@@ -855,6 +878,114 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             assets.add(asset);
         }
         return assets;
+    }
+
+    private DashboardHomeVO.AssetVO assetFromObservation(int slot,
+                                                          HomeTopAssetProjection projection,
+                                                          Long userId) {
+        if (projection == null || projection.assetId() == null || !hasText(projection.symbol())) {
+            return null;
+        }
+        DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(projection.symbol()));
+        String formalAnalysisId = authoritativeObservationAnalysisId(projection, userId);
+        boolean missingFormalAnalysis = formalAnalysisId == null;
+        String observationState = missingFormalAnalysis
+                ? "NEVER_SCANNED" : trimToNull(projection.opportunityState());
+        asset.setSlotType("OBSERVATION");
+        asset.setAssetId(projection.assetId());
+        asset.setName(trimToNull(projection.name()));
+        asset.setAnalysisId(formalAnalysisId);
+        asset.setOpportunityId(null);
+        asset.setPrimaryOpportunityId(null);
+        asset.setOpportunityScore(null);
+        asset.setPlanMode(null);
+        asset.setPrimaryPlanMode(null);
+        asset.setAiDecisionResult(null);
+        asset.setDataQualityScore(null);
+        asset.setMarketBias(null);
+        asset.setMarketBiasLabel(null);
+        asset.setCompositeScore(null);
+        asset.setConfidenceLevel(null);
+        asset.setConfidenceLabel(null);
+        asset.setRiskLevel(null);
+        asset.setRiskLabel(null);
+        asset.setWorthOpening(null);
+        clearCardFinalProjection(asset);
+        asset.setOpportunityState(observationState);
+        asset.setAssetState(observationState);
+        asset.setAssetStateLabel(observationStateLabel(observationState));
+        asset.setPrimaryTimeframe(trimToNull(projection.primaryTimeframe()));
+        asset.setSecondaryOpportunityCount(0);
+        asset.setTimeframeConflictState(trimToNull(projection.timeframeConflictState()));
+        asset.setRankingReason(trimToNull(projection.rankingReason()));
+        asset.setLatestAnalysisTime(formalAnalysisId == null ? null : projection.analysisTime());
+        asset.setCurrentConclusion(observationStateLabel(observationState));
+        applyPersistedMarketData(asset, normalizeSymbol(projection.symbol()));
+        asset.setDataFreshness(missingFormalAnalysis
+                ? "NEVER_SCANNED" : trimToNull(projection.freshness()));
+        asset.setUpdatedAt(maxTime(asset.getUpdatedAt(), asset.getLatestAnalysisTime()));
+        setFieldSource(asset, "assetState", "REAL");
+        setFieldSource(asset, "updatedAt", asset.getUpdatedAt() == null ? "MISSING" : "REAL");
+        asset.setModuleState("NEVER_SCANNED".equalsIgnoreCase(observationState)
+                ? "MISSING" : "PARTIAL");
+        return asset;
+    }
+
+    private void clearCardFinalProjection(DashboardHomeVO.AssetVO asset) {
+        asset.setHasFinal(false);
+        asset.setFinalMarketBias(null);
+        asset.setFinalPlanMode(null);
+        asset.setFinalPlanLifecycle(null);
+    }
+
+    private String observationStateLabel(String value) {
+        return switch (value == null ? "" : value.trim().toUpperCase(Locale.ROOT)) {
+            case "NO_QUALIFIED_OPPORTUNITY" -> "暂无合格机会";
+            case "STALE" -> "数据过期";
+            case "NEVER_SCANNED" -> "等待首次扫描";
+            default -> "观察中";
+        };
+    }
+
+    private String authoritativeObservationAnalysisId(HomeTopAssetProjection projection, Long userId) {
+        if (projection == null || analysisRunMapper == null || userId == null || userId <= 0
+                || !hasText(projection.analysisId()) || projection.assetId() == null) {
+            return null;
+        }
+        try {
+            AnalysisRunDO run = analysisRunMapper.selectById(projection.analysisId());
+            return formalObservationRun(run, projection, userId) ? run.getAnalysisId() : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private DecisionResultVO validatedObservationDecision(Long userId,
+                                                          HomeTopAssetProjection projection,
+                                                          DecisionResultVO decision) {
+        if (projection == null || decision == null
+                || !Objects.equals(trimToNull(projection.analysisId()), trimToNull(decision.getAnalysisId()))
+                || !Objects.equals(normalizeSymbol(projection.symbol()), normalizeSymbol(decision.getSymbol()))) {
+            return null;
+        }
+        return authoritativeObservationAnalysisId(projection, userId) == null ? null : decision;
+    }
+
+    private boolean formalObservationRun(AnalysisRunDO run,
+                                         HomeTopAssetProjection projection,
+                                         Long userId) {
+        return run != null
+                && !Boolean.TRUE.equals(run.getPreview())
+                && "SUCCESS".equalsIgnoreCase(trimToNull(run.getStatus()))
+                && AnalysisRunTriggerType.normalize(run.getTriggerType()) == AnalysisRunTriggerType.ASSET_POOL_SCAN
+                && !"ANALYSIS_PREVIEW".equalsIgnoreCase(trimToNull(run.getAnalysisMode()))
+                && "USER".equalsIgnoreCase(trimToNull(run.getOwnerType()))
+                && Objects.equals(userId, run.getOwnerId())
+                && Objects.equals(projection.assetId(), run.getAssetId())
+                && Objects.equals(normalizeSymbol(projection.symbol()), normalizeSymbol(run.getSymbol()))
+                && hasText(projection.primaryTimeframe())
+                && hasText(run.getTimeframe())
+                && projection.primaryTimeframe().trim().equalsIgnoreCase(run.getTimeframe().trim());
     }
 
     private void applyCardFinalProjection(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {

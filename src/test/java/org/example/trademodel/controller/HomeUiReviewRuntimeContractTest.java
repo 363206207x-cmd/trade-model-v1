@@ -110,6 +110,94 @@ class HomeUiReviewRuntimeContractTest {
                 .contains("audit.removeAttribute(\"href\")");
     }
 
+    @Test
+    void homeCardRuntimePreservesBackendOrderAndSeparatesObservationSemantics() throws Exception {
+        String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String validators = slice(source, "function eligibleOpportunity(asset)", "function selectedFinalAccess(home)");
+        String renderers = slice(source, "function stateBadge(asset)", "function trustedMonitor(position)");
+        String nodeScript = """
+                const assert = require('node:assert/strict');
+                var labels = Object.freeze({});
+                var selectedSymbol = '';
+                var contract = {
+                  assetStateView: value => ({ label: String(value || ''), tone: 'neutral' }),
+                  replaceUrlParam: () => {}
+                };
+                function has(value) { return value !== null && value !== undefined && value !== ''; }
+                function text(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
+                function escapeHtml(value) { return text(value, '').replace(/[&<>'\"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' })[character]); }
+                function label(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
+                function number(value) { return String(value); }
+                function time(value) { return has(value) ? String(value) : '—'; }
+                function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
+                function loadHome() {}
+                const nodes = {
+                  opportunityGrid: { innerHTML: '', hidden: false, querySelectorAll: () => [] },
+                  opportunityEmpty: { hidden: false },
+                  opportunityHeading: { textContent: '' }
+                };
+                var document = { getElementById: id => nodes[id] };
+                function setText(id, value) { nodes[id].textContent = value; }
+                %s
+                %s
+                const observation = {
+                  assetId: 1, symbol: 'ETHUSDT', name: 'ETH', slotType: 'OBSERVATION',
+                  opportunityState: 'NO_QUALIFIED_OPPORTUNITY', dataFreshness: 'FRESH',
+                  primaryTimeframe: '5m', latestAnalysisTime: '2026-08-30T10:00:00Z'
+                };
+                const blockedDecision = {
+                  assetId: 2, symbol: 'BTCUSDT', name: 'BTC', slotType: 'DECISION',
+                  analysisId: 'analysis-btc', opportunityId: 'opportunity-btc', opportunityScore: 0,
+                  opportunityState: 'HIGH_RISK', primaryPlanMode: 'BLOCKED', dataFreshness: 'STALE',
+                  confidenceLabel: '80%%', riskLabel: '高', primaryTimeframe: '15m',
+                  timeframeConflictState: 'ALIGNED', hasFinal: false
+                };
+                assert.equal(validObservationCard(observation), true);
+                assert.equal(validOpportunityCard(blockedDecision), true);
+                assert.equal(validObservationCard({ ...observation, slotType: 'DEFAULT_SLOT' }), false);
+                assert.equal(validObservationCard({ ...observation, opportunityScore: 1 }), false);
+                assert.equal(validOpportunityCard({ ...blockedDecision, analysisId: null }), false);
+                const observationHtml = observationCard(observation, '');
+                assert.match(observationHtml, /暂无合格机会/);
+                assert.match(observationHtml, /数据状态/);
+                assert.doesNotMatch(observationHtml, /机会评分|置信度|风险|最终偏向|计划模式|入场|止损|目标/);
+                const decisionHtml = opportunityCard(blockedDecision, '');
+                assert.match(decisionHtml, /数据过期/);
+                const all = [
+                  observation,
+                  blockedDecision,
+                  { ...observation, assetId: 3, symbol: 'ETHUSDT' },
+                  { ...observation, assetId: 4, symbol: 'SOLUSDT' },
+                  { ...observation, assetId: 5, symbol: 'ADAUSDT' },
+                  { ...observation, assetId: 6, symbol: 'XRPUSDT' },
+                  { ...observation, assetId: 7, symbol: 'LINKUSDT' },
+                  { ...observation, assetId: 8, symbol: 'AAVEUSDT' },
+                  { ...observation, assetId: 9, symbol: 'BNBUSDT', slotType: 'DEFAULT_SLOT' }
+                ];
+                const count = renderOpportunities({ assets: all, selectedSymbol: 'ETHUSDT' });
+                const symbols = [...nodes.opportunityGrid.innerHTML.matchAll(/data-symbol=\"([^\"]+)\"/g)]
+                  .map(match => match[1]);
+                assert.equal(count, 6);
+                assert.deepEqual(symbols, ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LINKUSDT']);
+                assert.equal(symbols.filter(symbol => symbol === 'ETHUSDT').length, 1);
+                assert.equal(nodes.opportunityGrid.innerHTML.includes('DEFAULT_SLOT'), false);
+                console.log('HOME_REAL_CARD_RUNTIME=PASS');
+                """.formatted(validators, renderers);
+
+        Process process = new ProcessBuilder("node", "-e", nodeScript)
+                .directory(Path.of("").toAbsolutePath().toFile())
+                .redirectErrorStream(true)
+                .start();
+        boolean completed = process.waitFor(30, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertThat(completed).as(output).isTrue();
+        assertThat(process.exitValue()).as(output).isZero();
+        assertThat(output).contains("HOME_REAL_CARD_RUNTIME=PASS");
+        String opportunityRender = slice(source, "function renderOpportunities(home)", "function trustedMonitor(position)");
+        assertThat(opportunityRender).doesNotContain(".sort(");
+    }
+
     private static String slice(String value, String start, String end) {
         int startIndex = value.indexOf(start);
         int endIndex = value.indexOf(end, startIndex + start.length());

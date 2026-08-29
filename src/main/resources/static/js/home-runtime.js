@@ -175,18 +175,31 @@
     }
     function eligibleOpportunity(asset) {
         var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
-        var mode = String(asset && (asset.primaryPlanMode || asset.planMode) || "").toUpperCase();
-        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0
-            && mode !== "BLOCKED";
+        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0;
     }
-    function validOpportunity(asset) {
+    function validOpportunityCard(asset) {
+        var slotType = String(asset && asset.slotType || "").toUpperCase();
+        if (slotType === "DEFAULT_SLOT") return false;
         return symbolOf(asset)
+            && has(asset && asset.assetId)
+            && slotType === "DECISION"
             && has(asset && (asset.opportunityId || asset.primaryOpportunityId))
             && has(asset && asset.analysisId)
             && has(asset && asset.opportunityScore)
             && !Number.isNaN(Number(asset.opportunityScore))
-            && eligibleOpportunity(asset)
-            && String(asset.slotType || "").toUpperCase() !== "DEFAULT_SLOT";
+            && eligibleOpportunity(asset);
+    }
+    function validObservationCard(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        var slotType = String(asset && asset.slotType || "").toUpperCase();
+        if (slotType === "DEFAULT_SLOT") return false;
+        return symbolOf(asset)
+            && has(asset && asset.assetId)
+            && String(asset && asset.slotType || "").toUpperCase() === "OBSERVATION"
+            && ["OBSERVING", "NO_QUALIFIED_OPPORTUNITY", "STALE", "NEVER_SCANNED"].indexOf(state) >= 0
+            && !has(asset && asset.opportunityId)
+            && !has(asset && asset.primaryOpportunityId)
+            && !has(asset && asset.opportunityScore);
     }
     function selectedFinalAccess(home) {
         var plan = home && home.executionSuggestion || {};
@@ -252,38 +265,92 @@
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
         var finalVisible = asset.hasFinal === true;
+        var mode = String(asset.finalPlanMode || "").toUpperCase();
+        var directionalExecutionAllowed = mode !== "BLOCKED";
         var finalBias = finalVisible ? label(asset.finalMarketBias, "—") : "—";
         var finalMode = finalVisible ? label(asset.finalPlanMode, "—") : "—";
         var confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
         var risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
         var timeframe = text(asset.primaryTimeframe, "周期待同步");
+        var dataNotice = opportunityDataNotice(asset);
         var conflict = label(asset.timeframeConflictState, "周期关系待同步");
         var rankingReason = text(asset.rankingReason, "排序原因待同步");
+        var executionNotice = directionalExecutionAllowed ? "" : "，当前执行许可受限";
         var secondaryCount = has(asset.secondaryOpportunityCount) ? Number(asset.secondaryOpportunityCount) : 0;
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
             + String(isSelected) + '" data-symbol="'
-            + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason) + '" aria-label="查看 ' + escapeHtml(symbol + " 决策上下文，周期关系 " + conflict + "，次级机会 " + secondaryCount + "，" + rankingReason) + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason) + '" aria-label="查看 ' + escapeHtml(symbol + " 决策上下文，周期关系 " + conflict + "，次级机会 " + secondaryCount + "，" + rankingReason + executionNotice) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol + " · " + timeframe)
+            + (dataNotice ? " · " + escapeHtml(dataNotice) : "")
             + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
             + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
             + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
             + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
             + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
     }
+    function opportunityDataNotice(asset) {
+        var state = String(asset && asset.dataFreshness || "").toUpperCase();
+        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
+        if (state === "STALE") return "数据过期";
+        return "";
+    }
+    function observationStateText(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        return {
+            OBSERVING: "观察中",
+            NO_QUALIFIED_OPPORTUNITY: "暂无合格机会",
+            STALE: "数据过期",
+            NEVER_SCANNED: "等待首次扫描"
+        }[state] || "观察中";
+    }
+    function observationDataText(asset) {
+        var state = String(asset && asset.dataFreshness || "").toUpperCase();
+        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
+        if (state === "STALE") return "数据过期";
+        if (state === "NEVER_SCANNED") return "尚未扫描";
+        if (state === "FRESH" || state === "READY") return "数据新鲜";
+        return "状态待同步";
+    }
+    function observationCard(asset, selected) {
+        var symbol = symbolOf(asset);
+        var isSelected = symbol === selected;
+        var state = observationStateText(asset);
+        var timeframe = text(asset.primaryTimeframe, "周期待同步");
+        var latestScan = has(asset.latestAnalysisTime) ? time(asset.latestAnalysisTime) : "—";
+        var rankingReason = text(asset.rankingReason, state);
+        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "")
+            + '" tabindex="0" role="button" aria-pressed="' + String(isSelected)
+            + '" data-symbol="' + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason)
+            + '" aria-label="查看 ' + escapeHtml(symbol + " 观察状态，" + state) + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
+            + '</small></div><span class="state-badge muted">' + escapeHtml(state)
+            + '</span></header><div class="opportunity-metrics"><span><small>数据状态</small><strong>'
+            + escapeHtml(observationDataText(asset)) + "</strong></span><span><small>主周期</small><strong>"
+            + escapeHtml(timeframe) + "</strong></span><span><small>最近扫描</small><strong>"
+            + escapeHtml(latestScan) + "</strong></span></div></article>";
+    }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
         var seen = new Set();
-        var assets = all.filter(validOpportunity).filter(function (asset) {
-            var identity = has(asset.assetId) ? "asset:" + asset.assetId : "symbol:" + symbolOf(asset);
-            if (seen.has(identity)) return false;
+        var assets = all.filter(function (asset) {
+            return validOpportunityCard(asset) || validObservationCard(asset);
+        }).filter(function (asset) {
+            var identity = "asset:" + String(asset.assetId);
+            var symbolIdentity = "symbol:" + symbolOf(asset);
+            if (seen.has(identity) || seen.has(symbolIdentity)) return false;
             seen.add(identity);
+            seen.add(symbolIdentity);
             return true;
         }).slice(0, 6);
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
         setText("opportunityHeading", "资产");
-        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
+        grid.innerHTML = assets.map(function (asset) {
+            return String(asset.slotType || "").toUpperCase() === "OBSERVATION"
+                ? observationCard(asset, selected)
+                : opportunityCard(asset, selected);
+        }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {

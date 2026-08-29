@@ -1,10 +1,15 @@
 package org.example.trademodel.service.impl;
 
-import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.PlanModeEnum;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.service.OpportunityPriorityRankingService;
@@ -14,26 +19,33 @@ import org.example.trademodel.vo.HomeTopAssetProjection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorityRankingService {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> INACTIVE_WATCH_STATES = Set.of("REMOVED", "DISABLED", "INACTIVE");
+
     private final AssetPoolService assetPoolService;
     private final DecisionResultMapper decisionResultMapper;
     private final AssetStateMapper assetStateMapper;
     private final FundamentalAiV41Properties properties;
     private final Clock clock;
+    private AnalysisRunMapper analysisRunMapper;
 
     public OpportunityPriorityRankingServiceImpl(AssetPoolService assetPoolService,
                                                  DecisionResultMapper decisionResultMapper,
@@ -55,53 +67,89 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
         this.clock = analysisRunClock == null ? Clock.systemUTC() : analysisRunClock;
     }
 
+    @Autowired(required = false)
+    void setAnalysisRunMapper(AnalysisRunMapper analysisRunMapper) {
+        this.analysisRunMapper = analysisRunMapper;
+    }
+
     @Override
     public List<HomeTopAssetProjection> rankForHome(Long userId, int limit) {
+        if (userId == null || userId <= 0) {
+            return List.of();
+        }
         int effectiveLimit = Math.max(1, Math.min(properties.getRanking().getHomeCapacity(), limit));
-        List<AssetPoolAssetDTO> pool = userId == null
-                ? assetPoolService.listSystemDefaults()
-                : assetPoolService.listForUser(userId);
-        Map<String, AssetPoolAssetDTO> poolBySymbol = effectivePool(pool);
+        Map<String, AssetPoolAssetDTO> poolBySymbol = effectivePool(assetPoolService.listForUser(userId), userId);
         if (poolBySymbol.isEmpty()) {
             return List.of();
         }
 
         List<String> symbols = List.copyOf(poolBySymbol.keySet());
-        String ownerType = userId == null ? "SYSTEM" : "USER";
-        Long ownerId = userId == null ? 0L : userId;
         List<DecisionResultVO> decisions = safe(decisionResultMapper
-                .findLatestDecisionResultsForSymbolsJoined(symbols, ownerType, ownerId));
-        List<AssetStateDO> states = safe(assetStateMapper.listByOwnerAndSymbols(symbols, ownerType, ownerId));
+                .findLatestDecisionResultsForSymbolsJoined(symbols, "USER", userId));
+        List<AssetStateDO> states = safe(assetStateMapper.listByOwnerAndSymbols(symbols, "USER", userId));
+        LocalDateTime now = LocalDateTime.now(clock);
 
-        Map<String, List<HomeTopAssetProjection>> bySymbol = decisions.stream()
+        List<HomeTopAssetProjection> opportunities = decisions.stream()
                 .filter(Objects::nonNull)
-                .map(decision -> projection(poolBySymbol, states, decision, LocalDateTime.now(clock)))
+                .map(decision -> opportunityProjection(poolBySymbol, states, decision, userId, now))
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(HomeTopAssetProjection::symbol,
-                        LinkedHashMap::new, Collectors.toList()));
-
-        return bySymbol.values().stream()
+                        LinkedHashMap::new, Collectors.toList()))
+                .values().stream()
                 .map(this::aggregateTimeframes)
-                .sorted(priorityOrder())
+                .toList();
+
+        List<HomeTopAssetProjection> combined = new ArrayList<>(opportunities);
+        Set<Long> opportunityAssetIds = opportunities.stream()
+                .map(HomeTopAssetProjection::assetId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> opportunitySymbols = opportunities.stream()
+                .map(HomeTopAssetProjection::symbol)
+                .map(OpportunityPriorityRankingServiceImpl::normalize)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        for (AssetPoolAssetDTO asset : poolBySymbol.values()) {
+            String symbol = normalize(asset.symbol());
+            if (opportunityAssetIds.contains(asset.assetId()) || opportunitySymbols.contains(symbol)) {
+                continue;
+            }
+            combined.add(observationProjection(asset, states, userId, now));
+        }
+
+        Set<Long> usedAssetIds = new LinkedHashSet<>();
+        Set<String> usedSymbols = new LinkedHashSet<>();
+        return combined.stream()
+                .filter(Objects::nonNull)
+                .sorted(homeOrder())
+                .filter(row -> row.assetId() != null && usedAssetIds.add(row.assetId()))
+                .filter(row -> normalize(row.symbol()) != null && usedSymbols.add(normalize(row.symbol())))
                 .limit(effectiveLimit)
                 .toList();
     }
 
-    private static Map<String, AssetPoolAssetDTO> effectivePool(List<AssetPoolAssetDTO> pool) {
+    private static Map<String, AssetPoolAssetDTO> effectivePool(List<AssetPoolAssetDTO> pool, Long userId) {
         Map<String, AssetPoolAssetDTO> bySymbol = new LinkedHashMap<>();
         for (AssetPoolAssetDTO asset : safe(pool)) {
             String symbol = normalize(asset == null ? null : asset.symbol());
-            if (asset != null && asset.assetId() != null && symbol != null) {
+            String watchStatus = upper(asset == null ? null : asset.watchStatus());
+            if (asset != null
+                    && userId.equals(asset.userId())
+                    && asset.assetId() != null
+                    && symbol != null
+                    && (watchStatus == null || !INACTIVE_WATCH_STATES.contains(watchStatus))) {
                 bySymbol.putIfAbsent(symbol, asset);
             }
         }
         return bySymbol;
     }
 
-    private HomeTopAssetProjection projection(Map<String, AssetPoolAssetDTO> poolBySymbol,
-                                              List<AssetStateDO> states,
-                                              DecisionResultVO decision,
-                                              LocalDateTime now) {
+    private HomeTopAssetProjection opportunityProjection(Map<String, AssetPoolAssetDTO> poolBySymbol,
+                                                          List<AssetStateDO> states,
+                                                          DecisionResultVO decision,
+                                                          Long userId,
+                                                          LocalDateTime now) {
         String symbol = normalize(decision.getSymbol());
         String analysisId = text(decision.getAnalysisId());
         String timeframe = normalizeTimeframe(decision.getTimeframe());
@@ -109,8 +157,12 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
         if (asset == null || analysisId == null || timeframe == null) {
             return null;
         }
+        AnalysisRunDO run = formalAssetPoolRun(analysisId, asset, userId, timeframe);
+        if (run == null) {
+            return null;
+        }
         AssetStateDO opportunity = states.stream()
-                .filter(Objects::nonNull)
+                .filter(state -> exactUserState(state, asset, userId))
                 .filter(state -> symbol.equals(normalize(state.getSymbol())))
                 .filter(state -> timeframe.equals(normalizeTimeframe(state.getTimeframe())))
                 .filter(state -> analysisId.equals(text(state.getLastAnalysisId())))
@@ -128,64 +180,118 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
         String planMode = upper(decision.getPlanMode());
         String aiDecisionResult = upper(decision.getAiConflictLevel());
         Integer dataQuality = decision.getDataQualityScore();
-        LocalDateTime analysisTime = decision.getAnalysisTime();
-        String opportunityState = opportunity.getState() == null ? null : opportunity.getState().name();
-        if (!completeRankingInput(opportunityScore, finalMarketBias, confidence, riskLevel, planMode,
-                aiDecisionResult, dataQuality, analysisTime)) {
+        LocalDateTime completedAt = latestRunTime(run);
+        String opportunityState = opportunity.getState().name();
+        if (!completeOpportunityInput(opportunityScore, finalMarketBias, confidence, riskLevel,
+                planMode, aiDecisionResult, dataQuality, completedAt)) {
             return null;
         }
-        if (PlanModeEnum.BLOCKED.name().equals(planMode)
-                || "HIGH".equals(riskLevel)
-                || "EXTREME".equals(riskLevel)
-                || dataQuality < properties.getRanking().getMinimumDataQuality()) {
-            return null;
-        }
-        long ageSeconds = Math.max(0, Duration.between(analysisTime, now).getSeconds());
-        if (ageSeconds > properties.getRanking().getFreshnessWindowSeconds()) {
-            return null;
+
+        SchedulerScanAudit audit = schedulerScanAudit(opportunity.getExtJson());
+        LocalDateTime latestScanAt = audit.present() ? audit.finishedAt() : completedAt;
+        long ageSeconds = ageSeconds(latestScanAt, now);
+        String auditFreshness = upper(audit.dataFreshness());
+        String freshness;
+        if (audit.present() && auditFreshness != null && auditFreshness.contains("CONFLICT")) {
+            freshness = "TIMEFRAME_CONFLICT";
+        } else if (audit.present() && (auditFreshness == null || !auditFreshness.startsWith("FRESH"))) {
+            freshness = "STALE";
+        } else {
+            freshness = ageSeconds > properties.getRanking().getFreshnessWindowSeconds()
+                    ? "STALE" : "FRESH";
         }
         long stabilitySeconds = opportunity.getStateEnteredAt() == null
-                ? 0L : Math.max(0, Duration.between(opportunity.getStateEnteredAt(), now).getSeconds());
-        int priorityScore = priorityScore(opportunityScore, confidence, riskLevel, planMode,
-                aiDecisionResult, dataQuality, ageSeconds, stabilitySeconds);
-        String rankingReason = rankingReason(opportunityScore, confidence, riskLevel, planMode,
-                aiDecisionResult, dataQuality, finalMarketBias, ageSeconds, stabilitySeconds, priorityScore);
+                ? 0L : ageSeconds(opportunity.getStateEnteredAt(), now);
+        String rankingReason = "HOME_STATE=" + opportunityState
+                + "|DATA_STATUS=" + freshness
+                + "|LATEST_FORMAL_SCAN_TIME=" + latestScanAt
+                + "|SOURCE=ASSET_POOL_SCAN";
 
         return new HomeTopAssetProjection(
-                asset.assetId(),
-                symbol,
-                asset.displayName(),
-                opportunityScore,
-                finalMarketBias,
-                confidence,
-                riskLevel,
-                planMode,
-                aiDecisionResult,
-                dataQuality,
-                "FRESH",
-                ageSeconds,
-                stabilitySeconds,
-                priorityScore,
-                rankingReason,
-                analysisId,
-                opportunity.getOpportunityId(),
-                opportunityState,
-                opportunity.getOpportunityId(),
-                timeframe,
-                planMode,
-                0,
-                "ALIGNED",
-                analysisTime,
-                decision);
+                asset.assetId(), symbol, asset.displayName(), opportunityScore, finalMarketBias,
+                confidence, riskLevel, planMode, aiDecisionResult, dataQuality, freshness,
+                ageSeconds, stabilitySeconds, 0, rankingReason, analysisId,
+                opportunity.getOpportunityId(), opportunityState, opportunity.getOpportunityId(),
+                timeframe, planMode, 0,
+                "TIMEFRAME_CONFLICT".equals(freshness) ? "TIMEFRAME_CONFLICT" : "ALIGNED",
+                latestScanAt, decision);
+    }
+
+    private HomeTopAssetProjection observationProjection(AssetPoolAssetDTO asset,
+                                                          List<AssetStateDO> states,
+                                                          Long userId,
+                                                          LocalDateTime now) {
+        List<ObservationState> observations = states.stream()
+                .filter(state -> exactUserState(state, asset, userId))
+                .map(state -> observationState(state, asset, userId, now))
+                .sorted(observationStateOrder())
+                .toList();
+        ObservationState primary = observations.stream().findFirst().orElse(ObservationState.neverScanned());
+        String analysisId = primary.formalRun() == null ? null : primary.formalRun().getAnalysisId();
+        String state = observationDisplayState(primary);
+        String assetState = primary.state() == null || primary.state().getState() == null
+                ? "MISSING" : primary.state().getState().name();
+        String rankingReason = "SLOT_TYPE=OBSERVATION"
+                + "|OBSERVATION_STATE=" + state
+                + "|DATA_STATUS=" + primary.dataStatus()
+                + "|LATEST_FORMAL_SCAN_TIME=" + value(primary.finishedAt())
+                + "|ASSET_STATE=" + assetState;
+        String conflictState = "TIMEFRAME_CONFLICT".equals(primary.dataStatus())
+                ? "TIMEFRAME_CONFLICT" : "ALIGNED";
+        return new HomeTopAssetProjection(
+                asset.assetId(), normalize(asset.symbol()), asset.displayName(), null, null, null,
+                null, null, null, null, primary.dataStatus(), primary.ageSeconds(), 0L, 0,
+                rankingReason, analysisId, null, state, null, primary.timeframe(), null, 0,
+                conflictState, primary.finishedAt(), null);
+    }
+
+    private ObservationState observationState(AssetStateDO state,
+                                              AssetPoolAssetDTO asset,
+                                              Long userId,
+                                              LocalDateTime now) {
+        String timeframe = normalizeTimeframe(state.getTimeframe());
+        AnalysisRunDO run = formalAssetPoolRun(text(state.getLastAnalysisId()), asset, userId, timeframe);
+        if (run == null) {
+            return new ObservationState(state, null, "NEVER_SCANNED", null, Long.MAX_VALUE,
+                    timeframe, false, null);
+        }
+        SchedulerScanAudit audit = schedulerScanAudit(state.getExtJson());
+        if (!audit.present()) {
+            LocalDateTime completedAt = latestRunTime(run);
+            if (completedAt != null) {
+                return new ObservationState(state, run, "STALE", completedAt,
+                        ageSeconds(completedAt, now), timeframe, false, null);
+            }
+            return new ObservationState(state, null, "NEVER_SCANNED", null, Long.MAX_VALUE,
+                    timeframe, false, null);
+        }
+        long age = ageSeconds(audit.finishedAt(), now);
+        String dataStatus;
+        String rawFreshness = upper(audit.dataFreshness());
+        if (rawFreshness != null && rawFreshness.contains("CONFLICT")) {
+            dataStatus = "TIMEFRAME_CONFLICT";
+        } else if (rawFreshness == null || !rawFreshness.startsWith("FRESH")
+                || age > properties.getRanking().getFreshnessWindowSeconds()) {
+            dataStatus = "STALE";
+        } else {
+            dataStatus = "FRESH";
+        }
+        return new ObservationState(state, run, dataStatus, audit.finishedAt(), age,
+                timeframe, audit.fullAnalysisSucceeded(), audit.result());
     }
 
     private HomeTopAssetProjection aggregateTimeframes(List<HomeTopAssetProjection> rows) {
         List<HomeTopAssetProjection> ordered = safe(rows).stream()
                 .filter(Objects::nonNull)
-                .sorted(priorityOrder())
+                .sorted(homeOrder())
                 .toList();
         HomeTopAssetProjection primary = ordered.get(0);
-        String conflictState = timeframeConflictState(ordered);
+        String conflictState = ordered.stream().anyMatch(
+                row -> "TIMEFRAME_CONFLICT".equals(upper(row.freshness())))
+                ? "TIMEFRAME_CONFLICT" : timeframeConflictState(ordered);
+        String freshness = "OPPOSING".equals(conflictState)
+                || "TIMEFRAME_CONFLICT".equals(conflictState)
+                ? "TIMEFRAME_CONFLICT" : primary.freshness();
         String reason = primary.rankingReason()
                 + "|PRIMARY_TIMEFRAME=" + value(primary.primaryTimeframe())
                 + "|SECONDARY_OPPORTUNITY_COUNT=" + Math.max(0, ordered.size() - 1)
@@ -194,11 +300,11 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
                 primary.assetId(), primary.symbol(), primary.name(), primary.opportunityScore(),
                 primary.finalMarketBias(), primary.confidence(), primary.riskLevel(),
                 primary.finalPlanMode(), primary.aiDecisionResult(), primary.dataQuality(),
-                primary.freshness(), primary.freshnessAgeSeconds(), primary.stabilitySeconds(),
-                primary.priorityScore(), reason, primary.analysisId(), primary.opportunityId(),
-                primary.opportunityState(), primary.opportunityId(), primary.primaryTimeframe(),
-                primary.finalPlanMode(), Math.max(0, ordered.size() - 1), conflictState,
-                primary.analysisTime(), primary.sourceDecision());
+                freshness, primary.freshnessAgeSeconds(), primary.stabilitySeconds(), 0, reason,
+                primary.analysisId(), primary.opportunityId(), primary.opportunityState(),
+                primary.opportunityId(), primary.primaryTimeframe(), primary.finalPlanMode(),
+                Math.max(0, ordered.size() - 1), conflictState, primary.analysisTime(),
+                primary.sourceDecision());
     }
 
     private String timeframeConflictState(List<HomeTopAssetProjection> rows) {
@@ -219,115 +325,141 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
         return "NEUTRAL";
     }
 
-    private static Comparator<HomeTopAssetProjection> priorityOrder() {
-        return Comparator
-                .comparingInt(HomeTopAssetProjection::priorityScore).reversed()
-                .thenComparing(HomeTopAssetProjection::freshnessAgeSeconds,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
+    private AnalysisRunDO formalAssetPoolRun(String analysisId,
+                                             AssetPoolAssetDTO asset,
+                                             Long userId,
+                                             String expectedTimeframe) {
+        if (analysisRunMapper == null || analysisId == null || asset == null) {
+            return null;
+        }
+        try {
+            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+            if (run == null
+                    || Boolean.TRUE.equals(run.getPreview())
+                    || !"SUCCESS".equals(upper(run.getStatus()))
+                    || AnalysisRunTriggerType.normalize(run.getTriggerType()) != AnalysisRunTriggerType.ASSET_POOL_SCAN
+                    || "ANALYSIS_PREVIEW".equals(upper(run.getAnalysisMode()))
+                    || !"USER".equals(upper(run.getOwnerType()))
+                    || !userId.equals(run.getOwnerId())
+                    || !asset.assetId().equals(run.getAssetId())
+                    || !normalize(asset.symbol()).equals(normalize(run.getSymbol()))
+                    || expectedTimeframe == null
+                    || !expectedTimeframe.equals(normalizeTimeframe(run.getTimeframe()))) {
+                return null;
+            }
+            return run;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean exactUserState(AssetStateDO state, AssetPoolAssetDTO asset, Long userId) {
+        return state != null
+                && asset != null
+                && "USER".equals(upper(state.getOwnerType()))
+                && userId.equals(state.getOwnerId())
+                && asset.assetId().equals(state.getAssetId())
+                && normalize(asset.symbol()).equals(normalize(state.getSymbol()));
+    }
+
+    private static Comparator<HomeTopAssetProjection> homeOrder() {
+        return Comparator.comparingInt((HomeTopAssetProjection row) -> stateRank(row.opportunityState()))
+                .thenComparingInt(row -> dataStatusRank(row.freshness()))
                 .thenComparing(HomeTopAssetProjection::analysisTime,
                         Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(Comparator.comparingLong(HomeTopAssetProjection::stabilitySeconds).reversed())
                 .thenComparing(HomeTopAssetProjection::symbol);
     }
 
-    private static int planModeRank(String value) {
-        return switch (upperOrEmpty(value)) {
-            case "CONFIRMATION" -> 5;
-            case "PREPARATION" -> 4;
-            case "REDUCED" -> 3;
-            case "OBSERVATION" -> 2;
-            case "BLOCKED" -> 1;
-            default -> 0;
+    private static Comparator<ObservationState> observationStateOrder() {
+        return Comparator.comparingInt((ObservationState row) -> dataStatusRank(row.dataStatus()))
+                .thenComparing(ObservationState::finishedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ObservationState::timeframe,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    private static int stateRank(String state) {
+        return switch (upperOrEmpty(state)) {
+            case "TRIGGERED" -> 0;
+            case "WAITING_TRIGGER" -> 1;
+            case "CANDIDATE" -> 2;
+            case "HIGH_RISK" -> 3;
+            default -> 4;
         };
     }
 
-    private static int confidenceRank(String value) {
+    private static int dataStatusRank(String value) {
         return switch (upperOrEmpty(value)) {
-            case "HIGH" -> 3;
-            case "MEDIUM" -> 2;
-            case "LOW" -> 1;
-            default -> 0;
+            case "FRESH", "READY" -> 0;
+            case "TIMEFRAME_CONFLICT" -> 1;
+            case "STALE" -> 2;
+            default -> 3;
         };
     }
 
-    private static int riskQualityRank(String value) {
-        return switch (upperOrEmpty(value)) {
-            case "LOW" -> 4;
-            case "MEDIUM" -> 3;
-            case "HIGH" -> 2;
-            case "EXTREME" -> 1;
-            default -> 0;
-        };
+    private String observationDisplayState(ObservationState observation) {
+        if ("NEVER_SCANNED".equals(observation.dataStatus())) return "NEVER_SCANNED";
+        if ("STALE".equals(observation.dataStatus())) return "STALE";
+        if (observation.formalRun() != null
+                && (observation.fullAnalysisSucceeded()
+                || "WAIT".equals(upper(observation.result())))) {
+            return "NO_QUALIFIED_OPPORTUNITY";
+        }
+        return "OBSERVING";
     }
 
-    private static int aiDecisionRank(String value) {
-        return switch (upperOrEmpty(value)) {
-            case "LEVEL_1_CONSISTENT" -> 4;
-            case "LEVEL_2_MINOR_DISAGREEMENT" -> 3;
-            case "LEVEL_3_SIGNIFICANT_DISAGREEMENT" -> 2;
-            case "LEVEL_4_EXTREME_CONFLICT" -> 1;
-            default -> 0;
-        };
+    private static SchedulerScanAudit schedulerScanAudit(String json) {
+        if (text(json) == null) return SchedulerScanAudit.missing();
+        try {
+            JsonNode scan = JSON.readTree(json).path("schedulerScan");
+            if (!scan.isObject()) return SchedulerScanAudit.missing();
+            LocalDateTime finishedAt = parseTime(scan.path("finishedAt"));
+            if (finishedAt == null) return SchedulerScanAudit.missing();
+            return new SchedulerScanAudit(true, nodeText(scan.path("result")),
+                    nodeText(scan.path("dataFreshness")), finishedAt,
+                    scan.path("fullAnalysisSucceeded").asBoolean(false));
+        } catch (Exception ignored) {
+            return SchedulerScanAudit.missing();
+        }
     }
 
-    private int priorityScore(Integer opportunityScore,
-                              String confidence,
-                              String riskLevel,
-                              String planMode,
-                              String conflict,
-                              Integer dataQuality,
-                              long freshnessAgeSeconds,
-                              long stabilitySeconds) {
-        FundamentalAiV41Properties.Ranking cfg = properties.getRanking();
-        BigDecimal freshness = BigDecimal.valueOf(Math.max(0D,
-                100D * (1D - (double) freshnessAgeSeconds / cfg.getFreshnessWindowSeconds())));
-        BigDecimal stability = BigDecimal.valueOf(Math.min(100D,
-                100D * stabilitySeconds / Math.max(1D, cfg.getFreshnessWindowSeconds())));
-        BigDecimal total = weighted(opportunityScore, cfg.getOpportunityScoreWeight())
-                .add(weighted(confidenceRank(confidence) * 100D / 3D, cfg.getConfidenceWeight()))
-                .add(weighted(riskQualityRank(riskLevel) * 25D, cfg.getRiskWeight()))
-                .add(weighted(planModeRank(planMode) * 20D, cfg.getPlanModeWeight()))
-                .add(weighted(dataQuality, cfg.getDataQualityWeight()))
-                .add(weighted(freshness, cfg.getFreshnessWeight()))
-                .add(weighted(aiDecisionRank(conflict) * 25D, cfg.getConflictWeight()))
-                .add(weighted(stability, cfg.getStabilityWeight()));
-        return total.setScale(0, RoundingMode.HALF_UP).intValue();
+    private static LocalDateTime parseTime(JsonNode value) {
+        String raw = value != null && value.isTextual() ? text(value.textValue()) : null;
+        if (raw == null) return null;
+        try {
+            return LocalDateTime.parse(raw);
+        } catch (RuntimeException ignored) {
+            try {
+                return LocalDateTime.ofInstant(Instant.parse(raw), ZoneOffset.UTC);
+            } catch (RuntimeException invalid) {
+                return null;
+            }
+        }
     }
 
-    private static BigDecimal weighted(Number value, BigDecimal weight) {
-        return BigDecimal.valueOf(value == null ? 0D : value.doubleValue()).multiply(weight);
+    private static String nodeText(JsonNode value) {
+        return value != null && value.isTextual() ? text(value.textValue()) : null;
     }
 
-    private static String rankingReason(Integer opportunityScore,
-                                        String confidence,
-                                        String riskLevel,
-                                        String planMode,
-                                        String aiDecisionResult,
-                                        Integer dataQuality,
-                                        String finalMarketBias,
-                                        long freshnessAgeSeconds,
-                                        long stabilitySeconds,
-                                        int priorityScore) {
-        return "OPPORTUNITY_SCORE=" + value(opportunityScore)
-                + "|FINAL_MARKET_BIAS=" + value(finalMarketBias)
-                + "|CONFIDENCE=" + value(confidence)
-                + "|RISK_LEVEL=" + value(riskLevel)
-                + "|PLAN_MODE=" + value(planMode)
-                + "|AI_DECISION=" + value(aiDecisionResult)
-                + "|DATA_QUALITY=" + value(dataQuality)
-                + "|FRESHNESS_AGE_SECONDS=" + freshnessAgeSeconds
-                + "|STABILITY_SECONDS=" + stabilitySeconds
-                + "|PRIORITY_SCORE=" + priorityScore;
+    private static LocalDateTime latestRunTime(AnalysisRunDO run) {
+        if (run == null) return null;
+        if (run.getCompletedAt() != null) return run.getCompletedAt();
+        return run.getAnalysisTime();
     }
 
-    private static boolean completeRankingInput(Integer opportunityScore,
-                                                String finalMarketBias,
-                                                String confidence,
-                                                String risk,
-                                                String planMode,
-                                                String conflict,
-                                                Integer dataQuality,
-                                                LocalDateTime analysisTime) {
+    private static long ageSeconds(LocalDateTime value, LocalDateTime now) {
+        if (value == null || now == null) return Long.MAX_VALUE;
+        return Math.max(0L, Duration.between(value, now).getSeconds());
+    }
+
+    private static boolean completeOpportunityInput(Integer opportunityScore,
+                                                    String finalMarketBias,
+                                                    String confidence,
+                                                    String risk,
+                                                    String planMode,
+                                                    String conflict,
+                                                    Integer dataQuality,
+                                                    LocalDateTime analysisTime) {
         try {
             org.example.trademodel.enums.MarketBiasEnum.valueOf(finalMarketBias);
             PlanModeEnum.require(planMode);
@@ -339,9 +471,10 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
     }
 
     private static boolean eligibleState(AssetStateEnum state) {
-        return state == AssetStateEnum.CANDIDATE
+        return state == AssetStateEnum.TRIGGERED
                 || state == AssetStateEnum.WAITING_TRIGGER
-                || state == AssetStateEnum.TRIGGERED;
+                || state == AssetStateEnum.CANDIDATE
+                || state == AssetStateEnum.HIGH_RISK;
     }
 
     private static String value(Object value) {
@@ -375,5 +508,29 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
 
     private static <T> List<T> safe(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private record SchedulerScanAudit(boolean present,
+                                      String result,
+                                      String dataFreshness,
+                                      LocalDateTime finishedAt,
+                                      boolean fullAnalysisSucceeded) {
+        private static SchedulerScanAudit missing() {
+            return new SchedulerScanAudit(false, null, null, null, false);
+        }
+    }
+
+    private record ObservationState(AssetStateDO state,
+                                    AnalysisRunDO formalRun,
+                                    String dataStatus,
+                                    LocalDateTime finishedAt,
+                                    long ageSeconds,
+                                    String timeframe,
+                                    boolean fullAnalysisSucceeded,
+                                    String result) {
+        private static ObservationState neverScanned() {
+            return new ObservationState(null, null, "NEVER_SCANNED", null,
+                    Long.MAX_VALUE, null, false, null);
+        }
     }
 }
