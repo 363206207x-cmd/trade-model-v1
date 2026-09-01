@@ -286,6 +286,52 @@ Closed PR #1201 and its preserved Head are non-effective audit/recovery
 evidence for the successor. This authorization does not make that branch
 current, copy its rules, or create a parallel Telegram implementation.
 
+### Owner-approved machine-gate amendment and exact B01-B04 successor
+
+This is a subordinate machine-authorization record, not a new Product Source
+and not a product-semantic change. Owner explicitly authorized the exact
+`TRINE_LOGIC_V4_1_MACHINE_GATE_OWNER_AMENDMENT` package to start from clean
+`origin/main` at
+`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e` on branch
+`codex/v4-1-machine-gate-owner-amendment`. Its mode is
+`DOCS_GATE_OWNER_AMENDMENT`; ordinary implementation packages cannot use this
+entry or modify canonical gate owners.
+
+The amendment may change only the following exact paths:
+
+- `docs/CODEX_NEXT_TASK.yml`
+- `docs/PRODUCT_SOURCE_OF_TRUTH.md`
+- `docs/PROJECT_CURRENT_STATE.md`
+- `docs/DELIVERY_PROGRESS_MATRIX.md`
+- `docs/ACTIVE_MAINLINE_STATUS.yml`
+- `scripts/v1-state.sh`
+- `scripts/codex-next-task.sh`
+- `scripts/check-workflow-contract.sh`
+
+It registers one successor triple only:
+
+| Attribute | Exact value |
+|---|---|
+| Package | `REAL_DATA_HOME_BLOCKER_CLOSURE` |
+| Branch | `codex/v4-1-real-data-home-blocker-closure` |
+| Starting full SHA | `a60eff8d83c0e1d04371bd425267f1e8d0e4f95c` |
+
+All three values are mandatory and machine-matched. Missing, shortened,
+inferred or incorrect SHA values fail closed. The preserved `a60eff8d...`
+candidate remains unmerged and is not made effective by this record.
+
+The successor may address only B01 direction/state schema alignment and
+persistence-error classification, B02 Home provenance projection, B03 asset
+card vertical overflow, B04 favicon 404, corresponding tests, real Binance
+public read-only acceptance, and one local candidate commit. V1-V14 mutation,
+algorithm or threshold changes, Home redesign, CoinGlass, real Telegram send,
+automatic trading, push, PR modification, merge and deployment remain blocked.
+
+Neither this amendment nor its successor is effective merely because this
+text exists on a branch. The gate amendment must first be independently
+reviewed and merged to `main`; B01-B04 remain open until the exact successor is
+implemented and separately accepted.
+
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 
 | Attribute | Registration |
