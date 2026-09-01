@@ -39,7 +39,13 @@ class MarketStructureBoundaryExtractorImplTest {
         assertThat(result.getTakeProfitTargets().get(0).getTargetType()).isEqualTo("STRUCTURE_RESISTANCE");
         assertThat(result.getTakeProfitTargets().get(0).getSourceRef()).contains("MARKET_STRUCTURE:RESISTANCE");
         assertThat(result.getRrRatio()).isPositive();
-        assertThat(result.getSourceRefs()).hasSize(3);
+        assertThat(result.getSourceRefs()).hasSize(4);
+        assertThat(result.getSourceRefs()).allSatisfy(source -> {
+            assertThat(source.getSourceType()).isNotBlank();
+            assertThat(source.getSourceId()).isNotBlank();
+            assertThat(source.getProvider()).isEqualTo("LOCAL_FIXTURE");
+            assertThat(source.getAnalysisId()).isEqualTo("analysis-boundary-test");
+        });
         assertReviewOnlySafety(result);
     }
 
@@ -197,6 +203,7 @@ class MarketStructureBoundaryExtractorImplTest {
     private MarketStructureBoundaryRequest request(String direction, List<RuntimeKlineItemDTO> bars) {
         MarketStructureBoundaryRequest request = new MarketStructureBoundaryRequest();
         request.setSymbol("BTCUSDT");
+        request.setAnalysisId("analysis-boundary-test");
         request.setDirection(direction);
         request.setTimeframe("1m");
         request.setGeneratedAt(LocalDateTime.of(2026, 6, 1, 10, 0));

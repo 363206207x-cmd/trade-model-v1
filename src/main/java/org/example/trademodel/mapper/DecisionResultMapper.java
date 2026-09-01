@@ -14,8 +14,8 @@ import java.util.List;
 @Mapper
 public interface DecisionResultMapper {
 
-    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, rule_market_bias, final_market_bias, rule_confidence, rule_risk, rule_plan_mode, rule_can_execute, candidate_plan_mode, final_plan_mode, bias_adjustment_reason, plan_mode_adjustment_reason, confused_score, asset_state_snapshot, create_time) " +
-            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{ruleMarketBias}, #{finalMarketBias}, #{ruleConfidence}, #{ruleRisk}, #{rulePlanMode}, #{ruleCanExecute}, #{candidatePlanMode}, #{finalPlanMode}, #{biasAdjustmentReason}, #{planModeAdjustmentReason}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
+    @Insert("INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, market_bias_hierarchy, trade_type, confidence_level, risk_level, action_priority, conclusion_summary, is_worth_opening, multi_tf_convergence, ai_role_results, is_adopted, valid_period, valid_from, expires_at, invalid_condition, evidence_summary, explanation_json, review_reasons, ai_conflict_level, ai_conflict_score, ai_plan_mode, rule_market_bias, validated_market_bias, final_market_bias, direction_data_state, data_quality_score, evidence_reliability, opportunity_score, risk_score, final_confidence, one_hour_opportunity_quality, four_hour_trend_alignment, normalization_version, score_version, data_quality_version, provider_matrix_version, rule_confidence, rule_risk, rule_plan_mode, rule_can_execute, candidate_plan_mode, final_plan_mode, bias_adjustment_reason, plan_mode_adjustment_reason, confused_score, asset_state_snapshot, create_time) " +
+            "VALUES(#{decisionId}, #{analysisId}, #{symbol}, #{marketBiasHierarchy}, #{tradeType}, #{confidenceLevel}, #{riskLevel}, #{actionPriority}, #{conclusionSummary}, #{isWorthOpening}, #{multiTfConvergence}, #{aiRoleResults}, #{isAdopted}, #{validPeriod}, #{validFrom}, #{expiresAt}, #{invalidCondition}, #{evidenceSummary}, #{explanationJson}, #{reviewReasons}, #{aiConflictLevel}, #{aiConflictScore}, #{aiPlanMode}, #{ruleMarketBias}, #{validatedMarketBias}, #{finalMarketBias}, #{directionDataState}, #{dataQualityScore}, #{evidenceReliability}, #{opportunityScore}, #{riskScore}, #{finalConfidence}, #{oneHourOpportunityQuality}, #{fourHourTrendAlignment}, #{normalizationVersion}, #{scoreVersion}, #{dataQualityVersion}, #{providerMatrixVersion}, #{ruleConfidence}, #{ruleRisk}, #{rulePlanMode}, #{ruleCanExecute}, #{candidatePlanMode}, #{finalPlanMode}, #{biasAdjustmentReason}, #{planModeAdjustmentReason}, #{confusedScore}, #{assetStateSnapshot}, #{createTime})")
     int insert(DecisionResult decision);
 
     @Select("SELECT * FROM tm_decision_result ORDER BY create_time DESC LIMIT #{limit}")
@@ -33,6 +33,14 @@ public interface DecisionResultMapper {
             p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.validated_market_bias AS validatedMarketBias, d.final_market_bias AS finalMarketBias,
+            d.direction_data_state AS directionDataState, d.data_quality_score AS dataQualityScore,
+            d.evidence_reliability AS evidenceReliability, d.opportunity_score AS opportunityScore,
+            d.risk_score AS riskScore, d.final_confidence AS finalConfidence,
+            d.one_hour_opportunity_quality AS oneHourOpportunityQuality,
+            d.four_hour_trend_alignment AS fourHourTrendAlignment,
+            d.normalization_version AS normalizationVersion, d.score_version AS scoreVersion,
+            d.data_quality_version AS dataQualityVersion, d.provider_matrix_version AS providerMatrixVersion,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
             p.invalid_condition AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
@@ -42,7 +50,7 @@ public interface DecisionResultMapper {
             p.take_profit_rules AS takeProfitRules,
             p.leverage_limit AS leverageSuggestion,
             p.position_limit AS positionSuggestion,
-            ar.data_quality_score AS dataQualityScore
+            d.data_quality_score AS persistedDataQualityScore
             FROM tm_decision_result d
             LEFT JOIN (
               SELECT plan_id, analysis_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
@@ -70,6 +78,14 @@ public interface DecisionResultMapper {
             p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.validated_market_bias AS validatedMarketBias, d.final_market_bias AS finalMarketBias,
+            d.direction_data_state AS directionDataState, d.data_quality_score AS dataQualityScore,
+            d.evidence_reliability AS evidenceReliability, d.opportunity_score AS opportunityScore,
+            d.risk_score AS riskScore, d.final_confidence AS finalConfidence,
+            d.one_hour_opportunity_quality AS oneHourOpportunityQuality,
+            d.four_hour_trend_alignment AS fourHourTrendAlignment,
+            d.normalization_version AS normalizationVersion, d.score_version AS scoreVersion,
+            d.data_quality_version AS dataQualityVersion, d.provider_matrix_version AS providerMatrixVersion,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
             p.invalid_condition AS executionPlanSummary,
             p.recommended_action AS recommendedAction,
@@ -79,7 +95,7 @@ public interface DecisionResultMapper {
             p.take_profit_rules AS takeProfitRules,
             p.leverage_limit AS leverageSuggestion,
             p.position_limit AS positionSuggestion,
-            ar.data_quality_score AS dataQualityScore
+            d.data_quality_score AS persistedDataQualityScore
             FROM tm_decision_result d
             LEFT JOIN (
               SELECT plan_id, analysis_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
@@ -110,12 +126,18 @@ public interface DecisionResultMapper {
             "d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson,",
             "d.review_reasons AS reviewReasons, d.ai_conflict_level AS aiConflictLevel,",
             "d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,",
+            "d.validated_market_bias AS validatedMarketBias, d.direction_data_state AS directionDataState,",
+            "d.evidence_reliability AS evidenceReliability, d.risk_score AS riskScore,",
+            "d.final_confidence AS finalConfidence, d.one_hour_opportunity_quality AS oneHourOpportunityQuality,",
+            "d.four_hour_trend_alignment AS fourHourTrendAlignment, d.normalization_version AS normalizationVersion,",
+            "d.score_version AS scoreVersion, d.data_quality_version AS dataQualityVersion,",
+            "d.provider_matrix_version AS providerMatrixVersion,",
             "d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot,",
             "d.create_time AS createTime, p.recommended_action AS recommendedAction,",
             "p.final_plan_mode AS planMode, p.final_market_bias AS finalMarketBias, p.entry_zone AS entryZone, p.stop_loss AS stopLoss,",
             "p.take_profit_rules AS takeProfitRules, p.leverage_limit AS leverageSuggestion,",
-            "p.position_limit AS positionSuggestion, ar.data_quality_score AS dataQualityScore,",
-            "scores.opportunity_score AS opportunityScore",
+            "p.position_limit AS positionSuggestion, d.data_quality_score AS dataQualityScore,",
+            "d.opportunity_score AS opportunityScore",
             "FROM (",
             "  SELECT src.*, ROW_NUMBER() OVER (",
             "    PARTITION BY UPPER(TRIM(src.symbol)), LOWER(TRIM(owner_run.timeframe))",
@@ -130,11 +152,6 @@ public interface DecisionResultMapper {
             "  AND ((#{ownerType} = 'SYSTEM' AND owner_run.owner_type = 'SYSTEM' AND owner_run.owner_id = 0)",
             "    OR (#{ownerType} = 'USER' AND ((owner_run.owner_type = 'USER' AND owner_run.owner_id = #{ownerId})",
             "      OR (owner_run.owner_type = 'SYSTEM' AND owner_run.owner_id = 0))))",
-            "  AND EXISTS (SELECT 1 FROM tm_execution_plan eligible_plan",
-            "    WHERE eligible_plan.analysis_id = src.analysis_id",
-            "      AND eligible_plan.final_plan = TRUE",
-            "      AND eligible_plan.rule_validation_status = 'PASS'",
-            "      AND eligible_plan.chain_status = 'FINAL_VALIDATED')",
             ") d",
             "LEFT JOIN (",
             "  SELECT plan_id, analysis_id, final_plan_mode, final_market_bias, recommended_action, entry_zone, stop_loss,",
@@ -146,10 +163,6 @@ public interface DecisionResultMapper {
             "    AND chain_status = 'FINAL_VALIDATED'",
             ") p ON d.analysis_id = p.analysis_id AND p.rn = 1",
             "LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id",
-            "LEFT JOIN (",
-            "  SELECT analysis_id, AVG(score_value) AS opportunity_score",
-            "  FROM tm_score_item GROUP BY analysis_id",
-            ") scores ON scores.analysis_id = d.analysis_id",
             "WHERE d.symbol_rank = 1",
             "ORDER BY ar.analysis_time DESC, d.create_time DESC, d.decision_id DESC",
             "</script>"
@@ -171,6 +184,14 @@ public interface DecisionResultMapper {
             p.invalid_condition AS invalidCondition,
             d.evidence_summary AS evidenceSummary, d.explanation_json AS explanationJson, d.review_reasons AS reviewReasons,
             d.ai_conflict_level AS aiConflictLevel, d.ai_conflict_score AS aiConflictScore, d.ai_plan_mode AS aiPlanMode,
+            d.validated_market_bias AS validatedMarketBias, d.final_market_bias AS finalMarketBias,
+            d.direction_data_state AS directionDataState, d.data_quality_score AS dataQualityScore,
+            d.evidence_reliability AS evidenceReliability, d.opportunity_score AS opportunityScore,
+            d.risk_score AS riskScore, d.final_confidence AS finalConfidence,
+            d.one_hour_opportunity_quality AS oneHourOpportunityQuality,
+            d.four_hour_trend_alignment AS fourHourTrendAlignment,
+            d.normalization_version AS normalizationVersion, d.score_version AS scoreVersion,
+            d.data_quality_version AS dataQualityVersion, d.provider_matrix_version AS providerMatrixVersion,
             d.confused_score AS confusedScore, d.asset_state_snapshot AS assetStateSnapshot, d.create_time AS createTime,
             p.recommended_action AS recommendedAction,
             p.final_plan_mode AS planMode,
@@ -179,7 +200,7 @@ public interface DecisionResultMapper {
             p.take_profit_rules AS takeProfitRules,
             p.leverage_limit AS leverageSuggestion,
             p.position_limit AS positionSuggestion,
-            ar.data_quality_score AS dataQualityScore
+            d.data_quality_score AS persistedDataQualityScore
             FROM tm_decision_result d
             INNER JOIN tm_execution_plan p
               ON p.plan_id = #{planId} AND p.analysis_id = d.analysis_id

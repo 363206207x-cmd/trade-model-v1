@@ -49,6 +49,42 @@ public interface AssetStateMapper {
             + "AND symbol = #{symbol} AND timeframe = #{timeframe}")
     int updateOpportunityProjection(AssetStateDO row);
 
+    @Insert("INSERT INTO tm_asset_state (owner_type, owner_id, asset_id, pool_item_id, symbol, timeframe, "
+            + "state, confused_score, confused_low_streak, opportunity_id, state_entered_at, "
+            + "last_transition_reason, last_trigger_source, last_update_time, trace_id, rule_version, "
+            + "created_at, updated_at) SELECT #{ownerType}, #{ownerId}, #{assetId}, #{poolItemId}, "
+            + "#{symbol}, #{timeframe}, #{state}, #{confusedScore}, #{confusedLowStreak}, "
+            + "#{opportunityId}, #{stateEnteredAt}, #{lastTransitionReason}, #{lastTriggerSource}, "
+            + "#{lastUpdateTime}, #{traceId}, #{ruleVersion}, #{createdAt}, #{updatedAt} "
+            + "WHERE NOT EXISTS (SELECT 1 FROM tm_asset_state WHERE owner_type = #{ownerType} "
+            + "AND owner_id = #{ownerId} AND symbol = #{symbol} AND timeframe = #{timeframe})")
+    int insertScheduledBaselineIfAbsent(AssetStateDO row);
+
+    @Update("UPDATE tm_asset_state SET last_update_time = #{startedAt}, trace_id = #{traceId}, "
+            + "rule_version = #{ruleVersion}, last_trigger_source = 'ASSET_POOL_SCAN', "
+            + "last_transition_reason = 'LIGHTWEIGHT_SCAN_CLAIMED', updated_at = #{startedAt} "
+            + "WHERE owner_type = #{ownerType} AND owner_id = #{ownerId} AND symbol = #{symbol} "
+            + "AND timeframe = #{timeframe} AND state = #{state} AND "
+            + "((last_update_time IS NULL AND #{expectedLastUpdateTime} IS NULL) "
+            + "OR last_update_time = #{expectedLastUpdateTime})")
+    int claimScheduledScan(@Param("ownerType") String ownerType,
+                           @Param("ownerId") Long ownerId,
+                           @Param("symbol") String symbol,
+                           @Param("timeframe") String timeframe,
+                           @Param("state") String state,
+                           @Param("expectedLastUpdateTime") java.time.LocalDateTime expectedLastUpdateTime,
+                           @Param("startedAt") java.time.LocalDateTime startedAt,
+                           @Param("traceId") String traceId,
+                           @Param("ruleVersion") String ruleVersion);
+
+    @Update("UPDATE tm_asset_state SET ext_json = #{row.extJson}, updated_at = #{row.updatedAt} "
+            + "WHERE owner_type = #{row.ownerType} AND owner_id = #{row.ownerId} "
+            + "AND symbol = #{row.symbol} AND timeframe = #{row.timeframe} "
+            + "AND (trace_id = #{claimTraceId} OR trace_id = #{analysisTraceId})")
+    int completeScheduledScanAudit(@Param("row") AssetStateDO row,
+                                   @Param("claimTraceId") String claimTraceId,
+                                   @Param("analysisTraceId") String analysisTraceId);
+
     @Select("SELECT * FROM tm_asset_state WHERE owner_type = 'SYSTEM' AND owner_id = 0 "
             + "AND symbol = #{symbol} ORDER BY last_update_time DESC, id DESC LIMIT 1")
     AssetStateDO selectBySymbol(@Param("symbol") String symbol);

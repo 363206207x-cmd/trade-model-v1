@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(classes = TradeModelApplication.class)
 @Transactional
@@ -37,8 +38,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?)",
                 "ana-mapper-it-1", "BTCUSDT", "1h", 87);
         jdbcTemplate.update(
-                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, valid_period, invalid_condition, create_time) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)",
-                "dec-mapper-it-1", "ana-mapper-it-1", "BTCUSDT", "2h", "decision-invalid");
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, valid_period, invalid_condition, data_quality_score, create_time) VALUES (?,?,?,?,?,?, CURRENT_TIMESTAMP)",
+                "dec-mapper-it-1", "ana-mapper-it-1", "BTCUSDT", "2h", "decision-invalid", 87);
         jdbcTemplate.update(
                 "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition, create_time) "
                         + "VALUES (?,?,?,?,?,?,?,?,?,?, TIMESTAMP '2020-01-01 00:00:00')",
@@ -70,8 +71,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?)",
                 "ana-mapper-it-2", "ETHUSDT", "1h", 73);
         jdbcTemplate.update(
-                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, invalid_condition, create_time) VALUES (?,?,?,?, CURRENT_TIMESTAMP)",
-                "dec-mapper-it-2", "ana-mapper-it-2", "ETHUSDT", "decision-eth-invalid");
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, invalid_condition, data_quality_score, create_time) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)",
+                "dec-mapper-it-2", "ana-mapper-it-2", "ETHUSDT", "decision-eth-invalid", 73);
         jdbcTemplate.update(
                 "INSERT INTO tm_execution_plan(plan_id, analysis_id, plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, invalid_condition, create_time) "
                         + "VALUES (?,?,?,?,?,?,?,?,?,?, TIMESTAMP '2025-01-01 12:00:00')",
@@ -118,6 +119,30 @@ class DecisionResultMapperLatestPlanIntegrationTest {
     }
 
     @Test
+    void solMultiTimeframeConflictPersistsWithoutCreatingFinalPlan() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
+                        + "VALUES (?,?,?, TIMESTAMP '2026-08-31 12:00:00', ?)",
+                "analysis-sol-conflict", "SOLUSDT", "1h", 91);
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, direction_data_state, "
+                        + "data_quality_score, opportunity_score, create_time) "
+                        + "VALUES (?,?,?,?,?,?, TIMESTAMP '2026-08-31 12:00:00')",
+                "decision-sol-conflict", "analysis-sol-conflict", "SOLUSDT",
+                "MULTI_TIMEFRAME_CONFLICT", 91, 78);
+
+        String persistedState = jdbcTemplate.queryForObject(
+                "SELECT direction_data_state FROM tm_decision_result WHERE decision_id=?",
+                String.class, "decision-sol-conflict");
+        Integer finalPlanCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tm_execution_plan WHERE analysis_id=? AND final_plan=TRUE",
+                Integer.class, "analysis-sol-conflict");
+
+        assertThat(persistedState).isEqualTo("MULTI_TIMEFRAME_CONFLICT");
+        assertThat(finalPlanCount).isZero();
+    }
+
+    @Test
     void opportunityRankingReadReturnsLatestDecisionRealScoreAndOnlyValidatedFinalPlan() {
         jdbcTemplate.update(
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
@@ -133,19 +158,22 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 "analysis-rank-link", "LINKUSDT", "1h", 88);
         jdbcTemplate.update(
                 "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
-                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2025-01-01 00:00:00')",
+                        + "ai_conflict_level, data_quality_score, opportunity_score, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?, TIMESTAMP '2025-01-01 00:00:00')",
                 "decision-rank-btc-old", "analysis-rank-btc-old", "BTCUSDT", "LOW", "HIGH",
-                "LEVEL_3_SIGNIFICANT_DISAGREEMENT");
+                "LEVEL_3_SIGNIFICANT_DISAGREEMENT", 70, 60);
         jdbcTemplate.update(
                 "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
-                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
+                        + "ai_conflict_level, data_quality_score, opportunity_score, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
                 "decision-rank-btc", "analysis-rank-btc", "BTCUSDT", "HIGH", "LOW",
-                "LEVEL_1_CONSISTENT");
+                "LEVEL_1_CONSISTENT", 94, 90);
         jdbcTemplate.update(
                 "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, confidence_level, risk_level, "
-                        + "ai_conflict_level, create_time) VALUES (?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
+                        + "ai_conflict_level, data_quality_score, opportunity_score, create_time) "
+                        + "VALUES (?,?,?,?,?,?,?,?, TIMESTAMP '2026-01-01 00:00:00')",
                 "decision-rank-link", "analysis-rank-link", "LINKUSDT", "MEDIUM", "MEDIUM",
-                "LEVEL_2_MINOR_DISAGREEMENT");
+                "LEVEL_2_MINOR_DISAGREEMENT", 88, 75);
         insertValidatedFinalPlan("analysis-rank-btc", "BTCUSDT", "5m",
                 "plan-rank-btc", "CONFIRMATION", "FINAL_VALIDATED");
         insertValidatedFinalPlan("analysis-rank-link", "LINKUSDT", "1h",
@@ -207,6 +235,41 @@ class DecisionResultMapperLatestPlanIntegrationTest {
                 .extracting(DecisionResultVO::getAnalysisId).isEqualTo("analysis-rank-user-41");
         assertThat(systemRows).singleElement()
                 .extracting(DecisionResultVO::getAnalysisId).isEqualTo("analysis-rank-system");
+    }
+
+    @Test
+    void observationFinalPersistsWithoutDirectionalParametersAndRejectsExecutionLeakage() {
+        insertOwnedAnalysis("analysis-observation-boundary", "SYSTEM", 0L,
+                "2026-01-01 00:00:00", 86);
+        insertValidatedFinalPlan("analysis-observation-boundary", "UNIUSDT", "5m",
+                "plan-observation-boundary", "OBSERVATION", "FINAL_VALIDATED");
+
+        ExecutionPlanDO persisted = executionPlanMapper.selectByPlanId("plan-observation-boundary");
+        assertThat(persisted).isNotNull();
+        assertThat(persisted.getFinalPlan()).isTrue();
+        assertThat(persisted.getFinalPlanMode()).isEqualTo("OBSERVATION");
+        assertThat(persisted.getEntryZone()).isNull();
+        assertThat(persisted.getStopLoss()).isNull();
+        assertThat(persisted.getTakeProfitRules()).isNull();
+        assertThat(persisted.getExpectedRiskReward()).isNull();
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE tm_execution_plan SET entry_zone=? WHERE plan_id=?",
+                "100-101", "plan-observation-boundary"))
+                .hasStackTraceContaining("CK_TM_EXECUTION_PLAN_FINAL_BOUNDARY");
+    }
+
+    @Test
+    void directionalFinalCannotLoseItsOwnedEntrySource() {
+        insertOwnedAnalysis("analysis-directional-boundary", "SYSTEM", 0L,
+                "2026-01-01 00:00:00", 92);
+        insertValidatedFinalPlan("analysis-directional-boundary", "UNIUSDT", "5m",
+                "plan-directional-boundary", "PREPARATION", "FINAL_VALIDATED");
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE tm_execution_plan SET entry_source=NULL WHERE plan_id=?",
+                "plan-directional-boundary"))
+                .hasStackTraceContaining("CK_TM_EXECUTION_PLAN_FINAL_BOUNDARY");
     }
 
     private void insertOwnedAnalysis(String analysisId, String ownerType, Long ownerId,
@@ -274,10 +337,42 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         finalPlan.setPlanMode(planMode);
         finalPlan.setCandidatePlanMode(planMode);
         finalPlan.setFinalPlanMode(planMode);
+        if ("OBSERVATION".equals(planMode)) {
+            clearDirectionalParameters(finalPlan);
+        }
         finalPlan.setChainStatus(chainStatus);
         finalPlan.setAccountRiskSnapshotId(accountRiskSnapshotId);
         finalPlan.setCreateTime(createdAt.toLocalDateTime());
         executionPlanMapper.insert(finalPlan);
+    }
+
+    private void clearDirectionalParameters(ExecutionPlanDO plan) {
+        plan.setEntryLogic(null);
+        plan.setEntryZone(null);
+        plan.setEntrySource(null);
+        plan.setEntryReason(null);
+        plan.setTriggerCondition(null);
+        plan.setStopLogic(null);
+        plan.setStopLoss(null);
+        plan.setStopSource(null);
+        plan.setStopReason(null);
+        plan.setTargetLogic(null);
+        plan.setTakeProfitRules(null);
+        plan.setTargetSource(null);
+        plan.setTargetReason(null);
+        plan.setAddPositionCondition(null);
+        plan.setReducePositionCondition(null);
+        plan.setAbandonCondition(null);
+        plan.setInvalidCondition(null);
+        plan.setInvalidationSource(null);
+        plan.setInvalidationReason(null);
+        plan.setLeverageSuggestion(null);
+        plan.setLeverageLimit(null);
+        plan.setPositionSuggestion(null);
+        plan.setPositionLimit(null);
+        plan.setExpectedRiskReward(null);
+        plan.setExpectedRiskRewardSource(null);
+        plan.setExpectedRiskRewardReason(null);
     }
 
     private long insertVerifiedAccountRiskSnapshot(String analysisId,

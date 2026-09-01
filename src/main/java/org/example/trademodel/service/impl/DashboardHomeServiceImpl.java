@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
@@ -14,6 +15,8 @@ import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
+import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.messagepush.MessageReadState;
@@ -31,6 +34,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
@@ -41,6 +45,7 @@ import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.ConfusedStatePolicy;
+import org.example.trademodel.service.MarketBiasPolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
@@ -120,6 +125,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
+    private EvidenceItemMapper evidenceItemMapper;
     private DecisionResultMapper decisionResultMapper;
     private ExecutionPlanMapper executionPlanMapper;
     private PositionPlanSourceResolver positionPlanSourceResolver;
@@ -182,6 +188,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                       AnalysisRunMapper analysisRunMapper) {
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
         this.analysisRunMapper = analysisRunMapper;
+    }
+
+    @Autowired(required = false)
+    void setHomeProvenanceSource(EvidenceItemMapper evidenceItemMapper) {
+        this.evidenceItemMapper = evidenceItemMapper;
     }
 
     @Autowired(required = false)
@@ -280,13 +291,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 ? selectedProjection == null ? null : selectedProjection.sourceDecision()
                 : findDecision(decisions, normalizedSelected);
         boolean selectedDecisionReadFailed = false;
-        if (selectedDecision == null && normalizedSelected != null) {
+        if (selectedDecision == null && normalizedSelected != null
+                && (selectedProjection == null || hasText(selectedProjection.analysisId()))) {
             DecisionLookupResult lookup = safeDecisionLookup(userId, normalizedSelected);
-            selectedDecision = lookup.decision();
+            selectedDecision = selectedProjection == null
+                    ? lookup.decision()
+                    : validatedObservationDecision(userId, selectedProjection, lookup.decision());
             selectedDecisionReadFailed = lookup.failed();
         }
         List<DashboardHomeVO.AssetVO> assets = rankingEnabled
-                ? buildRankedAssets(rankingRead.rows(), effectiveLimit)
+                ? buildRankedAssets(rankingRead.rows(), effectiveLimit, userId)
                 : buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
         if (!rankingEnabled && normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
             String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
@@ -333,7 +347,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(selectedDecision);
+        DecisionResultVO executionDecision = (selectedProjection != null
+                && selectedProjection.sourceDecision() == null)
+                || (selectedProjection != null
+                && "HIGH_RISK".equalsIgnoreCase(selectedProjection.opportunityState()))
+                ? null : selectedDecision;
+        DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(executionDecision);
         home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
@@ -816,7 +835,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private List<DashboardHomeVO.AssetVO> buildRankedAssets(
             List<HomeTopAssetProjection> projections,
-            int limit) {
+            int limit,
+            Long userId) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         Set<Long> usedAssetIds = new LinkedHashSet<>();
         Set<String> usedSymbols = new LinkedHashSet<>();
@@ -825,36 +845,343 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (assets.size() >= limit) {
                 break;
             }
-            if (projection == null || projection.sourceDecision() == null
-                    || projection.assetId() == null
-                    || !usedAssetIds.add(projection.assetId())
-                    || !usedSymbols.add(normalizeSymbol(projection.symbol()))) {
+            String symbol = projection == null ? null : normalizeSymbol(projection.symbol());
+            if (projection == null || projection.assetId() == null || symbol == null
+                    || usedAssetIds.contains(projection.assetId()) || usedSymbols.contains(symbol)) {
                 continue;
             }
-            DashboardHomeVO.AssetVO asset = assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            DashboardHomeVO.AssetVO asset = projection.sourceDecision() == null
+                    ? assetFromObservation(assets.size() + 1, projection, userId)
+                    : assetFromDecision(assets.size() + 1, projection.sourceDecision());
+            if (asset == null) {
+                continue;
+            }
+            usedAssetIds.add(projection.assetId());
+            usedSymbols.add(symbol);
             asset.setAssetId(projection.assetId());
             asset.setName(projection.name());
-            asset.setAnalysisId(projection.analysisId());
-            asset.setOpportunityId(projection.opportunityId());
-            asset.setOpportunityState(projection.opportunityState());
-            asset.setPrimaryOpportunityId(projection.primaryOpportunityId());
-            asset.setPrimaryTimeframe(projection.primaryTimeframe());
-            asset.setPrimaryPlanMode(projection.primaryPlanMode());
-            asset.setSecondaryOpportunityCount(projection.secondaryOpportunityCount());
-            asset.setTimeframeConflictState(projection.timeframeConflictState());
-            asset.setOpportunityScore(projection.opportunityScore());
-            asset.setPlanMode(projection.planMode());
-            asset.setAiDecisionResult(projection.aiDecisionResult());
-            asset.setDataQualityScore(projection.dataQuality());
-            asset.setRankingReason(projection.rankingReason());
-            applyCardFinalProjection(asset, projection.sourceDecision());
+            if (projection.sourceDecision() != null) {
+                asset.setAnalysisId(projection.analysisId());
+                asset.setOpportunityId(projection.opportunityId());
+                asset.setOpportunityState(projection.opportunityState());
+                asset.setPrimaryOpportunityId(projection.primaryOpportunityId());
+                asset.setPrimaryTimeframe(projection.primaryTimeframe());
+                asset.setPrimaryPlanMode(projection.primaryPlanMode());
+                asset.setSecondaryOpportunityCount(projection.secondaryOpportunityCount());
+                asset.setTimeframeConflictState(projection.timeframeConflictState());
+                asset.setOpportunityScore(projection.opportunityScore());
+                asset.setPlanMode(projection.planMode());
+                asset.setAiDecisionResult(projection.aiDecisionResult());
+                asset.setDataQualityScore(projection.dataQuality());
+                asset.setRankingReason(projection.rankingReason());
+            }
+            if (projection.sourceDecision() != null) {
+                applyCardFinalProjection(asset, projection.sourceDecision());
+            } else {
+                clearCardFinalProjection(asset);
+            }
+            if (Boolean.TRUE.equals(asset.getHasFinal()) && projection.sourceDecision() != null) {
+                DecisionResultVO decision = projection.sourceDecision();
+                asset.setMarketBias(asset.getFinalMarketBias());
+                asset.setMarketBiasLabel(biasLabel(asset.getFinalMarketBias()));
+                Integer finalConfidence = decision.getFinalConfidence();
+                asset.setConfidenceLevel(finalConfidence == null ? null : String.valueOf(finalConfidence));
+                asset.setConfidenceLabel(finalConfidence == null ? null : finalConfidence + "%");
+                asset.setOneHourOpportunityLabel(oneHourOpportunityLabel(
+                        decision.getOneHourOpportunityQuality()));
+                asset.setFourHourTrendLabel(fourHourTrendLabel(asset.getFinalMarketBias(),
+                        decision.getFourHourTrendAlignment()));
+            }
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
                 setFieldSource(asset, "score", "DERIVED");
             }
+            applyAnalysisProvenance(asset, projection, userId);
             assets.add(asset);
         }
         return assets;
+    }
+
+    private void applyAnalysisProvenance(DashboardHomeVO.AssetVO asset,
+                                         HomeTopAssetProjection projection,
+                                         Long userId) {
+        if (asset == null || projection == null) return;
+
+        boolean tierOne = projection.priorityScore() != null && projection.priorityScore() > 0
+                && Boolean.TRUE.equals(asset.getHasFinal());
+        asset.setHomeTier(tierOne ? "TIER_1" : "TIER_2");
+        asset.setDirectionMaturity(tierOne ? "FINAL"
+                : projection.analysisId() == null ? "NOT_EVALUATED" : "NON_FINAL");
+        asset.setFreshnessStatus(trimToNull(projection.freshness()));
+
+        String analysisId = trimToNull(projection.analysisId());
+        if (analysisId == null || analysisRunMapper == null) return;
+        AnalysisRunDO run;
+        try {
+            run = userId != null && userId > 0
+                    ? analysisRunMapper.selectReadableByUser(analysisId, userId)
+                    : analysisRunMapper.selectById(analysisId);
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        if (!sameAnalysisAsset(run, asset, projection)) return;
+
+        asset.setAnalysisId(run.getAnalysisId());
+        asset.setAnalysisVersion(run.getVersionNo());
+        asset.setConfigurationVersion(trimToNull(run.getRuleVersion()));
+
+        DecisionResultVO projectedDecision = projection.sourceDecision();
+        DecisionResult persistedDecision = null;
+        if (projectedDecision == null && decisionResultMapper != null) {
+            try {
+                persistedDecision = decisionResultMapper.selectLatestByAnalysisId(analysisId);
+            } catch (RuntimeException ignored) {
+                persistedDecision = null;
+            }
+        }
+        asset.setProviderMatrixVersion(projectedDecision != null
+                ? trimToNull(projectedDecision.getProviderMatrixVersion())
+                : persistedDecision == null ? null : trimToNull(persistedDecision.getProviderMatrixVersion()));
+        Integer persistedDataQuality = projectedDecision != null
+                ? projectedDecision.getDataQualityScore()
+                : persistedDecision == null ? run.getDataQualityScore() : persistedDecision.getDataQualityScore();
+        asset.setDataQualityScore(persistedDataQuality);
+
+        EvidenceItemDO marketEvidence = analysisMarketEvidence(analysisId, asset.getRawSymbol());
+        if (marketEvidence == null) return;
+        String sourceTraceId = trimToNull(marketEvidence.getSourceTraceId());
+        String evidenceProvider = trimToNull(marketEvidence.getSourceProvider());
+        asset.setSourceId(sourceTraceId);
+        asset.setProvider(evidenceProvider);
+        if (sourceTraceId == null || persistedOhlcvBarMapper == null || run.getAnalysisTime() == null) return;
+
+        PersistedOhlcvBarDO sourceAnchor;
+        try {
+            sourceAnchor = persistedOhlcvBarMapper.selectLatestClosedBarBySourceTrace(
+                    asset.getRawSymbol(), sourceTraceId);
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        if (!sameProvider(evidenceProvider, sourceAnchor)) return;
+
+        String provider = trimToNull(sourceAnchor.getProvider());
+        String marketType = trimToNull(sourceAnchor.getProviderMarketType());
+        if (provider == null || marketType == null) return;
+        long analysisTimeMs = run.getAnalysisTime().toInstant(ZoneOffset.UTC).toEpochMilli();
+        try {
+            PersistedOhlcvBarDO price = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "5m", provider, marketType, analysisTimeMs);
+            PersistedOhlcvBarDO oneHour = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "1h", provider, marketType, analysisTimeMs);
+            PersistedOhlcvBarDO fourHour = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "4h", provider, marketType, analysisTimeMs);
+            asset.setProvider(provider);
+            asset.setPriceObservedAt(closedAt(price));
+            asset.setOneHourClosedAt(closedAt(oneHour));
+            asset.setFourHourClosedAt(closedAt(fourHour));
+        } catch (RuntimeException ignored) {
+            asset.setPriceObservedAt(null);
+            asset.setOneHourClosedAt(null);
+            asset.setFourHourClosedAt(null);
+        }
+    }
+
+    private boolean sameAnalysisAsset(AnalysisRunDO run,
+                                      DashboardHomeVO.AssetVO asset,
+                                      HomeTopAssetProjection projection) {
+        if (run == null || !Objects.equals(trimToNull(run.getAnalysisId()), trimToNull(projection.analysisId()))) {
+            return false;
+        }
+        if (!Objects.equals(normalizeSymbol(run.getSymbol()), normalizeSymbol(asset.getRawSymbol()))) {
+            return false;
+        }
+        return run.getAssetId() == null || asset.getAssetId() == null
+                || Objects.equals(run.getAssetId(), asset.getAssetId());
+    }
+
+    private EvidenceItemDO analysisMarketEvidence(String analysisId, String symbol) {
+        if (evidenceItemMapper == null || !hasText(analysisId) || !hasText(symbol)) return null;
+        try {
+            String sourceMarker = ":" + normalizeSymbol(symbol) + ":1H:";
+            return evidenceItemMapper.listByAnalysisId(analysisId).stream()
+                    .filter(Objects::nonNull)
+                    .filter(row -> hasText(row.getSourceProvider()) && hasText(row.getSourceTraceId()))
+                    .filter(row -> {
+                        String reference = trimToNull(row.getSourceReference());
+                        return reference != null && reference.toUpperCase(Locale.ROOT).contains(sourceMarker);
+                    })
+                    .max(Comparator.comparing(EvidenceItemDO::getObservedAt,
+                            Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .orElse(null);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private boolean sameProvider(String evidenceProvider, PersistedOhlcvBarDO sourceAnchor) {
+        return sourceAnchor != null && hasText(sourceAnchor.getProvider())
+                && evidenceProvider != null
+                && evidenceProvider.equalsIgnoreCase(sourceAnchor.getProvider());
+    }
+
+    private PersistedOhlcvBarDO analysisBoundClosedBar(String symbol,
+                                                        String timeframe,
+                                                        String provider,
+                                                        String marketType,
+                                                        long analysisTimeMs) {
+        return persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                symbol, timeframe, provider, marketType, analysisTimeMs);
+    }
+
+    private LocalDateTime closedAt(PersistedOhlcvBarDO row) {
+        return row == null || row.getCloseTimeMs() == null || row.getCloseTimeMs() <= 0
+                ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(row.getCloseTimeMs()), ZoneOffset.UTC);
+    }
+
+    private DashboardHomeVO.AssetVO assetFromObservation(int slot,
+                                                          HomeTopAssetProjection projection,
+                                                          Long userId) {
+        if (projection == null || projection.assetId() == null || !hasText(projection.symbol())) {
+            return null;
+        }
+        DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(projection.symbol()));
+        String formalAnalysisId = authoritativeObservationAnalysisId(projection, userId);
+        boolean missingFormalAnalysis = formalAnalysisId == null;
+        String observationState = missingFormalAnalysis
+                ? "NEVER_SCANNED" : trimToNull(projection.opportunityState());
+        asset.setSlotType("OBSERVATION");
+        asset.setAssetId(projection.assetId());
+        asset.setName(trimToNull(projection.name()));
+        asset.setAnalysisId(formalAnalysisId);
+        asset.setOpportunityId(null);
+        asset.setPrimaryOpportunityId(null);
+        asset.setOpportunityScore(null);
+        asset.setPlanMode(null);
+        asset.setPrimaryPlanMode(null);
+        asset.setAiDecisionResult(null);
+        asset.setDataQualityScore(null);
+        asset.setMarketBias(null);
+        asset.setMarketBiasLabel(null);
+        asset.setCompositeScore(null);
+        asset.setConfidenceLevel(null);
+        asset.setConfidenceLabel(null);
+        asset.setRiskLevel(null);
+        asset.setRiskLabel(null);
+        asset.setWorthOpening(null);
+        clearCardFinalProjection(asset);
+        asset.setOpportunityState(observationState);
+        asset.setAssetState(observationState);
+        asset.setAssetStateLabel(observationStateLabel(observationState));
+        asset.setPrimaryTimeframe(trimToNull(projection.primaryTimeframe()));
+        asset.setSecondaryOpportunityCount(0);
+        asset.setTimeframeConflictState(trimToNull(projection.timeframeConflictState()));
+        asset.setRankingReason(trimToNull(projection.rankingReason()));
+        asset.setLatestAnalysisTime(formalAnalysisId == null ? null : projection.analysisTime());
+        asset.setCurrentConclusion(observationStateLabel(observationState));
+        asset.setOneHourOpportunityLabel(observationOneHourLabel(observationState));
+        asset.setFourHourTrendLabel(observationFourHourLabel(projection));
+        applyPersistedMarketData(asset, normalizeSymbol(projection.symbol()));
+        asset.setDataFreshness(missingFormalAnalysis
+                ? "NEVER_SCANNED" : trimToNull(projection.freshness()));
+        asset.setUpdatedAt(maxTime(asset.getUpdatedAt(), asset.getLatestAnalysisTime()));
+        setFieldSource(asset, "assetState", "REAL");
+        setFieldSource(asset, "updatedAt", asset.getUpdatedAt() == null ? "MISSING" : "REAL");
+        asset.setModuleState("NEVER_SCANNED".equalsIgnoreCase(observationState)
+                ? "MISSING" : "PARTIAL");
+        return asset;
+    }
+
+    private void clearCardFinalProjection(DashboardHomeVO.AssetVO asset) {
+        asset.setHasFinal(false);
+        asset.setFinalMarketBias(null);
+        asset.setFinalPlanMode(null);
+        asset.setFinalPlanLifecycle(null);
+    }
+
+    private String observationStateLabel(String value) {
+        return switch (value == null ? "" : value.trim().toUpperCase(Locale.ROOT)) {
+            case "NO_QUALIFIED_OPPORTUNITY" -> "暂无合格机会";
+            case "STALE" -> "数据过期";
+            case "NEVER_SCANNED" -> "等待首次扫描";
+            case "RANGE" -> "震荡";
+            case "WAIT" -> "观望";
+            case "CANDIDATE" -> "计划生成中";
+            case "HIGH_RISK" -> "高风险观察";
+            case "BLOCKED", "CONFUSED" -> "当前受限";
+            default -> "观察中";
+        };
+    }
+
+    private String oneHourOpportunityLabel(Integer value) {
+        if (value == null) return "1小时待验证";
+        if (value >= 70) return "1小时机会较强";
+        if (value >= 40) return "1小时机会形成";
+        return "1小时机会较弱";
+    }
+
+    private String fourHourTrendLabel(String bias, Integer alignment) {
+        if (alignment == null) return "4小时数据不足";
+        if (MarketBiasPolicy.bullishFamily(bias)) return "4小时趋势偏多";
+        if (MarketBiasPolicy.bearishFamily(bias)) return "4小时趋势偏空";
+        return "4小时趋势震荡";
+    }
+
+    private String observationOneHourLabel(String state) {
+        return switch (state == null ? "" : state.trim().toUpperCase(Locale.ROOT)) {
+            case "NO_QUALIFIED_OPPORTUNITY" -> "1小时观察";
+            case "CANDIDATE" -> "1小时计划生成中";
+            default -> "1小时待验证";
+        };
+    }
+
+    private String observationFourHourLabel(HomeTopAssetProjection projection) {
+        if (projection == null || "STALE".equalsIgnoreCase(projection.freshness())
+                || "NEVER_SCANNED".equalsIgnoreCase(projection.freshness())) {
+            return "4小时数据不足";
+        }
+        return "4小时趋势待验证";
+    }
+
+    private String authoritativeObservationAnalysisId(HomeTopAssetProjection projection, Long userId) {
+        if (projection == null || analysisRunMapper == null || userId == null || userId <= 0
+                || !hasText(projection.analysisId()) || projection.assetId() == null) {
+            return null;
+        }
+        try {
+            AnalysisRunDO run = analysisRunMapper.selectById(projection.analysisId());
+            return formalObservationRun(run, projection, userId) ? run.getAnalysisId() : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private DecisionResultVO validatedObservationDecision(Long userId,
+                                                          HomeTopAssetProjection projection,
+                                                          DecisionResultVO decision) {
+        if (projection == null || decision == null
+                || !Objects.equals(trimToNull(projection.analysisId()), trimToNull(decision.getAnalysisId()))
+                || !Objects.equals(normalizeSymbol(projection.symbol()), normalizeSymbol(decision.getSymbol()))) {
+            return null;
+        }
+        return authoritativeObservationAnalysisId(projection, userId) == null ? null : decision;
+    }
+
+    private boolean formalObservationRun(AnalysisRunDO run,
+                                         HomeTopAssetProjection projection,
+                                         Long userId) {
+        return run != null
+                && !Boolean.TRUE.equals(run.getPreview())
+                && "SUCCESS".equalsIgnoreCase(trimToNull(run.getStatus()))
+                && AnalysisRunTriggerType.normalize(run.getTriggerType()) == AnalysisRunTriggerType.ASSET_POOL_SCAN
+                && !"ANALYSIS_PREVIEW".equalsIgnoreCase(trimToNull(run.getAnalysisMode()))
+                && "USER".equalsIgnoreCase(trimToNull(run.getOwnerType()))
+                && Objects.equals(userId, run.getOwnerId())
+                && Objects.equals(projection.assetId(), run.getAssetId())
+                && Objects.equals(normalizeSymbol(projection.symbol()), normalizeSymbol(run.getSymbol()))
+                && hasText(projection.primaryTimeframe())
+                && hasText(run.getTimeframe())
+                && projection.primaryTimeframe().trim().equalsIgnoreCase(run.getTimeframe().trim());
     }
 
     private void applyCardFinalProjection(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
@@ -1280,13 +1607,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && positive(monitor.getCurrentPrice())
                 && hasText(monitor.getMarkPriceSource())
                 && recognizedEntryLogicStatus(monitor.getEntryLogicStatus())
-                && recognizedMonitorConclusion(monitor.getMonitorConclusion())
                 && recognizedReversalStatus(monitor.getReversalStatus())
                 && recognizedRiskReason(monitor.getRiskChangeReason())
                 && recognizedPositionRisk(monitor.getRiskLevel())
                 && recognizedRiskTrend(monitor.getRiskTrend())
-                && recognizedSuggestedAction(monitor.getSuggestedAction())
-                && recognizedMonitorActionPair(monitor);
+                && recognizedMonitorOutcome(monitor);
     }
 
     private void applyTrustedMonitor(DashboardHomeVO.PositionVO row,
@@ -1465,7 +1790,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private boolean recognizedEntryLogicStatus(String status) {
         return switch (upper(status)) {
-            case "STILL_VALID", "WEAKENED", "INVALIDATED" -> true;
+            case "STILL_VALID", "WEAKENED", "INVALIDATED", "NOT_APPLICABLE" -> true;
             default -> false;
         };
     }
@@ -1527,6 +1852,24 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private boolean recognizedMonitorOutcome(PositionMonitorLogDTO monitor) {
+        boolean conclusionPresent = hasText(monitor.getMonitorConclusion());
+        boolean actionPresent = hasText(monitor.getSuggestedAction());
+        if ("NOT_APPLICABLE".equals(upper(monitor.getEntryLogicStatus()))) {
+            if (!conclusionPresent && !actionPresent) {
+                return true;
+            }
+            return conclusionPresent && actionPresent
+                    && recognizedMonitorConclusion(monitor.getMonitorConclusion())
+                    && recognizedSuggestedAction(monitor.getSuggestedAction())
+                    && recognizedMonitorActionPair(monitor);
+        }
+        return conclusionPresent && actionPresent
+                && recognizedMonitorConclusion(monitor.getMonitorConclusion())
+                && recognizedSuggestedAction(monitor.getSuggestedAction())
+                && recognizedMonitorActionPair(monitor);
+    }
+
     private void applyPositionPnl(DashboardHomeVO.PositionVO row, UserPositionVO position, BigDecimal currentPrice) {
         if (row == null || position == null || !positive(position.getEntryPrice()) || !positive(currentPrice)) {
             return;
@@ -1546,6 +1889,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             BigDecimal pnlAmount = unitPnl.multiply(position.getQuantity());
             row.setFloatingPnl(pnlAmount);
             row.setPnlAmount(pnlAmount);
+            row.setPnlCoverage("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+            row.setFeeCoverage("UNKNOWN");
+            row.setFundingCoverage("UNKNOWN");
+            row.setPartialFillCoverage("UNKNOWN");
+            row.setPositionAdditionCoverage("UNKNOWN");
         }
     }
 
@@ -1554,6 +1902,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "STILL_VALID" -> "SUPPORTED";
             case "WEAKENED" -> "WEAKENED";
             case "INVALIDATED" -> "NOT_SUPPORTED";
+            case "NOT_APPLICABLE" -> "NOT_APPLICABLE";
             default -> null;
         };
     }
@@ -2909,6 +3258,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "STILL_VALID" -> "仍成立";
             case "WEAKENED" -> "弱化";
             case "INVALIDATED" -> "失效";
+            case "NOT_APPLICABLE" -> "N/A";
             default -> null;
         };
     }
@@ -2931,6 +3281,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "SUPPORTED" -> "当前方向仍获支持";
             case "WEAKENED" -> "方向支持减弱";
             case "NOT_SUPPORTED" -> "当前方向不再获支持";
+            case "NOT_APPLICABLE" -> "N/A";
             default -> null;
         };
     }

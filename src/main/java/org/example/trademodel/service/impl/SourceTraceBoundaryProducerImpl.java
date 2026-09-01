@@ -82,6 +82,7 @@ public class SourceTraceBoundaryProducerImpl implements SourceTraceBoundaryProdu
         result.setStop(stop);
         result.setTakeProfitLevels(takeProfitLevels);
         result.setSourceFields(sourceFields);
+        result.setSourceRefs(boundary.getSourceRefs());
         result.setBoundaryReady(true);
         result.setMissingFields(NON_BOUNDARY_MISSING_FIELDS);
         result.setBlockingReasons(List.of());

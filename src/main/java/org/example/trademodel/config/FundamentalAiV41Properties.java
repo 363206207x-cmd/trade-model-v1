@@ -17,6 +17,8 @@ public class FundamentalAiV41Properties {
     private OpportunityState opportunityState = new OpportunityState();
     private AiGate aiGate = new AiGate();
     private MultiTimeframe multiTimeframe = new MultiTimeframe();
+    private Normalization normalization = new Normalization();
+    private ProviderMatrix providerMatrix = new ProviderMatrix();
     private AccountRisk accountRisk = new AccountRisk();
     private ExecutionFeasibility executionFeasibility = new ExecutionFeasibility();
 
@@ -26,6 +28,8 @@ public class FundamentalAiV41Properties {
         opportunityState.validate();
         aiGate.validate();
         multiTimeframe.validate();
+        normalization.validate();
+        providerMatrix.validate();
         accountRisk.validate();
         executionFeasibility.validate();
     }
@@ -41,6 +45,14 @@ public class FundamentalAiV41Properties {
     public MultiTimeframe getMultiTimeframe() { return multiTimeframe; }
     public void setMultiTimeframe(MultiTimeframe value) {
         this.multiTimeframe = value == null ? new MultiTimeframe() : value;
+    }
+    public Normalization getNormalization() { return normalization; }
+    public void setNormalization(Normalization value) {
+        this.normalization = value == null ? new Normalization() : value;
+    }
+    public ProviderMatrix getProviderMatrix() { return providerMatrix; }
+    public void setProviderMatrix(ProviderMatrix value) {
+        this.providerMatrix = value == null ? new ProviderMatrix() : value;
     }
     public AccountRisk getAccountRisk() { return accountRisk; }
     public void setAccountRisk(AccountRisk value) {
@@ -62,9 +74,15 @@ public class FundamentalAiV41Properties {
         value.ranking.riskWeight = new BigDecimal("0.10");
         value.ranking.planModeWeight = new BigDecimal("0.15");
         value.ranking.dataQualityWeight = new BigDecimal("0.10");
-        value.ranking.freshnessWeight = new BigDecimal("0.08");
+        value.ranking.freshnessWeight = new BigDecimal("0.05");
         value.ranking.conflictWeight = new BigDecimal("0.07");
         value.ranking.stabilityWeight = new BigDecimal("0.05");
+        value.ranking.directionStrengthWeight = new BigDecimal("0.30");
+        value.ranking.finalConfidenceWeight = new BigDecimal("0.25");
+        value.ranking.oneHourOpportunityWeight = new BigDecimal("0.20");
+        value.ranking.fourHourAlignmentWeight = new BigDecimal("0.10");
+        value.ranking.executionFeasibilityWeight = new BigDecimal("0.10");
+        value.ranking.replacementThreshold = 5;
         value.opportunityState.minimumDwellSeconds = 300;
         value.opportunityState.coolingSeconds = 900;
         value.opportunityState.candidatePromotionScore = 70;
@@ -75,13 +93,34 @@ public class FundamentalAiV41Properties {
         value.aiGate.minimumSignificantEvidenceStrength = 60;
         value.aiGate.cacheTtlSeconds = 300;
         value.aiGate.cacheMaxEntries = 500;
-        value.multiTimeframe.fourHourWeight = new BigDecimal("0.40");
-        value.multiTimeframe.oneHourWeight = new BigDecimal("0.30");
-        value.multiTimeframe.fifteenMinuteWeight = new BigDecimal("0.20");
-        value.multiTimeframe.fiveMinuteWeight = new BigDecimal("0.10");
-        value.multiTimeframe.minimumAlignedCount = 3;
-        value.multiTimeframe.minimumAlignedWeight = new BigDecimal("0.60");
+        value.aiGate.perRunTokenLimit = 24000;
+        value.aiGate.perAssetCooldownSeconds = 300;
+        value.aiGate.hourlyCallLimit = 180;
+        value.aiGate.hourlyTokenLimit = 1440000;
+        value.aiGate.dailyCallLimit = 1200;
+        value.aiGate.dailyTokenLimit = 9600000;
+        value.aiGate.dailyCostMicrosLimit = 100000000L;
+        value.aiGate.concurrencyLimit = 3;
+        value.aiGate.maxRetryPerRole = 1;
+        value.multiTimeframe.fourHourWeight = new BigDecimal("0.57");
+        value.multiTimeframe.oneHourWeight = new BigDecimal("0.43");
+        value.multiTimeframe.fifteenMinuteWeight = BigDecimal.ZERO;
+        value.multiTimeframe.fiveMinuteWeight = BigDecimal.ZERO;
+        value.multiTimeframe.minimumAlignedCount = 2;
+        value.multiTimeframe.minimumAlignedWeight = BigDecimal.ONE;
         value.multiTimeframe.maximumTrendScoreDifference = new BigDecimal("15");
+        value.normalization.version = "V41-NORM-WREP-1";
+        value.normalization.lookback = 200;
+        value.normalization.minimumSampleCount = 60;
+        value.normalization.winsorizeLowerPercentile = new BigDecimal("2.5");
+        value.normalization.winsorizeUpperPercentile = new BigDecimal("97.5");
+        value.providerMatrix.version = "V41-PROVIDER-MATRIX-1";
+        value.providerMatrix.ohlcvRequirement = "MANDATORY";
+        value.providerMatrix.derivativesRequirement = "OPTIONAL";
+        value.providerMatrix.fiveMinuteTtlSeconds = 600;
+        value.providerMatrix.fifteenMinuteTtlSeconds = 1800;
+        value.providerMatrix.oneHourTtlSeconds = 7200;
+        value.providerMatrix.fourHourTtlSeconds = 28800;
         value.accountRisk.lowMaxExposure = new BigDecimal("0.30");
         value.accountRisk.mediumMaxExposure = new BigDecimal("0.20");
         value.accountRisk.highMaxExposure = new BigDecimal("0.10");
@@ -108,6 +147,12 @@ public class FundamentalAiV41Properties {
         private BigDecimal freshnessWeight;
         private BigDecimal conflictWeight;
         private BigDecimal stabilityWeight;
+        private BigDecimal directionStrengthWeight;
+        private BigDecimal finalConfidenceWeight;
+        private BigDecimal oneHourOpportunityWeight;
+        private BigDecimal fourHourAlignmentWeight;
+        private BigDecimal executionFeasibilityWeight;
+        private Integer replacementThreshold;
 
         void validate() {
             positive(homeCapacity, "ranking.home-capacity");
@@ -122,6 +167,12 @@ public class FundamentalAiV41Properties {
             positive(freshnessWeight, "ranking.freshness-weight");
             positive(conflictWeight, "ranking.conflict-weight");
             positive(stabilityWeight, "ranking.stability-weight");
+            positive(directionStrengthWeight, "ranking.direction-strength-weight");
+            positive(finalConfidenceWeight, "ranking.final-confidence-weight");
+            positive(oneHourOpportunityWeight, "ranking.one-hour-opportunity-weight");
+            positive(fourHourAlignmentWeight, "ranking.four-hour-alignment-weight");
+            positive(executionFeasibilityWeight, "ranking.execution-feasibility-weight");
+            positive(replacementThreshold, "ranking.replacement-threshold");
         }
 
         public Integer getHomeCapacity() { return homeCapacity; }
@@ -146,6 +197,18 @@ public class FundamentalAiV41Properties {
         public void setConflictWeight(BigDecimal value) { this.conflictWeight = value; }
         public BigDecimal getStabilityWeight() { return stabilityWeight; }
         public void setStabilityWeight(BigDecimal value) { this.stabilityWeight = value; }
+        public BigDecimal getDirectionStrengthWeight() { return directionStrengthWeight; }
+        public void setDirectionStrengthWeight(BigDecimal value) { this.directionStrengthWeight = value; }
+        public BigDecimal getFinalConfidenceWeight() { return finalConfidenceWeight; }
+        public void setFinalConfidenceWeight(BigDecimal value) { this.finalConfidenceWeight = value; }
+        public BigDecimal getOneHourOpportunityWeight() { return oneHourOpportunityWeight; }
+        public void setOneHourOpportunityWeight(BigDecimal value) { this.oneHourOpportunityWeight = value; }
+        public BigDecimal getFourHourAlignmentWeight() { return fourHourAlignmentWeight; }
+        public void setFourHourAlignmentWeight(BigDecimal value) { this.fourHourAlignmentWeight = value; }
+        public BigDecimal getExecutionFeasibilityWeight() { return executionFeasibilityWeight; }
+        public void setExecutionFeasibilityWeight(BigDecimal value) { this.executionFeasibilityWeight = value; }
+        public Integer getReplacementThreshold() { return replacementThreshold; }
+        public void setReplacementThreshold(Integer value) { this.replacementThreshold = value; }
     }
 
     public static class OpportunityState {
@@ -187,6 +250,15 @@ public class FundamentalAiV41Properties {
         private Integer minimumSignificantEvidenceStrength;
         private Integer cacheTtlSeconds;
         private Integer cacheMaxEntries;
+        private Integer perRunTokenLimit;
+        private Integer perAssetCooldownSeconds;
+        private Integer hourlyCallLimit;
+        private Integer hourlyTokenLimit;
+        private Integer dailyCallLimit;
+        private Integer dailyTokenLimit;
+        private Long dailyCostMicrosLimit;
+        private Integer concurrencyLimit;
+        private Integer maxRetryPerRole;
 
         void validate() {
             range(minimumDataQuality, 0, 100, "ai-gate.minimum-data-quality");
@@ -195,6 +267,19 @@ public class FundamentalAiV41Properties {
                     "ai-gate.minimum-significant-evidence-strength");
             positive(cacheTtlSeconds, "ai-gate.cache-ttl-seconds");
             positive(cacheMaxEntries, "ai-gate.cache-max-entries");
+            positive(perRunTokenLimit, "ai-gate.per-run-token-limit");
+            positive(perAssetCooldownSeconds, "ai-gate.per-asset-cooldown-seconds");
+            positive(hourlyCallLimit, "ai-gate.hourly-call-limit");
+            positive(hourlyTokenLimit, "ai-gate.hourly-token-limit");
+            positive(dailyCallLimit, "ai-gate.daily-call-limit");
+            positive(dailyTokenLimit, "ai-gate.daily-token-limit");
+            if (dailyCostMicrosLimit == null || dailyCostMicrosLimit <= 0) {
+                throw new IllegalStateException("ai-gate.daily-cost-micros-limit must be configured above 0");
+            }
+            positive(concurrencyLimit, "ai-gate.concurrency-limit");
+            if (maxRetryPerRole == null || maxRetryPerRole < 0 || maxRetryPerRole > 1) {
+                throw new IllegalStateException("ai-gate.max-retry-per-role must be in [0, 1]");
+            }
             if (minimumDataQuality < circuitBreakerScore) {
                 throw new IllegalStateException("AI quality threshold must not be below circuit breaker");
             }
@@ -212,6 +297,24 @@ public class FundamentalAiV41Properties {
         public void setCacheTtlSeconds(Integer value) { this.cacheTtlSeconds = value; }
         public Integer getCacheMaxEntries() { return cacheMaxEntries; }
         public void setCacheMaxEntries(Integer value) { this.cacheMaxEntries = value; }
+        public Integer getPerRunTokenLimit() { return perRunTokenLimit; }
+        public void setPerRunTokenLimit(Integer value) { this.perRunTokenLimit = value; }
+        public Integer getPerAssetCooldownSeconds() { return perAssetCooldownSeconds; }
+        public void setPerAssetCooldownSeconds(Integer value) { this.perAssetCooldownSeconds = value; }
+        public Integer getHourlyCallLimit() { return hourlyCallLimit; }
+        public void setHourlyCallLimit(Integer value) { this.hourlyCallLimit = value; }
+        public Integer getHourlyTokenLimit() { return hourlyTokenLimit; }
+        public void setHourlyTokenLimit(Integer value) { this.hourlyTokenLimit = value; }
+        public Integer getDailyCallLimit() { return dailyCallLimit; }
+        public void setDailyCallLimit(Integer value) { this.dailyCallLimit = value; }
+        public Integer getDailyTokenLimit() { return dailyTokenLimit; }
+        public void setDailyTokenLimit(Integer value) { this.dailyTokenLimit = value; }
+        public Long getDailyCostMicrosLimit() { return dailyCostMicrosLimit; }
+        public void setDailyCostMicrosLimit(Long value) { this.dailyCostMicrosLimit = value; }
+        public Integer getConcurrencyLimit() { return concurrencyLimit; }
+        public void setConcurrencyLimit(Integer value) { this.concurrencyLimit = value; }
+        public Integer getMaxRetryPerRole() { return maxRetryPerRole; }
+        public void setMaxRetryPerRole(Integer value) { this.maxRetryPerRole = value; }
     }
 
     public static class MultiTimeframe {
@@ -226,8 +329,8 @@ public class FundamentalAiV41Properties {
         void validate() {
             positive(fourHourWeight, "multi-timeframe.four-hour-weight");
             positive(oneHourWeight, "multi-timeframe.one-hour-weight");
-            positive(fifteenMinuteWeight, "multi-timeframe.fifteen-minute-weight");
-            positive(fiveMinuteWeight, "multi-timeframe.five-minute-weight");
+            nonNegative(fifteenMinuteWeight, "multi-timeframe.fifteen-minute-weight");
+            nonNegative(fiveMinuteWeight, "multi-timeframe.five-minute-weight");
             BigDecimal total = fourHourWeight.add(oneHourWeight)
                     .add(fifteenMinuteWeight).add(fiveMinuteWeight);
             if (total.compareTo(BigDecimal.ONE) != 0) {
@@ -260,6 +363,73 @@ public class FundamentalAiV41Properties {
         public void setMaximumTrendScoreDifference(BigDecimal value) {
             this.maximumTrendScoreDifference = value;
         }
+    }
+
+    public static class Normalization {
+        private String version;
+        private Integer lookback;
+        private Integer minimumSampleCount;
+        private BigDecimal winsorizeLowerPercentile;
+        private BigDecimal winsorizeUpperPercentile;
+
+        void validate() {
+            if (version == null || version.isBlank()) throw new IllegalStateException("normalization.version is required");
+            positive(lookback, "normalization.lookback");
+            positive(minimumSampleCount, "normalization.minimum-sample-count");
+            if (minimumSampleCount > lookback) throw new IllegalStateException("normalization minimum sample exceeds lookback");
+            nonNegative(winsorizeLowerPercentile, "normalization.winsorize-lower-percentile");
+            positive(winsorizeUpperPercentile, "normalization.winsorize-upper-percentile");
+            if (winsorizeLowerPercentile.compareTo(winsorizeUpperPercentile) >= 0
+                    || winsorizeUpperPercentile.compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalStateException("normalization winsor percentiles are invalid");
+            }
+        }
+        public String getVersion() { return version; }
+        public void setVersion(String value) { this.version = value; }
+        public Integer getLookback() { return lookback; }
+        public void setLookback(Integer value) { this.lookback = value; }
+        public Integer getMinimumSampleCount() { return minimumSampleCount; }
+        public void setMinimumSampleCount(Integer value) { this.minimumSampleCount = value; }
+        public BigDecimal getWinsorizeLowerPercentile() { return winsorizeLowerPercentile; }
+        public void setWinsorizeLowerPercentile(BigDecimal value) { this.winsorizeLowerPercentile = value; }
+        public BigDecimal getWinsorizeUpperPercentile() { return winsorizeUpperPercentile; }
+        public void setWinsorizeUpperPercentile(BigDecimal value) { this.winsorizeUpperPercentile = value; }
+    }
+
+    public static class ProviderMatrix {
+        private String version;
+        private String ohlcvRequirement;
+        private String derivativesRequirement;
+        private Integer fiveMinuteTtlSeconds;
+        private Integer fifteenMinuteTtlSeconds;
+        private Integer oneHourTtlSeconds;
+        private Integer fourHourTtlSeconds;
+
+        void validate() {
+            if (version == null || version.isBlank()) throw new IllegalStateException("provider-matrix.version is required");
+            if (!"MANDATORY".equals(ohlcvRequirement)) throw new IllegalStateException("OHLCV must be mandatory");
+            if (!java.util.Set.of("OPTIONAL", "MANDATORY", "NOT_APPLICABLE").contains(derivativesRequirement)) {
+                throw new IllegalStateException("provider-matrix.derivatives-requirement is invalid");
+            }
+            positive(fiveMinuteTtlSeconds, "provider-matrix.five-minute-ttl-seconds");
+            positive(fifteenMinuteTtlSeconds, "provider-matrix.fifteen-minute-ttl-seconds");
+            positive(oneHourTtlSeconds, "provider-matrix.one-hour-ttl-seconds");
+            positive(fourHourTtlSeconds, "provider-matrix.four-hour-ttl-seconds");
+        }
+        public String getVersion() { return version; }
+        public void setVersion(String value) { this.version = value; }
+        public String getOhlcvRequirement() { return ohlcvRequirement; }
+        public void setOhlcvRequirement(String value) { this.ohlcvRequirement = value; }
+        public String getDerivativesRequirement() { return derivativesRequirement; }
+        public void setDerivativesRequirement(String value) { this.derivativesRequirement = value; }
+        public Integer getFiveMinuteTtlSeconds() { return fiveMinuteTtlSeconds; }
+        public void setFiveMinuteTtlSeconds(Integer value) { this.fiveMinuteTtlSeconds = value; }
+        public Integer getFifteenMinuteTtlSeconds() { return fifteenMinuteTtlSeconds; }
+        public void setFifteenMinuteTtlSeconds(Integer value) { this.fifteenMinuteTtlSeconds = value; }
+        public Integer getOneHourTtlSeconds() { return oneHourTtlSeconds; }
+        public void setOneHourTtlSeconds(Integer value) { this.oneHourTtlSeconds = value; }
+        public Integer getFourHourTtlSeconds() { return fourHourTtlSeconds; }
+        public void setFourHourTtlSeconds(Integer value) { this.fourHourTtlSeconds = value; }
     }
 
     public static class AccountRisk {
@@ -341,6 +511,10 @@ public class FundamentalAiV41Properties {
 
     private static void positive(BigDecimal value, String field) {
         if (value == null || value.signum() <= 0) throw new IllegalStateException(field + " must be configured above 0");
+    }
+
+    private static void nonNegative(BigDecimal value, String field) {
+        if (value == null || value.signum() < 0) throw new IllegalStateException(field + " must be configured at or above 0");
     }
 
     private static void range(Integer value, int min, int max, String field) {

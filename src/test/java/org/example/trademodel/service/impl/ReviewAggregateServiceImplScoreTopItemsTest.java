@@ -99,7 +99,7 @@ class ReviewAggregateServiceImplScoreTopItemsTest {
         s1.setScoreType("趋势结构分");
         s1.setScoreValue(72.5);
         ScoreBriefVO s2 = new ScoreBriefVO();
-        s2.setScoreType("综合可信度分");
+        s2.setScoreType("证据可信度分");
         s2.setScoreValue(81.0);
 
         when(evidenceService.listTopEvidenceBriefByAnalysisId(analysisId)).thenReturn(Collections.emptyList());
@@ -112,7 +112,7 @@ class ReviewAggregateServiceImplScoreTopItemsTest {
         assertThat(result.get().getScoreTopItems()).hasSize(2);
         assertThat(result.get().getScoreTopItems().get(0).getScoreType()).isEqualTo("趋势结构分");
         assertThat(result.get().getScoreTopItems().get(0).getScoreValue()).isEqualTo(72.5);
-        assertThat(result.get().getScoreTopItems().get(1).getScoreType()).isEqualTo("综合可信度分");
+        assertThat(result.get().getScoreTopItems().get(1).getScoreType()).isEqualTo("证据可信度分");
         assertThat(result.get().getScoreTopItems().get(1).getScoreValue()).isEqualTo(81.0);
         assertThat(result.get().getEvidenceTopItems()).isEmpty();
     }

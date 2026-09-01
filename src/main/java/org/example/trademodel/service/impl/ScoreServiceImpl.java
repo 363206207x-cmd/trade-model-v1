@@ -26,18 +26,12 @@ public class ScoreServiceImpl implements ScoreService {
     private static final double TREND_BEAR_PENALTY = 15.0;
     private static final double EVIDENCE_BULL_BONUS = 5.0;
     private static final double EVIDENCE_BEAR_PENALTY = 5.0;
-    private static final double CREDIBILITY_BASE_SCORE = 55.0;
-    private static final double CREDIBILITY_SUMMARY_BONUS = 10.0;
-    private static final double CREDIBILITY_ENV_FIELDS_BONUS = 5.0;
-    private static final double CREDIBILITY_VALID_EVIDENCE_BONUS = 10.0;
-    private static final double CREDIBILITY_PRICE_STRUCTURE_SIGNAL_BONUS = 10.0;
-    private static final double CREDIBILITY_CONFLICT_PENALTY = 10.0;
     private static final double SCORE_MIN = 0.0;
     private static final double SCORE_MAX = 100.0;
     private static final String TREND_SCORE_TYPE = "趋势结构分";
     private static final String TREND_SCORE_DESCRIPTION = "基于市场环境摘要关键词的轻规则打分";
-    private static final String CREDIBILITY_SCORE_TYPE = "综合可信度分";
-    private static final String CREDIBILITY_SCORE_DESCRIPTION = "基于市场环境字段完整性与价格结构证据一致性的轻规则打分";
+    private static final String CREDIBILITY_SCORE_TYPE = "证据可信度分";
+    private static final String CREDIBILITY_SCORE_DESCRIPTION = "由覆盖率、来源质量、新鲜度、跨源一致性与样本充足度形成";
     private static final String FUNDING_SCORE_TYPE = "资金推动分";
     private static final String FUNDING_SCORE_DESCRIPTION = "基于 Funding 真值与价格结构方向一致性的轻规则打分";
     private static final String LEVERAGE_RISK_SCORE_TYPE = "杠杆风险分";
@@ -117,37 +111,46 @@ public class ScoreServiceImpl implements ScoreService {
         List<ScoreItemVO> list = new ArrayList<>();
         ScoreItemVO trendScore = new ScoreItemVO();
         trendScore.setScoreType(TREND_SCORE_TYPE);
-        trendScore.setScoreValue(computeTrendStructureScore(assetAnalysis, marketEnv));
+        Double trendValue = computeTrendStructureScore(assetAnalysis, marketEnv);
+        trendScore.setScoreValue(trendValue);
         trendScore.setWeight(1.0);
-        trendScore.setDescription(TREND_SCORE_DESCRIPTION);
+        trendScore.setDescription(withMissingState(TREND_SCORE_DESCRIPTION, trendValue,
+                "marketSummary/priceStructureEvidence"));
         list.add(trendScore);
 
         ScoreItemVO credibilityScore = new ScoreItemVO();
         credibilityScore.setScoreType(CREDIBILITY_SCORE_TYPE);
-        credibilityScore.setScoreValue(computeOverallCredibilityScore(assetAnalysis, marketEnv));
+        credibilityScore.setScoreValue(null);
         credibilityScore.setWeight(1.0);
-        credibilityScore.setDescription(CREDIBILITY_SCORE_DESCRIPTION);
+        credibilityScore.setDescription(withMissingState(CREDIBILITY_SCORE_DESCRIPTION, null,
+                "EvidenceCoverage/SourceQuality/Freshness/CrossSourceConsistency/SampleAdequacy"));
         list.add(credibilityScore);
 
         ScoreItemVO fundingScore = new ScoreItemVO();
         fundingScore.setScoreType(FUNDING_SCORE_TYPE);
-        fundingScore.setScoreValue(computeFundingMomentumScore(assetAnalysis, marketEnv));
+        Double fundingValue = computeFundingMomentumScore(assetAnalysis, marketEnv);
+        fundingScore.setScoreValue(fundingValue);
         fundingScore.setWeight(1.0);
-        fundingScore.setDescription(FUNDING_SCORE_DESCRIPTION);
+        fundingScore.setDescription(withMissingState(FUNDING_SCORE_DESCRIPTION, fundingValue,
+                "verifiedFundingRate"));
         list.add(fundingScore);
 
         ScoreItemVO leverageRiskScore = new ScoreItemVO();
         leverageRiskScore.setScoreType(LEVERAGE_RISK_SCORE_TYPE);
-        leverageRiskScore.setScoreValue(computeLeverageRiskScore(marketEnv));
+        Double leverageRiskValue = computeLeverageRiskScore(marketEnv);
+        leverageRiskScore.setScoreValue(leverageRiskValue);
         leverageRiskScore.setWeight(1.0);
-        leverageRiskScore.setDescription(LEVERAGE_RISK_SCORE_DESCRIPTION);
+        leverageRiskScore.setDescription(withMissingState(LEVERAGE_RISK_SCORE_DESCRIPTION,
+                leverageRiskValue, "leverage/volatility/range/riskMode"));
         list.add(leverageRiskScore);
 
         ScoreItemVO liquidityQualityScore = new ScoreItemVO();
         liquidityQualityScore.setScoreType(LIQUIDITY_QUALITY_SCORE_TYPE);
-        liquidityQualityScore.setScoreValue(computeLiquidityQualityScore(marketEnv));
+        Double liquidityQualityValue = computeLiquidityQualityScore(marketEnv);
+        liquidityQualityScore.setScoreValue(liquidityQualityValue);
         liquidityQualityScore.setWeight(1.0);
-        liquidityQualityScore.setDescription(LIQUIDITY_QUALITY_SCORE_DESCRIPTION);
+        liquidityQualityScore.setDescription(withMissingState(LIQUIDITY_QUALITY_SCORE_DESCRIPTION,
+                liquidityQualityValue, "volatility/range"));
         list.add(liquidityQualityScore);
 
         SentimentTemperatureEval sentimentEval = evaluateSentimentTemperature(assetAnalysis, marketEnv);
@@ -191,7 +194,11 @@ public class ScoreServiceImpl implements ScoreService {
         return rows != null ? rows : Collections.emptyList();
     }
 
-    private double computeTrendStructureScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
+    private Double computeTrendStructureScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
+        if (!hasText(marketEnv != null ? marketEnv.getSummary() : null)
+                && !hasPriceStructureEvidence(assetAnalysis != null ? assetAnalysis.getEvidenceList() : null)) {
+            return null;
+        }
         double score = TREND_BASE_SCORE;
         if (marketEnv != null && marketEnv.getSummary() != null && !marketEnv.getSummary().isBlank()) {
             String summary = marketEnv.getSummary().toLowerCase(Locale.ROOT);
@@ -274,72 +281,11 @@ public class ScoreServiceImpl implements ScoreService {
         return 0;
     }
 
-    private double computeOverallCredibilityScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
-        double score = CREDIBILITY_BASE_SCORE;
-        String summary = marketEnv != null && marketEnv.getSummary() != null ? marketEnv.getSummary().trim() : "";
-        if (!summary.isEmpty()) {
-            score += CREDIBILITY_SUMMARY_BONUS;
-        }
-        String environmentType = marketEnv != null && marketEnv.getEnvironmentType() != null
-                ? marketEnv.getEnvironmentType().trim()
-                : "";
-        String riskMode = marketEnv != null && marketEnv.getRiskMode() != null
-                ? marketEnv.getRiskMode().trim()
-                : "";
-        if (!environmentType.isEmpty() && !riskMode.isEmpty()) {
-            score += CREDIBILITY_ENV_FIELDS_BONUS;
-        }
-
-        List<EvidenceItemVO> evidenceList = assetAnalysis != null ? assetAnalysis.getEvidenceList() : null;
-        if (hasAnyValidEvidence(evidenceList)) {
-            score += CREDIBILITY_VALID_EVIDENCE_BONUS;
-        }
-        int priceStructureSignal = extractPriceStructureSignal(evidenceList);
-        if (priceStructureSignal != 0) {
-            score += CREDIBILITY_PRICE_STRUCTURE_SIGNAL_BONUS;
-        }
-        if (isSummaryEvidenceDirectionalConflict(summary, priceStructureSignal)) {
-            score -= CREDIBILITY_CONFLICT_PENALTY;
-        }
-        return clampScore(score);
-    }
-
-    private boolean hasAnyValidEvidence(List<EvidenceItemVO> evidenceList) {
-        if (evidenceList == null || evidenceList.isEmpty()) {
-            return false;
-        }
-        for (EvidenceItemVO item : evidenceList) {
-            if (item == null) {
-                continue;
-            }
-            String type = item.getEvidenceType();
-            String desc = item.getDescription();
-            if (type != null && !type.trim().isEmpty() && desc != null && !desc.trim().isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isSummaryEvidenceDirectionalConflict(String summary, int priceStructureSignal) {
-        if (priceStructureSignal == 0 || summary == null || summary.isBlank()) {
-            return false;
-        }
-        String normalized = summary.toLowerCase(Locale.ROOT);
-        boolean summaryBullish = containsAny(normalized, "上涨", "突破", "强势", "bull", "bullish");
-        boolean summaryBearish = containsAny(normalized, "下跌", "跌破", "弱势", "bear", "bearish");
-        if (summaryBullish == summaryBearish) {
-            return false;
-        }
-        int summarySignal = summaryBullish ? 1 : -1;
-        return summarySignal != priceStructureSignal;
-    }
-
-    private double computeFundingMomentumScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
+    private Double computeFundingMomentumScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
         double score = FUNDING_BASE_SCORE;
         if (marketEnv == null || !Boolean.TRUE.equals(marketEnv.getPerpFundingApplied())
                 || marketEnv.getLastFundingRate() == null) {
-            return score;
+            return null;
         }
         BigDecimal fundingRate = marketEnv.getLastFundingRate();
         BigDecimal absRate = fundingRate.abs();
@@ -356,10 +302,10 @@ public class ScoreServiceImpl implements ScoreService {
         return clampScore(score);
     }
 
-    private double computeLeverageRiskScore(MarketEnvironmentVO marketEnv) {
+    private Double computeLeverageRiskScore(MarketEnvironmentVO marketEnv) {
         double score = LEVERAGE_RISK_BASE_SCORE;
-        if (marketEnv == null) {
-            return score;
+        if (!hasLeverageRiskInput(marketEnv)) {
+            return null;
         }
         String leverageSuggestion = marketEnv.getLeverageSuggestion() != null
                 ? marketEnv.getLeverageSuggestion().trim()
@@ -386,10 +332,10 @@ public class ScoreServiceImpl implements ScoreService {
         return clampScore(score);
     }
 
-    private double computeLiquidityQualityScore(MarketEnvironmentVO marketEnv) {
+    private Double computeLiquidityQualityScore(MarketEnvironmentVO marketEnv) {
         double score = LIQUIDITY_QUALITY_BASE_SCORE;
-        if (marketEnv == null) {
-            return score;
+        if (!hasLiquidityInput(marketEnv)) {
+            return null;
         }
 
         String volatilityRegime = marketEnv.getVolatilityRegime() != null
@@ -416,6 +362,11 @@ public class ScoreServiceImpl implements ScoreService {
      * 情绪温度分第一刀：仅使用已落库/同源白名单输入，不引入外部事件源。
      */
     private SentimentTemperatureEval evaluateSentimentTemperature(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
+        if (!hasSentimentInput(assetAnalysis, marketEnv)) {
+            return new SentimentTemperatureEval(null,
+                    withMissingState(SENTIMENT_TEMPERATURE_SCORE_DESCRIPTION_PREFIX, null,
+                            "priceChange/volatility/funding/openInterest/priceStructureEvidence"));
+        }
         double score = SENTIMENT_BASE_SCORE;
         StringJoiner applied = new StringJoiner("; ");
 
@@ -524,16 +475,21 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     private static final class SentimentTemperatureEval {
-        private final double score;
+        private final Double score;
         private final String description;
 
-        private SentimentTemperatureEval(double score, String description) {
+        private SentimentTemperatureEval(Double score, String description) {
             this.score = score;
             this.description = description;
         }
     }
 
     private MacroEnvironmentEval evaluateMacroEnvironmentScore(MarketEnvironmentVO marketEnv) {
+        if (!hasMacroInput(marketEnv)) {
+            return new MacroEnvironmentEval(null,
+                    withMissingState(MACRO_ENVIRONMENT_SCORE_DESCRIPTION_PREFIX, null,
+                            "volatility/range/derivativesCrowding"));
+        }
         double score = MACRO_ENVIRONMENT_BASE_SCORE;
         StringJoiner applied = new StringJoiner("; ");
 
@@ -588,10 +544,10 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     private static final class MacroEnvironmentEval {
-        private final double score;
+        private final Double score;
         private final String description;
 
-        private MacroEnvironmentEval(double score, String description) {
+        private MacroEnvironmentEval(Double score, String description) {
             this.score = score;
             this.description = description;
         }
@@ -600,9 +556,14 @@ public class ScoreServiceImpl implements ScoreService {
     private EventImpactEval evaluateEventImpactScore(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
         double score = EVENT_IMPACT_BASE_SCORE;
         EventImpactInputVO input = assetAnalysis != null ? assetAnalysis.getEventImpactInput() : null;
+        boolean eventEvidence = hasEventEvidence(assetAnalysis != null ? assetAnalysis.getEvidenceList() : null);
+        if (input == null && !eventEvidence) {
+            return new EventImpactEval(null,
+                    withMissingState(EVENT_IMPACT_SCORE_DESCRIPTION_PREFIX, null, "eventFact/evidence"));
+        }
         boolean hit = input != null
                 ? Boolean.TRUE.equals(input.getEventFactHit())
-                : hasEventEvidence(assetAnalysis != null ? assetAnalysis.getEvidenceList() : null);
+                : eventEvidence;
         StringJoiner applied = new StringJoiner("; ");
         if (hit) {
             score -= EVENT_IMPACT_HIT_PENALTY;
@@ -715,10 +676,10 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     private static final class EventImpactEval {
-        private final double score;
+        private final Double score;
         private final String description;
 
-        private EventImpactEval(double score, String description) {
+        private EventImpactEval(Double score, String description) {
             this.score = score;
             this.description = description;
         }
@@ -730,6 +691,56 @@ public class ScoreServiceImpl implements ScoreService {
         }
         int fundingSignal = fundingRate.signum() > 0 ? 1 : -1;
         return fundingSignal != priceStructureSignal;
+    }
+
+    private static boolean hasLeverageRiskInput(MarketEnvironmentVO marketEnv) {
+        return marketEnv != null && (hasText(marketEnv.getLeverageSuggestion())
+                || hasText(marketEnv.getVolatilityRegime())
+                || marketEnv.getRangePct24h() != null
+                || hasText(marketEnv.getRiskMode()));
+    }
+
+    private static boolean hasLiquidityInput(MarketEnvironmentVO marketEnv) {
+        return marketEnv != null && (hasText(marketEnv.getVolatilityRegime())
+                || marketEnv.getRangePct24h() != null);
+    }
+
+    private static boolean hasMacroInput(MarketEnvironmentVO marketEnv) {
+        return marketEnv != null && (hasText(marketEnv.getVolatilityRegime())
+                || marketEnv.getRangePct24h() != null
+                || hasText(marketEnv.getDerivativesCrowdingState()));
+    }
+
+    private static boolean hasSentimentInput(AssetAnalysisVO assetAnalysis, MarketEnvironmentVO marketEnv) {
+        return marketEnv != null && (marketEnv.getPriceChangePercent24h() != null
+                || hasText(marketEnv.getVolatilityRegime())
+                || Boolean.TRUE.equals(marketEnv.getPerpFundingApplied())
+                    && marketEnv.getLastFundingRate() != null
+                || Boolean.TRUE.equals(marketEnv.getOiApplied())
+                    && marketEnv.getOpenInterestDelta() != null)
+                || hasPriceStructureEvidence(assetAnalysis != null ? assetAnalysis.getEvidenceList() : null);
+    }
+
+    private static boolean hasPriceStructureEvidence(List<EvidenceItemVO> evidenceList) {
+        if (evidenceList == null) {
+            return false;
+        }
+        return evidenceList.stream()
+                .filter(item -> item != null && hasText(item.getEvidenceType()))
+                .filter(item -> PRICE_STRUCTURE_EVIDENCE_TYPE.equals(item.getEvidenceType().trim()))
+                .anyMatch(item -> hasText(item.getDirection()) || hasText(item.getDescription()));
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String withMissingState(String description, Double score, String missingInputs) {
+        if (score != null) {
+            return description;
+        }
+        return description + " | coverage=0.0;missingInputs=[" + missingInputs
+                + "];permission=INSUFFICIENT_DATA";
     }
 
     private double clampScore(double score) {

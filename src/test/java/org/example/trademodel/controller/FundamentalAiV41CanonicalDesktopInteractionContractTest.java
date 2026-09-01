@@ -111,11 +111,12 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "id=\"planContent\"",
                 "id=\"aiRolePanel\"");
         assertThat(script).contains(
-                "asset.primaryTimeframe",
-                "asset.secondaryOpportunityCount",
-                "asset.timeframeConflictState",
+                "asset.hasFinal === true",
+                "asset.finalMarketBias",
+                "asset.oneHourOpportunityLabel",
+                "asset.fourHourTrendLabel",
                 "contract.replaceUrlParam(\"asset\"")
-                .doesNotContain("模拟K线", "模拟走势", "mini-chart", "sparkline");
+                .doesNotContain("机会评分</small>", "排序原因", "模拟K线", "模拟走势", "mini-chart", "sparkline");
     }
 
     @Test

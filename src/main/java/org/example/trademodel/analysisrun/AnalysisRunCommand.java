@@ -69,6 +69,14 @@ public class AnalysisRunCommand {
                 triggerReference, requestId, null, null, null, "USER", userId, assetId, false);
     }
 
+    public static AnalysisRunCommand assetPoolScan(String ownerType, Long ownerId, Long assetId,
+                                                   String symbol, String timeframe, String requestId,
+                                                   String triggerReference) {
+        return new AnalysisRunCommand(symbol, timeframe, AnalysisRunTriggerType.ASSET_POOL_SCAN,
+                triggerReference, requestId, null, null, null,
+                ownerType, ownerId, assetId, false);
+    }
+
     public static AnalysisRunCommand preview(Long userId, String symbol, String timeframe,
                                              String requestId, String analysisTime) {
         return new AnalysisRunCommand(symbol, timeframe, AnalysisRunTriggerType.ANALYSIS_PREVIEW,

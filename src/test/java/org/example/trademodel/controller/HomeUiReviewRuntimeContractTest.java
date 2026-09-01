@@ -76,9 +76,10 @@ class HomeUiReviewRuntimeContractTest {
                 %s
                 const assets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map((symbol, index) => ({
                   symbol, name: symbol.slice(0, -4), opportunityState: index === 2 ? 'HIGH_RISK' : 'WAITING_TRIGGER',
-                  primaryPlanMode: 'PREPARATION', opportunityScore: 80 - index, confidenceLabel: '80%%',
-                  riskLabel: index === 2 ? '高' : '中', primaryTimeframe: '15m', timeframeConflictState: 'ALIGNED',
-                  rankingReason: 'fixture', secondaryOpportunityCount: 0, hasFinal: false
+                  finalPlanMode: 'PREPARATION', finalMarketBias: 'BULLISH', confidenceLevel: 'HIGH',
+                  confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
+                  riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
+                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: true
                 }));
                 function render(selected) { return assets.map(asset => opportunityCard(asset, selected)).join(''); }
                 const btc = render('BTCUSDT');
@@ -89,7 +90,8 @@ class HomeUiReviewRuntimeContractTest {
                 assert.match(eth, /aria-pressed=\"true\" data-symbol=\"ETHUSDT\"/);
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
-                assert.match(eth, /HIGH_RISK/);
+                assert.doesNotMatch(eth, /HIGH_RISK/);
+                assert.equal(eth.includes('<small>风险</small><strong>高</strong>'), true);
                 console.log('HOME_OPPORTUNITY_PRESSED_STATE=PASS');
                 """.formatted(stateBadge, opportunityCard);
 
@@ -108,6 +110,112 @@ class HomeUiReviewRuntimeContractTest {
                 .contains("contract.replaceUrlParam(\"asset\", selectedSymbol)")
                 .contains("audit.textContent = \"审计链尚未形成\"")
                 .contains("audit.removeAttribute(\"href\")");
+    }
+
+    @Test
+    void homeRuntimeParsesAnalysisOwnedAssetProvenanceWithoutAddingVisibleCardRows() throws Exception {
+        String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String parser = slice(source, "function assetProvenance(asset)", "function opportunityCard(asset, selected)");
+
+        assertThat(parser).contains(
+                "analysisId", "analysisVersion", "configurationVersion", "providerMatrixVersion",
+                "provider", "sourceId", "priceObservedAt", "oneHourClosedAt", "fourHourClosedAt",
+                "freshnessStatus", "dataQualityScore", "directionMaturity", "homeTier",
+                "data-analysis-id", "data-analysis-version", "data-direction-maturity", "data-home-tier");
+        assertThat(source).doesNotContain(
+                "<small>analysisId</small>", "<small>providerMatrixVersion</small>",
+                "<small>sourceId</small>", "<small>homeTier</small>");
+    }
+
+    @Test
+    void homeCardRuntimePreservesBackendOrderAndSeparatesObservationSemantics() throws Exception {
+        String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String validators = slice(source, "function eligibleOpportunity(asset)", "function selectedFinalAccess(home)");
+        String renderers = slice(source, "function stateBadge(asset)", "function trustedMonitor(position)");
+        String nodeScript = """
+                const assert = require('node:assert/strict');
+                var labels = Object.freeze({});
+                var selectedSymbol = '';
+                var contract = {
+                  assetStateView: value => ({ label: String(value || ''), tone: 'neutral' }),
+                  replaceUrlParam: () => {}
+                };
+                function has(value) { return value !== null && value !== undefined && value !== ''; }
+                function text(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
+                function escapeHtml(value) { return text(value, '').replace(/[&<>'\"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' })[character]); }
+                function label(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
+                function number(value) { return String(value); }
+                function time(value) { return has(value) ? String(value) : '—'; }
+                function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
+                function loadHome() {}
+                const nodes = {
+                  opportunityGrid: { innerHTML: '', hidden: false, querySelectorAll: () => [] },
+                  opportunityEmpty: { hidden: false },
+                  opportunityHeading: { textContent: '' }
+                };
+                var document = { getElementById: id => nodes[id] };
+                function setText(id, value) { nodes[id].textContent = value; }
+                %s
+                %s
+                const observation = {
+                  assetId: 1, symbol: 'ETHUSDT', name: 'ETH', slotType: 'OBSERVATION',
+                  opportunityState: 'NO_QUALIFIED_OPPORTUNITY', dataFreshness: 'FRESH',
+                  oneHourOpportunityLabel: '1小时观察', fourHourTrendLabel: '4小时趋势震荡',
+                  latestAnalysisTime: '2026-08-30T10:00:00Z'
+                };
+                const blockedObservation = {
+                  assetId: 2, symbol: 'BTCUSDT', name: 'BTC', slotType: 'OBSERVATION',
+                  analysisId: 'analysis-btc', opportunityId: 'opportunity-btc', opportunityScore: 0,
+                  opportunityState: 'HIGH_RISK', finalPlanMode: 'BLOCKED', dataFreshness: 'STALE',
+                  confidenceLabel: '80%%', riskLabel: '高', oneHourOpportunityLabel: '1小时高风险观察',
+                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: false
+                };
+                assert.equal(validObservationCard(observation), true);
+                assert.equal(validOpportunityCard(blockedObservation), false);
+                assert.equal(validObservationCard(blockedObservation), true);
+                assert.equal(validObservationCard({ ...observation, slotType: 'DEFAULT_SLOT' }), false);
+                assert.equal(validObservationCard({ ...observation, opportunityScore: 1 }), true);
+                assert.equal(validOpportunityCard({ ...blockedObservation, slotType: 'DECISION', analysisId: null }), false);
+                const observationHtml = observationCard(observation, '');
+                assert.match(observationHtml, /暂无合格机会/);
+                assert.equal(observationHtml.includes('<small>状态</small>'), true);
+                assert.doesNotMatch(observationHtml, /机会评分|置信度|风险|最终偏向|计划模式|入场|止损|目标/);
+                const blockedHtml = observationCard(blockedObservation, '');
+                assert.match(blockedHtml, /高风险观察/);
+                assert.match(blockedHtml, /数据过期/);
+                const all = [
+                  observation,
+                  blockedObservation,
+                  { ...observation, assetId: 3, symbol: 'ETHUSDT' },
+                  { ...observation, assetId: 4, symbol: 'SOLUSDT' },
+                  { ...observation, assetId: 5, symbol: 'ADAUSDT' },
+                  { ...observation, assetId: 6, symbol: 'XRPUSDT' },
+                  { ...observation, assetId: 7, symbol: 'LINKUSDT' },
+                  { ...observation, assetId: 8, symbol: 'AAVEUSDT' },
+                  { ...observation, assetId: 9, symbol: 'BNBUSDT', slotType: 'DEFAULT_SLOT' }
+                ];
+                const count = renderOpportunities({ assets: all, selectedSymbol: 'ETHUSDT' });
+                const symbols = [...nodes.opportunityGrid.innerHTML.matchAll(/data-symbol=\"([^\"]+)\"/g)]
+                  .map(match => match[1]);
+                assert.equal(count, 6);
+                assert.deepEqual(symbols, ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LINKUSDT']);
+                assert.equal(symbols.filter(symbol => symbol === 'ETHUSDT').length, 1);
+                assert.equal(nodes.opportunityGrid.innerHTML.includes('DEFAULT_SLOT'), false);
+                console.log('HOME_REAL_CARD_RUNTIME=PASS');
+                """.formatted(validators, renderers);
+
+        Process process = new ProcessBuilder("node", "-e", nodeScript)
+                .directory(Path.of("").toAbsolutePath().toFile())
+                .redirectErrorStream(true)
+                .start();
+        boolean completed = process.waitFor(30, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertThat(completed).as(output).isTrue();
+        assertThat(process.exitValue()).as(output).isZero();
+        assertThat(output).contains("HOME_REAL_CARD_RUNTIME=PASS");
+        String opportunityRender = slice(source, "function renderOpportunities(home)", "function trustedMonitor(position)");
+        assertThat(opportunityRender).doesNotContain(".sort(");
     }
 
     private static String slice(String value, String start, String end) {

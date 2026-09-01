@@ -17,8 +17,10 @@ import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.service.support.ExternalContextPolicy;
 import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
+import org.example.trademodel.vo.ScoreItemVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -163,7 +165,7 @@ public class DecisionEngineService {
                                          DerivativesBusinessAssessment derivativesAssessment,
                                          Integer eightScoreComposite) {
         return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
-                externalContextInput, derivativesAssessment, eightScoreComposite, true, null);
+                externalContextInput, derivativesAssessment, eightScoreComposite, null, true, null);
     }
 
     public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
@@ -172,7 +174,7 @@ public class DecisionEngineService {
                                                          DerivativesBusinessAssessment derivativesAssessment,
                                                          Integer eightScoreComposite) {
         return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
-                externalContextInput, derivativesAssessment, eightScoreComposite, false, null);
+                externalContextInput, derivativesAssessment, eightScoreComposite, null, false, null);
     }
 
     public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
@@ -182,7 +184,18 @@ public class DecisionEngineService {
                                                          Integer eightScoreComposite,
                                                          OpportunityStateIdentity opportunityIdentity) {
         return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
-                externalContextInput, derivativesAssessment, eightScoreComposite, false, opportunityIdentity);
+                externalContextInput, derivativesAssessment, eightScoreComposite, null, false, opportunityIdentity);
+    }
+
+    public DecisionBundleVO makeDecisionForDecisionChain(String symbol, String timeframe, String analysisId,
+                                                         Integer dataQualityScore, Integer trendStructureScore,
+                                                         EventImpactInputVO externalContextInput,
+                                                         DerivativesBusinessAssessment derivativesAssessment,
+                                                         List<ScoreItemVO> scores,
+                                                         OpportunityStateIdentity opportunityIdentity) {
+        return makeDecisionInternal(symbol, timeframe, analysisId, dataQualityScore, trendStructureScore,
+                externalContextInput, derivativesAssessment, averageScore(scores), scores, false,
+                opportunityIdentity);
     }
 
     private DecisionBundleVO makeDecisionInternal(String symbol, String timeframe, String analysisId,
@@ -190,6 +203,7 @@ public class DecisionEngineService {
                                                   EventImpactInputVO externalContextInput,
                                                   DerivativesBusinessAssessment derivativesAssessment,
                                                   Integer eightScoreComposite,
+                                                  List<ScoreItemVO> scores,
                                                   boolean runLegacyAiReview,
                                                   OpportunityStateIdentity opportunityIdentity) {
         String decisionId = AnalysisPersistenceIds.decisionId();
@@ -221,22 +235,26 @@ public class DecisionEngineService {
 
             // ==================== 1. 权威落库 K 线快照（同一 run trace） ====================
             String marketTraceId = analysisId == null || analysisId.isBlank() ? decisionId : analysisId;
-            List<String[]> klines5m = ohlcvSnapshotSource.readClosedBars(symbol, "5m", 3, marketTraceId);
-            List<String[]> klines15m = ohlcvSnapshotSource.readClosedBars(symbol, "15m", 3, marketTraceId);
-            List<String[]> klines1h = ohlcvSnapshotSource.readClosedBars(symbol, "1h", 3, marketTraceId);
-            List<String[]> klines4h = ohlcvSnapshotSource.readClosedBars(symbol, "4h", 3, marketTraceId);
+            List<String[]> klines5m = readNormalizationWindow(symbol, "5m", marketTraceId);
+            List<String[]> klines15m = readNormalizationWindow(symbol, "15m", marketTraceId);
+            List<String[]> klines1h = readNormalizationWindow(symbol, "1h", marketTraceId);
+            List<String[]> klines4h = readNormalizationWindow(symbol, "4h", marketTraceId);
 
-            String ruleMarketBias = MarketBiasPolicy.classify(
-                    klines5m, klines15m, klines1h, klines4h, v41Properties.getMultiTimeframe());
+            MarketBiasPolicy.DirectionAssessment directionAssessment = MarketBiasPolicy.assessDirection(
+                    klines5m, klines15m, klines1h, klines4h,
+                    v41Properties.getMultiTimeframe(), v41Properties.getNormalization());
+            String ruleMarketBias = directionAssessment.ruleMarketBias();
             Map<String, Map<String, Object>> multiTimeframeDetails = MarketBiasPolicy.describeTimeframes(
-                    klines5m, klines15m, klines1h, klines4h, v41Properties.getMultiTimeframe());
+                    klines5m, klines15m, klines1h, klines4h,
+                    v41Properties.getMultiTimeframe(), v41Properties.getNormalization());
             boolean isBullish5m = MarketBiasPolicy.direction(klines5m)
                     == MarketBiasPolicy.WindowDirection.BULLISH;
             boolean isBullish4h = MarketBiasPolicy.direction(klines4h)
                     == MarketBiasPolicy.WindowDirection.BULLISH;
-            boolean multiTfConvergence = MarketBiasPolicy.converged(
-                    klines5m, klines15m, klines1h, klines4h,
-                    ruleMarketBias, v41Properties.getMultiTimeframe());
+            boolean multiTfConvergence = directionAssessment.structurallyReady()
+                    && directional(ruleMarketBias)
+                    && sameDirection(directionAssessment.normalized4hDirectionScore(),
+                    directionAssessment.normalized1hDirectionScore());
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================
@@ -254,7 +272,8 @@ public class DecisionEngineService {
             boolean aiQualityEligible = dataQualityScore != null
                     && dataQualityScore >= v41Properties.getAiGate().getMinimumDataQuality();
             if (!aiQualityEligible) confidenceLevel = downgradeConfidenceLevel(confidenceLevel);
-            boolean hasUsableMarketStructure = !"WAIT".equals(ruleMarketBias) && !"RANGE".equals(ruleMarketBias);
+            boolean hasUsableMarketStructure = directional(ruleMarketBias)
+                    && directionAssessment.structurallyReady();
             boolean dataQualitySufficient = DataQualityCircuitBreakerPolicy.passes(dataQualityScore);
             boolean decisionInputsSufficient = dataQualitySufficient && hasUsableMarketStructure;
             boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence
@@ -264,7 +283,9 @@ public class DecisionEngineService {
             }
             boolean externalContextBlocked = isEffectiveExternalBlocked(externalContextInput);
             boolean effectiveWorthOpening = worthOpening && !externalContextBlocked;
-            if (derivativesAssessment != null
+            boolean derivativesMandatory = "MANDATORY".equals(
+                    v41Properties.getProviderMatrix().getDerivativesRequirement());
+            if (derivativesMandatory && derivativesAssessment != null
                     && (derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.STALE
                     || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.ERROR
                     || derivativesAssessment.sourceStatus() == org.example.trademodel.providercall.UnifiedSourceStatus.NOT_CONFIGURED
@@ -274,7 +295,9 @@ public class DecisionEngineService {
             String riskTier = decisionInputsSufficient
                     ? finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM"
                     : "HIGH";
-            String userMarketBias = dataQualitySufficient ? ruleMarketBias : "WAIT";
+            String validatedMarketBias = dataQualitySufficient && hasUsableMarketStructure
+                    ? ruleMarketBias : null;
+            String userMarketBias = validatedMarketBias == null ? "WAIT" : validatedMarketBias;
             String userConfidenceLevel = dataQualitySufficient ? confidenceLevel : "LOW";
 
             // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
@@ -338,6 +361,10 @@ public class DecisionEngineService {
             AssetStateEnum finalAssetState = failClosedExternalState(syntheticState, externalContextBlocked);
             finalAssetState = failClosedDecisionInputState(finalAssetState, decisionInputsSufficient);
             finalAssetState = mergeDerivativesState(finalAssetState, derivativesAssessment);
+            if (finalAssetState == AssetStateEnum.CONFUSED) {
+                validatedMarketBias = null;
+                userMarketBias = "WAIT";
+            }
             String snapshot = assetStateService.buildSnapshotAtDecision(
                     symbol,
                     analysisId != null ? analysisId : "",
@@ -417,7 +444,29 @@ public class DecisionEngineService {
             DecisionBundleVO decision = new DecisionBundleVO();
             decision.setDecisionId(decisionId);
             decision.setMarketBiasHierarchy(userMarketBias);
-            decision.setRuleMarketBias(userMarketBias);
+            decision.setRuleMarketBias(ruleMarketBias);
+            decision.setValidatedMarketBias(validatedMarketBias);
+            decision.setDirectionDataState(validatedMarketBias != null
+                    ? "READY" : dataQualitySufficient
+                    ? directionAssessment.directionDataState() : "INSUFFICIENT_DATA");
+            decision.setDataQualityScore(dataQualityScore);
+            Map<String, Double> scoreMap = V41DecisionContractPolicy.scoreMap(scores);
+            Integer evidenceReliability = integer(scoreMap.get(
+                    V41DecisionContractPolicy.EVIDENCE_RELIABILITY));
+            decision.setEvidenceReliability(evidenceReliability);
+            V41DecisionContractPolicy.Metric opportunityMetric = V41DecisionContractPolicy.opportunityScore(
+                    scores, evidenceReliability, conflict.getAiConflictScore(), externalContextBlocked ? 20 : 0);
+            decision.setOpportunityScore(opportunityMetric.value());
+            V41DecisionContractPolicy.Metric riskMetric = V41DecisionContractPolicy.riskScore(
+                    scores, eventRisk(scoreMap), conflict.getAiConflictScore());
+            decision.setRiskScore(riskMetric.value());
+            decision.setOneHourOpportunityQuality(directionQuality(
+                    directionAssessment.normalized1hDirectionScore()));
+            decision.setFourHourTrendAlignment(fourHourAlignment(directionAssessment));
+            decision.setNormalizationVersion(v41Properties.getNormalization().getVersion());
+            decision.setScoreVersion(V41DecisionContractPolicy.SCORE_VERSION);
+            decision.setDataQualityVersion(V41DecisionContractPolicy.DATA_QUALITY_VERSION);
+            decision.setProviderMatrixVersion(v41Properties.getProviderMatrix().getVersion());
             decision.setRuleConfidence(userConfidenceLevel);
             decision.setRuleRisk(riskLevelLabel);
             decision.setTradeType("SPOT");
@@ -435,17 +484,20 @@ public class DecisionEngineService {
             decision.setMultiTfConvergence(multiTfLabel);
             decision.setMultiTimeframeDetails(multiTimeframeDetails);
             AiRoleResultsPayload.SynthesisPayload aiSynthesis = new AiRoleResultsPayload.SynthesisPayload(
-                    userMarketBias,
-                    effectiveConfidence,
-                    riskLevelLabel,
-                    effectiveWorthOpening && !confused.isDirectionalPushBlocked(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
                     conflict.getLevel() != null ? conflict.getLevel().name() : null,
                     conflict.getAiConflictScore(),
                     conflict.getAdjustedConfidence(),
                     conflict.getRiskAdjustment(),
                     effectiveAiPlanMode,
                     AssetStateEnum.CONFUSED.equals(finalAssetState) || confused.isDirectionalPushBlocked(),
-                    firstAiDowngradeReason(aiReview));
+                    firstAiDowngradeReason(aiReview),
+                    firstAiDowngradeReason(aiReview),
+                    null);
             decision.setAiRoleResults(aiRoleResultsCodec.serialize(aiReview, ruleVersion, aiSynthesis));
             decision.setReviewReasons(reviewJson);
             decision.setAiConflictLevel(conflict.getLevel() != null ? conflict.getLevel().name() : null);
@@ -472,7 +524,7 @@ public class DecisionEngineService {
                         ? null : derivativesAssessment.sourceStatus().name());
                 decision.setDerivativesFreshness(derivativesAssessment.freshnessStatus() == null
                         ? null : derivativesAssessment.freshnessStatus().name());
-                decision.setDerivativesRequired(true);
+                decision.setDerivativesRequired(derivativesMandatory);
                 decision.setDerivativesConfirmEligible(derivativesAssessment.confirmEligible());
                 decision.setDerivativesPushMode(derivativesAssessment.pushMode());
                 decision.setDerivativesReasonCodes(derivativesAssessment.reasonCodes());
@@ -501,6 +553,55 @@ public class DecisionEngineService {
                     "trade-model.fundamental-ai-v4-1.opportunity-state.candidate-promotion-score is required");
         }
         return value;
+    }
+
+    private List<String[]> readNormalizationWindow(String symbol, String timeframe, String traceId) {
+        int lookback = v41Properties.getNormalization().getLookback();
+        int minimum = v41Properties.getNormalization().getMinimumSampleCount();
+        try {
+            return ohlcvSnapshotSource.readClosedBars(symbol, timeframe, lookback, traceId);
+        } catch (RuntimeException fullWindowUnavailable) {
+            return ohlcvSnapshotSource.readClosedBars(symbol, timeframe, minimum, traceId);
+        }
+    }
+
+    private static boolean directional(String value) {
+        return MarketBiasPolicy.bullishFamily(value) || MarketBiasPolicy.bearishFamily(value);
+    }
+
+    private static boolean sameDirection(BigDecimal left, BigDecimal right) {
+        return left != null && right != null && left.signum() != 0 && left.signum() == right.signum();
+    }
+
+    private static Integer averageScore(List<ScoreItemVO> scores) {
+        if (scores == null || scores.isEmpty()) return null;
+        return (int) Math.round(scores.stream().filter(java.util.Objects::nonNull)
+                .map(ScoreItemVO::getScoreValue).filter(java.util.Objects::nonNull)
+                .mapToDouble(Double::doubleValue).average().orElse(0.0));
+    }
+
+    private static Integer integer(Double value) {
+        return value == null ? null : (int) Math.round(value);
+    }
+
+    private static Integer eventRisk(Map<String, Double> scores) {
+        Double alignment = scores.get(V41DecisionContractPolicy.EVENT_IMPACT);
+        return alignment == null ? null : (int) Math.round(Math.max(0.0, 100.0 - alignment));
+    }
+
+    private static Integer directionQuality(BigDecimal normalizedScore) {
+        return normalizedScore == null ? null
+                : normalizedScore.abs().min(BigDecimal.valueOf(100)).intValue();
+    }
+
+    private static Integer fourHourAlignment(MarketBiasPolicy.DirectionAssessment assessment) {
+        if (assessment.normalized4hDirectionScore() == null
+                || assessment.normalized1hDirectionScore() == null) return null;
+        if (assessment.normalized4hDirectionScore().signum()
+                != assessment.normalized1hDirectionScore().signum()) return 0;
+        BigDecimal fourHourStrength = assessment.normalized4hDirectionScore().abs();
+        BigDecimal oneHourStrength = assessment.normalized1hDirectionScore().abs();
+        return fourHourStrength.compareTo(oneHourStrength) >= 0 ? 100 : 80;
     }
 
     private static int getInt(Map<String, RuleConfigDO> cfgMap, String key, int defaultVal) {

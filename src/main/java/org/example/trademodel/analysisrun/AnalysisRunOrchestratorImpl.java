@@ -8,11 +8,14 @@ import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -33,6 +36,8 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             "(?i)\"(?:[A-Z0-9_]+\\.)?([A-Z0-9_]+)\\s+ON\\s+(?:[A-Z0-9_]+\\.)?([A-Z0-9_]+)\\(");
     private static final Pattern NAMED_UNIQUE_CONSTRAINT = Pattern.compile(
             "(?i)unique constraint \\\"([A-Z0-9_]+)\\\"");
+    private static final Pattern NAMED_CHECK_CONSTRAINT = Pattern.compile(
+            "(?i)(?:check constraint violation:\\s*\\\"?|violates check constraint\\s+\\\"?)([A-Z0-9_]+)");
 
     private final AnalysisIdempotencyGuard idempotencyGuard;
     private final AnalysisAssemblerService assemblerService;
@@ -275,44 +280,100 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     }
 
     static AnalysisPersistenceFailure classifyPersistenceFailure(Throwable error) {
-        if (!isDuplicateKey(error)) {
+        if (error == null) {
             return null;
         }
         String message = throwableMessages(error);
-        Matcher h2 = H2_UNIQUE_CONSTRAINT.matcher(message);
-        String constraint = null;
-        String table = null;
-        if (h2.find()) {
-            constraint = h2.group(1).toUpperCase(Locale.ROOT);
-            table = h2.group(2).toUpperCase(Locale.ROOT);
-        } else {
-            Matcher named = NAMED_UNIQUE_CONSTRAINT.matcher(message);
-            if (named.find()) {
-                constraint = named.group(1).toUpperCase(Locale.ROOT);
-            }
-            table = knownTable(message);
+        ConstraintContext context = constraintContext(message);
+        if (isDuplicateKey(error, message)) {
+            String failureCode = switch (context.table() != null ? context.table() : "") {
+                case "TM_ANALYSIS_RUN" -> "ANALYSIS_ID_COLLISION";
+                case "TM_ANALYSIS_INPUT_SNAPSHOT" -> "SNAPSHOT_ID_COLLISION";
+                case "TM_EVIDENCE_ITEM" -> "EVIDENCE_ID_COLLISION";
+                case "TM_SCORE_ITEM" -> "SCORE_ID_COLLISION";
+                case "TM_DECISION_RESULT" -> "DECISION_ID_COLLISION";
+                default -> "PERSISTENCE_ID_COLLISION";
+            };
+            return persistenceFailure(failureCode, context);
         }
-        String failureCode = switch (table != null ? table : "") {
-            case "TM_ANALYSIS_RUN" -> "ANALYSIS_ID_COLLISION";
-            case "TM_ANALYSIS_INPUT_SNAPSHOT" -> "SNAPSHOT_ID_COLLISION";
-            case "TM_EVIDENCE_ITEM" -> "EVIDENCE_ID_COLLISION";
-            case "TM_SCORE_ITEM" -> "SCORE_ID_COLLISION";
-            case "TM_DECISION_RESULT" -> "DECISION_ID_COLLISION";
-            default -> "PERSISTENCE_ID_COLLISION";
-        };
-        return new AnalysisPersistenceFailure(failureCode,
-                table != null ? table.toLowerCase(Locale.ROOT) : "unknown",
-                constraint != null ? constraint : "UNKNOWN");
+
+        if (isIntegrityConstraint(error)) {
+            boolean decisionStateConstraint = "CK_TM_DECISION_DIRECTION_DATA_STATE".equals(context.constraint())
+                    || ("TM_DECISION_RESULT".equals(context.table())
+                    && message.toUpperCase(Locale.ROOT).contains("DIRECTION_DATA_STATE"));
+            return persistenceFailure(decisionStateConstraint
+                    ? "DECISION_STATE_CONSTRAINT_VIOLATION"
+                    : "PERSISTENCE_CONSTRAINT_VIOLATION", context);
+        }
+
+        if (isPersistenceError(error)) {
+            return persistenceFailure("PERSISTENCE_FAILURE", context);
+        }
+        return null;
     }
 
-    private static boolean isDuplicateKey(Throwable error) {
+    private static boolean isDuplicateKey(Throwable error, String message) {
         for (Throwable current = error; current != null; current = current.getCause()) {
-            if (current instanceof DuplicateKeyException
+            if (current instanceof DuplicateKeyException) {
+                return true;
+            }
+            if (current instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        String upper = message.toUpperCase(Locale.ROOT);
+        return upper.contains("DUPLICATE KEY")
+                || upper.contains("UNIQUE INDEX OR PRIMARY KEY VIOLATION")
+                || upper.contains("VIOLATES UNIQUE CONSTRAINT");
+    }
+
+    private static boolean isIntegrityConstraint(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof DataIntegrityViolationException
                     || current.getClass().getSimpleName().contains("IntegrityConstraintViolation")) {
+                return true;
+            }
+            if (current instanceof SQLException sql
+                    && sql.getSQLState() != null && sql.getSQLState().startsWith("23")) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isPersistenceError(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof DataAccessException || current instanceof SQLException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static ConstraintContext constraintContext(String message) {
+        Matcher h2Unique = H2_UNIQUE_CONSTRAINT.matcher(message);
+        if (h2Unique.find()) {
+            return new ConstraintContext(
+                    h2Unique.group(2).toUpperCase(Locale.ROOT),
+                    h2Unique.group(1).toUpperCase(Locale.ROOT));
+        }
+        Matcher namedUnique = NAMED_UNIQUE_CONSTRAINT.matcher(message);
+        String constraint = namedUnique.find() ? namedUnique.group(1).toUpperCase(Locale.ROOT) : null;
+        Matcher namedCheck = NAMED_CHECK_CONSTRAINT.matcher(message);
+        if (constraint == null && namedCheck.find()) {
+            constraint = namedCheck.group(1).toUpperCase(Locale.ROOT);
+        }
+        String table = knownTable(message);
+        if (table == null && constraint != null && constraint.startsWith("CK_TM_DECISION_")) {
+            table = "TM_DECISION_RESULT";
+        }
+        return new ConstraintContext(table, constraint);
+    }
+
+    private static AnalysisPersistenceFailure persistenceFailure(String failureCode, ConstraintContext context) {
+        return new AnalysisPersistenceFailure(failureCode,
+                context.table() != null ? context.table().toLowerCase(Locale.ROOT) : "unknown",
+                context.constraint() != null ? context.constraint() : "UNKNOWN");
     }
 
     private static String throwableMessages(Throwable error) {
@@ -334,6 +395,9 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             }
         }
         return null;
+    }
+
+    private record ConstraintContext(String table, String constraint) {
     }
 
     private static String safe(String raw) {

@@ -51,6 +51,12 @@ public interface ChannelDeliveryMapper {
                                                   @Param("cooldownKey") String cooldownKey,
                                                   @Param("cutoff") LocalDateTime cutoff);
 
+    @Select("SELECT * FROM tm_channel_delivery WHERE user_id = #{userId} AND channel = 'TELEGRAM' "
+            + "AND cooldown_key = #{cooldownKey} "
+            + "ORDER BY created_at ASC, delivery_id ASC LIMIT 1")
+    ChannelDeliveryDO selectExistingLifetimeDelivery(@Param("userId") Long userId,
+                                                      @Param("cooldownKey") String cooldownKey);
+
     @Select("SELECT * FROM tm_channel_delivery WHERE channel = 'TELEGRAM' "
             + "AND status IN ('QUEUED', 'RETRYING') "
             + "AND (next_attempt_at IS NULL OR next_attempt_at <= #{now}) "

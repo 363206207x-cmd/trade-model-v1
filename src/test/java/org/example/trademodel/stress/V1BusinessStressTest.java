@@ -253,10 +253,10 @@ class V1BusinessStressTest {
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.expectWorthOpening());
         assertThat(decision.getAssetState()).isEqualTo(scenario.expectedState());
         assertThat(decision.getAiRoleResults()).contains("RULE_ONLY_FALLBACK");
-        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(3), anyString());
-        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(3), anyString());
-        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(3), anyString());
-        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(3), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(200), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(200), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(200), anyString());
+        verify(fetcher).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(200), anyString());
         return new OpportunityResult(scenario, decision, plan);
     }
 
@@ -396,11 +396,23 @@ class V1BusinessStressTest {
     }
 
     private static List<String[]> bullishKlines() {
-        return List.of(kline("100", "105"), kline("104", "108"), kline("107", "112"));
+        return directionalKlines(true);
     }
 
     private static List<String[]> bearishKlines() {
-        return List.of(kline("112", "107"), kline("108", "104"), kline("105", "100"));
+        return directionalKlines(false);
+    }
+
+    private static List<String[]> directionalKlines(boolean bullish) {
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 60; index++) {
+            BigDecimal open = new BigDecimal("100");
+            BigDecimal close = bullish
+                    ? open.add(BigDecimal.valueOf(index + 1L, 1))
+                    : open.subtract(BigDecimal.valueOf(index + 1L, 1));
+            bars.add(kline(open.toPlainString(), close.toPlainString()));
+        }
+        return bars;
     }
 
     private static String[] kline(String open, String close) {
@@ -480,7 +492,7 @@ class V1BusinessStressTest {
         position.setLeverage(new BigDecimal("2"));
         position.setStopLoss(new BigDecimal(stopLoss));
         position.setTakeProfit(new BigDecimal(takeProfit));
-        position.setSourceType("MANUAL_INDEPENDENT");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId(sourceRefId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -608,7 +620,7 @@ class V1BusinessStressTest {
         }
 
         private static OpportunityScenario conflicted(String name, String symbol) {
-            return new OpportunityScenario(name, symbol, "BULLISH", false, false, AssetStateEnum.CONFUSED, 88, 70,
+            return new OpportunityScenario(name, symbol, "WAIT", false, false, AssetStateEnum.CONFUSED, 88, 70,
                     bullishKlines(), bullishKlines(),
                     new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BULLISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),

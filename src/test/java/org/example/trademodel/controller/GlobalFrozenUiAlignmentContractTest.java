@@ -55,12 +55,12 @@ class GlobalFrozenUiAlignmentContractTest {
         String script = Files.readString(HOME_JS);
         assertThat(script).contains(
                 "[\"CANDIDATE\", \"WAITING_TRIGGER\", \"TRIGGERED\", \"HIGH_RISK\"]",
-                "mode !== \"BLOCKED\"",
+                "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"].indexOf(finalMode) >= 0",
                 "var seen = new Set()", "seen.has(identity)", ".slice(0, 6)",
                 "asset.hasFinal === true", "asset.finalMarketBias", "asset.finalPlanMode",
-                "asset.primaryTimeframe", "asset.timeframeConflictState", "asset.rankingReason",
-                "revalidating ? \"正在重验\"", "DEFAULT_SLOT")
-                .doesNotContain("const assets = [");
+                "asset.confidenceLevel", "asset.riskLevel",
+                "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel", "DEFAULT_SLOT")
+                .doesNotContain("机会评分</small>", "rankingReason", "const assets = [");
     }
 
     @Test
@@ -160,11 +160,12 @@ class GlobalFrozenUiAlignmentContractTest {
         String workspaceCss = Files.readString(WORKSPACE_CSS);
 
         assertThat(homeScript).contains(
-                "<small>最终偏向</small>", "<small>计划模式</small>",
+                "<small>方向</small>", "<small>置信</small>", "<small>风险</small>",
                 "PENDING: \"等待监控数据\"", "STALE: \"监控数据已过期\"",
                 "INVALID: \"当前不可查看\"", "SOURCE_UNAVAILABLE: \"监控来源不可用\"",
                 "position-trust-state", "is-untrusted")
-                .doesNotContain("Final Market Bias", "Final Plan Mode", "等待触发后进入人工确认");
+                .doesNotContain("<small>机会评分</small>", "<small>计划模式</small>",
+                        "Final Market Bias", "Final Plan Mode", "等待触发后进入人工确认");
         assertThat(homeCss).contains(
                 ".opportunity-final b { min-width: 0; white-space: nowrap;",
                 ".system-status-strip strong { min-width: 0;",

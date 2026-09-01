@@ -75,6 +75,100 @@ class AssetStateMapperIntegrationTest {
         assertThat(rows).noneMatch(row -> "SOLUSDT".equals(row.getSymbol()));
     }
 
+    @Test
+    void lightweightScanClaimIsAtomicAcrossSchedulerInstances() {
+        LocalDateTime previous = LocalDateTime.of(2026, 8, 12, 9, 0);
+        LocalDateTime started = previous.plusMinutes(16);
+        AssetStateDO initial = row(
+                "LOCKUSDT", AssetStateEnum.OBSERVING, 0, 0, previous, "trace-before");
+        initial.setOwnerType("SYSTEM");
+        initial.setOwnerId(0L);
+        initial.setAssetId(null);
+        initial.setPoolItemId(null);
+        initial.setTimeframe("5m");
+        initial.setOpportunityId("opp-user-lock-5m");
+        assetStateMapper.mergeUpsertCore(initial);
+
+        int first = assetStateMapper.claimScheduledScan(
+                "SYSTEM", 0L, "LOCKUSDT", "5m", "OBSERVING", previous,
+                started, "trace-first", "rules-v1");
+        int second = assetStateMapper.claimScheduledScan(
+                "SYSTEM", 0L, "LOCKUSDT", "5m", "OBSERVING", previous,
+                started, "trace-second", "rules-v1");
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        AssetStateDO persisted = assetStateMapper.selectByIdentity("SYSTEM", 0L, "LOCKUSDT", "5m");
+        assertThat(persisted.getState()).isEqualTo(AssetStateEnum.OBSERVING);
+        assertThat(persisted.getLastUpdateTime()).isEqualTo(started);
+        assertThat(persisted.getTraceId()).isEqualTo("trace-first");
+    }
+
+    @Test
+    void scanAuditCanCompleteAgainstTheClaimOrItsResultingAnalysisTrace() {
+        LocalDateTime started = LocalDateTime.of(2026, 8, 12, 10, 0);
+        AssetStateDO initial = row(
+                "AUDITUSDT", AssetStateEnum.TRIGGERED, 0, 0, started, "scan-trace");
+        initial.setOwnerType("SYSTEM");
+        initial.setOwnerId(0L);
+        initial.setTimeframe("5m");
+        assetStateMapper.mergeUpsertCore(initial);
+
+        AssetStateDO analysisUpdate = row(
+                "AUDITUSDT", AssetStateEnum.TRIGGERED, 0, 0,
+                started.plusSeconds(5), "analysis-trace");
+        analysisUpdate.setOwnerType("SYSTEM");
+        analysisUpdate.setOwnerId(0L);
+        analysisUpdate.setTimeframe("5m");
+        assetStateMapper.mergeUpsertCore(analysisUpdate);
+
+        AssetStateDO audit = new AssetStateDO();
+        audit.setOwnerType("SYSTEM");
+        audit.setOwnerId(0L);
+        audit.setSymbol("AUDITUSDT");
+        audit.setTimeframe("5m");
+        audit.setExtJson("{\"schedulerScan\":{\"fullAnalysisSucceeded\":true}}");
+        audit.setUpdatedAt(started.plusSeconds(6));
+
+        int updated = assetStateMapper.completeScheduledScanAudit(
+                audit, "scan-trace", "analysis-trace");
+
+        assertThat(updated).isEqualTo(1);
+        AssetStateDO persisted = assetStateMapper.selectByIdentity(
+                "SYSTEM", 0L, "AUDITUSDT", "5m");
+        assertThat(persisted.getExtJson()).contains("\"fullAnalysisSucceeded\":true");
+        assertThat(persisted.getTraceId()).isEqualTo("analysis-trace");
+        assertThat(persisted.getState()).isEqualTo(AssetStateEnum.TRIGGERED);
+    }
+
+    @Test
+    void scanAuditCanCompleteAgainstClaimWhenAnalysisTraceIsNull() {
+        LocalDateTime started = LocalDateTime.of(2026, 8, 12, 10, 30);
+        AssetStateDO initial = row(
+                "CLAIMAUDITUSDT", AssetStateEnum.OBSERVING, 0, 0, started, "claim-trace");
+        initial.setOwnerType("SYSTEM");
+        initial.setOwnerId(0L);
+        initial.setTimeframe("5m");
+        assetStateMapper.mergeUpsertCore(initial);
+
+        AssetStateDO audit = new AssetStateDO();
+        audit.setOwnerType("SYSTEM");
+        audit.setOwnerId(0L);
+        audit.setSymbol("CLAIMAUDITUSDT");
+        audit.setTimeframe("5m");
+        audit.setExtJson("{\"schedulerScan\":{\"result\":\"NO_MATERIAL_CHANGE\"}}");
+        audit.setUpdatedAt(started.plusSeconds(1));
+
+        int updated = assetStateMapper.completeScheduledScanAudit(
+                audit, "claim-trace", null);
+
+        assertThat(updated).isEqualTo(1);
+        AssetStateDO persisted = assetStateMapper.selectByIdentity(
+                "SYSTEM", 0L, "CLAIMAUDITUSDT", "5m");
+        assertThat(persisted.getExtJson()).contains("\"result\":\"NO_MATERIAL_CHANGE\"");
+        assertThat(persisted.getTraceId()).isEqualTo("claim-trace");
+    }
+
     private static AssetStateDO row(String symbol, AssetStateEnum state, Integer confusedScore,
                                     Integer confusedLowStreak, LocalDateTime updateTime, String traceId) {
         AssetStateDO row = new AssetStateDO();

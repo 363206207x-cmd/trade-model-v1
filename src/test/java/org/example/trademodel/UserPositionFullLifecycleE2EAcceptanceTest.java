@@ -82,6 +82,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         AnalysisRunMapper analysisRunMapper = mock(AnalysisRunMapper.class);
         ExecutionPlanDO executionPlan = executionPlan();
         when(executionPlanMapper.selectByPlanId(PLAN_ID)).thenReturn(executionPlan);
+        when(executionPlanMapper.selectValidatedFinalByPlanIdAndSymbol(PLAN_ID, "BTCUSDT"))
+                .thenReturn(executionPlan);
         ExecutionPlanDO latestSiblingPlanB = executionPlan();
         latestSiblingPlanB.setPlanId("plan-latest-sibling-B");
         latestSiblingPlanB.setEntryZone("B-entry");
@@ -122,7 +124,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         UserPositionRiskAdapter riskAdapter = mock(UserPositionRiskAdapter.class);
         when(riskAdapter.currentRiskForUser(USER_ID)).thenReturn(allowedRisk());
 
-        UserPositionServiceImpl userPositionService = new UserPositionServiceImpl(userPositionMapper);
+        UserPositionServiceImpl userPositionService =
+                new UserPositionServiceImpl(userPositionMapper, executionPlanMapper);
         PositionMonitorService positionMonitorService = new PositionMonitorServiceImpl(
                 userPositionMapper,
                 org.example.trademodel.testsupport.MarketPriceSnapshotTestSupport.snapshotService(marketQuoteClient),
@@ -148,7 +151,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(opened.getId()).isNotNull();
         assertThat(opened.getAssetSymbol()).isEqualTo("BTCUSDT");
         assertThat(opened.getStatus()).isEqualTo("OPEN");
-        assertThat(opened.getSourceType()).isEqualTo("MANUAL_INDEPENDENT");
+        assertThat(opened.getSourceType()).isEqualTo("SYSTEM_PLAN_POSITION");
         assertThat(opened.isNotTradeInstruction()).isTrue();
         assertThat(opened.isNotAutoTrading()).isTrue();
         assertThat(opened.isNotOrderExecution()).isTrue();
@@ -290,7 +293,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         req.setStopLoss(new BigDecimal("90"));
         req.setTakeProfit(new BigDecimal("120"));
         req.setOpenedAt(LocalDateTime.of(2024, 1, 1, 10, 0));
-        req.setSourceType("MANUAL");
+        req.setSourceType("SYSTEM_PLAN_POSITION");
+        req.setFinalPlanId(PLAN_ID);
         req.setSourceRefId(PositionMonitorSourceContract.executionPlanReference(PLAN_ID));
         return req;
     }

@@ -175,18 +175,33 @@
     }
     function eligibleOpportunity(asset) {
         var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
-        var mode = String(asset && (asset.primaryPlanMode || asset.planMode) || "").toUpperCase();
-        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0
-            && mode !== "BLOCKED";
+        return ["CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK"].indexOf(state) >= 0;
     }
-    function validOpportunity(asset) {
+    function validOpportunityCard(asset) {
+        var slotType = String(asset && asset.slotType || "").toUpperCase();
+        var finalMode = String(asset && asset.finalPlanMode || "").toUpperCase();
+        if (slotType === "DEFAULT_SLOT") return false;
         return symbolOf(asset)
+            && has(asset && asset.assetId)
+            && slotType === "DECISION"
             && has(asset && (asset.opportunityId || asset.primaryOpportunityId))
             && has(asset && asset.analysisId)
-            && has(asset && asset.opportunityScore)
-            && !Number.isNaN(Number(asset.opportunityScore))
             && eligibleOpportunity(asset)
-            && String(asset.slotType || "").toUpperCase() !== "DEFAULT_SLOT";
+            && asset.hasFinal === true
+            && has(asset.finalMarketBias)
+            && ["CONFIRMATION", "REDUCED", "PREPARATION"].indexOf(finalMode) >= 0
+            && has(asset.confidenceLevel)
+            && has(asset.riskLevel);
+    }
+    function validObservationCard(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        var slotType = String(asset && asset.slotType || "").toUpperCase();
+        if (slotType === "DEFAULT_SLOT") return false;
+        return symbolOf(asset)
+            && has(asset && asset.assetId)
+            && String(asset && asset.slotType || "").toUpperCase() === "OBSERVATION"
+            && ["OBSERVING", "NO_QUALIFIED_OPPORTUNITY", "STALE", "NEVER_SCANNED", "RANGE", "WAIT",
+                "CANDIDATE", "HIGH_RISK", "BLOCKED", "CONFUSED", "INVALIDATED", "COOLING"].indexOf(state) >= 0;
     }
     function selectedFinalAccess(home) {
         var plan = home && home.executionSuggestion || {};
@@ -248,42 +263,129 @@
         var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
         return '<span class="state-badge' + tone + '">' + escapeHtml(visible) + "</span>";
     }
+    function assetProvenance(asset) {
+        return {
+            analysisId: has(asset && asset.analysisId) ? String(asset.analysisId) : null,
+            analysisVersion: has(asset && asset.analysisVersion) ? Number(asset.analysisVersion) : null,
+            configurationVersion: has(asset && asset.configurationVersion) ? String(asset.configurationVersion) : null,
+            providerMatrixVersion: has(asset && asset.providerMatrixVersion) ? String(asset.providerMatrixVersion) : null,
+            provider: has(asset && asset.provider) ? String(asset.provider) : null,
+            sourceId: has(asset && asset.sourceId) ? String(asset.sourceId) : null,
+            priceObservedAt: has(asset && asset.priceObservedAt) ? String(asset.priceObservedAt) : null,
+            oneHourClosedAt: has(asset && asset.oneHourClosedAt) ? String(asset.oneHourClosedAt) : null,
+            fourHourClosedAt: has(asset && asset.fourHourClosedAt) ? String(asset.fourHourClosedAt) : null,
+            freshnessStatus: has(asset && asset.freshnessStatus) ? String(asset.freshnessStatus) : null,
+            dataQualityScore: has(asset && asset.dataQualityScore) ? Number(asset.dataQualityScore) : null,
+            directionMaturity: has(asset && asset.directionMaturity) ? String(asset.directionMaturity) : null,
+            homeTier: has(asset && asset.homeTier) ? String(asset.homeTier) : null
+        };
+    }
+    function provenanceAttributes(asset) {
+        var provenance = assetProvenance(asset);
+        return ' data-analysis-id="' + escapeHtml(provenance.analysisId || "")
+            + '" data-analysis-version="' + escapeHtml(has(provenance.analysisVersion) ? provenance.analysisVersion : "")
+            + '" data-direction-maturity="' + escapeHtml(provenance.directionMaturity || "")
+            + '" data-home-tier="' + escapeHtml(provenance.homeTier || "") + '"';
+    }
     function opportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
-        var finalVisible = asset.hasFinal === true;
-        var finalBias = finalVisible ? label(asset.finalMarketBias, "—") : "—";
-        var finalMode = finalVisible ? label(asset.finalPlanMode, "—") : "—";
+        var finalBias = label(asset.finalMarketBias, "—");
         var confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
         var risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
-        var timeframe = text(asset.primaryTimeframe, "周期待同步");
-        var conflict = label(asset.timeframeConflictState, "周期关系待同步");
-        var rankingReason = text(asset.rankingReason, "排序原因待同步");
-        var secondaryCount = has(asset.secondaryOpportunityCount) ? Number(asset.secondaryOpportunityCount) : 0;
+        var oneHour = text(asset.oneHourOpportunityLabel, "1小时待验证");
+        var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
+        var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "—";
+        var dataNotice = opportunityDataNotice(asset);
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
             + String(isSelected) + '" data-symbol="'
-            + escapeHtml(symbol) + '" title="' + escapeHtml(rankingReason) + '" aria-label="查看 ' + escapeHtml(symbol + " 决策上下文，周期关系 " + conflict + "，次级机会 " + secondaryCount + "，" + rankingReason) + '"><header><div class="asset-identity"><strong>'
-            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol + " · " + timeframe)
-            + "</small></div>" + stateBadge(asset) + '</header><div class="opportunity-metrics"><span><small>机会评分</small><strong>'
-            + escapeHtml(number(asset.opportunityScore, 0)) + "</strong></span><span><small>置信度</small><strong>" + escapeHtml(confidence)
-            + "</strong></span><span><small>风险</small><strong>" + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-final"><span><small>最终偏向</small><b>' + escapeHtml(finalBias)
-            + "</b></span><span><small>计划模式</small><b>" + escapeHtml(finalMode) + "</b></span></div></article>";
+            + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
+            + escapeHtml(symbol + " 最终决策上下文") + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
+            + (dataNotice ? " · " + escapeHtml(dataNotice) : "")
+            + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
+            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(finalBias)
+            + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong>' + escapeHtml(confidence)
+            + '</strong></span><span><small>风险</small><strong>' + escapeHtml(risk)
+            + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
+            + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
+    }
+    function opportunityDataNotice(asset) {
+        var state = String(asset && asset.dataFreshness || "").toUpperCase();
+        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
+        if (state === "STALE") return "数据过期";
+        return "";
+    }
+    function observationStateText(asset) {
+        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
+        return {
+            OBSERVING: "观察中",
+            NO_QUALIFIED_OPPORTUNITY: "暂无合格机会",
+            STALE: "数据过期",
+            NEVER_SCANNED: "等待首次扫描",
+            RANGE: "震荡",
+            WAIT: "观望",
+            CANDIDATE: "计划生成中",
+            HIGH_RISK: "高风险观察",
+            BLOCKED: "当前受限",
+            CONFUSED: "当前受限",
+            INVALIDATED: "已失效",
+            COOLING: "冷却中"
+        }[state] || "观察中";
+    }
+    function observationDataText(asset) {
+        var state = String(asset && asset.dataFreshness || "").toUpperCase();
+        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
+        if (state === "STALE") return "数据过期";
+        if (state === "NEVER_SCANNED") return "尚未扫描";
+        if (state === "FRESH" || state === "READY") return "数据新鲜";
+        return "状态待同步";
+    }
+    function observationCard(asset, selected) {
+        var symbol = symbolOf(asset);
+        var isSelected = symbol === selected;
+        var state = observationStateText(asset);
+        var direction = asset.hasFinal === true && has(asset.finalMarketBias)
+            ? label(asset.finalMarketBias, "待验证")
+            : state === "震荡" ? "震荡" : state === "观望" ? "观望" : "待验证";
+        var oneHour = text(asset.oneHourOpportunityLabel, "1小时待验证");
+        var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
+        var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "—";
+        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "")
+            + '" tabindex="0" role="button" aria-pressed="' + String(isSelected)
+            + '" data-symbol="' + escapeHtml(symbol)
+            + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
+            + escapeHtml(symbol + " 观察状态，" + state) + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
+            + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
+            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(direction)
+            + '</b></span></div><div class="opportunity-metrics"><span><small>状态</small><strong>' + escapeHtml(state)
+            + '</strong></span><span><small>数据</small><strong>' + escapeHtml(observationDataText(asset))
+            + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
+            + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
     }
     function renderOpportunities(home) {
         var all = Array.isArray(home.assets) ? home.assets : [];
         var seen = new Set();
-        var assets = all.filter(validOpportunity).filter(function (asset) {
-            var identity = has(asset.assetId) ? "asset:" + asset.assetId : "symbol:" + symbolOf(asset);
-            if (seen.has(identity)) return false;
+        var assets = all.filter(function (asset) {
+            return validOpportunityCard(asset) || validObservationCard(asset);
+        }).filter(function (asset) {
+            var identity = "asset:" + String(asset.assetId);
+            var symbolIdentity = "symbol:" + symbolOf(asset);
+            if (seen.has(identity) || seen.has(symbolIdentity)) return false;
             seen.add(identity);
+            seen.add(symbolIdentity);
             return true;
         }).slice(0, 6);
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
         setText("opportunityHeading", "资产");
-        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
+        grid.innerHTML = assets.map(function (asset) {
+            return String(asset.slotType || "").toUpperCase() === "OBSERVATION"
+                ? observationCard(asset, selected)
+                : opportunityCard(asset, selected);
+        }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {
@@ -346,6 +448,9 @@
         var source = typeof contract.positionSourceLabel === "function"
             ? contract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可用");
         var detailLink = positionDetailLink(position.positionId);
+        var pnlCoverage = trusted && has(position.pnlCoverage)
+            ? "盈亏仅含标记价格、开仓价和数量；费用、资金费率、部分成交及追加仓位覆盖未知"
+            : "";
         var openingFacts = '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
             + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric");
         if (trusted) {
@@ -362,7 +467,10 @@
                 + positionFact("建议动作", action, position.suggestedAction, "narrative")
                 + detailLink + '</div>'
             : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + detailLink + '</div>';
-        return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " " + (trusted ? conclusion : unavailable)) + '">'
+        return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted")
+            + '"' + (pnlCoverage ? ' title="' + escapeHtml(pnlCoverage) + '"' : '')
+            + ' aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " "
+                + (trusted ? conclusion : unavailable) + (pnlCoverage ? " " + pnlCoverage : "")) + '">'
             + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
             + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
             + openingFacts + monitorColumns + "</article>";

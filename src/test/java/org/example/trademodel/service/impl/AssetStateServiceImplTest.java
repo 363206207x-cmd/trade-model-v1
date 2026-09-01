@@ -9,6 +9,8 @@ import org.example.trademodel.mapper.HotResetEventMapper;
 import org.example.trademodel.mapper.OpportunityStateTransitionMapper;
 import org.example.trademodel.service.OpportunityTransitionResult;
 import org.example.trademodel.service.OpportunityTriggerSource;
+import org.example.trademodel.service.OpportunityStateIdentity;
+import org.example.trademodel.service.AssetStateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -355,6 +358,148 @@ class AssetStateServiceImplTest {
         assertThat(oneHourResult.state()).isEqualTo(AssetStateEnum.CANDIDATE);
         assertThat(oneHourResult.suppressed()).isFalse();
         assertThat(oneHourResult.opportunityId()).isEqualTo("opp-btcusdt-1h");
+    }
+
+    @Test
+    void dueLightweightScanUsesAtomicPersistentClaimAndComputesNextEligibility() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 12, 12, 0);
+        AssetStateDO current = currentState(AssetStateEnum.OBSERVING);
+        current.setOpportunityId("opp-user-btc-5m");
+        current.setLastUpdateTime(now.minusMinutes(16));
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(current);
+        when(assetStateMapper.claimScheduledScan(
+                "USER", 42L, "BTCUSDT", "5m", "OBSERVING",
+                current.getLastUpdateTime(), now, "trace-scan", "rules-v1"))
+                .thenReturn(1);
+
+        AssetStateService.ScheduledScanClaim claim = service.claimScheduledScan(
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m"),
+                77L, now, 900L, "trace-scan", "rules-v1");
+
+        assertThat(claim).isNotNull();
+        assertThat(claim.scheduledAt()).isEqualTo(now.minusMinutes(1));
+        assertThat(claim.startedAt()).isEqualTo(now);
+        assertThat(claim.nextEligibleScanAt()).isEqualTo(now.plusMinutes(15));
+        assertThat(claim.state()).isEqualTo(AssetStateEnum.OBSERVING);
+    }
+
+    @Test
+    void notDueOrLosingAtomicClaimCreatesNoScan() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 12, 12, 0);
+        OpportunityStateIdentity identity =
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m");
+        AssetStateDO notDue = currentState(AssetStateEnum.CANDIDATE);
+        notDue.setLastUpdateTime(now.minusMinutes(4));
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(notDue);
+
+        assertThat(service.claimScheduledScan(
+                identity, 77L, now, 300L, "trace-not-due", "rules-v1")).isNull();
+        verify(assetStateMapper, never()).claimScheduledScan(
+                any(), any(), any(), any(), any(), any(), any(), any(), any());
+
+        AssetStateDO due = currentState(AssetStateEnum.CANDIDATE);
+        due.setLastUpdateTime(now.minusMinutes(6));
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(due);
+        when(assetStateMapper.claimScheduledScan(
+                "USER", 42L, "BTCUSDT", "5m", "CANDIDATE",
+                due.getLastUpdateTime(), now, "trace-lost-race", "rules-v1"))
+                .thenReturn(0);
+
+        assertThat(service.claimScheduledScan(
+                identity, 77L, now, 300L, "trace-lost-race", "rules-v1")).isNull();
+    }
+
+    @Test
+    void scanCompletionPersistsRequiredAuditWithoutChangingOpportunityState() {
+        LocalDateTime started = LocalDateTime.of(2026, 8, 12, 12, 0);
+        AssetStateService.ScheduledScanClaim claim = new AssetStateService.ScheduledScanClaim(
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m"),
+                "opp-user-btc-5m", AssetStateEnum.TRIGGERED, "analysis-1", "HIGH", null,
+                "trace-scan", "rules-v1", started.minusMinutes(1), started,
+                started.plusMinutes(1), null);
+        when(assetStateMapper.completeScheduledScanAudit(any(), eq("trace-scan"), eq(null))).thenReturn(1);
+
+        boolean completed = service.completeScheduledScan(
+                claim, started.plusSeconds(2), "NO_MATERIAL_CHANGE", null,
+                "FRESH:BINANCE_PUBLIC:SPOT", "5m=UP;15m=UP;1h=UP;4h=UP",
+                12345L, null, false, false);
+
+        assertThat(completed).isTrue();
+        ArgumentCaptor<AssetStateDO> row = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).completeScheduledScanAudit(
+                row.capture(), eq("trace-scan"), eq(null));
+        assertThat(row.getValue().getExtJson())
+                .contains("\"scheduledAt\"")
+                .contains("\"startedAt\"")
+                .contains("\"finishedAt\"")
+                .contains("\"result\":\"NO_MATERIAL_CHANGE\"")
+                .contains("\"traceId\":\"trace-scan\"")
+                .contains("\"ruleVersion\":\"rules-v1\"")
+                .contains("\"dataFreshness\":\"FRESH:BINANCE_PUBLIC:SPOT\"")
+                .contains("\"fullAnalysisSucceeded\":false")
+                .contains("\"nextEligibleScanAt\"");
+        assertThat(row.getValue().getState()).isNull();
+    }
+
+    @Test
+    void failedFullAnalysisPreservesLastSuccessfulScanWatermarks() {
+        LocalDateTime started = LocalDateTime.of(2026, 8, 12, 12, 0);
+        String previous = "{\"schedulerScan\":{"
+                + "\"latestFullAnalysisCloseTimeMs\":1000,"
+                + "\"latestFullStructureSignature\":\"old-signature\","
+                + "\"latestFullHotResetAt\":\"2026-08-12T10:00\"}}";
+        AssetStateDO current = currentState(AssetStateEnum.TRIGGERED);
+        current.setExtJson(previous);
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(current);
+        when(assetStateMapper.completeScheduledScanAudit(
+                any(), eq("trace-scan"), eq("analysis-trace"))).thenReturn(1);
+        AssetStateService.ScheduledScanClaim claim = new AssetStateService.ScheduledScanClaim(
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m"),
+                "opp-user-btc-5m", AssetStateEnum.TRIGGERED, "analysis-1", "HIGH",
+                started.minusMinutes(1), "trace-scan", "rules-v1",
+                started.minusMinutes(1), started, started.plusMinutes(1), previous);
+
+        boolean completed = service.completeScheduledScan(
+                claim, started.plusSeconds(5), "TRIGGERED_RECHECK:FAILED", "PROVIDER_TIMEOUT",
+                "FRESH:BINANCE_PUBLIC:SPOT", "new-signature", 2000L,
+                "analysis-trace", true, false);
+
+        assertThat(completed).isTrue();
+        ArgumentCaptor<AssetStateDO> row = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).completeScheduledScanAudit(
+                row.capture(), eq("trace-scan"), eq("analysis-trace"));
+        assertThat(row.getValue().getExtJson())
+                .contains("\"fullAnalysisRequested\":true")
+                .contains("\"fullAnalysisSucceeded\":false")
+                .contains("\"latestFullAnalysisCloseTimeMs\":1000")
+                .contains("\"latestFullStructureSignature\":\"old-signature\"")
+                .contains("\"latestFullHotResetAt\":\"2026-08-12T10:00\"");
+    }
+
+    @Test
+    void opportunityProjectionPreservesSchedulerAuditInSameAssetStateOwner() {
+        AssetStateDO current = currentState(AssetStateEnum.CANDIDATE);
+        current.setExtJson("{\"schedulerScan\":{\"result\":\"NO_MATERIAL_CHANGE\"},"
+                + "\"legacy\":true}");
+        when(assetStateMapper.selectByIdentity("USER", 42L, "BTCUSDT", "5m"))
+                .thenReturn(current);
+        when(assetStateMapper.updateOpportunityProjection(any())).thenReturn(1);
+
+        service.recordOpportunityProjection(
+                new OpportunityStateIdentity("USER", 42L, 9001L, "BTCUSDT", "5m"),
+                77L, "analysis-new", "trace-new", "rules-v1", 82, "HIGH", "MEDIUM",
+                "{\"schemaVersion\":\"FUNDAMENTAL_AI_V4_1_OPPORTUNITY_V1\"}");
+
+        ArgumentCaptor<AssetStateDO> row = ArgumentCaptor.forClass(AssetStateDO.class);
+        verify(assetStateMapper).updateOpportunityProjection(row.capture());
+        assertThat(row.getValue().getExtJson())
+                .contains("\"schemaVersion\":\"FUNDAMENTAL_AI_V4_1_OPPORTUNITY_V1\"")
+                .contains("\"schedulerScan\":{\"result\":\"NO_MATERIAL_CHANGE\"}")
+                .doesNotContain("\"legacy\":true");
     }
 
     private static AssetStateDO currentState(AssetStateEnum state) {

@@ -90,6 +90,11 @@ public class MessageFactService {
         return mapper.selectByIdForUser(require(messageId, "messageId"), userId);
     }
 
+    public MessageDO findOpportunityForPlan(Long userId, String planId) {
+        requireUser(userId);
+        return mapper.selectOpportunityByPlanId(userId, require(planId, "planId"));
+    }
+
     public boolean markRead(Long userId, String messageId) {
         requireUser(userId);
         return mapper.markRead(require(messageId, "messageId"), userId, LocalDateTime.now(clock)) == 1;

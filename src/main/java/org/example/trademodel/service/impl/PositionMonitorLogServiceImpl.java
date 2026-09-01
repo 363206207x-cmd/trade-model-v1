@@ -95,17 +95,35 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         if (monitorSourceStatus == PositionMonitorSourceStatusEnum.VERIFIED) {
             entryLogicStatus = parseEnum(
                     command.getEntryLogicStatus(), PositionEntryLogicStatusEnum.class, "entry_logic_status");
-            monitorConclusion = parseEnum(
-                    command.getMonitorConclusion(), PositionMonitorConclusionEnum.class, "monitor_conclusion");
+            boolean manualIndependent = isManualIndependent(position.getSourceType());
+            if (manualIndependent && entryLogicStatus != PositionEntryLogicStatusEnum.NOT_APPLICABLE) {
+                throw new IllegalArgumentException(
+                        "MANUAL_INDEPENDENT without an original thesis must use NOT_APPLICABLE entry_logic_status");
+            }
+            if (!manualIndependent && entryLogicStatus == PositionEntryLogicStatusEnum.NOT_APPLICABLE) {
+                throw new IllegalArgumentException(
+                        "SYSTEM_PLAN_POSITION cannot use NOT_APPLICABLE entry_logic_status");
+            }
             reversalStatus = parseEnum(
                     command.getReversalStatus(), PositionReversalStatusEnum.class, "reversal_status");
             riskChangeReason = parseEnum(
                     command.getRiskChangeReason(), PositionRiskChangeReasonEnum.class, "risk_change_reason");
             riskLevel = parseEnum(command.getRiskLevel(), PositionRiskLevelEnum.class, "risk_level");
             riskTrend = parseEnum(command.getRiskTrend(), PositionRiskTrendEnum.class, "risk_trend");
-            suggestedAction = PositionMonitorSuggestedActionEnum.parse(command.getSuggestedAction());
-            if (!suggestedAction.isAllowedFor(monitorConclusion)) {
-                throw new IllegalArgumentException("suggested_action is not valid for monitor_conclusion");
+            String conclusionValue = optionalText(command.getMonitorConclusion());
+            String actionValue = optionalText(command.getSuggestedAction());
+            if (entryLogicStatus == PositionEntryLogicStatusEnum.NOT_APPLICABLE
+                    && (conclusionValue == null) != (actionValue == null)) {
+                throw new IllegalArgumentException(
+                        "manual monitor_conclusion and suggested_action must either both be present or both be absent");
+            }
+            if (entryLogicStatus != PositionEntryLogicStatusEnum.NOT_APPLICABLE || conclusionValue != null) {
+                monitorConclusion = parseEnum(
+                        conclusionValue, PositionMonitorConclusionEnum.class, "monitor_conclusion");
+                suggestedAction = PositionMonitorSuggestedActionEnum.parse(actionValue);
+                if (!suggestedAction.isAllowedFor(monitorConclusion)) {
+                    throw new IllegalArgumentException("suggested_action is not valid for monitor_conclusion");
+                }
             }
         } else {
             requireMissing(command.getEntryLogicStatus(), "entry_logic_status");
@@ -334,6 +352,17 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static boolean isManualIndependent(String sourceType) {
+        String normalized = optionalText(sourceType);
+        if (normalized == null) {
+            return false;
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        return "MANUAL_INDEPENDENT".equals(normalized)
+                || "MANUAL".equals(normalized)
+                || "MANUAL_POSITION".equals(normalized);
     }
 
     private static void requireMissing(String value, String fieldName) {

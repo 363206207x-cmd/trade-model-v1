@@ -37,7 +37,7 @@ public class DerivativesBusinessIntegrationService {
     public static final String SENTIMENT_SCORE = "情绪温度分";
     public static final String EVENT_SCORE = "事件冲击分";
     public static final String MACRO_SCORE = "宏观环境分";
-    public static final String CREDIBILITY_SCORE = "综合可信度分";
+    public static final String CREDIBILITY_SCORE = "证据可信度分";
 
     private static final String OI_DATASET = ProviderDatasetType.COINGLASS_OPEN_INTEREST.name();
     private static final String FUNDING_DATASET = ProviderDatasetType.COINGLASS_FUNDING.name();

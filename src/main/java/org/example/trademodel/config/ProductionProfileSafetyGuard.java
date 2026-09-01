@@ -37,9 +37,9 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
             new SchedulerPolicyItem("market-data", "trade-model.schedulers.market-data.enabled", false),
             new SchedulerPolicyItem("ohlcv-ingestion", "trade-model.schedulers.ohlcv-ingestion.enabled", false),
             new SchedulerPolicyItem("watchlist", "trade-model.schedulers.watchlist.enabled", false),
-            new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", true),
+            new SchedulerPolicyItem("position-monitor", "trade-model.schedulers.position-monitor.enabled", false),
             new SchedulerPolicyItem("analysis", "trade-model.analysis.scheduler.enabled", false),
-            new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", true)
+            new SchedulerPolicyItem("provider-scan", "trade-model.provider-call.scheduler-enabled", false)
     );
 
     private final Environment environment;
@@ -124,8 +124,10 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
 
         validateProductionSchedulerPolicy(environment, errors);
+        validateCoreProductionLoopPolicy(environment, errors);
         validateOhlcvIngestionPolicy(environment, errors);
         validateProviderCallPolicy(environment, errors);
+        validateProviderScanPolicy(environment, errors);
         validateCoinGlassPolicy(environment, errors);
         validateProductionRateLimit(environment, errors);
 
@@ -215,6 +217,59 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
     }
 
+    private static void validateCoreProductionLoopPolicy(Environment environment, List<String> errors) {
+        boolean globallyEnabled = isTrue(property(environment, "trade-model.schedulers.enabled"));
+        boolean marketEnabled = isTrue(property(environment, "trade-model.schedulers.market-data.enabled"));
+        boolean analysisEnabled = isTrue(property(environment, "trade-model.analysis.scheduler.enabled"));
+        boolean ingestionEnabled = isTrue(property(environment,
+                "trade-model.schedulers.ohlcv-ingestion.enabled"));
+        if (marketEnabled || analysisEnabled) {
+            if (!globallyEnabled || !marketEnabled || !analysisEnabled || !ingestionEnabled) {
+                errors.add("core production opportunity loop requires global, market-data, analysis, and OHLCV schedulers");
+            }
+            if (!"BINANCE".equals(normalized(property(environment,
+                    "trade-model.ohlcv.provider.primary")))) {
+                errors.add("core production opportunity loop requires Binance primary OHLCV");
+            }
+            if (isTrue(property(environment, "trade-model.ohlcv.provider.fallback-enabled"))) {
+                errors.add("core production opportunity loop forbids OHLCV fallback");
+            }
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.observing-interval-seconds", 900L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.candidate-interval-seconds", 300L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.waiting-trigger-interval-seconds", 120L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.triggered-interval-seconds", 60L);
+            requireExactLong(environment, errors, "trade-model.analysis.scheduler.fixed-delay-ms", 60000L);
+            if (!"5M".equals(normalized(property(environment,
+                    "trade-model.analysis.scheduler.decision-timeframe")))) {
+                errors.add("core production opportunity loop decision timeframe must be 5m");
+            }
+            if (!isPositiveInteger(property(environment,
+                    "trade-model.analysis.scheduler.required-closed-bars"))
+                    || Integer.parseInt(trim(property(environment,
+                    "trade-model.analysis.scheduler.required-closed-bars"))) < 100) {
+                errors.add("core production opportunity loop requires at least 100 closed bars");
+            }
+        }
+        if (isTrue(property(environment, "trade-model.schedulers.position-monitor.enabled"))) {
+            if (!globallyEnabled) {
+                errors.add("production position monitor requires the global scheduler opt-in");
+            }
+            requireExactLong(environment, errors,
+                    "trade-model.schedulers.position-monitor.fixed-rate-ms", 30000L);
+        }
+    }
+
+    private static void requireExactLong(Environment environment, List<String> errors,
+                                         String property, long expected) {
+        try {
+            if (Long.parseLong(trim(property(environment, property))) != expected) {
+                errors.add(property + " must equal " + expected);
+            }
+        } catch (NumberFormatException ex) {
+            errors.add(property + " must equal " + expected);
+        }
+    }
+
     private static void validateExplicitOhlcvProvider(Environment environment,
                                                       List<String> errors,
                                                       String provider,
@@ -244,6 +299,40 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         }
         if (schedulerEnabled && !externalCallsEnabled) {
             errors.add("production provider-call scheduler requires explicit external-call opt-in");
+        }
+    }
+
+    private static void validateProviderScanPolicy(Environment environment, List<String> errors) {
+        if (!isTrue(property(environment, "trade-model.provider-call.scheduler-enabled"))) {
+            return;
+        }
+        if (!isTrue(property(environment, "trade-model.schedulers.enabled"))) {
+            errors.add("production provider-call scheduler requires the global scheduler opt-in");
+        }
+        if (!"EXPLICIT_OPT_IN".equals(normalized(property(environment,
+                "trade-model.production.scheduler-policy")))) {
+            errors.add("production provider-call scheduler requires EXPLICIT_OPT_IN policy");
+        }
+        if (!"PROD_ALLOWED_EXPLICIT_OPT_IN".equals(normalized(property(environment,
+                "trade-model.production.scheduler-approval.provider-scan")))) {
+            errors.add("production provider-call scheduler requires explicit provider-scan approval");
+        }
+        if (!isTrue(property(environment, "trade-model.providers.coinglass.enabled"))) {
+            errors.add("production provider-call scheduler requires explicitly enabled CoinGlass provider");
+        }
+        if (!isTrue(property(environment, "trade-model.providers.coinglass.external-calls-enabled"))) {
+            errors.add("production provider-call scheduler requires CoinGlass external-call opt-in");
+        }
+        if (isBlank(property(environment, "trade-model.providers.coinglass.api-key"))) {
+            errors.add("production provider-call scheduler requires CoinGlass API key");
+        }
+        String serverAddress = normalizedAddress(property(environment, "server.address"));
+        if (!isLoopbackBind(serverAddress)
+                || isTrue(property(environment, "trade-model.production.allow-public-bind"))) {
+            errors.add("production provider-call scheduler requires private loopback binding with public exposure disabled");
+        }
+        if (!isFalse(property(environment, "trade-model.production.tailscale-funnel-enabled"))) {
+            errors.add("production provider-call scheduler requires explicitly disabled Tailscale Funnel");
         }
     }
 
@@ -344,8 +433,18 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         return "0.0.0.0".equals(serverAddress) || "::".equals(serverAddress);
     }
 
+    private static boolean isLoopbackBind(String serverAddress) {
+        return "127.0.0.1".equals(serverAddress)
+                || "localhost".equals(serverAddress)
+                || "::1".equals(serverAddress);
+    }
+
     private static boolean isTrue(String value) {
         return "true".equalsIgnoreCase(trim(value));
+    }
+
+    private static boolean isFalse(String value) {
+        return "false".equalsIgnoreCase(trim(value));
     }
 
     private static boolean hasUnsafeActuatorExposure(String exposure) {

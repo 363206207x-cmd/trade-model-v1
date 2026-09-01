@@ -39,6 +39,10 @@ public interface ExecutionPlanMapper {
             + "ORDER BY create_time DESC, plan_id DESC LIMIT 1")
     ExecutionPlanDO selectLatestByCandidateId(@Param("candidateId") String candidateId);
 
+    @Select("SELECT * FROM tm_execution_plan WHERE opportunity_id = #{opportunityId} "
+            + "AND final_plan = TRUE ORDER BY create_time DESC, plan_id DESC LIMIT 1")
+    ExecutionPlanDO selectLatestFinalByOpportunityId(@Param("opportunityId") String opportunityId);
+
     @Select("SELECT ep.* FROM tm_execution_plan ep WHERE ep.final_plan = TRUE "
             + "AND ep.plan_lifecycle_state IN ('CURRENT', 'NEEDS_REVALIDATION') "
             + "AND (ep.analysis_id = #{analysisId} OR ep.analysis_id IN ("

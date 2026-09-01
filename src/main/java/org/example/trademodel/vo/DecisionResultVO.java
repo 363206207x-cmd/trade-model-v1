@@ -36,6 +36,7 @@ public class DecisionResultVO {
     private String executionPlanSummary;
     private String recommendedAction;
     private String planMode;
+    private String validatedMarketBias;
     private String finalMarketBias;
     private String entryZone;
     private String stopLoss;
@@ -44,6 +45,16 @@ public class DecisionResultVO {
     private String positionSuggestion;
     private Integer dataQualityScore;
     private Double opportunityScore;
+    private Integer evidenceReliability;
+    private Integer riskScore;
+    private Integer finalConfidence;
+    private Integer oneHourOpportunityQuality;
+    private Integer fourHourTrendAlignment;
+    private String directionDataState;
+    private String normalizationVersion;
+    private String scoreVersion;
+    private String dataQualityVersion;
+    private String providerMatrixVersion;
     private LocalDateTime createTime;
     private BigDecimal latestPrice;
     private BigDecimal priceChangePct;
@@ -318,6 +329,29 @@ public class DecisionResultVO {
     public void setFinalMarketBias(String finalMarketBias) {
         this.finalMarketBias = finalMarketBias;
     }
+
+    public String getValidatedMarketBias() { return validatedMarketBias; }
+    public void setValidatedMarketBias(String value) { this.validatedMarketBias = value; }
+    public Integer getEvidenceReliability() { return evidenceReliability; }
+    public void setEvidenceReliability(Integer value) { this.evidenceReliability = value; }
+    public Integer getRiskScore() { return riskScore; }
+    public void setRiskScore(Integer value) { this.riskScore = value; }
+    public Integer getFinalConfidence() { return finalConfidence; }
+    public void setFinalConfidence(Integer value) { this.finalConfidence = value; }
+    public Integer getOneHourOpportunityQuality() { return oneHourOpportunityQuality; }
+    public void setOneHourOpportunityQuality(Integer value) { this.oneHourOpportunityQuality = value; }
+    public Integer getFourHourTrendAlignment() { return fourHourTrendAlignment; }
+    public void setFourHourTrendAlignment(Integer value) { this.fourHourTrendAlignment = value; }
+    public String getDirectionDataState() { return directionDataState; }
+    public void setDirectionDataState(String value) { this.directionDataState = value; }
+    public String getNormalizationVersion() { return normalizationVersion; }
+    public void setNormalizationVersion(String value) { this.normalizationVersion = value; }
+    public String getScoreVersion() { return scoreVersion; }
+    public void setScoreVersion(String value) { this.scoreVersion = value; }
+    public String getDataQualityVersion() { return dataQualityVersion; }
+    public void setDataQualityVersion(String value) { this.dataQualityVersion = value; }
+    public String getProviderMatrixVersion() { return providerMatrixVersion; }
+    public void setProviderMatrixVersion(String value) { this.providerMatrixVersion = value; }
 
     public String getEntryZone() {
         return entryZone;

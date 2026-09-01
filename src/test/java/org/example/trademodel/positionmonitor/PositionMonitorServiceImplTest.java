@@ -6,6 +6,9 @@ import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.MacroEventDO;
 import org.example.trademodel.entity.NewsEventDO;
 import org.example.trademodel.entity.UserPositionDO;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessStatus;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvStaleReasonCode;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
 import org.example.trademodel.mapper.EvidenceItemMapper;
@@ -21,6 +24,7 @@ import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.MacroEventService;
 import org.example.trademodel.service.NewsEventService;
 import org.example.trademodel.service.PositionMonitorLogService;
+import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExternalContextEvidenceBuilder;
@@ -55,6 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -89,6 +94,8 @@ class PositionMonitorServiceImplTest {
     private AnalysisRunMapper analysisRunMapper;
     @Mock
     private ExternalContextEvidenceBuilder externalContextEvidenceBuilder;
+    @Mock
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
 
     private PositionMonitorServiceImpl service;
     private final AtomicLong logIds = new AtomicLong(100L);
@@ -107,6 +114,12 @@ class PositionMonitorServiceImplTest {
                 new ObjectMapper(),
                 analysisRunMapper,
                 null);
+        service.setPersistedOhlcvQueryService(persistedOhlcvQueryService);
+        lenient().when(persistedOhlcvQueryService.evaluateReadinessForSource(
+                        anyString(), anyString(), eq(100), anyLong(),
+                        eq("BINANCE_PUBLIC"), eq("SPOT")))
+                .thenReturn(readiness(PersistedOhlcvReadinessStatus.FRESH,
+                        PersistedOhlcvStaleReasonCode.NONE));
         lenient().when(positionMonitorLogService.listByPositionIdForUser(eq(USER_ID), anyLong(), eq(1))).thenReturn(List.of());
         lenient().when(positionMonitorLogService.recordMonitorRunForUser(eq(USER_ID), any())).thenAnswer(invocation -> {
             return monitorLog(invocation.getArgument(1));
@@ -184,6 +197,11 @@ class PositionMonitorServiceImplTest {
 
         assertThat(longResult.getPnlAmount()).isEqualByComparingTo("20");
         assertThat(longResult.getPnlPercent()).isEqualByComparingTo("10");
+        assertThat(longResult.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+        assertThat(longResult.getFeeCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getFundingCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getPartialFillCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getPositionAdditionCoverage()).isEqualTo("UNKNOWN");
 
         UserPositionDO shortPosition = position(110L, "SHORT", "OPEN", "plan-short-pnl", "120", "70");
         shortPosition.setQuantity(new BigDecimal("2"));
@@ -193,6 +211,7 @@ class PositionMonitorServiceImplTest {
 
         assertThat(shortResult.getPnlAmount()).isEqualByComparingTo("20");
         assertThat(shortResult.getPnlPercent()).isEqualByComparingTo("10");
+        assertThat(shortResult.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
     }
 
     @Test
@@ -406,14 +425,15 @@ class PositionMonitorServiceImplTest {
         UserPositionDO missingContext = position(11L, "LONG", "OPEN", null, "90", "120");
         arrange(missingContext, "100", risk("LOW", false), null);
         PositionMonitorResultDTO missingContextResult = service.monitorUserPositionForUser(11L, USER_ID);
-        assertThat(missingContextResult.getAnalysisId()).isNull();
+        assertThat(missingContextResult.getAnalysisId()).isEqualTo("monitor-BTC");
+        assertThat(missingContextResult.getEntryLogicStatus()).isEqualTo("NOT_APPLICABLE");
         assertThat(missingContextResult.getMonitorConclusion()).isNull();
-        assertThat(missingContextResult.getRiskLevel()).isNull();
+        assertThat(missingContextResult.getRiskLevel()).isEqualTo("LOW");
         assertThat(missingContextResult.getSuggestedAction()).isNull();
-        assertThat(missingContextResult.getMarkPrice()).isNull();
-        assertThat(missingContextResult.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertThat(missingContextResult.getMarkPrice()).isEqualByComparingTo("100");
+        assertThat(missingContextResult.getDataState()).isEqualTo("OPEN_MONITORING");
         assertThat(missingContextResult.getReasonCodes())
-                .contains("PLAN_SOURCE_UNVERIFIED", "PLAN_CONTEXT_MISSING");
+                .doesNotContain("PLAN_SOURCE_UNVERIFIED", "PLAN_CONTEXT_MISSING");
 
         UserPositionDO missingStop = position(12L, "LONG", "OPEN", "plan-missing-stop", null, "120");
         arrange(missingStop, "100", risk("LOW", false), plan("plan-missing-stop", "ana-12", "VALID", true));
@@ -429,6 +449,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void positionSourceRefAnalysisWithPlansAAndB_monitorNeverLogsBAsOriginalSource() {
         UserPositionDO position = position(131L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId("analysis-with-plan-a-and-b");
         arrange(position, "100", risk("LOW", false), null);
         ExecutionPlanDO latestB = plan("plan-B", "analysis-with-plan-a-and-b", "VALID", true);
@@ -454,6 +475,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void ambiguousSourceRefProducesUnverifiedMonitorSource() {
         UserPositionDO position = position(132L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId("plan-A-without-type");
         arrange(position, "100", risk("LOW", false), null);
         lenient().when(executionPlanMapper.selectByPlanId("plan-A-without-type"))
@@ -475,6 +497,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void typedAnalysisSourceWithSinglePlanLogsVerifiedSource() {
         UserPositionDO position = position(133L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId(PositionMonitorSourceContract.analysisReference("analysis-A"));
         arrange(position, "100", risk("LOW", false), null);
         ExecutionPlanDO planA = plan("plan-A", "analysis-A", "VALID", true);
@@ -682,18 +705,56 @@ class PositionMonitorServiceImplTest {
     }
 
     @Test
-    void unexpectedMonitorFailureStopsSystemBatch() {
-        UserPositionDO position = position(27L, "LONG", "OPEN", "plan-runtime-failure", "90", "120");
-        position.setUserId(101L);
-        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
+    void unexpectedMonitorFailureIsIsolatedAndDoesNotStopSystemBatch() {
+        UserPositionDO failed = position(27L, "LONG", "OPEN", "plan-runtime-failure", "90", "120");
+        failed.setUserId(101L);
+        UserPositionDO next = position(29L, "LONG", "OPEN", "plan-after-runtime-failure", "90", "120");
+        next.setUserId(202L);
+        next.setAssetSymbol("ETH");
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(failed, next));
         when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(risk("LOW", false));
+        when(executionPlanMapper.selectByPlanId("plan-runtime-failure"))
+                .thenReturn(plan("plan-runtime-failure", "ana-27", "VALID", true));
+        when(executionPlanMapper.selectByPlanId("plan-after-runtime-failure"))
+                .thenReturn(plan("plan-after-runtime-failure", "ana-29", "VALID", true));
         doThrow(new IllegalStateException("PositionMonitorLog insert failed"))
+                .doAnswer(invocation -> monitorLog(invocation.getArgument(0)))
                 .when(positionMonitorLogService).recordMonitorRunForSystem(any());
 
-        assertThatThrownBy(service::monitorClaimedOpenPositionsForSystem)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("PositionMonitorLog insert failed");
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
+
+        assertThat(batch.getTotalCount()).isEqualTo(2);
+        assertThat(batch.getSuccessCount()).isEqualTo(1);
+        assertThat(batch.getFailureCount()).isEqualTo(1);
+        assertThat(batch.getFailures()).singleElement().satisfies(failure -> {
+            assertThat(failure.getPositionId()).isEqualTo(27L);
+            assertThat(failure.getReason()).isEqualTo("POSITION_MONITOR_FAILED:IllegalStateException");
+        });
+        assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId).containsExactly(29L);
+        verify(positionMonitorLogService, times(2)).recordMonitorRunForSystem(any());
+    }
+
+    @Test
+    void systemBatchFailsClosedWhenAnyRequiredBinanceWindowIsStale() {
+        UserPositionDO position = position(28L, "LONG", "OPEN", "plan-stale-window", "90", "120");
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
+        when(persistedOhlcvQueryService.evaluateReadinessForSource(
+                eq("BTCUSDT"), eq("15m"), eq(100), anyLong(),
+                eq("BINANCE_PUBLIC"), eq("SPOT")))
+                .thenReturn(readiness(PersistedOhlcvReadinessStatus.STALE,
+                        PersistedOhlcvStaleReasonCode.LATEST_BAR_TOO_OLD));
+
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
+
+        assertThat(batch.getSuccessCount()).isZero();
+        assertThat(batch.getFailureCount()).isEqualTo(1);
+        assertThat(batch.getFailures()).singleElement().satisfies(failure ->
+                assertThat(failure.getReason()).contains(
+                        "AUTHORITATIVE_OHLCV_UNAVAILABLE:15m:LATEST_BAR_TOO_OLD"));
+        verify(marketQuoteClient, never()).fetch24hTicker(anyString());
+        verify(positionMonitorLogService, never()).recordMonitorRunForSystem(any());
     }
 
     @Test
@@ -838,7 +899,7 @@ class PositionMonitorServiceImplTest {
         row.setLeverage(new BigDecimal("2"));
         row.setStopLoss(stopLoss == null ? null : new BigDecimal(stopLoss));
         row.setTakeProfit(takeProfit == null ? null : new BigDecimal(takeProfit));
-        row.setSourceType("MANUAL_INDEPENDENT");
+        row.setSourceType(sourceRefId == null ? "MANUAL_INDEPENDENT" : "SYSTEM_PLAN_POSITION");
         row.setSourceRefId(sourceRefId == null
                 ? null
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));
@@ -948,6 +1009,14 @@ class PositionMonitorServiceImplTest {
         dto.setObservedAt(LocalDateTime.now(ZoneOffset.UTC).minusHours(2));
         dto.setFreshUntil(LocalDateTime.now(ZoneOffset.UTC).minusHours(1));
         return dto;
+    }
+
+    private static PersistedOhlcvReadinessResult readiness(PersistedOhlcvReadinessStatus status,
+                                                            PersistedOhlcvStaleReasonCode reason) {
+        PersistedOhlcvReadinessResult result = new PersistedOhlcvReadinessResult();
+        result.setStatus(status);
+        result.setStaleReasonCode(reason);
+        return result;
     }
 
     private static MacroEventDO macroEvent(String id, LocalDateTime now) {

@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import org.example.trademodel.ai.AiRoleResultsPayload;
@@ -510,6 +511,17 @@ public class DashboardHomeVO {
         private String name;
         private Long assetId;
         private String analysisId;
+        private Integer analysisVersion;
+        private String configurationVersion;
+        private String providerMatrixVersion;
+        private String provider;
+        private String sourceId;
+        private LocalDateTime priceObservedAt;
+        private LocalDateTime oneHourClosedAt;
+        private LocalDateTime fourHourClosedAt;
+        private String freshnessStatus;
+        private String directionMaturity;
+        private String homeTier;
         private String opportunityId;
         private String opportunityState;
         private String primaryOpportunityId;
@@ -533,6 +545,8 @@ public class DashboardHomeVO {
         private String confidenceLabel;
         private String riskLevel;
         private String riskLabel;
+        private String oneHourOpportunityLabel;
+        private String fourHourTrendLabel;
         private String assetState;
         private String assetStateLabel;
         private Boolean worthOpening;
@@ -607,6 +621,32 @@ public class DashboardHomeVO {
         public void setAnalysisId(String analysisId) {
             this.analysisId = analysisId;
         }
+
+        public Integer getAnalysisVersion() { return analysisVersion; }
+        public void setAnalysisVersion(Integer analysisVersion) { this.analysisVersion = analysisVersion; }
+        public String getConfigurationVersion() { return configurationVersion; }
+        public void setConfigurationVersion(String configurationVersion) { this.configurationVersion = configurationVersion; }
+        public String getProviderMatrixVersion() { return providerMatrixVersion; }
+        public void setProviderMatrixVersion(String providerMatrixVersion) { this.providerMatrixVersion = providerMatrixVersion; }
+        public String getProvider() { return provider; }
+        public void setProvider(String provider) { this.provider = provider; }
+        public String getSourceId() { return sourceId; }
+        public void setSourceId(String sourceId) { this.sourceId = sourceId; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getPriceObservedAt() { return priceObservedAt; }
+        public void setPriceObservedAt(LocalDateTime priceObservedAt) { this.priceObservedAt = priceObservedAt; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getOneHourClosedAt() { return oneHourClosedAt; }
+        public void setOneHourClosedAt(LocalDateTime oneHourClosedAt) { this.oneHourClosedAt = oneHourClosedAt; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getFourHourClosedAt() { return fourHourClosedAt; }
+        public void setFourHourClosedAt(LocalDateTime fourHourClosedAt) { this.fourHourClosedAt = fourHourClosedAt; }
+        public String getFreshnessStatus() { return freshnessStatus; }
+        public void setFreshnessStatus(String freshnessStatus) { this.freshnessStatus = freshnessStatus; }
+        public String getDirectionMaturity() { return directionMaturity; }
+        public void setDirectionMaturity(String directionMaturity) { this.directionMaturity = directionMaturity; }
+        public String getHomeTier() { return homeTier; }
+        public void setHomeTier(String homeTier) { this.homeTier = homeTier; }
 
         public String getOpportunityId() { return opportunityId; }
         public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
@@ -697,6 +737,11 @@ public class DashboardHomeVO {
             this.riskLabel = riskLabel;
         }
 
+        public String getOneHourOpportunityLabel() { return oneHourOpportunityLabel; }
+        public void setOneHourOpportunityLabel(String value) { this.oneHourOpportunityLabel = value; }
+        public String getFourHourTrendLabel() { return fourHourTrendLabel; }
+        public void setFourHourTrendLabel(String value) { this.fourHourTrendLabel = value; }
+
         public String getAssetState() {
             return assetState;
         }
@@ -768,6 +813,11 @@ public class DashboardHomeVO {
         private BigDecimal pnlPct;
         private BigDecimal pnlAmount;
         private BigDecimal pnlPercent;
+        private String pnlCoverage;
+        private String feeCoverage;
+        private String fundingCoverage;
+        private String partialFillCoverage;
+        private String positionAdditionCoverage;
         private BigDecimal accountImpactPct;
         private BigDecimal leverage;
         private BigDecimal positionSize;
@@ -884,6 +934,16 @@ public class DashboardHomeVO {
         public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
         public BigDecimal getPnlPercent() { return pnlPercent; }
         public void setPnlPercent(BigDecimal pnlPercent) { this.pnlPercent = pnlPercent; }
+        public String getPnlCoverage() { return pnlCoverage; }
+        public void setPnlCoverage(String value) { this.pnlCoverage = value; }
+        public String getFeeCoverage() { return feeCoverage; }
+        public void setFeeCoverage(String value) { this.feeCoverage = value; }
+        public String getFundingCoverage() { return fundingCoverage; }
+        public void setFundingCoverage(String value) { this.fundingCoverage = value; }
+        public String getPartialFillCoverage() { return partialFillCoverage; }
+        public void setPartialFillCoverage(String value) { this.partialFillCoverage = value; }
+        public String getPositionAdditionCoverage() { return positionAdditionCoverage; }
+        public void setPositionAdditionCoverage(String value) { this.positionAdditionCoverage = value; }
 
         public BigDecimal getAccountImpactPct() {
             return accountImpactPct;

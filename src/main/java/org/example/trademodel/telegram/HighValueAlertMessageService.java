@@ -18,11 +18,14 @@ import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -78,12 +81,19 @@ public class HighValueAlertMessageService {
         if (!isUserOwned(run)) return null;
         LocalDateTime now = LocalDateTime.now(clock);
         TmPushSnapshotDO snapshot = latestSnapshot(run.getAnalysisId());
-        boolean reducedAllowed = telegramProperties.isAllowHighQualityReduced()
-                && plan != null && plan.getDataQuality() != null
-                && plan.getDataQuality() >= v41Properties.getAiGate().getMinimumDataQuality();
+        if (snapshot != null && (snapshot.getPushId() == null || snapshot.getExpiresAt() == null
+                || !now.isBefore(snapshot.getExpiresAt()))) snapshot = null;
+        LocalDateTime effectiveExpiry = plan != null && plan.getValidUntil() != null
+                ? plan.getValidUntil() : snapshot == null ? null : snapshot.getExpiresAt();
+        String target = plan == null ? null : firstText(plan.getTakeProfitRules(), plan.getTargetLogic());
         boolean traceable = hasText(run.getAnalysisId()) && plan != null && hasText(plan.getPlanId())
                 && opportunity != null && hasText(opportunity.opportunityId())
-                && hasText(run.getTraceId());
+                && persistedLog != null && hasText(persistedLog.getOpportunityId())
+                && Objects.equals(run.getAnalysisId(), plan.getAnalysisId())
+                && Objects.equals(opportunity.opportunityId(), persistedLog.getOpportunityId())
+                && Objects.equals(opportunity.opportunityId(), plan.getOpportunityId())
+                && hasText(run.getTraceId()) && Objects.equals(run.getTraceId(), plan.getTraceId())
+                && hasText(run.getSymbol());
         boolean sourceGate = plan != null && Boolean.TRUE.equals(plan.getSourceGateComplete())
                 && accepted(plan.getSourceGateStatus(), "PASS", "VALID", "COMPLETE", "ALLOWED", "READY")
                 && accepted(plan.getSourceStatus(), "PASS", "VALID", "VERIFIED", "COMPLETE", "READY");
@@ -91,7 +101,7 @@ public class HighValueAlertMessageService {
                 "PASS", "VALID", "VERIFIED", "ALLOWED", "READY");
         boolean fresh = plan != null && plan.getExecutionFeasibilityFreshUntil() != null
                 && now.isBefore(plan.getExecutionFeasibilityFreshUntil());
-        boolean expired = plan == null || plan.getValidUntil() == null || !now.isBefore(plan.getValidUntil());
+        boolean expired = effectiveExpiry == null || !now.isBefore(effectiveExpiry);
         HighValueAlertPolicy.OpportunityQualification qualification =
                 new HighValueAlertPolicy.OpportunityQualification(
                         run.getOwnerId(),
@@ -102,7 +112,9 @@ public class HighValueAlertMessageService {
                         plan != null && "PASS".equals(normalize(plan.getRuleValidationStatus()))
                                 && "FINAL_VALIDATED".equals(normalize(plan.getChainStatus())),
                         plan == null ? null : firstText(plan.getFinalPlanMode(), plan.getPlanMode()),
-                        reducedAllowed,
+                        plan == null ? null : plan.getFinalMarketBias(),
+                        decision == null ? null : decision.getRiskLevel(),
+                        plan == null ? null : plan.getPlanLifecycleState(),
                         opportunity == null || opportunity.state() == null ? null : opportunity.state().name(),
                         expired,
                         plan != null && plan.getDataQuality() != null
@@ -111,30 +123,41 @@ public class HighValueAlertMessageService {
                         sourceGate,
                         feasibility,
                         traceable,
-                        snapshot != null && snapshot.getPushId() != null,
+                        plan != null && hasText(plan.getEntryZone()),
+                        plan != null && hasText(plan.getTriggerCondition()),
+                        plan != null && hasText(plan.getStopLoss()),
+                        hasText(target),
+                        effectiveExpiry != null,
+                        plan != null && hasText(plan.getFinalMarketBias()),
                         Boolean.TRUE.equals(run.getPreview()),
                         plan == null || !Boolean.TRUE.equals(plan.getFinalPlan()),
                         plan != null && Boolean.TRUE.equals(plan.getNotTradeInstruction()),
                         plan != null && Boolean.TRUE.equals(plan.getNotOrderExecution()));
         if (!policy.allowsOpportunity(qualification)) return null;
 
-        int severity = "CONFIRMATION".equals(normalize(qualification.finalPlanMode())) ? 3 : 2;
-        MessageDO message = base(run.getOwnerId(), "HIGH_PERMISSION_OPPORTUNITY", "PUSH_SNAPSHOT",
-                String.valueOf(snapshot.getPushId()), run.getAnalysisId(), null, plan.getPlanId(),
-                run.getSymbol(), run.getTraceId(), plan.getValidUntil());
+        MessageDO existingPlanMessage = messageFactService.findOpportunityForPlan(
+                run.getOwnerId(), plan.getPlanId());
+        if (existingPlanMessage != null) return existingPlanMessage;
+
+        String sourceType = snapshot == null ? "FINAL_PLAN" : "PUSH_SNAPSHOT";
+        String sourceId = snapshot == null ? plan.getPlanId() : String.valueOf(snapshot.getPushId());
+        MessageDO message = base(run.getOwnerId(), "HIGH_PERMISSION_OPPORTUNITY", sourceType,
+                sourceId, run.getAnalysisId(), null, plan.getPlanId(),
+                run.getSymbol(), run.getTraceId(), effectiveExpiry);
         message.setCurrentRecheckId(null);
-        message.setTitle("【机会达到人工复核条件】");
-        message.setBody("资产：" + safe(run.getSymbol())
-                + "\n方向：" + readableBias(plan.getFinalMarketBias())
-                + "\n计划模式：" + readablePlanMode(qualification.finalPlanMode())
-                + "\n机会状态：" + readableOpportunityState(qualification.opportunityState())
-                + "\n主要依据：" + concise(firstText(decision == null ? null : decision.getEvidenceSummary(), plan.getEntryLogic()))
-                + "\n主要风险：" + concise(plan.getRiskExplanation())
-                + "\n有效至：" + format(plan.getValidUntil())
-                + "\n操作：打开系统重新校验");
-        message.setDedupeKey(TelegramDedupeKey.create("OPPORTUNITY_READY",
-                qualification.opportunityState(), severity, telegramProperties.getCooldownMinutes(),
-                run.getOwnerId(), "OPPORTUNITY", opportunity.opportunityId(), now));
+        message.setTitle(HighValueAlertPolicy.OPPORTUNITY_SHORT_TITLE);
+        String finalMode = firstText(plan.getFinalPlanMode(), plan.getPlanMode());
+        message.setBody(run.getSymbol().trim() + "  ·  " + readableBias(plan.getFinalMarketBias())
+                + "  ·  " + readablePlanMode(finalMode)
+                + "\n\n入场：" + plan.getEntryZone().trim()
+                + "\n触发：" + plan.getTriggerCondition().trim()
+                + "\n止损：" + plan.getStopLoss().trim()
+                + "\n目标：" + target.trim()
+                + "\n有效至：" + format(effectiveExpiry)
+                + "\n\n操作：打开系统重新校验");
+        message.setDedupeKey(TelegramDedupeKey.createPlanLifetime(HighValueAlertPolicy.OPPORTUNITY_EVENT,
+                normalize(finalMode), 3,
+                run.getOwnerId(), "FINAL_PLAN", plan.getPlanId()));
         return messageFactService.recordIfAbsent(message);
     }
 
@@ -142,21 +165,21 @@ public class HighValueAlertMessageService {
         if (input == null || !policy.allowsSafetyChange(new HighValueAlertPolicy.SafetyQualification(
                 input.userId(), input.changeType(), input.traceable(), true, true))) return null;
         LocalDateTime now = input.occurredAt() == null ? LocalDateTime.now(clock) : input.occurredAt();
+        String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
+        String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
+        if (!hasText(subjectId)) return null;
         MessageDO message = base(input.userId(), "OPPORTUNITY_PLAN_SAFETY_CHANGE",
-                required(input.sourceType()), required(input.sourceId()), input.analysisId(), null,
+                subjectType, subjectId, input.analysisId(), null,
                 input.planId(), input.symbol(), input.traceId(), input.expiresAt());
         message.setCurrentRecheckId(null);
-        message.setTitle("【原计划需要重新验证】");
+        message.setTitle(HighValueAlertPolicy.SAFETY_SHORT_TITLE);
         message.setBody("资产：" + safe(input.symbol())
                 + "\n变化：" + readableSafetyChange(input.changeType())
                 + "\n原因：" + concise(input.reason())
                 + "\n当前状态：暂不视为有效机会"
                 + "\n恢复条件：" + concise(input.recoveryCondition()));
-        String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
-        String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
-        if (!hasText(subjectId)) return null;
-        message.setDedupeKey(TelegramDedupeKey.create(input.changeType().name(),
-                input.state(), Math.max(2, input.severity()), telegramProperties.getCooldownMinutes(),
+        message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.SAFETY_EVENT,
+                input.changeType().name(), Math.max(2, input.severity()), telegramProperties.getCooldownMinutes(),
                 input.userId(), subjectType, subjectId, now));
         return messageFactService.recordIfAbsent(message);
     }
@@ -164,40 +187,72 @@ public class HighValueAlertMessageService {
     public MessageDO recordPosition(UserPositionDO position,
                                     PositionMonitorLogDTO log,
                                     PositionMonitorResultDTO result) {
-        if (position == null || log == null || result == null) return null;
+        if (position == null || log == null || result == null || log.getLogId() == null) return null;
         LocalDateTime now = LocalDateTime.now(clock);
         boolean active = Set.of("OPEN", "PARTIALLY_CLOSED").contains(normalize(position.getStatus()))
-                && MANUAL_POSITION_SOURCES.contains(normalize(position.getSourceType()));
-        HighValueAlertPolicy.PositionQualification qualification =
+                && MANUAL_POSITION_SOURCES.contains(normalize(position.getSourceType()))
+                && Set.of("LONG", "SHORT").contains(normalize(position.getSide()))
+                && hasText(position.getAssetSymbol());
+        boolean verified = "VERIFIED".equals(normalize(log.getMonitorSourceStatus()));
+        boolean fresh = log.isTrustedAndFreshAt(now);
+        HighValueAlertPolicy.PositionQualification messageQualification =
                 new HighValueAlertPolicy.PositionQualification(
-                        position.getUserId(), active,
-                        "VERIFIED".equals(normalize(log.getMonitorSourceStatus())),
-                        log.isTrustedAndFreshAt(now),
+                        position.getUserId(), active, verified, fresh,
                         log.getEntryLogicStatus(), log.getReversalStatus(), log.getRiskLevel(),
                         log.getRiskTrend(), log.getMonitorConclusion());
-        if (!policy.allowsPosition(qualification)) return null;
+        if (!policy.allowsPositionMessage(messageQualification)) return null;
 
-        int severity = positionSeverity(log);
-        String state = strongestPositionState(log);
-        ExecutionPlanDO sourcePlan = hasText(position.getFinalPlanId())
-                ? executionPlanMapper.selectByPlanId(position.getFinalPlanId()) : null;
+        BigDecimal currentPrice = trustedCurrentPrice(result, log);
+        boolean sameMonitorResult = sameMonitorResult(position, log, result);
+        HighValueAlertPolicy.PositionTelegramQualification telegramQualification =
+                new HighValueAlertPolicy.PositionTelegramQualification(
+                        position.getUserId(), active, verified, fresh, sameMonitorResult,
+                        result.isMarkPriceFresh() && result.getMarkPriceObservedAt() != null
+                                && hasText(result.getMarkPriceSource())
+                                && positive(currentPrice),
+                        positive(position.getEntryPrice()), positive(position.getStopLoss()),
+                        positive(position.getTakeProfit()), result.isNearStopLoss(),
+                        result.isStopLossBreached(), result.isNearTakeProfit(),
+                        result.isTakeProfitReached(), result.getRiskLevel(), result.getRiskTrend(),
+                        result.getReversalStatus(), result.isNotTradeInstruction(),
+                        result.isNotOrderExecution());
+        Optional<HighValueAlertPolicy.PositionTelegramChange> telegramChange =
+                policy.resolveTelegramPositionChange(telegramQualification);
+
         MessageDO message = base(position.getUserId(), "POSITION_LOGIC_RISK_CHANGE",
                 "POSITION_MONITOR", String.valueOf(log.getLogId()), log.getAnalysisId(),
                 position.getId(), position.getFinalPlanId(), position.getAssetSymbol(),
                 log.getTraceId(), log.getFreshUntil());
-        message.setTitle("【持仓逻辑发生重要变化】");
-        message.setBody("资产：" + safe(position.getAssetSymbol())
-                + "\n当前变化：" + readableEntryLogic(log.getEntryLogicStatus())
-                + "\n原入场逻辑：" + concise(sourcePlan == null
-                        ? "手动持仓未关联系统计划，请核对原始录入依据" : sourcePlan.getEntryLogic())
-                + "\n反转状态：" + readableReversal(log.getReversalStatus())
-                + "\n风险：" + readableRisk(log.getRiskLevel(), log.getRiskTrend())
-                + "\n主要原因：" + readableRiskReason(log.getRiskChangeReason())
-                + "\n最近监控：" + format(log.getCreatedAt())
-                + "\n建议：打开持仓详情人工处理");
-        message.setDedupeKey(TelegramDedupeKey.create("POSITION_RISK_CHANGE", state, severity,
-                telegramProperties.getCooldownMinutes(), position.getUserId(),
-                "USER_POSITION", String.valueOf(position.getId()), now));
+        if (telegramChange.isPresent()) {
+            HighValueAlertPolicy.PositionTelegramChange change = telegramChange.get();
+            message.setTitle(HighValueAlertPolicy.POSITION_SHORT_TITLE);
+            message.setBody(position.getAssetSymbol().trim() + "  ·  " + readableDirection(position.getSide())
+                    + "\n\n变化：" + change.displayText()
+                    + "\n\n入场：" + decimal(position.getEntryPrice())
+                    + "\n现价：" + decimal(currentPrice)
+                    + "\n止损：" + decimalOrUnset(position.getStopLoss())
+                    + "  目标：" + decimalOrUnset(position.getTakeProfit())
+                    + "\n\n操作：打开持仓详情");
+            message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.POSITION_EVENT,
+                    change.name(), change.severityRank(), telegramProperties.getCooldownMinutes(),
+                    position.getUserId(), "USER_POSITION", String.valueOf(position.getId()), now));
+        } else {
+            ExecutionPlanDO sourcePlan = hasText(position.getFinalPlanId())
+                    ? executionPlanMapper.selectByPlanId(position.getFinalPlanId()) : null;
+            message.setTitle("【持仓逻辑发生重要变化】");
+            message.setBody("资产：" + safe(position.getAssetSymbol())
+                    + "\n当前变化：" + readableEntryLogic(log.getEntryLogicStatus())
+                    + "\n原入场逻辑：" + concise(sourcePlan == null
+                            ? "手动持仓未关联系统计划，请核对原始录入依据" : sourcePlan.getEntryLogic())
+                    + "\n反转状态：" + readableReversal(log.getReversalStatus())
+                    + "\n风险：" + readableRisk(log.getRiskLevel(), log.getRiskTrend())
+                    + "\n主要原因：" + readableRiskReason(log.getRiskChangeReason())
+                    + "\n最近监控：" + format(log.getCreatedAt())
+                    + "\n建议：打开持仓详情人工处理");
+            message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.POSITION_EVENT,
+                    strongestPositionState(log), positionSeverity(log), telegramProperties.getCooldownMinutes(),
+                    position.getUserId(), "USER_POSITION", String.valueOf(position.getId()), now));
+        }
         return messageFactService.recordIfAbsent(message);
     }
 
@@ -224,6 +279,44 @@ public class HighValueAlertMessageService {
         if (!hasText(analysisId)) return null;
         List<TmPushSnapshotDO> values = pushSnapshotMapper.listByAnalysisId(analysisId);
         return values == null || values.isEmpty() ? null : values.get(0);
+    }
+
+    private static BigDecimal trustedCurrentPrice(PositionMonitorResultDTO result, PositionMonitorLogDTO log) {
+        if (result == null || !result.isMarkPriceFresh()) return null;
+        if (positive(result.getMarkPrice())) return result.getMarkPrice();
+        if (positive(result.getCurrentPrice())) return result.getCurrentPrice();
+        return positive(log == null ? null : log.getCurrentPrice()) ? log.getCurrentPrice() : null;
+    }
+
+    private static boolean sameMonitorResult(UserPositionDO position,
+                                             PositionMonitorLogDTO log,
+                                             PositionMonitorResultDTO result) {
+        if (position.getId() == null || log.getLogId() == null
+                || !Objects.equals(position.getId(), log.getPositionId())
+                || !Objects.equals(position.getId(), result.getPositionId())
+                || !Objects.equals(log.getLogId(), result.getMonitorLogId())) return false;
+        if (!sameSemantic(log.getRiskLevel(), result.getRiskLevel())
+                || !sameSemantic(log.getRiskTrend(), result.getRiskTrend())
+                || !sameSemantic(log.getReversalStatus(), result.getReversalStatus())) return false;
+        BigDecimal logPrice = log.getCurrentPrice();
+        BigDecimal resultPrice = result.getMarkPrice() != null ? result.getMarkPrice() : result.getCurrentPrice();
+        return logPrice == null || resultPrice == null || logPrice.compareTo(resultPrice) == 0;
+    }
+
+    private static boolean sameSemantic(String left, String right) {
+        return hasText(left) && normalize(left).equals(normalize(right));
+    }
+
+    private static boolean positive(BigDecimal value) {
+        return value != null && value.signum() > 0;
+    }
+
+    private static String decimal(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static String decimalOrUnset(BigDecimal value) {
+        return positive(value) ? decimal(value) : "未设置";
     }
 
     private static int positionSeverity(PositionMonitorLogDTO log) {
@@ -274,9 +367,22 @@ public class HighValueAlertMessageService {
     private static String format(LocalDateTime value) { return value == null ? "当前不可查看" : DATE_TIME.format(value); }
     private static String readableBias(String value) {
         return switch (normalize(value)) {
-            case "STRONG_LONG" -> "强偏多"; case "LONG" -> "偏多"; case "WEAK_LONG" -> "弱偏多";
-            case "NEUTRAL" -> "中性"; case "WEAK_SHORT" -> "弱偏空"; case "SHORT" -> "偏空";
-            case "STRONG_SHORT" -> "强偏空"; case "CONFUSED" -> "冲突"; default -> "当前不可查看";
+            case "STRONG_BULLISH", "STRONG_LONG" -> "强偏多";
+            case "BULLISH", "LONG" -> "偏多";
+            case "WEAK_BULLISH", "WEAK_LONG" -> "弱偏多";
+            case "RANGE", "NEUTRAL" -> "震荡";
+            case "WEAK_BEARISH", "WEAK_SHORT" -> "弱偏空";
+            case "BEARISH", "SHORT" -> "偏空";
+            case "STRONG_BEARISH", "STRONG_SHORT" -> "强偏空";
+            case "WAIT", "CONFUSED" -> "观望";
+            default -> "当前不可查看";
+        };
+    }
+    private static String readableDirection(String value) {
+        return switch (normalize(value)) {
+            case "LONG" -> "做多";
+            case "SHORT" -> "做空";
+            default -> throw new IllegalArgumentException("position direction is required");
         };
     }
     private static String readablePlanMode(String value) {
@@ -309,7 +415,9 @@ public class HighValueAlertMessageService {
     private static String readableEntryLogic(String value) {
         return switch (normalize(value)) {
             case "WEAKENED" -> "入场逻辑弱化"; case "INVALIDATED" -> "入场逻辑失效";
-            case "STILL_VALID" -> "入场逻辑仍成立"; default -> "当前变化待人工核对";
+            case "STILL_VALID" -> "入场逻辑仍成立";
+            case "NOT_APPLICABLE" -> "原入场逻辑不适用";
+            default -> "当前变化待人工核对";
         };
     }
     private static String readableReversal(String value) {

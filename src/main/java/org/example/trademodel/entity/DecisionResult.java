@@ -76,7 +76,33 @@ public class DecisionResult {
     private String aiPlanMode;
 
     private String ruleMarketBias;
+    @Column(name = "validated_market_bias")
+    private String validatedMarketBias;
     private String finalMarketBias;
+    @Column(name = "direction_data_state")
+    private String directionDataState;
+    @Column(name = "data_quality_score")
+    private Integer dataQualityScore;
+    @Column(name = "evidence_reliability")
+    private Integer evidenceReliability;
+    @Column(name = "opportunity_score")
+    private Integer opportunityScore;
+    @Column(name = "risk_score")
+    private Integer riskScore;
+    @Column(name = "final_confidence")
+    private Integer finalConfidence;
+    @Column(name = "one_hour_opportunity_quality")
+    private Integer oneHourOpportunityQuality;
+    @Column(name = "four_hour_trend_alignment")
+    private Integer fourHourTrendAlignment;
+    @Column(name = "normalization_version")
+    private String normalizationVersion;
+    @Column(name = "score_version")
+    private String scoreVersion;
+    @Column(name = "data_quality_version")
+    private String dataQualityVersion;
+    @Column(name = "provider_matrix_version")
+    private String providerMatrixVersion;
     private String ruleConfidence;
     private String ruleRisk;
     private String rulePlanMode;
@@ -293,8 +319,34 @@ public class DecisionResult {
 
     public String getRuleMarketBias() { return ruleMarketBias; }
     public void setRuleMarketBias(String value) { this.ruleMarketBias = value; }
+    public String getValidatedMarketBias() { return validatedMarketBias; }
+    public void setValidatedMarketBias(String value) { this.validatedMarketBias = value; }
     public String getFinalMarketBias() { return finalMarketBias; }
     public void setFinalMarketBias(String value) { this.finalMarketBias = value; }
+    public String getDirectionDataState() { return directionDataState; }
+    public void setDirectionDataState(String value) { this.directionDataState = value; }
+    public Integer getDataQualityScore() { return dataQualityScore; }
+    public void setDataQualityScore(Integer value) { this.dataQualityScore = value; }
+    public Integer getEvidenceReliability() { return evidenceReliability; }
+    public void setEvidenceReliability(Integer value) { this.evidenceReliability = value; }
+    public Integer getOpportunityScore() { return opportunityScore; }
+    public void setOpportunityScore(Integer value) { this.opportunityScore = value; }
+    public Integer getRiskScore() { return riskScore; }
+    public void setRiskScore(Integer value) { this.riskScore = value; }
+    public Integer getFinalConfidence() { return finalConfidence; }
+    public void setFinalConfidence(Integer value) { this.finalConfidence = value; }
+    public Integer getOneHourOpportunityQuality() { return oneHourOpportunityQuality; }
+    public void setOneHourOpportunityQuality(Integer value) { this.oneHourOpportunityQuality = value; }
+    public Integer getFourHourTrendAlignment() { return fourHourTrendAlignment; }
+    public void setFourHourTrendAlignment(Integer value) { this.fourHourTrendAlignment = value; }
+    public String getNormalizationVersion() { return normalizationVersion; }
+    public void setNormalizationVersion(String value) { this.normalizationVersion = value; }
+    public String getScoreVersion() { return scoreVersion; }
+    public void setScoreVersion(String value) { this.scoreVersion = value; }
+    public String getDataQualityVersion() { return dataQualityVersion; }
+    public void setDataQualityVersion(String value) { this.dataQualityVersion = value; }
+    public String getProviderMatrixVersion() { return providerMatrixVersion; }
+    public void setProviderMatrixVersion(String value) { this.providerMatrixVersion = value; }
     public String getRuleConfidence() { return ruleConfidence; }
     public void setRuleConfidence(String value) { this.ruleConfidence = value; }
     public String getRuleRisk() { return ruleRisk; }

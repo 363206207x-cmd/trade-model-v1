@@ -42,7 +42,7 @@ class ScoreServiceImplTest {
                 .extracting(ScoreItemVO::getScoreType)
                 .containsExactlyInAnyOrder(
                         "趋势结构分",
-                        "综合可信度分",
+                        "证据可信度分",
                         "资金推动分",
                         "杠杆风险分",
                         "流动性质量分",
@@ -91,7 +91,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_returnsBaselineWhenSummaryBlankOrMarketEnvNull() {
+    void buildScoreList_returnsNullWhenTrendInputsAreMissing() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         MarketEnvironmentVO blankEnv = new MarketEnvironmentVO();
         blankEnv.setSummary("   ");
@@ -104,11 +104,13 @@ class ScoreServiceImplTest {
         assertThat(blankSummaryResult).hasSize(8);
         assertThat(blankTrend).isNotNull();
         assertThat(pickByType(blankSummaryResult, "情绪温度分")).isNotNull();
-        assertThat(blankTrend.getScoreValue()).isEqualTo(50.0);
+        assertThat(blankTrend.getScoreValue()).isNull();
+        assertThat(blankTrend.getDescription()).contains("INSUFFICIENT_DATA");
         assertThat(nullEnvResult).hasSize(8);
         assertThat(nullTrend).isNotNull();
         assertThat(pickByType(nullEnvResult, "情绪温度分")).isNotNull();
-        assertThat(nullTrend.getScoreValue()).isEqualTo(50.0);
+        assertThat(nullTrend.getScoreValue()).isNull();
+        assertThat(nullTrend.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
@@ -186,7 +188,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsSentimentTemperatureBaseline50_whenNoWhitelistInputs() {
+    void buildScoreList_setsSentimentTemperatureNull_whenNoWhitelistInputs() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         MarketEnvironmentVO env = new MarketEnvironmentVO();
@@ -196,7 +198,8 @@ class ScoreServiceImplTest {
 
         assertThat(result).hasSize(8);
         assertThat(sentiment).isNotNull();
-        assertThat(sentiment.getScoreValue()).isEqualTo(50.0);
+        assertThat(sentiment.getScoreValue()).isNull();
+        assertThat(sentiment.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
@@ -346,7 +349,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsOverallCredibilityHigh_whenInputsAreComplete() {
+    void buildScoreList_doesNotInferEvidenceReliabilityFromLegacySummaryFields() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         EvidenceItemVO evidence = new EvidenceItemVO();
@@ -359,27 +362,29 @@ class ScoreServiceImplTest {
         env.setRiskMode("normal");
 
         List<ScoreItemVO> result = service.buildScoreList(analysis, env);
-        ScoreItemVO credibility = pickByType(result, "综合可信度分");
+        ScoreItemVO credibility = pickByType(result, "证据可信度分");
 
         assertThat(credibility).isNotNull();
-        assertThat(credibility.getScoreValue()).isGreaterThan(80.0);
+        assertThat(credibility.getScoreValue()).isNull();
+        assertThat(credibility.getDescription()).contains("SourceQuality");
     }
 
     @Test
-    void buildScoreList_setsOverallCredibilityNearBaseline_whenInputsMissing() {
+    void buildScoreList_setsEvidenceReliabilityNull_whenInputsMissing() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         MarketEnvironmentVO env = new MarketEnvironmentVO();
 
         List<ScoreItemVO> result = service.buildScoreList(analysis, env);
-        ScoreItemVO credibility = pickByType(result, "综合可信度分");
+        ScoreItemVO credibility = pickByType(result, "证据可信度分");
 
         assertThat(credibility).isNotNull();
-        assertThat(credibility.getScoreValue()).isEqualTo(55.0);
+        assertThat(credibility.getScoreValue()).isNull();
+        assertThat(credibility.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
-    void buildScoreList_setsOverallCredibilityLower_whenSummaryConflictsWithPriceStructureEvidence() {
+    void buildScoreList_doesNotUseDirectionalConflictAsEvidenceReliabilityFallback() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         EvidenceItemVO evidence = new EvidenceItemVO();
@@ -392,10 +397,11 @@ class ScoreServiceImplTest {
         env.setRiskMode("normal");
 
         List<ScoreItemVO> result = service.buildScoreList(analysis, env);
-        ScoreItemVO credibility = pickByType(result, "综合可信度分");
+        ScoreItemVO credibility = pickByType(result, "证据可信度分");
 
         assertThat(credibility).isNotNull();
-        assertThat(credibility.getScoreValue()).isEqualTo(80.0);
+        assertThat(credibility.getScoreValue()).isNull();
+        assertThat(credibility.getDescription()).contains("CrossSourceConsistency");
     }
 
     @Test
@@ -412,7 +418,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsFundingMomentumBaseline_whenFundingNotApplied() {
+    void buildScoreList_setsFundingMomentumNull_whenFundingNotApplied() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         MarketEnvironmentVO env = new MarketEnvironmentVO();
         env.setPerpFundingApplied(false);
@@ -421,7 +427,8 @@ class ScoreServiceImplTest {
         ScoreItemVO funding = pickByType(result, "资金推动分");
 
         assertThat(funding).isNotNull();
-        assertThat(funding.getScoreValue()).isEqualTo(50.0);
+        assertThat(funding.getScoreValue()).isNull();
+        assertThat(funding.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
@@ -521,7 +528,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsLiquidityQualityBaseline_whenLiquidityInputsMissing() {
+    void buildScoreList_setsLiquidityQualityNull_whenLiquidityInputsMissing() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         MarketEnvironmentVO env = new MarketEnvironmentVO();
 
@@ -529,7 +536,8 @@ class ScoreServiceImplTest {
         ScoreItemVO liquidity = pickByType(result, "流动性质量分");
 
         assertThat(liquidity).isNotNull();
-        assertThat(liquidity.getScoreValue()).isEqualTo(50.0);
+        assertThat(liquidity.getScoreValue()).isNull();
+        assertThat(liquidity.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
@@ -584,7 +592,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsMacroEnvironmentScoreBaseline50_whenMacroWhitelistInputsMissing() {
+    void buildScoreList_setsMacroEnvironmentScoreNull_whenMacroWhitelistInputsMissing() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         MarketEnvironmentVO env = new MarketEnvironmentVO();
 
@@ -593,7 +601,8 @@ class ScoreServiceImplTest {
 
         assertThat(result).hasSize(8);
         assertThat(macro).isNotNull();
-        assertThat(macro.getScoreValue()).isEqualTo(50.0);
+        assertThat(macro.getScoreValue()).isNull();
+        assertThat(macro.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
@@ -643,7 +652,7 @@ class ScoreServiceImplTest {
     }
 
     @Test
-    void buildScoreList_setsEventImpactScoreBaseline_whenNoEventEvidenceExists() {
+    void buildScoreList_setsEventImpactNull_whenNoEventFactExists() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
         EvidenceItemVO nonEvent = new EvidenceItemVO();
@@ -656,11 +665,12 @@ class ScoreServiceImplTest {
 
         assertThat(result).hasSize(8);
         assertThat(eventImpact).isNotNull();
-        assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
+        assertThat(eventImpact.getScoreValue()).isNull();
+        assertThat(eventImpact.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test
-    void buildScoreList_setsEventImpactScoreBaseline_whenEvidenceListMissing() {
+    void buildScoreList_setsEventImpactNull_whenEvidenceListMissing() {
         ScoreServiceImpl service = new ScoreServiceImpl(scoreItemMapper);
         AssetAnalysisVO analysis = new AssetAnalysisVO();
 
@@ -669,7 +679,8 @@ class ScoreServiceImplTest {
 
         assertThat(result).hasSize(8);
         assertThat(eventImpact).isNotNull();
-        assertThat(eventImpact.getScoreValue()).isEqualTo(50.0);
+        assertThat(eventImpact.getScoreValue()).isNull();
+        assertThat(eventImpact.getDescription()).contains("INSUFFICIENT_DATA");
     }
 
     @Test

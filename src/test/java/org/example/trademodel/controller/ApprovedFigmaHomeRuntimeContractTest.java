@@ -56,6 +56,31 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
+    void opportunityCardsKeepFourVisibleRowsInsideTheFrozenHeightWithoutClipping() throws Exception {
+        String css = Files.readString(STYLE);
+        String cardRule = css.substring(css.indexOf(".opportunity-card {"),
+                css.indexOf(".opportunity-card:hover"));
+
+        assertThat(cardRule).contains("height: 120px", "padding: 8px 10px")
+                .doesNotContain("overflow: hidden");
+        assertThat(css).contains(
+                ".opportunity-final { display: grid; grid-template-columns: 1fr;",
+                ".opportunity-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));",
+                ".opportunity-context { min-width: 0; display: flex;",
+                ".opportunity-context span { min-width: 0; white-space: nowrap;");
+    }
+
+    @Test
+    void dashboardDeclaresARepositoryLocalTrineLogicFavicon() throws Exception {
+        String html = Files.readString(HOME);
+        Path favicon = Path.of("src/main/resources/static/favicon.svg");
+
+        assertThat(html).contains("rel=\"icon\"", "href=\"/favicon.svg\"");
+        assertThat(favicon).exists();
+        assertThat(Files.readString(favicon)).contains("aria-label=\"TRINE LOGIC\"");
+    }
+
+    @Test
     void homeAlertSummaryMapsTechnicalStatesToUserFacingCopy() throws Exception {
         String script = Files.readString(SCRIPT);
 
@@ -75,9 +100,12 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(script).contains(
                 "/api/dashboard/home?", "/api/asset-pool/search?query=",
-                "filter(validOpportunity)", ".slice(0, 6)",
-                "has(asset && asset.opportunityScore)",
-                "finalVisible ? label(asset.finalMarketBias", "finalVisible ? label(asset.finalPlanMode",
+                "function validOpportunityCard(asset)", "function validObservationCard(asset)",
+                "validOpportunityCard(asset) || validObservationCard(asset)", ".slice(0, 6)",
+                "asset.hasFinal === true", "has(asset.finalMarketBias)",
+                "has(asset.confidenceLevel)", "has(asset.riskLevel)",
+                "String(asset && asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
+                "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
                 "position.monitorConclusion", "position.suggestedManualActionText",
@@ -141,15 +169,21 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
-    void homeOpportunityProjectionRemainsIndependentFromPoolMembershipAndPreview() throws Exception {
+    void homeProjectionSeparatesOpportunityAndObservationCardsWithoutPreviewOrPoolInference() throws Exception {
         String script = Files.readString(SCRIPT);
 
         assertThat(script).contains(
-                "var assets = all.filter(validOpportunity)", ".slice(0, 6)",
+                "var assets = all.filter(function (asset)",
+                "validOpportunityCard(asset) || validObservationCard(asset)",
+                "String(asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
+                ".slice(0, 6)",
                 "setText(\"opportunityHeading\", \"资产\")",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",
-                "has(asset && asset.opportunityScore)",
+                "asset.hasFinal === true", "has(asset.finalMarketBias)",
+                "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"]",
+                "function observationCard(asset, selected)",
+                "function opportunityDataNotice(asset)", "周期冲突", "数据过期",
                 "await api(\"/api/asset-pool\", { method: \"POST\"",
                 "await api(\"/api/asset-pool/search/\"",
                 "window.location.assign(\"/analysis/\"")

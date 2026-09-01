@@ -1,14 +1,18 @@
 package org.example.trademodel.service.impl;
 
 import org.example.trademodel.market.RealMarketEnvironmentService;
+import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -325,5 +329,88 @@ class AnalysisAssemblerServiceImplTest {
         score.setScoreValue(80.0);
 
         assertEquals(null, AnalysisAssemblerServiceImpl.calculateEightScoreComposite(List.of(score)));
+    }
+
+    @Test
+    void contractDataQualityUsesFreshProviderAndAdequatePersistedSamples() {
+        assertEquals(100, AnalysisAssemblerServiceImpl.calculateContractDataQuality(
+                completeEvidence(), completeScores(), sourceEnvironment("FRESH"), HEURISTIC,
+                persistedAssessment(true, 240), 60));
+    }
+
+    @Test
+    void contractDataQualityCapsStaleMandatorySourceAt69() {
+        assertEquals(69, AnalysisAssemblerServiceImpl.calculateContractDataQuality(
+                completeEvidence(), completeScores(), sourceEnvironment("STALE"), HEURISTIC,
+                persistedAssessment(true, 240), 60));
+    }
+
+    @Test
+    void contractDataQualityFailsClosedWhenProviderProvenanceIsIncomplete() {
+        MarketEnvironmentVO environment = sourceEnvironment("FRESH");
+        environment.setSourceTraceId(null);
+
+        assertEquals(0, AnalysisAssemblerServiceImpl.calculateContractDataQuality(
+                completeEvidence(), completeScores(), environment, HEURISTIC,
+                persistedAssessment(true, 240), 60));
+    }
+
+    @Test
+    void contractDataQualityFailsClosedBelowMinimumSampleCountPerRequiredWindow() {
+        assertEquals(0, AnalysisAssemblerServiceImpl.calculateContractDataQuality(
+                completeEvidence(), completeScores(), sourceEnvironment("FRESH"), HEURISTIC,
+                persistedAssessment(false, 239), 60));
+    }
+
+    @Test
+    void contractDataQualityFailsClosedForPlaceholderSource() {
+        assertEquals(0, AnalysisAssemblerServiceImpl.calculateContractDataQuality(
+                completeEvidence(), completeScores(), sourceEnvironment("FRESH"), FALLBACK,
+                persistedAssessment(true, 240), 60));
+    }
+
+    private static MarketEnvironmentVO sourceEnvironment(String freshness) {
+        MarketEnvironmentVO environment = new MarketEnvironmentVO();
+        environment.setSourceProvider("BINANCE");
+        environment.setSourceReference("BINANCE:BTCUSDT:1h:closed");
+        environment.setSourceTraceId("trace-dq-contract");
+        environment.setObservedAt(LocalDateTime.of(2026, 9, 1, 0, 0));
+        environment.setFreshness(freshness);
+        return environment;
+    }
+
+    private static PersistedRealMarketEnvironmentAssessment persistedAssessment(boolean ready, int count) {
+        return new PersistedRealMarketEnvironmentAssessment(ready, ready ? null : "INSUFFICIENT_SAMPLE",
+                "BINANCE", "BINANCE_PERSISTED_OHLCV", sourceEnvironment("FRESH"), Map.of(),
+                count, 1_788_220_800_000L, List.of("trace-dq-contract"));
+    }
+
+    private static List<EvidenceItemVO> completeEvidence() {
+        return java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
+            EvidenceItemVO evidence = new EvidenceItemVO();
+            evidence.setEvidenceType("价格结构");
+            evidence.setDirection("BULLISH");
+            evidence.setDescription("closed evidence " + index);
+            return evidence;
+        }).toList();
+    }
+
+    private static List<ScoreItemVO> completeScores() {
+        return List.of(
+                score(V41DecisionContractPolicy.TREND_STRUCTURE),
+                score(V41DecisionContractPolicy.CAPITAL_FLOW),
+                score(V41DecisionContractPolicy.LEVERAGE_RISK),
+                score(V41DecisionContractPolicy.LIQUIDITY_QUALITY),
+                score(V41DecisionContractPolicy.SENTIMENT),
+                score(V41DecisionContractPolicy.EVENT_IMPACT),
+                score(V41DecisionContractPolicy.MACRO),
+                score(V41DecisionContractPolicy.EVIDENCE_RELIABILITY));
+    }
+
+    private static ScoreItemVO score(String type) {
+        ScoreItemVO score = new ScoreItemVO();
+        score.setScoreType(type);
+        score.setScoreValue(80.0);
+        return score;
     }
 }

@@ -41,6 +41,11 @@ public class PositionMonitorResultDTO {
     private BigDecimal pnlPct;
     private BigDecimal pnlPercent;
     private BigDecimal pnlAmount;
+    private String pnlCoverage;
+    private String feeCoverage;
+    private String fundingCoverage;
+    private String partialFillCoverage;
+    private String positionAdditionCoverage;
     private BigDecimal accountImpactPct;
     private List<String> reasonCodes = new ArrayList<>();
     private String externalContextStatus;
@@ -136,6 +141,16 @@ public class PositionMonitorResultDTO {
     public void setPnlPercent(BigDecimal pnlPercent) { this.pnlPercent = pnlPercent; }
     public BigDecimal getPnlAmount() { return pnlAmount; }
     public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
+    public String getPnlCoverage() { return pnlCoverage; }
+    public void setPnlCoverage(String value) { this.pnlCoverage = value; }
+    public String getFeeCoverage() { return feeCoverage; }
+    public void setFeeCoverage(String value) { this.feeCoverage = value; }
+    public String getFundingCoverage() { return fundingCoverage; }
+    public void setFundingCoverage(String value) { this.fundingCoverage = value; }
+    public String getPartialFillCoverage() { return partialFillCoverage; }
+    public void setPartialFillCoverage(String value) { this.partialFillCoverage = value; }
+    public String getPositionAdditionCoverage() { return positionAdditionCoverage; }
+    public void setPositionAdditionCoverage(String value) { this.positionAdditionCoverage = value; }
     public BigDecimal getAccountImpactPct() { return accountImpactPct; }
     public void setAccountImpactPct(BigDecimal accountImpactPct) { this.accountImpactPct = accountImpactPct; }
     public List<String> getReasonCodes() { return Collections.unmodifiableList(reasonCodes); }

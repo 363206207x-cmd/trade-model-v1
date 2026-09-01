@@ -16,6 +16,7 @@ public class SourceTraceBoundaryProducerResult {
     private List<String> blockingReasons = new ArrayList<>();
     private boolean manualReviewRequired = true;
     private boolean notTradeInstruction = true;
+    private List<BoundarySourceRefDTO> sourceRefs = new ArrayList<>();
 
     public SourceTraceDTO getSourceTrace() {
         return sourceTrace;
@@ -103,5 +104,9 @@ public class SourceTraceBoundaryProducerResult {
 
     public void setNotTradeInstruction(boolean notTradeInstruction) {
         this.notTradeInstruction = notTradeInstruction;
+    }
+    public List<BoundarySourceRefDTO> getSourceRefs() { return new ArrayList<>(sourceRefs); }
+    public void setSourceRefs(List<BoundarySourceRefDTO> value) {
+        this.sourceRefs = value == null ? new ArrayList<>() : new ArrayList<>(value);
     }
 }

@@ -39,6 +39,8 @@ import org.example.trademodel.service.*;
 import org.example.trademodel.service.planboundary.MarketStructureBoundaryExtractor;
 import org.example.trademodel.service.planboundary.SourceTraceBoundaryProducer;
 import org.example.trademodel.service.support.ExecutionFeasibilityAssessmentService;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.vo.*;
 import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.providercall.AssetPriority;
@@ -74,6 +76,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private static final AtomicBoolean FIRST_ANALYSIS_RUN_LOGGED = new AtomicBoolean(false);
     private static final ObjectMapper EXPLAIN_JSON = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(AnalysisAssemblerServiceImpl.class);
+    private static final int V41_REQUIRED_TIMEFRAME_COUNT = 4;
     private final EvidenceService evidenceService;
     private final ScoreService scoreService;
     private final PlanService planService;
@@ -107,6 +110,12 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private boolean requireRealMarketEnvironment;
     private Clock assemblerClock = Clock.systemUTC();
     private HighValueAlertMessageService highValueAlertMessageService;
+    private FundamentalAiV41Properties v41Properties = FundamentalAiV41Properties.contractFixture();
+
+    @Autowired(required = false)
+    void setFundamentalAiV41Properties(FundamentalAiV41Properties properties) {
+        if (properties != null) this.v41Properties = properties;
+    }
 
     private static final String KEY_ACTIVE_VERSION_FALLBACK = "rule.active_version_fallback";
     private static final String DEFAULT_ACTIVE_RULE_VERSION = "v1.0";
@@ -315,6 +324,9 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             MarketEnvironmentVO marketEnv = new MarketEnvironmentVO();
             marketEnv.setSummary(null);
             String marketEnvSourceType = MARKET_ENV_SOURCE_FALLBACK;
+            PersistedRealMarketEnvironmentAssessment persistedEnvironment =
+                    persistedRealMarketEnvironmentService == null ? null
+                            : persistedRealMarketEnvironmentService.assess(symbol, timeframe);
             MarketEnvironmentVO quoteEnv = realMarketEnvironmentService == null ? null
                     : realMarketEnvironmentService.tryBuildFromRealQuote(symbol, timeframe).orElse(null);
             if (quoteEnv != null) {
@@ -326,9 +338,6 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 log.info("[market-env] assemble uses Binance market-env heuristic symbol={} tf={} sourceType={}",
                         symbol, timeframe, marketEnvSourceType);
             } else {
-                PersistedRealMarketEnvironmentAssessment persistedEnvironment =
-                        persistedRealMarketEnvironmentService == null ? null
-                                : persistedRealMarketEnvironmentService.assess(symbol, timeframe);
                 if (persistedEnvironment != null && persistedEnvironment.ready()) {
                     marketEnv = persistedEnvironment.environment();
                     marketEnvSourceType = persistedEnvironment.sourceType();
@@ -354,7 +363,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             List<EvidenceItemVO> evidences = evidenceService.buildEvidence(scoreInput, marketEnv);
             scoreInput.setEvidenceList(evidences);
             List<ScoreItemVO> scores = scoreService.buildScoreList(scoreInput, marketEnv);
-            int baseDataQualityScore = estimateDataQualityScore(evidences, scores, marketEnvSourceType);
+            applyEvidenceReliabilityScore(evidences, scores, marketEnv, marketEnvSourceType,
+                    persistedEnvironment, v41Properties.getNormalization().getMinimumSampleCount());
+            int baseDataQualityScore = calculateContractDataQuality(evidences, scores, marketEnv,
+                    marketEnvSourceType, persistedEnvironment,
+                    v41Properties.getNormalization().getMinimumSampleCount());
             DerivativesBusinessInput derivativesInput = buildDerivativesBusinessInput(
                     effectiveContext, baseDataQualityScore, false);
             DerivativesBusinessAssessment derivativesAssessment = evaluateDerivatives(derivativesInput);
@@ -362,9 +375,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 evidences.addAll(derivativesBusinessIntegrationService.toEvidenceVos(derivativesAssessment));
                 derivativesBusinessIntegrationService.applyScoreAdjustments(scores, derivativesAssessment);
             }
-            int dataQualityScore = derivativesAssessment == null
-                    ? baseDataQualityScore
-                    : Math.max(0, baseDataQualityScore - derivativesAssessment.dataQualityDiscount());
+            boolean derivativesMandatory = "MANDATORY".equals(
+                    v41Properties.getProviderMatrix().getDerivativesRequirement());
+            int dataQualityScore = derivativesMandatory && derivativesAssessment != null
+                    ? Math.max(0, baseDataQualityScore - derivativesAssessment.dataQualityDiscount())
+                    : baseDataQualityScore;
             Integer trendStructureScore = extractTrendStructureScore(scores);
             Integer eightScoreComposite = calculateEightScoreComposite(scores);
 
@@ -376,7 +391,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     trendStructureScore,
                     scoreInput.getEventImpactInput(),
                     derivativesAssessment,
-                    eightScoreComposite,
+                    scores,
                     new OpportunityStateIdentity(
                             effectiveContext.getOwnerType(),
                             effectiveContext.getOwnerId(),
@@ -615,6 +630,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     : utcLocalNow();
             MarketStructureBoundaryRequest request = new MarketStructureBoundaryRequest();
             request.setSymbol(symbol);
+            request.setAnalysisId(executionContext.getAnalysisId());
             request.setDirection(direction);
             request.setTimeframe(timeframe);
             request.setGeneratedAt(generatedAt);
@@ -908,7 +924,20 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 ddo.setAiConflictScore(decision.getAiConflictScore());
                 ddo.setAiPlanMode(decision.getAiPlanMode());
                 ddo.setRuleMarketBias(decision.getRuleMarketBias());
+                ddo.setValidatedMarketBias(decision.getValidatedMarketBias());
                 ddo.setFinalMarketBias(decision.getFinalMarketBias());
+                ddo.setDirectionDataState(decision.getDirectionDataState());
+                ddo.setDataQualityScore(decision.getDataQualityScore());
+                ddo.setEvidenceReliability(decision.getEvidenceReliability());
+                ddo.setOpportunityScore(decision.getOpportunityScore());
+                ddo.setRiskScore(decision.getRiskScore());
+                ddo.setFinalConfidence(decision.getFinalConfidence());
+                ddo.setOneHourOpportunityQuality(decision.getOneHourOpportunityQuality());
+                ddo.setFourHourTrendAlignment(decision.getFourHourTrendAlignment());
+                ddo.setNormalizationVersion(decision.getNormalizationVersion());
+                ddo.setScoreVersion(decision.getScoreVersion());
+                ddo.setDataQualityVersion(decision.getDataQualityVersion());
+                ddo.setProviderMatrixVersion(decision.getProviderMatrixVersion());
                 ddo.setRuleConfidence(decision.getRuleConfidence());
                 ddo.setRuleRisk(decision.getRuleRisk());
                 ddo.setRulePlanMode(decision.getRulePlanMode());
@@ -1351,6 +1380,102 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         }
         if (MARKET_ENV_SOURCE_FALLBACK.equals(marketEnvSourceType)) return 0;
         return base;
+    }
+
+    static int calculateContractDataQuality(List<EvidenceItemVO> evidences,
+                                            List<ScoreItemVO> scores,
+                                            MarketEnvironmentVO marketEnv,
+                                            String marketEnvSourceType,
+                                            PersistedRealMarketEnvironmentAssessment persistedEnvironment,
+                                            int minimumSampleCount) {
+        double completeness = (V41DecisionContractPolicy.scoreCoverage(scores)
+                + V41DecisionContractPolicy.evidenceCoverage(evidences)) / 2.0;
+        Double freshness = freshnessScore(marketEnv);
+        V41DecisionContractPolicy.Metric metric = V41DecisionContractPolicy.dataQuality(
+                completeness,
+                freshness,
+                providerHealthScore(marketEnv, marketEnvSourceType),
+                directionalEvidenceConsistency(evidences),
+                sampleAdequacyScore(persistedEnvironment, minimumSampleCount));
+        int value = metric.value() == null ? 0 : metric.value();
+        return isStale(marketEnv) ? Math.min(69, value) : value;
+    }
+
+    private static void applyEvidenceReliabilityScore(List<EvidenceItemVO> evidences,
+                                                      List<ScoreItemVO> scores,
+                                                      MarketEnvironmentVO marketEnv,
+                                                      String marketEnvSourceType,
+                                                      PersistedRealMarketEnvironmentAssessment persistedEnvironment,
+                                                      int minimumSampleCount) {
+        if (scores == null) return;
+        V41DecisionContractPolicy.Metric metric = V41DecisionContractPolicy.evidenceReliability(
+                (double) V41DecisionContractPolicy.evidenceCoverage(evidences),
+                providerHealthScore(marketEnv, marketEnvSourceType),
+                freshnessScore(marketEnv),
+                directionalEvidenceConsistency(evidences),
+                sampleAdequacyScore(persistedEnvironment, minimumSampleCount));
+        for (ScoreItemVO score : scores) {
+            if (score != null && V41DecisionContractPolicy.EVIDENCE_RELIABILITY.equals(
+                    V41DecisionContractPolicy.canonicalScoreType(score.getScoreType()))) {
+                score.setScoreType(V41DecisionContractPolicy.EVIDENCE_RELIABILITY);
+                score.setScoreValue(metric.value() == null ? null : metric.value().doubleValue());
+                score.setDescription("coverage=" + metric.coverage()
+                        + ";missingInputs=" + metric.missingInputs()
+                        + ";permission=" + metric.permissionState()
+                        + ";version=" + V41DecisionContractPolicy.SCORE_VERSION);
+            }
+        }
+    }
+
+    private static Double sampleAdequacyScore(PersistedRealMarketEnvironmentAssessment assessment,
+                                              int minimumSampleCount) {
+        if (assessment == null || !assessment.ready() || assessment.closedBarCount() <= 0) return null;
+        if (minimumSampleCount <= 0) return null;
+        int required = Math.multiplyExact(minimumSampleCount, V41_REQUIRED_TIMEFRAME_COUNT);
+        return assessment.closedBarCount() < required ? null : 100.0;
+    }
+
+    private static Double providerHealthScore(MarketEnvironmentVO marketEnv, String marketEnvSourceType) {
+        if (marketEnv == null || marketEnvSourceType == null
+                || MARKET_ENV_SOURCE_FALLBACK.equals(marketEnvSourceType)
+                || !hasText(marketEnv.getSourceProvider())
+                || !hasText(marketEnv.getSourceReference())
+                || !hasText(marketEnv.getSourceTraceId())
+                || marketEnv.getObservedAt() == null) {
+            return null;
+        }
+        return 100.0;
+    }
+
+    private static Double freshnessScore(MarketEnvironmentVO marketEnv) {
+        if (marketEnv == null || !hasText(marketEnv.getFreshness())) return null;
+        return switch (marketEnv.getFreshness().trim().toUpperCase(Locale.ROOT)) {
+            case "FRESH", "VERIFIED" -> 100.0;
+            case "STALE" -> 0.0;
+            default -> null;
+        };
+    }
+
+    private static boolean isStale(MarketEnvironmentVO marketEnv) {
+        return marketEnv != null && "STALE".equalsIgnoreCase(marketEnv.getFreshness());
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static Double directionalEvidenceConsistency(List<EvidenceItemVO> evidences) {
+        if (evidences == null || evidences.isEmpty()) return null;
+        int bullish = 0;
+        int bearish = 0;
+        for (EvidenceItemVO evidence : evidences) {
+            String direction = evidence == null ? null : evidence.getDirection();
+            if ("BULLISH".equalsIgnoreCase(direction)) bullish++;
+            if ("BEARISH".equalsIgnoreCase(direction)) bearish++;
+        }
+        int total = bullish + bearish;
+        if (total == 0) return null;
+        return 100.0 - (Math.min(bullish, bearish) * 100.0 / total);
     }
 
     static Integer extractTrendStructureScore(List<ScoreItemVO> scores) {

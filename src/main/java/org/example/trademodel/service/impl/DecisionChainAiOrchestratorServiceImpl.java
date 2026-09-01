@@ -64,7 +64,7 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                                                   AiCallLogService callLogService,
                                                   AiOrchestratorProperties properties) {
         this(providerClients, usageGuard, callLogService, properties,
-                FundamentalAiV41Properties.contractFixture(), new ObjectMapper());
+                constructorContract(properties), new ObjectMapper());
     }
 
     @Autowired
@@ -86,7 +86,9 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         this.properties = properties;
         this.v41Properties = v41Properties;
         this.objectMapper = objectMapper;
-        this.concurrencyGate = new Semaphore(Math.max(1, properties.getMaxConcurrentCalls()), true);
+        this.concurrencyGate = new Semaphore(Math.max(1, Math.min(
+                properties.getMaxConcurrentCalls(),
+                v41Properties.getAiGate().getConcurrencyLimit())), true);
     }
 
     @Override
@@ -141,7 +143,17 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             recordTerminalTrace(request, client.provider(), modelName(client), failed, BigDecimal.ZERO);
             return failed;
         }
-        BigDecimal reserved = guard.getReservedCostUsd();
+        if (guard == null) {
+            AiDecisionChainResult failed = AiDecisionChainResult.failed(client.provider(), request.getRole(),
+                    AiProviderCallStatus.FAILED, "AI_USAGE_GUARD_RESULT_MISSING");
+            failed.setLatencyMs(elapsedMs(startedNanos));
+            attachRuntimeMetadata(request, failed);
+            recordTerminalTrace(request, client.provider(), modelName(client), failed, BigDecimal.ZERO);
+            return failed;
+        }
+        BigDecimal reserved = guard.getReservedCostUsd() == null
+                ? BigDecimal.ZERO : guard.getReservedCostUsd();
+        QuotaBlock quotaBlock = guard.isAllowed() ? machineQuotaBlock(request, reserved) : null;
         AiCallLogDO log;
         try {
             log = callLogService.startDecisionChainCall(request, client, reserved);
@@ -157,6 +169,9 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         if (!guard.isAllowed()) {
             result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
                     guard.getStatus(), guard.getReasonCode());
+        } else if (quotaBlock != null) {
+            result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
+                    quotaBlock.status(), quotaBlock.reasonCode());
         } else if (!acquireAssetRoleFrequency(request)) {
             result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
                     AiProviderCallStatus.RATE_LIMITED, "ASSET_ROLE_FREQUENCY_LIMITED");
@@ -226,7 +241,9 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
     }
 
     private boolean acquireAssetRoleFrequency(AiDecisionChainRequest request) {
-        long minimumInterval = properties.getPerAssetRoleMinIntervalMs();
+        long contractInterval = Math.multiplyExact(
+                v41Properties.getAiGate().getPerAssetCooldownSeconds().longValue(), 1_000L);
+        long minimumInterval = Math.max(properties.getPerAssetRoleMinIntervalMs(), contractInterval);
         if (minimumInterval <= 0L) {
             return true;
         }
@@ -246,6 +263,62 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             return previous;
         });
         return allowed.get();
+    }
+
+    private QuotaBlock machineQuotaBlock(AiDecisionChainRequest request, BigDecimal reservedCost) {
+        try {
+            FundamentalAiV41Properties.AiGate gate = v41Properties.getAiGate();
+            long estimatedTokens = Math.max(1L, properties.getMaxInputChars() / 4L)
+                    + Math.max(1L, properties.getMaxOutputTokens());
+            int maximumRoleAttempts = 1 + gate.getMaxRetryPerRole();
+            if (callLogService.countDecisionChainRoleAttempts(
+                    request.getAnalysisId(), request.getRole().name()) >= maximumRoleAttempts) {
+                return new QuotaBlock(AiProviderCallStatus.RATE_LIMITED, "AI_ROLE_ATTEMPT_LIMIT_REACHED");
+            }
+            if (callLogService.sumDecisionChainTokensByAnalysisId(request.getAnalysisId()) + estimatedTokens
+                    > gate.getPerRunTokenLimit()) {
+                return new QuotaBlock(AiProviderCallStatus.BUDGET_BLOCKED, "AI_PER_RUN_TOKEN_LIMIT_REACHED");
+            }
+
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            java.time.LocalDateTime hourStart = now.minusHours(1).toLocalDateTime();
+            java.time.LocalDateTime dayStart = now.toLocalDate().atStartOfDay();
+            if (callLogService.countDecisionChainAttemptsSince(hourStart) >= gate.getHourlyCallLimit()) {
+                return new QuotaBlock(AiProviderCallStatus.RATE_LIMITED, "AI_HOURLY_CALL_LIMIT_REACHED");
+            }
+            if (callLogService.sumDecisionChainTokensSince(hourStart) + estimatedTokens
+                    > gate.getHourlyTokenLimit()) {
+                return new QuotaBlock(AiProviderCallStatus.BUDGET_BLOCKED, "AI_HOURLY_TOKEN_LIMIT_REACHED");
+            }
+            if (callLogService.countDecisionChainAttemptsSince(dayStart) >= gate.getDailyCallLimit()) {
+                return new QuotaBlock(AiProviderCallStatus.RATE_LIMITED, "AI_DAILY_CALL_LIMIT_REACHED");
+            }
+            if (callLogService.sumDecisionChainTokensSince(dayStart) + estimatedTokens
+                    > gate.getDailyTokenLimit()) {
+                return new QuotaBlock(AiProviderCallStatus.BUDGET_BLOCKED, "AI_DAILY_TOKEN_LIMIT_REACHED");
+            }
+            BigDecimal hardDailyCostLimit = BigDecimal.valueOf(gate.getDailyCostMicrosLimit(), 6);
+            BigDecimal spent = callLogService.sumChargeableCostSince(dayStart);
+            if (spent == null) spent = BigDecimal.ZERO;
+            if (spent.add(reservedCost == null ? BigDecimal.ZERO : reservedCost)
+                    .compareTo(hardDailyCostLimit) > 0) {
+                return new QuotaBlock(AiProviderCallStatus.BUDGET_BLOCKED, "AI_DAILY_COST_LIMIT_REACHED");
+            }
+            return null;
+        } catch (Exception quotaReadFailure) {
+            return new QuotaBlock(AiProviderCallStatus.BUDGET_BLOCKED, "AI_MACHINE_QUOTA_UNAVAILABLE");
+        }
+    }
+
+    private static FundamentalAiV41Properties constructorContract(AiOrchestratorProperties properties) {
+        FundamentalAiV41Properties contract = FundamentalAiV41Properties.contractFixture();
+        long cooldownMs = properties == null ? 0L : properties.getPerAssetRoleMinIntervalMs();
+        contract.getAiGate().setPerAssetCooldownSeconds((int) Math.min(
+                Integer.MAX_VALUE, (cooldownMs + 999L) / 1_000L));
+        if (properties != null) {
+            contract.getAiGate().setConcurrencyLimit(properties.getMaxConcurrentCalls());
+        }
+        return contract;
     }
 
     private static AiDecisionChainResult attachRuntimeMetadata(AiDecisionChainRequest request,
@@ -314,12 +387,11 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                     return "AI_OUTPUT_RULE_DIRECTION_VIOLATION";
                 }
                 JsonNode candidate = root.path("candidateSummary");
-                for (String sourceField : List.of(
-                        "entrySource", "stopSource", "targetSource", "invalidationSource",
-                        "expectedRiskRewardSource")) {
-                    String source = candidate.path(sourceField).asText(null);
-                    if (source == null || !allowedRefs.contains(source)) {
-                        return "AI_OUTPUT_CANDIDATE_SOURCE_REFERENCE_INVALID";
+                for (String forbiddenField : List.of(
+                        "entryZone", "stopZone", "targetZones", "expectedRiskReward",
+                        "entrySource", "stopSource", "targetSource")) {
+                    if (candidate.has(forbiddenField)) {
+                        return "AI_OUTPUT_RULE_OWNED_PLAN_FIELD_FORBIDDEN";
                     }
                 }
             } else if (request.getRole() == AiDecisionChainRole.GEMINI_REVIEW) {
@@ -754,6 +826,9 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
     }
 
     private record CachedResult(AiDecisionChainResult result, JsonNode input, long expiresAtEpochMs) {
+    }
+
+    private record QuotaBlock(AiProviderCallStatus status, String reasonCode) {
     }
 
     private static long elapsedMs(long startedNanos) {

@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.example.trademodel.entity.AssetStateDO;
 import org.example.trademodel.entity.HotResetEventDO;
 import org.example.trademodel.entity.OpportunityStateTransitionDO;
@@ -17,6 +18,7 @@ import org.example.trademodel.service.OpportunityStateIdentity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Duration;
 import java.time.Clock;
@@ -258,13 +260,147 @@ public class AssetStateServiceImpl implements AssetStateService {
         row.setConfidence(normalizedConfidence);
         row.setRisk(normalizedRisk);
         row.setRuleVersion(requireRuleVersion(ruleVersion, OpportunityTriggerSource.ANALYSIS));
-        row.setExtJson(trimToNull(extJson));
+        AssetStateDO current = assetStateMapper.selectByIdentity(
+                identity.ownerType(), identity.ownerId(), row.getSymbol(), row.getTimeframe());
+        row.setExtJson(mergeSchedulerAudit(current == null ? null : current.getExtJson(), extJson));
         row.setLastUpdateTime(now);
         row.setUpdatedAt(now);
         row.setTraceId(requireTraceId(traceId));
         if (assetStateMapper.updateOpportunityProjection(row) != 1) {
             throw new IllegalStateException("opportunity projection update failed");
         }
+    }
+
+    @Override
+    @Transactional
+    public ScheduledScanClaim claimScheduledScan(OpportunityStateIdentity identity,
+                                                  Long poolItemId,
+                                                  LocalDateTime now,
+                                                  long intervalSeconds,
+                                                  String traceId,
+                                                  String ruleVersion) {
+        if (identity == null) throw new IllegalArgumentException("opportunity identity is required");
+        if (intervalSeconds <= 0) throw new IllegalArgumentException("scan interval must be positive");
+        LocalDateTime startedAt = now == null ? LocalDateTime.now(clock) : now;
+        String normalizedSymbol = normalizeSymbol(identity.symbol());
+        String normalizedTimeframe = normalizeTimeframe(identity.timeframe());
+        String normalizedTrace = requireTraceId(traceId);
+        String normalizedRuleVersion = requireRuleVersion(ruleVersion, OpportunityTriggerSource.ASSET_POOL_SCAN);
+        AssetStateDO current = assetStateMapper.selectByIdentity(identity.ownerType(), identity.ownerId(),
+                normalizedSymbol, normalizedTimeframe);
+        if (current == null) {
+            AssetStateDO baseline = new AssetStateDO();
+            baseline.setOwnerType(identity.ownerType());
+            baseline.setOwnerId(identity.ownerId());
+            baseline.setAssetId(identity.assetId());
+            baseline.setPoolItemId(poolItemId);
+            baseline.setSymbol(normalizedSymbol);
+            baseline.setTimeframe(normalizedTimeframe);
+            baseline.setState(AssetStateEnum.OBSERVING);
+            baseline.setConfusedScore(0);
+            baseline.setConfusedLowStreak(0);
+            baseline.setOpportunityId(opportunityId(identity, normalizedSymbol, normalizedTimeframe));
+            baseline.setStateEnteredAt(startedAt);
+            baseline.setLastTransitionReason("AUTOMATION_BASELINE");
+            baseline.setLastTriggerSource(OpportunityTriggerSource.ASSET_POOL_SCAN.name());
+            baseline.setLastUpdateTime(startedAt.minusSeconds(intervalSeconds));
+            baseline.setTraceId(normalizedTrace);
+            baseline.setRuleVersion(normalizedRuleVersion);
+            baseline.setCreatedAt(startedAt);
+            baseline.setUpdatedAt(startedAt);
+            try {
+                assetStateMapper.insertScheduledBaselineIfAbsent(baseline);
+            } catch (DataIntegrityViolationException ignoredRace) {
+                // A concurrent node established the same authoritative baseline.
+            }
+            current = assetStateMapper.selectByIdentity(identity.ownerType(), identity.ownerId(),
+                    normalizedSymbol, normalizedTimeframe);
+        }
+        if (current == null || current.getState() == null) return null;
+        LocalDateTime lastUpdate = current.getLastUpdateTime();
+        LocalDateTime scheduledAt = lastUpdate == null ? startedAt : lastUpdate.plusSeconds(intervalSeconds);
+        if (scheduledAt.isAfter(startedAt)) return null;
+        int claimed = assetStateMapper.claimScheduledScan(identity.ownerType(), identity.ownerId(),
+                normalizedSymbol, normalizedTimeframe, current.getState().name(), lastUpdate, startedAt,
+                normalizedTrace, normalizedRuleVersion);
+        if (claimed != 1) return null;
+        return new ScheduledScanClaim(
+                new OpportunityStateIdentity(identity.ownerType(), identity.ownerId(), identity.assetId(),
+                        normalizedSymbol, normalizedTimeframe),
+                current.getOpportunityId(), current.getState(), current.getLastAnalysisId(),
+                current.getRisk(), current.getHotResetTime(), normalizedTrace, normalizedRuleVersion,
+                scheduledAt, startedAt, startedAt.plusSeconds(intervalSeconds), current.getExtJson());
+    }
+
+    @Override
+    @Transactional
+    public boolean completeScheduledScan(ScheduledScanClaim claim,
+                                         LocalDateTime finishedAt,
+                                         String result,
+                                         String failureReason,
+                                         String dataFreshness,
+                                         String structureSignature,
+                                         Long latestCloseTimeMs,
+                                         String analysisTraceId,
+                                         boolean fullAnalysisRequested,
+                                         boolean fullAnalysisSucceeded) {
+        if (claim == null) return false;
+        LocalDateTime completedAt = finishedAt == null ? LocalDateTime.now(clock) : finishedAt;
+        AssetStateDO current = assetStateMapper.selectByIdentity(
+                claim.identity().ownerType(), claim.identity().ownerId(),
+                claim.identity().symbol(), claim.identity().timeframe());
+        ObjectNode root = objectNode(current == null ? claim.previousExtJson() : current.getExtJson());
+        ObjectNode audit = root.putObject("schedulerScan");
+        audit.put("scheduledAt", claim.scheduledAt().toString());
+        audit.put("startedAt", claim.startedAt().toString());
+        audit.put("finishedAt", completedAt.toString());
+        audit.put("result", hasText(result) ? result.trim() : "UNKNOWN");
+        putNullable(audit, "failureReason", trimToNull(failureReason));
+        audit.put("traceId", claim.traceId());
+        audit.put("ruleVersion", claim.ruleVersion());
+        putNullable(audit, "dataFreshness", trimToNull(dataFreshness));
+        putNullable(audit, "structureSignature", trimToNull(structureSignature));
+        if (latestCloseTimeMs == null) audit.putNull("latestCloseTimeMs");
+        else audit.put("latestCloseTimeMs", latestCloseTimeMs);
+        audit.put("nextEligibleScanAt", claim.nextEligibleScanAt().toString());
+        audit.put("fullAnalysisRequested", fullAnalysisRequested);
+        audit.put("fullAnalysisSucceeded", fullAnalysisSucceeded);
+        Long previousFullClose = scanLong(claim.previousExtJson(), "latestFullAnalysisCloseTimeMs");
+        if (fullAnalysisSucceeded && latestCloseTimeMs != null) {
+            audit.put("latestFullAnalysisCloseTimeMs", latestCloseTimeMs);
+        } else if (previousFullClose != null) {
+            audit.put("latestFullAnalysisCloseTimeMs", previousFullClose);
+        } else {
+            audit.putNull("latestFullAnalysisCloseTimeMs");
+        }
+        String previousFullSignature = scanText(
+                current == null ? claim.previousExtJson() : current.getExtJson(),
+                "latestFullStructureSignature");
+        if (fullAnalysisSucceeded && hasText(structureSignature)) {
+            audit.put("latestFullStructureSignature", structureSignature.trim());
+        } else if (previousFullSignature != null) {
+            audit.put("latestFullStructureSignature", previousFullSignature);
+        } else {
+            audit.putNull("latestFullStructureSignature");
+        }
+        String previousFullHotReset = scanText(claim.previousExtJson(), "latestFullHotResetAt");
+        if (fullAnalysisSucceeded && claim.hotResetTime() != null) {
+            audit.put("latestFullHotResetAt", claim.hotResetTime().toString());
+        } else if (previousFullHotReset != null) {
+            audit.put("latestFullHotResetAt", previousFullHotReset);
+        } else {
+            audit.putNull("latestFullHotResetAt");
+        }
+        AssetStateDO row = new AssetStateDO();
+        row.setOwnerType(claim.identity().ownerType());
+        row.setOwnerId(claim.identity().ownerId());
+        row.setSymbol(claim.identity().symbol());
+        row.setTimeframe(claim.identity().timeframe());
+        row.setTraceId(claim.traceId());
+        row.setExtJson(root.toString());
+        row.setUpdatedAt(completedAt);
+        return assetStateMapper.completeScheduledScanAudit(
+                row, claim.traceId(), trimToNull(analysisTraceId)) == 1;
     }
 
     @Override
@@ -377,8 +513,11 @@ public class AssetStateServiceImpl implements AssetStateService {
         if (current == requested) return true;
         return switch (current) {
             case OBSERVING -> requested == AssetStateEnum.CANDIDATE;
-            case CANDIDATE -> requested == AssetStateEnum.WAITING_TRIGGER;
-            case WAITING_TRIGGER -> requested == AssetStateEnum.TRIGGERED;
+            case CANDIDATE -> requested == AssetStateEnum.WAITING_TRIGGER
+                    || requested == AssetStateEnum.TRIGGERED
+                    || requested == AssetStateEnum.HIGH_RISK;
+            case WAITING_TRIGGER -> requested == AssetStateEnum.TRIGGERED
+                    || requested == AssetStateEnum.HIGH_RISK;
             case TRIGGERED -> requested == AssetStateEnum.HIGH_RISK;
             case HIGH_RISK, INVALIDATED, COOLING, CONFUSED -> false;
         };
@@ -486,6 +625,56 @@ public class AssetStateServiceImpl implements AssetStateService {
             if (candidate.equals(normalized)) return normalized;
         }
         throw new IllegalArgumentException(name + " is invalid");
+    }
+
+    private static ObjectNode objectNode(String json) {
+        if (hasText(json)) {
+            try {
+                JsonNode parsed = MAPPER.readTree(json);
+                if (parsed instanceof ObjectNode object) return object.deepCopy();
+            } catch (Exception ignored) {
+                // Preserve truth by starting a clean audit object when legacy JSON is malformed.
+            }
+        }
+        return MAPPER.createObjectNode();
+    }
+
+    private static String mergeSchedulerAudit(String currentJson, String projectionJson) {
+        ObjectNode projection = objectNode(projectionJson);
+        if (hasText(currentJson)) {
+            try {
+                JsonNode schedulerScan = MAPPER.readTree(currentJson).path("schedulerScan");
+                if (schedulerScan.isObject()) projection.set("schedulerScan", schedulerScan.deepCopy());
+            } catch (Exception ignored) {
+                // The authoritative projection remains usable; malformed legacy audit JSON is not copied.
+            }
+        }
+        return projection.toString();
+    }
+
+    private static void putNullable(ObjectNode node, String field, String value) {
+        if (value == null) node.putNull(field);
+        else node.put(field, value);
+    }
+
+    private static Long scanLong(String json, String field) {
+        if (!hasText(json)) return null;
+        try {
+            JsonNode value = MAPPER.readTree(json).path("schedulerScan").path(field);
+            return value.isIntegralNumber() ? value.longValue() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String scanText(String json, String field) {
+        if (!hasText(json)) return null;
+        try {
+            JsonNode value = MAPPER.readTree(json).path("schedulerScan").path(field);
+            return value.isTextual() && !value.textValue().isBlank() ? value.textValue() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean hasText(String value) {

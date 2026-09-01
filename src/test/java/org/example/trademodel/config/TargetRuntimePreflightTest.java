@@ -128,7 +128,7 @@ class TargetRuntimePreflightTest {
         String production = Files.readString(Path.of("src/main/resources/application-prod.yml"));
 
         assertThat(production).contains(
-                "primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}",
+                "primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:binance}",
                 "fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:kraken}",
                 "fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:false}",
                 "enabled: ${TRADE_MODEL_KRAKEN_OHLCV_ENABLED:false}",

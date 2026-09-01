@@ -23,7 +23,7 @@ class PlanServiceImplTest {
     private final PlanServiceImpl service = new PlanServiceImpl();
 
     @Test
-    void buildRuleExecutionAssessmentNeverCreatesDetailedCandidateOrFinalFields() {
+    void buildRuleExecutionAssessmentCarriesOnlyRuleOwnedBoundariesAndNeverBecomesFinal() {
         DecisionBundleVO decision = new DecisionBundleVO();
         decision.setIsWorthOpening(true);
         SourceTraceBoundaryProducerResult boundary = readyBoundaryOnlyResult();
@@ -40,13 +40,17 @@ class PlanServiceImplTest {
         assertThat(assessment.getSourceGateComplete()).isTrue();
         assertThat(assessment.getExecutionPlanStatus())
                 .isEqualTo(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
-        assertThat(assessment.getRecommendedAction()).isNull();
-        assertThat(assessment.getEntryZone()).isNull();
-        assertThat(assessment.getStopLoss()).isNull();
-        assertThat(assessment.getTakeProfitRules()).isNull();
+        assertThat(assessment.getRecommendedAction())
+                .isEqualTo("等待触发；触发后重新校验，通过后再进入人工确认");
+        assertThat(assessment.getEntryZone()).contains("62800", "63100");
+        assertThat(assessment.getStopLoss()).contains("62300");
+        assertThat(assessment.getTakeProfitRules()).contains("64000", "65500");
         assertThat(assessment.getLeverageSuggestion()).isNull();
         assertThat(assessment.getPositionSuggestion()).isNull();
-        assertThat(assessment.getInvalidCondition()).isNull();
+        assertThat(assessment.getInvalidCondition()).contains("structure break below 62300");
+        assertThat(assessment.getEntrySource()).isEqualTo("entry-1");
+        assertThat(assessment.getStopSource()).isEqualTo("stop-1");
+        assertThat(assessment.getTargetSource()).isEqualTo("tp-1");
         assertThat(assessment.getNotAutoTrading()).isTrue();
         assertThat(assessment.getNotOrderExecution()).isTrue();
         assertThat(assessment.getNotUserPositionCreation()).isTrue();

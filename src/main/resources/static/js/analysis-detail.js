@@ -14,7 +14,7 @@
     "情绪温度分",
     "事件冲击分",
     "宏观环境分",
-    "综合可信度分"
+    "证据可信度分"
   ];
   var activeRole = "GPT_FINAL";
   var requestGeneration = 0;
@@ -137,7 +137,7 @@
 
   function aggregateConfidenceScore(items) {
     var row = (Array.isArray(items) ? items : []).find(function (item) {
-      return item && String(item.scoreType || "").trim() === "综合可信度分"
+      return item && String(item.scoreType || "").trim() === "证据可信度分"
         && item.scoreValue !== null && item.scoreValue !== undefined;
     });
     return row ? row.scoreValue : null;

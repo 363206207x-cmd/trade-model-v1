@@ -47,7 +47,7 @@ trade-model:
       # Compatibility binding only. Runtime symbols come from the persistent Asset Pool.
       symbols:
       timeframes: 5m,15m,1h,4h
-      bar-limit: 101
+      bar-limit: 100
       max-symbols: 6
   analysis:
     require-real-market-environment: true

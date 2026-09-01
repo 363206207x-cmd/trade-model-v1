@@ -16,7 +16,7 @@ public class TelegramMessageCommitListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void afterMessageCommit(MessageRecordedEvent event) {
-        if (event == null || !TelegramDedupeKey.managed(event.dedupeKey())) return;
+        if (event == null || !HighValueAlertPolicy.telegramDeliveryEventEligible(event.dedupeKey())) return;
         try {
             channelDeliveryService.queueTelegram(event.userId(), event.messageId());
         } catch (RuntimeException ignored) {

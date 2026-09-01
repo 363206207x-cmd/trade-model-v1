@@ -14,6 +14,9 @@ public class TelegramMessageFormatter {
 
     public TelegramOutboundMessage format(MessageDO message) {
         if (message == null) throw new IllegalArgumentException("Message is required");
+        if (HighValueAlertPolicy.telegramDeliveryIdentity(message).isPresent()) {
+            return formatEligibleShortAlert(message);
+        }
         String link = null;
         String label = null;
         if ("POSITION_LOGIC_RISK_CHANGE".equals(message.getCategory())) {
@@ -27,6 +30,23 @@ public class TelegramMessageFormatter {
         String text = trim(message.getTitle(), "Fundamental AI 提醒") + "\n\n"
                 + trim(message.getBody(), "请打开系统进行人工复核。") + fallback + "\n\n" + MANUAL_REVIEW;
         return new TelegramOutboundMessage(text, label, link);
+    }
+
+    private TelegramOutboundMessage formatEligibleShortAlert(MessageDO message) {
+        String link = null;
+        String label = null;
+        if ("POSITION_LOGIC_RISK_CHANGE".equals(message.getCategory())) {
+            link = linkPolicy.positionDetailLink(message.getPositionId());
+            label = link == null ? null : "查看持仓详情";
+        } else if ("PUSH_SNAPSHOT".equals(message.getSourceType())
+                && message.getSourceId() != null && !message.getSourceId().isBlank()) {
+            link = linkPolicy.pushRecheckLink("push-snapshot-" + message.getSourceId().trim());
+            label = link == null ? null : "打开并重新校验";
+        }
+        String title = trim(message.getTitle(), "TRINE LOGIC 提醒");
+        String body = trim(message.getBody(), "");
+        return new TelegramOutboundMessage(body.isEmpty() ? title : title + "\n\n" + body,
+                label, link);
     }
 
     private static String trim(String value, String fallback) {

@@ -27,8 +27,9 @@ public class AnalysisRunProperties {
          */
         private List<String> symbols = new ArrayList<>();
         private List<String> timeframes = new ArrayList<>(List.of("5m", "15m", "1h", "4h"));
-        private List<String> requiredMarketTimeframes = new ArrayList<>();
-        private int requiredClosedBars;
+        private List<String> requiredMarketTimeframes = new ArrayList<>(List.of("5m", "15m", "1h", "4h"));
+        private int requiredClosedBars = 100;
+        private String decisionTimeframe = "5m";
         private long observingIntervalSeconds = 900L;
         private long candidateIntervalSeconds = 300L;
         private long waitingTriggerIntervalSeconds = 120L;
@@ -58,6 +59,11 @@ public class AnalysisRunProperties {
         public void setRequiredClosedBars(int requiredClosedBars) {
             this.requiredClosedBars = Math.max(0, requiredClosedBars);
         }
+        public String getDecisionTimeframe() { return decisionTimeframe; }
+        public void setDecisionTimeframe(String decisionTimeframe) {
+            this.decisionTimeframe = decisionTimeframe == null || decisionTimeframe.isBlank()
+                    ? "5m" : decisionTimeframe.trim();
+        }
         public long getObservingIntervalSeconds() { return observingIntervalSeconds; }
         public void setObservingIntervalSeconds(long value) { this.observingIntervalSeconds = value; }
         public long getCandidateIntervalSeconds() { return candidateIntervalSeconds; }
@@ -84,6 +90,13 @@ public class AnalysisRunProperties {
                     && invalidatedIntervalSeconds > 0
                     && coolingIntervalSeconds > 0
                     && confusedIntervalSeconds > 0;
+        }
+
+        public boolean productionCadenceConfigured() {
+            return observingIntervalSeconds == 900L
+                    && candidateIntervalSeconds == 300L
+                    && waitingTriggerIntervalSeconds == 120L
+                    && triggeredIntervalSeconds == 60L;
         }
 
         public long intervalSeconds(String state) {

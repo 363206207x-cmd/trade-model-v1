@@ -140,7 +140,7 @@ class LocalSmokeSchedulerGateTest {
     }
 
     @Test
-    void defaultEnabledSchedulerMethodsStillDelegateToExistingDependencies() {
+    void explicitlyEnabledSchedulerMethodsStillDelegateToExistingDependencies() {
         SchedulerMocks mocks = new SchedulerMocks();
 
         runner(mocks, () -> {
@@ -148,7 +148,10 @@ class LocalSmokeSchedulerGateTest {
                     properties.getScheduler().setEnabled(true);
                     return properties;
                 })
-                .withPropertyValues("trade-model.schedulers.position-sync.enabled=true")
+                .withPropertyValues(
+                        "trade-model.schedulers.enabled=true",
+                        "trade-model.schedulers.position-sync.enabled=true",
+                        "trade-model.schedulers.market-data.enabled=true")
                 .run(context -> {
                     reset(mocks.pushSnapshotMapper, mocks.positionSyncService, mocks.analysisSchedulerService);
 

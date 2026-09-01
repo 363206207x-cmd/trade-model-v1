@@ -1,5 +1,7 @@
 package org.example.trademodel.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.analysisrun.AnalysisRunCommand;
 import org.example.trademodel.analysisrun.AnalysisRunInputException;
 import org.example.trademodel.analysisrun.AnalysisRunOrchestrator;
@@ -7,34 +9,63 @@ import org.example.trademodel.analysisrun.AnalysisRunProperties;
 import org.example.trademodel.analysisrun.AnalysisRunResult;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.common.ApiResponse;
+import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.dto.ohlcv.PersistedOhlcvReadinessResult;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.ExecutionPlanDO;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
+import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AssetStateMapper;
+import org.example.trademodel.mapper.ExecutionPlanMapper;
+import org.example.trademodel.providercall.coinglass.CoinGlassConfigurationState;
+import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.requestcontext.RequestIdSupport;
-import org.example.trademodel.vo.AssetAnalysisVO;
 import org.example.trademodel.service.watchlistsource.AssetPoolScanTarget;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
+import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Locale;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class AnalysisSchedulerService {
+    private static final Logger log = LoggerFactory.getLogger(AnalysisSchedulerService.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> PRODUCT_TIMEFRAMES = Set.of("5m", "15m", "1h", "4h");
+    private static final String BINANCE_PROVIDER = "BINANCE_PUBLIC";
+    private static final String SPOT_MARKET = "SPOT";
 
     private final AnalysisRunOrchestrator analysisRunOrchestrator;
     private final AnalysisRunProperties properties;
     private final Clock clock;
-    private PersistedOhlcvQueryService persistedOhlcvQueryService;
     private final AssetPoolService assetPoolService;
     private final AssetStateMapper assetStateMapper;
+    private PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private AssetStateService assetStateService;
+    private RuleConfigService ruleConfigService;
+    private ExecutionPlanMapper executionPlanMapper;
+    private CoinGlassProperties coinGlassProperties;
+    private FundamentalAiV41Properties v41Properties;
+    private final AtomicLong lightweightScanCount = new AtomicLong();
+    private final AtomicLong fullAnalysisRequestCount = new AtomicLong();
+    private final AtomicLong triggeredLightweightCount = new AtomicLong();
+    private final AtomicLong triggeredFullAnalysisRequestCount = new AtomicLong();
 
     public AnalysisSchedulerService(AnalysisRunOrchestrator analysisRunOrchestrator,
                                     AnalysisRunProperties properties) {
@@ -68,8 +99,24 @@ public class AnalysisSchedulerService {
     }
 
     @Autowired(required = false)
-    void setPersistedOhlcvQueryService(PersistedOhlcvQueryService persistedOhlcvQueryService) {
-        this.persistedOhlcvQueryService = persistedOhlcvQueryService;
+    public void setPersistedOhlcvQueryService(PersistedOhlcvQueryService value) {
+        this.persistedOhlcvQueryService = value;
+    }
+
+    @Autowired(required = false)
+    public void setScheduledScanDependencies(AssetStateService stateService,
+                                             RuleConfigService rules,
+                                             CoinGlassProperties coinGlass,
+                                             FundamentalAiV41Properties contract) {
+        this.assetStateService = stateService;
+        this.ruleConfigService = rules;
+        this.coinGlassProperties = coinGlass;
+        this.v41Properties = contract;
+    }
+
+    @Autowired(required = false)
+    public void setExecutionPlanMapper(ExecutionPlanMapper value) {
+        this.executionPlanMapper = value;
     }
 
     public ApiResponse<AssetAnalysisVO> executeAnalysis(String symbol, String timeframe, String triggerType) {
@@ -115,47 +162,158 @@ public class AnalysisSchedulerService {
                 RequestIdSupport.generate(), parentAnalysisId, parentTraceId));
     }
 
+    /**
+     * One production tick. Every due Asset Pool target first passes a persisted,
+     * source-owned lightweight scan. Only legal material changes reach the full
+     * Analysis/Three-AI/Final chain.
+     */
     public List<AnalysisRunResult> runScheduledCycle() {
-        if (!properties.getScheduler().isEnabled()) {
-            return List.of();
-        }
-        if (!schedulerConfigValid()) {
-            return List.of();
-        }
-        String reference = "SCHEDULED:" + LocalDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
+        if (!properties.getScheduler().isEnabled() || !schedulerConfigValid()) return List.of();
         List<AnalysisRunResult> results = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now(clock);
         for (AssetPoolScanTarget target : scanTargets()) {
-            if (!marketDataReady(target.symbol())) {
-                continue;
-            }
-            for (String timeframe : properties.getScheduler().getTimeframes()) {
-                if (!scanDue(target, timeframe, now)) {
-                    continue;
-                }
-                results.add(analysisRunOrchestrator.run(AnalysisRunCommand.scheduled(
-                        target.ownerType(), target.ownerId(), target.assetId(), target.symbol(), timeframe,
-                        RequestIdSupport.generate(), reference)));
+            try {
+                AnalysisRunResult result = scanTarget(target, now);
+                if (result != null) results.add(result);
+            } catch (RuntimeException failure) {
+                log.warn("asset-pool lightweight scan failed symbol={} reason={}",
+                        target.symbol(), safeReason(failure));
             }
         }
         return results;
     }
 
-    public boolean marketDataReady(String symbol) {
-        int requiredBars = properties.getScheduler().getRequiredClosedBars();
-        List<String> requiredTimeframes = properties.getScheduler().getRequiredMarketTimeframes();
-        if (requiredBars <= 0 && (requiredTimeframes == null || requiredTimeframes.isEmpty())) {
-            return true;
+    private AnalysisRunResult scanTarget(AssetPoolScanTarget target, LocalDateTime now) {
+        if (assetStateService == null || assetStateMapper == null || persistedOhlcvQueryService == null) return null;
+        String timeframe = properties.getScheduler().getDecisionTimeframe();
+        OpportunityStateIdentity identity = new OpportunityStateIdentity(
+                target.ownerType(), target.ownerId(), target.assetId(), target.symbol(), timeframe);
+        AssetStateDO before = assetStateMapper.selectByIdentity(
+                identity.ownerType(), identity.ownerId(), identity.symbol(), identity.timeframe());
+        AssetStateEnum state = before == null || before.getState() == null
+                ? AssetStateEnum.OBSERVING : before.getState();
+        long intervalSeconds = properties.getScheduler().intervalSeconds(state.name());
+        String traceId = "pool-scan-" + UUID.randomUUID();
+        String ruleVersion = ruleConfigService == null ? "v1.0" : ruleConfigService.resolveActiveRuleVersion();
+        Long poolItemId = assetPoolService == null ? null : assetPoolService.resolvePoolItemId(
+                target.ownerType(), target.ownerId(), target.assetId(), target.symbol());
+        if (poolItemId == null || poolItemId <= 0) return null;
+        AssetStateService.ScheduledScanClaim claim = assetStateService.claimScheduledScan(
+                identity, poolItemId, now, intervalSeconds, traceId, ruleVersion);
+        if (claim == null) return null;
+        lightweightScanCount.incrementAndGet();
+        if (claim.state() == AssetStateEnum.TRIGGERED) triggeredLightweightCount.incrementAndGet();
+
+        LightweightAssessment assessment = lightweightAssessment(claim);
+        boolean coinGlassReady = coinGlassReady();
+        boolean requestFull = assessment.fullAnalysisCondition() && coinGlassReady;
+        String result = !assessment.fresh()
+                ? "DATA_NOT_READY"
+                : assessment.fullAnalysisCondition() && !coinGlassReady
+                ? "BLOCKED_EXTERNAL_CREDENTIAL"
+                : requestFull ? assessment.fullAnalysisReason() : "NO_MATERIAL_CHANGE";
+        String failureReason = !assessment.fresh() ? assessment.failureReason()
+                : assessment.fullAnalysisCondition() && !coinGlassReady ? "COINGLASS_NOT_CONFIGURED" : null;
+        if (!requestFull) {
+            assetStateService.completeScheduledScan(claim, LocalDateTime.now(clock), result, failureReason,
+                    assessment.dataFreshness(), assessment.structureSignature(), assessment.latestCloseTimeMs(),
+                    null, false, false);
+            return null;
         }
-        if (requiredBars <= 0 || requiredTimeframes == null || requiredTimeframes.isEmpty()
-                || persistedOhlcvQueryService == null) {
-            return false;
+
+        boolean requestRecorded = assetStateService.completeScheduledScan(
+                claim, LocalDateTime.now(clock), assessment.fullAnalysisReason() + ":REQUESTED", null,
+                assessment.dataFreshness(), assessment.structureSignature(), assessment.latestCloseTimeMs(),
+                null, true, false);
+        if (!requestRecorded) return null;
+
+        fullAnalysisRequestCount.incrementAndGet();
+        if (claim.state() == AssetStateEnum.TRIGGERED) triggeredFullAnalysisRequestCount.incrementAndGet();
+        String reference = "ASSET_POOL_SCAN:" + assessment.latestCloseTimeMs()
+                + ":" + assessment.fullAnalysisReason();
+        try {
+            AnalysisRunResult fullResult = analysisRunOrchestrator.run(AnalysisRunCommand.assetPoolScan(
+                    target.ownerType(), target.ownerId(), target.assetId(), target.symbol(), timeframe,
+                    RequestIdSupport.generate(), reference));
+            boolean succeeded = fullResult != null && fullResult.isSuccessfulAnalysisAvailable();
+            String completion = assessment.fullAnalysisReason() + ":"
+                    + (fullResult == null ? "RESULT_MISSING" : fullResult.getStatus());
+            String completionFailure = succeeded ? null : failureMessage(fullResult);
+            assetStateService.completeScheduledScan(
+                    claim, LocalDateTime.now(clock), completion, completionFailure,
+                    assessment.dataFreshness(), assessment.structureSignature(), assessment.latestCloseTimeMs(),
+                    fullResult == null ? null : fullResult.getTraceId(), true, succeeded);
+            return fullResult;
+        } catch (RuntimeException failure) {
+            assetStateService.completeScheduledScan(
+                    claim, LocalDateTime.now(clock), assessment.fullAnalysisReason() + ":FAILED",
+                    safeReason(failure), assessment.dataFreshness(), assessment.structureSignature(),
+                    assessment.latestCloseTimeMs(), null, true, false);
+            throw failure;
         }
-        for (String timeframe : requiredTimeframes) {
-            long maxReadLagMs = maxReadLagMs(timeframe);
-            if (!persistedOhlcvQueryService.evaluateReadiness(symbol, timeframe, requiredBars, maxReadLagMs).isFresh()) {
-                return false;
+    }
+
+    private LightweightAssessment lightweightAssessment(AssetStateService.ScheduledScanClaim claim) {
+        Map<String, String> trends = new LinkedHashMap<>();
+        Long latestDecisionClose = null;
+        BigDecimal latestDecisionPrice = null;
+        for (String timeframe : properties.getScheduler().getRequiredMarketTimeframes()) {
+            PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadinessForSource(
+                    claim.identity().symbol(), timeframe, properties.getScheduler().getRequiredClosedBars(),
+                    maxReadLagMs(timeframe), BINANCE_PROVIDER, SPOT_MARKET);
+            if (readiness == null || !readiness.isFresh()) {
+                String reason = readiness == null || readiness.getStaleReasonCode() == null
+                        ? "SOURCE_READINESS_MISSING" : readiness.getStaleReasonCode().name();
+                return LightweightAssessment.notReady(reason);
             }
+            trends.put(timeframe, trend(readiness.getBars()));
+            if (timeframe.equals(properties.getScheduler().getDecisionTimeframe())) {
+                latestDecisionClose = readiness.getLatestCloseTimeMs();
+                List<PersistedOhlcvBarDO> bars = readiness.getBars();
+                latestDecisionPrice = bars.isEmpty() ? null : bars.get(0).getClosePrice();
+            }
+        }
+        if (latestDecisionPrice == null || latestDecisionPrice.signum() <= 0) {
+            return LightweightAssessment.notReady("TRUSTED_DECISION_PRICE_MISSING");
+        }
+        String riskPrecheck = riskPrecheck(claim.risk());
+        PlanPrecheck planPrecheck = planPrecheck(claim, LocalDateTime.now(clock));
+        String signature = structureSignature(trends)
+                + ";RISK=" + riskPrecheck + ";PLAN=" + planPrecheck.status();
+        String previousFullSignature = scanText(claim.previousExtJson(), "latestFullStructureSignature");
+        Long previousFullClose = scanLong(claim.previousExtJson(), "latestFullAnalysisCloseTimeMs");
+        String previousFullHotReset = scanText(claim.previousExtJson(), "latestFullHotResetAt");
+        boolean materialSinceFull = !signature.equals(previousFullSignature);
+        boolean hotResetPending = claim.hotResetTime() != null
+                && !claim.hotResetTime().toString().equals(previousFullHotReset);
+        boolean newClosedCandle = latestDecisionClose != null
+                && (previousFullClose == null || latestDecisionClose > previousFullClose);
+        boolean promotion = claim.state() == AssetStateEnum.OBSERVING && alignedForPromotion(trends);
+        boolean stateRecalculation = newClosedCandle
+                && (claim.state() == AssetStateEnum.CANDIDATE
+                || claim.state() == AssetStateEnum.WAITING_TRIGGER);
+        boolean triggeredMaterialRecheck = claim.state() == AssetStateEnum.TRIGGERED
+                && materialSinceFull;
+        boolean otherMaterialRecheck = materialSinceFull
+                && (claim.state() == AssetStateEnum.HIGH_RISK || claim.state() == AssetStateEnum.CONFUSED);
+        boolean full = hotResetPending || promotion || stateRecalculation
+                || triggeredMaterialRecheck || otherMaterialRecheck;
+        String reason = hotResetPending ? "HOT_RESET_RECALCULATION"
+                : promotion ? "PROMOTION_SIGNAL"
+                : stateRecalculation ? "NEW_CLOSED_CANDLE_RECALCULATION"
+                : triggeredMaterialRecheck ? "TRIGGERED_MATERIAL_EVIDENCE_CHANGE"
+                : otherMaterialRecheck ? "MATERIAL_EVIDENCE_CHANGE" : "NO_MATERIAL_CHANGE";
+        return new LightweightAssessment(true, "FRESH:BINANCE_PUBLIC:SPOT", null,
+                signature, latestDecisionClose, full, reason);
+    }
+
+    public boolean marketDataReady(String symbol) {
+        if (persistedOhlcvQueryService == null) return false;
+        for (String timeframe : properties.getScheduler().getRequiredMarketTimeframes()) {
+            PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadinessForSource(
+                    symbol, timeframe, properties.getScheduler().getRequiredClosedBars(),
+                    maxReadLagMs(timeframe), BINANCE_PROVIDER, SPOT_MARKET);
+            if (readiness == null || !readiness.isFresh()) return false;
         }
         return true;
     }
@@ -167,22 +325,146 @@ public class AnalysisSchedulerService {
         status.put("targetCount", scanTargets().size());
         status.put("assetPoolOnly", true);
         status.put("timeframes", properties.getScheduler().getTimeframes());
+        status.put("decisionTimeframe", properties.getScheduler().getDecisionTimeframe());
         status.put("leaseSeconds", properties.getIdempotency().getLeaseSeconds());
         status.put("maxRecoveryAttempts", properties.getIdempotency().getMaxRecoveryAttempts());
         status.put("entryUnified", true);
-        status.put("inMemoryCacheRemoved", true);
-        status.put("manualThreadRemoved", true);
-        status.put("reviewOnly", true);
+        status.put("persistentScanClaim", true);
+        status.put("lightweightScanCount", lightweightScanCount.get());
+        status.put("fullAnalysisRequestCount", fullAnalysisRequestCount.get());
+        status.put("triggeredLightweightCount", triggeredLightweightCount.get());
+        status.put("triggeredFullAnalysisRequestCount", triggeredFullAnalysisRequestCount.get());
         status.put("notAutoTrading", true);
         status.put("notOrderExecution", true);
         status.put("notUserPositionCreation", true);
         status.put("notUserPositionMutation", true);
-        status.put("supportedTimeframes", AnalysisTimePolicy.supportedTimeframes());
         status.put("requiredMarketTimeframes", properties.getScheduler().getRequiredMarketTimeframes());
         status.put("requiredClosedBars", properties.getScheduler().getRequiredClosedBars());
-        status.put("stateCadenceConfigured", properties.getScheduler().cadenceConfigured());
+        status.put("stateCadenceConfigured", properties.getScheduler().productionCadenceConfigured());
+        status.put("coinGlassConfigured", coinGlassReady());
         status.put("configValid", schedulerConfigValid());
         return status;
+    }
+
+    private boolean alignedForPromotion(Map<String, String> trends) {
+        FundamentalAiV41Properties contract = v41Properties == null
+                ? FundamentalAiV41Properties.contractFixture() : v41Properties;
+        String winner = trends.values().stream()
+                .filter(value -> !"FLAT".equals(value))
+                .max(Comparator.comparingLong(value -> trends.values().stream().filter(value::equals).count()))
+                .orElse("FLAT");
+        if ("FLAT".equals(winner)) return false;
+        int count = (int) trends.values().stream().filter(winner::equals).count();
+        BigDecimal weight = BigDecimal.ZERO;
+        for (Map.Entry<String, String> entry : trends.entrySet()) {
+            if (winner.equals(entry.getValue())) weight = weight.add(weight(entry.getKey(), contract));
+        }
+        return count >= contract.getMultiTimeframe().getMinimumAlignedCount()
+                && weight.compareTo(contract.getMultiTimeframe().getMinimumAlignedWeight()) >= 0;
+    }
+
+    private static BigDecimal weight(String timeframe, FundamentalAiV41Properties contract) {
+        return switch (timeframe) {
+            case "4h" -> contract.getMultiTimeframe().getFourHourWeight();
+            case "1h" -> contract.getMultiTimeframe().getOneHourWeight();
+            case "15m" -> contract.getMultiTimeframe().getFifteenMinuteWeight();
+            case "5m" -> contract.getMultiTimeframe().getFiveMinuteWeight();
+            default -> BigDecimal.ZERO;
+        };
+    }
+
+    private static String trend(List<PersistedOhlcvBarDO> bars) {
+        if (bars == null || bars.size() < 2) return "FLAT";
+        BigDecimal newest = bars.get(0).getClosePrice();
+        BigDecimal oldest = bars.get(bars.size() - 1).getClosePrice();
+        if (newest == null || oldest == null) return "FLAT";
+        int comparison = newest.compareTo(oldest);
+        return comparison > 0 ? "UP" : comparison < 0 ? "DOWN" : "FLAT";
+    }
+
+    private static String structureSignature(Map<String, String> trends) {
+        return List.of("5m", "15m", "1h", "4h").stream()
+                .map(timeframe -> timeframe + "=" + trends.getOrDefault(timeframe, "MISSING"))
+                .reduce((left, right) -> left + ";" + right).orElse("");
+    }
+
+    private PlanPrecheck planPrecheck(AssetStateService.ScheduledScanClaim claim, LocalDateTime now) {
+        if (claim.state() != AssetStateEnum.TRIGGERED) return new PlanPrecheck("NOT_REQUIRED");
+        if (executionPlanMapper == null) return new PlanPrecheck("SOURCE_UNAVAILABLE");
+        if (claim.opportunityId() == null || claim.opportunityId().isBlank()) {
+            return new PlanPrecheck("OPPORTUNITY_ID_MISSING");
+        }
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestFinalByOpportunityId(claim.opportunityId());
+        if (plan == null) return new PlanPrecheck("FINAL_MISSING");
+        if (!"CURRENT".equals(normalized(plan.getPlanLifecycleState()))) {
+            return new PlanPrecheck("LIFECYCLE_" + normalizedOrUnknown(plan.getPlanLifecycleState()));
+        }
+        if (plan.getValidFrom() == null || plan.getValidUntil() == null) {
+            return new PlanPrecheck("VALIDITY_MISSING");
+        }
+        if (now.isBefore(plan.getValidFrom())) return new PlanPrecheck("NOT_YET_VALID");
+        if (!now.isBefore(plan.getValidUntil())) return new PlanPrecheck("EXPIRED");
+        Integer threshold = v41Properties == null ? null
+                : v41Properties.getAiGate().getMinimumDataQuality();
+        if (threshold == null || plan.getDataQuality() == null || plan.getDataQuality() < threshold) {
+            return new PlanPrecheck("DATA_QUALITY_BLOCKED");
+        }
+        ExecutionPlanReviewPolicy.PersistedPlanState state =
+                ExecutionPlanReviewPolicy.currentProjectionPlanState(plan, now);
+        return new PlanPrecheck(state == ExecutionPlanReviewPolicy.PersistedPlanState.ACTIVE
+                ? "READY" : state.name());
+    }
+
+    private static String riskPrecheck(String risk) {
+        String normalized = normalized(risk);
+        return Set.of("LOW", "MEDIUM", "HIGH", "EXTREME").contains(normalized)
+                ? normalized : "UNAVAILABLE";
+    }
+
+    private static String normalized(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String normalizedOrUnknown(String value) {
+        String normalized = normalized(value);
+        return normalized.isEmpty() ? "UNKNOWN" : normalized;
+    }
+
+    private boolean coinGlassReady() {
+        return coinGlassProperties != null
+                && coinGlassProperties.configurationState() == CoinGlassConfigurationState.CONFIGURED;
+    }
+
+    private boolean schedulerConfigValid() {
+        try {
+            List<AssetPoolScanTarget> targets = scanTargets();
+            if (targets.isEmpty() || persistedOhlcvQueryService == null || assetStateService == null) return false;
+            for (AssetPoolScanTarget target : targets) validateSymbol(target.symbol());
+            Set<String> timeframes = Set.copyOf(properties.getScheduler().getTimeframes());
+            Set<String> required = Set.copyOf(properties.getScheduler().getRequiredMarketTimeframes());
+            for (String timeframe : timeframes) AnalysisTimePolicy.requireSupportedTimeframe(timeframe);
+            return timeframes.equals(PRODUCT_TIMEFRAMES)
+                    && required.equals(PRODUCT_TIMEFRAMES)
+                    && "5m".equals(properties.getScheduler().getDecisionTimeframe())
+                    && properties.getScheduler().getRequiredClosedBars() >= 100
+                    && properties.getScheduler().cadenceConfigured()
+                    && properties.getScheduler().productionCadenceConfigured();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private List<String> scanSymbols() {
+        if (assetPoolService == null) return List.of();
+        List<String> symbols = assetPoolService.listScanSymbols();
+        return symbols == null ? List.of() : symbols;
+    }
+
+    private List<AssetPoolScanTarget> scanTargets() {
+        if (assetPoolService == null) return List.of();
+        List<AssetPoolScanTarget> targets = assetPoolService.listScanTargets();
+        if (targets != null && !targets.isEmpty()) return targets;
+        return scanSymbols().stream().map(AssetPoolScanTarget::system).toList();
     }
 
     private static long maxReadLagMs(String timeframe) {
@@ -195,62 +477,23 @@ public class AnalysisSchedulerService {
         };
     }
 
-    private boolean schedulerConfigValid() {
+    private static String scanText(String json, String field) {
+        if (json == null || json.isBlank()) return null;
         try {
-            List<AssetPoolScanTarget> targets = scanTargets();
-            if (targets.isEmpty()
-                    || properties.getScheduler().getTimeframes() == null || properties.getScheduler().getTimeframes().isEmpty()) {
-                return false;
-            }
-            for (AssetPoolScanTarget target : targets) {
-                validateSymbol(target.symbol());
-            }
-            List<String> timeframes = properties.getScheduler().getTimeframes();
-            for (String timeframe : timeframes) {
-                AnalysisTimePolicy.requireSupportedTimeframe(timeframe);
-            }
-            return timeframes.size() == 4
-                    && new java.util.HashSet<>(timeframes).equals(Set.of("5m", "15m", "1h", "4h"))
-                    && properties.getScheduler().cadenceConfigured();
-        } catch (AnalysisRunInputException ex) {
-            return false;
+            JsonNode node = JSON.readTree(json).path("schedulerScan").path(field);
+            return node.isTextual() && !node.textValue().isBlank() ? node.textValue() : null;
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
-    private List<String> scanSymbols() {
-        if (assetPoolService == null) {
-            return List.of();
-        }
-        List<String> symbols = assetPoolService.listScanSymbols();
-        return symbols == null ? List.of() : symbols;
-    }
-
-    private List<AssetPoolScanTarget> scanTargets() {
-        if (assetPoolService == null) {
-            return List.of();
-        }
-        List<AssetPoolScanTarget> targets = assetPoolService.listScanTargets();
-        if (targets != null && !targets.isEmpty()) {
-            return targets;
-        }
-        return scanSymbols().stream().map(AssetPoolScanTarget::system).toList();
-    }
-
-    private boolean scanDue(AssetPoolScanTarget target, String timeframe, LocalDateTime now) {
-        if (assetStateMapper == null) {
-            return true;
-        }
+    private static Long scanLong(String json, String field) {
+        if (json == null || json.isBlank()) return null;
         try {
-            AssetStateDO state = assetStateMapper.selectByIdentity(
-                    target.ownerType(), target.ownerId(), target.symbol(), timeframe);
-            if (state == null || state.getLastUpdateTime() == null) {
-                return true;
-            }
-            long intervalSeconds = properties.getScheduler().intervalSeconds(
-                    state.getState() == null ? null : state.getState().name());
-            return !state.getLastUpdateTime().plusSeconds(intervalSeconds).isAfter(now);
-        } catch (RuntimeException stateReadFailure) {
-            return false;
+            JsonNode node = JSON.readTree(json).path("schedulerScan").path(field);
+            return node.isIntegralNumber() ? node.longValue() : null;
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -267,9 +510,7 @@ public class AnalysisSchedulerService {
     }
 
     private static AssetAnalysisVO analysisOrMinimal(AnalysisRunResult result) {
-        if (result.getAnalysis() != null) {
-            return result.getAnalysis();
-        }
+        if (result.getAnalysis() != null) return result.getAnalysis();
         AssetAnalysisVO vo = new AssetAnalysisVO();
         vo.setAnalysisId(result.getAnalysisId());
         vo.setSymbol(result.getSymbol());
@@ -279,16 +520,28 @@ public class AnalysisSchedulerService {
     }
 
     private static String failureMessage(AnalysisRunResult result) {
-        if (result == null) {
-            return "ANALYSIS_REBUILD_RESULT_MISSING";
-        }
-        String status = hasText(result.getStatus()) ? result.getStatus() : "UNKNOWN";
-        String reason = hasText(result.getReasonCode()) ? result.getReasonCode() : "ANALYSIS_REBUILD_NOT_EXECUTED";
-        String message = hasText(result.getMessage()) ? result.getMessage() : "analysis rebuild did not execute successfully";
-        return status + ": " + reason + ": " + message;
+        if (result == null) return "ANALYSIS_RESULT_MISSING";
+        if (result.getReasonCode() != null && !result.getReasonCode().isBlank()) return result.getReasonCode();
+        return result.getMessage() == null ? "ANALYSIS_NOT_AVAILABLE" : result.getMessage();
     }
 
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
+    private static String safeReason(RuntimeException failure) {
+        return failure == null ? "RuntimeException" : failure.getClass().getSimpleName();
+    }
+
+    private record LightweightAssessment(boolean fresh,
+                                         String dataFreshness,
+                                         String failureReason,
+                                         String structureSignature,
+                                         Long latestCloseTimeMs,
+                                         boolean fullAnalysisCondition,
+                                         String fullAnalysisReason) {
+        static LightweightAssessment notReady(String reason) {
+            return new LightweightAssessment(false, "NOT_FRESH", reason, null, null,
+                    false, "DATA_NOT_READY");
+        }
+    }
+
+    private record PlanPrecheck(String status) {
     }
 }

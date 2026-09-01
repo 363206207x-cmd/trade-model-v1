@@ -54,6 +54,7 @@ import org.example.trademodel.vo.DashboardHomeVO;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
+import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -215,7 +216,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
-    void nonFinalAnalysisKeepsAiExplanationSeparateFromFinalPlan() {
+    void nonFinalDirectionBlockedAnalysisKeepsAiExplanationSeparateFromFinalPlan() {
         String symbol = "BNBUSDT";
         AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
@@ -231,7 +232,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(home.getSelectedContextState()).isEqualTo("EXITED_TOP6");
         assertThat(home.getSelectedAssetContext()).isNotNull();
         assertThat(home.getSelectedAssetContext().getRawSymbol()).isEqualTo(symbol);
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DATA_QUALITY_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DIRECTION_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v2");
         assertThat(home.getAiDecision().getTabs()).allSatisfy(tab ->
                 assertThat(tab.getResultAvailable()).isTrue());
@@ -247,7 +249,12 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         AiRoleResultsPayload payload = aiRoleResultsCodec.parse(persisted.getAiRoleResults()).payload();
 
         assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
-        assertThat(payload.synthesis().finalMarketBias()).isEqualTo("WAIT");
+        assertThat(persisted.getRuleMarketBias()).contains("BULLISH");
+        assertThat(persisted.getValidatedMarketBias()).contains("BULLISH");
+        assertThat(persisted.getFinalMarketBias()).isNull();
+        assertThat(payload.synthesis().finalMarketBias()).isNull();
+        assertThat(payload.synthesis().finalPlanMode()).isEqualTo("BLOCKED");
+        assertThat(payload.roles().get("GPT_FINAL").coreJudgment().marketBias()).isEqualTo("BULLISH");
         assertThat(payload.safety().ruleDirectionPreserved()).isTrue();
         assertThat(payload.safety().notStateMachineOverride()).isTrue();
         assertThat(payload.safety().notUserPositionCreation()).isTrue();
@@ -339,7 +346,9 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
 
     @Test
     void oneMinuteAnalysisDoesNotGenerateFormalExecutionPlanBoundary() {
-        long latestCloseMs = persistDecisionTimeframes("ADAUSDT", true);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote(eq("ADAUSDT"), eq("1m")))
+                .thenReturn(Optional.of(authoritativeMarketEnvironment("ADAUSDT")));
+        long latestCloseMs = persistDecisionTimeframes("ADAUSDT", true, 100);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
 
@@ -489,7 +498,9 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     private AnalysisRunResult runAiContractAnalysis(String symbol, String requestId) {
-        long latestCloseMs = persistDecisionTimeframes(symbol, true);
+        when(realMarketEnvironmentService.tryBuildFromRealQuote(eq(symbol), eq("5m")))
+                .thenReturn(Optional.of(authoritativeMarketEnvironment(symbol)));
+        long latestCloseMs = persistDecisionTimeframes(symbol, true, 100);
         String analysisTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), ZoneOffset.UTC).toString();
         return analysisRunOrchestrator.run(
@@ -548,19 +559,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                   "candidateSummary":{
                     "planMode":"PREPARATION","confidence":"MEDIUM","riskLevel":"MEDIUM","worthOpening":false,
                     "opportunityType":"TREND_CONTINUATION","recommendedAction":"WAIT_FOR_MANUAL_CONFIRMATION",
-                    "entryLogic":"verified continuation logic","entryZone":"100-101","entrySource":"source-entry-1",
-                    "entryReason":"verified entry boundary","triggerCondition":"manual confirmation after refresh",
-                    "stopLogic":"rule invalidation boundary","stopZone":"95","stopSource":"source-stop-1",
-                    "stopReason":"structure fails below boundary","targetLogic":"risk reward target structure",
-                    "targetZones":"110 then 120","targetSource":"source-target-1","targetReason":"validated target zones",
-                    "addPositionCondition":"manual review only","reducePositionCondition":"risk increases",
-                    "abandonCondition":"source becomes stale","leverageSuggestion":"1x","positionSuggestion":"small",
-                    "riskExplanation":"bounded manual decision risk","invalidCondition":"close below 95",
-                    "invalidationSource":"source-stop-1","invalidationReason":"verified structure invalidation boundary",
-                    "expectedRiskReward":2.0,"expectedRiskRewardSource":"source-rr-1",
-                    "expectedRiskRewardReason":"entry stop target relation","validity":"until source expiry",
-                    "triggerTimeframe":"5m","holdingHorizon":"intraday",
-                    "revalidationRule":"refresh all verified evidence","summary":"Candidate only, not final"
+                    "riskExplanation":"bounded manual decision risk","summary":"Candidate only, not final"
                   }
                 }
                 """;
@@ -766,7 +765,20 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         decision.setAiConflictScore(12);
         decision.setAiPlanMode("CONFIRMATION");
         decision.setRuleMarketBias("BULLISH");
+        decision.setValidatedMarketBias("BULLISH");
         decision.setFinalMarketBias("BULLISH");
+        decision.setDirectionDataState("READY");
+        decision.setDataQualityScore(91);
+        decision.setEvidenceReliability(88);
+        decision.setOpportunityScore(82);
+        decision.setRiskScore(24);
+        decision.setFinalConfidence(87);
+        decision.setOneHourOpportunityQuality(88);
+        decision.setFourHourTrendAlignment(92);
+        decision.setNormalizationVersion("V41-NORM-WREP-1");
+        decision.setScoreVersion("V41-SCORE-1");
+        decision.setDataQualityVersion("V41-DQ-1");
+        decision.setProviderMatrixVersion("V41-PROVIDER-MATRIX-1");
         decision.setRuleConfidence("HIGH");
         decision.setRuleRisk("LOW");
         decision.setRulePlanMode("CONFIRMATION");
@@ -996,6 +1008,26 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         return validPeriod;
     }
 
+    private MarketEnvironmentVO authoritativeMarketEnvironment(String symbol) {
+        MarketEnvironmentVO environment = new MarketEnvironmentVO();
+        environment.setEnvironmentType("TREND");
+        environment.setRiskMode("NORMAL");
+        environment.setTrendFriendliness(80.0);
+        environment.setLeverageSuggestion("moderate_leverage");
+        environment.setSummary("bullish authoritative integration environment");
+        environment.setPriceChangePercent24h(new BigDecimal("2.50"));
+        environment.setRangePct24h(4.0);
+        environment.setVolatilityRegime("中等波动");
+        environment.setPerpFundingApplied(false);
+        environment.setOiApplied(false);
+        environment.setSourceProvider("BINANCE_PUBLIC");
+        environment.setSourceReference("test://binance/24h/" + symbol);
+        environment.setSourceTraceId("trace-market-" + symbol);
+        environment.setObservedAt(LocalDateTime.now(Clock.systemUTC()).minusMinutes(1));
+        environment.setFreshness("FRESH");
+        return environment;
+    }
+
     private TmAccountRiskSnapshotDO verifiedAccountRiskSnapshot(LocalDateTime now, String traceId) {
         TmAccountRiskSnapshotDO snapshot = new TmAccountRiskSnapshotDO();
         snapshot.setAnalysisId(ANALYSIS_ID);
@@ -1023,51 +1055,49 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     private long persistDecisionTimeframes(String symbol, boolean bullish) {
+        return persistDecisionTimeframes(symbol, bullish, 60);
+    }
+
+    private long persistDecisionTimeframes(String symbol, boolean bullish, int closedBarCount) {
         long latest5m = 0L;
         for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
-            long latest = persistBoundaryBars(symbol, timeframe, bullish);
+            long latest = persistBoundaryBars(symbol, timeframe, bullish, closedBarCount);
             if ("5m".equals(timeframe)) latest5m = latest;
         }
         return latest5m;
     }
 
-    private long persistBoundaryBars(String symbol, String timeframe, boolean bullishStructure) {
+    private long persistBoundaryBars(String symbol, String timeframe, boolean bullishStructure,
+                                     int closedBarCount) {
         long intervalMs = timeframeMs(timeframe);
         long latestOpenMs = (System.currentTimeMillis() / intervalMs) * intervalMs - intervalMs;
         long latestCloseMs = latestOpenMs + intervalMs - 1L;
-        long firstOpenMs = latestOpenMs - (49L * intervalMs);
+        long firstOpenMs = latestOpenMs - ((closedBarCount - 1L) * intervalMs);
         String batchId = "batch-" + symbol + "-" + latestOpenMs;
         List<OhlcvBarInput> bars = new java.util.ArrayList<>();
-        for (int i = 0; i < 50; i++) {
-            BigDecimal open = bullishStructure ? new BigDecimal("101.00") : new BigDecimal("102.00");
-            BigDecimal high = new BigDecimal("103.00");
-            BigDecimal low = new BigDecimal("99.00");
-            BigDecimal close = bullishStructure ? new BigDecimal("102.00") : new BigDecimal("101.00");
+        for (int i = 0; i < closedBarCount; i++) {
+            BigDecimal step = new BigDecimal("0.20").multiply(BigDecimal.valueOf(i));
+            BigDecimal open = bullishStructure
+                    ? new BigDecimal("100.00").add(step)
+                    : new BigDecimal("112.00").subtract(step);
+            BigDecimal high = open.add(new BigDecimal("1.00"));
+            BigDecimal low = open.subtract(new BigDecimal("1.00"));
+            BigDecimal close = bullishStructure
+                    ? open.add(new BigDecimal("0.10"))
+                    : open.subtract(new BigDecimal("0.10"));
             if (bullishStructure) {
                 if (i == 44) {
-                    open = new BigDecimal("100.00");
-                    high = new BigDecimal("102.00");
-                    low = new BigDecimal("95.00");
-                    close = new BigDecimal("100.50");
+                    low = open.subtract(new BigDecimal("6.00"));
                 }
                 if (i == 46) {
-                    open = new BigDecimal("102.00");
-                    high = new BigDecimal("110.00");
-                    low = new BigDecimal("100.00");
-                    close = new BigDecimal("104.00");
+                    high = open.add(new BigDecimal("6.00"));
                 }
             } else {
                 if (i == 44) {
-                    open = new BigDecimal("104.00");
-                    high = new BigDecimal("110.00");
-                    low = new BigDecimal("101.00");
-                    close = new BigDecimal("103.00");
+                    high = open.add(new BigDecimal("6.00"));
                 }
                 if (i == 46) {
-                    open = new BigDecimal("100.00");
-                    high = new BigDecimal("103.00");
-                    low = new BigDecimal("95.00");
-                    close = new BigDecimal("98.00");
+                    low = open.subtract(new BigDecimal("6.00"));
                 }
             }
             long openTimeMs = firstOpenMs + (i * intervalMs);
@@ -1082,7 +1112,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
                 Instant.ofEpochMilli(latestCloseMs + 1_000L), "integration-fixture-v1", 1,
                 "trace-" + symbol, batchId, bars));
         assertThat(ingestion.ready()).isTrue();
-        assertThat(ingestion.insertedCount()).isEqualTo(50);
+        assertThat(ingestion.insertedCount()).isEqualTo(closedBarCount);
         return latestCloseMs;
     }
 

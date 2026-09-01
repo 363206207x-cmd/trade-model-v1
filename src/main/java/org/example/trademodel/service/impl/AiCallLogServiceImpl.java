@@ -156,6 +156,26 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     }
 
     @Override
+    public int countDecisionChainAttemptsSince(LocalDateTime since) {
+        return mapper.countDecisionChainAttemptsSince(since);
+    }
+
+    @Override
+    public int countDecisionChainRoleAttempts(String analysisId, String role) {
+        return mapper.countDecisionChainRoleAttempts(analysisId, role);
+    }
+
+    @Override
+    public long sumDecisionChainTokensSince(LocalDateTime since) {
+        return mapper.sumDecisionChainTokensSince(since);
+    }
+
+    @Override
+    public long sumDecisionChainTokensByAnalysisId(String analysisId) {
+        return mapper.sumDecisionChainTokensByAnalysisId(analysisId);
+    }
+
+    @Override
     public BigDecimal sumChargeableCostSince(LocalDateTime since) {
         BigDecimal sum = mapper.sumChargeableCostSince(since);
         return sum == null ? BigDecimal.ZERO : sum;

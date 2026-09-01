@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -26,20 +27,25 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
     private static final Logger log = LoggerFactory.getLogger(BinancePublicOhlcvProvider.class);
     static final String SOURCE_ENDPOINT = "/api/v3/klines";
     private static final Set<String> SUPPORTED_TIMEFRAMES = Set.of("5m", "15m", "1h", "4h");
+    private static final int RAW_REQUEST_HEADROOM = 2;
+    private static final int MAX_REQUEST_LIMIT = 500;
 
     private final RealMarketDataFetcherService fetcher;
     private final boolean providerEnabled;
     private final boolean externalCallsEnabled;
+    private final long settlementDelayMs;
     private final AtomicBoolean geoRestrictedCircuitOpen = new AtomicBoolean(false);
 
     public BinancePublicOhlcvProvider(
             RealMarketDataFetcherService fetcher,
             @Value("${trade-model.ohlcv.binance.enabled:${trade-model.ohlcv.public-provider.enabled:false}}") boolean providerEnabled,
-            @Value("${trade-model.ohlcv.binance.external-calls-enabled:${trade-model.ohlcv.public-provider.external-calls-enabled:false}}") boolean externalCallsEnabled
+            @Value("${trade-model.ohlcv.binance.external-calls-enabled:${trade-model.ohlcv.public-provider.external-calls-enabled:false}}") boolean externalCallsEnabled,
+            @Value("${trade-model.ohlcv.freshness-tolerance-ms:30000}") long settlementDelayMs
     ) {
         this.fetcher = fetcher;
         this.providerEnabled = providerEnabled;
         this.externalCallsEnabled = externalCallsEnabled;
+        this.settlementDelayMs = Math.max(0L, settlementDelayMs);
     }
 
     @Override
@@ -61,11 +67,12 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
         if (symbol == null || symbol.isBlank() || !SUPPORTED_TIMEFRAMES.contains(timeframe)) {
             return result(OhlcvSourceState.DEGRADED, "PUBLIC_OHLCV_REQUEST_INVALID", null);
         }
-        if (limit <= 0 || limit > 500) {
+        if (limit <= 0 || limit > MAX_REQUEST_LIMIT) {
             return result(OhlcvSourceState.DEGRADED, "PUBLIC_OHLCV_LIMIT_INVALID", null);
         }
 
-        PublicKlineFetchResult fetched = fetcher.fetchKlinesDetailed(symbol, timeframe, limit);
+        int rawRequestLimit = Math.min(limit + RAW_REQUEST_HEADROOM, MAX_REQUEST_LIMIT);
+        PublicKlineFetchResult fetched = fetcher.fetchKlinesDetailed(symbol, timeframe, rawRequestLimit);
         if (fetched == null) {
             return result(OhlcvSourceState.ERROR, "PUBLIC_OHLCV_PROVIDER_RESULT_MISSING", null);
         }
@@ -80,12 +87,13 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
 
         List<OhlcvBarInput> bars = new ArrayList<>();
         try {
+            long fetchTimeMs = fetched.fetchTime().toEpochMilli();
             for (String[] row : fetched.rows()) {
                 if (row == null || row.length < 11) {
                     return result(OhlcvSourceState.DEGRADED, "PUBLIC_OHLCV_ROW_MALFORMED", null);
                 }
                 long closeTimeMs = Long.parseLong(row[6]);
-                if (closeTimeMs >= fetched.fetchTime().toEpochMilli()) {
+                if (closeTimeMs > fetchTimeMs || fetchTimeMs - closeTimeMs < settlementDelayMs) {
                     continue;
                 }
                 bars.add(new OhlcvBarInput(
@@ -107,8 +115,15 @@ public class BinancePublicOhlcvProvider implements PublicOhlcvProvider {
         } catch (RuntimeException e) {
             return result(OhlcvSourceState.DEGRADED, "PUBLIC_OHLCV_ROW_PARSE_FAILED", null);
         }
-        if (bars.isEmpty()) {
-            return result(OhlcvSourceState.WAITING_SYNC, "PUBLIC_OHLCV_NO_CLOSED_BAR", null);
+        if (bars.size() < limit) {
+            return result(OhlcvSourceState.WAITING_SYNC,
+                    "PUBLIC_OHLCV_INSUFFICIENT_SETTLED_BARS", null);
+        }
+
+        bars.sort(Comparator.comparingLong(OhlcvBarInput::closeTimeMs)
+                .thenComparingLong(OhlcvBarInput::openTimeMs));
+        if (bars.size() > limit) {
+            bars = new ArrayList<>(bars.subList(bars.size() - limit, bars.size()));
         }
 
         OhlcvIngestionBatch batch = new OhlcvIngestionBatch(

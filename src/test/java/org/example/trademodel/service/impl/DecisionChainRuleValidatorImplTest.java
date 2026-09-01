@@ -340,6 +340,53 @@ class DecisionChainRuleValidatorImplTest {
         assertThat(result.passed()).isTrue();
     }
 
+    @Test
+    void observationFinalAcceptsExplicitOptionalMissingInputsWithoutExecutionParameters() {
+        Fixture fixture = fixture();
+        fixture.input().decision().setIsWorthOpening(false);
+        fixture.input().decision().setRuleCanExecute(false);
+        fixture.input().decision().setRulePlanMode("OBSERVATION");
+        fixture.input().rulePlan().setSourceGateComplete(false);
+        fixture.input().rulePlan().setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        fixture.candidate().setRuleCanExecute(false);
+        fixture.candidate().setRulePlanMode("OBSERVATION");
+        fixture.candidate().setPlanMode("OBSERVATION");
+        fixture.candidate().setWorthOpening(false);
+        fixture.candidate().setRecommendedAction("CONTINUE_OBSERVE");
+        fixture.candidate().setRiskExplanation("Optional source unavailable; keep observing");
+        fixture.candidate().setSummary("No directional execution parameters are exposed");
+        clearDirectionalCandidate(fixture.candidate());
+        fixture.conflict().setPlanModeBefore("OBSERVATION");
+        fixture.conflict().setPlanModeAfter("OBSERVATION");
+        fixture.input().scores().get(1).setScoreValue(null);
+        fixture.input().scores().get(1).setDescription(
+                "coverage=0.0;missingInputs=[verifiedFundingRate];permission=INSUFFICIENT_DATA");
+        EvidenceItemVO unavailable = new EvidenceItemVO();
+        unavailable.setEvidenceId("evidence-optional-unavailable");
+        unavailable.setAnalysisId("analysis-1");
+        unavailable.setEvidenceType("风险");
+        unavailable.setSource("SYSTEM_GENERATED");
+        unavailable.setSourceReference("provider=OPTIONAL;state=UNAVAILABLE");
+        unavailable.setFreshness("UNAVAILABLE");
+        unavailable.setDescription("OPTIONAL_PROVIDER_DATA_UNAVAILABLE");
+        DecisionChainBuildInput input = new DecisionChainBuildInput(
+                fixture.input().analysisId(), fixture.input().traceId(), fixture.input().symbol(),
+                fixture.input().timeframe(), fixture.input().dataQualityScore(), fixture.input().decision(),
+                fixture.input().rulePlan(), List.of(fixture.input().evidence().get(0), unavailable),
+                fixture.input().scores(), fixture.input().triggerType(), fixture.input().ownerType(),
+                fixture.input().ownerId(), fixture.input().assetId(), fixture.input().ruleVersion(),
+                fixture.input().preview(), fixture.input().requestId(), fixture.input().accountRiskSnapshot());
+        fixture.candidate().setEvidenceRefsJson("[\"evidence-1\",\"evidence-optional-unavailable\"]");
+
+        RuleValidationResult result = validator.validate(
+                input, opportunity(AssetStateEnum.CANDIDATE), fixture.candidate(), fixture.conflict());
+
+        assertThat(result.passed()).isTrue();
+        assertThat(result.reasons()).doesNotContain(
+                "RULE_SOURCE_GATE_BLOCKED", "EIGHT_SCORE_CONTRACT_INCOMPLETE",
+                "EVIDENCE_CONTRACT_INCOMPLETE", "SOURCE_REFS_MISSING");
+    }
+
     private static Fixture fixture() {
         OffsetDateTime expiresAt = OffsetDateTime.of(2026, 8, 12, 0, 0, 0, 0, ZoneOffset.UTC);
         DecisionBundleVO decision = new DecisionBundleVO();
@@ -377,9 +424,14 @@ class DecisionChainRuleValidatorImplTest {
         EvidenceItemVO evidence = new EvidenceItemVO();
         evidence.setEvidenceId("evidence-1");
         evidence.setAnalysisId("analysis-1");
+        evidence.setEvidenceType("价格结构");
         evidence.setSource("VERIFIED_MARKET_SOURCE");
         evidence.setSourceReference("source-1");
         evidence.setSourceTraceId("source-trace-1");
+        evidence.setStrength(80.0);
+        evidence.setConfidence(90.0);
+        evidence.setCurrentValue("101");
+        evidence.setChangeFromBaseline("+1%");
         evidence.setObservedAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         evidence.setFreshness("FRESH");
 
@@ -446,7 +498,26 @@ class DecisionChainRuleValidatorImplTest {
         candidate.setEvidenceRefsJson("[\"evidence-1\"]");
         candidate.setScoreRefsJson("[\"score-1\",\"score-2\",\"score-3\",\"score-4\","
                 + "\"score-5\",\"score-6\",\"score-7\",\"score-8\"]");
-        candidate.setSourceRefsJson("[\"source-1\"]");
+        candidate.setSourceRefsJson("""
+                [
+                  {"sourceType":"ENTRY","sourceId":"evidence-1","provider":"UNIT_TEST",\
+                   "timeframe":"5m","observedAt":"2026-08-11T12:00:00Z",\
+                   "structureId":"entry-1","calculationReason":"confirmed entry structure",\
+                   "analysisId":"analysis-1"},
+                  {"sourceType":"STOP","sourceId":"evidence-1","provider":"UNIT_TEST",\
+                   "timeframe":"5m","observedAt":"2026-08-11T12:00:00Z",\
+                   "structureId":"stop-1","calculationReason":"confirmed invalidation structure",\
+                   "analysisId":"analysis-1"},
+                  {"sourceType":"TARGET","sourceId":"evidence-1","provider":"UNIT_TEST",\
+                   "timeframe":"5m","observedAt":"2026-08-11T12:00:00Z",\
+                   "structureId":"target-1","calculationReason":"confirmed target structure",\
+                   "analysisId":"analysis-1"},
+                  {"sourceType":"RISK_REWARD","sourceId":"evidence-1","provider":"UNIT_TEST",\
+                   "timeframe":"5m","observedAt":"2026-08-11T12:00:00Z",\
+                   "structureId":"rr-1","calculationReason":"derived from entry stop and target",\
+                   "analysisId":"analysis-1"}
+                ]
+                """);
         candidate.setValidity(expiresAt.toString());
         candidate.setValidFrom(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         candidate.setValidUntil(LocalDateTime.now(ZoneOffset.UTC).plusHours(1));
@@ -486,7 +557,7 @@ class DecisionChainRuleValidatorImplTest {
                 score("score-5", "情绪温度分"),
                 score("score-6", "事件冲击分"),
                 score("score-7", "宏观环境分"),
-                score("score-8", "综合可信度分"));
+                score("score-8", "证据可信度分"));
     }
 
     private static ScoreItemVO score(String id, String type) {
@@ -494,7 +565,39 @@ class DecisionChainRuleValidatorImplTest {
         score.setScoreId(id);
         score.setScoreType(type);
         score.setScoreValue(80D);
+        score.setWeight(1D);
         return score;
+    }
+
+    private static void clearDirectionalCandidate(ExecutionPlanCandidateDO candidate) {
+        candidate.setOpportunityType(null);
+        candidate.setEntryLogic(null);
+        candidate.setEntryZone(null);
+        candidate.setEntrySource(null);
+        candidate.setEntryReason(null);
+        candidate.setTriggerCondition(null);
+        candidate.setStopLogic(null);
+        candidate.setStopLoss(null);
+        candidate.setStopSource(null);
+        candidate.setStopReason(null);
+        candidate.setTargetLogic(null);
+        candidate.setTakeProfitRules(null);
+        candidate.setTargetSource(null);
+        candidate.setTargetReason(null);
+        candidate.setAddPositionCondition(null);
+        candidate.setReducePositionCondition(null);
+        candidate.setAbandonCondition(null);
+        candidate.setLeverageSuggestion(null);
+        candidate.setPositionSuggestion(null);
+        candidate.setInvalidCondition(null);
+        candidate.setInvalidationSource(null);
+        candidate.setInvalidationReason(null);
+        candidate.setExpectedRiskReward(null);
+        candidate.setExpectedRiskRewardSource(null);
+        candidate.setExpectedRiskRewardReason(null);
+        candidate.setHoldingHorizon(null);
+        candidate.setRevalidationRule(null);
+        candidate.setSourceRefsJson(null);
     }
 
     private static TmAccountRiskSnapshotDO verifiedAccountRisk() {

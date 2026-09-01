@@ -297,16 +297,81 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
-    void rejectsProductionPositionMonitorSchedulerEnabled() {
+    void allowsExplicitProductionPositionMonitorAtFrozenThirtySecondCadence() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
         environment.setProperty("trade-model.schedulers.enabled", "true");
         environment.setProperty("trade-model.schedulers.position-monitor.enabled", "true");
         environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.position-monitor.fixed-rate-ms", "30000");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsProductionPositionMonitorAtNonContractCadence() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.position-monitor.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.position-monitor", "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.position-monitor.fixed-rate-ms", "60000");
 
         assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("production position-monitor scheduler must remain default-off");
+                .hasMessageContaining("trade-model.schedulers.position-monitor.fixed-rate-ms must equal 30000");
+    }
+
+    @Test
+    void allowsExplicitCoreProductionLoopOnlyAtFrozenCadencesAndBinanceSource() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.market-data.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "false");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.observing-interval-seconds", "900");
+        environment.setProperty("trade-model.analysis.scheduler.candidate-interval-seconds", "300");
+        environment.setProperty("trade-model.analysis.scheduler.waiting-trigger-interval-seconds", "120");
+        environment.setProperty("trade-model.analysis.scheduler.triggered-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.fixed-delay-ms", "60000");
+        environment.setProperty("trade-model.analysis.scheduler.decision-timeframe", "5m");
+        environment.setProperty("trade-model.analysis.scheduler.required-closed-bars", "100");
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsCoreLoopWithFallbackOrWrongStateCadence() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.schedulers.market-data.enabled", "true");
+        environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.provider.primary", "binance");
+        environment.setProperty("trade-model.ohlcv.provider.fallback", "kraken");
+        environment.setProperty("trade-model.ohlcv.provider.fallback-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.enabled", "true");
+        environment.setProperty("trade-model.ohlcv.kraken.external-calls-enabled", "true");
+        environment.setProperty("trade-model.analysis.scheduler.observing-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.candidate-interval-seconds", "300");
+        environment.setProperty("trade-model.analysis.scheduler.waiting-trigger-interval-seconds", "120");
+        environment.setProperty("trade-model.analysis.scheduler.triggered-interval-seconds", "60");
+        environment.setProperty("trade-model.analysis.scheduler.fixed-delay-ms", "60000");
+        environment.setProperty("trade-model.analysis.scheduler.decision-timeframe", "5m");
+        environment.setProperty("trade-model.analysis.scheduler.required-closed-bars", "100");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("core production opportunity loop forbids OHLCV fallback")
+                .hasMessageContaining("trade-model.analysis.scheduler.observing-interval-seconds must equal 900");
     }
 
     @Test
@@ -434,6 +499,148 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void rejectsProviderScanWhenExplicitOptInClassificationIsMissingOrNotApproved() {
+        MockEnvironment missing = providerScanEnvironment();
+        missing.setProperty("trade-model.production.scheduler-approval.provider-scan", " ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires explicit provider-scan approval");
+
+        MockEnvironment notApproved = providerScanEnvironment();
+        notApproved.setProperty("trade-model.production.scheduler-approval.provider-scan",
+                "PROD_ALLOWED_DEFAULT_OFF");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(notApproved))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires explicit provider-scan approval");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutGlobalSchedulerOptIn() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.schedulers.enabled", "false");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires the global scheduler opt-in");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutExplicitProviderCoordinator() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.provider-call.enabled", "false");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call features require explicitly enabled coordinator");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutProviderExternalCalls() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.provider-call.external-calls-enabled", "false");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires explicit external-call opt-in");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutEnabledCoinGlassProvider() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.enabled", "false");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires explicitly enabled CoinGlass provider");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutCoinGlassExternalCalls() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "false");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires CoinGlass external-call opt-in");
+    }
+
+    @Test
+    void rejectsProviderScanWithMissingOrBlankCoinGlassKey() {
+        MockEnvironment missing = providerScanEnvironment();
+        missing.setProperty("trade-model.providers.coinglass.api-key", "");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires CoinGlass API key");
+
+        MockEnvironment blank = providerScanEnvironment();
+        blank.setProperty("trade-model.providers.coinglass.api-key", "   ");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(blank))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production provider-call scheduler requires CoinGlass API key");
+    }
+
+    @Test
+    void rejectsProviderScanWithInvalidCoinGlassConfiguration() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.providers.coinglass.base-url", "http://invalid.example");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production CoinGlass base URL must be valid HTTPS");
+    }
+
+    @Test
+    void rejectsProviderScanWithoutPrivateLoopbackBinding() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("server.address", "10.1.2.3");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("private loopback binding with public exposure disabled");
+    }
+
+    @Test
+    void rejectsProviderScanWhenPublicExposureIsAllowed() {
+        MockEnvironment environment = providerScanEnvironment();
+        environment.setProperty("trade-model.production.allow-public-bind", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("private loopback binding with public exposure disabled");
+    }
+
+    @Test
+    void rejectsProviderScanWhenFunnelStateIsMissingOrEnabled() {
+        MockEnvironment missing = providerScanEnvironment();
+        missing.setProperty("trade-model.production.tailscale-funnel-enabled", "");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("requires explicitly disabled Tailscale Funnel");
+
+        MockEnvironment enabled = providerScanEnvironment();
+        enabled.setProperty("trade-model.production.tailscale-funnel-enabled", "true");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(enabled))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("requires explicitly disabled Tailscale Funnel");
+    }
+
+    @Test
+    void allowsProviderScanOnlyWithCompletePrivateExplicitOptIn() {
+        MockEnvironment environment = providerScanEnvironment();
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
+        assertThat(environment.getProperty("trade-model.telegram.enabled", Boolean.class, false)).isFalse();
+        assertThat(environment.getProperty("trade-model.telegram.external-calls-enabled", Boolean.class, false)).isFalse();
+        assertThat(environment.getProperty("trade-model.telegram.dispatch-enabled", Boolean.class, false)).isFalse();
+    }
+
+    @Test
     void providerCallProductionSwitchesAreFailClosedByDefault() {
         MockEnvironment environment = safeEnvironment();
         assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment)).doesNotThrowAnyException();
@@ -494,6 +701,7 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("spring.h2.console.enabled", "false");
         environment.setProperty("server.address", "127.0.0.1");
         environment.setProperty("trade-model.production.allow-public-bind", "false");
+        environment.setProperty("trade-model.production.tailscale-funnel-enabled", "false");
         environment.setProperty("position.provider.type", "BINANCE");
         environment.setProperty("binance.api.key", "configured-key");
         environment.setProperty("binance.api.secret", "configured-secret");
@@ -540,6 +748,9 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.ohlcv.binance.external-calls-enabled", "false");
         environment.setProperty("trade-model.providers.coinglass.enabled", "false");
         environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "false");
+        environment.setProperty("trade-model.telegram.enabled", "false");
+        environment.setProperty("trade-model.telegram.external-calls-enabled", "false");
+        environment.setProperty("trade-model.telegram.dispatch-enabled", "false");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
@@ -553,6 +764,25 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.enabled", "true");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.symbols", "BTCUSDT,ETHUSDT");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
+        return environment;
+    }
+
+    private MockEnvironment providerScanEnvironment() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.schedulers.enabled", "true");
+        environment.setProperty("trade-model.production.scheduler-approval.provider-scan",
+                "PROD_ALLOWED_EXPLICIT_OPT_IN");
+        environment.setProperty("trade-model.provider-call.enabled", "true");
+        environment.setProperty("trade-model.provider-call.scheduler-enabled", "true");
+        environment.setProperty("trade-model.provider-call.external-calls-enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.external-calls-enabled", "true");
+        environment.setProperty("trade-model.providers.coinglass.api-key", "configured-key");
+        environment.setProperty("trade-model.providers.coinglass.base-url", "https://open-api-v4.coinglass.com");
+        environment.setProperty("trade-model.providers.coinglass.auth-header-name", "CG-API-KEY");
+        environment.setProperty("trade-model.providers.coinglass.advertised-rpm", "240");
+        environment.setProperty("trade-model.providers.coinglass.internal-budget-ratio", "0.8");
         return environment;
     }
 }

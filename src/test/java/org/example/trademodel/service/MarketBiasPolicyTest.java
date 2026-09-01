@@ -3,6 +3,8 @@ package org.example.trademodel.service;
 import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,20 +13,23 @@ class MarketBiasPolicyTest {
 
     @Test
     void coversAllEightFormalMarketBiasLevels() {
-        assertThat(classify(up(), up(), up(), up())).isEqualTo("STRONG_BULLISH");
-        assertThat(classify(up(), up(), down(), up())).isEqualTo("BULLISH");
-        assertThat(classify(flat(), flat(), flat(), flat())).isEqualTo("RANGE");
-        assertThat(classify(up(), flat(), flat(), up())).isEqualTo("WEAK_BULLISH");
-        assertThat(classify(down(), flat(), flat(), down())).isEqualTo("WEAK_BEARISH");
-        assertThat(classify(down(), down(), up(), down())).isEqualTo("BEARISH");
-        assertThat(classify(down(), down(), down(), down())).isEqualTo("STRONG_BEARISH");
-        assertThat(classify(List.of(), up(), up(), up())).isEqualTo("WAIT");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("70"))).isEqualTo("STRONG_BULLISH");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("35"))).isEqualTo("BULLISH");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("15"))).isEqualTo("WEAK_BULLISH");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(BigDecimal.ZERO)).isEqualTo("RANGE");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("-15"))).isEqualTo("WEAK_BEARISH");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("-35"))).isEqualTo("BEARISH");
+        assertThat(MarketBiasPolicy.classifyStructuralBias(new BigDecimal("-70"))).isEqualTo("STRONG_BEARISH");
+        assertThat(classify(up(), up(), List.of(), up())).isEqualTo("WAIT");
     }
 
     @Test
-    void usesFrozenWeightsSoFourHourAndOneHourOutweighLowerTimeframes() {
-        assertThat(classify(down(), down(), up(), up())).isEqualTo("WEAK_BULLISH");
-        assertThat(classify(up(), up(), down(), down())).isEqualTo("WEAK_BEARISH");
+    void usesOnlyFourHourAndOneHourForStructuralDirection() {
+        String bullish = classify(down(), down(), up(), up());
+        String bearish = classify(up(), up(), down(), down());
+
+        assertThat(bullish).isEqualTo("STRONG_BULLISH");
+        assertThat(bearish).isEqualTo("STRONG_BEARISH");
     }
 
     @Test
@@ -56,15 +61,28 @@ class MarketBiasPolicyTest {
     }
 
     private static List<String[]> up() {
-        return List.of(bar("100", "102"), bar("102", "105"));
+        return directionalWindow(true);
     }
 
     private static List<String[]> down() {
-        return List.of(bar("105", "102"), bar("102", "100"));
+        return directionalWindow(false);
     }
 
     private static List<String[]> flat() {
-        return List.of(bar("100", "101"), bar("101", "100"));
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 60; index++) bars.add(bar("100", "100"));
+        return bars;
+    }
+
+    private static List<String[]> directionalWindow(boolean bullish) {
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 60; index++) {
+            BigDecimal price = bullish
+                    ? BigDecimal.valueOf(100).add(BigDecimal.valueOf(index + 1L, 1))
+                    : BigDecimal.valueOf(100).subtract(BigDecimal.valueOf(index + 1L, 1));
+            bars.add(bar("100", price.toPlainString()));
+        }
+        return bars;
     }
 
     private static String[] bar(String open, String close) {

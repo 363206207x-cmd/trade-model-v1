@@ -16,6 +16,8 @@ import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
+import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.entity.UserConfigDO;
@@ -148,6 +150,8 @@ class DashboardHomeServiceImplTest {
     @Mock
     private AnalysisRunMapper analysisRunMapper;
     @Mock
+    private EvidenceItemMapper evidenceItemMapper;
+    @Mock
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     @Mock
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
@@ -173,6 +177,7 @@ class DashboardHomeServiceImplTest {
         );
         service.setAssetStateMapper(assetStateMapper);
         service.setLocalRealDashboardSources(persistedOhlcvBarMapper, analysisRunMapper);
+        service.setHomeProvenanceSource(evidenceItemMapper);
         service.setPersistedOhlcvQueryService(persistedOhlcvQueryService);
         service.setOriginalPlanSources(decisionResultMapper, executionPlanMapper, analysisRunMapper);
         service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-07-01T12:00:00Z"), ZoneOffset.UTC));
@@ -211,6 +216,246 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAssets().get(0).getRankingReason()).contains("OPPORTUNITY_SCORE=94");
         verify(assetPoolService, never()).listFocusSymbols(any(), anyInt());
         verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
+    }
+
+    @Test
+    void homeProjectionBindsPersistedProvenanceToTheSameAnalysisVersion() throws Exception {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        String analysisId = "analysis-SOLUSDT";
+        String sourceTraceId = "source-trace-sol-5m";
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 8, 11, 12, 10);
+        AnalysisRunDO run = formalSchedulerRun(analysisId, "SOLUSDT", 106L);
+        run.setAnalysisTime(analysisTime);
+        run.setVersionNo(7);
+        run.setRuleVersion("rules-v4.1.7");
+        run.setDataQualityScore(88);
+        when(analysisRunMapper.selectById(analysisId)).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(analysisId, USER_ID)).thenReturn(run);
+
+        DecisionResult persistedDecision = new DecisionResult();
+        persistedDecision.setAnalysisId(analysisId);
+        persistedDecision.setSymbol("SOLUSDT");
+        persistedDecision.setProviderMatrixVersion("provider-matrix-v4.1");
+        persistedDecision.setDirectionDataState("MULTI_TIMEFRAME_CONFLICT");
+        persistedDecision.setDataQualityScore(88);
+        when(decisionResultMapper.selectLatestByAnalysisId(analysisId)).thenReturn(persistedDecision);
+
+        EvidenceItemDO evidence = new EvidenceItemDO();
+        evidence.setAnalysisId(analysisId);
+        evidence.setSourceProvider("BINANCE_PUBLIC");
+        evidence.setSourceReference("BINANCE_PUBLIC:SOLUSDT:1h:1786421100000");
+        evidence.setSourceTraceId(sourceTraceId);
+        evidence.setObservedAt(LocalDateTime.of(2026, 8, 11, 12, 5));
+        when(evidenceItemMapper.listByAnalysisId(analysisId)).thenReturn(List.of(evidence));
+
+        PersistedOhlcvBarDO anchor = sourceOwnedBar("SOLUSDT", "5m", sourceTraceId,
+                Instant.parse("2026-08-11T12:05:00Z"));
+        PersistedOhlcvBarDO oneHour = sourceOwnedBar("SOLUSDT", "1h", "source-sol-1h",
+                Instant.parse("2026-08-11T12:00:00Z"));
+        PersistedOhlcvBarDO fourHour = sourceOwnedBar("SOLUSDT", "4h", "source-sol-4h",
+                Instant.parse("2026-08-11T12:00:00Z"));
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceTrace("SOLUSDT", sourceTraceId))
+                .thenReturn(anchor);
+        long asOfMs = analysisTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "5m", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(anchor);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "1h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(oneHour);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "4h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(fourHour);
+
+        HomeTopAssetProjection observation = observationProjection(
+                106L, "SOLUSDT", "OBSERVING", "FRESH", analysisTime, analysisId);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observation));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "SOLUSDT", 6, null);
+        DashboardHomeVO.AssetVO asset = home.getAssets().get(0);
+
+        assertThat(asset.getAnalysisId()).isEqualTo(analysisId);
+        assertThat(asset.getAnalysisVersion()).isEqualTo(7);
+        assertThat(asset.getConfigurationVersion()).isEqualTo("rules-v4.1.7");
+        assertThat(asset.getProviderMatrixVersion()).isEqualTo("provider-matrix-v4.1");
+        assertThat(asset.getProvider()).isEqualTo("BINANCE_PUBLIC");
+        assertThat(asset.getSourceId()).isEqualTo(sourceTraceId);
+        assertThat(asset.getPriceObservedAt()).isEqualTo(LocalDateTime.of(2026, 8, 11, 12, 5));
+        assertThat(asset.getOneHourClosedAt()).isEqualTo(LocalDateTime.of(2026, 8, 11, 12, 0));
+        assertThat(asset.getFourHourClosedAt()).isEqualTo(LocalDateTime.of(2026, 8, 11, 12, 0));
+        assertThat(asset.getFreshnessStatus()).isEqualTo("FRESH");
+        assertThat(asset.getDataQualityScore()).isEqualTo(88);
+        assertThat(asset.getDirectionMaturity()).isEqualTo("NON_FINAL");
+        assertThat(asset.getHomeTier()).isEqualTo("TIER_2");
+        assertThat(asset.getFinalMarketBias()).isNull();
+        assertThat(asset.getMarketBias()).isNull();
+
+        AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
+        when(resolver.requireCurrentUserId()).thenReturn(USER_ID);
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new DashboardHomeController(service, resolver)).build();
+        mockMvc.perform(get("/api/dashboard/home").param("selectedSymbol", "SOLUSDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.assets[0].analysisId").value(analysisId))
+                .andExpect(jsonPath("$.data.assets[0].analysisVersion").value(7))
+                .andExpect(jsonPath("$.data.assets[0].configurationVersion").value("rules-v4.1.7"))
+                .andExpect(jsonPath("$.data.assets[0].providerMatrixVersion").value("provider-matrix-v4.1"))
+                .andExpect(jsonPath("$.data.assets[0].provider").value("BINANCE_PUBLIC"))
+                .andExpect(jsonPath("$.data.assets[0].sourceId").value(sourceTraceId))
+                .andExpect(jsonPath("$.data.assets[0].priceObservedAt").value("2026-08-11T12:05:00"))
+                .andExpect(jsonPath("$.data.assets[0].oneHourClosedAt").value("2026-08-11T12:00:00"))
+                .andExpect(jsonPath("$.data.assets[0].fourHourClosedAt").value("2026-08-11T12:00:00"))
+                .andExpect(jsonPath("$.data.assets[0].freshnessStatus").value("FRESH"))
+                .andExpect(jsonPath("$.data.assets[0].dataQualityScore").value(88))
+                .andExpect(jsonPath("$.data.assets[0].directionMaturity").value("NON_FINAL"))
+                .andExpect(jsonPath("$.data.assets[0].homeTier").value("TIER_2"))
+                .andExpect(jsonPath("$.data.assets[0].finalMarketBias").doesNotExist());
+    }
+
+    @Test
+    void pricedObservationProjectionRemainsObservationAndHidesOpportunityAndPlanFields() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        LocalDateTime scannedAt = LocalDateTime.of(2026, 8, 11, 12, 10);
+        String analysisId = "analysis-btc-formal-scheduler";
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                observationProjection(101L, "BTCUSDT", "NO_QUALIFIED_OPPORTUNITY",
+                        "FRESH", scannedAt, analysisId),
+                observationProjection(102L, "ETHUSDT", "NEVER_SCANNED",
+                        "NEVER_SCANNED", null, null)));
+        when(analysisRunMapper.selectById(analysisId))
+                .thenReturn(formalSchedulerRun(analysisId, "BTCUSDT", 101L));
+        PersistedOhlcvBarDO marketBar = persistedBar(
+                "BTCUSDT", "64123.45", "FRESH", scannedAt);
+        when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                eq("BTCUSDT"), anyString(), eq("BINANCE_PUBLIC"), eq("SPOT"), eq(1)))
+                .thenReturn(List.of(marketBar));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6, null);
+
+        assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BTCUSDT", "ETHUSDT");
+        DashboardHomeVO.AssetVO btc = home.getAssets().get(0);
+        assertThat(btc.getSlotType()).isEqualTo("OBSERVATION");
+        assertThat(btc.getLatestPrice()).isEqualByComparingTo("64123.45");
+        assertThat(btc.getOpportunityState()).isEqualTo("NO_QUALIFIED_OPPORTUNITY");
+        assertThat(btc.getAssetStateLabel()).isEqualTo("暂无合格机会");
+        assertThat(btc.getDataFreshness()).isEqualTo("FRESH");
+        assertThat(btc.getLatestAnalysisTime()).isEqualTo(scannedAt);
+        assertThat(btc.getOpportunityId()).isNull();
+        assertThat(btc.getPrimaryOpportunityId()).isNull();
+        assertThat(btc.getOpportunityScore()).isNull();
+        assertThat(btc.getMarketBias()).isNull();
+        assertThat(btc.getConfidenceLevel()).isNull();
+        assertThat(btc.getRiskLevel()).isNull();
+        assertThat(btc.getPlanMode()).isNull();
+        assertThat(btc.getHasFinal()).isFalse();
+        assertThat(btc.getFinalMarketBias()).isNull();
+        assertThat(btc.getFinalPlanMode()).isNull();
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isNull();
+        assertThat(home.getAiDecision().getDecisionMode()).isEqualTo("RULE_ONLY_FALLBACK");
+        verify(decisionService).getLatestDecisionResultBySymbolForUser(USER_ID, "BTCUSDT");
+    }
+
+    @Test
+    void observationAiContextRequiresTheExactFormalSchedulerRun() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        String analysisId = "analysis-btc-formal-scheduler";
+        HomeTopAssetProjection observation = observationProjection(
+                101L, "BTCUSDT", "NO_QUALIFIED_OPPORTUNITY", "FRESH",
+                LocalDateTime.of(2026, 8, 11, 12, 10), analysisId);
+        DecisionResultVO decision = decisionWithStructuredAiRoles();
+        decision.setAnalysisId(analysisId);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observation));
+        when(decisionService.getLatestDecisionResultBySymbolForUser(USER_ID, "BTCUSDT"))
+                .thenReturn(decision);
+        when(analysisRunMapper.selectById(analysisId))
+                .thenReturn(formalSchedulerRun(analysisId, "BTCUSDT", 101L));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getAssets()).singleElement().satisfies(asset -> {
+            assertThat(asset.getSlotType()).isEqualTo("OBSERVATION");
+            assertThat(asset.getAnalysisId()).isEqualTo(analysisId);
+            assertThat(asset.getOpportunityId()).isNull();
+            assertThat(asset.getOpportunityScore()).isNull();
+        });
+        assertThat(home.getAiDecision().getRunStatus()).isNotEqualTo("NOT_CONFIGURED");
+        assertThat(aiTab(home, "GPT_FINAL").getDecisionSummary()).isNotBlank();
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isNull();
+    }
+
+    @Test
+    void previewAnalysisCannotPopulateObservationAiOrPlanContext() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        String previewId = "ana-preview-54";
+        HomeTopAssetProjection observation = observationProjection(
+                101L, "BTCUSDT", "NO_QUALIFIED_OPPORTUNITY", "FRESH",
+                LocalDateTime.of(2026, 8, 11, 12, 10), previewId);
+        DecisionResultVO previewDecision = decisionWithStructuredAiRoles();
+        previewDecision.setAnalysisId(previewId);
+        AnalysisRunDO preview = formalSchedulerRun(previewId, "BTCUSDT", 101L);
+        preview.setPreview(true);
+        preview.setTriggerType("ANALYSIS_PREVIEW");
+        preview.setAnalysisMode("ANALYSIS_PREVIEW");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observation));
+        when(decisionService.getLatestDecisionResultBySymbolForUser(USER_ID, "BTCUSDT"))
+                .thenReturn(previewDecision);
+        when(analysisRunMapper.selectById(previewId)).thenReturn(preview);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getAssets()).singleElement().satisfies(asset -> {
+            assertThat(asset.getSlotType()).isEqualTo("OBSERVATION");
+            assertThat(asset.getAnalysisId()).isNull();
+            assertThat(asset.getOpportunityId()).isNull();
+            assertThat(asset.getOpportunityState()).isEqualTo("NEVER_SCANNED");
+            assertThat(asset.getLatestAnalysisTime()).isNull();
+            assertThat(asset.getDataFreshness()).isEqualTo("NEVER_SCANNED");
+        });
+        assertThat(home.getAiDecision().getDecisionMode()).isEqualTo("RULE_ONLY_FALLBACK");
+        assertThat(aiTab(home, "GPT_FINAL").getDecisionSummary()).isNull();
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isNull();
+    }
+
+    @Test
+    void highRiskRankingProjectionNeverExposesFinalOrExecutablePlanFields() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 92, 20,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"HIGH_RISK\"}");
+        decision.setPlanMode("CONFIRMATION");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(101L, decision, 92, "opportunity-high-risk", "HIGH_RISK")));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getAssets()).singleElement().satisfies(asset -> {
+            assertThat(asset.getSlotType()).isEqualTo("DECISION");
+            assertThat(asset.getOpportunityState()).isEqualTo("HIGH_RISK");
+            assertThat(asset.getHasFinal()).isFalse();
+            assertThat(asset.getFinalMarketBias()).isNull();
+            assertThat(asset.getFinalPlanMode()).isNull();
+            assertThat(asset.getFinalPlanLifecycle()).isNull();
+        });
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getDirection()).isNull();
+        assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
+        assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
+        assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
     }
 
     @Test
@@ -679,6 +924,9 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getPnlPct()).isEqualByComparingTo("2.41935500");
         assertThat(homePosition.getPnlAmount()).isEqualByComparingTo("300.0");
         assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("2.41935500");
+        assertThat(homePosition.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+        assertThat(homePosition.getFeeCoverage()).isEqualTo("UNKNOWN");
+        assertThat(homePosition.getFundingCoverage()).isEqualTo("UNKNOWN");
         assertThat(homePosition.getAccountImpactPct()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
                 .isEqualTo("1 笔");
@@ -3827,6 +4075,58 @@ class DashboardHomeServiceImplTest {
                 decision);
     }
 
+    private HomeTopAssetProjection observationProjection(Long assetId,
+                                                          String symbol,
+                                                          String observationState,
+                                                          String freshness,
+                                                          LocalDateTime analysisTime,
+                                                          String analysisId) {
+        return new HomeTopAssetProjection(
+                assetId,
+                symbol,
+                symbol.replace("USDT", ""),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                freshness,
+                analysisTime == null ? Long.MAX_VALUE : 0L,
+                0L,
+                0,
+                "SLOT_TYPE=OBSERVATION|OBSERVATION_STATE=" + observationState
+                        + "|DATA_STATUS=" + freshness,
+                analysisId,
+                null,
+                observationState,
+                null,
+                "5m",
+                null,
+                0,
+                "TIMEFRAME_CONFLICT".equals(freshness) ? "TIMEFRAME_CONFLICT" : "ALIGNED",
+                analysisTime,
+                null);
+    }
+
+    private AnalysisRunDO formalSchedulerRun(String analysisId, String symbol, Long assetId) {
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId(analysisId);
+        run.setSymbol(symbol);
+        run.setTimeframe("5m");
+        run.setStatus("SUCCESS");
+        run.setTriggerType("ASSET_POOL_SCAN");
+        run.setOwnerType("USER");
+        run.setOwnerId(USER_ID);
+        run.setAssetId(assetId);
+        run.setPreview(false);
+        run.setAnalysisMode("OPPORTUNITY_DECISION");
+        run.setAnalysisTime(LocalDateTime.of(2026, 8, 11, 12, 10));
+        run.setCompletedAt(LocalDateTime.of(2026, 8, 11, 12, 10));
+        return run;
+    }
+
     private AnalysisRunDO analysisRun(String analysisId, String symbol) {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(analysisId);
@@ -3837,6 +4137,21 @@ class DashboardHomeServiceImplTest {
     private PersistedOhlcvBarDO persistedClosedBar(Instant closedAt) {
         PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
         bar.setCloseTimeMs(closedAt == null ? null : closedAt.toEpochMilli());
+        return bar;
+    }
+
+    private PersistedOhlcvBarDO sourceOwnedBar(String symbol,
+                                               String timeframe,
+                                               String sourceTraceId,
+                                               Instant closedAt) {
+        PersistedOhlcvBarDO bar = persistedClosedBar(closedAt);
+        bar.setSymbol(symbol);
+        bar.setTimeframe(timeframe);
+        bar.setProvider("BINANCE_PUBLIC");
+        bar.setProviderMarketType("SPOT");
+        bar.setSourceTraceId(sourceTraceId);
+        bar.setClosed(true);
+        bar.setFreshnessStatus("FRESH");
         return bar;
     }
 

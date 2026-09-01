@@ -67,6 +67,44 @@ public interface AssetStateService {
                                      String extJson);
 
     /**
+     * Atomically claims one due lightweight Asset Pool scan using the existing
+     * authoritative AssetState row. The claim changes no opportunity state and
+     * therefore cannot promote an asset or grant execution permission.
+     */
+    ScheduledScanClaim claimScheduledScan(OpportunityStateIdentity identity,
+                                           Long poolItemId,
+                                           LocalDateTime now,
+                                           long intervalSeconds,
+                                           String traceId,
+                                           String ruleVersion);
+
+    /** Completes the scan audit on the same claimed AssetState row. */
+    boolean completeScheduledScan(ScheduledScanClaim claim,
+                                  LocalDateTime finishedAt,
+                                  String result,
+                                  String failureReason,
+                                  String dataFreshness,
+                                  String structureSignature,
+                                  Long latestCloseTimeMs,
+                                  String analysisTraceId,
+                                  boolean fullAnalysisRequested,
+                                  boolean fullAnalysisSucceeded);
+
+    record ScheduledScanClaim(OpportunityStateIdentity identity,
+                              String opportunityId,
+                              AssetStateEnum state,
+                              String lastAnalysisId,
+                              String risk,
+                              LocalDateTime hotResetTime,
+                              String traceId,
+                              String ruleVersion,
+                              LocalDateTime scheduledAt,
+                              LocalDateTime startedAt,
+                              LocalDateTime nextEligibleScanAt,
+                              String previousExtJson) {
+    }
+
+    /**
      * 全库维度「最近一次 Hot Reset」行（按 hot_reset_time 最大），供 systemStatus 展示；无则 null。
      */
     AssetStateDO findLatestHotResetSnapshot();

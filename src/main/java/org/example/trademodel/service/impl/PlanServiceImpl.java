@@ -1,5 +1,6 @@
 package org.example.trademodel.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.dto.planboundary.BoundaryEntryDTO;
 import org.example.trademodel.dto.planboundary.BoundaryStopDTO;
 import org.example.trademodel.dto.planboundary.BoundaryTakeProfitLevelDTO;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 @Service
 public class PlanServiceImpl implements PlanService {
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final String PLACEHOLDER_NOT_AVAILABLE = "暂无";
     private static final String DEFAULT_OBSERVE_ACTION = "观望";
     private static final String SOURCE_TRACE_MISSING = "SOURCE_TRACE_MISSING";
@@ -80,11 +82,62 @@ public class PlanServiceImpl implements PlanService {
                 assessment.setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
                 assessment.setSourceCompletenessSummary("rule source gate INCOMPLETE");
             }
+        } else {
+            applyBoundaryProducerResult(assessment, boundaryResult, null);
+            applyRuleOwnedBoundaryContract(assessment, boundaryResult, decisionBundle);
         }
         // This object is a non-final rule assessment, never a detailed plan.
         assessment.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
         applyExternalContextReadiness(assessment, decisionBundle);
         return assessment;
+    }
+
+    private static void applyRuleOwnedBoundaryContract(
+            ExecutionPlanVO plan,
+            SourceTraceBoundaryProducerResult boundaryResult,
+            DecisionBundleVO decision) {
+        SourceTraceDTO trace = boundaryResult.getSourceTrace();
+        if (plan == null || trace == null || !boundaryResult.isBoundaryReady()) return;
+        plan.setRecommendedAction("等待触发；触发后重新校验，通过后再进入人工确认");
+        plan.setOpportunityType("STRUCTURAL_DIRECTIONAL_OPPORTUNITY");
+        plan.setEntryLogic("已确认结构位回踩或突破后重新校验");
+        plan.setEntrySource(trace.getEntrySourceRef());
+        plan.setEntryReason(trace.getEntrySourceReason());
+        plan.setTriggerCondition("15m触发条件满足后重新校验，不构成自动交易授权");
+        plan.setStopLogic("结构证伪位外加确定性保护缓冲");
+        plan.setStopSource(trace.getStopSourceRef());
+        plan.setStopReason(trace.getStopSourceReason());
+        plan.setTargetLogic("下一组已确认支撑或压力结构");
+        plan.setTargetSource(trace.getTpSourceRef());
+        plan.setTargetReason(trace.getTpSourceReason());
+        plan.setAddPositionCondition("仅在新分析与账户风险门禁再次通过后人工决定");
+        plan.setReducePositionCondition("风险或结构恶化时仅提示人工复核");
+        plan.setAbandonCondition(plan.getInvalidCondition());
+        plan.setInvalidationSource(trace.getStopSourceRef());
+        plan.setInvalidationReason(trace.getStopSourceReason());
+        plan.setRiskExplanation("风险由结构止损、流动性、事件、冲突与账户风险共同约束");
+        plan.setLeverageLimit("ACCOUNT_RISK_LIMIT_ONLY");
+        plan.setPositionLimit("ACCOUNT_RISK_SNAPSHOT_BOUND");
+        plan.setExpectedRiskReward(trace.getRrSource());
+        plan.setExpectedRiskRewardSource(trace.getRrRuleRef());
+        plan.setExpectedRiskRewardReason("由同一分析的入场、止损和目标实时计算");
+        plan.setHoldingHorizon("4h/1h结构有效期");
+        plan.setRevalidationRule("触发、来源新鲜度或结构变化时必须重新校验");
+        try {
+            plan.setSourceRefsJson(JSON.writeValueAsString(boundaryResult.getSourceRefs()));
+        } catch (Exception failure) {
+            plan.setSourceGateComplete(false);
+            plan.setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+            plan.getSourceBlockerReasons().add("BOUNDARY_SOURCE_REFS_SERIALIZATION_FAILED");
+        }
+        if (decision != null && decision.getMultiTimeframeDetails() != null) {
+            try {
+                plan.setAnalysisTimeframesJson(JSON.writeValueAsString(decision.getMultiTimeframeDetails()));
+            } catch (Exception ignored) {
+                plan.setSourceGateComplete(false);
+            }
+        }
+        plan.setTriggerTimeframe("15m");
     }
 
     @Override

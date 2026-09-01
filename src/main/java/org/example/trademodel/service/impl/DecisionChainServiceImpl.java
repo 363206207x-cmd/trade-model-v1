@@ -33,6 +33,7 @@ import org.example.trademodel.service.OpportunityTriggerSource;
 import org.example.trademodel.service.OpportunityStateIdentity;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.example.trademodel.service.support.ExecutionFeasibilityContract;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
@@ -54,7 +55,7 @@ import java.util.UUID;
 public class DecisionChainServiceImpl implements DecisionChainService {
     private static final Set<String> FROZEN_EIGHT_SCORE_TYPES = Set.of(
             "趋势结构分", "资金推动分", "杠杆风险分", "流动性质量分",
-            "情绪温度分", "事件冲击分", "宏观环境分", "综合可信度分");
+            "情绪温度分", "事件冲击分", "宏观环境分", "证据可信度分");
     private static final Set<String> FROZEN_TIMEFRAMES = Set.of("4h", "1h", "15m", "5m");
     private final AssetPoolService assetPoolService;
     private final AssetStateService assetStateService;
@@ -124,7 +125,46 @@ public class DecisionChainServiceImpl implements DecisionChainService {
             return buildPreview(input);
         }
 
+        if (!directionalBias(decision.getValidatedMarketBias())) {
+            OpportunityTransitionResult observing = assetStateService.transition(
+                    new OpportunityStateIdentity(input.ownerType(), input.ownerId(), input.assetId(),
+                            input.symbol(), input.timeframe()), AssetStateEnum.OBSERVING,
+                    integer(decision.getConfusedScore()), integer(decision.getConfusedLowStreak()),
+                    input.analysisId(), input.traceId(), input.ruleVersion(),
+                    "VALIDATED_DIRECTION_UNAVAILABLE", OpportunityTriggerSource.ANALYSIS);
+            RuleValidationResult blocked = RuleValidationResult.blocked(List.of(
+                    "VALIDATED_MARKET_BIAS_REQUIRED"));
+            decision.setFinalMarketBias(null);
+            decision.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+            decision.setMarketBiasHierarchy("WAIT");
+            decision.setIsWorthOpening(false);
+            applyOpportunityState(decision, input, observing, blocked);
+            persistOpportunityProjection(input, observing, null, blocked);
+            return new DecisionChainBuildResult(observing, null, null, blocked,
+                    blockedPlan(input.rulePlan(), observing, null, null, blocked));
+        }
+
         AssetStateEnum requestedState = defaultState(decision.getAssetState(), decision.getIsWorthOpening());
+        if (requestedState == AssetStateEnum.CONFUSED
+                || requestedState == AssetStateEnum.INVALIDATED
+                || requestedState == AssetStateEnum.COOLING) {
+            OpportunityTransitionResult held = assetStateService.transition(
+                    new OpportunityStateIdentity(input.ownerType(), input.ownerId(), input.assetId(),
+                            input.symbol(), input.timeframe()), requestedState,
+                    integer(decision.getConfusedScore()), integer(decision.getConfusedLowStreak()),
+                    input.analysisId(), input.traceId(), input.ruleVersion(),
+                    "STATE_NOT_ELIGIBLE_FOR_NEW_DIRECTION_PLAN",
+                    triggerSource(input.triggerType(), requestedState));
+            RuleValidationResult blocked = RuleValidationResult.blocked(List.of(
+                    "STATE_NOT_ELIGIBLE_FOR_NEW_DIRECTION_PLAN"));
+            decision.setFinalMarketBias(null);
+            decision.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+            decision.setIsWorthOpening(false);
+            applyOpportunityState(decision, input, held, blocked);
+            persistOpportunityProjection(input, held, null, blocked);
+            return new DecisionChainBuildResult(held, null, null, blocked,
+                    blockedPlan(input.rulePlan(), held, null, null, blocked));
+        }
         ExecutionFeasibilityContract.Assessment executionFeasibility =
                 ExecutionFeasibilityContract.assess(input.rulePlan());
         String transitionReason = "ANALYSIS_DECISION_PROMOTION";
@@ -135,11 +175,11 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         }
         OpportunityTransitionResult opportunity = assetStateService.transition(
                 new OpportunityStateIdentity(input.ownerType(), input.ownerId(), input.assetId(),
-                        input.symbol(), input.timeframe()), requestedState,
+                        input.symbol(), input.timeframe()), AssetStateEnum.CANDIDATE,
                 integer(decision.getConfusedScore()), integer(decision.getConfusedLowStreak()),
                 input.analysisId(), input.traceId(), input.ruleVersion(),
-                transitionReason,
-                triggerSource(input.triggerType(), requestedState));
+                "VALIDATED_DIRECTION_PLAN_CHAIN_STARTED",
+                triggerSource(input.triggerType(), AssetStateEnum.CANDIDATE));
 
         String candidateId = "candidate-" + UUID.randomUUID();
         Map<String, Object> facts = commonFacts(input, opportunity);
@@ -164,19 +204,29 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         ConflictResolverResultDO conflict = conflictResolver.resolveDecisionChain(
                 candidate, geminiJson, grokJson, input.dataQualityScore(), decision.getConfusedScore(),
                 accountRiskState(input.accountRiskSnapshot()));
-        if (Boolean.TRUE.equals(conflict.getConfusedDecision())
-                && opportunity.state() != AssetStateEnum.CONFUSED) {
+        enforceStatePlanModeContract(requestedState, conflict);
+        AssetStateEnum resolvedState = Boolean.TRUE.equals(conflict.getConfusedDecision())
+                ? AssetStateEnum.CONFUSED : resolvedState(requestedState, conflict.getPlanModeAfter());
+        if (opportunity.state() != resolvedState) {
             opportunity = assetStateService.transition(
                     new OpportunityStateIdentity(input.ownerType(), input.ownerId(), input.assetId(),
-                            input.symbol(), input.timeframe()), AssetStateEnum.CONFUSED,
-                    Math.max(integer(decision.getConfusedScore()), ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD),
+                            input.symbol(), input.timeframe()), resolvedState,
+                    resolvedState == AssetStateEnum.CONFUSED
+                            ? Math.max(integer(decision.getConfusedScore()), ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD)
+                            : integer(decision.getConfusedScore()),
                     integer(decision.getConfusedLowStreak()),
                     input.analysisId(), input.traceId(), input.ruleVersion(),
-                    defaultText(conflict.getDowngradeReason(), "CONFLICT_RESOLVER_BLOCKED"),
-                    OpportunityTriggerSource.CONFUSED);
+                    resolvedState == AssetStateEnum.CONFUSED
+                            ? defaultText(conflict.getDowngradeReason(), "CONFLICT_RESOLVER_BLOCKED")
+                            : transitionReason,
+                    resolvedState == AssetStateEnum.CONFUSED
+                            ? OpportunityTriggerSource.CONFUSED
+                            : triggerSource(input.triggerType(), resolvedState));
         }
         RuleValidationResult validation = ruleValidator.validate(input, opportunity, candidate, conflict);
-        if (!"GPT_FINAL".equals(candidate.getCandidateSource()) && validation.passed()) {
+        if ((!gpt.successful() || !gemini.successful() || !grok.successful()) && validation.passed()) {
+            validation = RuleValidationResult.blocked(List.of("COMPLETE_THREE_AI_CHAIN_REQUIRED"));
+        } else if (!"GPT_FINAL".equals(candidate.getCandidateSource()) && validation.passed()) {
             validation = RuleValidationResult.blocked(List.of("GPT_CANDIDATE_REQUIRED"));
         }
         candidate.setCandidateStatus(validation.passed() ? "VALIDATED" : "REJECTED");
@@ -248,20 +298,23 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         Integer dataQuality = input.dataQualityScore();
         boolean circuitOpen = dataQuality == null
                 || dataQuality < v41Properties.getAiGate().getCircuitBreakerScore();
-        boolean aiQualityEligible = !circuitOpen
+        boolean degradedChainEligible = !circuitOpen;
+        boolean fullQualityEligible = degradedChainEligible
                 && dataQuality >= v41Properties.getAiGate().getMinimumDataQuality();
         boolean executionFeasibilityReady = ExecutionFeasibilityContract.assess(input.rulePlan()).allowed();
-        if (!aiQualityEligible) {
+        if (!degradedChainEligible) {
             ruleConfidence = downgradeConfidence(ruleConfidence);
-            ruleMode = circuitOpen ? PlanModeEnum.BLOCKED.name()
-                    : moreRestrictiveMode(ruleMode, PlanModeEnum.OBSERVATION);
+            ruleMode = PlanModeEnum.BLOCKED.name();
+        } else if (!fullQualityEligible) {
+            ruleConfidence = downgradeConfidence(ruleConfidence);
+            ruleMode = moreRestrictiveMode(ruleMode, PlanModeEnum.PREPARATION);
         }
         decision.setRuleMarketBias(ruleBias);
         decision.setRuleConfidence(ruleConfidence);
         decision.setRuleRisk(ruleRisk);
         decision.setRulePlanMode(ruleMode);
         decision.setConfidenceLevel(ruleConfidence);
-        decision.setRuleCanExecute(aiQualityEligible
+        decision.setRuleCanExecute(fullQualityEligible
                 && Boolean.TRUE.equals(decision.getIsWorthOpening())
                 && Boolean.TRUE.equals(input.rulePlan().getSourceGateComplete())
                 && executionFeasibilityReady
@@ -296,17 +349,12 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                                          Map<String, Object> facts) {
         List<String> failures = new ArrayList<>();
         if (input.dataQualityScore() == null
-                || input.dataQualityScore() < v41Properties.getAiGate().getMinimumDataQuality()) {
+                || input.dataQualityScore() < v41Properties.getAiGate().getCircuitBreakerScore()) {
             failures.add("DATA_QUALITY_BELOW_AI_THRESHOLD");
         }
         if (input.evidence() == null || input.evidence().isEmpty()
-                || input.evidence().stream().anyMatch(item -> item == null
-                || !hasText(item.getEvidenceId()) || !hasText(item.getSource())
-                || !java.util.Objects.equals(item.getAnalysisId(), input.analysisId())
-                || (!hasText(item.getSourceReference()) && !hasText(item.getSourceTraceId()))
-                || item.getStrength() == null || item.getConfidence() == null
-                || !hasText(item.getCurrentValue()) || !hasText(item.getChangeFromBaseline())
-                || item.getObservedAt() == null || !hasText(item.getFreshness()))) {
+                || input.evidence().stream().anyMatch(item ->
+                !V41DecisionContractPolicy.evidenceItemContractComplete(item, input.analysisId()))) {
             failures.add("EVIDENCE_CONTRACT_INCOMPLETE");
         }
         if (input.evidence() == null || input.evidence().stream()
@@ -320,8 +368,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 .collect(java.util.stream.Collectors.toSet());
         boolean scoresComplete = input.scores() != null && input.scores().size() == FROZEN_EIGHT_SCORE_TYPES.size()
                 && scoreTypes.equals(FROZEN_EIGHT_SCORE_TYPES)
-                && input.scores().stream().allMatch(item -> item != null
-                && hasText(item.getScoreId()) && item.getScoreValue() != null && item.getWeight() != null);
+                && input.scores().stream().allMatch(V41DecisionContractPolicy::scoreItemContractComplete);
         if (!scoresComplete) failures.add("EIGHT_SCORE_CONTRACT_INCOMPLETE");
         DecisionBundleVO decision = input.decision();
         if (!hasText(decision.getRuleMarketBias()) || !hasText(decision.getRuleConfidence())
@@ -335,9 +382,6 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 || !"FOUND".equals(value.get("state")) || value.get("direction") == null
                 || value.get("trendScore") == null)) {
             failures.add("MULTI_TIMEFRAME_CONTRACT_INCOMPLETE");
-        }
-        if (!Boolean.TRUE.equals(input.rulePlan().getSourceGateComplete())) {
-            failures.add("RULE_SOURCE_GATE_INCOMPLETE");
         }
         if (!hasText(input.ruleVersion())) failures.add("RULE_VERSION_MISSING");
         if (!accountRiskInputReady(input.accountRiskSnapshot())) {
@@ -446,6 +490,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         candidate.setCandidateSource("GPT_FINAL");
         candidate.setCandidateStatus("GENERATED");
         candidate.setPayloadJson(ai.getPayloadJson());
+        applyRuleOwnedPlan(candidate, input.rulePlan());
         return candidate;
     }
 
@@ -465,7 +510,54 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         candidate.setCandidateStatus("FALLBACK");
         candidate.setFallbackReason(failure == null ? "GPT_RESULT_MISSING" : failure.getFallbackReason());
         candidate.setPayloadJson(json(candidatePayload(candidate)));
+        applyRuleOwnedPlan(candidate, input.rulePlan());
         return candidate;
+    }
+
+    private static void applyRuleOwnedPlan(ExecutionPlanCandidateDO candidate, ExecutionPlanVO rulePlan) {
+        if (candidate == null || rulePlan == null) return;
+        candidate.setOpportunityType(rulePlan.getOpportunityType());
+        candidate.setEntryLogic(rulePlan.getEntryLogic());
+        candidate.setEntryZone(rulePlan.getEntryZone());
+        candidate.setEntrySource(rulePlan.getEntrySource());
+        candidate.setEntryReason(rulePlan.getEntryReason());
+        candidate.setTriggerCondition(rulePlan.getTriggerCondition());
+        candidate.setStopLogic(rulePlan.getStopLogic());
+        candidate.setStopLoss(rulePlan.getStopLoss());
+        candidate.setStopSource(rulePlan.getStopSource());
+        candidate.setStopReason(rulePlan.getStopReason());
+        candidate.setTargetLogic(rulePlan.getTargetLogic());
+        candidate.setTakeProfitRules(rulePlan.getTakeProfitRules());
+        candidate.setTargetSource(rulePlan.getTargetSource());
+        candidate.setTargetReason(rulePlan.getTargetReason());
+        candidate.setAddPositionCondition(rulePlan.getAddPositionCondition());
+        candidate.setReducePositionCondition(rulePlan.getReducePositionCondition());
+        candidate.setAbandonCondition(rulePlan.getAbandonCondition());
+        if (hasText(rulePlan.getRiskExplanation())) {
+            candidate.setRiskExplanation(rulePlan.getRiskExplanation());
+        }
+        candidate.setInvalidCondition(rulePlan.getInvalidCondition());
+        candidate.setInvalidationSource(rulePlan.getInvalidationSource());
+        candidate.setInvalidationReason(rulePlan.getInvalidationReason());
+        candidate.setLeverageSuggestion(rulePlan.getLeverageLimit());
+        candidate.setPositionSuggestion(rulePlan.getPositionLimit());
+        candidate.setExpectedRiskReward(rulePlan.getExpectedRiskReward());
+        candidate.setExpectedRiskRewardSource(rulePlan.getExpectedRiskRewardSource());
+        candidate.setExpectedRiskRewardReason(rulePlan.getExpectedRiskRewardReason());
+        candidate.setAnalysisTimeframesJson(rulePlan.getAnalysisTimeframesJson());
+        if (hasText(rulePlan.getTriggerTimeframe())) {
+            candidate.setTriggerTimeframe(rulePlan.getTriggerTimeframe());
+        }
+        if (hasText(rulePlan.getHoldingHorizon())) {
+            candidate.setHoldingHorizon(rulePlan.getHoldingHorizon());
+        }
+        if (hasText(rulePlan.getRevalidationRule())) {
+            candidate.setRevalidationRule(rulePlan.getRevalidationRule());
+        }
+        if (hasText(rulePlan.getSourceRefsJson())) {
+            candidate.setSourceRefsJson(rulePlan.getSourceRefsJson());
+        }
+        candidate.setValidity("CURRENT_UNTIL_VALID_UNTIL");
     }
 
     private ExecutionPlanCandidateDO baseCandidate(DecisionChainBuildInput input,
@@ -713,6 +805,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
             value.put("value", item.getScoreValue());
             value.put("weight", item.getWeight());
             value.put("direction", item.getDirection());
+            value.put("description", item.getDescription());
             return value;
         }).toList();
     }
@@ -783,12 +876,41 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         plan.setPlanLifecycleState("CURRENT");
         plan.setPlanVersion(1);
         copyFrozenFinalContract(plan, candidate, conflict);
+        if (PlanModeEnum.OBSERVATION.name().equals(conflict.getPlanModeAfter())) {
+            clearDirectionalParameters(plan);
+        }
         plan.setValidationResultId("validation-" + UUID.randomUUID());
         plan.setValidationReasons(List.of());
         plan.setRiskLimit(input.accountRiskSnapshot() == null
                 ? null : input.accountRiskSnapshot().getMaxAllowedExposure());
         plan.setSourceStatus("VALID");
         return plan;
+    }
+
+    private static void clearDirectionalParameters(ExecutionPlanVO plan) {
+        plan.setEntryZone(null);
+        plan.setStopLoss(null);
+        plan.setTakeProfitRules(null);
+        plan.setEntryLogic(null);
+        plan.setEntrySource(null);
+        plan.setEntryReason(null);
+        plan.setTriggerCondition(null);
+        plan.setStopLogic(null);
+        plan.setStopSource(null);
+        plan.setStopReason(null);
+        plan.setTargetLogic(null);
+        plan.setTargetSource(null);
+        plan.setTargetReason(null);
+        plan.setAddPositionCondition(null);
+        plan.setReducePositionCondition(null);
+        plan.setAbandonCondition(null);
+        plan.setLeverageLimit(null);
+        plan.setPositionLimit(null);
+        plan.setLeverageSuggestion(null);
+        plan.setPositionSuggestion(null);
+        plan.setExpectedRiskReward(null);
+        plan.setExpectedRiskRewardSource(null);
+        plan.setExpectedRiskRewardReason(null);
     }
 
     private ExecutionPlanVO blockedPlan(ExecutionPlanVO rulePlan,
@@ -815,9 +937,48 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         plan.setValidationResultId("validation-" + UUID.randomUUID());
         plan.setValidationReasons(validation.reasons());
         plan.setFinalPlan(false);
+        plan.setPlanMode(PlanModeEnum.BLOCKED.name());
+        plan.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+        plan.setRecommendedAction(null);
+        clearDirectionalParameters(plan);
         plan.setPlanLifecycleState("INVALIDATED");
         plan.setFinalizedAt(null);
         return plan;
+    }
+
+    private static void enforceStatePlanModeContract(AssetStateEnum requestedState,
+                                                     ConflictResolverResultDO conflict) {
+        if (requestedState == null || conflict == null) return;
+        PlanModeEnum mode;
+        try {
+            mode = PlanModeEnum.require(conflict.getPlanModeAfter());
+        } catch (RuntimeException invalidMode) {
+            conflict.setPlanModeAfter(PlanModeEnum.BLOCKED.name());
+            appendDowngradeReason(conflict, "STATE_PLAN_MODE_UNKNOWN_BLOCKED");
+            return;
+        }
+        if (requestedState == AssetStateEnum.CONFUSED) {
+            conflict.setPlanModeAfter(PlanModeEnum.BLOCKED.name());
+            conflict.setConfusedDecision(true);
+            appendDowngradeReason(conflict, "CONFUSED_ONLY_BLOCKED");
+        } else if (requestedState == AssetStateEnum.WAITING_TRIGGER
+                && (mode == PlanModeEnum.CONFIRMATION || mode == PlanModeEnum.REDUCED)) {
+            conflict.setPlanModeAfter(PlanModeEnum.PREPARATION.name());
+            appendDowngradeReason(conflict, "WAITING_TRIGGER_ONLY_PREPARATION");
+        } else if (requestedState == AssetStateEnum.HIGH_RISK
+                && (mode == PlanModeEnum.CONFIRMATION || mode == PlanModeEnum.PREPARATION)) {
+            conflict.setPlanModeAfter(PlanModeEnum.REDUCED.name());
+            appendDowngradeReason(conflict, "HIGH_RISK_CONFIRMATION_FORBIDDEN");
+        } else if (requestedState == AssetStateEnum.INVALIDATED
+                || requestedState == AssetStateEnum.COOLING) {
+            conflict.setPlanModeAfter(PlanModeEnum.BLOCKED.name());
+            appendDowngradeReason(conflict, "STATE_NOT_ELIGIBLE_FOR_NEW_DIRECTION_PLAN");
+        }
+    }
+
+    private static void appendDowngradeReason(ConflictResolverResultDO conflict, String reason) {
+        String current = conflict.getDowngradeReason();
+        conflict.setDowngradeReason(hasText(current) ? current + ";" + reason : reason);
     }
 
     private static void copyFrozenFinalContract(ExecutionPlanVO plan,
@@ -976,14 +1137,25 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         decision.setRiskLevel(conflict.getRiskAfter());
         decision.setAiPlanMode(conflict.getPlanModeAfter());
         decision.setCandidatePlanMode(conflict.getPlanModeBefore());
-        decision.setFinalPlanMode(conflict.getPlanModeAfter());
-        decision.setFinalMarketBias(conflict.getBiasAfter());
+        decision.setFinalPlanMode(validation.passed() ? conflict.getPlanModeAfter() : PlanModeEnum.BLOCKED.name());
+        decision.setFinalMarketBias(validation.passed() ? conflict.getBiasAfter() : null);
         decision.setBiasAdjustmentReason(conflict.getAdjustmentReason());
         decision.setPlanModeAdjustmentReason(conflict.getDowngradeReason());
-        decision.setMarketBiasHierarchy(conflict.getBiasAfter());
+        decision.setMarketBiasHierarchy(validation.passed() ? conflict.getBiasAfter() : "WAIT");
         decision.setAiConflictLevel(conflict.getConflictLevel());
         decision.setAiConflictScore(conflict.getConflictScore());
-        if (!validation.passed()) decision.setIsWorthOpening(false);
+        if (!validation.passed()) {
+            decision.setIsWorthOpening(false);
+            decision.setFinalConfidence(null);
+        } else {
+            int multiTf = decision.isMultiTimeframeAligned() ? 100 : 50;
+            int evidenceCoverage = decision.getEvidenceReliability() == null ? 0 : decision.getEvidenceReliability();
+            org.example.trademodel.service.support.V41DecisionContractPolicy.Metric confidence =
+                    org.example.trademodel.service.support.V41DecisionContractPolicy.finalConfidence(
+                            decision.getDataQualityScore(), multiTf, evidenceCoverage,
+                            evidenceCoverage, conflict.getConflictScore());
+            decision.setFinalConfidence(confidence.value());
+        }
     }
 
     private void applyOpportunityState(DecisionBundleVO decision,
@@ -1017,12 +1189,14 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         roles.put(AiDecisionChainRole.GPT_FINAL, gpt);
         roles.put(AiDecisionChainRole.GEMINI_REVIEW, gemini);
         roles.put(AiDecisionChainRole.GROK_CHALLENGE, grok);
+        boolean finalValidated = decision.getFinalMarketBias() != null;
         AiRoleResultsPayload.SynthesisPayload synthesis = new AiRoleResultsPayload.SynthesisPayload(
-                conflict.getBiasAfter(),
-                conflict.getConfidenceAfter(),
-                conflict.getRiskAfter(),
-                conflict.getPlanModeAfter(),
-                Boolean.TRUE.equals(candidate.getWorthOpening()),
+                decision.getFinalMarketBias(),
+                finalValidated && decision.getFinalConfidence() != null
+                        ? String.valueOf(decision.getFinalConfidence()) : null,
+                finalValidated ? conflict.getRiskAfter() : null,
+                decision.getFinalPlanMode(),
+                finalValidated && Boolean.TRUE.equals(decision.getIsWorthOpening()),
                 conflict.getConflictLevel(),
                 conflict.getConflictScore(),
                 conflict.getConfidenceAfter(),
@@ -1052,6 +1226,11 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         ext.put("conflictLevel", conflict == null ? null : conflict.getConflictLevel());
         ext.put("ruleValidationPassed", validation != null && validation.passed());
         ext.put("dataQuality", input.dataQualityScore());
+        ext.put("validatedMarketBias", input.decision().getValidatedMarketBias());
+        ext.put("directionDataState", input.decision().getDirectionDataState());
+        ext.put("finalConfidence", input.decision().getFinalConfidence());
+        ext.put("opportunityScore", input.decision().getOpportunityScore());
+        ext.put("riskScore", input.decision().getRiskScore());
         assetStateService.recordOpportunityProjection(
                 new OpportunityStateIdentity(input.ownerType(), input.ownerId(), input.assetId(),
                         input.symbol(), input.timeframe()),
@@ -1059,8 +1238,10 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 input.analysisId(),
                 input.traceId(),
                 input.ruleVersion(),
-                opportunityScore(input.scores()),
-                input.decision().getConfidenceLevel(),
+                input.decision().getOpportunityScore() == null
+                        ? opportunityScore(input.scores()) : input.decision().getOpportunityScore(),
+                input.decision().getFinalConfidence() == null
+                        ? input.decision().getConfidenceLevel() : String.valueOf(input.decision().getFinalConfidence()),
                 input.decision().getRiskLevel(),
                 json(ext));
     }
@@ -1192,6 +1373,26 @@ public class DecisionChainServiceImpl implements DecisionChainService {
     private static AssetStateEnum defaultState(AssetStateEnum state, Boolean worthOpening) {
         if (state != null) return state;
         return Boolean.TRUE.equals(worthOpening) ? AssetStateEnum.CANDIDATE : AssetStateEnum.OBSERVING;
+    }
+
+    private static boolean directionalBias(String value) {
+        String normalized = upper(value);
+        return normalized.endsWith("BULLISH") || normalized.endsWith("BEARISH");
+    }
+
+    private static AssetStateEnum resolvedState(AssetStateEnum requestedState, String modeValue) {
+        PlanModeEnum mode;
+        try {
+            mode = PlanModeEnum.require(modeValue);
+        } catch (RuntimeException ignored) {
+            return AssetStateEnum.CANDIDATE;
+        }
+        if (requestedState == AssetStateEnum.HIGH_RISK) return AssetStateEnum.HIGH_RISK;
+        if (mode == PlanModeEnum.PREPARATION) return AssetStateEnum.WAITING_TRIGGER;
+        if (mode == PlanModeEnum.CONFIRMATION || mode == PlanModeEnum.REDUCED) {
+            return AssetStateEnum.TRIGGERED;
+        }
+        return AssetStateEnum.CANDIDATE;
     }
 
     private static String defaultText(String value, String fallback) {

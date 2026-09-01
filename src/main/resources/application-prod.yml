@@ -82,6 +82,8 @@ trade-model:
       enabled: ${TRADE_MODEL_POSITION_SYNC_SCHEDULER_ENABLED:false}
     position-monitor:
       enabled: ${TRADE_MODEL_POSITION_MONITOR_SCHEDULER_ENABLED:false}
+      initial-delay-ms: ${TRADE_MODEL_POSITION_MONITOR_INITIAL_DELAY_MS:15000}
+      fixed-rate-ms: ${TRADE_MODEL_POSITION_MONITOR_FIXED_RATE_MS:30000}
     market-data:
       enabled: ${TRADE_MODEL_MARKET_DATA_SCHEDULER_ENABLED:false}
     ohlcv-ingestion:
@@ -90,14 +92,30 @@ trade-model:
       timeframes: ${TRADE_MODEL_OHLCV_INGESTION_TIMEFRAMES:5m,15m,1h,4h}
       bar-limit: ${TRADE_MODEL_OHLCV_INGESTION_BAR_LIMIT:100}
       max-symbols: ${TRADE_MODEL_OHLCV_INGESTION_MAX_SYMBOLS:6}
+      retry-base-seconds: ${TRADE_MODEL_OHLCV_INGESTION_RETRY_BASE_SECONDS:15}
+      retry-max-seconds: ${TRADE_MODEL_OHLCV_INGESTION_RETRY_MAX_SECONDS:300}
     watchlist:
       enabled: ${TRADE_MODEL_WATCHLIST_SCHEDULER_ENABLED:false}
   analysis:
     scheduler:
       enabled: ${TRADE_MODEL_ANALYSIS_SCHEDULER_ENABLED:false}
+      initial-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_INITIAL_DELAY_MS:60000}
+      fixed-delay-ms: ${TRADE_MODEL_ANALYSIS_SCHEDULER_FIXED_DELAY_MS:60000}
+      timeframes: ${TRADE_MODEL_ANALYSIS_SCHEDULER_TIMEFRAMES:5m,15m,1h,4h}
+      decision-timeframe: ${TRADE_MODEL_ANALYSIS_DECISION_TIMEFRAME:5m}
+      required-market-timeframes: ${TRADE_MODEL_ANALYSIS_REQUIRED_MARKET_TIMEFRAMES:5m,15m,1h,4h}
+      required-closed-bars: ${TRADE_MODEL_ANALYSIS_REQUIRED_CLOSED_BARS:100}
+      observing-interval-seconds: ${TRADE_MODEL_ANALYSIS_OBSERVING_INTERVAL_SECONDS:900}
+      candidate-interval-seconds: ${TRADE_MODEL_ANALYSIS_CANDIDATE_INTERVAL_SECONDS:300}
+      waiting-trigger-interval-seconds: ${TRADE_MODEL_ANALYSIS_WAITING_TRIGGER_INTERVAL_SECONDS:120}
+      triggered-interval-seconds: ${TRADE_MODEL_ANALYSIS_TRIGGERED_INTERVAL_SECONDS:60}
+      high-risk-interval-seconds: ${TRADE_MODEL_ANALYSIS_HIGH_RISK_INTERVAL_SECONDS:60}
+      invalidated-interval-seconds: ${TRADE_MODEL_ANALYSIS_INVALIDATED_INTERVAL_SECONDS:900}
+      cooling-interval-seconds: ${TRADE_MODEL_ANALYSIS_COOLING_INTERVAL_SECONDS:900}
+      confused-interval-seconds: ${TRADE_MODEL_ANALYSIS_CONFUSED_INTERVAL_SECONDS:120}
   ohlcv:
     provider:
-      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:kraken}
+      primary: ${TRADE_MODEL_OHLCV_PRIMARY_PROVIDER:binance}
       fallback: ${TRADE_MODEL_OHLCV_FALLBACK_PROVIDER:kraken}
       fallback-enabled: ${TRADE_MODEL_OHLCV_FALLBACK_ENABLED:false}
     kraken:

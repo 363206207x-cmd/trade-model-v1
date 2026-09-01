@@ -49,6 +49,22 @@ public interface AiCallLogService {
 
     int countProviderAttemptsSince(String providerName, LocalDateTime since);
 
+    default int countDecisionChainAttemptsSince(LocalDateTime since) {
+        return 0;
+    }
+
+    default int countDecisionChainRoleAttempts(String analysisId, String role) {
+        return 0;
+    }
+
+    default long sumDecisionChainTokensSince(LocalDateTime since) {
+        return 0L;
+    }
+
+    default long sumDecisionChainTokensByAnalysisId(String analysisId) {
+        return 0L;
+    }
+
     BigDecimal sumChargeableCostSince(LocalDateTime since);
 
     default BigDecimal sumChargeableCostByAnalysisId(String analysisId) {

@@ -225,19 +225,7 @@ class AiDecisionChainContractTest {
                   "candidateSummary":{
                     "planMode":"PREPARATION","confidence":"MEDIUM","riskLevel":"MEDIUM","worthOpening":false,
                     "opportunityType":"TREND_CONTINUATION","recommendedAction":"WAIT_FOR_MANUAL_CONFIRMATION",
-                    "entryLogic":"verified continuation logic","entryZone":"100-101","entrySource":"source-entry-1",
-                    "entryReason":"verified entry boundary","triggerCondition":"manual confirmation after refresh",
-                    "stopLogic":"rule invalidation boundary","stopZone":"95","stopSource":"source-stop-1",
-                    "stopReason":"structure fails below boundary","targetLogic":"risk reward target structure",
-                    "targetZones":"110 then 120","targetSource":"source-target-1","targetReason":"validated target zones",
-                    "addPositionCondition":"manual review only","reducePositionCondition":"risk increases",
-                    "abandonCondition":"source becomes stale","leverageSuggestion":"1x","positionSuggestion":"small",
-                    "riskExplanation":"bounded manual decision risk","invalidCondition":"close below 95",
-                    "invalidationSource":"source-stop-1","invalidationReason":"verified structure invalidation boundary",
-                    "expectedRiskReward":2.0,"expectedRiskRewardSource":"source-rr-1",
-                    "expectedRiskRewardReason":"entry stop target relation","validity":"until source expiry",
-                    "triggerTimeframe":"5m","holdingHorizon":"intraday",
-                    "revalidationRule":"refresh all verified evidence","summary":"Candidate only, not final"
+                    "riskExplanation":"bounded manual decision risk","summary":"Candidate only, not final"
                   }
                 }
                 """;
