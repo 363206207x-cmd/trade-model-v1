@@ -40,7 +40,110 @@ is_true_flag() {
   [[ "$1" == "true" || "$1" == "YES" ]]
 }
 
+is_full_git_sha() {
+  [[ "${1:-}" =~ ^[0-9a-fA-F]{40}$ ]]
+}
+
+path_is_in_list() {
+  local wanted="$1"
+  local candidate
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" && "$candidate" == "$wanted" ]] && return 0
+  done <<<"${2:-}"
+  return 1
+}
+
+changed_paths_from_starting_sha() {
+  local starting_sha="$1"
+  {
+    git diff --name-only "$starting_sha"..HEAD 2>/dev/null || true
+    git diff --name-only 2>/dev/null || true
+    git diff --cached --name-only 2>/dev/null || true
+    git ls-files --others --exclude-standard 2>/dev/null || true
+  } | awk 'NF && !seen[$0]++'
+}
+
+gate_owner_paths() {
+  printf '%s\n' \
+    docs/CODEX_NEXT_TASK.yml \
+    docs/PRODUCT_SOURCE_OF_TRUTH.md \
+    docs/PROJECT_CURRENT_STATE.md \
+    docs/DELIVERY_PROGRESS_MATRIX.md \
+    docs/ACTIVE_MAINLINE_STATUS.yml \
+    scripts/v1-state.sh \
+    scripts/codex-next-task.sh \
+    scripts/check-workflow-contract.sh
+}
+
+owner_amendment_scope_matches() {
+  local starting_sha="$1"
+  local allowed_paths="$2"
+  local changed_path
+  is_full_git_sha "$starting_sha" || return 1
+  while IFS= read -r changed_path; do
+    [[ -z "$changed_path" ]] && continue
+    path_is_in_list "$changed_path" "$allowed_paths" || return 1
+  done < <(changed_paths_from_starting_sha "$starting_sha")
+}
+
+ordinary_package_preserves_gate_owners() {
+  local gate_path
+  git rev-parse --verify origin/main >/dev/null 2>&1 || return 1
+  while IFS= read -r gate_path; do
+    [[ -z "$gate_path" ]] && continue
+    git diff --quiet origin/main -- "$gate_path" || return 1
+  done < <(gate_owner_paths)
+}
+
+normalization_commit_matches() {
+  local source_parent="$1"
+  local allowed_paths="$2"
+  local expected_extra_count="$3"
+  local candidate="" parent_line="" changed_paths="" changed_count="0"
+  local expected_count="0" path candidate_blob main_blob
+
+  normalized_base_full_sha="UNAVAILABLE"
+  normalization_match="NO"
+  is_full_git_sha "$source_parent" || return 1
+  [[ "$expected_extra_count" == "0" ]] || return 1
+  git cat-file -e "$source_parent^{commit}" >/dev/null 2>&1 || return 1
+  git merge-base --is-ancestor "$source_parent" HEAD >/dev/null 2>&1 || return 1
+  candidate="$(git rev-list --reverse --ancestry-path "$source_parent"..HEAD 2>/dev/null | head -n 1)"
+  is_full_git_sha "$candidate" || return 1
+  parent_line="$(git rev-list --parents -n 1 "$candidate")"
+  [[ "$(awk '{print NF}' <<<"$parent_line")" == "2" ]] || return 1
+  [[ "$(awk '{print $2}' <<<"$parent_line")" == "$source_parent" ]] || return 1
+
+  changed_paths="$(git diff-tree --no-commit-id --name-only -r "$candidate" | awk 'NF' | sort)"
+  changed_count="$(printf '%s\n' "$changed_paths" | awk 'NF {count++} END {print count+0}')"
+  expected_count="$(printf '%s\n' "$allowed_paths" | awk 'NF {count++} END {print count+0}')"
+  [[ "$changed_count" == "$expected_count" ]] || return 1
+  [[ "$expected_count" == "4" ]] || return 1
+  [[ "$changed_paths" == "$(printf '%s\n' "$allowed_paths" | awk 'NF' | sort)" ]] || return 1
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    candidate_blob="$(git rev-parse "$candidate:$path" 2>/dev/null || true)"
+    main_blob="$(git rev-parse "origin/main:$path" 2>/dev/null || true)"
+    [[ -n "$candidate_blob" && "$candidate_blob" == "$main_blob" ]] || return 1
+  done <<<"$allowed_paths"
+
+  normalized_base_full_sha="$candidate"
+  normalization_match="YES"
+  return 0
+}
+
 emit_resolved_task_state() {
+  printf 'MACHINE_AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
+  printf 'MACHINE_AUTHORIZED_BRANCH: %s\n' "${authorized_next_package_branch:-UNDECLARED}"
+  printf 'MACHINE_AUTHORIZED_STARTING_FULL_SHA: %s\n' "${authorized_next_package_starting_full_sha:-UNDECLARED}"
+  printf 'NORMALIZATION_SOURCE_PARENT_SHA: %s\n' "${authorized_next_normalization_source_parent_sha:-UNDECLARED}"
+  printf 'NORMALIZED_BASE_FULL_SHA: %s\n' "${normalized_base_full_sha:-UNAVAILABLE}"
+  printf 'SOURCE_STARTING_SHA_MATCH: %s\n' "${current_starting_sha_match:-NO}"
+  printf 'NORMALIZATION_MATCH: %s\n' "${normalization_match:-NO}"
+  printf 'CURRENT_PACKAGE_MATCH: %s\n' "${current_package_match:-NO}"
+  printf 'CURRENT_BRANCH_MATCH: %s\n' "${current_branch_match:-NO}"
+  printf 'CURRENT_STARTING_SHA_MATCH: %s\n' "${current_starting_sha_match:-NO}"
   printf 'CURRENT_PACKAGE: %s\n' "${current_package_phase:-UNDECLARED}"
   printf 'REQUESTED_PACKAGE: %s\n' "${requested_package:-AUTO}"
   printf 'CURRENT_PACKAGE_ACTION_ALLOWED: %s\n' "${current_package_action_allowed:-NO}"
@@ -88,6 +191,10 @@ emit_resolved_task_state() {
   printf 'V4_1_TELEGRAM_REMEDIATION_IMPLEMENTATION_STATUS: %s\n' "${v4_1_telegram_remediation_implementation_status:-UNDECLARED}"
   printf 'V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS: %s\n' "${v4_1_core_production_loop_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_CORE_PRODUCTION_LOOP_IMPLEMENTATION_STATUS: %s\n' "${v4_1_core_production_loop_implementation_status:-UNDECLARED}"
+  printf 'V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: %s\n' "${v4_1_machine_gate_owner_amendment_runtime_status:-BLOCKED}"
+  printf 'V4_1_BASELINE_RECONCILIATION_GATE_STATUS: %s\n' "${v4_1_baseline_reconciliation_gate_runtime_status:-BLOCKED}"
+  printf 'REAL_DATA_HOME_BLOCKER_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${real_data_home_blocker_closure_authorization_runtime_status:-BLOCKED}"
+  printf 'REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${real_data_home_blocker_closure_implementation_status:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -173,6 +280,9 @@ resolve_task_handoff() {
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_NOT_PENDING"
     elif [[ "${branch:-UNKNOWN}" != "${current_package_branch:-UNDECLARED}" ]]; then
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
+      && "${machine_identity_allowed:-NO}" != "YES" ]]; then
+      current_package_block_reason="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
     elif [[ "${current_package_pr_count:-UNKNOWN}" != "0" \
       && "${current_package_pr_count:-UNKNOWN}" != "1" ]]; then
       current_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE"
@@ -181,7 +291,26 @@ resolve_task_handoff() {
       current_package_block_reason="NONE"
     fi
 
-    if [[ "${completion_effective_state:-UNKNOWN}" != "EFFECTIVE_MERGED_MAIN" ]]; then
+    if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+      if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
+        next_package_block_reason="BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN"
+      elif [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+        next_package_block_reason="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+      elif [[ "${current_package_pr_count:-UNKNOWN}" == "UNKNOWN" ]]; then
+        next_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE"
+      elif [[ "${current_package_pr_count:-0}" != "0" ]]; then
+        next_package_block_reason="BLOCKED_CURRENT_PACKAGE_PR_PRESENT_OR_UNKNOWN"
+      elif [[ "${active_conflicting_pr_count:-UNKNOWN}" == "UNKNOWN" ]]; then
+        next_package_block_reason="BLOCKED_UNKNOWN_ACTIVE_PR_STATE"
+      elif [[ "${active_conflicting_pr_count:-0}" != "0" ]]; then
+        next_package_block_reason="BLOCKED_ACTIVE_CONFLICTING_PR"
+      elif [[ "${next_transition_allowed:-NO}" != "YES" ]]; then
+        next_package_block_reason="${next_task_authorization_status:-BLOCKED_TRANSITION_NOT_AUTHORIZED}"
+      else
+        next_package_allowed="YES"
+        next_package_block_reason="NONE"
+      fi
+    elif [[ "${completion_effective_state:-UNKNOWN}" != "EFFECTIVE_MERGED_MAIN" ]]; then
       next_package_block_reason="${next_task_authorization_status:-BLOCKED_PENDING_P0_MERGED_MAIN}"
     elif [[ "${current_package_pr_count:-UNKNOWN}" == "UNKNOWN" ]]; then
       next_package_block_reason="BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE"
@@ -235,6 +364,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+      resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_REVIEW"
     elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
       resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -262,6 +393,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+        resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
         resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -300,6 +433,8 @@ resolve_task_handoff() {
 
   resolution_status="ALLOWED"
   resolution_block_reason="NONE"
+  current_package_action_allowed="YES"
+  current_package_block_reason="NONE"
   resolved_package="$authorized_next_package_phase"
   resolved_mode="$authorized_next_package_mode"
   resolved_branch="$authorized_next_package_branch"
@@ -323,6 +458,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION"
   elif [[ "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION" ]]; then
     resolved_handoff_stage="FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION"
+  elif [[ "$authorized_next_package_phase" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]]; then
+    resolved_handoff_stage="REAL_DATA_HOME_BLOCKER_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
     resolved_handoff_stage="LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
   elif [[ "$authorized_next_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
@@ -1132,7 +1269,104 @@ evaluate_v4_1_core_production_loop_transition() {
   v4_1_core_production_loop_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
+evaluate_baseline_reconciliation_transition() {
+  effective_task_mode="$current_package_mode"
+  p1a_transition_allowed="YES"
+  p1a_completion_status="PASS"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_INVALID_TRANSITION_CONTRACT"
+  v4_1_target_runtime_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_telegram_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_telegram_remediation_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_core_production_loop_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_machine_gate_owner_amendment_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_baseline_reconciliation_gate_runtime_status="BLOCKED"
+  real_data_home_blocker_closure_authorization_runtime_status="BLOCKED"
+  local_real_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  frontend_interaction_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  multi_user_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]] || return 0
+  [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || return 0
+  [[ "$authorized_next_package_phase" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]] || return 0
+  [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || return 0
+
+  if [[ "$current_package_status" != "COMPLETED" ]]; then
+    next_task_authorization_status="BLOCKED_BASELINE_RECONCILIATION_INCOMPLETE"
+    return 0
+  fi
+  if [[ "$v4_1_machine_gate_owner_amendment_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_baseline_reconciliation_gate_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_BASELINE_RECONCILIATION_NOT_AUTHORIZED"
+    return 0
+  fi
+  if [[ "$real_data_home_blocker_closure_authorization_declared_status" != "PENDING_BASELINE_RECONCILIATION_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_REAL_DATA_HOME_SCOPE_NOT_AUTHORIZED"
+    return 0
+  fi
+  if ! is_full_git_sha "$current_package_starting_full_sha" \
+    || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
+    || [[ "$authorized_next_normalization_source_parent_sha" != "$authorized_next_package_starting_full_sha" ]] \
+    || [[ "$authorized_next_normalization_expected_source" != "MERGED_MAIN" ]] \
+    || [[ "$authorized_next_normalization_extra_file_count" != "0" ]] \
+    || [[ "$authorized_next_normalization_one_time_only" != "true" ]] \
+    || [[ "$(printf '%s\n' "$authorized_next_normalization_allowed_files" | awk 'NF {count++} END {print count+0}')" != "4" ]]; then
+    next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
+    return 0
+  fi
+  if ! is_true_flag "$current_package_repository_edits_allowed" \
+    || ! is_false_flag "$current_package_implementation_allowed" \
+    || ! is_true_flag "$current_package_implementation_pr_allowed" \
+    || ! is_true_flag "$current_package_push_allowed" \
+    || ! is_true_flag "$current_package_merge_allowed" \
+    || ! is_false_flag "$current_package_deployment_allowed"; then
+    next_task_authorization_status="BLOCKED_BASELINE_RECONCILIATION_PERMISSIONS_INVALID"
+    return 0
+  fi
+  if ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
+    || ! is_true_flag "$authorized_next_push_allowed" \
+    || ! is_true_flag "$authorized_next_merge_allowed" \
+    || ! is_false_flag "$authorized_next_deployment_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    next_task_authorization_status="BLOCKED_REAL_DATA_HOME_PERMISSIONS_INCOMPLETE"
+    return 0
+  fi
+  if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
+    next_task_authorization_status="BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN"
+    v4_1_baseline_reconciliation_gate_runtime_status="PENDING_MERGED_MAIN"
+    real_data_home_blocker_closure_authorization_runtime_status="PENDING_BASELINE_RECONCILIATION_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+    next_task_authorization_status="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+    return 0
+  fi
+  if [[ "$product_source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+
+  effective_task_mode="$authorized_next_package_mode"
+  next_transition_allowed="YES"
+  authorization_status="AUTHORIZED"
+  next_task_authorization_status="ALLOWED"
+  v4_1_machine_gate_owner_amendment_runtime_status="EFFECTIVE_MERGED_MAIN"
+  v4_1_baseline_reconciliation_gate_runtime_status="EFFECTIVE_MERGED_MAIN"
+  real_data_home_blocker_closure_authorization_runtime_status="AUTHORIZED"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
+    && "$authorized_next_package_phase" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]]; then
+    evaluate_baseline_reconciliation_transition
+    return 0
+  fi
+
   if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION" ]]; then
     evaluate_v4_1_core_production_loop_transition \
@@ -1496,11 +1730,233 @@ run_product_audit_policy_self_test() {
   return 1
 }
 
+machine_gate_policy_check() {
+  local expected_package="$1" actual_package="$2" expected_branch="$3" actual_branch="$4"
+  local expected_starting_sha="$5" observed_starting_sha="$6" mode="$7"
+  local started_from_exact_origin_main="$8" gate_effective_on_origin_main="$9"
+  local repository_edits_allowed="${10}" implementation_allowed="${11}" pr_allowed="${12}"
+  local push_allowed="${13}" merge_allowed="${14}" deployment_allowed="${15}"
+  local changed_files="${16}" allowed_paths="${17}" ordinary_gate_owners_unchanged="${18}"
+  local normalized_base_valid="${19:-NO}"
+  local changed_path
+
+  [[ -n "$expected_package" && "$actual_package" == "$expected_package" ]] || return 1
+  [[ -n "$expected_branch" && "$actual_branch" == "$expected_branch" ]] || return 1
+  is_full_git_sha "$expected_starting_sha" || return 1
+  is_full_git_sha "$observed_starting_sha" || return 1
+  [[ "$observed_starting_sha" == "$expected_starting_sha" ]] || return 1
+  is_false_flag "$deployment_allowed" || return 1
+
+  if [[ "$mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]]; then
+    [[ "$started_from_exact_origin_main" == "YES" ]] || return 1
+    is_true_flag "$repository_edits_allowed" || return 1
+    is_false_flag "$implementation_allowed" || return 1
+    is_true_flag "$pr_allowed" || return 1
+    is_true_flag "$push_allowed" || return 1
+    is_true_flag "$merge_allowed" || return 1
+    while IFS= read -r changed_path; do
+      [[ -z "$changed_path" ]] && continue
+      path_is_in_list "$changed_path" "$allowed_paths" || return 1
+    done <<<"$changed_files"
+    return 0
+  fi
+
+  [[ "$mode" == "IMPLEMENTATION" ]] || return 1
+  [[ "$gate_effective_on_origin_main" == "YES" ]] || return 1
+  [[ "$ordinary_gate_owners_unchanged" == "YES" ]] || return 1
+  [[ "$normalized_base_valid" == "YES" ]] || return 1
+  is_true_flag "$repository_edits_allowed" || return 1
+  is_true_flag "$implementation_allowed" || return 1
+  is_true_flag "$pr_allowed" || return 1
+  is_true_flag "$push_allowed" || return 1
+  is_true_flag "$merge_allowed" || return 1
+}
+
+evaluate_machine_runtime_identity() {
+  local actual_package expected_package expected_branch expected_starting_sha expected_mode
+  local expected_repository_edits expected_implementation expected_pr expected_push expected_merge expected_deployment
+  local observed_starting_sha="" started_from_exact_origin_main="NO" changed_files=""
+  local gate_owners_unchanged="NO"
+  local normalized_base_valid="NO"
+
+  actual_package="${requested_package:-$current_package_phase}"
+  if [[ "$actual_package" == "$current_package_phase" ]]; then
+    expected_package="$current_package_phase"
+    expected_branch="$current_package_branch"
+    expected_starting_sha="$current_package_starting_full_sha"
+    expected_mode="$current_package_mode"
+    expected_repository_edits="$current_package_repository_edits_allowed"
+    expected_implementation="$current_package_implementation_allowed"
+    expected_pr="$current_package_implementation_pr_allowed"
+    expected_push="$current_package_push_allowed"
+    expected_merge="$current_package_merge_allowed"
+    expected_deployment="$current_package_deployment_allowed"
+  else
+    expected_package="$authorized_next_package_phase"
+    expected_branch="$authorized_next_package_branch"
+    expected_starting_sha="$authorized_next_package_starting_full_sha"
+    expected_mode="$authorized_next_package_mode"
+    expected_repository_edits="$authorized_next_repository_edits_allowed"
+    expected_implementation="$authorized_next_implementation_allowed"
+    expected_pr="$authorized_next_implementation_pr_allowed"
+    expected_push="$authorized_next_push_allowed"
+    expected_merge="$authorized_next_merge_allowed"
+    expected_deployment="$authorized_next_deployment_allowed"
+  fi
+
+  current_package_match="NO"
+  current_branch_match="NO"
+  current_starting_sha_match="NO"
+  machine_identity_allowed="NO"
+  machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+  machine_gate_effective_on_origin_main="NO"
+
+  [[ "$actual_package" == "$expected_package" ]] && current_package_match="YES"
+  [[ "${branch:-}" == "$expected_branch" ]] && current_branch_match="YES"
+  if is_full_git_sha "$expected_starting_sha" \
+    && git cat-file -e "$expected_starting_sha^{commit}" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$expected_starting_sha" HEAD >/dev/null 2>&1; then
+    observed_starting_sha="$expected_starting_sha"
+    current_starting_sha_match="YES"
+  fi
+
+  if [[ "$expected_package" == "$current_package_phase" ]]; then
+    if is_full_git_sha "$current_package_starting_full_sha" \
+      && [[ "${origin_main_sha:-}" == "$current_package_starting_full_sha" ]]; then
+      started_from_exact_origin_main="YES"
+    fi
+    changed_files="$(changed_paths_from_starting_sha "$current_package_starting_full_sha")"
+  else
+    if git show origin/main:docs/CODEX_NEXT_TASK.yml 2>/dev/null \
+      | grep -Fq "current_package_phase: \"$current_package_phase\"" \
+      && git show origin/main:docs/CODEX_NEXT_TASK.yml 2>/dev/null \
+      | grep -Fq "authorized_next_package_starting_full_sha: \"$authorized_next_package_starting_full_sha\"" \
+      && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
+      machine_gate_effective_on_origin_main="YES"
+    fi
+    if ordinary_package_preserves_gate_owners; then
+      gate_owners_unchanged="YES"
+    fi
+    if [[ "$expected_package" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]] \
+      && [[ "$authorized_next_normalization_one_time_only" == "true" ]] \
+      && [[ "$authorized_next_normalization_expected_source" == "MERGED_MAIN" ]] \
+      && normalization_commit_matches \
+        "$authorized_next_normalization_source_parent_sha" \
+        "$authorized_next_normalization_allowed_files" \
+        "$authorized_next_normalization_extra_file_count"; then
+      normalized_base_valid="YES"
+    fi
+  fi
+
+  if machine_gate_policy_check \
+    "$expected_package" "$actual_package" "$expected_branch" "${branch:-}" \
+    "$expected_starting_sha" "$observed_starting_sha" "$expected_mode" \
+    "$started_from_exact_origin_main" "$machine_gate_effective_on_origin_main" \
+    "$expected_repository_edits" "$expected_implementation" "$expected_pr" \
+    "$expected_push" "$expected_merge" "$expected_deployment" \
+    "$changed_files" "$current_package_allowed_paths" "$gate_owners_unchanged" "$normalized_base_valid"; then
+    machine_identity_allowed="YES"
+    machine_identity_block_reason="NONE"
+  fi
+}
+
+run_exact_machine_gate_self_test() {
+  local failed=0
+  local owner_package="TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE"
+  local owner_branch="codex/v4-1-baseline-reconciliation-gate"
+  local owner_sha="08abe1f1040df0d4242a01cc306867ad5d3b4782"
+  local target_package="REAL_DATA_HOME_BLOCKER_CLOSURE"
+  local target_branch="codex/v4-1-real-data-home-blocker-closure"
+  local target_sha="a60eff8d83c0e1d04371bd425267f1e8d0e4f95c"
+  local owner_paths
+  owner_paths="$(
+    gate_owner_paths
+    printf '%s\n' \
+      docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md \
+      docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
+      scripts/product-source-gate.sh
+  )"
+
+  assert_machine_pass() {
+    local name="$1"
+    shift
+    if machine_gate_policy_check "$@"; then
+      printf '%s: PASS\n' "$name"
+    else
+      printf '%s: FAIL\n' "$name"
+      failed=1
+    fi
+  }
+
+  assert_machine_blocked() {
+    local name="$1"
+    shift
+    if machine_gate_policy_check "$@"; then
+      printf '%s: FAIL\n' "$name"
+      failed=1
+    else
+      printf '%s: PASS\n' "$name"
+    fi
+  }
+
+  assert_machine_pass EXACT_GATE_01_CORRECT_TRIPLE \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_02_WRONG_SHA \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "b60eff8d83c0e1d04371bd425267f1e8d0e4f95c" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_03_SHORT_SHA \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" a60eff8d a60eff8d \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_04_MISSING_SHA \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" "" "" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_05_WRONG_BRANCH \
+    "$target_package" "$target_package" "$target_branch" codex/wrong-branch "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_06_WRONG_PACKAGE \
+    "$target_package" WRONG_PACKAGE "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_07_OUT_OF_SCOPE_FILE \
+    "$owner_package" "$owner_package" "$owner_branch" "$owner_branch" "$owner_sha" "$owner_sha" \
+    DOCS_GATE_BASELINE_RECONCILIATION YES NO true false true true true false $'README.md' "$owner_paths" YES NO
+  assert_machine_blocked EXACT_GATE_08_JAVA_SQL_CSS_MIX \
+    "$owner_package" "$owner_package" "$owner_branch" "$owner_branch" "$owner_sha" "$owner_sha" \
+    DOCS_GATE_BASELINE_RECONCILIATION YES NO true false true true true false $'src/main/java/Unsafe.java\nsrc/main/resources/db/migration/V16__unsafe.sql\nsrc/main/resources/static/css/unsafe.css' "$owner_paths" YES NO
+  assert_machine_blocked EXACT_GATE_09_ORDINARY_PACKAGE_GATE_OWNER_MUTATION \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" NO YES
+  assert_machine_blocked EXACT_GATE_10_OWNER_AMENDMENT_NON_MAIN_START \
+    "$owner_package" "$owner_package" "$owner_branch" "$owner_branch" "$owner_sha" "$owner_sha" \
+    DOCS_GATE_BASELINE_RECONCILIATION NO NO true false true true true false docs/CODEX_NEXT_TASK.yml "$owner_paths" YES NO
+  assert_machine_blocked EXACT_GATE_11_OWNER_PERMISSION_MISMATCH \
+    "$owner_package" "$owner_package" "$owner_branch" "$owner_branch" "$owner_sha" "$owner_sha" \
+    DOCS_GATE_BASELINE_RECONCILIATION YES NO true false false false false false docs/CODEX_NEXT_TASK.yml "$owner_paths" YES NO
+  assert_machine_blocked EXACT_GATE_12_BLOCKED_PACKAGE_REGRESSION \
+    "$target_package" FUNDAMENTAL_AI_V4_1_AUTO_TRADING "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES YES
+  assert_machine_blocked EXACT_GATE_13_NORMALIZATION_MISSING \
+    "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
+    IMPLEMENTATION NO YES true true true true true false "" "$owner_paths" YES NO
+
+  if [[ "$failed" -eq 0 ]]; then
+    echo "EXACT_MACHINE_GATE_TESTS: PASS"
+    return 0
+  fi
+  echo "EXACT_MACHINE_GATE_TESTS: BLOCKED"
+  return 1
+}
+
 run_policy_self_test="NO"
+run_exact_gate_self_test="NO"
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --self-test-product-audit-policy)
       run_policy_self_test="YES"
+      shift
+      ;;
+    --self-test-exact-machine-gate)
+      run_exact_gate_self_test="YES"
       shift
       ;;
     --open-pr-none-confirmed)
@@ -1514,7 +1970,7 @@ while [[ "$#" -gt 0 ]]; do
       shift 2
       ;;
     *)
-      echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy] [--open-pr-none-confirmed] [--request-package PACKAGE]" >&2
+      echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy] [--self-test-exact-machine-gate] [--open-pr-none-confirmed] [--request-package PACKAGE]" >&2
       exit 2
       ;;
   esac
@@ -1522,6 +1978,11 @@ done
 
 if [[ "$run_policy_self_test" == "YES" ]]; then
   run_product_audit_policy_self_test
+  exit $?
+fi
+
+if [[ "$run_exact_gate_self_test" == "YES" ]]; then
+  run_exact_machine_gate_self_test
   exit $?
 fi
 
@@ -1570,10 +2031,16 @@ load_task_package_contract() {
   current_package_mode="$(yaml_value "$TASK_FILE" current_package_mode)"
   current_package_status="$(yaml_value "$TASK_FILE" current_package_status)"
   current_package_branch="$(yaml_value "$TASK_FILE" current_package_branch)"
+  current_package_starting_full_sha="$(yaml_value "$TASK_FILE" current_package_starting_full_sha)"
   current_package_risk="$(yaml_value "$TASK_FILE" current_package_risk)"
   current_package_repository_edits_allowed="$(yaml_value "$TASK_FILE" current_package_repository_edits_allowed)"
   current_package_implementation_allowed="$(yaml_value "$TASK_FILE" current_package_implementation_allowed)"
   current_package_implementation_pr_allowed="$(yaml_value "$TASK_FILE" current_package_implementation_pr_allowed)"
+  current_package_push_allowed="$(yaml_value "$TASK_FILE" current_package_push_allowed)"
+  current_package_merge_allowed="$(yaml_value "$TASK_FILE" current_package_merge_allowed)"
+  current_package_deployment_allowed="$(yaml_value "$TASK_FILE" current_package_deployment_allowed)"
+  current_package_requires_clean_origin_main="$(yaml_value "$TASK_FILE" current_package_requires_clean_origin_main)"
+  current_package_allowed_paths="$(yaml_list "$TASK_FILE" current_package_allowed_paths)"
   current_package_next_action="$(yaml_value "$TASK_FILE" current_package_next_action)"
 
   authorized_next_package_phase="$(yaml_value "$TASK_FILE" authorized_next_package_phase)"
@@ -1581,10 +2048,19 @@ load_task_package_contract() {
   authorized_next_package_active_block="$(yaml_value "$TASK_FILE" authorized_next_package_active_block)"
   authorized_next_package_mode="$(yaml_value "$TASK_FILE" authorized_next_package_mode)"
   authorized_next_package_branch="$(yaml_value "$TASK_FILE" authorized_next_package_branch)"
+  authorized_next_package_starting_full_sha="$(yaml_value "$TASK_FILE" authorized_next_package_starting_full_sha)"
+  authorized_next_normalization_source_parent_sha="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_source_parent_sha)"
+  authorized_next_normalization_expected_source="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_expected_source)"
+  authorized_next_normalization_extra_file_count="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_extra_file_count)"
+  authorized_next_normalization_one_time_only="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_one_time_only)"
+  authorized_next_normalization_allowed_files="$(yaml_list "$TASK_FILE" authorized_next_package_normalization_allowed_files)"
   authorized_next_package_risk="$(yaml_value "$TASK_FILE" authorized_next_package_risk)"
   authorized_next_repository_edits_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
   authorized_next_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_allowed)"
   authorized_next_implementation_pr_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
+  authorized_next_push_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_push_allowed)"
+  authorized_next_merge_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_merge_allowed)"
+  authorized_next_deployment_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_deployment_allowed)"
   authorized_next_canonical_figma_desktop_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_desktop_implementation_allowed)"
   authorized_next_mobile_implementation_allowed="$(yaml_value "$TASK_FILE" authorized_next_package_mobile_implementation_allowed)"
   authorized_next_canonical_figma_file_key="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_file_key)"
@@ -1611,6 +2087,10 @@ load_task_package_contract() {
   v4_1_telegram_remediation_implementation_status="$(yaml_value "$TASK_FILE" v4_1_telegram_remediation_implementation_status)"
   v4_1_core_production_loop_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_core_production_loop_authorization_status)"
   v4_1_core_production_loop_implementation_status="$(yaml_value "$TASK_FILE" v4_1_core_production_loop_implementation_status)"
+  v4_1_machine_gate_owner_amendment_declared_status="$(yaml_value "$TASK_FILE" v4_1_machine_gate_owner_amendment_status)"
+  v4_1_baseline_reconciliation_gate_declared_status="$(yaml_value "$TASK_FILE" v4_1_baseline_reconciliation_gate_status)"
+  real_data_home_blocker_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" real_data_home_blocker_closure_authorization_status)"
+  real_data_home_blocker_closure_implementation_status="$(yaml_value "$TASK_FILE" real_data_home_blocker_closure_implementation_status)"
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -1649,6 +2129,12 @@ run_handoff_resolution_simulation() {
   open_pr_evidence_source="GH_QUERY"
   open_pr_none_confirmed="NO"
   open_pr_evidence_input_valid="$provided_evidence_valid"
+  current_package_match="YES"
+  current_branch_match="YES"
+  current_starting_sha_match="YES"
+  machine_identity_allowed="YES"
+  machine_identity_block_reason="NONE"
+  machine_gate_effective_on_origin_main="NO"
 
   case "$scenario" in
     authorization_pending|current_authorization_remediation)
@@ -1661,7 +2147,10 @@ run_handoff_resolution_simulation() {
       requested_package="$authorized_next_package_phase"
       ;;
     predecessor_incomplete)
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+        real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
         v4_1_implementation_status="IN_PROGRESS"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION" ]]; then
         v4_1_telegram_implementation_status="IN_PROGRESS"
@@ -1762,7 +2251,10 @@ run_handoff_resolution_simulation() {
       current_package_pr_draft="NONE"
       open_prs="none"
       requested_package="$authorized_next_package_phase"
-      if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
+      if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+        real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
         v4_1_core_production_loop_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="V4_1_CORE_PRODUCTION_LOOP_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION" ]]; then
@@ -1856,6 +2348,29 @@ run_handoff_resolution_simulation() {
       exit 2
       ;;
   esac
+
+  if [[ -z "$requested_package" && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" ]]; then
+    requested_package="$authorized_next_package_phase"
+  fi
+
+  if [[ "$requested_package" == "$authorized_next_package_phase" \
+    && "$completion_effective_state" == "EFFECTIVE_MERGED_MAIN" \
+    && "$scenario" != "authorization_merged_unsynced" \
+    && "$scenario" != "unknown_state" ]]; then
+    branch="$authorized_next_package_branch"
+    machine_gate_effective_on_origin_main="YES"
+    current_package_match="YES"
+    current_branch_match="YES"
+    current_starting_sha_match="YES"
+    machine_identity_allowed="YES"
+    machine_identity_block_reason="NONE"
+  elif [[ -n "$requested_package" && "$requested_package" != "$current_package_phase" ]]; then
+    current_package_match="NO"
+    current_branch_match="NO"
+    current_starting_sha_match="NO"
+    machine_identity_allowed="NO"
+    machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+  fi
 
   evaluate_runtime_transition
 
@@ -2035,6 +2550,9 @@ v4_1_telegram_remediation_authorization_declared_status="$(yaml_value "$TASK_FIL
 v4_1_telegram_remediation_implementation_status="$(yaml_value "$TASK_FILE" v4_1_telegram_remediation_implementation_status)"
 v4_1_core_production_loop_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_core_production_loop_authorization_status)"
 v4_1_core_production_loop_implementation_status="$(yaml_value "$TASK_FILE" v4_1_core_production_loop_implementation_status)"
+v4_1_machine_gate_owner_amendment_declared_status="$(yaml_value "$TASK_FILE" v4_1_machine_gate_owner_amendment_status)"
+real_data_home_blocker_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" real_data_home_blocker_closure_authorization_status)"
+real_data_home_blocker_closure_implementation_status="$(yaml_value "$TASK_FILE" real_data_home_blocker_closure_implementation_status)"
 local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2235,6 +2753,46 @@ if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTO
     || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
     || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+fi
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
+  if [[ "$current_package_status" != "COMPLETED" \
+    || "$current_package_mode" != "DOCS_GATE_BASELINE_RECONCILIATION" \
+    || "$current_package_branch" != "codex/v4-1-baseline-reconciliation-gate" \
+    || "$current_package_starting_full_sha" != "08abe1f1040df0d4242a01cc306867ad5d3b4782" \
+    || "$authorized_next_package_phase" != "REAL_DATA_HOME_BLOCKER_CLOSURE" \
+    || "$authorized_next_package_mode" != "IMPLEMENTATION" \
+    || "$authorized_next_package_branch" != "codex/v4-1-real-data-home-blocker-closure" \
+    || "$authorized_next_package_starting_full_sha" != "a60eff8d83c0e1d04371bd425267f1e8d0e4f95c" \
+    || "$authorized_next_normalization_source_parent_sha" != "a60eff8d83c0e1d04371bd425267f1e8d0e4f95c" \
+    || "$authorized_next_normalization_expected_source" != "MERGED_MAIN" \
+    || "$authorized_next_normalization_extra_file_count" != "0" \
+    || "$authorized_next_normalization_one_time_only" != "true" \
+    || "$v4_1_core_production_loop_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_machine_gate_owner_amendment_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$v4_1_baseline_reconciliation_gate_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$real_data_home_blocker_closure_authorization_declared_status" != "PENDING_BASELINE_RECONCILIATION_MERGED_MAIN" \
+    || "$real_data_home_blocker_closure_implementation_status" != "NOT_STARTED" \
+    || "$p1b_scope" != "REAL_DATA_HOME_BLOCKER_CLOSURE_ONLY" ]]; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  elif ! is_true_flag "$current_package_repository_edits_allowed" \
+    || ! is_false_flag "$current_package_implementation_allowed" \
+    || ! is_true_flag "$current_package_implementation_pr_allowed" \
+    || ! is_true_flag "$current_package_push_allowed" \
+    || ! is_true_flag "$current_package_merge_allowed" \
+    || ! is_false_flag "$current_package_deployment_allowed" \
+    || ! is_true_flag "$authorized_next_repository_edits_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_allowed" \
+    || ! is_true_flag "$authorized_next_implementation_pr_allowed" \
+    || ! is_true_flag "$authorized_next_push_allowed" \
+    || ! is_true_flag "$authorized_next_merge_allowed" \
+    || ! is_false_flag "$authorized_next_deployment_allowed" \
+    || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
+    || ! is_full_git_sha "$current_package_starting_full_sha" \
+    || ! is_full_git_sha "$authorized_next_package_starting_full_sha"; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
@@ -2523,6 +3081,7 @@ else
   p0_merged_main_validation_status="BLOCKED"
 fi
 
+evaluate_machine_runtime_identity
 evaluate_runtime_transition
 
 evaluate_product_audit_policy \

@@ -8,13 +8,43 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC Core Production Loop Automation Authorization
-Product Phase Status: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact core production-loop automation permission; no application implementation is included here
-Next Business Phase: FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after Owner-approved merge and clean/synced-main validation
+Product Phase: TRINE LOGIC v4.1 Baseline Reconciliation Gate
+Product Phase Status: BASELINE_RECONCILIATION_PENDING_MERGED_MAIN
+Current Work Package: Reconcile the four exact a60/main product-gate files and register a one-time normalized successor; no B01-B04 implementation is included
+Next Business Phase: REAL_DATA_HOME_BLOCKER_CLOSURE
+Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after reconciliation is effective on merged main and its direct-child normalization proves all four files
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Baseline Reconciliation Gate
+
+Owner explicitly authorized one clean-main `DOCS_GATE_BASELINE_RECONCILIATION`
+to retain the confirmed a60 product decisions and current main fail-closed
+machine mechanics without restoring either side wholesale. This branch starts
+from exact `origin/main`
+`08abe1f1040df0d4242a01cc306867ad5d3b4782` and contains no B01-B04 runtime
+implementation.
+
+The successor remains exact package
+`REAL_DATA_HOME_BLOCKER_CLOSURE`, branch
+`codex/v4-1-real-data-home-blocker-closure`, and source parent
+`a60eff8d83c0e1d04371bd425267f1e8d0e4f95c`. Its first direct child must change
+exactly the four declared normalization files, no fifth path, and every result
+must match the reconciled merged main byte-for-byte. The gate derives and
+reports that normalized SHA; another package, branch, parent or second
+normalization attempt fails closed.
+
+The reconciliation copies Owner-final calculation/DQ/direction/Plan/Home/
+Message facts into the sole canonical v4.1 Product Source. It preserves main's
+exact-SHA, recursive gate-owner and ordinary-package protections. The legacy
+candidate-only reconciliation registration is not retained as a second source.
+
+B01 direction/state and persistence classification, B02 Home provenance, B03
+card overflow and B04 favicon remain open until the successor. Capability
+movement here is `NONE`: no Java, API, Schema, provider, UI, Figma, Mobile,
+Telegram, deployment or automatic-trading behavior changes.
 
 ---
 
@@ -24,7 +54,7 @@ PR #1201 is closed without merge and its remote branch/commits remain
 preserved at Head `b158b7a89a4fdb9bd2254a210ecd258e26032161` for successor audit evidence.
 It is not effective merged code and is not copied into this authorization.
 
-This docs/gate-only package registers exactly
+Merged main registers exactly
 `FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION`. It freezes the bounded
 runtime contract: Asset Pool is the sole continuous opportunity source;
 observing/candidate/waiting-triggered/triggered use 15m/5m/2m/lightweight-1m
@@ -36,15 +66,15 @@ automatic mutation.
 The successor must reuse existing Analysis, Opportunity, Final, UserPosition,
 PositionMonitor, Review, Message and ChannelDelivery owners. It may audit and
 integrate compatible #1201 behavior into the existing Telegram pipeline, but
-may not create a parallel stack. Three in-app Message categories and the two
-Owner-first-release Telegram categories remain unchanged; one user + planId +
-CONFIRMATION has at most one lifetime Telegram Delivery.
+may not create a parallel stack. The Owner-final canonical contract retains
+three fact-owned Telegram eligibility categories with stable-subject
+idempotency; it does not authorize automatic position scheduling or trading.
 
-Repository scheduler and Telegram defaults stay off. This package makes no
+Repository scheduler and Telegram defaults stay off. That authorization made no
 Java, API, Schema, runtime-config, Figma or Mobile change; accesses no secret;
 runs no provider or scheduler; sends no message; performs no deployment; and
-adds no trading capability. Capability movement is `NONE` until the separate
-implementation is reviewed, merged and accepted.
+adds no trading capability. Its authorization is effective, while the
+preserved implementation candidate remains unmerged and is not accepted.
 
 ---
 

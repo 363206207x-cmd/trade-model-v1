@@ -108,8 +108,12 @@ validate_contract_task() {
 
   local matrix_phase="P0-0"
   local matrix_status task_phase task_allowed current_phase current_status effective compat state_text
-  local current_package_phase current_package_mode current_package_status authorized_next_phase authorized_next_mode
+  local current_package_phase current_package_mode current_package_status current_package_branch current_package_starting_full_sha
+  local current_package_edits current_package_implementation current_package_pr current_package_push current_package_merge current_package_deployment
+  local authorized_next_phase authorized_next_mode authorized_next_starting_full_sha
   local authorized_next_edits authorized_next_implementation authorized_next_pr blocked_package blocked_status
+  local authorized_next_push authorized_next_merge authorized_next_deployment
+  local normalization_source_parent normalization_expected_source normalization_extra_count normalization_one_time normalization_files
   local p1b_1_status p1b_authorization_status home_core_data_status home_core_data_implementation_status p1b_scope
   local product_p1b_status product_p2_status p2_authorization_status p2_implementation_status
   local product_v4_1_authorization v4_1_design_status v4_1_authorization_status v4_1_implementation_status
@@ -129,11 +133,28 @@ validate_contract_task() {
   current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
   current_package_mode="$(yaml_value "$TASK_FILE" current_package_mode)"
   current_package_status="$(yaml_value "$TASK_FILE" current_package_status)"
+  current_package_branch="$(yaml_value "$TASK_FILE" current_package_branch)"
+  current_package_starting_full_sha="$(yaml_value "$TASK_FILE" current_package_starting_full_sha)"
+  current_package_edits="$(yaml_value "$TASK_FILE" current_package_repository_edits_allowed)"
+  current_package_implementation="$(yaml_value "$TASK_FILE" current_package_implementation_allowed)"
+  current_package_pr="$(yaml_value "$TASK_FILE" current_package_implementation_pr_allowed)"
+  current_package_push="$(yaml_value "$TASK_FILE" current_package_push_allowed)"
+  current_package_merge="$(yaml_value "$TASK_FILE" current_package_merge_allowed)"
+  current_package_deployment="$(yaml_value "$TASK_FILE" current_package_deployment_allowed)"
   authorized_next_phase="$(yaml_value "$TASK_FILE" authorized_next_package_phase)"
   authorized_next_mode="$(yaml_value "$TASK_FILE" authorized_next_package_mode)"
+  authorized_next_starting_full_sha="$(yaml_value "$TASK_FILE" authorized_next_package_starting_full_sha)"
   authorized_next_edits="$(yaml_value "$TASK_FILE" authorized_next_package_repository_edits_allowed)"
   authorized_next_implementation="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_allowed)"
   authorized_next_pr="$(yaml_value "$TASK_FILE" authorized_next_package_implementation_pr_allowed)"
+  authorized_next_push="$(yaml_value "$TASK_FILE" authorized_next_package_push_allowed)"
+  authorized_next_merge="$(yaml_value "$TASK_FILE" authorized_next_package_merge_allowed)"
+  authorized_next_deployment="$(yaml_value "$TASK_FILE" authorized_next_package_deployment_allowed)"
+  normalization_source_parent="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_source_parent_sha)"
+  normalization_expected_source="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_expected_source)"
+  normalization_extra_count="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_extra_file_count)"
+  normalization_one_time="$(yaml_value "$TASK_FILE" authorized_next_package_normalization_one_time_only)"
+  normalization_files="$(yaml_list "$TASK_FILE" authorized_next_package_normalization_allowed_files)"
   authorized_next_canonical_figma="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_desktop_implementation_allowed)"
   authorized_next_mobile="$(yaml_value "$TASK_FILE" authorized_next_package_mobile_implementation_allowed)"
   authorized_next_canonical_figma_key="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_file_key)"
@@ -174,12 +195,26 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED core production-loop authorization declaration mismatch" >&2; failed=1; }
-  [[ "$current_package_mode" == "BOUNDED_PRODUCT_DECISION_AND_AUTHORIZATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED baseline reconciliation declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || { echo "TASK_VALIDATION_FAILED current baseline reconciliation mode mismatch" >&2; failed=1; }
+  [[ "$current_package_branch" == "codex/v4-1-baseline-reconciliation-gate" ]] || { echo "TASK_VALIDATION_FAILED baseline reconciliation branch mismatch" >&2; failed=1; }
+  [[ "$current_package_starting_full_sha" == "08abe1f1040df0d4242a01cc306867ad5d3b4782" ]] || { echo "TASK_VALIDATION_FAILED baseline reconciliation starting SHA mismatch" >&2; failed=1; }
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || { echo "TASK_VALIDATION_FAILED baseline reconciliation permissions mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized core production-loop package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "REAL_DATA_HOME_BLOCKER_CLOSURE" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized real-data Home blocker package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "TASK_VALIDATION_FAILED authorized starting SHA must be full length" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded core production-loop permissions are incomplete" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded B01-B04 permissions are incomplete" >&2; failed=1; }
+  [[ "$normalization_source_parent" == "a60eff8d83c0e1d04371bd425267f1e8d0e4f95c" && "$normalization_source_parent" == "$authorized_next_starting_full_sha" ]] || { echo "TASK_VALIDATION_FAILED normalization source parent mismatch" >&2; failed=1; }
+  [[ "$normalization_expected_source" == "MERGED_MAIN" && "$normalization_extra_count" == "0" && "$normalization_one_time" == "true" ]] || { echo "TASK_VALIDATION_FAILED normalization contract mismatch" >&2; failed=1; }
+  [[ "$(printf '%s\n' "$normalization_files" | sed '/^$/d' | wc -l | tr -d ' ')" == "4" ]] || { echo "TASK_VALIDATION_FAILED normalization must contain exactly four files" >&2; failed=1; }
+  for normalization_file in \
+    docs/PRODUCT_SOURCE_OF_TRUTH.md \
+    docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md \
+    docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
+    scripts/product-source-gate.sh; do
+    printf '%s\n' "$normalization_files" | grep -Fxq "$normalization_file" || { echo "TASK_VALIDATION_FAILED normalization file missing: $normalization_file" >&2; failed=1; }
+  done
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
   [[ "$p1b_1_status" == "EFFECTIVE_MERGED_MAIN" ]] || { echo "TASK_VALIDATION_FAILED P1B-1 predecessor is not effective" >&2; failed=1; }
   [[ "$p1b_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_status" == "EFFECTIVE_MERGED_MAIN" && "$home_core_data_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED Product P1B predecessor boundary mismatch" >&2; failed=1; }
@@ -188,7 +223,7 @@ validate_contract_task() {
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
   [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
-  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_ONLY" ]] || { echo "TASK_VALIDATION_FAILED core production-loop authorization boundary mismatch" >&2; failed=1; }
+  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "REAL_DATA_HOME_BLOCKER_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED baseline reconciliation predecessor boundary mismatch" >&2; failed=1; }
   [[ -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED core production-loop authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
@@ -260,6 +295,16 @@ active_conflicting_prs="$(state_value "$state_text" ACTIVE_CONFLICTING_PRS)"
 request_class="$(state_value "$state_text" REQUEST_CLASS)"
 current_package="$(state_value "$state_text" CURRENT_PACKAGE)"
 requested_package_output="$(state_value "$state_text" REQUESTED_PACKAGE)"
+machine_authorized_package="$(state_value "$state_text" MACHINE_AUTHORIZED_PACKAGE)"
+machine_authorized_branch="$(state_value "$state_text" MACHINE_AUTHORIZED_BRANCH)"
+machine_authorized_starting_full_sha="$(state_value "$state_text" MACHINE_AUTHORIZED_STARTING_FULL_SHA)"
+normalization_source_parent_sha="$(state_value "$state_text" NORMALIZATION_SOURCE_PARENT_SHA)"
+normalized_base_full_sha="$(state_value "$state_text" NORMALIZED_BASE_FULL_SHA)"
+source_starting_sha_match="$(state_value "$state_text" SOURCE_STARTING_SHA_MATCH)"
+normalization_match="$(state_value "$state_text" NORMALIZATION_MATCH)"
+current_package_match="$(state_value "$state_text" CURRENT_PACKAGE_MATCH)"
+current_branch_match="$(state_value "$state_text" CURRENT_BRANCH_MATCH)"
+current_starting_sha_match="$(state_value "$state_text" CURRENT_STARTING_SHA_MATCH)"
 authorization_status="$(state_value "$state_text" AUTHORIZATION_STATUS)"
 p1a_completion_status="$(state_value "$state_text" P1A_COMPLETION_STATUS)"
 p1b_authorization_runtime_status="$(state_value "$state_text" P1B_AUTHORIZATION_RUNTIME_STATUS)"
@@ -281,6 +326,10 @@ v4_1_telegram_remediation_authorization_runtime_status="$(state_value "$state_te
 v4_1_telegram_remediation_implementation_runtime_status="$(state_value "$state_text" V4_1_TELEGRAM_REMEDIATION_IMPLEMENTATION_STATUS)"
 v4_1_core_production_loop_authorization_runtime_status="$(state_value "$state_text" V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS)"
 v4_1_core_production_loop_implementation_runtime_status="$(state_value "$state_text" V4_1_CORE_PRODUCTION_LOOP_IMPLEMENTATION_STATUS)"
+v4_1_machine_gate_owner_amendment_runtime_status="$(state_value "$state_text" V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS)"
+v4_1_baseline_reconciliation_gate_runtime_status="$(state_value "$state_text" V4_1_BASELINE_RECONCILIATION_GATE_STATUS)"
+real_data_home_blocker_closure_authorization_runtime_status="$(state_value "$state_text" REAL_DATA_HOME_BLOCKER_CLOSURE_AUTHORIZATION_STATUS)"
+real_data_home_blocker_closure_implementation_runtime_status="$(state_value "$state_text" REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS)"
 local_real_authorization_runtime_status="$(state_value "$state_text" LOCAL_REAL_AUTHORIZATION_STATUS)"
 local_real_implementation_runtime_status="$(state_value "$state_text" LOCAL_REAL_IMPLEMENTATION_STATUS)"
 frontend_interaction_authorization_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_AUTHORIZATION_STATUS)"
@@ -339,7 +388,11 @@ case "$resolved_scope_profile" in
       IMPLEMENTATION)
         [[ "$resolved_edit_permission" == "true" ]] || { echo "STOP: implementation resolved without repository edit permission." >&2; exit 1; }
         [[ "$resolved_implementation_permission" == "true" ]] || { echo "STOP: implementation resolved without implementation permission." >&2; exit 1; }
-        [[ "$resolved_pr_creation_permission" == "true" ]] || { echo "STOP: implementation resolved without PR creation permission." >&2; exit 1; }
+        if [[ "$resolved_package" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]]; then
+          [[ "$resolved_pr_creation_permission" == "true" ]] || { echo "STOP: one-pass B01-B04 package resolved without PR creation permission." >&2; exit 1; }
+        else
+          [[ "$resolved_pr_creation_permission" == "true" ]] || { echo "STOP: implementation resolved without PR creation permission." >&2; exit 1; }
+        fi
         if [[ "$resolved_package" == "FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_IMPLEMENTATION" ]]; then
           [[ "$canonical_figma_desktop_implementation_allowed" == "true" ]] || { echo "STOP: exact v4.1 package resolved without Canonical Figma Desktop permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: exact v4.1 package resolved with forbidden Mobile permission." >&2; exit 1; }
@@ -356,6 +409,10 @@ case "$resolved_scope_profile" in
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: core production-loop automation resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: core production-loop automation resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: core production-loop automation resolved a forbidden Figma file." >&2; exit 1; }
+        elif [[ "$resolved_package" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]]; then
+          [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Figma permission." >&2; exit 1; }
+          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Mobile permission." >&2; exit 1; }
+          [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: B01-B04 remediation resolved a forbidden Figma file." >&2; exit 1; }
         elif [[ "$resolved_package" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Mobile permission." >&2; exit 1; }
@@ -389,6 +446,16 @@ RESOLVED_FROM_STATE: YES
 RESOLUTION_STATUS: ALLOWED
 CURRENT_PACKAGE: $current_package
 REQUESTED_PACKAGE: $requested_package_output
+MACHINE_AUTHORIZED_PACKAGE: $machine_authorized_package
+MACHINE_AUTHORIZED_BRANCH: $machine_authorized_branch
+MACHINE_AUTHORIZED_STARTING_FULL_SHA: $machine_authorized_starting_full_sha
+NORMALIZATION_SOURCE_PARENT_SHA: $normalization_source_parent_sha
+NORMALIZED_BASE_FULL_SHA: $normalized_base_full_sha
+SOURCE_STARTING_SHA_MATCH: $source_starting_sha_match
+NORMALIZATION_MATCH: $normalization_match
+CURRENT_PACKAGE_MATCH: $current_package_match
+CURRENT_BRANCH_MATCH: $current_branch_match
+CURRENT_STARTING_SHA_MATCH: $current_starting_sha_match
 P1A_COMPLETION_STATUS: $p1a_completion_status
 AUTHORIZATION_STATUS: $authorization_status
 P1B_AUTHORIZATION_RUNTIME_STATUS: $p1b_authorization_runtime_status
@@ -413,6 +480,10 @@ V4_1_TELEGRAM_REMEDIATION_AUTHORIZATION_STATUS: $v4_1_telegram_remediation_autho
 V4_1_TELEGRAM_REMEDIATION_IMPLEMENTATION_STATUS: $v4_1_telegram_remediation_implementation_runtime_status
 V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS: $v4_1_core_production_loop_authorization_runtime_status
 V4_1_CORE_PRODUCTION_LOOP_IMPLEMENTATION_STATUS: $v4_1_core_production_loop_implementation_runtime_status
+V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: $v4_1_machine_gate_owner_amendment_runtime_status
+V4_1_BASELINE_RECONCILIATION_GATE_STATUS: $v4_1_baseline_reconciliation_gate_runtime_status
+REAL_DATA_HOME_BLOCKER_CLOSURE_AUTHORIZATION_STATUS: $real_data_home_blocker_closure_authorization_runtime_status
+REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS: $real_data_home_blocker_closure_implementation_runtime_status
 LOCAL_REAL_AUTHORIZATION_STATUS: $local_real_authorization_runtime_status
 LOCAL_REAL_IMPLEMENTATION_STATUS: $local_real_implementation_runtime_status
 FRONTEND_INTERACTION_AUTHORIZATION_STATUS: $frontend_interaction_authorization_runtime_status
