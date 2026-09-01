@@ -210,7 +210,8 @@ implementation_allowed_files=(
   src/main/resources/application-prod.yml
   src/main/resources/application-local-real.yml
   src/main/resources/application.yml
-  src/main/resources/db/migration/V15__v4_1_machine_executable_decision_contract.sql
+  src/main/resources/db/migration/V15__private_multi_user_account_registration.sql
+  src/main/resources/db/migration/V16__v4_1_machine_executable_decision_contract.sql
   src/main/resources/schema.sql
   src/main/resources/static/js/analysis-detail.js
   src/main/resources/static/js/home-runtime.js
@@ -262,7 +263,7 @@ implementation_allowed_files=(
   src/test/java/org/example/trademodel/service/impl/ScoreServiceImplTest.java
   src/test/java/org/example/trademodel/stress/V1BusinessStressTest.java
   src/test/java/org/example/trademodel/stress/V1HistoricalReplayValidationTest.java
-  src/test/java/org/example/trademodel/postgresql/V15DecisionContractMigrationContractTest.java
+  src/test/java/org/example/trademodel/postgresql/V16DecisionContractMigrationContractTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
   src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java

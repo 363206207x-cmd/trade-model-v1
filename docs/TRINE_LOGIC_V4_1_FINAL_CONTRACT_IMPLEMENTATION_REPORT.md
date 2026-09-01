@@ -77,9 +77,14 @@ evidence.
 Standard-JAR startup also exposed an H2 portability defect: H2 requires a
 declared unique table constraint for the composite UserPosition ownership
 foreign key, while the separate unique index was sufficient for PostgreSQL.
-`schema.sql` now declares `UNIQUE (id, user_id)` inside `tm_user_position`;
-the PostgreSQL V9/V15 history is unchanged. The V15 migration contract test
-asserts both the unique ownership key and the review ownership foreign key.
+`schema.sql` now declares `UNIQUE (id, user_id)` inside `tm_user_position`.
+Previously executed PostgreSQL V1-V15 histories are not modified. The existing
+V15 private-account migration is preserved byte-for-byte at SHA-256
+`eed2850e4e40aa32e53ec92fd4a5dd2a973916c32cba8040e76438221b428218`,
+matching the migration already recorded by private Staging. The decision
+contract therefore uses V16 and cannot reuse the occupied version. The V16
+migration contract test pins that V15 compatibility checksum and asserts both
+the unique ownership key and the review ownership foreign key.
 
 ## Validation
 

@@ -5,19 +5,27 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("core-regression")
-class V15DecisionContractMigrationContractTest {
+class V16DecisionContractMigrationContractTest {
+    private static final Path COMPATIBILITY_V15 = Path.of(
+            "src/main/resources/db/migration/V15__private_multi_user_account_registration.sql");
     private static final Path MIGRATION = Path.of(
-            "src/main/resources/db/migration/V15__v4_1_machine_executable_decision_contract.sql");
+            "src/main/resources/db/migration/V16__v4_1_machine_executable_decision_contract.sql");
 
     @Test
-    void v15AddsMachineExecutableDecisionFieldsWithoutRecreatingOwnedObjects() throws Exception {
+    void v16AddsMachineExecutableDecisionFieldsWithoutRecreatingOwnedObjects() throws Exception {
         String sql = Files.readString(MIGRATION);
 
+        assertThat(MIGRATION).exists();
+        assertThat(Path.of(
+                "src/main/resources/db/migration/V15__v4_1_machine_executable_decision_contract.sql"))
+                .doesNotExist();
         assertThat(sql).contains(
                 "ALTER TABLE tm_decision_result",
                 "validated_market_bias VARCHAR(32)",
@@ -68,5 +76,15 @@ class V15DecisionContractMigrationContractTest {
                 "leverage_suggestion IS NULL",
                 "'NOT_APPLICABLE'")
                 .doesNotContain("CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_id_user");
+    }
+
+    @Test
+    void v15CompatibilityMigrationMatchesTheAlreadyAppliedStagingHistory() throws Exception {
+        assertThat(COMPATIBILITY_V15).exists();
+        byte[] content = Files.readAllBytes(COMPATIBILITY_V15);
+        String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+
+        assertThat(sha256).isEqualTo(
+                "eed2850e4e40aa32e53ec92fd4a5dd2a973916c32cba8040e76438221b428218");
     }
 }
