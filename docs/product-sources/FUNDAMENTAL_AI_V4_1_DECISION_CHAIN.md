@@ -151,27 +151,120 @@ The eight scores are trend structure, capital momentum, leverage risk,
 liquidity quality, sentiment temperature, event impact, macro environment and
 overall confidence.
 
-`data_quality_score` is 0-100:
+`data_quality_score` is 0-100 and has one versioned calculation owner:
 
-- `85-100`: the data gate passes and the complete decision chain is allowed;
-  this never guarantees an Opportunity or plan;
-- `70-84`: confidence is downgraded at least once; Opportunity, Evidence,
-  Conflict, Risk and Rule Validation determine Plan Mode;
-- `<70`: `CONFIRMATION` is forbidden, but the complete chain may produce
-  `PREPARATION`, `REDUCED`, `OBSERVATION` or `BLOCKED`. `REDUCED` is legal only
-  when its key source and safety gates are complete; low quality is not a
-  mechanical global pause;
-- `STALE` or `SOURCE_UNAVAILABLE`: the response names affected sources and
-  modules plus the exact revalidation condition.
+`DQ = Completeness*0.30 + Freshness*0.25 + ProviderHealth*0.20 +
+CrossSourceConsistency*0.15 + SampleAdequacy*0.10`.
 
-Three AI is normally called only at quality >=85 plus material change, except
-the fail-closed/degraded paths explicitly permitted above. All thresholds are
-configuration. Missing configuration fails closed.
+- `85-100`: the data gate permits the complete decision chain; this never
+  guarantees an Opportunity or plan;
+- `70-84`: validated direction may exist, but `CONFIRMATION` is forbidden;
+  Opportunity, Evidence, Conflict, Risk and Rule Validation determine whether
+  the result is `PREPARATION`, `REDUCED`, `OBSERVATION` or `BLOCKED`;
+- `<70`: no validated direction is produced and no directional Final is
+  allowed;
+- mandatory stale data caps DQ at 69; mandatory unavailable data fails closed;
+- optional unavailable data affects only the declared scores and permissions;
+- `STALE` or `SOURCE_UNAVAILABLE` names the affected sources/modules and the
+  exact revalidation condition.
+
+Three AI is called only when the configured DQ and checkpoint gates permit it.
+DQ failure produces zero role calls. A rule fallback may preserve a fail-closed
+non-directional result, but it cannot impersonate AI success or create a
+directional Final. Missing configuration fails closed.
 
 Timeframe responsibilities are separate: 4h direction, 1h structure, 15m
 trigger, 5m microstructure/liquidity filter. Weights and convergence threshold
 are configuration; the accepted baseline is 40/30/20/10 and difference <=15%
 with at least three aligned timeframes.
+
+### 4.1 Owner-final executable calculation contract
+
+The final versioned machine contract is:
+
+| Contract | Version |
+|---|---|
+| calculation DAG | `V41-DAG-2026-08-31` |
+| normalization | `V41-NORM-WREP-1` |
+| direction engine | `V41-DIRECTION-4H1H-1` |
+| eight-score engine | `V41-SCORE-1` |
+| data quality | `V41-DQ-1` |
+| provider matrix | `V41-PROVIDER-MATRIX-1` |
+| plan source gate | `V41-PLAN-SOURCE-1` |
+| Home ranking | `V41-HOME-RANK-1` |
+| Telegram eligibility | `V41-TELEGRAM-3C-1` |
+
+The only legal calculation order is:
+
+`Provider/raw -> DQ -> eight scores -> 4h/1h structural score ->
+ruleMarketBias -> EvidenceReliability -> OpportunityScore -> RiskScore ->
+validatedMarketBias -> Candidate -> deterministic plan boundaries -> GPT ->
+Gemini -> Grok -> Conflict Resolver -> Rule Validation -> FinalConfidence ->
+finalMarketBias -> Final/BLOCKED -> Home ranking -> Message/Telegram`.
+
+`OpportunityScore` never consumes `FinalConfidence`. One production normalizer
+owns all score inputs: Winsorized Rolling Empirical Percentile over 200 closed
+samples, minimum 60, winsor bounds 2.5/97.5, output 0..100, isolated by provider,
+venue, asset and timeframe. Missing samples return
+`null/INSUFFICIENT_SAMPLE`; a synthetic neutral 50 is forbidden.
+
+The 4h/1h structural score is `normalized4h*0.57 + normalized1h*0.43`.
+Thresholds are +70/+35/+15 and -15/-35/-70; -14..14 is `RANGE`. `WAIT`
+is a data/conflict state rather than a numeric band. Direction has three
+separate maturity fields: internal eight-state `ruleMarketBias`, six-state
+`validatedMarketBias` only after DQ/source/structure/non-confused gates, and
+`finalMarketBias` only after Candidate, all three role calls, Resolver and Rule
+Validation. RANGE, WAIT and missing validated direction cannot start a
+directional plan.
+
+The eight score owners are TrendStructure, CapitalFlow, LeverageRisk,
+LiquidityQuality, SentimentTemperature, EventImpact, MacroEnvironment and
+EvidenceReliability. LLM output cannot create or replace them. The formulas are:
+
+`OpportunityScore = TrendStructure*0.30 + CapitalFlow*0.20 +
+LiquidityQuality*0.15 + SentimentAlignment*0.10 + EventAlignment*0.10 +
+MacroAlignment*0.05 + EvidenceReliability*0.10 - LeverageRiskPenalty -
+ConflictPenalty - StalePenalty`.
+
+`RiskScore = LeverageRisk*0.35 + LiquidityRisk*0.25 + EventRisk*0.20 +
+ConflictAndExecutionRisk*0.20`.
+
+`FinalConfidence = DQ*0.35 + MultiTimeframeConsistency*0.30 +
+EvidenceCoverage*0.20 + CrossSourceConsistency*0.15 - ConflictPenalty`, and is
+calculated only after Rule Validation.
+
+Legal opportunity-state results are exact: observing has no directional Final;
+candidate is plan generation in progress without user-visible Final parameters;
+waiting_trigger permits `PREPARATION` only; triggered permits
+`CONFIRMATION/REDUCED/PREPARATION/OBSERVATION/BLOCKED`; high_risk permits
+`REDUCED/OBSERVATION/BLOCKED`; confused permits `BLOCKED` only; invalidated has
+no active plan; cooling permits no new directional plan. In particular,
+`waiting_trigger + REDUCED` and `high_risk + CONFIRMATION` are illegal.
+
+The existing FinalExecutionPlan remains the only Final owner.
+`CONFIRMATION/REDUCED` require complete sourced execution parameters;
+`PREPARATION` requires complete trigger, invalidation and conditional
+parameters; `OBSERVATION/BLOCKED` keep directional execution parameters null.
+Only `CONFIRMATION/REDUCED` may offer manual position recording. No Final
+creates a UserPosition.
+
+Tier 1 Home ranking is
+`DirectionStrength*0.30 + FinalConfidence*0.25 +
+OneHourOpportunityQuality*0.20 + FourHourTrendAlignment*0.10 +
+ExecutionFeasibility*0.10 + Freshness*0.05 - RiskPenalty - ConflictPenalty`.
+Tie order is lower risk, higher FinalConfidence, higher 1h quality, newer data,
+then symbol. Replacement requires a five-point lead unless the incumbent loses
+eligibility. Tier 2 may fill only from the current user's real Asset Pool and
+recent real analysis and never outranks Tier 1.
+
+AI cache identity is symbol + timeframe + evidenceHash with a five-minute TTL.
+Each analysis permits at most three role calls and one retry per role. Per-run,
+per-asset, hourly, daily cost/token/call and concurrency limits are mandatory
+configuration and fail closed when exhausted. Runtime acceptance must aggregate
+one same-run chain from provider observation through persisted closed OHLCV,
+analysis/scores/direction maturity, Candidate/role traces/Resolver/Validation,
+Final, Home and Message eligibility with `fixture=false`; HTTP 200 alone is not
+acceptance evidence.
 
 ## 5. Market Bias, Opportunity State and Plan Mode
 
@@ -438,9 +531,9 @@ effectiveness, failure-path hit rate and missed-opportunity quality.
 
 Home order is system status, alert/event, dynamic Top6, Position Monitoring
 plus Final Execution Plan, then single Three-AI workspace plus AI Consistency.
-The historical Position Monitoring / Final Execution Plan ratio `70:30` is
-`SUPERSEDED`. The frozen replacement is `60:40`, with an allowed range of
-`58:42-62:38`, as defined by the normative visual-density contract.
+The earlier Position Monitoring / Final Execution Plan ratio `60:40` is
+superseded. The frozen current desktop ratio is `70:30`; responsive stacking
+may adapt presentation but cannot change this business layout contract.
 
 Top6 cards show trusted price, final bias, opportunity score, confidence, risk,
 opportunity state and Plan Mode. Clicking updates Final plan and Three-AI only.

@@ -8,48 +8,43 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Machine-Gate Owner Amendment
-Product Phase Status: MACHINE_GATE_OWNER_AMENDMENT_PENDING_MERGED_MAIN
-Current Work Package: Add the Owner-only gate amendment entry and exact package/branch/starting-SHA matcher; no B01-B04 implementation is included
+Product Phase: TRINE LOGIC v4.1 Baseline Reconciliation Gate
+Product Phase Status: BASELINE_RECONCILIATION_PENDING_MERGED_MAIN
+Current Work Package: Reconcile the four exact a60/main product-gate files and register a one-time normalized successor; no B01-B04 implementation is included
 Next Business Phase: REAL_DATA_HOME_BLOCKER_CLOSURE
-Next Business Phase Allowed: NO on this amendment branch; the exact successor is allowed only after this gate amendment is effective on merged main
+Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after reconciliation is effective on merged main and its direct-child normalization proves all four files
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Machine-Gate Owner Amendment
+## TRINE LOGIC v4.1 Baseline Reconciliation Gate
 
-Owner explicitly authorized one clean-main `DOCS_GATE_OWNER_AMENDMENT` to
-resolve the recursive gate-owner lock without weakening ordinary package
-rules. This branch starts from exact `origin/main`
-`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e`; it does not contain the preserved
-business candidate's unmerged history.
+Owner explicitly authorized one clean-main `DOCS_GATE_BASELINE_RECONCILIATION`
+to retain the confirmed a60 product decisions and current main fail-closed
+machine mechanics without restoring either side wholesale. This branch starts
+from exact `origin/main`
+`08abe1f1040df0d4242a01cc306867ad5d3b4782` and contains no B01-B04 runtime
+implementation.
 
-The machine contract registers only this successor triple:
+The successor remains exact package
+`REAL_DATA_HOME_BLOCKER_CLOSURE`, branch
+`codex/v4-1-real-data-home-blocker-closure`, and source parent
+`a60eff8d83c0e1d04371bd425267f1e8d0e4f95c`. Its first direct child must change
+exactly the four declared normalization files, no fifth path, and every result
+must match the reconciled merged main byte-for-byte. The gate derives and
+reports that normalized SHA; another package, branch, parent or second
+normalization attempt fails closed.
 
-- package `REAL_DATA_HOME_BLOCKER_CLOSURE`;
-- branch `codex/v4-1-real-data-home-blocker-closure`;
-- starting full SHA `a60eff8d83c0e1d04371bd425267f1e8d0e4f95c`.
+The reconciliation copies Owner-final calculation/DQ/direction/Plan/Home/
+Message facts into the sole canonical v4.1 Product Source. It preserves main's
+exact-SHA, recursive gate-owner and ordinary-package protections. The legacy
+candidate-only reconciliation registration is not retained as a second source.
 
-Package, branch and the complete 40-character SHA must all match. Missing,
-short, inferred or incorrect values fail closed. Only the eight exact
-gate-owner/status/test paths declared in `docs/CODEX_NEXT_TASK.yml` may change
-in this amendment. Normal implementation packages remain unable to modify
-canonical gate owners, and this package has no push, PR, merge or deployment
-permission.
-
-The core production-loop authorization is effective on merged main through
-`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e`. The separate candidate
-`a60eff8d83c0e1d04371bd425267f1e8d0e4f95c` remains unmerged and requires
-bounded remediation. B01 direction/state and persistence error
-classification, B02 Home provenance, B03 card overflow and B04 favicon remain
-open; this docs/gate package fixes none of them. The amendment and successor
-cannot be reported effective or complete before their own merged-main and
-acceptance gates.
-
-Capability movement is `NONE`: no Java, API, Schema, provider, UI, Figma,
-Mobile, Telegram, deployment or automatic-trading behavior changes.
+B01 direction/state and persistence classification, B02 Home provenance, B03
+card overflow and B04 favicon remain open until the successor. Capability
+movement here is `NONE`: no Java, API, Schema, provider, UI, Figma, Mobile,
+Telegram, deployment or automatic-trading behavior changes.
 
 ---
 
@@ -71,9 +66,9 @@ automatic mutation.
 The successor must reuse existing Analysis, Opportunity, Final, UserPosition,
 PositionMonitor, Review, Message and ChannelDelivery owners. It may audit and
 integrate compatible #1201 behavior into the existing Telegram pipeline, but
-may not create a parallel stack. Three in-app Message categories and the two
-Owner-first-release Telegram categories remain unchanged; one user + planId +
-CONFIRMATION has at most one lifetime Telegram Delivery.
+may not create a parallel stack. The Owner-final canonical contract retains
+three fact-owned Telegram eligibility categories with stable-subject
+idempotency; it does not authorize automatic position scheduling or trading.
 
 Repository scheduler and Telegram defaults stay off. That authorization made no
 Java, API, Schema, runtime-config, Figma or Mobile change; accesses no secret;
