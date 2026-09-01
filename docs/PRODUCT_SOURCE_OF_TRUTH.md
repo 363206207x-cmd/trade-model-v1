@@ -42,9 +42,11 @@ For Fundamental AI v4.1 specifically,
 `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` is the sole
 ACTIVE/AUTHORITATIVE source. Earlier V1, Home, AI, Figma, authorization,
 implementation and audit documents are historical/supporting evidence for
-v4.1 and cannot override the unified source. Its page/route/component,
-ownership, PR-reuse and visual-density/proportion annexes are part of the same
-authority, not additional Product Sources.
+v4.1 and cannot override the unified source. Owner-final executable decisions
+from the preserved `a60eff8d...` candidate are reconciled directly into that
+canonical source rather than registered through a second product document. Its
+page/route/component, ownership, PR-reuse and visual-density/proportion annexes
+are part of the same authority, not additional Product Sources.
 
 ## 3. Registered Product Sources
 
@@ -56,12 +58,12 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|103b77453d0efaebe8d913b59281591b31e01f3894fb74453f3e74b5230f0c4d|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION|docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md|5e254094531ea5dfcc33d8455ecb6f75551f5c22cf5e891b48787eca3b519323|V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION -->
-<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION|docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md|baa4bbd0282e8660a46150b0e9cc0c48d437372f6904b455d4079eedb3a880db|V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION|docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md|25968904bddc80b5e5774cc13fb3de01193c5c33d1587e80473178078d01dce0|V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION|docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md|c994167bb2824ecbc3b2778ecf977ba5ef9adbcdb71c4dfc9da5926987add64e|LOCAL_REAL_READINESS_AND_CURRENT_HOME_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-FRONTEND-INTERACTION-RUNTIME-CLOSURE-AUTHORIZATION|docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md|116a559ab8ee5a60d4233237a26bc88203b52380ad67a78d4019c025ebd54ea5|DESKTOP_RUNTIME_INTERACTION_CLOSURE_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION|docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md|417a93357663953de338fdb64ec9961c85589589c4feb4c0d0328dcaa198a7d7|PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_AUTHORIZATION -->
@@ -183,7 +185,7 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09` |
+| Repository SHA-256 | `103b77453d0efaebe8d913b59281591b31e01f3894fb74453f3e74b5230f0c4d` |
 | Version/date | v4.1 unified final freeze; registered `2026-08-14` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
@@ -260,14 +262,15 @@ clean, synchronized merged main.
 | Repository path | `docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md` |
 | Repository SHA-256 | `5e254094531ea5dfcc33d8455ecb6f75551f5c22cf5e891b48787eca3b519323` |
 | Version/date | Owner first-release narrowing authorization candidate `2026-08-26`; effective only after merged-main validation |
-| Authority | Remediation delivery authorization subordinate to frozen v4.1 Section 15.2 |
+| Authority | Historical first-release narrowing, superseded where the later Owner-final canonical v4.1 contract explicitly differs |
 | Applicable modules | Exact `FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_INTEGRATION` package only |
 | Required concepts | all three in-app Message categories retained; Telegram Delivery narrowed to CONFIRMATION Final and trusted material active-position change; safety changes in-app only; missing source facts fail closed; existing owners reused |
 | Forbidden reinterpretations | no Section 15.2 rewrite, third Telegram first-release category, `REDUCED` delivery, untrusted position delivery, second owner, automatic position scheduling, real send, secret access, deployment, Figma/Mobile or automatic trading |
 
-This subordinate record narrows only the Owner's first-release Telegram
-delivery surface. It neither reduces the frozen in-application Message contract
-nor reopens the historical Telegram implementation completion claim.
+This record remains delivery-history evidence. The later Owner-final canonical
+contract restores all three fact-owned Telegram eligibility categories while
+retaining the same Message ownership, trust, idempotency and zero-trading
+boundaries; the historical narrowing cannot override that later decision.
 
 ### PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION
 
@@ -275,62 +278,61 @@ nor reopens the historical Telegram implementation completion claim.
 |---|---|
 | Document name | TRINE LOGIC Core Production Loop Automation Authorization |
 | Repository path | `docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md` |
-| Repository SHA-256 | `baa4bbd0282e8660a46150b0e9cc0c48d437372f6904b455d4079eedb3a880db` |
+| Repository SHA-256 | `25968904bddc80b5e5774cc13fb3de01193c5c33d1587e80473178078d01dce0` |
 | Version/date | Owner authorization candidate `2026-08-27`; effective only after merged-main validation |
 | Authority | Runtime-loop authorization subordinate to the sole canonical v4.1 Product Source |
 | Applicable modules | Exact `FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION` package only |
-| Required concepts | Asset Pool sole source; state-sensitive 15m/5m/2m/lightweight-1m opportunity loop; promotion-gated full analysis; Binance public SPOT closed 5m/15m/1h/4h OHLCV; active-position 30s monitoring; existing-owner reuse; production opt-in defaults off; preserved Message/Telegram narrowing and lifetime confirmation idempotency |
+| Required concepts | Asset Pool sole source; state-sensitive 15m/5m/2m/lightweight-1m opportunity loop; promotion-gated full analysis; Binance public SPOT closed 5m/15m/1h/4h OHLCV; active-position 30s monitoring; existing-owner reuse; production opt-in defaults off; canonical three-category Message/Telegram eligibility and stable-subject idempotency |
 | Forbidden reinterpretations | no second scheduler/business/Telegram owner, cadence-only Schema field, cross-provider fallback, open/fixture candle as real, unconditional high-cost AI loop, automatic position mutation/trading, switch activation, secret access, Figma/Mobile, Staging or Production deployment in this authorization package |
 
 Closed PR #1201 and its preserved Head are non-effective audit/recovery
 evidence for the successor. This authorization does not make that branch
 current, copy its rules, or create a parallel Telegram implementation.
 
-### Owner-approved machine-gate amendment and exact B01-B04 successor
+### Owner-approved one-pass baseline reconciliation and exact B01-B04 successor
 
-This is a subordinate machine-authorization record, not a new Product Source
-and not a product-semantic change. Owner explicitly authorized the exact
-`TRINE_LOGIC_V4_1_MACHINE_GATE_OWNER_AMENDMENT` package to start from clean
-`origin/main` at
-`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e` on branch
-`codex/v4-1-machine-gate-owner-amendment`. Its mode is
-`DOCS_GATE_OWNER_AMENDMENT`; ordinary implementation packages cannot use this
-entry or modify canonical gate owners.
+This is a subordinate machine-authorization record, not a second Product
+Source. Owner explicitly authorized
+`TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE` to start from clean
+`origin/main` at `08abe1f1040df0d4242a01cc306867ad5d3b4782` on branch
+`codex/v4-1-baseline-reconciliation-gate`. It may reconcile only the four
+named product/gate files, canonical gate-owner/status mirrors and their
+existing contract tests. It adds no runtime capability.
 
-The amendment may change only the following exact paths:
+The exact four normalization files are:
 
-- `docs/CODEX_NEXT_TASK.yml`
-- `docs/PRODUCT_SOURCE_OF_TRUTH.md`
-- `docs/PROJECT_CURRENT_STATE.md`
-- `docs/DELIVERY_PROGRESS_MATRIX.md`
-- `docs/ACTIVE_MAINLINE_STATUS.yml`
-- `scripts/v1-state.sh`
-- `scripts/codex-next-task.sh`
-- `scripts/check-workflow-contract.sh`
+- `docs/PRODUCT_SOURCE_OF_TRUTH.md`;
+- `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md`;
+- `docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md`;
+- `scripts/product-source-gate.sh`.
 
-It registers one successor triple only:
+The successor contract is one-time and fail closed:
 
 | Attribute | Exact value |
 |---|---|
 | Package | `REAL_DATA_HOME_BLOCKER_CLOSURE` |
 | Branch | `codex/v4-1-real-data-home-blocker-closure` |
-| Starting full SHA | `a60eff8d83c0e1d04371bd425267f1e8d0e4f95c` |
+| Normalization source parent | `a60eff8d83c0e1d04371bd425267f1e8d0e4f95c` |
+| Normalization expected source | merged `origin/main` after this reconciliation |
+| Normalization changed-file count | `4` |
+| Unauthorized normalization files | `0` |
 
-All three values are mandatory and machine-matched. Missing, shortened,
-inferred or incorrect SHA values fail closed. The preserved `a60eff8d...`
-candidate remains unmerged and is not made effective by this record.
+The machine gate derives exactly one direct child of the source parent as the
+normalized base, requires that commit to change only those four paths, and
+requires every resulting blob to equal merged main. Package, branch, complete
+source SHA, normalized commit topology and file contents all must match.
+Missing, shortened, inferred, duplicated or reusable normalization evidence
+fails closed. The permission cannot be used by another package, branch, source
+SHA or second normalization commit.
 
-The successor may address only B01 direction/state schema alignment and
-persistence-error classification, B02 Home provenance projection, B03 asset
-card vertical overflow, B04 favicon 404, corresponding tests, real Binance
-public read-only acceptance, and one local candidate commit. V1-V14 mutation,
-algorithm or threshold changes, Home redesign, CoinGlass, real Telegram send,
-automatic trading, push, PR modification, merge and deployment remain blocked.
-
-Neither this amendment nor its successor is effective merely because this
-text exists on a branch. The gate amendment must first be independently
-reviewed and merged to `main`; B01-B04 remain open until the exact successor is
-implemented and separately accepted.
+After normalization and merged-main gate synchronization, the successor may
+address B01 direction/state schema alignment and persistence-error
+classification, B02 Home provenance projection, B03 asset-card vertical
+overflow, B04 favicon, corresponding tests and real read-only acceptance. It
+may proceed through its separately checked PR, merged-main and private Staging
+acceptance under the Owner's one-pass authorization. Production deployment,
+automatic trading, exchange private order APIs, fake data, weakened Final/DQ/
+source/risk gates and secret disclosure remain forbidden.
 
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 

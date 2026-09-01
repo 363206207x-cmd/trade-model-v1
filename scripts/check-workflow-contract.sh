@@ -465,6 +465,12 @@ current_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_mode
 current_package_status="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_status)"
 current_package_branch="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_branch)"
 current_package_starting_full_sha="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_starting_full_sha)"
+current_package_edits="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_repository_edits_allowed)"
+current_package_implementation="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_implementation_allowed)"
+current_package_pr="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_implementation_pr_allowed)"
+current_package_push="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_push_allowed)"
+current_package_merge="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_merge_allowed)"
+current_package_deployment="$(yaml_value docs/CODEX_NEXT_TASK.yml current_package_deployment_allowed)"
 authorized_next_package_phase="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_phase)"
 authorized_next_package_mode="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_mode)"
 authorized_next_package_branch="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_branch)"
@@ -472,6 +478,14 @@ authorized_next_package_starting_full_sha="$(yaml_value docs/CODEX_NEXT_TASK.yml
 authorized_next_package_edits="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_repository_edits_allowed)"
 authorized_next_package_implementation="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_allowed)"
 authorized_next_package_pr="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_implementation_pr_allowed)"
+authorized_next_package_push="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_push_allowed)"
+authorized_next_package_merge="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_merge_allowed)"
+authorized_next_package_deployment="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_deployment_allowed)"
+normalization_source_parent="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_normalization_source_parent_sha)"
+normalization_expected_source="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_normalization_expected_source)"
+normalization_extra_count="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_normalization_extra_file_count)"
+normalization_one_time="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_normalization_one_time_only)"
+normalization_allowed_files="$(yaml_list docs/CODEX_NEXT_TASK.yml authorized_next_package_normalization_allowed_files)"
 authorized_next_package_canonical_figma="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_canonical_figma_desktop_implementation_allowed)"
 authorized_next_package_mobile="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_mobile_implementation_allowed)"
 authorized_next_package_canonical_figma_key="$(yaml_value docs/CODEX_NEXT_TASK.yml authorized_next_package_canonical_figma_file_key)"
@@ -490,7 +504,7 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ -n "$current_task_mode" ]] || fail "current_task_mode must be declared"
 [[ -n "$authorized_next_task_mode" ]] || fail "authorized_next_task_mode must be declared"
 [[ "$current_task_mode" != "$authorized_next_task_mode" ]] || fail "current and authorized next task modes must remain distinct"
-[[ "$current_task_mode" == "DOCS_GATE_OWNER_AMENDMENT" ]] || fail "current task mode must be the explicit Owner gate amendment"
+[[ "$current_task_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "current task mode must be the explicit baseline reconciliation"
 [[ "$authorized_next_task_mode" == "IMPLEMENTATION" ]] || fail "authorized next task mode must be IMPLEMENTATION"
 [[ "$p1a_repository_edits_allowed" == "false" ]] || fail "P1A repository edits must remain false"
 [[ "$p1a_implementation_allowed" == "false" ]] || fail "P1A implementation must remain false"
@@ -516,8 +530,10 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 Telegram remediation implementation must remain not started"
 [[ "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "v4.1 core production-loop authorization must remain effective on merged main"
 [[ "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" ]] || fail "v4.1 core production-loop implementation must remain not started"
-[[ "$v4_1_machine_gate_owner_amendment_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "machine-gate owner amendment must remain pending merged-main effectivity"
-[[ "$real_data_home_blocker_closure_authorization_status" == "PENDING_MACHINE_GATE_OWNER_AMENDMENT_MERGED_MAIN" ]] || fail "B01-B04 successor authorization must remain pending the gate amendment merge"
+[[ "$v4_1_machine_gate_owner_amendment_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "machine-gate owner amendment must remain effective on merged main"
+v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_baseline_reconciliation_gate_status)"
+[[ "$v4_1_baseline_reconciliation_gate_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "baseline reconciliation must remain pending merged-main effectivity"
+[[ "$real_data_home_blocker_closure_authorization_status" == "PENDING_BASELINE_RECONCILIATION_MERGED_MAIN" ]] || fail "B01-B04 successor authorization must remain pending the baseline reconciliation merge"
 [[ "$real_data_home_blocker_closure_implementation_status" == "NOT_STARTED" ]] || fail "B01-B04 successor must remain not started"
 [[ "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "local-real authorization must remain effective on merged main"
 [[ "$local_real_implementation_status" == "COMPLETE" ]] || fail "local-real implementation must remain complete"
@@ -526,10 +542,12 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_MACHINE_GATE_OWNER_AMENDMENT" && "$current_package_status" == "COMPLETED" ]] || fail "machine-gate owner amendment declaration mismatch"
-[[ "$current_package_branch" == "codex/v4-1-machine-gate-owner-amendment" ]] || fail "machine-gate owner amendment branch mismatch"
-[[ "$current_package_starting_full_sha" == "ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e" ]] || fail "machine-gate owner amendment starting SHA mismatch"
-[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "machine-gate owner amendment SHA must be full length"
+[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" && "$current_package_status" == "COMPLETED" ]] || fail "baseline reconciliation declaration mismatch"
+[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "baseline reconciliation mode mismatch"
+[[ "$current_package_branch" == "codex/v4-1-baseline-reconciliation-gate" ]] || fail "baseline reconciliation branch mismatch"
+[[ "$current_package_starting_full_sha" == "08abe1f1040df0d4242a01cc306867ad5d3b4782" ]] || fail "baseline reconciliation starting SHA mismatch"
+[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "baseline reconciliation SHA must be full length"
+[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "baseline reconciliation permissions mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
 [[ "$authorized_next_package_phase" == "REAL_DATA_HOME_BLOCKER_CLOSURE" ]] || fail "authorized next package phase mismatch"
 [[ "$authorized_next_package_branch" == "codex/v4-1-real-data-home-blocker-closure" ]] || fail "authorized next package branch mismatch"
@@ -539,13 +557,16 @@ p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
-[[ "$authorized_next_package_pr" == "false" ]] || fail "authorized B01-B04 PR creation must remain false"
+[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized B01-B04 PR creation must be true for the one-pass task"
+[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" ]] || fail "authorized B01-B04 push/merge/deployment permissions mismatch"
+[[ "$normalization_source_parent" == "$authorized_next_package_starting_full_sha" ]] || fail "normalization source parent must equal the exact a60 starting SHA"
+[[ "$normalization_expected_source" == "MERGED_MAIN" && "$normalization_extra_count" == "0" && "$normalization_one_time" == "true" ]] || fail "normalization source/count/one-time contract mismatch"
 [[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "frontend interaction Canonical Figma Desktop permission must remain false"
 [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
 [[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
 [[ "$p1b_scope" == "REAL_DATA_HOME_BLOCKER_CLOSURE_ONLY" ]] || fail "scope must remain REAL_DATA_HOME_BLOCKER_CLOSURE_ONLY"
-[[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package gate-owner scope must be explicit"
+[[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package baseline reconciliation scope must be explicit"
 expected_owner_paths="$(printf '%s\n' \
   docs/CODEX_NEXT_TASK.yml \
   docs/PRODUCT_SOURCE_OF_TRUTH.md \
@@ -554,21 +575,36 @@ expected_owner_paths="$(printf '%s\n' \
   docs/ACTIVE_MAINLINE_STATUS.yml \
   scripts/v1-state.sh \
   scripts/codex-next-task.sh \
-  scripts/check-workflow-contract.sh)"
+  scripts/check-workflow-contract.sh \
+  docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md \
+  docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
+  scripts/product-source-gate.sh)"
 [[ "$(printf '%s\n' "$current_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_owner_paths" | sort)" ]] \
-  || fail "gate-owner allowlist must contain exactly the eight authorized paths"
+  || fail "baseline reconciliation allowlist must contain exactly the eleven authorized paths"
 if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "gate-owner allowlist must not contain wildcards or directory-level grants"
+  fail "baseline reconciliation allowlist must not contain wildcards or directory-level grants"
+fi
+expected_normalization_files="$(printf '%s\n' \
+  docs/PRODUCT_SOURCE_OF_TRUTH.md \
+  docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md \
+  docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
+  scripts/product-source-gate.sh)"
+[[ "$(printf '%s\n' "$normalization_allowed_files" | sort)" == "$(printf '%s\n' "$expected_normalization_files" | sort)" ]] \
+  || fail "normalization allowlist must contain exactly the four semantic reconciliation files"
+if printf '%s\n' "$normalization_allowed_files" | grep -Eq '[*?]|(^|/)(docs|scripts)/?$'; then
+  fail "normalization allowlist must not contain wildcards or directory-level grants"
 fi
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 for transition_condition in \
-  OWNER_EXPLICIT_DOCS_GATE_OWNER_AMENDMENT_AUTHORIZATION \
-  GATE_AMENDMENT_STARTED_FROM_CLEAN_EXACT_ORIGIN_MAIN \
+  OWNER_EXPLICIT_ONE_PASS_BASELINE_RECONCILIATION_AUTHORIZATION \
+  BASELINE_RECONCILIATION_STARTED_FROM_CLEAN_EXACT_ORIGIN_MAIN \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
-  EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  MACHINE_GATE_OWNER_AMENDMENT_EFFECTIVE_MERGED_MAIN \
+  EXACT_40_CHARACTER_SOURCE_PARENT_SHA_MATCH \
+  EXACT_DIRECT_CHILD_NORMALIZATION_MATCH \
+  NORMALIZATION_FOUR_FILES_EQUAL_MERGED_MAIN \
+  BASELINE_RECONCILIATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
   CLEAN_WORKTREE \
@@ -617,8 +653,8 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_MACHINE_GATE_OWNER_AMENDMENT_REVIEW" \
-  || fail "machine-gate owner amendment review stage mismatch"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_BASELINE_RECONCILIATION_REVIEW" \
+  || fail "baseline reconciliation review stage mismatch"
 for machine_identity_field in \
   "MACHINE_AUTHORIZED_PACKAGE: $authorized_next_package_phase" \
   "MACHINE_AUTHORIZED_BRANCH: $authorized_next_package_branch" \
@@ -633,11 +669,11 @@ printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_MACHINE_GATE_OWNER_AMENDMENT_FINAL_MERGE_PATH" \
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_BASELINE_RECONCILIATION_FINAL_MERGE_PATH" \
   || fail "ready authorization did not resolve final merge path"
 
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_MACHINE_GATE_OWNER_AMENDMENT_MERGED_MAIN
-assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_MACHINE_GATE_OWNER_AMENDMENT_MERGED_MAIN
+assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN
+assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
@@ -657,6 +693,7 @@ for v4_1_expected in \
   "V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "V4_1_CORE_PRODUCTION_LOOP_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_BASELINE_RECONCILIATION_GATE_STATUS: EFFECTIVE_MERGED_MAIN" \
   "REAL_DATA_HOME_BLOCKER_CLOSURE_AUTHORIZATION_STATUS: AUTHORIZED" \
   "REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "LOCAL_REAL_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -668,7 +705,7 @@ for v4_1_expected in \
   "RESOLVED_MODE: IMPLEMENTATION" \
   "RESOLVED_EDIT_PERMISSION: true" \
   "RESOLVED_IMPLEMENTATION_PERMISSION: true" \
-  "RESOLVED_PR_CREATION_PERMISSION: false" \
+  "RESOLVED_PR_CREATION_PERMISSION: true" \
   "CANONICAL_FIGMA_DESKTOP_IMPLEMENTATION_ALLOWED: false" \
   "MOBILE_IMPLEMENTATION_ALLOWED: false" \
   "CANONICAL_FIGMA_FILE_KEY: NONE" \
@@ -704,7 +741,7 @@ operator_head_before="$(git rev-parse HEAD)"
 operator_status_before="$(git status --porcelain=v1)"
 operator_output="$(V1_WORKFLOW_SELF_TEST=1 V1_HANDOFF_SELF_TEST_SCENARIO=authorization_pending \
   bash scripts/v1-operator.sh)" \
-  || fail "gate-owner amendment operator invocation failed"
+  || fail "baseline reconciliation operator invocation failed"
 operator_branch_after="$(git branch --show-current)"
 operator_head_after="$(git rev-parse HEAD)"
 operator_status_after="$(git status --porcelain=v1)"
@@ -713,7 +750,7 @@ for operator_expected in \
   "CURRENT_PACKAGE_ACTION: ALLOWED" \
   "CURRENT_PACKAGE_BRANCH: ACCEPTED"; do
   printf '%s\n' "$operator_output" | grep -Fq "$operator_expected" \
-    || fail "gate-owner amendment operator omitted: $operator_expected"
+    || fail "baseline reconciliation operator omitted: $operator_expected"
 done
 [[ "$operator_branch_before" == "$operator_branch_after" ]] || fail "v4.1 operator self-test changed branch"
 [[ "$operator_head_before" == "$operator_head_after" ]] || fail "v4.1 operator self-test changed HEAD"
@@ -730,11 +767,11 @@ assert_chain_allowed() {
     || fail "$name request classification mismatch"
   printf '%s\n' "$handoff_output" | grep -Fq "OPEN_PR_EVIDENCE_SOURCE: $expected_evidence" \
     || fail "$name evidence source mismatch"
-  if [[ "$expected_operator_mode" == "LOCAL_IMPLEMENTATION_NO_PR" ]]; then
+  if [[ "$expected_operator_mode" == "IMPLEMENTATION_WITH_PR" ]]; then
     printf '%s\n' "$handoff_output" | grep -Fq "RESOLVED_MODE: IMPLEMENTATION" \
-      || fail "$name local implementation mode mismatch"
-    printf '%s\n' "$handoff_output" | grep -Fq "RESOLVED_PR_CREATION_PERMISSION: false" \
-      || fail "$name local implementation unexpectedly received PR permission"
+      || fail "$name implementation mode mismatch"
+    printf '%s\n' "$handoff_output" | grep -Fq "RESOLVED_PR_CREATION_PERMISSION: true" \
+      || fail "$name one-pass implementation omitted PR permission"
   else
     operator_output="$(run_operator_scenario "$scenario" "$@")" || { fail "$name operator was blocked"; return; }
     printf '%s\n' "$operator_output" | grep -Fq "OPERATOR_MODE: $expected_operator_mode" \
@@ -768,14 +805,14 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_MACHINE_GATE_OWNER_AMENDMENT_FINAL_MERGE_PATH" \
-  || fail "machine-gate owner amendment final gate stage mismatch"
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V4_1_BASELINE_RECONCILIATION_FINAL_MERGE_PATH" \
+  || fail "baseline reconciliation final gate stage mismatch"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
-  AUTHORIZED_IMPLEMENTATION_PACKAGE LOCAL_IMPLEMENTATION_NO_PR GH_QUERY --request-package "$authorized_next_package_phase"
+  AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION_WITH_PR GH_QUERY --request-package "$authorized_next_package_phase"
 assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
   BLOCKED_UNKNOWN_CURRENT_PACKAGE_PR_STATE --request-package "$authorized_next_package_phase"
 assert_chain_allowed MERGED_WITH_EXPLICIT_EVIDENCE merged_gh_unavailable \
-  AUTHORIZED_IMPLEMENTATION_PACKAGE LOCAL_IMPLEMENTATION_NO_PR EXPLICIT_CONFIRMED --open-pr-none-confirmed \
+  AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION_WITH_PR EXPLICIT_CONFIRMED --open-pr-none-confirmed \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked EXPLICIT_EVIDENCE_WITH_CONFLICT explicit_with_conflict \
   BLOCKED_ACTIVE_CONFLICTING_PR --open-pr-none-confirmed --request-package "$authorized_next_package_phase"
@@ -787,7 +824,7 @@ assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflictin
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_DATA_HOME_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_MACHINE_GATE_OWNER_AMENDMENT_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_DATA_HOME_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
@@ -829,7 +866,7 @@ assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediat
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
 assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_DATA_HOME_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_MACHINE_GATE_OWNER_AMENDMENT_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_BASELINE_RECONCILIATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_DATA_HOME_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
@@ -854,8 +891,8 @@ run_next_output="$(V1_WORKFLOW_SELF_TEST=1 \
   || fail "codex-next-task did not propagate explicit Open PR evidence"
 printf '%s\n' "$run_next_output" | grep -Fq "OPEN_PR_EVIDENCE_SOURCE: EXPLICIT_CONFIRMED" \
   || fail "codex-next-task omitted explicit evidence at the authoritative resolver"
-printf '%s\n' "$run_next_output" | grep -Fq "PR_CREATION_PERMISSION: false" \
-  || fail "bounded target handoff unexpectedly enabled PR creation"
+printf '%s\n' "$run_next_output" | grep -Fq "PR_CREATION_PERMISSION: true" \
+  || fail "one-pass target handoff omitted PR creation permission"
 
 exact_gate_text="$(bash scripts/v1-state.sh --self-test-exact-machine-gate)" \
   || fail "exact machine-gate self-test failed"
@@ -870,8 +907,9 @@ for exact_gate_case in \
   EXACT_GATE_08_JAVA_SQL_CSS_MIX \
   EXACT_GATE_09_ORDINARY_PACKAGE_GATE_OWNER_MUTATION \
   EXACT_GATE_10_OWNER_AMENDMENT_NON_MAIN_START \
-  EXACT_GATE_11_OWNER_PUSH_MERGE_PERMISSION \
-  EXACT_GATE_12_BLOCKED_PACKAGE_REGRESSION; do
+  EXACT_GATE_11_OWNER_PERMISSION_MISMATCH \
+  EXACT_GATE_12_BLOCKED_PACKAGE_REGRESSION \
+  EXACT_GATE_13_NORMALIZATION_MISSING; do
   printf '%s\n' "$exact_gate_text" | grep -Fq "$exact_gate_case: PASS" \
     || fail "missing exact machine-gate case: $exact_gate_case"
 done
@@ -944,11 +982,13 @@ bash scripts/validate-multi-user-account-registration-authorization.sh >/dev/nul
 for core_authorization_artifact in \
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md \
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md \
-  docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md; do
   git diff --quiet origin/main -- "$core_authorization_artifact" \
     || fail "merged core production-loop authorization artifact changed: $core_authorization_artifact"
 done
+printf '%s\n' "$current_package_allowed_paths" \
+  | grep -Fxq docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md \
+  || fail "baseline reconciliation must explicitly allow the canonical core-loop authorization document"
 
 changed_files="$({ git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git diff --name-only origin/main...HEAD 2>/dev/null || true; git diff --name-only HEAD~1..HEAD 2>/dev/null || true; } | sort -u)"
 if echo "$changed_files" | grep -Eq 'src/main/java|src/test/java'; then
