@@ -59,7 +59,8 @@ else
 fi
 
 changed_files="$({ git diff --name-only; git diff --cached --name-only; } | sort -u)"
-if grep -Eq '^(src/|pom.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$)' <<<"$changed_files"; then
+if [[ "$current_package_phase" == "$authorization_package" ]] \
+  && grep -Eq '^(src/|pom.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$)' <<<"$changed_files"; then
   echo "MULTI_USER_AUTHORIZATION_VALIDATION=BLOCKED application/API/schema/UI change in authorization diff" >&2
   exit 1
 fi

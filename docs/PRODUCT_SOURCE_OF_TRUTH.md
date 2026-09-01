@@ -39,12 +39,15 @@ Consequences:
 - product-source changes require explicit human approval and a recorded reason.
 
 For Fundamental AI v4.1 specifically,
-`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` is the sole
-ACTIVE/AUTHORITATIVE source. Earlier V1, Home, AI, Figma, authorization,
-implementation and audit documents are historical/supporting evidence for
-v4.1 and cannot override the unified source. Its page/route/component,
-ownership, PR-reuse and visual-density/proportion annexes are part of the same
-authority, not additional Product Sources.
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` remains the sole
+ACTIVE/AUTHORITATIVE architecture source. The Owner-approved, bounded
+reconciliation at
+`docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md` is a subordinate
+amendment and overrides only the conflicts it names. Earlier V1, Home, AI,
+Figma, authorization, implementation and audit documents are historical or
+supporting evidence and cannot override D0 or that explicit reconciliation.
+The D0 page/route/component, ownership, PR-reuse and
+visual-density/proportion annexes remain part of the same authority.
 
 ## 3. Registered Product Sources
 
@@ -56,12 +59,13 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|595800a91dd1995d6ea64e586405767ad679dea24e5619d8f1e215bc5c7d100d|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-V4-1-FINAL-CONTRACT-RECONCILIATION|docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md|bdd5a4dbd68968b3b7385d539e97d4683ea45676c030f3c387c07adb1e2666b3|V4_1_OWNER_RECONCILIATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-TELEGRAM-TWO-CATEGORY-REMEDIATION-AUTHORIZATION|docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION.md|5e254094531ea5dfcc33d8455ecb6f75551f5c22cf5e891b48787eca3b519323|V4_1_TELEGRAM_TWO_CATEGORY_REMEDIATION_AUTHORIZATION -->
-<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION|docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md|baa4bbd0282e8660a46150b0e9cc0c48d437372f6904b455d4079eedb3a880db|V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION -->
+<!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION|docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md|28b57ac4c6b8f1d45a2990bd7aee1f3903332025ae4d99bc84d1e83afffbbca1|V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION|docs/FUNDAMENTAL_AI_LOCAL_REAL_READINESS_AUTHORIZATION.md|c994167bb2824ecbc3b2778ecf977ba5ef9adbcdb71c4dfc9da5926987add64e|LOCAL_REAL_READINESS_AND_CURRENT_HOME_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-FRONTEND-INTERACTION-RUNTIME-CLOSURE-AUTHORIZATION|docs/FUNDAMENTAL_AI_FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION.md|116a559ab8ee5a60d4233237a26bc88203b52380ad67a78d4019c025ebd54ea5|DESKTOP_RUNTIME_INTERACTION_CLOSURE_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-TRINE-LOGIC-MULTI-USER-ACCOUNT-REGISTRATION-AUTHORIZATION|docs/TRINE_LOGIC_MULTI_USER_ACCOUNT_REGISTRATION_AUTHORIZATION.md|417a93357663953de338fdb64ec9961c85589589c4feb4c0d0328dcaa198a7d7|PRIVATE_MULTI_USER_REGISTRATION_AND_DATA_ISOLATION_AUTHORIZATION -->
@@ -183,7 +187,7 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `220bcfa215d2d7b2cb79b36e69bdd30151a70633faa94e77175ceba64c0dcc09` |
+| Repository SHA-256 | `595800a91dd1995d6ea64e586405767ad679dea24e5619d8f1e215bc5c7d100d` |
 | Version/date | v4.1 unified final freeze; registered `2026-08-14` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
@@ -195,6 +199,19 @@ Normative annex registration:
 | Repository path | SHA-256 | Role |
 |---|---|---|
 | `docs/FUNDAMENTAL_AI_V4_1_VISUAL_DENSITY_AND_PROPORTION_CONTRACT.md` | `4d3e937be4534d69e07d34fcf3fe08c4cd5a63ed0bda58b4961ffe6249d26d61` | Canonical Desktop visual measurements and ratio supersession |
+
+### PS-TRINE-LOGIC-V4-1-FINAL-CONTRACT-RECONCILIATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC v4.1 Final Contract Reconciliation |
+| Repository path | `docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md` |
+| Repository SHA-256 | `bdd5a4dbd68968b3b7385d539e97d4683ea45676c030f3c387c07adb1e2666b3` |
+| Version/date | Owner reconciliation `2026-08-31` |
+| Authority | Subordinate bounded amendment to D0; explicit conflicts only |
+| Applicable modules | v4.1 calculation DAG, DQ, scores, direction maturity, Candidate/Final, Home ranking, Telegram, manual position and runtime proof |
+| Required concepts | acyclic scoring; one normalization owner; three direction maturities; mode-specific Final fields; two-tier Home; three fact-owned Telegram categories; same-run evidence |
+| Forbidden reinterpretations | no second architecture; no AI-created scores or prices; no fake values; no CoinGlass call; no automatic trade; no Figma/Mobile redesign |
 
 ### PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
 

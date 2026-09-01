@@ -48,8 +48,11 @@ set -e
 grep -Fq 'RESOLUTION_STATUS: BLOCKED' <<<"$wrong_output"
 grep -Fq 'IMPLEMENTATION_ALLOWED: false' <<<"$wrong_output"
 
+current_package_phase="$(awk -F': ' '$1 == "current_package_phase" {gsub(/"/, "", $2); print $2; exit}' \
+  docs/CODEX_NEXT_TASK.yml)"
 changed_files="$({ git diff --name-only; git diff --cached --name-only; } | sort -u)"
-if grep -Eq '^(src/|pom.xml|.*\.sql$)' <<<"$changed_files"; then
+if [[ "$current_package_phase" == "$authorization_package" ]] \
+  && grep -Eq '^(src/|pom.xml|.*\.sql$)' <<<"$changed_files"; then
   echo "FRONTEND_INTERACTION_AUTHORIZATION_VALIDATION=BLOCKED application/API/schema change in authorization diff" >&2
   exit 1
 fi

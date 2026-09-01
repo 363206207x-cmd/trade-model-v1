@@ -270,9 +270,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
                  "strength":85.0,"confidence":82.0,"observedAt":"2026-08-20T06:26:00",
                  "freshness":"FRESH","analysisId":"analysis-1"}],"opposingEvidence":[],
                  "biasAdjustment":{"before":"BULLISH","after":"BULLISH","reason":"衍生品证据确认"},
-                 "candidateSummary":{"entrySource":"coinglass-oi-1","stopSource":"coinglass-oi-1",
-                 "targetSource":"coinglass-oi-1","invalidationSource":"coinglass-oi-1",
-                 "expectedRiskRewardSource":"coinglass-oi-1"}}
+                 "candidateSummary":{"summary":"衍生品证据已纳入候选解释"}}
                 """);
         when(gpt.executeDecisionChain(any(), anyLong())).thenReturn(providerResult);
         DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
@@ -440,7 +438,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
         assertThat(cached.getAnalysisId()).isEqualTo("analysis-2");
         assertThat(cached.getTraceId()).isEqualTo("trace-2");
         assertThat(cached.getPayloadJson())
-                .contains("\"entrySource\":\"evidence-2\"")
+                .contains("\"evidenceId\":\"evidence-2\"")
                 .doesNotContain("evidence-1");
         verify(gpt).executeDecisionChain(any(), anyLong());
         verify(callLogService).recordDecisionChainResult(
@@ -478,14 +476,20 @@ class DecisionChainAiOrchestratorServiceImplTest {
         request.setAnalysisId(analysisId);
         request.setTraceId(traceId);
         request.setInput(Map.of(
-                "evidence", List.of(Map.of(
-                        "evidenceId", evidenceId,
-                        "source", "MARKET_SOURCE",
-                        "sourceReference", "market://BTCUSDT/5m",
-                        "sourceTraceId", sourceTraceId,
-                        "currentValue", "65000",
-                        "changeFromBaseline", "+1.2%",
-                        "analysisId", analysisId)),
+                "evidence", List.of(Map.ofEntries(
+                        Map.entry("evidenceId", evidenceId),
+                        Map.entry("type", "MARKET_STRUCTURE"),
+                        Map.entry("source", "MARKET_SOURCE"),
+                        Map.entry("sourceReference", "market://BTCUSDT/5m"),
+                        Map.entry("sourceTraceId", sourceTraceId),
+                        Map.entry("currentValue", "65000"),
+                        Map.entry("changeFromBaseline", "+1.2%"),
+                        Map.entry("direction", "BULLISH"),
+                        Map.entry("strength", 80.0),
+                        Map.entry("confidence", 87.0),
+                        Map.entry("observedAt", "2026-08-12T00:00:00Z"),
+                        Map.entry("freshness", "FRESH"),
+                        Map.entry("analysisId", analysisId))),
                 "decisionBundle", Map.of("ruleDirection", "BULLISH")));
         return request;
     }
@@ -538,11 +542,13 @@ class DecisionChainAiOrchestratorServiceImplTest {
         AiDecisionChainResult result = success(AiDecisionChainRole.GPT_FINAL, AiProviderName.OPENAI);
         result.setSelectedModel("gpt-cache-test");
         result.setPayloadJson("""
-                {"supportingEvidence":[],"opposingEvidence":[],
+                {"supportingEvidence":[{"evidenceId":"evidence-1","type":"MARKET_STRUCTURE",
+                 "source":"MARKET_SOURCE","currentValue":"65000","change":"+1.2%",
+                 "direction":"BULLISH","strength":80.0,"confidence":87.0,
+                 "observedAt":"2026-08-12T00:00:00Z","freshness":"FRESH","analysisId":"analysis-1"}],
+                 "opposingEvidence":[],
                  "biasAdjustment":{"before":"BULLISH","after":"BULLISH","reason":"unchanged"},
-                 "candidateSummary":{"entrySource":"evidence-1","stopSource":"evidence-1",
-                 "targetSource":"evidence-1","invalidationSource":"evidence-1",
-                 "expectedRiskRewardSource":"evidence-1"}}
+                 "candidateSummary":{"summary":"规则候选解释"}}
                 """);
         return result;
     }
@@ -556,9 +562,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
                  "observedAt":"2026-08-12T00:00:00Z","freshness":"FRESH","analysisId":"analysis-1"}],
                  "opposingEvidence":[],
                  "biasAdjustment":{"before":"BULLISH","after":"BULLISH","reason":"unchanged"},
-                 "candidateSummary":{"entrySource":"evidence-1","stopSource":"evidence-1",
-                 "targetSource":"evidence-1","invalidationSource":"evidence-1",
-                 "expectedRiskRewardSource":"evidence-1"}}
+                 "candidateSummary":{"summary":"事件风险解释"}}
                 """.formatted(source));
         return result;
     }

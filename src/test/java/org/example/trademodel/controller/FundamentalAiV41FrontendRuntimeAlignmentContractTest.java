@@ -26,9 +26,10 @@ class FundamentalAiV41FrontendRuntimeAlignmentContractTest {
             "docs/evidence/v4_1_final_interaction");
 
     @Test
-    void desktopHomeKeepsTheFrozenModuleOrder() throws Exception {
+    void sealedLegacyDashboardEvidenceKeepsItsArchivedModuleOrder() throws Exception {
         String html = Files.readString(DASHBOARD);
 
+        // /dashboard now resolves to home.html; this assertion preserves the sealed legacy visual evidence only.
         assertOrdered(html,
                 "class=\"latest-system-status\"",
                 "class=\"latest-signal-grid\"",

@@ -513,8 +513,11 @@ public class AssetStateServiceImpl implements AssetStateService {
         if (current == requested) return true;
         return switch (current) {
             case OBSERVING -> requested == AssetStateEnum.CANDIDATE;
-            case CANDIDATE -> requested == AssetStateEnum.WAITING_TRIGGER;
-            case WAITING_TRIGGER -> requested == AssetStateEnum.TRIGGERED;
+            case CANDIDATE -> requested == AssetStateEnum.WAITING_TRIGGER
+                    || requested == AssetStateEnum.TRIGGERED
+                    || requested == AssetStateEnum.HIGH_RISK;
+            case WAITING_TRIGGER -> requested == AssetStateEnum.TRIGGERED
+                    || requested == AssetStateEnum.HIGH_RISK;
             case TRIGGERED -> requested == AssetStateEnum.HIGH_RISK;
             case HIGH_RISK, INVALIDATED, COOLING, CONFUSED -> false;
         };

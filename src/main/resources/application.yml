@@ -167,9 +167,15 @@ trade-model:
       risk-weight: 0.10
       plan-mode-weight: 0.15
       data-quality-weight: 0.10
-      freshness-weight: 0.08
+      freshness-weight: 0.05
       conflict-weight: 0.07
       stability-weight: 0.05
+      direction-strength-weight: 0.30
+      final-confidence-weight: 0.25
+      one-hour-opportunity-weight: 0.20
+      four-hour-alignment-weight: 0.10
+      execution-feasibility-weight: 0.10
+      replacement-threshold: 5
     opportunity-state:
       minimum-dwell-seconds: 300
       cooling-seconds: 900
@@ -182,14 +188,37 @@ trade-model:
       minimum-significant-evidence-strength: 60
       cache-ttl-seconds: 300
       cache-max-entries: 500
+      per-run-token-limit: 24000
+      per-asset-cooldown-seconds: 300
+      hourly-call-limit: 180
+      hourly-token-limit: 1440000
+      daily-call-limit: 1200
+      daily-token-limit: 9600000
+      daily-cost-micros-limit: 100000000
+      concurrency-limit: 3
+      max-retry-per-role: 1
     multi-timeframe:
-      four-hour-weight: 0.40
-      one-hour-weight: 0.30
-      fifteen-minute-weight: 0.20
-      five-minute-weight: 0.10
-      minimum-aligned-count: 3
-      minimum-aligned-weight: 0.60
+      four-hour-weight: 0.57
+      one-hour-weight: 0.43
+      fifteen-minute-weight: 0.00
+      five-minute-weight: 0.00
+      minimum-aligned-count: 2
+      minimum-aligned-weight: 1.00
       maximum-trend-score-difference: 15
+    normalization:
+      version: V41-NORM-WREP-1
+      lookback: 200
+      minimum-sample-count: 60
+      winsorize-lower-percentile: 2.5
+      winsorize-upper-percentile: 97.5
+    provider-matrix:
+      version: V41-PROVIDER-MATRIX-1
+      ohlcv-requirement: MANDATORY
+      derivatives-requirement: OPTIONAL
+      five-minute-ttl-seconds: 600
+      fifteen-minute-ttl-seconds: 1800
+      one-hour-ttl-seconds: 7200
+      four-hour-ttl-seconds: 28800
     account-risk:
       low-max-exposure: 0.30
       medium-max-exposure: 0.20

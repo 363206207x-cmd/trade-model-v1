@@ -165,6 +165,44 @@ public interface AiCallLogMapper {
     @Select("SELECT COUNT(*) FROM tm_ai_call_log WHERE provider_name = #{providerName} AND started_at >= #{since}")
     int countProviderAttemptsSince(@Param("providerName") String providerName, @Param("since") LocalDateTime since);
 
+    @Select("""
+            SELECT COUNT(*) FROM tm_ai_call_log
+            WHERE contract_type = 'DECISION_CHAIN_V4_1'
+              AND started_at >= #{since}
+              AND call_status IN ('STARTED', 'SUCCESS', 'FAILED', 'TIMEOUT', 'INVALID_RESPONSE')
+              AND COALESCE(cache_hit, FALSE) = FALSE
+            """)
+    int countDecisionChainAttemptsSince(@Param("since") LocalDateTime since);
+
+    @Select("""
+            SELECT COUNT(*) FROM tm_ai_call_log
+            WHERE contract_type = 'DECISION_CHAIN_V4_1'
+              AND analysis_id = #{analysisId}
+              AND ai_role = #{role}
+              AND call_status IN ('STARTED', 'SUCCESS', 'FAILED', 'TIMEOUT', 'INVALID_RESPONSE')
+              AND COALESCE(cache_hit, FALSE) = FALSE
+            """)
+    int countDecisionChainRoleAttempts(@Param("analysisId") String analysisId,
+                                       @Param("role") String role);
+
+    @Select("""
+            SELECT COALESCE(SUM(COALESCE(total_tokens, 0)), 0) FROM tm_ai_call_log
+            WHERE contract_type = 'DECISION_CHAIN_V4_1'
+              AND started_at >= #{since}
+              AND call_status IN ('SUCCESS', 'FAILED', 'TIMEOUT', 'INVALID_RESPONSE')
+              AND COALESCE(cache_hit, FALSE) = FALSE
+            """)
+    long sumDecisionChainTokensSince(@Param("since") LocalDateTime since);
+
+    @Select("""
+            SELECT COALESCE(SUM(COALESCE(total_tokens, 0)), 0) FROM tm_ai_call_log
+            WHERE contract_type = 'DECISION_CHAIN_V4_1'
+              AND analysis_id = #{analysisId}
+              AND call_status IN ('SUCCESS', 'FAILED', 'TIMEOUT', 'INVALID_RESPONSE')
+              AND COALESCE(cache_hit, FALSE) = FALSE
+            """)
+    long sumDecisionChainTokensByAnalysisId(@Param("analysisId") String analysisId);
+
     @Select("SELECT COALESCE(SUM(" + CHARGEABLE_COST + "), 0) FROM tm_ai_call_log WHERE started_at >= #{since}")
     BigDecimal sumChargeableCostSince(@Param("since") LocalDateTime since);
 

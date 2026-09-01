@@ -14,6 +14,8 @@ required_files=(
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md
+  docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md
+  docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_FINDING_MAPPING.md
 )
 for file in "${required_files[@]}"; do
   [[ -s "$file" ]] || { echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED missing=$file" >&2; exit 1; }
@@ -36,8 +38,8 @@ grep -Fq 'promotion-gated' "$authorization_doc"
 grep -Fq 'must not add a' "$authorization_doc"
 grep -Fq '`nextScanAt` column' "$authorization_doc"
 grep -Fq 'All three frozen in-application Message categories remain' "$authorization_doc"
-grep -Fq 'narrowed to exactly two categories' "$authorization_doc"
-grep -Fq 'at most one Telegram Delivery' "$authorization_doc"
+grep -Fq 'retains exactly three fact-owned categories' "$authorization_doc"
+grep -Fq 'most one Telegram Delivery' "$authorization_doc"
 grep -Fq 'default-off' "$authorization_doc"
 grep -Fq 'Automatic trading capability count remains `0`' "$authorization_doc"
 grep -Fq 'Duplicate Skeleton Gate' "$ownership_doc"
@@ -132,59 +134,135 @@ authorization_allowed_files=(
 )
 
 implementation_allowed_files=(
+  docs/PRODUCT_SOURCE_OF_TRUTH.md
+  docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md
   docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_IMPLEMENTATION_REPORT.md
+  docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md
+  docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md
+  docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_FINDING_MAPPING.md
+  docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_IMPLEMENTATION_REPORT.md
+  docs/evidence/v4_1_final_interaction/README.md
+  docs/evidence/v4_1_final_interaction/browser-qa.json
+  docs/evidence/v4_1_final_interaction/runtime/post-fix-real-binance-home-1280x720-viewport.jpg
+  docs/evidence/v4_1_final_interaction/runtime/post-fix-real-binance-home-1280x1036-full.jpg
+  scripts/dashboard-visual-acceptance-fixture.py
+  scripts/product-source-gate.sh
+  scripts/standard-release-postgresql-smoke.sh
+  scripts/validate-frontend-interaction-runtime-closure-authorization.sh
+  scripts/validate-multi-user-account-registration-authorization.sh
   docs/TRINE_LOGIC_TELEGRAM_TWO_CATEGORY_SHORT_ALERT_IMPLEMENTATION_REPORT.md
   scripts/validate-v4-1-core-production-loop-authorization.sh
   scripts/validate-v4-1-telegram-remediation-authorization.sh
+  src/main/java/org/example/trademodel/ai/AiDecisionChainSchema.java
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunCommand.java
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunProperties.java
+  src/main/java/org/example/trademodel/config/FundamentalAiV41Properties.java
   src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java
+  src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java
+  src/main/java/org/example/trademodel/dto/planboundary/BoundarySourceRefDTO.java
+  src/main/java/org/example/trademodel/dto/planboundary/MarketStructureBoundaryRequest.java
+  src/main/java/org/example/trademodel/dto/planboundary/SourceTraceBoundaryProducerResult.java
+  src/main/java/org/example/trademodel/entity/DecisionResult.java
   src/main/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProvider.java
+  src/main/java/org/example/trademodel/mapper/AiCallLogMapper.java
   src/main/java/org/example/trademodel/mapper/AssetStateMapper.java
   src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java
+  src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java
   src/main/java/org/example/trademodel/mapper/ExecutionPlanMapper.java
   src/main/java/org/example/trademodel/mapper/MessageMapper.java
+  src/main/java/org/example/trademodel/positionmonitor/PositionMonitorResultDTO.java
+  src/main/java/org/example/trademodel/positionmonitorlog/PositionEntryLogicStatusEnum.java
+  src/main/java/org/example/trademodel/service/AiCallLogService.java
   src/main/java/org/example/trademodel/service/AnalysisSchedulerService.java
   src/main/java/org/example/trademodel/service/AssetStateService.java
   src/main/java/org/example/trademodel/service/ChannelDeliveryService.java
+  src/main/java/org/example/trademodel/service/DecisionEngineService.java
   src/main/java/org/example/trademodel/service/MarketDataScheduler.java
+  src/main/java/org/example/trademodel/service/MarketBiasPolicy.java
   src/main/java/org/example/trademodel/service/MessageFactService.java
   src/main/java/org/example/trademodel/service/PersistedOhlcvIngestionScheduler.java
   src/main/java/org/example/trademodel/service/PositionMonitorScheduler.java
+  src/main/java/org/example/trademodel/service/impl/AiCallLogServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImpl.java
   src/main/java/org/example/trademodel/service/impl/AssetStateServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/AuthoritativePersistedDecisionOhlcvSource.java
   src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/DecisionChainRuleValidatorImpl.java
+  src/main/java/org/example/trademodel/service/impl/DecisionChainServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/MarketStructureBoundaryExtractorImpl.java
   src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/PlanServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/PositionMonitorLogServiceImpl.java
   src/main/java/org/example/trademodel/service/impl/PositionMonitorServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/ScoreServiceImpl.java
+  src/main/java/org/example/trademodel/service/impl/SourceTraceBoundaryProducerImpl.java
+  src/main/java/org/example/trademodel/service/support/V41DecisionContractPolicy.java
   src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java
   src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java
   src/main/java/org/example/trademodel/telegram/TelegramDedupeKey.java
   src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java
   src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java
   src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java
+  src/main/java/org/example/trademodel/vo/DashboardHomeVO.java
+  src/main/java/org/example/trademodel/vo/DecisionBundleVO.java
+  src/main/java/org/example/trademodel/vo/DecisionResultVO.java
   src/main/resources/application-prod.yml
   src/main/resources/application-local-real.yml
   src/main/resources/application.yml
+  src/main/resources/db/migration/V15__v4_1_machine_executable_decision_contract.sql
+  src/main/resources/schema.sql
+  src/main/resources/static/js/analysis-detail.js
   src/main/resources/static/js/home-runtime.js
+  src/main/resources/templates/analysis-detail.html
+  src/test/java/org/example/trademodel/UserPositionFullLifecycleE2EAcceptanceTest.java
+  src/test/java/org/example/trademodel/ai/AiDecisionChainContractTest.java
   src/test/java/org/example/trademodel/analysisrun/AnalysisSchedulerServiceTest.java
   src/test/java/org/example/trademodel/config/LocalSmokeSchedulerGateTest.java
   src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java
   src/test/java/org/example/trademodel/config/TargetRuntimePreflightTest.java
   src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java
+  src/test/java/org/example/trademodel/controller/AnalysisDetailFrontendContractTest.java
   src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java
+  src/test/java/org/example/trademodel/controller/FundamentalAiV41CanonicalDesktopInteractionContractTest.java
+  src/test/java/org/example/trademodel/controller/FundamentalAiV41FrontendRuntimeAlignmentContractTest.java
+  src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java
   src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java
+  src/test/java/org/example/trademodel/integration/AnalysisDecisionExecutionPlanIntegrationTest.java
   src/test/java/org/example/trademodel/localreal/LocalRealProfileContractTest.java
   src/test/java/org/example/trademodel/mapper/AssetStateMapperIntegrationTest.java
+  src/test/java/org/example/trademodel/mapper/DecisionResultMapperLatestPlanIntegrationTest.java
   src/test/java/org/example/trademodel/market/client/impl/BinancePublicOhlcvProviderTest.java
   src/test/java/org/example/trademodel/market/client/impl/RoutedPublicOhlcvProviderTest.java
   src/test/java/org/example/trademodel/positionmonitor/PositionMonitorServiceImplTest.java
+  src/test/java/org/example/trademodel/positionmonitor/PositionMonitoringBackendContractTest.java
+  src/test/java/org/example/trademodel/postgresql/ControlledPostgreSqlFlywaySmokeTest.java
+  src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java
+  src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java
+  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java
+  src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java
   src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderTest.java
   src/test/java/org/example/trademodel/service/AnalysisSchedulerLocalRealReadinessGateTest.java
   src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java
   src/test/java/org/example/trademodel/service/MessageFactServiceTest.java
   src/test/java/org/example/trademodel/service/PersistedOhlcvIngestionSchedulerTest.java
+  src/test/java/org/example/trademodel/service/DecisionEngineServiceTest.java
+  src/test/java/org/example/trademodel/service/MarketBiasPolicyTest.java
   src/test/java/org/example/trademodel/service/impl/AssetStateServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/AuthoritativePersistedDecisionOhlcvSourceTest.java
   src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/DecisionChainRuleValidatorImplTest.java
+  src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/MarketStructureBoundaryExtractorImplTest.java
   src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/PlanServiceImplTest.java
+  src/test/java/org/example/trademodel/service/impl/ReviewAggregateServiceImplScoreTopItemsTest.java
+  src/test/java/org/example/trademodel/service/impl/ScoreServiceImplTest.java
+  src/test/java/org/example/trademodel/stress/V1BusinessStressTest.java
+  src/test/java/org/example/trademodel/stress/V1HistoricalReplayValidationTest.java
+  src/test/java/org/example/trademodel/postgresql/V15DecisionContractMigrationContractTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
   src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
   src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java
@@ -217,13 +295,16 @@ while IFS= read -r changed_file; do
   fi
 done <<<"$changed_files"
 
+database_schema_change_count="$(grep -Ec '(^|/)db/migration/|(^|/)schema\.sql$' <<<"$changed_files" || true)"
+
 if [[ "$authorization_scope" == "AUTHORIZATION_DOCS_GATE" ]] \
   && grep -Eq '^(src/|pom\.xml|.*\.sql$|.*\.java$|.*\.js$|.*\.html$|.*\.css$|.*application[^/]*\.ya?ml$)' <<<"$changed_files"; then
   echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED application-api-schema-ui-config-change" >&2
   exit 1
 fi
 
-if grep -Eq '(^|/)db/migration/|\.sql$|\.html$|\.css$' <<<"$changed_files"; then
+if [[ "$authorization_scope" == "AUTHORIZATION_DOCS_GATE" ]] \
+  && grep -Eq '(^|/)db/migration/|\.sql$|\.html$|\.css$' <<<"$changed_files"; then
   echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED schema-or-ui-change" >&2
   exit 1
 fi
@@ -231,15 +312,27 @@ fi
 while IFS= read -r changed_file; do
   [[ -n "$changed_file" ]] || continue
   if [[ "$changed_file" == *.js ]] \
-    && [[ "$changed_file" != "src/main/resources/static/js/home-runtime.js" ]]; then
+    && [[ "$changed_file" != "src/main/resources/static/js/home-runtime.js" ]] \
+    && [[ "$changed_file" != "src/main/resources/static/js/analysis-detail.js" ]]; then
     echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED unauthorized-js=$changed_file" >&2
     exit 1
   fi
 done <<<"$changed_files"
 
 if ! git diff --quiet "$base_ref" -- docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md; then
-  echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED frozen-product-source-changed" >&2
-  exit 1
+  if [[ "$authorization_scope" != "AUTHORIZED_IMPLEMENTATION" ]]; then
+    echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED frozen-product-source-changed" >&2
+    exit 1
+  fi
+
+  registered_source_sha="$(awk -F'|' \
+    '$2 == "PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN" { print $4 }' \
+    docs/PRODUCT_SOURCE_OF_TRUTH.md)"
+  actual_source_sha="$(shasum -a 256 docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md | awk '{ print $1 }')"
+  if [[ -z "$registered_source_sha" || "$actual_source_sha" != "$registered_source_sha" ]]; then
+    echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=BLOCKED product-source-sha-mismatch" >&2
+    exit 1
+  fi
 fi
 
 echo "ASSET_POOL_SOLE_CONTINUOUS_SOURCE=PASS"
@@ -248,17 +341,17 @@ echo "ACTIVE_POSITION_MONITOR_CADENCE=30s"
 echo "PROMOTION_GATED_FULL_ANALYSIS=PASS"
 echo "BINANCE_SOURCE_OWNED_CLOSED_OHLCV=5m,15m,1h,4h"
 echo "MESSAGE_CATEGORIES_RETAINED=3"
-echo "TELEGRAM_FIRST_RELEASE_CATEGORIES_RETAINED=2"
+echo "TELEGRAM_CATEGORIES_RETAINED=3"
 echo "PREMERGE_EXACT_PACKAGE_BLOCKED=PASS"
 echo "MERGED_MAIN_EXACT_PACKAGE_ALLOWED=PASS"
 echo "WRONG_AND_EXPANDED_PACKAGES_BLOCKED=PASS"
 echo "AUTHORIZATION_SCOPE=$authorization_scope"
 echo "UNAUTHORIZED_APPLICATION_API_SCHEMA_UI_CONFIG_CHANGE_COUNT=0"
-echo "DATABASE_SCHEMA_CHANGE_COUNT=0"
+echo "DATABASE_SCHEMA_CHANGE_COUNT=$database_schema_change_count"
 echo "SCHEDULER_SWITCH_CHANGES=0"
 echo "TELEGRAM_SWITCH_CHANGES=0"
 echo "TELEGRAM_REAL_SEND_ATTEMPTS=0"
 echo "DEPLOYMENT_ATTEMPTS=0"
 echo "AUTO_TRADING_CAPABILITY_COUNT=0"
-echo "CAPABILITY_MOVEMENT=NONE"
+echo "CAPABILITY_MOVEMENT=V4_1_FINAL_CONTRACT_MACHINE_EXECUTABLE_CLOSURE_CANDIDATE"
 echo "CORE_PRODUCTION_LOOP_AUTHORIZATION_VALIDATION=PASS"

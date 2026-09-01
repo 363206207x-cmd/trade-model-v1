@@ -75,16 +75,22 @@ not be copied as an authoritative rule set. The successor must review and
 integrate only compatible work into the existing Message -> ChannelDelivery ->
 Telegram pipeline; it must not create a parallel Telegram stack.
 
-All three frozen in-application Message categories remain. Owner first-release
-Telegram Delivery remains narrowed to exactly two categories:
+All three frozen in-application Message categories remain. The later Owner
+reconciliation in
+`docs/TRINE_LOGIC_V4_1_FINAL_CONTRACT_RECONCILIATION.md` supersedes the earlier
+two-category first-release narrowing for this exact package. Telegram Delivery
+retains exactly three fact-owned categories:
 
-1. validated `CONFIRMATION` Final short alerts;
-2. trusted material active-position change short alerts.
+1. a complete trusted STRONG_BULLISH/STRONG_BEARISH `CONFIRMATION` or qualified
+   `REDUCED` Final short alert;
+2. a material opportunity/plan safety-change alert without new direction advice;
+3. a trusted material active-position change short alert.
 
-Opportunity/plan safety changes remain in-app only. For one user, one `planId`
-and the `CONFIRMATION` category, at most one Telegram Delivery may be sent for
-the lifetime of that Final. Rechecks, snapshots, analyses, time buckets or
-severity must not create duplicate confirmation delivery identity.
+For one user, one stable business subject and one concrete change category, at
+most one Telegram Delivery may be sent within the existing idempotency/cooldown
+contract. Rechecks, snapshots, analyses, monitor logs, time buckets or severity
+must not create a duplicate identity. A real severity escalation may create a
+new concrete-change fact through the existing Message owner.
 
 The existing three Telegram switches remain default-off. This authorization
 does not activate them, access a secret or send a message.

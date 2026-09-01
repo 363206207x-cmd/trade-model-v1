@@ -88,6 +88,7 @@ class ControlledPostgreSqlFlywaySmokeTest {
             assertUserPositionOwnershipContract(connection);
             assertFinalInteractionRuntimeContract(connection);
             assertTelegramDeliveryV14Contract(connection);
+            assertDecisionContractV15(connection);
             assertPostgreSqlPushRecheckCutoffQuery(connection);
         }
     }
@@ -276,6 +277,45 @@ class ControlledPostgreSqlFlywaySmokeTest {
                 try (ResultSet rs = statement.executeQuery()) {
                     assertThat(rs.next()).isTrue();
                     assertThat(rs.getInt(1)).as("V14 column %s", column).isEqualTo(1);
+                }
+            }
+        }
+        assertObservationFinalBoundaryV15(connection);
+    }
+
+    private static void assertObservationFinalBoundaryV15(Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT pg_get_constraintdef(oid, true) AS definition
+                FROM pg_constraint
+                WHERE conname = 'ck_tm_execution_plan_final_boundary'
+                  AND conrelid = 'public.tm_execution_plan'::regclass
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("definition"))
+                        .contains("OBSERVATION", "entry_zone IS NULL", "stop_loss IS NULL",
+                                "take_profit_rules IS NULL", "expected_risk_reward IS NULL",
+                                "invalidation_source IS NULL");
+            }
+        }
+    }
+
+    private static void assertDecisionContractV15(Connection connection) throws Exception {
+        for (String column : List.of(
+                "validated_market_bias", "direction_data_state", "data_quality_score",
+                "evidence_reliability", "opportunity_score", "risk_score", "final_confidence",
+                "one_hour_opportunity_quality", "four_hour_trend_alignment",
+                "normalization_version", "score_version", "data_quality_version",
+                "provider_matrix_version")) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'tm_decision_result'
+                      AND column_name = ?
+                    """)) {
+                statement.setString(1, column);
+                try (ResultSet rs = statement.executeQuery()) {
+                    assertThat(rs.next()).isTrue();
+                    assertThat(rs.getInt(1)).as("V15 column %s", column).isEqualTo(1);
                 }
             }
         }

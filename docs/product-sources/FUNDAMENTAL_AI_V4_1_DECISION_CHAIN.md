@@ -438,9 +438,10 @@ effectiveness, failure-path hit rate and missed-opportunity quality.
 
 Home order is system status, alert/event, dynamic Top6, Position Monitoring
 plus Final Execution Plan, then single Three-AI workspace plus AI Consistency.
-The historical Position Monitoring / Final Execution Plan ratio `70:30` is
-`SUPERSEDED`. The frozen replacement is `60:40`, with an allowed range of
-`58:42-62:38`, as defined by the normative visual-density contract.
+The earlier Position Monitoring / Final Execution Plan ratio `60:40` is
+superseded by the Owner reconciliation R0. The frozen current ratio is
+`70:30`; D2 may implement its responsive stacking behavior but may not change
+this desktop business layout contract.
 
 Top6 cards show trusted price, final bias, opportunity score, confidence, risk,
 opportunity state and Plan Mode. Clicking updates Final plan and Three-AI only.

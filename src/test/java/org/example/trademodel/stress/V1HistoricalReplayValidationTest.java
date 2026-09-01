@@ -54,6 +54,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -92,7 +93,7 @@ class V1HistoricalReplayValidationTest {
         assertResult(results, "HISTORICAL_STYLE_DOWNTREND_BREAKDOWN", "BEARISH", true, AssetStateEnum.CANDIDATE);
         assertResult(results, "CHOPPY_RANGE_NO_TRADE", "BEARISH", false, AssetStateEnum.OBSERVING);
         assertResult(results, "WICK_STOP_SWEEP", "BULLISH", false, AssetStateEnum.OBSERVING);
-        assertResult(results, "FAST_CRASH_REBOUND", "BEARISH", false, AssetStateEnum.CONFUSED);
+        assertResult(results, "FAST_CRASH_REBOUND", "WAIT", false, AssetStateEnum.CONFUSED);
         assertResult(results, "SLOW_TREND_PULLBACK", "BULLISH", true, AssetStateEnum.WAITING_TRIGGER);
         assertResult(results, "HIGH_RISK_EVENT_WINDOW", "BULLISH", false, AssetStateEnum.HIGH_RISK);
 
@@ -207,10 +208,10 @@ class V1HistoricalReplayValidationTest {
         assertThat(decision.getIsWorthOpening()).isEqualTo(scenario.opportunityExpected());
         assertThat(decision.getAssetState()).isEqualTo(scenario.state());
         assertThat(decision.getAssetStateSnapshot()).contains(FIXTURE_SOURCE);
-        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(3), anyString());
-        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(3), anyString());
-        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(3), anyString());
-        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(3), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("5m"), eq(200), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("15m"), eq(200), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("1h"), eq(200), anyString());
+        verify(localAdapter).readClosedBars(eq(scenario.symbol()), eq("4h"), eq(200), anyString());
         return new ReplayResult(scenario, decision, plan);
     }
 
@@ -382,7 +383,12 @@ class V1HistoricalReplayValidationTest {
     }
 
     private static List<String[]> klines(List<ReplayCandle> candles) {
-        return candles.stream().map(ReplayCandle::toKline).toList();
+        if (candles == null || candles.isEmpty()) return List.of();
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 60; index++) {
+            bars.add(candles.get(index % candles.size()).toKline());
+        }
+        return bars;
     }
 
     private static ReplayCandle last(List<ReplayCandle> candles) {
@@ -489,7 +495,7 @@ class V1HistoricalReplayValidationTest {
         position.setLeverage(decimal("2"));
         position.setStopLoss(decimal(stopLoss));
         position.setTakeProfit(decimal(takeProfit));
-        position.setSourceType("MANUAL_INDEPENDENT");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId(planId);
         position.setNotTradeInstruction(true);
         position.setNotAutoTrading(true);
@@ -569,7 +575,7 @@ class V1HistoricalReplayValidationTest {
 
         private static ReplayScenario confused(String name, String symbol,
                                                List<ReplayCandle> oneMinute, List<ReplayCandle> fiveMinute) {
-            return new ReplayScenario(name, symbol, "BEARISH", false, false, AssetStateEnum.CONFUSED, 70, 65,
+            return new ReplayScenario(name, symbol, "WAIT", false, false, AssetStateEnum.CONFUSED, 70, 65,
                     oneMinute, fiveMinute,
                     new AiConflictResult(AiConflictLevelEnum.LEVEL_4_EXTREME_CONFLICT, "BEARISH", "LOW", "HIGH",
                             "CONFUSED", 92, 3, false, 92),

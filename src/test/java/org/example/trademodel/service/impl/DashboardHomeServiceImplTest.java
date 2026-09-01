@@ -825,6 +825,9 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getPnlPct()).isEqualByComparingTo("2.41935500");
         assertThat(homePosition.getPnlAmount()).isEqualByComparingTo("300.0");
         assertThat(homePosition.getPnlPercent()).isEqualByComparingTo("2.41935500");
+        assertThat(homePosition.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+        assertThat(homePosition.getFeeCoverage()).isEqualTo("UNKNOWN");
+        assertThat(homePosition.getFundingCoverage()).isEqualTo("UNKNOWN");
         assertThat(homePosition.getAccountImpactPct()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
                 .isEqualTo("1 笔");

@@ -241,12 +241,19 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
         result.setTakeProfitTargets(takeProfitTargets);
         result.setRrRatio(rr);
         List<BoundarySourceRefDTO> refs = new ArrayList<>();
-        refs.add(sourceRef("ENTRY", result.getTimeframe(), null, null, result.getEntrySourceRef()));
-        refs.add(sourceRef("STOP", result.getTimeframe(), null, null, result.getStopSourceRef()));
+        refs.add(sourceRef(request, "ENTRY", result.getTimeframe(), null, null,
+                result.getEntrySourceRef(), result.getEntryReason()));
+        refs.add(sourceRef(request, "STOP", result.getTimeframe(), null, null,
+                result.getStopSourceRef(), result.getStopReason()));
         for (int i = 0; i < takeProfitTargets.size(); i++) {
             MarketStructureTakeProfitTargetDTO target = takeProfitTargets.get(i);
-            refs.add(sourceRef(target.getTargetType(), result.getTimeframe(), null, i, target.getSourceRef()));
+            refs.add(sourceRef(request, target.getTargetType(), result.getTimeframe(), null, i,
+                    target.getSourceRef(), target.getReason()));
         }
+        refs.add(sourceRef(request, "RISK_REWARD", result.getTimeframe(), null, null,
+                result.getEntrySourceRef() + "|" + result.getStopSourceRef()
+                        + "|" + firstTarget.getSourceRef(),
+                "由同一分析的确定性入场、止损和目标实时计算"));
         result.setSourceRefs(refs);
     }
 
@@ -550,18 +557,31 @@ public class MarketStructureBoundaryExtractorImpl implements MarketStructureBoun
     }
 
     private BoundarySourceRefDTO sourceRef(
+            MarketStructureBoundaryRequest request,
             String sourceType,
             String timeframe,
             Long barTime,
             Integer index,
-            String reason
+            String sourceId,
+            String calculationReason
     ) {
         BoundarySourceRefDTO ref = new BoundarySourceRefDTO();
+        RuntimeKlineItemDTO latest = request == null || request.getBars() == null
+                || request.getBars().isEmpty() ? null
+                : sortedBars(request.getBars()).get(sortedBars(request.getBars()).size() - 1);
+        Long effectiveBarTime = barTime != null ? barTime : latest == null ? null : latest.getCloseTimeMs();
         ref.setSourceType(sourceType);
         ref.setTimeframe(timeframe);
-        ref.setBarTime(barTime);
+        ref.setBarTime(effectiveBarTime);
         ref.setIndex(index);
-        ref.setReason(reason);
+        ref.setReason(calculationReason);
+        ref.setSourceId(sourceId);
+        ref.setProvider(latest == null ? null : latest.getProvider());
+        ref.setObservedAt(effectiveBarTime == null ? null
+                : java.time.Instant.ofEpochMilli(effectiveBarTime).toString());
+        ref.setStructureId(sourceType + ":" + timeframe + ":" + sourceId);
+        ref.setCalculationReason(calculationReason);
+        ref.setAnalysisId(request == null ? null : request.getAnalysisId());
         return ref;
     }
 

@@ -32,6 +32,17 @@ is not a runtime target.
 
 ## Runtime Captures
 
+Final same-run, real-provider evidence:
+
+- `runtime/post-fix-real-binance-home-1280x720-viewport.jpg`
+- `runtime/post-fix-real-binance-home-1280x1036-full.jpg`
+
+These two captures come from the authenticated standard release JAR running
+against an isolated H2 database after one authorized ADAUSDT/5m Asset Pool
+scan. They show one analyzed ADA observation card, no unscanned-template fill,
+no Final field substitution and no UI Review fixture. The in-app browser owns a
+fixed 1280 x 720 viewport; these files are not relabelled as 1440 evidence.
+
 - `desktop-home-1280x800.jpg`
 - `desktop-home-1440x900.jpg`
 - `desktop-home-1600x1000.jpg`

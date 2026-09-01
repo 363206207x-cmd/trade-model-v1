@@ -3,5 +3,6 @@ package org.example.trademodel.positionmonitorlog;
 public enum PositionEntryLogicStatusEnum {
     STILL_VALID,
     WEAKENED,
-    INVALIDATED
+    INVALIDATED,
+    NOT_APPLICABLE
 }

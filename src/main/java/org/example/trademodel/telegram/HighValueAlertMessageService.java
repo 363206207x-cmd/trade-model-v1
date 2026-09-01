@@ -112,6 +112,8 @@ public class HighValueAlertMessageService {
                         plan != null && "PASS".equals(normalize(plan.getRuleValidationStatus()))
                                 && "FINAL_VALIDATED".equals(normalize(plan.getChainStatus())),
                         plan == null ? null : firstText(plan.getFinalPlanMode(), plan.getPlanMode()),
+                        plan == null ? null : plan.getFinalMarketBias(),
+                        decision == null ? null : decision.getRiskLevel(),
                         plan == null ? null : plan.getPlanLifecycleState(),
                         opportunity == null || opportunity.state() == null ? null : opportunity.state().name(),
                         expired,
@@ -144,7 +146,9 @@ public class HighValueAlertMessageService {
                 run.getSymbol(), run.getTraceId(), effectiveExpiry);
         message.setCurrentRecheckId(null);
         message.setTitle(HighValueAlertPolicy.OPPORTUNITY_SHORT_TITLE);
-        message.setBody(run.getSymbol().trim() + "  ·  " + readableBias(plan.getFinalMarketBias()) + "  ·  确认型"
+        String finalMode = firstText(plan.getFinalPlanMode(), plan.getPlanMode());
+        message.setBody(run.getSymbol().trim() + "  ·  " + readableBias(plan.getFinalMarketBias())
+                + "  ·  " + readablePlanMode(finalMode)
                 + "\n\n入场：" + plan.getEntryZone().trim()
                 + "\n触发：" + plan.getTriggerCondition().trim()
                 + "\n止损：" + plan.getStopLoss().trim()
@@ -152,7 +156,7 @@ public class HighValueAlertMessageService {
                 + "\n有效至：" + format(effectiveExpiry)
                 + "\n\n操作：打开系统重新校验");
         message.setDedupeKey(TelegramDedupeKey.createPlanLifetime(HighValueAlertPolicy.OPPORTUNITY_EVENT,
-                "CONFIRMATION", 3,
+                normalize(finalMode), 3,
                 run.getOwnerId(), "FINAL_PLAN", plan.getPlanId()));
         return messageFactService.recordIfAbsent(message);
     }
@@ -161,21 +165,21 @@ public class HighValueAlertMessageService {
         if (input == null || !policy.allowsSafetyChange(new HighValueAlertPolicy.SafetyQualification(
                 input.userId(), input.changeType(), input.traceable(), true, true))) return null;
         LocalDateTime now = input.occurredAt() == null ? LocalDateTime.now(clock) : input.occurredAt();
+        String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
+        String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
+        if (!hasText(subjectId)) return null;
         MessageDO message = base(input.userId(), "OPPORTUNITY_PLAN_SAFETY_CHANGE",
-                required(input.sourceType()), required(input.sourceId()), input.analysisId(), null,
+                subjectType, subjectId, input.analysisId(), null,
                 input.planId(), input.symbol(), input.traceId(), input.expiresAt());
         message.setCurrentRecheckId(null);
-        message.setTitle("【原计划需要重新验证】");
+        message.setTitle(HighValueAlertPolicy.SAFETY_SHORT_TITLE);
         message.setBody("资产：" + safe(input.symbol())
                 + "\n变化：" + readableSafetyChange(input.changeType())
                 + "\n原因：" + concise(input.reason())
                 + "\n当前状态：暂不视为有效机会"
                 + "\n恢复条件：" + concise(input.recoveryCondition()));
-        String subjectType = hasText(input.planId()) ? "FINAL_PLAN" : "OPPORTUNITY";
-        String subjectId = hasText(input.planId()) ? input.planId() : input.opportunityId();
-        if (!hasText(subjectId)) return null;
-        message.setDedupeKey(TelegramDedupeKey.create(input.changeType().name(),
-                input.state(), Math.max(2, input.severity()), telegramProperties.getCooldownMinutes(),
+        message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.SAFETY_EVENT,
+                input.changeType().name(), Math.max(2, input.severity()), telegramProperties.getCooldownMinutes(),
                 input.userId(), subjectType, subjectId, now));
         return messageFactService.recordIfAbsent(message);
     }
@@ -363,9 +367,15 @@ public class HighValueAlertMessageService {
     private static String format(LocalDateTime value) { return value == null ? "当前不可查看" : DATE_TIME.format(value); }
     private static String readableBias(String value) {
         return switch (normalize(value)) {
-            case "STRONG_LONG" -> "强偏多"; case "LONG" -> "偏多"; case "WEAK_LONG" -> "弱偏多";
-            case "NEUTRAL" -> "中性"; case "WEAK_SHORT" -> "弱偏空"; case "SHORT" -> "偏空";
-            case "STRONG_SHORT" -> "强偏空"; case "CONFUSED" -> "冲突"; default -> "当前不可查看";
+            case "STRONG_BULLISH", "STRONG_LONG" -> "强偏多";
+            case "BULLISH", "LONG" -> "偏多";
+            case "WEAK_BULLISH", "WEAK_LONG" -> "弱偏多";
+            case "RANGE", "NEUTRAL" -> "震荡";
+            case "WEAK_BEARISH", "WEAK_SHORT" -> "弱偏空";
+            case "BEARISH", "SHORT" -> "偏空";
+            case "STRONG_BEARISH", "STRONG_SHORT" -> "强偏空";
+            case "WAIT", "CONFUSED" -> "观望";
+            default -> "当前不可查看";
         };
     }
     private static String readableDirection(String value) {
@@ -405,7 +415,9 @@ public class HighValueAlertMessageService {
     private static String readableEntryLogic(String value) {
         return switch (normalize(value)) {
             case "WEAKENED" -> "入场逻辑弱化"; case "INVALIDATED" -> "入场逻辑失效";
-            case "STILL_VALID" -> "入场逻辑仍成立"; default -> "当前变化待人工核对";
+            case "STILL_VALID" -> "入场逻辑仍成立";
+            case "NOT_APPLICABLE" -> "原入场逻辑不适用";
+            default -> "当前变化待人工核对";
         };
     }
     private static String readableReversal(String value) {

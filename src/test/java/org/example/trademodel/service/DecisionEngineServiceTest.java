@@ -324,7 +324,7 @@ class DecisionEngineServiceTest {
     }
 
     @Test
-    void makeDecision_threeAlignedTimeframesMeetTheFrozenConvergenceThreshold() {
+    void makeDecision_conflictingStructuralTimeframesFailClosedEvenWhenLowerTimeframesAlign() {
         when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
                 .thenAnswer(invocation -> "1h".equals(invocation.getArgument(1))
                         ? bearishKlines()
@@ -332,9 +332,9 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-mtf-conflict", 85, 65);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
-        assertThat(decision.getMultiTfConvergence()).isEqualTo("STRONG");
-        assertThat(decision.getIsWorthOpening()).isTrue();
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(decision.getMultiTfConvergence()).isEqualTo("WEAK");
+        assertThat(decision.getIsWorthOpening()).isFalse();
     }
 
     @Test
@@ -392,10 +392,13 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-11", 85, 65);
 
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BEARISH");
+        assertThat(decision.getRuleMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(decision.getValidatedMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(decision.getFinalMarketBias()).isNull();
         assertThat(decision.getAiRoleResults())
                 .contains("\"schemaVersion\":\"v1\"")
-                .contains("\"finalMarketBias\":\"STRONG_BEARISH\"")
                 .contains("\"ruleDirectionPreserved\":true");
+        assertThat(decision.getAiRoleResults()).doesNotContain("\"finalMarketBias\"");
         assertThat(decision.getAiRoleResults()).doesNotContain("最终裁决");
     }
 
@@ -555,9 +558,12 @@ class DecisionEngineServiceTest {
         assertThat(context.getAiProviderConflictContribution()).isEqualTo(18);
         assertThat(context.getAiOrchestrationMode()).isEqualTo("AI_ASSISTED");
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getRuleMarketBias()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getValidatedMarketBias()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getFinalMarketBias()).isNull();
         assertThat(decision.getAiRoleResults())
-                .contains("\"finalMarketBias\":\"STRONG_BULLISH\"")
                 .contains("\"ruleDirectionPreserved\":true");
+        assertThat(decision.getAiRoleResults()).doesNotContain("\"finalMarketBias\"");
         assertThat(decision.getAiRoleResults()).doesNotContain("Grok advisory");
         assertThat(decision.getAiRoleResults()).doesNotContain("Gemini advisory");
     }
@@ -638,19 +644,26 @@ class DecisionEngineServiceTest {
     }
 
     private static List<String[]> bullishKlines() {
-        return List.of(
-                new String[]{"0", "100", "110", "95", "108"},
-                new String[]{"0", "108", "112", "107", "110"},
-                new String[]{"0", "110", "118", "109", "117"}
-        );
+        return directionalKlines(true);
     }
 
     private static List<String[]> bearishKlines() {
-        return List.of(
-                new String[]{"0", "110", "112", "105", "108"},
-                new String[]{"0", "108", "109", "101", "104"},
-                new String[]{"0", "104", "105", "98", "100"}
-        );
+        return directionalKlines(false);
+    }
+
+    private static List<String[]> directionalKlines(boolean bullish) {
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 60; index++) {
+            java.math.BigDecimal open = new java.math.BigDecimal("100");
+            java.math.BigDecimal close = bullish
+                    ? open.add(java.math.BigDecimal.valueOf(index + 1L, 1))
+                    : open.subtract(java.math.BigDecimal.valueOf(index + 1L, 1));
+            bars.add(new String[]{String.valueOf(index), open.toPlainString(),
+                    open.max(close).add(java.math.BigDecimal.ONE).toPlainString(),
+                    open.min(close).subtract(java.math.BigDecimal.ONE).toPlainString(),
+                    close.toPlainString()});
+        }
+        return bars;
     }
 
     private static AiProviderReviewResult successfulRole(AiProviderName provider,

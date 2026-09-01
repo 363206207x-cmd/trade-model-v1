@@ -28,6 +28,7 @@ import org.example.trademodel.service.OpportunityTransitionResult;
 import org.example.trademodel.service.OpportunityStateIdentity;
 import org.example.trademodel.service.OpportunityTriggerSource;
 import org.example.trademodel.service.support.ExecutionFeasibilityContract;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EvidenceItemVO;
@@ -117,6 +118,35 @@ class DecisionChainServiceImplTest {
         verify(assetStateService, never()).transition(
                 any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(), anyString(), anyString(), any());
         verify(aiOrchestratorService, never()).invoke(any());
+    }
+
+    @Test
+    void explicitOptionalAbsenceIsCompleteButUnexplainedNullsRemainBlocked() {
+        ScoreItemVO explicitMissingScore = score("score-optional", "资金推动分");
+        explicitMissingScore.setScoreValue(null);
+        explicitMissingScore.setDescription(
+                "coverage=0.0;missingInputs=[verifiedFundingRate];permission=INSUFFICIENT_DATA");
+        assertThat(V41DecisionContractPolicy.scoreItemContractComplete(explicitMissingScore)).isTrue();
+
+        explicitMissingScore.setDescription("provider unavailable");
+        assertThat(V41DecisionContractPolicy.scoreItemContractComplete(explicitMissingScore)).isFalse();
+
+        EvidenceItemVO unavailableEvidence = evidence();
+        unavailableEvidence.setStrength(null);
+        unavailableEvidence.setConfidence(null);
+        unavailableEvidence.setCurrentValue(null);
+        unavailableEvidence.setChangeFromBaseline(null);
+        unavailableEvidence.setObservedAt(null);
+        unavailableEvidence.setFreshness("SOURCE_UNAVAILABLE");
+        unavailableEvidence.setDescription("Optional derivatives provider is unavailable");
+        assertThat(V41DecisionContractPolicy.evidenceItemContractComplete(
+                unavailableEvidence, "analysis-1")).isTrue();
+
+        unavailableEvidence.setFreshness("FRESH");
+        assertThat(V41DecisionContractPolicy.evidenceItemContractComplete(
+                unavailableEvidence, "analysis-1")).isFalse();
+        assertThat(V41DecisionContractPolicy.evidenceItemContractComplete(
+                evidence(), "analysis-1")).isTrue();
     }
 
     @Test
@@ -273,7 +303,7 @@ class DecisionChainServiceImplTest {
         assertThat(result.candidate().getAnalysisTimeframesJson()).isNull();
         assertThat(result.candidate().getRevalidationRule()).isNull();
         assertThat(result.validation().passed()).isFalse();
-        assertThat(result.validation().reasons()).containsExactly("GPT_CANDIDATE_REQUIRED");
+        assertThat(result.validation().reasons()).containsExactly("COMPLETE_THREE_AI_CHAIN_REQUIRED");
         assertThat(result.finalPlan().getFinalPlan()).isFalse();
         assertThat(result.finalPlan().getChainStatus()).isEqualTo("RULE_VALIDATION_BLOCKED");
         ArgumentCaptor<String> fallbackPayloads = ArgumentCaptor.forClass(String.class);
@@ -323,6 +353,76 @@ class DecisionChainServiceImplTest {
                     "EIGHT_SCORE_CONTRACT_INCOMPLETE",
                     "MULTI_TIMEFRAME_CONTRACT_INCOMPLETE");
         });
+    }
+
+    @Test
+    void explicitOptionalMissingInputsDoNotBlockTheThreeAiInputContract() {
+        DecisionChainBuildInput complete = input();
+        complete.scores().get(1).setScoreValue(null);
+        complete.scores().get(1).setDescription(
+                "coverage=0.0;missingInputs=[verifiedFundingRate];permission=INSUFFICIENT_DATA");
+        EvidenceItemVO unavailable = new EvidenceItemVO();
+        unavailable.setEvidenceId("evidence-optional-unavailable");
+        unavailable.setAnalysisId(complete.analysisId());
+        unavailable.setEvidenceType("风险");
+        unavailable.setSource("SYSTEM_GENERATED");
+        unavailable.setSourceReference("provider=OPTIONAL;state=UNAVAILABLE");
+        unavailable.setSourceTraceId("source-trace-optional");
+        unavailable.setFreshness("UNAVAILABLE");
+        unavailable.setDescription("OPTIONAL_PROVIDER_DATA_UNAVAILABLE");
+        List<EvidenceItemVO> evidence = new ArrayList<>(complete.evidence());
+        evidence.add(unavailable);
+        complete.rulePlan().setSourceGateComplete(false);
+        complete.rulePlan().setSourceGateStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
+        DecisionChainBuildInput degraded = new DecisionChainBuildInput(
+                complete.analysisId(), complete.traceId(), complete.symbol(), complete.timeframe(),
+                complete.dataQualityScore(), complete.decision(), complete.rulePlan(), evidence,
+                complete.scores(), complete.triggerType(), complete.ownerType(), complete.ownerId(),
+                complete.assetId(), complete.ruleVersion(), complete.preview(), complete.requestId(),
+                complete.accountRiskSnapshot());
+        stubHappyPath();
+
+        service.build(degraded);
+
+        ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
+        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(requests.capture());
+        assertThat(requests.getAllValues()).allSatisfy(request -> {
+            assertThat(request.isInputContractSatisfied()).isTrue();
+            assertThat(request.getInputContractFailures()).doesNotContain(
+                    "EVIDENCE_CONTRACT_INCOMPLETE",
+                    "EIGHT_SCORE_CONTRACT_INCOMPLETE",
+                    "RULE_SOURCE_GATE_INCOMPLETE");
+        });
+    }
+
+    @Test
+    void validatedObservationFinalClearsEveryDirectionalExecutionParameter() {
+        stubHappyPath();
+        ConflictResolverResultDO observation = conflict(false);
+        observation.setPlanModeAfter("OBSERVATION");
+        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(observation);
+        DecisionChainBuildInput input = input();
+        input.rulePlan().setEntryZone("100-101");
+        input.rulePlan().setStopLoss("95");
+        input.rulePlan().setTakeProfitRules("110");
+        input.rulePlan().setLeverageSuggestion("1x");
+        input.rulePlan().setPositionSuggestion("10%");
+        input.rulePlan().setLeverageLimit("1x");
+        input.rulePlan().setPositionLimit("10%");
+
+        DecisionChainBuildResult result = service.build(input);
+
+        assertThat(result.finalPlan().getFinalPlan()).isTrue();
+        assertThat(result.finalPlan().getFinalPlanMode()).isEqualTo("OBSERVATION");
+        assertThat(result.finalPlan().getEntryZone()).isNull();
+        assertThat(result.finalPlan().getStopLoss()).isNull();
+        assertThat(result.finalPlan().getTakeProfitRules()).isNull();
+        assertThat(result.finalPlan().getLeverageSuggestion()).isNull();
+        assertThat(result.finalPlan().getPositionSuggestion()).isNull();
+        assertThat(result.finalPlan().getLeverageLimit()).isNull();
+        assertThat(result.finalPlan().getPositionLimit()).isNull();
+        assertThat(result.finalPlan().getExpectedRiskReward()).isNull();
     }
 
     @Test
@@ -454,6 +554,8 @@ class DecisionChainServiceImplTest {
         decision.setConfidenceLevel("HIGH");
         decision.setRiskLevel("MEDIUM");
         decision.setRuleMarketBias("BULLISH");
+        decision.setValidatedMarketBias("BULLISH");
+        decision.setDirectionDataState("READY");
         decision.setRuleConfidence("HIGH");
         decision.setRuleRisk("MEDIUM");
         decision.setConclusionSummary("Rule conclusion");
@@ -549,7 +651,7 @@ class DecisionChainServiceImplTest {
                 score("score-5", "情绪温度分"),
                 score("score-6", "事件冲击分"),
                 score("score-7", "宏观环境分"),
-                score("score-8", "综合可信度分"));
+                score("score-8", "证据可信度分"));
     }
 
     private static ScoreItemVO score(String id, String type) {

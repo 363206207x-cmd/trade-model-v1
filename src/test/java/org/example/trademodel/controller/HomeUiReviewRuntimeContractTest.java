@@ -76,9 +76,10 @@ class HomeUiReviewRuntimeContractTest {
                 %s
                 const assets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map((symbol, index) => ({
                   symbol, name: symbol.slice(0, -4), opportunityState: index === 2 ? 'HIGH_RISK' : 'WAITING_TRIGGER',
-                  primaryPlanMode: 'PREPARATION', opportunityScore: 80 - index, confidenceLabel: '80%%',
-                  riskLabel: index === 2 ? '高' : '中', primaryTimeframe: '15m', timeframeConflictState: 'ALIGNED',
-                  rankingReason: 'fixture', secondaryOpportunityCount: 0, hasFinal: false
+                  finalPlanMode: 'PREPARATION', finalMarketBias: 'BULLISH', confidenceLevel: 'HIGH',
+                  confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
+                  riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
+                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: true
                 }));
                 function render(selected) { return assets.map(asset => opportunityCard(asset, selected)).join(''); }
                 const btc = render('BTCUSDT');
@@ -89,7 +90,8 @@ class HomeUiReviewRuntimeContractTest {
                 assert.match(eth, /aria-pressed=\"true\" data-symbol=\"ETHUSDT\"/);
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
-                assert.match(eth, /HIGH_RISK/);
+                assert.doesNotMatch(eth, /HIGH_RISK/);
+                assert.equal(eth.includes('<small>风险</small><strong>高</strong>'), true);
                 console.log('HOME_OPPORTUNITY_PRESSED_STATE=PASS');
                 """.formatted(stateBadge, opportunityCard);
 
@@ -143,29 +145,32 @@ class HomeUiReviewRuntimeContractTest {
                 const observation = {
                   assetId: 1, symbol: 'ETHUSDT', name: 'ETH', slotType: 'OBSERVATION',
                   opportunityState: 'NO_QUALIFIED_OPPORTUNITY', dataFreshness: 'FRESH',
-                  primaryTimeframe: '5m', latestAnalysisTime: '2026-08-30T10:00:00Z'
+                  oneHourOpportunityLabel: '1小时观察', fourHourTrendLabel: '4小时趋势震荡',
+                  latestAnalysisTime: '2026-08-30T10:00:00Z'
                 };
-                const blockedDecision = {
-                  assetId: 2, symbol: 'BTCUSDT', name: 'BTC', slotType: 'DECISION',
+                const blockedObservation = {
+                  assetId: 2, symbol: 'BTCUSDT', name: 'BTC', slotType: 'OBSERVATION',
                   analysisId: 'analysis-btc', opportunityId: 'opportunity-btc', opportunityScore: 0,
-                  opportunityState: 'HIGH_RISK', primaryPlanMode: 'BLOCKED', dataFreshness: 'STALE',
-                  confidenceLabel: '80%%', riskLabel: '高', primaryTimeframe: '15m',
-                  timeframeConflictState: 'ALIGNED', hasFinal: false
+                  opportunityState: 'HIGH_RISK', finalPlanMode: 'BLOCKED', dataFreshness: 'STALE',
+                  confidenceLabel: '80%%', riskLabel: '高', oneHourOpportunityLabel: '1小时高风险观察',
+                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: false
                 };
                 assert.equal(validObservationCard(observation), true);
-                assert.equal(validOpportunityCard(blockedDecision), true);
+                assert.equal(validOpportunityCard(blockedObservation), false);
+                assert.equal(validObservationCard(blockedObservation), true);
                 assert.equal(validObservationCard({ ...observation, slotType: 'DEFAULT_SLOT' }), false);
-                assert.equal(validObservationCard({ ...observation, opportunityScore: 1 }), false);
-                assert.equal(validOpportunityCard({ ...blockedDecision, analysisId: null }), false);
+                assert.equal(validObservationCard({ ...observation, opportunityScore: 1 }), true);
+                assert.equal(validOpportunityCard({ ...blockedObservation, slotType: 'DECISION', analysisId: null }), false);
                 const observationHtml = observationCard(observation, '');
                 assert.match(observationHtml, /暂无合格机会/);
-                assert.match(observationHtml, /数据状态/);
+                assert.equal(observationHtml.includes('<small>状态</small>'), true);
                 assert.doesNotMatch(observationHtml, /机会评分|置信度|风险|最终偏向|计划模式|入场|止损|目标/);
-                const decisionHtml = opportunityCard(blockedDecision, '');
-                assert.match(decisionHtml, /数据过期/);
+                const blockedHtml = observationCard(blockedObservation, '');
+                assert.match(blockedHtml, /高风险观察/);
+                assert.match(blockedHtml, /数据过期/);
                 const all = [
                   observation,
-                  blockedDecision,
+                  blockedObservation,
                   { ...observation, assetId: 3, symbol: 'ETHUSDT' },
                   { ...observation, assetId: 4, symbol: 'SOLUSDT' },
                   { ...observation, assetId: 5, symbol: 'ADAUSDT' },

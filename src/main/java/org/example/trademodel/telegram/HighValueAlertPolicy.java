@@ -10,11 +10,14 @@ import java.util.Set;
 @Component
 public class HighValueAlertPolicy {
     static final String OPPORTUNITY_EVENT = "OPPORTUNITY_READY";
+    static final String SAFETY_EVENT = "PLAN_SAFETY_CHANGE";
     static final String POSITION_EVENT = "POSITION_RISK_CHANGE";
     static final String OPPORTUNITY_TELEGRAM_CATEGORY = "EXECUTABLE_FINAL_PLAN";
     static final String POSITION_TELEGRAM_CATEGORY = "ACTIVE_POSITION_ATTENTION";
+    static final String SAFETY_TELEGRAM_CATEGORY = "PLAN_SAFETY_CHANGE";
     static final String OPPORTUNITY_SHORT_TITLE = "【可复核执行计划】";
     static final String POSITION_SHORT_TITLE = "【持仓需关注】";
+    static final String SAFETY_SHORT_TITLE = "【原计划需要重新验证】";
 
     private static final Set<String> BLOCKED_OPPORTUNITY_STATES = Set.of(
             "HIGH_RISK", "INVALIDATED", "COOLING", "CONFUSED");
@@ -36,7 +39,9 @@ public class HighValueAlertPolicy {
                 && value.persistedOpportunity()
                 && value.finalPlan()
                 && value.ruleValidated()
-                && "CONFIRMATION".equals(normalized(value.finalPlanMode()))
+                && Set.of("CONFIRMATION", "REDUCED").contains(normalized(value.finalPlanMode()))
+                && Set.of("STRONG_BULLISH", "STRONG_BEARISH").contains(normalized(value.finalMarketBias()))
+                && Set.of("LOW", "MEDIUM").contains(normalized(value.finalRiskLevel()))
                 && "CURRENT".equals(normalized(value.planLifecycleState()))
                 && !opportunityState.isEmpty()
                 && !BLOCKED_OPPORTUNITY_STATES.contains(opportunityState)
@@ -116,7 +121,8 @@ public class HighValueAlertPolicy {
         if (!TelegramDedupeKey.managed(dedupeKey)) return false;
         String event = normalized(TelegramDedupeKey.eventType(dedupeKey));
         String state = normalized(TelegramDedupeKey.state(dedupeKey));
-        return (OPPORTUNITY_EVENT.equals(event) && "CONFIRMATION".equals(state))
+        return (OPPORTUNITY_EVENT.equals(event) && Set.of("CONFIRMATION", "REDUCED").contains(state))
+                || (SAFETY_EVENT.equals(event) && isSafetyState(state))
                 || (POSITION_EVENT.equals(event) && TELEGRAM_POSITION_STATES.contains(state));
     }
 
@@ -147,8 +153,23 @@ public class HighValueAlertPolicy {
                 return Optional.empty();
             }
             return Optional.of(new TelegramDeliveryIdentity(
-                    OPPORTUNITY_TELEGRAM_CATEGORY, "CONFIRMATION", "FINAL_PLAN",
+                    OPPORTUNITY_TELEGRAM_CATEGORY, state, "FINAL_PLAN",
                     message.getPlanId().trim(), 3));
+        }
+        if (SAFETY_EVENT.equals(event)) {
+            if (!"OPPORTUNITY_PLAN_SAFETY_CHANGE".equals(normalized(message.getCategory()))
+                    || !SAFETY_SHORT_TITLE.equals(message.getTitle().trim())
+                    || !safetyShortBody(message)) {
+                return Optional.empty();
+            }
+            String subjectType = hasText(message.getPlanId()) ? "FINAL_PLAN" : "OPPORTUNITY";
+            String subjectId = hasText(message.getPlanId()) ? message.getPlanId() : message.getSourceId();
+            if (!hasText(subjectId) || !TelegramDedupeKey.matchesSubject(message.getDedupeKey(),
+                    message.getUserId(), subjectType, subjectId)) {
+                return Optional.empty();
+            }
+            return Optional.of(new TelegramDeliveryIdentity(
+                    SAFETY_TELEGRAM_CATEGORY, state, subjectType, subjectId, safetySeverity(state)));
         }
         if (!"POSITION_LOGIC_RISK_CHANGE".equals(normalized(message.getCategory()))
                 || !POSITION_SHORT_TITLE.equals(message.getTitle().trim())
@@ -183,8 +204,8 @@ public class HighValueAlertPolicy {
         String[] lines = message.getBody().split("\\n", -1);
         return lines.length == 9
                 && lines[0].startsWith(message.getSymbol().trim() + "  ·  ")
-                && lines[0].endsWith("  ·  确认型")
-                && lines[0].length() > message.getSymbol().trim().length() + "  ·    ·  确认型".length()
+                && (lines[0].endsWith("  ·  确认型") || lines[0].endsWith("  ·  缩减型"))
+                && lines[0].length() > message.getSymbol().trim().length() + "  ·    ·  缩减型".length()
                 && lines[1].isEmpty()
                 && populatedLine(lines[2], "入场：")
                 && populatedLine(lines[3], "触发：")
@@ -213,6 +234,32 @@ public class HighValueAlertPolicy {
         return lines[6].startsWith("止损：")
                 && targetIndex > "止损：".length()
                 && targetIndex + "  目标：".length() < lines[6].length();
+    }
+
+    private static boolean safetyShortBody(MessageDO message) {
+        String[] lines = message.getBody().split("\\n", -1);
+        return lines.length == 5
+                && populatedLine(lines[0], "资产：")
+                && populatedLine(lines[1], "变化：")
+                && populatedLine(lines[2], "原因：")
+                && "当前状态：暂不视为有效机会".equals(lines[3])
+                && populatedLine(lines[4], "恢复条件：");
+    }
+
+    private static boolean isSafetyState(String state) {
+        try {
+            SafetyChangeType.valueOf(state);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static int safetySeverity(String state) {
+        return switch (normalized(state)) {
+            case "HIGH_CONFUSED", "HOT_RESET", "FINAL_INVALIDATED", "SOURCE_INVALID" -> 4;
+            default -> 3;
+        };
     }
 
     private static boolean populatedLine(String line, String prefix) {
@@ -272,6 +319,8 @@ public class HighValueAlertPolicy {
             boolean finalPlan,
             boolean ruleValidated,
             String finalPlanMode,
+            String finalMarketBias,
+            String finalRiskLevel,
             String planLifecycleState,
             String opportunityState,
             boolean expired,

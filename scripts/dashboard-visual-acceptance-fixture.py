@@ -1250,7 +1250,7 @@ def analysis_audit_fixture(analysis_id: str, symbol: str) -> dict[str, object]:
     }]
     score_names = [
         "趋势结构分", "资金推动分", "杠杆风险分", "流动性质量分",
-        "情绪温度分", "事件冲击分", "宏观环境分", "综合可信度分",
+        "情绪温度分", "事件冲击分", "宏观环境分", "证据可信度分",
     ]
     scores = [{"scoreType": name, "scoreValue": 88 - index * 2}
               for index, name in enumerate(score_names)]

@@ -67,13 +67,19 @@ class OpportunityPriorityRankingServiceImplTest {
     }
 
     @Test
-    void opportunityScoresDoNotReorderTheFixedHomeStateHierarchy() {
+    void tierOneReplacementRequiresFiveRankingPoints() {
         List<String> symbols = List.of("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT",
                 "FUSDT", "GUSDT", "HUSDT", "IUSDT", "JUSDT");
         when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(symbols));
+        List<AssetStateDO> firstStates = states(symbols,
+                List.of(100, 90, 80, 70, 60, 50, 40, 30, 20, 10));
+        List<AssetStateDO> secondStates = states(symbols,
+                List.of(100, 90, 80, 70, 60, 50, 79, 78, 77, 10));
+        firstStates.forEach(state -> state.setState(AssetStateEnum.TRIGGERED));
+        secondStates.forEach(state -> state.setState(AssetStateEnum.TRIGGERED));
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
-                .thenReturn(states(symbols, List.of(100, 90, 80, 70, 60, 50, 40, 30, 20, 10)))
-                .thenReturn(states(symbols, List.of(100, 90, 80, 70, 60, 50, 79, 78, 77, 10)));
+                .thenReturn(firstStates)
+                .thenReturn(secondStates);
         when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
                 .thenReturn(decisions(symbols, List.of(100, 90, 80, 70, 60, 50, 40, 30, 20, 10)))
                 .thenReturn(decisions(symbols, List.of(100, 90, 80, 70, 60, 50, 79, 78, 77, 10)));
@@ -84,7 +90,7 @@ class OpportunityPriorityRankingServiceImplTest {
         assertThat(first).extracting(HomeTopAssetProjection::symbol)
                 .containsExactly("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT");
         assertThat(second).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT");
+                .containsExactly("AUSDT", "BUSDT", "CUSDT", "GUSDT", "HUSDT", "DUSDT");
     }
 
     @Test
@@ -133,20 +139,55 @@ class OpportunityPriorityRankingServiceImplTest {
 
         List<HomeTopAssetProjection> ranked = service.rankForHome(USER_ID, 6);
 
-        assertThat(ranked).hasSize(3);
-        assertThat(ranked.get(0)).satisfies(asset -> {
+        assertThat(ranked).singleElement().satisfies(asset -> {
             assertThat(asset.symbol()).isEqualTo("BTCUSDT");
             assertThat(asset.opportunityId()).isEqualTo("opportunity-BTCUSDT");
             assertThat(asset.analysisId()).isEqualTo("analysis-BTCUSDT");
             assertThat(asset.rankingReason()).contains(
                     "HOME_STATE=CANDIDATE", "DATA_STATUS=FRESH", "SOURCE=ASSET_POOL_SCAN");
         });
-        assertThat(ranked.subList(1, 3)).allSatisfy(asset -> {
+    }
+
+    @Test
+    void systemDefaultTemplateFromEffectiveUserPoolCanBecomeARealTierTwoObservation() {
+        String symbol = "ADAUSDT";
+        AssetPoolAssetDTO systemDefault = poolAsset(symbol, 0L, "OBSERVING", "DEFAULT");
+        DecisionResultVO decision = decision(symbol, 55, "LOW", "MEDIUM",
+                "BLOCKED", "LEVEL_1_CONSISTENT", 95);
+        decision.setOpportunityScore(null);
+        decision.setFinalMarketBias(null);
+        decision.setFinalConfidence(null);
+        AssetStateDO state = state(symbol);
+        state.setExtJson(scanAudit(LocalDateTime.of(2026, 8, 11, 12, 20),
+                "SUCCESS", "FRESH", true));
+        AssetPoolAssetDTO unscannedDefault = poolAsset("XRPUSDT", 0L, "OBSERVING", "DEFAULT");
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(List.of(systemDefault, unscannedDefault));
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(
+                anyList(), eq("USER"), eq(USER_ID))).thenReturn(List.of(decision));
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(List.of(state));
+
+        assertThat(service.rankForHome(USER_ID, 6)).singleElement().satisfies(asset -> {
+            assertThat(asset.symbol()).isEqualTo(symbol);
+            assertThat(asset.rankingReason()).startsWith("SLOT_TYPE=OBSERVATION|");
+            assertThat(asset.analysisId()).isEqualTo("analysis-" + symbol);
+            assertThat(asset.opportunityId()).isEqualTo("opportunity-" + symbol);
+            assertThat(asset.opportunityState()).isEqualTo("CANDIDATE");
+            assertThat(asset.opportunityScore()).isNull();
+            assertThat(asset.finalMarketBias()).isNull();
+            assertThat(asset.finalPlanMode()).isNull();
             assertThat(asset.sourceDecision()).isNull();
-            assertThat(asset.opportunityId()).isNull();
-            assertThat(asset.analysisId()).isNull();
-            assertThat(asset.opportunityState()).isEqualTo("NEVER_SCANNED");
         });
+    }
+
+    @Test
+    void foreignUserPoolRowsRemainExcluded() {
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(List.of(
+                poolAsset("ADAUSDT", USER_ID + 1, "OBSERVING", "USER_ADDED")));
+
+        assertThat(service.rankForHome(USER_ID, 6)).isEmpty();
+        verify(decisionResultMapper, never())
+                .findLatestDecisionResultsForSymbolsJoined(anyList(), anyString(), eq(USER_ID));
     }
 
     @Test
@@ -166,7 +207,7 @@ class OpportunityPriorityRankingServiceImplTest {
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID))).thenReturn(rows);
 
         assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("TRIGUSDT", "WAITUSDT", "CANDUSDT", "HIGHUSDT", "OBSUSDT");
+                .containsExactly("TRIGUSDT", "CANDUSDT", "HIGHUSDT", "WAITUSDT", "OBSUSDT");
     }
 
     @Test
@@ -184,7 +225,7 @@ class OpportunityPriorityRankingServiceImplTest {
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID))).thenReturn(stateRows);
 
         assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("DUSDT", "EUSDT", "FUSDT", "AUSDT", "BUSDT", "CUSDT");
+                .containsExactly("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT");
     }
 
     @Test
@@ -205,24 +246,30 @@ class OpportunityPriorityRankingServiceImplTest {
     }
 
     @Test
-    void highRiskOpportunityIsRetainedAfterDirectionalOpportunityStates() {
+    void highRiskReducedIsRetainedWhileExtremeRiskLeavesTierOne() {
         List<String> symbols = List.of("STATEHIGHUSDT", "RISKHIGHUSDT", "EXTREMEUSDT", "READYUSDT");
         List<AssetStateDO> stateRows = states(symbols);
         stateRows.get(0).setState(AssetStateEnum.HIGH_RISK);
+        stateRows.get(1).setState(AssetStateEnum.TRIGGERED);
+        stateRows.get(2).setState(AssetStateEnum.TRIGGERED);
+        stateRows.get(3).setState(AssetStateEnum.TRIGGERED);
         List<DecisionResultVO> decisionRows = decisions(symbols, List.of(99, 98, 97, 70));
-        stateRows.get(1).setRisk("HIGH");
-        stateRows.get(2).setRisk("EXTREME");
+        decisionRows.get(0).setPlanMode("REDUCED");
+        decisionRows.get(1).setRiskLevel("HIGH");
+        decisionRows.get(2).setRiskLevel("EXTREME");
         when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(symbols));
         when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
                 .thenReturn(decisionRows);
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
                 .thenReturn(stateRows);
 
-        assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("EXTREMEUSDT", "READYUSDT", "RISKHIGHUSDT", "STATEHIGHUSDT");
-        HomeTopAssetProjection highRisk = service.rankForHome(USER_ID, 6).get(3);
+        List<HomeTopAssetProjection> ranked = service.rankForHome(USER_ID, 6);
+        assertThat(ranked).extracting(HomeTopAssetProjection::symbol)
+                .containsExactly("STATEHIGHUSDT", "READYUSDT", "RISKHIGHUSDT", "EXTREMEUSDT");
+        HomeTopAssetProjection highRisk = ranked.get(0);
         assertThat(highRisk.opportunityState()).isEqualTo("HIGH_RISK");
         assertThat(highRisk.sourceDecision()).isNotNull();
+        assertThat(ranked.get(3).sourceDecision()).isNull();
     }
 
     @Test
@@ -265,13 +312,13 @@ class OpportunityPriorityRankingServiceImplTest {
         when(analysisRunMapper.selectById("analysis-BTC-1h")).thenReturn(oneHourRun);
 
         assertThat(service.rankForHome(USER_ID, 6)).singleElement().satisfies(asset -> {
-            assertThat(asset.primaryOpportunityId()).isEqualTo("opportunity-BTC-5m");
-            assertThat(asset.primaryTimeframe()).isEqualTo("5m");
-            assertThat(asset.primaryPlanMode()).isEqualTo("CONFIRMATION");
+            assertThat(asset.primaryOpportunityId()).isEqualTo("opportunity-BTC-1h");
+            assertThat(asset.primaryTimeframe()).isEqualTo("1h");
+            assertThat(asset.primaryPlanMode()).isNull();
             assertThat(asset.secondaryOpportunityCount()).isEqualTo(1);
             assertThat(asset.timeframeConflictState()).isEqualTo("OPPOSING");
             assertThat(asset.rankingReason()).contains(
-                    "PRIMARY_TIMEFRAME=5m", "SECONDARY_OPPORTUNITY_COUNT=1",
+                    "PRIMARY_TIMEFRAME=1h", "SECONDARY_OPPORTUNITY_COUNT=1",
                     "TIMEFRAME_CONFLICT_STATE=OPPOSING");
         });
     }
@@ -300,8 +347,12 @@ class OpportunityPriorityRankingServiceImplTest {
                 anyList(), eq("USER"), eq(USER_ID))).thenReturn(List.of(
                 decision("SEARCHONLYUSDT", 99, "HIGH", "LOW", "CONFIRMATION",
                         "LEVEL_1_CONSISTENT", 99)));
+        AssetStateDO a = observationState("AUSDT", "FRESH",
+                LocalDateTime.of(2026, 8, 11, 12, 15));
+        AssetStateDO g = observationState("GUSDT", "FRESH",
+                LocalDateTime.of(2026, 8, 11, 12, 10));
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
-                .thenReturn(List.of());
+                .thenReturn(List.of(a, g));
 
         List<HomeTopAssetProjection> ranked = service.rankForHome(USER_ID, 6);
 
@@ -375,9 +426,9 @@ class OpportunityPriorityRankingServiceImplTest {
         List<HomeTopAssetProjection> ranked = service.rankForHome(USER_ID, 6);
 
         assertThat(ranked).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("FRESHNEWUSDT", "FRESHOLDUSDT", "CONFLICTUSDT", "STALEUSDT", "NEVERUSDT");
+                .containsExactly("FRESHNEWUSDT", "FRESHOLDUSDT", "CONFLICTUSDT", "STALEUSDT");
         assertThat(ranked).extracting(HomeTopAssetProjection::freshness)
-                .containsExactly("FRESH", "FRESH", "TIMEFRAME_CONFLICT", "STALE", "NEVER_SCANNED");
+                .containsExactly("FRESH", "FRESH", "TIMEFRAME_CONFLICT", "STALE");
     }
 
     @Test
@@ -403,7 +454,7 @@ class OpportunityPriorityRankingServiceImplTest {
         List<HomeTopAssetProjection> ranked = service.rankForHome(USER_ID, 6);
 
         assertThat(ranked).extracting(HomeTopAssetProjection::symbol)
-                .containsExactly("FRESHNEWUSDT", "FRESHOLDUSDT", "CONFLICTUSDT", "STALEUSDT");
+                .containsExactly("FRESHOLDUSDT", "FRESHNEWUSDT", "CONFLICTUSDT", "STALEUSDT");
         assertThat(ranked).extracting(HomeTopAssetProjection::freshness)
                 .containsExactly("FRESH", "FRESH", "TIMEFRAME_CONFLICT", "STALE");
         assertThat(ranked.get(2).timeframeConflictState()).isEqualTo("TIMEFRAME_CONFLICT");
@@ -432,15 +483,7 @@ class OpportunityPriorityRankingServiceImplTest {
         when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
                 .thenReturn(List.of(state));
 
-        assertThat(service.rankForHome(USER_ID, 6)).singleElement().satisfies(asset -> {
-            assertThat(asset.sourceDecision()).isNull();
-            assertThat(asset.analysisId()).isNull();
-            assertThat(asset.opportunityId()).isNull();
-            assertThat(asset.opportunityScore()).isNull();
-            assertThat(asset.opportunityState()).isEqualTo("NEVER_SCANNED");
-            assertThat(asset.analysisTime()).isNull();
-            assertThat(asset.freshness()).isEqualTo("NEVER_SCANNED");
-        });
+        assertThat(service.rankForHome(USER_ID, 6)).isEmpty();
     }
 
     private static List<AssetPoolAssetDTO> pool(List<String> symbols) {
@@ -450,10 +493,15 @@ class OpportunityPriorityRankingServiceImplTest {
     }
 
     private static AssetPoolAssetDTO poolAsset(String symbol, Long userId, String watchStatus) {
+        return poolAsset(symbol, userId, watchStatus, "USER_ADDED");
+    }
+
+    private static AssetPoolAssetDTO poolAsset(String symbol, Long userId,
+                                                String watchStatus, String sourceType) {
         Long assetId = assetIdFor(symbol);
         return new AssetPoolAssetDTO(assetId, symbol, symbol.replace("USDT", ""),
-                "SPOT", "USDT", true, assetId.intValue(), "USER_ADDED",
-                assetId * 10, userId, symbol.replace("USDT", ""), "USER_ADDED",
+                "SPOT", "USDT", true, assetId.intValue(), sourceType,
+                assetId * 10, userId, symbol.replace("USDT", ""), sourceType,
                 watchStatus, LocalDateTime.of(2026, 8, 10, 12, 0),
                 LocalDateTime.of(2026, 8, 11, 12, 0), 1, null);
     }
@@ -482,6 +530,9 @@ class OpportunityPriorityRankingServiceImplTest {
         decision.setRiskLevel(risk);
         decision.setPlanMode(planMode);
         decision.setFinalMarketBias("BULLISH");
+        decision.setFinalConfidence(Math.max(0, Math.min(100, score)));
+        decision.setOneHourOpportunityQuality(Math.max(0, Math.min(100, score)));
+        decision.setFourHourTrendAlignment(100);
         decision.setAiConflictLevel(aiDecision);
         decision.setDataQualityScore(dataQuality);
         decision.setAnalysisTime(LocalDateTime.of(2026, 8, 11, 12, 0));

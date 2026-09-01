@@ -19,6 +19,7 @@ public class MarketStructureBoundaryRequest {
     private Boolean riskActionGuardBlocked;
     private String riskActionGuardReason;
     private String leverageSuggestion;
+    private String analysisId;
 
     public String getSymbol() {
         return symbol;
@@ -123,4 +124,6 @@ public class MarketStructureBoundaryRequest {
     public void setLeverageSuggestion(String leverageSuggestion) {
         this.leverageSuggestion = leverageSuggestion;
     }
+    public String getAnalysisId() { return analysisId; }
+    public void setAnalysisId(String value) { this.analysisId = value; }
 }

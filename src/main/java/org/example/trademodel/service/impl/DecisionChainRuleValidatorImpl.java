@@ -15,6 +15,7 @@ import org.example.trademodel.service.DecisionChainRuleValidator;
 import org.example.trademodel.service.OpportunityTransitionResult;
 import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.ExecutionFeasibilityContract;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,7 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
     private static final Set<String> FROZEN_TIMEFRAMES = Set.of("4h", "1h", "15m", "5m");
     private static final Set<String> FROZEN_EIGHT_SCORE_TYPES = Set.of(
             "趋势结构分", "资金推动分", "杠杆风险分", "流动性质量分",
-            "情绪温度分", "事件冲击分", "宏观环境分", "综合可信度分");
+            "情绪温度分", "事件冲击分", "宏观环境分", "证据可信度分");
     private FundamentalAiV41Properties properties = FundamentalAiV41Properties.contractFixture();
 
     @Autowired(required = false)
@@ -155,20 +156,57 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
         }
         validateWorthOpeningSemantics(reasons, candidate, conflict.getPlanModeAfter());
 
+        PlanModeEnum finalMode = finalPlanMode(conflict.getPlanModeAfter());
+        if (finalMode != null && finalMode != PlanModeEnum.BLOCKED) {
+            requireText(reasons, candidate.getRecommendedAction(), "RECOMMENDED_ACTION_MISSING");
+        }
+        if (containsAutomaticTrading(candidate.getRecommendedAction())) {
+            reasons.add("AUTOMATIC_TRADING_ACTION_FORBIDDEN");
+        }
+        if (isDirectionalPlanMode(finalMode)) {
+            validateDirectionalPlanContract(reasons, input, candidate, conflict);
+        } else if (finalMode == PlanModeEnum.OBSERVATION) {
+            requireText(reasons, candidate.getRiskExplanation(), "RISK_EXPLANATION_MISSING");
+            requireText(reasons, candidate.getSummary(), "OBSERVATION_SUMMARY_MISSING");
+        }
+        requireText(reasons, candidate.getAnalysisTimeframesJson(), "MULTI_TIMEFRAME_EXPLANATION_MISSING");
+        requireText(reasons, candidate.getTriggerTimeframe(), "TRIGGER_TIMEFRAME_MISSING");
+        if (hasText(candidate.getTriggerTimeframe())
+                && !FROZEN_TIMEFRAMES.contains(candidate.getTriggerTimeframe().trim())) {
+            reasons.add("TRIGGER_TIMEFRAME_UNSUPPORTED");
+        }
+        if (hasText(candidate.getAnalysisTimeframesJson())
+                && !hasFrozenMultiTimeframeContract(candidate.getAnalysisTimeframesJson())) {
+            reasons.add("MULTI_TIMEFRAME_CONTRACT_INCOMPLETE");
+        }
+        requireText(reasons, candidate.getEvidenceRefsJson(), "EVIDENCE_REFS_MISSING");
+        requireText(reasons, candidate.getScoreRefsJson(), "SCORE_REFS_MISSING");
+        validateFrozenInputLineage(reasons, input, candidate);
+        if (!hasText(candidate.getValidity())) reasons.add("VALIDITY_MISSING");
+        if (candidate.getValidFrom() == null || candidate.getValidUntil() == null) {
+            reasons.add("VALIDITY_WINDOW_MISSING");
+        } else if (!candidate.getValidFrom().isBefore(candidate.getValidUntil())) {
+            reasons.add("VALIDITY_WINDOW_INVALID");
+        }
+        return reasons.isEmpty() ? RuleValidationResult.pass() : RuleValidationResult.blocked(reasons);
+    }
+
+    private void validateDirectionalPlanContract(List<String> reasons,
+                                                 DecisionChainBuildInput input,
+                                                 ExecutionPlanCandidateDO candidate,
+                                                 ConflictResolverResultDO conflict) {
         ExecutionPlanVO rulePlan = input.rulePlan();
         if (!Boolean.TRUE.equals(rulePlan.getSourceGateComplete())
                 || !ExecutionPlanVO.EXECUTION_PLAN_STATUS_VALID.equals(rulePlan.getSourceGateStatus())) {
             reasons.add("RULE_SOURCE_GATE_BLOCKED");
         }
         ExecutionFeasibilityContract.Assessment feasibility =
-                ExecutionFeasibilityContract.assess(rulePlan, LocalDateTime.now(java.time.ZoneOffset.UTC));
+                ExecutionFeasibilityContract.assess(rulePlan, LocalDateTime.now(ZoneOffset.UTC));
         if (!feasibility.allowed()) reasons.add(feasibility.reasonCode());
         AccountRiskPlanPolicy.Assessment accountRisk = AccountRiskPlanPolicy.assess(
                 input.accountRiskSnapshot(), candidate, conflict.getRiskAfter(),
-                properties.getAccountRisk(), LocalDateTime.now(java.time.ZoneOffset.UTC));
+                properties.getAccountRisk(), LocalDateTime.now(ZoneOffset.UTC));
         if (!accountRisk.allowed()) reasons.add(accountRisk.reasonCode());
-        if (!hasText(candidate.getRecommendedAction())) reasons.add("RECOMMENDED_ACTION_MISSING");
-        if (containsAutomaticTrading(candidate.getRecommendedAction())) reasons.add("AUTOMATIC_TRADING_ACTION_FORBIDDEN");
         requireText(reasons, candidate.getOpportunityType(), "OPPORTUNITY_TYPE_MISSING");
         requireText(reasons, candidate.getEntryLogic(), "ENTRY_LOGIC_MISSING");
         requireText(reasons, candidate.getEntryZone(), "ENTRY_ZONE_MISSING");
@@ -195,33 +233,13 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
         }
         requireText(reasons, candidate.getExpectedRiskRewardSource(), "EXPECTED_RISK_REWARD_SOURCE_MISSING");
         requireText(reasons, candidate.getExpectedRiskRewardReason(), "EXPECTED_RISK_REWARD_REASON_MISSING");
-        requireText(reasons, candidate.getAnalysisTimeframesJson(), "MULTI_TIMEFRAME_EXPLANATION_MISSING");
-        requireText(reasons, candidate.getTriggerTimeframe(), "TRIGGER_TIMEFRAME_MISSING");
-        if (hasText(candidate.getTriggerTimeframe())
-                && !FROZEN_TIMEFRAMES.contains(candidate.getTriggerTimeframe().trim())) {
-            reasons.add("TRIGGER_TIMEFRAME_UNSUPPORTED");
-        }
-        if (hasText(candidate.getAnalysisTimeframesJson())
-                && !hasFrozenMultiTimeframeContract(candidate.getAnalysisTimeframesJson())) {
-            reasons.add("MULTI_TIMEFRAME_CONTRACT_INCOMPLETE");
-        }
         requireText(reasons, candidate.getHoldingHorizon(), "HOLDING_HORIZON_MISSING");
         requireText(reasons, candidate.getRevalidationRule(), "REVALIDATION_RULE_MISSING");
-        requireText(reasons, candidate.getEvidenceRefsJson(), "EVIDENCE_REFS_MISSING");
-        requireText(reasons, candidate.getScoreRefsJson(), "SCORE_REFS_MISSING");
         requireText(reasons, candidate.getSourceRefsJson(), "SOURCE_REFS_MISSING");
-        validateFrozenInputLineage(reasons, input, candidate);
         validateCandidateSources(reasons, input, candidate);
         requireText(reasons, candidate.getInvalidCondition(), "INVALIDATION_MISSING");
         requireText(reasons, candidate.getInvalidationSource(), "INVALIDATION_SOURCE_MISSING");
         requireText(reasons, candidate.getInvalidationReason(), "INVALIDATION_REASON_MISSING");
-        if (!hasText(candidate.getValidity())) reasons.add("VALIDITY_MISSING");
-        if (candidate.getValidFrom() == null || candidate.getValidUntil() == null) {
-            reasons.add("VALIDITY_WINDOW_MISSING");
-        } else if (!candidate.getValidFrom().isBefore(candidate.getValidUntil())) {
-            reasons.add("VALIDITY_WINDOW_INVALID");
-        }
-        return reasons.isEmpty() ? RuleValidationResult.pass() : RuleValidationResult.blocked(reasons);
     }
 
     private static void validateIdentityChain(List<String> reasons,
@@ -273,26 +291,36 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
                                                    ExecutionPlanCandidateDO candidate) {
         Set<String> scoreTypes = new HashSet<>();
         Set<String> scoreIds = new HashSet<>();
+        boolean scoreContractComplete = input.scores() != null
+                && input.scores().size() == FROZEN_EIGHT_SCORE_TYPES.size();
         if (input.scores() != null) {
             input.scores().stream().filter(Objects::nonNull).forEach(score -> {
                 addText(scoreTypes, score.getScoreType());
-                if (score.getScoreValue() != null) addText(scoreIds, score.getScoreId());
+                if (V41DecisionContractPolicy.scoreItemContractComplete(score)) {
+                    addText(scoreIds, score.getScoreId());
+                }
             });
         }
-        if (!scoreTypes.equals(FROZEN_EIGHT_SCORE_TYPES) || scoreIds.size() != FROZEN_EIGHT_SCORE_TYPES.size()) {
+        scoreContractComplete = scoreContractComplete
+                && scoreTypes.equals(FROZEN_EIGHT_SCORE_TYPES)
+                && scoreIds.size() == FROZEN_EIGHT_SCORE_TYPES.size();
+        if (!scoreContractComplete) {
             reasons.add("EIGHT_SCORE_CONTRACT_INCOMPLETE");
         }
         Set<String> evidenceIds = new HashSet<>();
+        boolean evidenceContractComplete = input.evidence() != null && !input.evidence().isEmpty();
         if (input.evidence() != null) {
             input.evidence().stream().filter(Objects::nonNull).forEach(evidence -> {
-                if (hasText(evidence.getEvidenceId()) && hasText(evidence.getAnalysisId())
-                        && same(evidence.getAnalysisId(), input.analysisId())
-                        && hasText(evidence.getSource()) && hasText(evidence.getSourceReference())
-                        && evidence.getObservedAt() != null && hasText(evidence.getFreshness())) {
+                if (V41DecisionContractPolicy.evidenceItemContractComplete(
+                        evidence, input.analysisId())) {
                     evidenceIds.add(evidence.getEvidenceId().trim());
                 }
             });
         }
+        evidenceContractComplete = evidenceContractComplete
+                && input.evidence().stream().allMatch(evidence ->
+                V41DecisionContractPolicy.evidenceItemContractComplete(evidence, input.analysisId()));
+        if (!evidenceContractComplete) reasons.add("EVIDENCE_CONTRACT_INCOMPLETE");
         if (evidenceIds.isEmpty()) reasons.add("TRACEABLE_EVIDENCE_MISSING");
         if (!jsonArrayContainsAll(candidate.getEvidenceRefsJson(), evidenceIds)) {
             reasons.add("EVIDENCE_REFS_INCOMPLETE");
@@ -329,23 +357,71 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
     private static void validateCandidateSources(List<String> reasons,
                                                  DecisionChainBuildInput input,
                                                  ExecutionPlanCandidateDO candidate) {
-        Set<String> allowed = new HashSet<>();
-        if (input.evidence() != null) {
-            input.evidence().stream().filter(java.util.Objects::nonNull).forEach(evidence -> {
-                addText(allowed, evidence.getEvidenceId());
-                addText(allowed, evidence.getSource());
-                addText(allowed, evidence.getSourceReference());
-                addText(allowed, evidence.getSourceTraceId());
-            });
+        if (!hasText(candidate.getSourceRefsJson())) {
+            reasons.add("PLAN_SOURCE_REFS_MISSING");
+            return;
         }
-        if (!allowed.contains(candidate.getEntrySource())) reasons.add("ENTRY_SOURCE_NOT_TRACEABLE");
-        if (!allowed.contains(candidate.getStopSource())) reasons.add("STOP_SOURCE_NOT_TRACEABLE");
-        if (!allowed.contains(candidate.getTargetSource())) reasons.add("TARGET_SOURCE_NOT_TRACEABLE");
-        if (!allowed.contains(candidate.getInvalidationSource())) {
-            reasons.add("INVALIDATION_SOURCE_NOT_TRACEABLE");
-        }
-        if (!allowed.contains(candidate.getExpectedRiskRewardSource())) {
-            reasons.add("EXPECTED_RISK_REWARD_SOURCE_NOT_TRACEABLE");
+        try {
+            JsonNode refs = JSON.readTree(candidate.getSourceRefsJson());
+            if (!refs.isArray() || refs.isEmpty()) {
+                reasons.add("PLAN_SOURCE_REFS_MISSING");
+                return;
+            }
+            java.util.Map<String, Set<String>> sourceIdsByType = new java.util.HashMap<>();
+            for (JsonNode ref : refs) {
+                String sourceType = ref.path("sourceType").asText(null);
+                String sourceId = ref.path("sourceId").asText(null);
+                String provider = ref.path("provider").asText(null);
+                String timeframe = ref.path("timeframe").asText(null);
+                String observedAt = ref.path("observedAt").asText(null);
+                String structureId = ref.path("structureId").asText(null);
+                String calculationReason = ref.path("calculationReason").asText(null);
+                String analysisId = ref.path("analysisId").asText(null);
+                if (!hasText(sourceType) || !hasText(sourceId) || !hasText(provider)
+                        || !FROZEN_TIMEFRAMES.contains(timeframe) || !hasText(observedAt)
+                        || !hasText(structureId) || !hasText(calculationReason)
+                        || !same(analysisId, input.analysisId())) {
+                    reasons.add("PLAN_SOURCE_REF_INCOMPLETE");
+                    return;
+                }
+                try {
+                    if (java.time.Instant.parse(observedAt).isAfter(java.time.Instant.now())) {
+                        reasons.add("PLAN_SOURCE_OBSERVED_AT_INVALID");
+                        return;
+                    }
+                } catch (RuntimeException invalidTime) {
+                    reasons.add("PLAN_SOURCE_OBSERVED_AT_INVALID");
+                    return;
+                }
+                sourceIdsByType.computeIfAbsent(normalize(sourceType), ignored -> new HashSet<>())
+                        .add(sourceId.trim());
+            }
+            Set<String> types = sourceIdsByType.keySet();
+            if (!types.contains("ENTRY")) reasons.add("ENTRY_SOURCE_NOT_TRACEABLE");
+            if (!types.contains("STOP")) reasons.add("STOP_SOURCE_NOT_TRACEABLE");
+            if (types.stream().noneMatch(type -> type.contains("TARGET")
+                    || type.contains("RESISTANCE") || type.contains("SUPPORT"))) {
+                reasons.add("TARGET_SOURCE_NOT_TRACEABLE");
+            }
+            if (!types.contains("RISK_REWARD")) reasons.add("EXPECTED_RISK_REWARD_SOURCE_NOT_TRACEABLE");
+            if (!sourceIdsByType.getOrDefault("ENTRY", Set.of()).contains(candidate.getEntrySource())) {
+                reasons.add("ENTRY_SOURCE_NOT_TRACEABLE");
+            }
+            if (!sourceIdsByType.getOrDefault("STOP", Set.of()).contains(candidate.getStopSource())) {
+                reasons.add("STOP_SOURCE_NOT_TRACEABLE");
+            }
+            boolean targetMatched = sourceIdsByType.entrySet().stream()
+                    .filter(entry -> entry.getKey().contains("TARGET")
+                            || entry.getKey().contains("RESISTANCE")
+                            || entry.getKey().contains("SUPPORT"))
+                    .anyMatch(entry -> entry.getValue().contains(candidate.getTargetSource()));
+            if (!targetMatched) reasons.add("TARGET_SOURCE_NOT_TRACEABLE");
+            if (!sourceIdsByType.getOrDefault("RISK_REWARD", Set.of())
+                    .contains(candidate.getExpectedRiskRewardSource())) {
+                reasons.add("EXPECTED_RISK_REWARD_SOURCE_NOT_TRACEABLE");
+            }
+        } catch (Exception invalidJson) {
+            reasons.add("PLAN_SOURCE_REFS_INVALID");
         }
     }
 
@@ -397,6 +473,20 @@ public class DecisionChainRuleValidatorImpl implements DecisionChainRuleValidato
         } catch (RuntimeException ignored) {
             return false;
         }
+    }
+
+    private static PlanModeEnum finalPlanMode(String value) {
+        try {
+            return PlanModeEnum.require(value);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isDirectionalPlanMode(PlanModeEnum mode) {
+        return mode == PlanModeEnum.CONFIRMATION
+                || mode == PlanModeEnum.PREPARATION
+                || mode == PlanModeEnum.REDUCED;
     }
 
     private static boolean knownMarketBias(String value) {

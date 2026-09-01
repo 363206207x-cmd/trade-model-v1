@@ -13,7 +13,7 @@
     "dashboardHtml": "1ad287ccd22a6bd53accd90f56e5079989f1397e735c0165aa7249d8dd09c125",
     "dashboardLatestCss": "625c9fb07d051e595d56bd265bfab1ce5ec76bfc71d02ef21e7a1ce026ccba69",
     "frontendContractJs": "dc1afbf7302b4d8923880616a241aa57117b70f95eecca116f6a9b4279201c11",
-    "visualFixture": "7bb2bcf8fed2761c2d40ae7d79d2e0084010476332886842eb3b877afc7c7785"
+    "visualFixture": "46db7ecf521f27112716264fe562ad26a02a4e9a88eeab7981dde6aa476f04ed"
   },
   "counts": {
     "routedPages": 14,
@@ -92,5 +92,65 @@
       "rawEnumPrimaryDisplayCount": 0
     },
     "boundary": "This refresh validates the updated shared semantic mapper and its authenticated Home/Analysis consumers. The original multi-route and multi-viewport evidence above remains the owning full visual sweep."
+  },
+  "finalContractSameRun": {
+    "status": "PASS",
+    "observedAt": "2026-09-01T01:00:27.544763Z",
+    "runtimeScope": "AUTHENTICATED_LOCAL_H2_REAL_BINANCE_READ_ONLY",
+    "runtimeUrl": "http://127.0.0.1:18083/dashboard",
+    "symbol": "ADAUSDT",
+    "timeframe": "5m",
+    "provider": "BINANCE_PUBLIC",
+    "fixture": false,
+    "requestId": "req-042e2123e4bf4aed967be69fadaf0dba",
+    "analysisId": "ana-bc12ab0bb68d4713823ac28a1b85ef59",
+    "traceId": "trace-9c3086bea1f549b194ab1f3b6938e165",
+    "opportunityId": "opp-user-1-6-adausdt-5m",
+    "candidateId": "candidate-28a493a8-76b9-4e46-92ff-18d834b9b1cd",
+    "resolverResultId": "resolver-57594c73-295e-4daa-8e16-80224fd060b9",
+    "validationResultId": "validation-45e841c8-62e7-4b9a-a908-a64d202b7988",
+    "planId": null,
+    "aiRoleStates": {
+      "GPT_FINAL": "FALLBACK",
+      "GEMINI_REVIEW": "FALLBACK",
+      "GROK_CHALLENGE": "FALLBACK"
+    },
+    "ruleValidation": "BLOCKED",
+    "ruleValidationReasons": [
+      "GPT_CANDIDATE_REQUIRED",
+      "RECOMMENDED_ACTION_MISSING",
+      "RISK_EXPLANATION_MISSING",
+      "OBSERVATION_SUMMARY_MISSING"
+    ],
+    "evidenceItemCount": 5,
+    "scoreItemCount": 8,
+    "positionCount": 0,
+    "notAutoTrading": true,
+    "preFixHomeEvidence": {
+      "assetCount": 6,
+      "validAnalyzedAssetCount": 1,
+      "finding": "UNSCANNED_DEFAULT_TEMPLATES_INCLUDED"
+    },
+    "remediation": {
+      "status": "PASS",
+      "expectedHomeAssetCount": 1,
+      "actualHomeAssetCount": 1,
+      "unscannedTemplateCardCount": 0,
+      "slotType": "OBSERVATION",
+      "selectedContextState": "RANKED",
+      "finalOnlyFieldLeakCount": 0
+    },
+    "browser": {
+      "viewportWidth": 1280,
+      "viewportHeight": 720,
+      "fullPageHeight": 1036,
+      "opportunityCardCount": 1,
+      "renderedSymbols": ["ADAUSDT"],
+      "horizontalOverflow": 0,
+      "consoleErrors": 0,
+      "uiReviewMarkerCount": 0,
+      "viewportScreenshot": "runtime/post-fix-real-binance-home-1280x720-viewport.jpg",
+      "fullPageScreenshot": "runtime/post-fix-real-binance-home-1280x1036-full.jpg"
+    }
   }
 }

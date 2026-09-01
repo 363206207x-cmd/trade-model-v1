@@ -197,6 +197,11 @@ class PositionMonitorServiceImplTest {
 
         assertThat(longResult.getPnlAmount()).isEqualByComparingTo("20");
         assertThat(longResult.getPnlPercent()).isEqualByComparingTo("10");
+        assertThat(longResult.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+        assertThat(longResult.getFeeCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getFundingCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getPartialFillCoverage()).isEqualTo("UNKNOWN");
+        assertThat(longResult.getPositionAdditionCoverage()).isEqualTo("UNKNOWN");
 
         UserPositionDO shortPosition = position(110L, "SHORT", "OPEN", "plan-short-pnl", "120", "70");
         shortPosition.setQuantity(new BigDecimal("2"));
@@ -206,6 +211,7 @@ class PositionMonitorServiceImplTest {
 
         assertThat(shortResult.getPnlAmount()).isEqualByComparingTo("20");
         assertThat(shortResult.getPnlPercent()).isEqualByComparingTo("10");
+        assertThat(shortResult.getPnlCoverage()).isEqualTo("MARK_PRICE_ENTRY_QUANTITY_ONLY");
     }
 
     @Test
@@ -419,14 +425,15 @@ class PositionMonitorServiceImplTest {
         UserPositionDO missingContext = position(11L, "LONG", "OPEN", null, "90", "120");
         arrange(missingContext, "100", risk("LOW", false), null);
         PositionMonitorResultDTO missingContextResult = service.monitorUserPositionForUser(11L, USER_ID);
-        assertThat(missingContextResult.getAnalysisId()).isNull();
+        assertThat(missingContextResult.getAnalysisId()).isEqualTo("monitor-BTC");
+        assertThat(missingContextResult.getEntryLogicStatus()).isEqualTo("NOT_APPLICABLE");
         assertThat(missingContextResult.getMonitorConclusion()).isNull();
-        assertThat(missingContextResult.getRiskLevel()).isNull();
+        assertThat(missingContextResult.getRiskLevel()).isEqualTo("LOW");
         assertThat(missingContextResult.getSuggestedAction()).isNull();
-        assertThat(missingContextResult.getMarkPrice()).isNull();
-        assertThat(missingContextResult.getDataState()).isEqualTo("WAITING_MONITOR_DATA");
+        assertThat(missingContextResult.getMarkPrice()).isEqualByComparingTo("100");
+        assertThat(missingContextResult.getDataState()).isEqualTo("OPEN_MONITORING");
         assertThat(missingContextResult.getReasonCodes())
-                .contains("PLAN_SOURCE_UNVERIFIED", "PLAN_CONTEXT_MISSING");
+                .doesNotContain("PLAN_SOURCE_UNVERIFIED", "PLAN_CONTEXT_MISSING");
 
         UserPositionDO missingStop = position(12L, "LONG", "OPEN", "plan-missing-stop", null, "120");
         arrange(missingStop, "100", risk("LOW", false), plan("plan-missing-stop", "ana-12", "VALID", true));
@@ -442,6 +449,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void positionSourceRefAnalysisWithPlansAAndB_monitorNeverLogsBAsOriginalSource() {
         UserPositionDO position = position(131L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId("analysis-with-plan-a-and-b");
         arrange(position, "100", risk("LOW", false), null);
         ExecutionPlanDO latestB = plan("plan-B", "analysis-with-plan-a-and-b", "VALID", true);
@@ -467,6 +475,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void ambiguousSourceRefProducesUnverifiedMonitorSource() {
         UserPositionDO position = position(132L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId("plan-A-without-type");
         arrange(position, "100", risk("LOW", false), null);
         lenient().when(executionPlanMapper.selectByPlanId("plan-A-without-type"))
@@ -488,6 +497,7 @@ class PositionMonitorServiceImplTest {
     @Test
     void typedAnalysisSourceWithSinglePlanLogsVerifiedSource() {
         UserPositionDO position = position(133L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         position.setSourceRefId(PositionMonitorSourceContract.analysisReference("analysis-A"));
         arrange(position, "100", risk("LOW", false), null);
         ExecutionPlanDO planA = plan("plan-A", "analysis-A", "VALID", true);
@@ -889,7 +899,7 @@ class PositionMonitorServiceImplTest {
         row.setLeverage(new BigDecimal("2"));
         row.setStopLoss(stopLoss == null ? null : new BigDecimal(stopLoss));
         row.setTakeProfit(takeProfit == null ? null : new BigDecimal(takeProfit));
-        row.setSourceType("MANUAL_INDEPENDENT");
+        row.setSourceType(sourceRefId == null ? "MANUAL_INDEPENDENT" : "SYSTEM_PLAN_POSITION");
         row.setSourceRefId(sourceRefId == null
                 ? null
                 : PositionMonitorSourceContract.executionPlanReference(sourceRefId));

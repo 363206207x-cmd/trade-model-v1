@@ -42,6 +42,7 @@ import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.ConfusedStatePolicy;
+import org.example.trademodel.service.MarketBiasPolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
 import org.example.trademodel.service.OpportunityLogService;
@@ -865,11 +866,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 asset.setDataQualityScore(projection.dataQuality());
                 asset.setRankingReason(projection.rankingReason());
             }
-            if (!"HIGH_RISK".equalsIgnoreCase(projection.opportunityState())
-                    && projection.sourceDecision() != null) {
+            if (projection.sourceDecision() != null) {
                 applyCardFinalProjection(asset, projection.sourceDecision());
             } else {
                 clearCardFinalProjection(asset);
+            }
+            if (Boolean.TRUE.equals(asset.getHasFinal()) && projection.sourceDecision() != null) {
+                DecisionResultVO decision = projection.sourceDecision();
+                asset.setMarketBias(asset.getFinalMarketBias());
+                asset.setMarketBiasLabel(biasLabel(asset.getFinalMarketBias()));
+                Integer finalConfidence = decision.getFinalConfidence();
+                asset.setConfidenceLevel(finalConfidence == null ? null : String.valueOf(finalConfidence));
+                asset.setConfidenceLabel(finalConfidence == null ? null : finalConfidence + "%");
+                asset.setOneHourOpportunityLabel(oneHourOpportunityLabel(
+                        decision.getOneHourOpportunityQuality()));
+                asset.setFourHourTrendLabel(fourHourTrendLabel(asset.getFinalMarketBias(),
+                        decision.getFourHourTrendAlignment()));
             }
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
@@ -920,6 +932,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setRankingReason(trimToNull(projection.rankingReason()));
         asset.setLatestAnalysisTime(formalAnalysisId == null ? null : projection.analysisTime());
         asset.setCurrentConclusion(observationStateLabel(observationState));
+        asset.setOneHourOpportunityLabel(observationOneHourLabel(observationState));
+        asset.setFourHourTrendLabel(observationFourHourLabel(projection));
         applyPersistedMarketData(asset, normalizeSymbol(projection.symbol()));
         asset.setDataFreshness(missingFormalAnalysis
                 ? "NEVER_SCANNED" : trimToNull(projection.freshness()));
@@ -943,8 +957,43 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "NO_QUALIFIED_OPPORTUNITY" -> "暂无合格机会";
             case "STALE" -> "数据过期";
             case "NEVER_SCANNED" -> "等待首次扫描";
+            case "RANGE" -> "震荡";
+            case "WAIT" -> "观望";
+            case "CANDIDATE" -> "计划生成中";
+            case "HIGH_RISK" -> "高风险观察";
+            case "BLOCKED", "CONFUSED" -> "当前受限";
             default -> "观察中";
         };
+    }
+
+    private String oneHourOpportunityLabel(Integer value) {
+        if (value == null) return "1小时待验证";
+        if (value >= 70) return "1小时机会较强";
+        if (value >= 40) return "1小时机会形成";
+        return "1小时机会较弱";
+    }
+
+    private String fourHourTrendLabel(String bias, Integer alignment) {
+        if (alignment == null) return "4小时数据不足";
+        if (MarketBiasPolicy.bullishFamily(bias)) return "4小时趋势偏多";
+        if (MarketBiasPolicy.bearishFamily(bias)) return "4小时趋势偏空";
+        return "4小时趋势震荡";
+    }
+
+    private String observationOneHourLabel(String state) {
+        return switch (state == null ? "" : state.trim().toUpperCase(Locale.ROOT)) {
+            case "NO_QUALIFIED_OPPORTUNITY" -> "1小时观察";
+            case "CANDIDATE" -> "1小时计划生成中";
+            default -> "1小时待验证";
+        };
+    }
+
+    private String observationFourHourLabel(HomeTopAssetProjection projection) {
+        if (projection == null || "STALE".equalsIgnoreCase(projection.freshness())
+                || "NEVER_SCANNED".equalsIgnoreCase(projection.freshness())) {
+            return "4小时数据不足";
+        }
+        return "4小时趋势待验证";
     }
 
     private String authoritativeObservationAnalysisId(HomeTopAssetProjection projection, Long userId) {
@@ -1411,13 +1460,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && positive(monitor.getCurrentPrice())
                 && hasText(monitor.getMarkPriceSource())
                 && recognizedEntryLogicStatus(monitor.getEntryLogicStatus())
-                && recognizedMonitorConclusion(monitor.getMonitorConclusion())
                 && recognizedReversalStatus(monitor.getReversalStatus())
                 && recognizedRiskReason(monitor.getRiskChangeReason())
                 && recognizedPositionRisk(monitor.getRiskLevel())
                 && recognizedRiskTrend(monitor.getRiskTrend())
-                && recognizedSuggestedAction(monitor.getSuggestedAction())
-                && recognizedMonitorActionPair(monitor);
+                && recognizedMonitorOutcome(monitor);
     }
 
     private void applyTrustedMonitor(DashboardHomeVO.PositionVO row,
@@ -1596,7 +1643,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private boolean recognizedEntryLogicStatus(String status) {
         return switch (upper(status)) {
-            case "STILL_VALID", "WEAKENED", "INVALIDATED" -> true;
+            case "STILL_VALID", "WEAKENED", "INVALIDATED", "NOT_APPLICABLE" -> true;
             default -> false;
         };
     }
@@ -1658,6 +1705,24 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private boolean recognizedMonitorOutcome(PositionMonitorLogDTO monitor) {
+        boolean conclusionPresent = hasText(monitor.getMonitorConclusion());
+        boolean actionPresent = hasText(monitor.getSuggestedAction());
+        if ("NOT_APPLICABLE".equals(upper(monitor.getEntryLogicStatus()))) {
+            if (!conclusionPresent && !actionPresent) {
+                return true;
+            }
+            return conclusionPresent && actionPresent
+                    && recognizedMonitorConclusion(monitor.getMonitorConclusion())
+                    && recognizedSuggestedAction(monitor.getSuggestedAction())
+                    && recognizedMonitorActionPair(monitor);
+        }
+        return conclusionPresent && actionPresent
+                && recognizedMonitorConclusion(monitor.getMonitorConclusion())
+                && recognizedSuggestedAction(monitor.getSuggestedAction())
+                && recognizedMonitorActionPair(monitor);
+    }
+
     private void applyPositionPnl(DashboardHomeVO.PositionVO row, UserPositionVO position, BigDecimal currentPrice) {
         if (row == null || position == null || !positive(position.getEntryPrice()) || !positive(currentPrice)) {
             return;
@@ -1677,6 +1742,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             BigDecimal pnlAmount = unitPnl.multiply(position.getQuantity());
             row.setFloatingPnl(pnlAmount);
             row.setPnlAmount(pnlAmount);
+            row.setPnlCoverage("MARK_PRICE_ENTRY_QUANTITY_ONLY");
+            row.setFeeCoverage("UNKNOWN");
+            row.setFundingCoverage("UNKNOWN");
+            row.setPartialFillCoverage("UNKNOWN");
+            row.setPositionAdditionCoverage("UNKNOWN");
         }
     }
 
@@ -1685,6 +1755,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "STILL_VALID" -> "SUPPORTED";
             case "WEAKENED" -> "WEAKENED";
             case "INVALIDATED" -> "NOT_SUPPORTED";
+            case "NOT_APPLICABLE" -> "NOT_APPLICABLE";
             default -> null;
         };
     }
@@ -3040,6 +3111,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "STILL_VALID" -> "仍成立";
             case "WEAKENED" -> "弱化";
             case "INVALIDATED" -> "失效";
+            case "NOT_APPLICABLE" -> "N/A";
             default -> null;
         };
     }
@@ -3062,6 +3134,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "SUPPORTED" -> "当前方向仍获支持";
             case "WEAKENED" -> "方向支持减弱";
             case "NOT_SUPPORTED" -> "当前方向不再获支持";
+            case "NOT_APPLICABLE" -> "N/A";
             default -> null;
         };
     }

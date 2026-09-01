@@ -533,6 +533,8 @@ public class DashboardHomeVO {
         private String confidenceLabel;
         private String riskLevel;
         private String riskLabel;
+        private String oneHourOpportunityLabel;
+        private String fourHourTrendLabel;
         private String assetState;
         private String assetStateLabel;
         private Boolean worthOpening;
@@ -697,6 +699,11 @@ public class DashboardHomeVO {
             this.riskLabel = riskLabel;
         }
 
+        public String getOneHourOpportunityLabel() { return oneHourOpportunityLabel; }
+        public void setOneHourOpportunityLabel(String value) { this.oneHourOpportunityLabel = value; }
+        public String getFourHourTrendLabel() { return fourHourTrendLabel; }
+        public void setFourHourTrendLabel(String value) { this.fourHourTrendLabel = value; }
+
         public String getAssetState() {
             return assetState;
         }
@@ -768,6 +775,11 @@ public class DashboardHomeVO {
         private BigDecimal pnlPct;
         private BigDecimal pnlAmount;
         private BigDecimal pnlPercent;
+        private String pnlCoverage;
+        private String feeCoverage;
+        private String fundingCoverage;
+        private String partialFillCoverage;
+        private String positionAdditionCoverage;
         private BigDecimal accountImpactPct;
         private BigDecimal leverage;
         private BigDecimal positionSize;
@@ -884,6 +896,16 @@ public class DashboardHomeVO {
         public void setPnlAmount(BigDecimal pnlAmount) { this.pnlAmount = pnlAmount; }
         public BigDecimal getPnlPercent() { return pnlPercent; }
         public void setPnlPercent(BigDecimal pnlPercent) { this.pnlPercent = pnlPercent; }
+        public String getPnlCoverage() { return pnlCoverage; }
+        public void setPnlCoverage(String value) { this.pnlCoverage = value; }
+        public String getFeeCoverage() { return feeCoverage; }
+        public void setFeeCoverage(String value) { this.feeCoverage = value; }
+        public String getFundingCoverage() { return fundingCoverage; }
+        public void setFundingCoverage(String value) { this.fundingCoverage = value; }
+        public String getPartialFillCoverage() { return partialFillCoverage; }
+        public void setPartialFillCoverage(String value) { this.partialFillCoverage = value; }
+        public String getPositionAdditionCoverage() { return positionAdditionCoverage; }
+        public void setPositionAdditionCoverage(String value) { this.positionAdditionCoverage = value; }
 
         public BigDecimal getAccountImpactPct() {
             return accountImpactPct;

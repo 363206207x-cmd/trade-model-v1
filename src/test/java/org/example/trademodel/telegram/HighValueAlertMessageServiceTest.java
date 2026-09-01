@@ -81,6 +81,7 @@ class HighValueAlertMessageServiceTest {
 
         DecisionResult decision = new DecisionResult();
         decision.setEvidenceSummary("趋势、资金与事件证据通过规则校验");
+        decision.setRiskLevel("MEDIUM");
 
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
@@ -89,7 +90,7 @@ class HighValueAlertMessageServiceTest {
         plan.setTraceId("trace-9");
         plan.setFinalPlan(true);
         plan.setFinalPlanMode("CONFIRMATION");
-        plan.setFinalMarketBias("LONG");
+        plan.setFinalMarketBias("STRONG_BULLISH");
         plan.setRuleValidationStatus("PASS");
         plan.setChainStatus("FINAL_VALIDATED");
         plan.setPlanLifecycleState("CURRENT");
@@ -130,7 +131,7 @@ class HighValueAlertMessageServiceTest {
         assertThat(message.getTitle()).isEqualTo("【可复核执行计划】");
         assertThat(message.getDedupeKey()).startsWith("TG1|OPPORTUNITY_READY|CONFIRMATION|3|");
         assertThat(message.getBody()).contains(
-                "SOLUSDT  ·  偏多  ·  确认型", "入场：142 - 145", "触发：15m 收盘确认",
+                "SOLUSDT  ·  强偏多  ·  确认型", "入场：142 - 145", "触发：15m 收盘确认",
                 "止损：138", "目标：150 / 156 分批止盈", "操作：打开系统重新校验");
         assertThat(message.getBody()).doesNotContain("主要依据", "主要风险", "不构成交易指令");
         assertThat(message.getNotTradeInstruction()).isTrue();
@@ -148,7 +149,7 @@ class HighValueAlertMessageServiceTest {
         when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
         when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of());
 
-        MessageDO message = service.recordOpportunity(run, new DecisionResult(), plan, opportunity, persistedLog);
+        MessageDO message = service.recordOpportunity(run, qualifiedDecision(), plan, opportunity, persistedLog);
 
         assertThat(message.getSourceType()).isEqualTo("FINAL_PLAN");
         assertThat(message.getSourceId()).isEqualTo("plan-9");
@@ -171,7 +172,7 @@ class HighValueAlertMessageServiceTest {
         when(messageFactService.findOpportunityForPlan(41L, "plan-9")).thenReturn(original);
 
         MessageDO repeated = service.recordOpportunity(
-                run, new DecisionResult(), plan, opportunity, persistedLog);
+                run, qualifiedDecision(), plan, opportunity, persistedLog);
 
         assertThat(repeated).isSameAs(original);
         verify(messageFactService, never()).recordIfAbsent(any());
@@ -191,17 +192,17 @@ class HighValueAlertMessageServiceTest {
         when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of(snapshot));
 
         MessageDO message = service.recordOpportunity(
-                run, new DecisionResult(), plan, qualifiedOpportunity(), persistedLog);
+                run, qualifiedDecision(), plan, qualifiedOpportunity(), persistedLog);
         assertThat(message.getExpiresAt()).isEqualTo(snapshot.getExpiresAt());
         assertThat(message.getBody()).contains("有效至：2026-08-16 12:30 UTC");
 
         snapshot.setExpiresAt(null);
         assertThat(service.recordOpportunity(
-                run, new DecisionResult(), plan, qualifiedOpportunity(), persistedLog)).isNull();
+                run, qualifiedDecision(), plan, qualifiedOpportunity(), persistedLog)).isNull();
     }
 
     @Test
-    void reducedCannotUseLegacyOptInAndMissingPlanFactsFailClosed() {
+    void strongReducedFinalIsEligibleAndMissingPlanFactsFailClosed() {
         AnalysisRunDO run = qualifiedRun();
         OpportunityTransitionResult opportunity = qualifiedOpportunity();
         OpportunityLogDTO persistedLog = new OpportunityLogDTO();
@@ -212,16 +213,21 @@ class HighValueAlertMessageServiceTest {
 
         ExecutionPlanDO reduced = qualifiedPlan();
         reduced.setFinalPlanMode("REDUCED");
-        assertThat(service.recordOpportunity(run, new DecisionResult(), reduced, opportunity, persistedLog)).isNull();
+        MessageDO reducedMessage = service.recordOpportunity(
+                run, qualifiedDecision(), reduced, opportunity, persistedLog);
+        assertThat(reducedMessage).isNotNull();
+        assertThat(reducedMessage.getDedupeKey()).contains("|REDUCED|");
 
         ExecutionPlanDO missingStop = qualifiedPlan();
         missingStop.setStopLoss(null);
-        assertThat(service.recordOpportunity(run, new DecisionResult(), missingStop, opportunity, persistedLog)).isNull();
+        assertThat(service.recordOpportunity(
+                run, qualifiedDecision(), missingStop, opportunity, persistedLog)).isNull();
 
         ExecutionPlanDO missingTarget = qualifiedPlan();
         missingTarget.setTakeProfitRules(null);
         missingTarget.setTargetLogic(null);
-        assertThat(service.recordOpportunity(run, new DecisionResult(), missingTarget, opportunity, persistedLog)).isNull();
+        assertThat(service.recordOpportunity(
+                run, qualifiedDecision(), missingTarget, opportunity, persistedLog)).isNull();
     }
 
     @Test
@@ -234,7 +240,7 @@ class HighValueAlertMessageServiceTest {
 
         assertThat(message.getCategory()).isEqualTo("OPPORTUNITY_PLAN_SAFETY_CHANGE");
         assertThat(message.getCurrentRecheckId()).isNull();
-        assertThat(message.getDedupeKey()).startsWith("TG1|HOT_RESET|CONFUSED|4|");
+        assertThat(message.getDedupeKey()).startsWith("TG1|PLAN_SAFETY_CHANGE|HOT_RESET|4|");
         assertThat(message.getTraceId()).isEqualTo("trace-9");
         assertThat(message.getNotTradeInstruction()).isTrue();
         assertThat(message.getNotOrderExecution()).isTrue();
@@ -248,20 +254,23 @@ class HighValueAlertMessageServiceTest {
             message.setMessageId("message-prod");
             return message;
         });
-        MessageDO message = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
-                41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
-                "PUSH_SNAPSHOT", "99", "analysis-9", "plan-9", "opportunity-9", "99",
-                "SOLUSDT", "trace-9", "DRIFTED", 3,
-                "价格偏离", "重新校验", LocalDateTime.of(2026, 8, 16, 12, 0), null));
-        assertThat(message.getCurrentRecheckId()).isNull();
-
-        when(messageMapper.selectByIdForUser("message-prod", 41L)).thenReturn(message);
         TmPushSnapshotDO snapshot = new TmPushSnapshotDO();
         snapshot.setPushId(99L);
         snapshot.setAnalysisId("analysis-9");
         snapshot.setTraceId("trace-9");
         snapshot.setSymbol("SOLUSDT");
         snapshot.setTimeframe("15m");
+        snapshot.setExpiresAt(LocalDateTime.of(2026, 8, 16, 12, 30));
+        OpportunityLogDTO persistedLog = new OpportunityLogDTO();
+        persistedLog.setOpportunityId("opportunity-9");
+        when(assetPoolService.isOpportunitySource("USER", 41L, 9L, "SOLUSDT")).thenReturn(true);
+        when(pushSnapshotMapper.listByAnalysisId("analysis-9")).thenReturn(List.of(snapshot));
+
+        MessageDO message = service.recordOpportunity(
+                qualifiedRun(), qualifiedDecision(), qualifiedPlan(), qualifiedOpportunity(), persistedLog);
+        assertThat(message.getCurrentRecheckId()).isNull();
+
+        when(messageMapper.selectByIdForUser("message-prod", 41L)).thenReturn(message);
         when(pushSnapshotMapper.selectByPushId(99L)).thenReturn(snapshot);
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
@@ -295,7 +304,7 @@ class HighValueAlertMessageServiceTest {
     }
 
     @Test
-    void safetyMessagesKeepTheirTg1FactsButNeverBecomeTelegramDeliveries() {
+    void safetyMessagesKeepStableFinalPlanIdentityAndBecomeCanonicalTelegramDeliveries() {
         MessageDO first = service.recordSafetyChange(new HighValueAlertMessageService.SafetyChangeInput(
                 41L, HighValueAlertPolicy.SafetyChangeType.EXECUTION_DRIFT,
                 "PUSH_RECHECK", "recheck-1", "analysis-1", "plan-1", "opportunity-1", "snapshot-1",
@@ -307,11 +316,14 @@ class HighValueAlertMessageServiceTest {
                 "BTCUSDT", "trace-2", "DRIFTED", 3, "drift", "revalidate",
                 LocalDateTime.of(2026, 8, 16, 12, 30), null));
 
-        assertThat(first.getSourceId()).isNotEqualTo(second.getSourceId());
-        assertThat(first.getDedupeKey()).startsWith("TG1|EXECUTION_DRIFT|DRIFTED|");
-        assertThat(second.getDedupeKey()).startsWith("TG1|EXECUTION_DRIFT|DRIFTED|");
-        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(first)).isEmpty();
-        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(second)).isEmpty();
+        assertThat(first.getSourceType()).isEqualTo("FINAL_PLAN");
+        assertThat(first.getSourceId()).isEqualTo("plan-1");
+        assertThat(second.getSourceType()).isEqualTo("FINAL_PLAN");
+        assertThat(second.getSourceId()).isEqualTo("plan-1");
+        assertThat(first.getDedupeKey()).startsWith("TG1|PLAN_SAFETY_CHANGE|EXECUTION_DRIFT|");
+        assertThat(second.getDedupeKey()).startsWith("TG1|PLAN_SAFETY_CHANGE|EXECUTION_DRIFT|");
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(first)).isPresent();
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(second)).isPresent();
     }
 
     @Test
@@ -431,6 +443,12 @@ class HighValueAlertMessageServiceTest {
         return run;
     }
 
+    private static DecisionResult qualifiedDecision() {
+        DecisionResult decision = new DecisionResult();
+        decision.setRiskLevel("MEDIUM");
+        return decision;
+    }
+
     private static ExecutionPlanDO qualifiedPlan() {
         ExecutionPlanDO plan = new ExecutionPlanDO();
         plan.setPlanId("plan-9");
@@ -439,7 +457,7 @@ class HighValueAlertMessageServiceTest {
         plan.setTraceId("trace-9");
         plan.setFinalPlan(true);
         plan.setFinalPlanMode("CONFIRMATION");
-        plan.setFinalMarketBias("LONG");
+        plan.setFinalMarketBias("STRONG_BULLISH");
         plan.setPlanLifecycleState("CURRENT");
         plan.setRuleValidationStatus("PASS");
         plan.setChainStatus("FINAL_VALIDATED");

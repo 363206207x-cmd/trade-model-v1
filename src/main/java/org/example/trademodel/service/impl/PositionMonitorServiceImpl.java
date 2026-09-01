@@ -246,7 +246,13 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.addAll(derivativesAssessment.reasonCodes());
         }
 
-        PlanContext planContext = resolvePlanContext(position, reasons);
+        String positionSource = normalize(position.getSourceType());
+        boolean manualIndependent = "MANUAL_INDEPENDENT".equals(positionSource)
+                || "MANUAL".equals(positionSource)
+                || "MANUAL_POSITION".equals(positionSource);
+        PlanContext planContext = manualIndependent
+                ? PlanContext.notApplicable()
+                : resolvePlanContext(position, reasons);
         MonitorEvidenceContext monitorEvidence = resolveMonitorEvidenceContext(assetSymbol, markPrice);
         if (monitorEvidence.reasonCode() != null) {
             reasons.add(monitorEvidence.reasonCode());
@@ -314,12 +320,14 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.add("NEAR_TAKE_PROFIT");
         }
 
-        boolean persistedPlanInvalidated = planContext.persistedPlanState == PersistedPlanState.INVALID
-                || planContext.persistedPlanState == PersistedPlanState.BLOCKED;
-        boolean planNeedsReview = planContext.persistedPlanState == PersistedPlanState.REVALIDATION_REQUIRED
+        boolean persistedPlanInvalidated = !manualIndependent
+                && (planContext.persistedPlanState == PersistedPlanState.INVALID
+                || planContext.persistedPlanState == PersistedPlanState.BLOCKED);
+        boolean planNeedsReview = !manualIndependent
+                && (planContext.persistedPlanState == PersistedPlanState.REVALIDATION_REQUIRED
                 || planContext.persistedPlanState == PersistedPlanState.INCOMPLETE
                 || planContext.persistedPlanState == PersistedPlanState.REVIEW_ONLY
-                || planContext.persistedPlanState == PersistedPlanState.MISSING;
+                || planContext.persistedPlanState == PersistedPlanState.MISSING);
         PositionReversalEvaluator.Assessment reversalAssessment = positionReversalEvaluator.evaluate(
                 side, monitorEvidence.verified() ? monitorEvidence.decision().getMarketBiasHierarchy() : null);
         PositionReversalStatusEnum reversalStatus = reversalAssessment.status();
@@ -328,8 +336,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
         boolean strongReversal = reversalStatus == PositionReversalStatusEnum.STRONG_REVERSAL;
         boolean weakReversal = reversalStatus == PositionReversalStatusEnum.WEAK_REVERSAL;
-        boolean planInvalidated = stopLossBreached || persistedPlanInvalidated || strongReversal;
-        boolean logicWeakened = planContext.missing
+        boolean planInvalidated = !manualIndependent
+                && (stopLossBreached || persistedPlanInvalidated || strongReversal);
+        boolean logicWeakened = !manualIndependent && (planContext.missing
                 || planNeedsReview
                 || riskIncreased
                 || derivativesAssessment != null && derivativesAssessment.needsRevalidation()
@@ -337,44 +346,50 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
                 || weakReversal
                 || missingStopLoss
                 || missingTakeProfit
-                || (externalHighRisk && !externalBlocked);
+                || (externalHighRisk && !externalBlocked));
 
-        PositionEntryLogicStatusEnum entryLogicStatus = planInvalidated
+        PositionEntryLogicStatusEnum entryLogicStatus = manualIndependent
+                ? PositionEntryLogicStatusEnum.NOT_APPLICABLE
+                : planInvalidated
                 ? PositionEntryLogicStatusEnum.INVALIDATED
                 : logicWeakened ? PositionEntryLogicStatusEnum.WEAKENED
                 : PositionEntryLogicStatusEnum.STILL_VALID;
         PositionMonitorConclusionEnum monitorConclusion = monitorConclusion(
-                stopLossBreached, takeProfitReached, planInvalidated, nearStopLoss,
+                manualIndependent, stopLossBreached, takeProfitReached, planInvalidated, nearStopLoss,
                 nearTakeProfit, risk.level().name(), entryLogicStatus);
-        PositionMonitorSuggestedActionEnum suggestedAction = suggestedAction(monitorConclusion, risk.level().name());
+        PositionMonitorSuggestedActionEnum suggestedAction = monitorConclusion == null
+                ? null : suggestedAction(monitorConclusion, risk.level().name());
         PositionRiskChangeReasonEnum riskReason = riskChangeReason(
-                planContext.missing, externalSourceBlocked, externalHighRisk, derivativesHighRisk, planInvalidated,
+                !manualIndependent && planContext.missing, externalSourceBlocked,
+                externalHighRisk, derivativesHighRisk, planInvalidated,
                 reversalStatus, logicWeakened, riskIncreased);
         if (monitorConclusion == PositionMonitorConclusionEnum.LOGIC_VALID) {
             reasons.add("LOGIC_VALID");
         }
         PositionMonitorSourceStatusEnum sourceStatus = monitorEvidence.sourceStatus();
         if (sourceStatus == PositionMonitorSourceStatusEnum.VERIFIED
-                && (planContext.missing || !reversalAssessment.sourceAvailable())) {
+                && ((!manualIndependent && planContext.missing) || !reversalAssessment.sourceAvailable())) {
             sourceStatus = PositionMonitorSourceStatusEnum.PENDING_VERIFICATION;
         }
         boolean trustedMonitorResult = sourceStatus == PositionMonitorSourceStatusEnum.VERIFIED;
 
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(position.getId());
-        command.setAnalysisId(planContext.missing || currentAnalysisId == null
+        command.setAnalysisId((!manualIndependent && planContext.missing) || currentAnalysisId == null
                 ? PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID
                 : currentAnalysisId);
         command.setExecutionPlanId(planContext.executionPlanId);
         command.setCurrentPrice(markPrice.price());
         command.setMarkPriceSource(markPrice.source());
         command.setEntryLogicStatus(trustedMonitorResult ? entryLogicStatus.name() : null);
-        command.setMonitorConclusion(trustedMonitorResult ? monitorConclusion.name() : null);
+        command.setMonitorConclusion(trustedMonitorResult && monitorConclusion != null
+                ? monitorConclusion.name() : null);
         command.setReversalStatus(trustedMonitorResult ? reversalStatus.name() : null);
         command.setRiskChangeReason(trustedMonitorResult ? riskReason.name() : null);
         command.setRiskLevel(trustedMonitorResult ? riskLevel : null);
         command.setRiskTrend(trustedMonitorResult ? riskTrend.name() : null);
-        command.setSuggestedAction(trustedMonitorResult ? suggestedAction.name() : null);
+        command.setSuggestedAction(trustedMonitorResult && suggestedAction != null
+                ? suggestedAction.name() : null);
         command.setMonitorSourceStatus(sourceStatus.name());
         command.setObservedAt(markPrice.observedAt());
         command.setFreshUntil(markPrice.freshUntil());
@@ -407,7 +422,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             result.setMarkPriceObservedAt(markPrice.observedAt());
             result.setMarkPriceFresh(true);
             result.setEntryLogicStatus(entryLogicStatus.name());
-            result.setMonitorConclusion(monitorConclusion.name());
+            result.setMonitorConclusion(monitorConclusion == null ? null : monitorConclusion.name());
             result.setDirectionSupportStatus(directionSupportStatus(entryLogicStatus));
             result.setReversalStatus(reversalStatus.name());
             result.setRiskReason(riskReason.name());
@@ -419,9 +434,10 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             result.setNearTakeProfit(nearTakeProfit);
             result.setStopLossBreached(stopLossBreached);
             result.setTakeProfitReached(takeProfitReached);
-            result.setSuggestedAction(suggestedAction.name());
-            result.setSuggestedManualAction(suggestedAction.name());
-            result.setSuggestedManualActionText(suggestedActionText(suggestedAction));
+            result.setSuggestedAction(suggestedAction == null ? null : suggestedAction.name());
+            result.setSuggestedManualAction(suggestedAction == null ? null : suggestedAction.name());
+            result.setSuggestedManualActionText(suggestedAction == null
+                    ? null : suggestedActionText(suggestedAction));
             applyPnl(result, side, position.getEntryPrice(), markPrice.price(), position.getQuantity());
         } else {
             result.setMarkPriceFresh(false);
@@ -545,6 +561,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
         result.setPnlPct(pct);
         result.setPnlPercent(pct);
+        result.setPnlCoverage(positive(quantity)
+                ? "MARK_PRICE_ENTRY_QUANTITY_ONLY" : "PERCENT_ONLY_QUANTITY_UNKNOWN");
+        result.setFeeCoverage("UNKNOWN");
+        result.setFundingCoverage("UNKNOWN");
+        result.setPartialFillCoverage("UNKNOWN");
+        result.setPositionAdditionCoverage("UNKNOWN");
         if (positive(quantity)) {
             BigDecimal unitPnl = "SHORT".equals(side)
                     ? entryPrice.subtract(currentPrice)
@@ -558,10 +580,12 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             case STILL_VALID -> "SUPPORTED";
             case WEAKENED -> "WEAKENED";
             case INVALIDATED -> "NOT_SUPPORTED";
+            case NOT_APPLICABLE -> "NOT_APPLICABLE";
         };
     }
 
     private static PositionMonitorConclusionEnum monitorConclusion(
+            boolean manualIndependent,
             boolean stopLossBreached,
             boolean takeProfitReached,
             boolean persistedPlanInvalidated,
@@ -569,6 +593,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             boolean nearTakeProfit,
             String riskLevel,
             PositionEntryLogicStatusEnum entryLogicStatus) {
+        if (stopLossBreached && manualIndependent) {
+            return PositionMonitorConclusionEnum.WAIT_USER_CONFIRM_CLOSE;
+        }
         if (stopLossBreached || persistedPlanInvalidated) {
             return PositionMonitorConclusionEnum.PLAN_INVALIDATED;
         }
@@ -586,6 +613,9 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         }
         if (entryLogicStatus == PositionEntryLogicStatusEnum.WEAKENED) {
             return PositionMonitorConclusionEnum.LOGIC_WEAKENED;
+        }
+        if (entryLogicStatus == PositionEntryLogicStatusEnum.NOT_APPLICABLE) {
+            return null;
         }
         return PositionMonitorConclusionEnum.LOGIC_VALID;
     }
@@ -1009,6 +1039,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
 
         private static PlanContext missing() {
             return new PlanContext(null, null, null, true, false, null,
+                    false, null, null, false, PersistedPlanState.MISSING);
+        }
+
+        private static PlanContext notApplicable() {
+            return new PlanContext(null, null, null, false, false, null,
                     false, null, null, false, PersistedPlanState.MISSING);
         }
     }
