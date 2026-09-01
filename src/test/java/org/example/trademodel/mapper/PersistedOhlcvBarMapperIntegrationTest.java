@@ -126,6 +126,36 @@ class PersistedOhlcvBarMapperIntegrationTest {
     }
 
     @Test
+    void homeProvenanceQueriesBindSourceTraceProviderAndAnalysisCutoff() {
+        LocalDateTime ingestedAt = LocalDateTime.of(2026, 8, 25, 8, 0);
+        insertBar("PROVENANCEUSDT", "5m", 1_000L, 1_999L, "100.00", true, 0,
+                "binance-before", "binance-analysis-trace", ingestedAt,
+                "BINANCE_PUBLIC", "SPOT");
+        insertBar("PROVENANCEUSDT", "5m", 1_000L, 1_999L, "200.00", true, 0,
+                "kraken-before", "kraken-analysis-trace", ingestedAt.plusSeconds(1),
+                "KRAKEN", "SPOT");
+        insertBar("PROVENANCEUSDT", "5m", 3_000L, 3_999L, "101.00", true, 0,
+                "binance-after", "binance-future-trace", ingestedAt.plusMinutes(1),
+                "BINANCE_PUBLIC", "SPOT");
+
+        PersistedOhlcvBarDO sourceAnchor = persistedOhlcvBarMapper
+                .selectLatestClosedBarBySourceTrace("PROVENANCEUSDT", "binance-analysis-trace");
+        PersistedOhlcvBarDO binanceAtAnalysis = persistedOhlcvBarMapper
+                .selectLatestClosedBarBySourceAtOrBefore(
+                        "PROVENANCEUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 2_500L);
+        PersistedOhlcvBarDO krakenAtAnalysis = persistedOhlcvBarMapper
+                .selectLatestClosedBarBySourceAtOrBefore(
+                        "PROVENANCEUSDT", "5m", "KRAKEN", "SPOT", 2_500L);
+
+        assertThat(sourceAnchor).isNotNull();
+        assertThat(sourceAnchor.getProvider()).isEqualTo("BINANCE_PUBLIC");
+        assertThat(sourceAnchor.getSourceTraceId()).isEqualTo("binance-analysis-trace");
+        assertThat(binanceAtAnalysis.getSourceTraceId()).isEqualTo("binance-analysis-trace");
+        assertThat(binanceAtAnalysis.getCloseTimeMs()).isEqualTo(1_999L);
+        assertThat(krakenAtAnalysis.getSourceTraceId()).isEqualTo("kraken-analysis-trace");
+    }
+
+    @Test
     void selectLatestIngestionBatch_returnsNewestNonDeletedBatchMetadata() {
         insertBar("SOLUSDT", "15m", 20_000L, 34_999L, "150.00", true, 0, "batch-older", "trace-old",
                 LocalDateTime.of(2026, 5, 17, 10, 0, 0));

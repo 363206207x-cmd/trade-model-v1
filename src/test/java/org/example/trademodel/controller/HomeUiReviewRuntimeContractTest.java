@@ -113,6 +113,21 @@ class HomeUiReviewRuntimeContractTest {
     }
 
     @Test
+    void homeRuntimeParsesAnalysisOwnedAssetProvenanceWithoutAddingVisibleCardRows() throws Exception {
+        String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String parser = slice(source, "function assetProvenance(asset)", "function opportunityCard(asset, selected)");
+
+        assertThat(parser).contains(
+                "analysisId", "analysisVersion", "configurationVersion", "providerMatrixVersion",
+                "provider", "sourceId", "priceObservedAt", "oneHourClosedAt", "fourHourClosedAt",
+                "freshnessStatus", "dataQualityScore", "directionMaturity", "homeTier",
+                "data-analysis-id", "data-analysis-version", "data-direction-maturity", "data-home-tier");
+        assertThat(source).doesNotContain(
+                "<small>analysisId</small>", "<small>providerMatrixVersion</small>",
+                "<small>sourceId</small>", "<small>homeTier</small>");
+    }
+
+    @Test
     void homeCardRuntimePreservesBackendOrderAndSeparatesObservationSemantics() throws Exception {
         String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
         String validators = slice(source, "function eligibleOpportunity(asset)", "function selectedFinalAccess(home)");

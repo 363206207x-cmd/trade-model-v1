@@ -242,7 +242,8 @@ CREATE TABLE IF NOT EXISTS tm_decision_result (
     ),
     CONSTRAINT ck_tm_decision_direction_data_state CHECK (
         direction_data_state IS NULL OR direction_data_state IN (
-            'READY', 'INSUFFICIENT_DATA', 'STALE', 'SOURCE_UNAVAILABLE'
+            'READY', 'INSUFFICIENT_DATA', 'STALE', 'SOURCE_UNAVAILABLE',
+            'MULTI_TIMEFRAME_CONFLICT'
         )
     ),
     CONSTRAINT ck_tm_decision_machine_scores CHECK (

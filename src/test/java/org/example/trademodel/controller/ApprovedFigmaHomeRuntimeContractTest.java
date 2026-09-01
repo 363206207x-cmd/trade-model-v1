@@ -56,6 +56,31 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
+    void opportunityCardsKeepFourVisibleRowsInsideTheFrozenHeightWithoutClipping() throws Exception {
+        String css = Files.readString(STYLE);
+        String cardRule = css.substring(css.indexOf(".opportunity-card {"),
+                css.indexOf(".opportunity-card:hover"));
+
+        assertThat(cardRule).contains("height: 120px", "padding: 8px 10px")
+                .doesNotContain("overflow: hidden");
+        assertThat(css).contains(
+                ".opportunity-final { display: grid; grid-template-columns: 1fr;",
+                ".opportunity-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));",
+                ".opportunity-context { min-width: 0; display: flex;",
+                ".opportunity-context span { min-width: 0; white-space: nowrap;");
+    }
+
+    @Test
+    void dashboardDeclaresARepositoryLocalTrineLogicFavicon() throws Exception {
+        String html = Files.readString(HOME);
+        Path favicon = Path.of("src/main/resources/static/favicon.svg");
+
+        assertThat(html).contains("rel=\"icon\"", "href=\"/favicon.svg\"");
+        assertThat(favicon).exists();
+        assertThat(Files.readString(favicon)).contains("aria-label=\"TRINE LOGIC\"");
+    }
+
+    @Test
     void homeAlertSummaryMapsTechnicalStatesToUserFacingCopy() throws Exception {
         String script = Files.readString(SCRIPT);
 

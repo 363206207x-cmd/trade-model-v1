@@ -119,6 +119,30 @@ class DecisionResultMapperLatestPlanIntegrationTest {
     }
 
     @Test
+    void solMultiTimeframeConflictPersistsWithoutCreatingFinalPlan() {
+        jdbcTemplate.update(
+                "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "
+                        + "VALUES (?,?,?, TIMESTAMP '2026-08-31 12:00:00', ?)",
+                "analysis-sol-conflict", "SOLUSDT", "1h", 91);
+        jdbcTemplate.update(
+                "INSERT INTO tm_decision_result(decision_id, analysis_id, symbol, direction_data_state, "
+                        + "data_quality_score, opportunity_score, create_time) "
+                        + "VALUES (?,?,?,?,?,?, TIMESTAMP '2026-08-31 12:00:00')",
+                "decision-sol-conflict", "analysis-sol-conflict", "SOLUSDT",
+                "MULTI_TIMEFRAME_CONFLICT", 91, 78);
+
+        String persistedState = jdbcTemplate.queryForObject(
+                "SELECT direction_data_state FROM tm_decision_result WHERE decision_id=?",
+                String.class, "decision-sol-conflict");
+        Integer finalPlanCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tm_execution_plan WHERE analysis_id=? AND final_plan=TRUE",
+                Integer.class, "analysis-sol-conflict");
+
+        assertThat(persistedState).isEqualTo("MULTI_TIMEFRAME_CONFLICT");
+        assertThat(finalPlanCount).isZero();
+    }
+
+    @Test
     void opportunityRankingReadReturnsLatestDecisionRealScoreAndOnlyValidatedFinalPlan() {
         jdbcTemplate.update(
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) "

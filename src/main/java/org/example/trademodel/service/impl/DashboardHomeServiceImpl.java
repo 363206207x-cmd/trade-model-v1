@@ -15,6 +15,8 @@ import org.example.trademodel.derivatives.DerivativesSnapshotReadPort;
 import org.example.trademodel.entity.MonitorAlertDO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
+import org.example.trademodel.entity.EvidenceItemDO;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.messagepush.MessageReadState;
@@ -32,6 +34,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AccountRiskSnapshotMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
 import org.example.trademodel.mapper.DecisionResultMapper;
+import org.example.trademodel.mapper.EvidenceItemMapper;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
 import org.example.trademodel.localreal.LocalRealAssetReadiness;
@@ -122,6 +125,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private DerivativesBusinessIntegrationService derivativesBusinessIntegrationService;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
     private AnalysisRunMapper analysisRunMapper;
+    private EvidenceItemMapper evidenceItemMapper;
     private DecisionResultMapper decisionResultMapper;
     private ExecutionPlanMapper executionPlanMapper;
     private PositionPlanSourceResolver positionPlanSourceResolver;
@@ -184,6 +188,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                       AnalysisRunMapper analysisRunMapper) {
         this.persistedOhlcvBarMapper = persistedOhlcvBarMapper;
         this.analysisRunMapper = analysisRunMapper;
+    }
+
+    @Autowired(required = false)
+    void setHomeProvenanceSource(EvidenceItemMapper evidenceItemMapper) {
+        this.evidenceItemMapper = evidenceItemMapper;
     }
 
     @Autowired(required = false)
@@ -887,9 +896,147 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 asset.setCompositeScore(projection.opportunityScore());
                 setFieldSource(asset, "score", "DERIVED");
             }
+            applyAnalysisProvenance(asset, projection, userId);
             assets.add(asset);
         }
         return assets;
+    }
+
+    private void applyAnalysisProvenance(DashboardHomeVO.AssetVO asset,
+                                         HomeTopAssetProjection projection,
+                                         Long userId) {
+        if (asset == null || projection == null) return;
+
+        boolean tierOne = projection.priorityScore() != null && projection.priorityScore() > 0
+                && Boolean.TRUE.equals(asset.getHasFinal());
+        asset.setHomeTier(tierOne ? "TIER_1" : "TIER_2");
+        asset.setDirectionMaturity(tierOne ? "FINAL"
+                : projection.analysisId() == null ? "NOT_EVALUATED" : "NON_FINAL");
+        asset.setFreshnessStatus(trimToNull(projection.freshness()));
+
+        String analysisId = trimToNull(projection.analysisId());
+        if (analysisId == null || analysisRunMapper == null) return;
+        AnalysisRunDO run;
+        try {
+            run = userId != null && userId > 0
+                    ? analysisRunMapper.selectReadableByUser(analysisId, userId)
+                    : analysisRunMapper.selectById(analysisId);
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        if (!sameAnalysisAsset(run, asset, projection)) return;
+
+        asset.setAnalysisId(run.getAnalysisId());
+        asset.setAnalysisVersion(run.getVersionNo());
+        asset.setConfigurationVersion(trimToNull(run.getRuleVersion()));
+
+        DecisionResultVO projectedDecision = projection.sourceDecision();
+        DecisionResult persistedDecision = null;
+        if (projectedDecision == null && decisionResultMapper != null) {
+            try {
+                persistedDecision = decisionResultMapper.selectLatestByAnalysisId(analysisId);
+            } catch (RuntimeException ignored) {
+                persistedDecision = null;
+            }
+        }
+        asset.setProviderMatrixVersion(projectedDecision != null
+                ? trimToNull(projectedDecision.getProviderMatrixVersion())
+                : persistedDecision == null ? null : trimToNull(persistedDecision.getProviderMatrixVersion()));
+        Integer persistedDataQuality = projectedDecision != null
+                ? projectedDecision.getDataQualityScore()
+                : persistedDecision == null ? run.getDataQualityScore() : persistedDecision.getDataQualityScore();
+        asset.setDataQualityScore(persistedDataQuality);
+
+        EvidenceItemDO marketEvidence = analysisMarketEvidence(analysisId, asset.getRawSymbol());
+        if (marketEvidence == null) return;
+        String sourceTraceId = trimToNull(marketEvidence.getSourceTraceId());
+        String evidenceProvider = trimToNull(marketEvidence.getSourceProvider());
+        asset.setSourceId(sourceTraceId);
+        asset.setProvider(evidenceProvider);
+        if (sourceTraceId == null || persistedOhlcvBarMapper == null || run.getAnalysisTime() == null) return;
+
+        PersistedOhlcvBarDO sourceAnchor;
+        try {
+            sourceAnchor = persistedOhlcvBarMapper.selectLatestClosedBarBySourceTrace(
+                    asset.getRawSymbol(), sourceTraceId);
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        if (!sameProvider(evidenceProvider, sourceAnchor)) return;
+
+        String provider = trimToNull(sourceAnchor.getProvider());
+        String marketType = trimToNull(sourceAnchor.getProviderMarketType());
+        if (provider == null || marketType == null) return;
+        long analysisTimeMs = run.getAnalysisTime().toInstant(ZoneOffset.UTC).toEpochMilli();
+        try {
+            PersistedOhlcvBarDO price = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "5m", provider, marketType, analysisTimeMs);
+            PersistedOhlcvBarDO oneHour = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "1h", provider, marketType, analysisTimeMs);
+            PersistedOhlcvBarDO fourHour = analysisBoundClosedBar(
+                    asset.getRawSymbol(), "4h", provider, marketType, analysisTimeMs);
+            asset.setProvider(provider);
+            asset.setPriceObservedAt(closedAt(price));
+            asset.setOneHourClosedAt(closedAt(oneHour));
+            asset.setFourHourClosedAt(closedAt(fourHour));
+        } catch (RuntimeException ignored) {
+            asset.setPriceObservedAt(null);
+            asset.setOneHourClosedAt(null);
+            asset.setFourHourClosedAt(null);
+        }
+    }
+
+    private boolean sameAnalysisAsset(AnalysisRunDO run,
+                                      DashboardHomeVO.AssetVO asset,
+                                      HomeTopAssetProjection projection) {
+        if (run == null || !Objects.equals(trimToNull(run.getAnalysisId()), trimToNull(projection.analysisId()))) {
+            return false;
+        }
+        if (!Objects.equals(normalizeSymbol(run.getSymbol()), normalizeSymbol(asset.getRawSymbol()))) {
+            return false;
+        }
+        return run.getAssetId() == null || asset.getAssetId() == null
+                || Objects.equals(run.getAssetId(), asset.getAssetId());
+    }
+
+    private EvidenceItemDO analysisMarketEvidence(String analysisId, String symbol) {
+        if (evidenceItemMapper == null || !hasText(analysisId) || !hasText(symbol)) return null;
+        try {
+            String sourceMarker = ":" + normalizeSymbol(symbol) + ":1H:";
+            return evidenceItemMapper.listByAnalysisId(analysisId).stream()
+                    .filter(Objects::nonNull)
+                    .filter(row -> hasText(row.getSourceProvider()) && hasText(row.getSourceTraceId()))
+                    .filter(row -> {
+                        String reference = trimToNull(row.getSourceReference());
+                        return reference != null && reference.toUpperCase(Locale.ROOT).contains(sourceMarker);
+                    })
+                    .max(Comparator.comparing(EvidenceItemDO::getObservedAt,
+                            Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .orElse(null);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private boolean sameProvider(String evidenceProvider, PersistedOhlcvBarDO sourceAnchor) {
+        return sourceAnchor != null && hasText(sourceAnchor.getProvider())
+                && evidenceProvider != null
+                && evidenceProvider.equalsIgnoreCase(sourceAnchor.getProvider());
+    }
+
+    private PersistedOhlcvBarDO analysisBoundClosedBar(String symbol,
+                                                        String timeframe,
+                                                        String provider,
+                                                        String marketType,
+                                                        long analysisTimeMs) {
+        return persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                symbol, timeframe, provider, marketType, analysisTimeMs);
+    }
+
+    private LocalDateTime closedAt(PersistedOhlcvBarDO row) {
+        return row == null || row.getCloseTimeMs() == null || row.getCloseTimeMs() <= 0
+                ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(row.getCloseTimeMs()), ZoneOffset.UTC);
     }
 
     private DashboardHomeVO.AssetVO assetFromObservation(int slot,

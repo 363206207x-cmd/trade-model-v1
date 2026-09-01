@@ -60,6 +60,7 @@ class V15DecisionContractMigrationContractTest {
         assertThat(schema).contains(
                 "CONSTRAINT ck_tm_decision_validated_bias",
                 "CONSTRAINT ck_tm_decision_direction_data_state",
+                "'MULTI_TIMEFRAME_CONFLICT'",
                 "CONSTRAINT uk_tm_user_position_id_user UNIQUE (id, user_id)",
                 "FOREIGN KEY (user_position_id, user_id) REFERENCES tm_user_position(id, user_id)",
                 "CREATE INDEX IF NOT EXISTS idx_tm_decision_home_contract",

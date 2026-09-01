@@ -50,6 +50,28 @@ public interface PersistedOhlcvBarMapper {
     );
 
     @Select(BASE_SELECT
+            + "WHERE symbol = #{symbol} AND source_trace_id = #{sourceTraceId} "
+            + "AND is_closed = TRUE AND is_deleted = 0 "
+            + "ORDER BY close_time_ms DESC, id DESC LIMIT 1")
+    PersistedOhlcvBarDO selectLatestClosedBarBySourceTrace(
+            @Param("symbol") String symbol,
+            @Param("sourceTraceId") String sourceTraceId
+    );
+
+    @Select(BASE_SELECT
+            + "WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
+            + "AND provider = #{provider} AND provider_market_type = #{providerMarketType} "
+            + "AND close_time_ms <= #{asOfMs} AND is_closed = TRUE AND is_deleted = 0 "
+            + "ORDER BY close_time_ms DESC, id DESC LIMIT 1")
+    PersistedOhlcvBarDO selectLatestClosedBarBySourceAtOrBefore(
+            @Param("symbol") String symbol,
+            @Param("timeframe") String timeframe,
+            @Param("provider") String provider,
+            @Param("providerMarketType") String providerMarketType,
+            @Param("asOfMs") long asOfMs
+    );
+
+    @Select(BASE_SELECT
             + "WHERE symbol = #{symbol} AND timeframe = #{timeframe} "
             + "AND open_time_ms = #{openTimeMs} AND is_deleted = 0 "
             + "ORDER BY id DESC LIMIT 1")

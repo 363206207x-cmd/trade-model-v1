@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Clock;
@@ -163,6 +165,46 @@ class AnalysisRunOrchestratorImplTest {
     void nonDuplicateFailureKeepsExistingFailureClassification() {
         assertThat(AnalysisRunOrchestratorImpl.classifyPersistenceFailure(
                 new IllegalStateException("REAL_MARKET_ENVIRONMENT_REQUIRED"))).isNull();
+    }
+
+    @Test
+    void decisionDirectionStateCheckIsNotReportedAsIdCollision() {
+        DataIntegrityViolationException violation = new DataIntegrityViolationException(
+                "Check constraint violation: \"CK_TM_DECISION_DIRECTION_DATA_STATE\"; "
+                        + "table TM_DECISION_RESULT");
+
+        var failure = AnalysisRunOrchestratorImpl
+                .classifyPersistenceFailure(violation);
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.failureCode()).isEqualTo("DECISION_STATE_CONSTRAINT_VIOLATION");
+        assertThat(failure.entity()).isEqualTo("tm_decision_result");
+        assertThat(failure.constraintName()).isEqualTo("CK_TM_DECISION_DIRECTION_DATA_STATE");
+    }
+
+    @Test
+    void otherCheckConstraintHasGenericConstraintClassification() {
+        DataIntegrityViolationException violation = new DataIntegrityViolationException(
+                "Check constraint violation: \"CK_TM_DECISION_MACHINE_SCORES\"; "
+                        + "table TM_DECISION_RESULT");
+
+        var failure = AnalysisRunOrchestratorImpl
+                .classifyPersistenceFailure(violation);
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.failureCode()).isEqualTo("PERSISTENCE_CONSTRAINT_VIOLATION");
+        assertThat(failure.constraintName()).isEqualTo("CK_TM_DECISION_MACHINE_SCORES");
+    }
+
+    @Test
+    void ordinaryDataAccessFailureHasPersistenceClassification() {
+        var failure = AnalysisRunOrchestratorImpl.classifyPersistenceFailure(
+                new DataAccessResourceFailureException("database unavailable"));
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.failureCode()).isEqualTo("PERSISTENCE_FAILURE");
+        assertThat(failure.entity()).isEqualTo("unknown");
+        assertThat(failure.constraintName()).isEqualTo("UNKNOWN");
     }
 
     private static AnalysisRunOrchestratorImpl orchestrator(CapturingGuard guard, CapturingAssembler assembler, String ruleVersion) {

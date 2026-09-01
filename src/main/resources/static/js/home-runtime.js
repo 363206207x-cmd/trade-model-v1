@@ -263,6 +263,30 @@
         var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
         return '<span class="state-badge' + tone + '">' + escapeHtml(visible) + "</span>";
     }
+    function assetProvenance(asset) {
+        return {
+            analysisId: has(asset && asset.analysisId) ? String(asset.analysisId) : null,
+            analysisVersion: has(asset && asset.analysisVersion) ? Number(asset.analysisVersion) : null,
+            configurationVersion: has(asset && asset.configurationVersion) ? String(asset.configurationVersion) : null,
+            providerMatrixVersion: has(asset && asset.providerMatrixVersion) ? String(asset.providerMatrixVersion) : null,
+            provider: has(asset && asset.provider) ? String(asset.provider) : null,
+            sourceId: has(asset && asset.sourceId) ? String(asset.sourceId) : null,
+            priceObservedAt: has(asset && asset.priceObservedAt) ? String(asset.priceObservedAt) : null,
+            oneHourClosedAt: has(asset && asset.oneHourClosedAt) ? String(asset.oneHourClosedAt) : null,
+            fourHourClosedAt: has(asset && asset.fourHourClosedAt) ? String(asset.fourHourClosedAt) : null,
+            freshnessStatus: has(asset && asset.freshnessStatus) ? String(asset.freshnessStatus) : null,
+            dataQualityScore: has(asset && asset.dataQualityScore) ? Number(asset.dataQualityScore) : null,
+            directionMaturity: has(asset && asset.directionMaturity) ? String(asset.directionMaturity) : null,
+            homeTier: has(asset && asset.homeTier) ? String(asset.homeTier) : null
+        };
+    }
+    function provenanceAttributes(asset) {
+        var provenance = assetProvenance(asset);
+        return ' data-analysis-id="' + escapeHtml(provenance.analysisId || "")
+            + '" data-analysis-version="' + escapeHtml(has(provenance.analysisVersion) ? provenance.analysisVersion : "")
+            + '" data-direction-maturity="' + escapeHtml(provenance.directionMaturity || "")
+            + '" data-home-tier="' + escapeHtml(provenance.homeTier || "") + '"';
+    }
     function opportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
@@ -275,7 +299,8 @@
         var dataNotice = opportunityDataNotice(asset);
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
             + String(isSelected) + '" data-symbol="'
-            + escapeHtml(symbol) + '" aria-label="查看 ' + escapeHtml(symbol + " 最终决策上下文") + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
+            + escapeHtml(symbol + " 最终决策上下文") + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
             + (dataNotice ? " · " + escapeHtml(dataNotice) : "")
             + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
@@ -329,7 +354,8 @@
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "")
             + '" tabindex="0" role="button" aria-pressed="' + String(isSelected)
             + '" data-symbol="' + escapeHtml(symbol)
-            + '" aria-label="查看 ' + escapeHtml(symbol + " 观察状态，" + state) + '"><header><div class="asset-identity"><strong>'
+            + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
+            + escapeHtml(symbol + " 观察状态，" + state) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
             + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
             + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(direction)

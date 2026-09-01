@@ -22,7 +22,8 @@ ALTER TABLE tm_decision_result
     ),
     ADD CONSTRAINT ck_tm_decision_direction_data_state CHECK (
         direction_data_state IS NULL OR direction_data_state IN (
-            'READY', 'INSUFFICIENT_DATA', 'STALE', 'SOURCE_UNAVAILABLE'
+            'READY', 'INSUFFICIENT_DATA', 'STALE', 'SOURCE_UNAVAILABLE',
+            'MULTI_TIMEFRAME_CONFLICT'
         )
     ),
     ADD CONSTRAINT ck_tm_decision_dq_range CHECK (

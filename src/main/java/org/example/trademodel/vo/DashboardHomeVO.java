@@ -1,6 +1,7 @@
 package org.example.trademodel.vo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import org.example.trademodel.ai.AiRoleResultsPayload;
@@ -510,6 +511,17 @@ public class DashboardHomeVO {
         private String name;
         private Long assetId;
         private String analysisId;
+        private Integer analysisVersion;
+        private String configurationVersion;
+        private String providerMatrixVersion;
+        private String provider;
+        private String sourceId;
+        private LocalDateTime priceObservedAt;
+        private LocalDateTime oneHourClosedAt;
+        private LocalDateTime fourHourClosedAt;
+        private String freshnessStatus;
+        private String directionMaturity;
+        private String homeTier;
         private String opportunityId;
         private String opportunityState;
         private String primaryOpportunityId;
@@ -609,6 +621,32 @@ public class DashboardHomeVO {
         public void setAnalysisId(String analysisId) {
             this.analysisId = analysisId;
         }
+
+        public Integer getAnalysisVersion() { return analysisVersion; }
+        public void setAnalysisVersion(Integer analysisVersion) { this.analysisVersion = analysisVersion; }
+        public String getConfigurationVersion() { return configurationVersion; }
+        public void setConfigurationVersion(String configurationVersion) { this.configurationVersion = configurationVersion; }
+        public String getProviderMatrixVersion() { return providerMatrixVersion; }
+        public void setProviderMatrixVersion(String providerMatrixVersion) { this.providerMatrixVersion = providerMatrixVersion; }
+        public String getProvider() { return provider; }
+        public void setProvider(String provider) { this.provider = provider; }
+        public String getSourceId() { return sourceId; }
+        public void setSourceId(String sourceId) { this.sourceId = sourceId; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getPriceObservedAt() { return priceObservedAt; }
+        public void setPriceObservedAt(LocalDateTime priceObservedAt) { this.priceObservedAt = priceObservedAt; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getOneHourClosedAt() { return oneHourClosedAt; }
+        public void setOneHourClosedAt(LocalDateTime oneHourClosedAt) { this.oneHourClosedAt = oneHourClosedAt; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getFourHourClosedAt() { return fourHourClosedAt; }
+        public void setFourHourClosedAt(LocalDateTime fourHourClosedAt) { this.fourHourClosedAt = fourHourClosedAt; }
+        public String getFreshnessStatus() { return freshnessStatus; }
+        public void setFreshnessStatus(String freshnessStatus) { this.freshnessStatus = freshnessStatus; }
+        public String getDirectionMaturity() { return directionMaturity; }
+        public void setDirectionMaturity(String directionMaturity) { this.directionMaturity = directionMaturity; }
+        public String getHomeTier() { return homeTier; }
+        public void setHomeTier(String homeTier) { this.homeTier = homeTier; }
 
         public String getOpportunityId() { return opportunityId; }
         public void setOpportunityId(String opportunityId) { this.opportunityId = opportunityId; }
