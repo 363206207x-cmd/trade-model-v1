@@ -98,6 +98,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -246,20 +247,21 @@ class DashboardHomeServiceImplTest {
 
         EvidenceItemDO evidence = new EvidenceItemDO();
         evidence.setAnalysisId(analysisId);
-        evidence.setSourceProvider("BINANCE_PUBLIC");
-        evidence.setSourceReference("BINANCE_PUBLIC:SOLUSDT:1h:1786421100000");
+        evidence.setEvidenceType("价格结构");
+        evidence.setSource("MARKET_HEURISTIC");
+        evidence.setSourceProvider("BINANCE");
+        evidence.setSourceReference(
+                "BINANCE|PRICE|BINANCE:SPOT:NONE:SOL/USDT|SOLUSDT|GLOBAL|source-v1");
         evidence.setSourceTraceId(sourceTraceId);
         evidence.setObservedAt(LocalDateTime.of(2026, 8, 11, 12, 5));
         when(evidenceItemMapper.listByAnalysisId(analysisId)).thenReturn(List.of(evidence));
 
-        PersistedOhlcvBarDO anchor = sourceOwnedBar("SOLUSDT", "5m", sourceTraceId,
+        PersistedOhlcvBarDO anchor = sourceOwnedBar("SOLUSDT", "5m", "ohlcv-sol-5m",
                 Instant.parse("2026-08-11T12:05:00Z"));
         PersistedOhlcvBarDO oneHour = sourceOwnedBar("SOLUSDT", "1h", "source-sol-1h",
                 Instant.parse("2026-08-11T12:00:00Z"));
         PersistedOhlcvBarDO fourHour = sourceOwnedBar("SOLUSDT", "4h", "source-sol-4h",
                 Instant.parse("2026-08-11T12:00:00Z"));
-        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceTrace("SOLUSDT", sourceTraceId))
-                .thenReturn(anchor);
         long asOfMs = analysisTime.toInstant(ZoneOffset.UTC).toEpochMilli();
         when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
                 "SOLUSDT", "5m", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(anchor);
@@ -310,6 +312,86 @@ class DashboardHomeServiceImplTest {
                 .andExpect(jsonPath("$.data.assets[0].directionMaturity").value("NON_FINAL"))
                 .andExpect(jsonPath("$.data.assets[0].homeTier").value("TIER_2"))
                 .andExpect(jsonPath("$.data.assets[0].finalMarketBias").doesNotExist());
+        verify(persistedOhlcvBarMapper, never()).selectLatestClosedBarBySourceTrace(anyString(), anyString());
+    }
+
+    @Test
+    void homeProjectionFailsClosedWhenAnalysisEvidenceAndPersistedBarsHaveDifferentOwners() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        String analysisId = "analysis-SOLUSDT-provider-mismatch";
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 8, 11, 12, 10);
+        AnalysisRunDO run = formalSchedulerRun(analysisId, "SOLUSDT", 106L);
+        run.setAnalysisTime(analysisTime);
+        when(analysisRunMapper.selectReadableByUser(analysisId, USER_ID)).thenReturn(run);
+
+        EvidenceItemDO evidence = new EvidenceItemDO();
+        evidence.setAnalysisId(analysisId);
+        evidence.setEvidenceType("价格结构");
+        evidence.setSource("MARKET_HEURISTIC");
+        evidence.setSourceProvider("KRAKEN");
+        evidence.setSourceReference("KRAKEN:SOLUSDT:1h:1786421100000");
+        evidence.setSourceTraceId("kraken-analysis-trace");
+        evidence.setObservedAt(LocalDateTime.of(2026, 8, 11, 12, 5));
+        when(evidenceItemMapper.listByAnalysisId(analysisId)).thenReturn(List.of(evidence));
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observationProjection(
+                106L, "SOLUSDT", "OBSERVING", "FRESH", analysisTime, analysisId)));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "SOLUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getAnalysisId()).isEqualTo(analysisId);
+        assertThat(asset.getProvider()).isNull();
+        assertThat(asset.getSourceId()).isNull();
+        assertThat(asset.getPriceObservedAt()).isNull();
+        assertThat(asset.getOneHourClosedAt()).isNull();
+        assertThat(asset.getFourHourClosedAt()).isNull();
+        verify(persistedOhlcvBarMapper, never()).selectLatestClosedBarBySourceAtOrBefore(
+                anyString(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void homeProjectionRejectsMarketBarsAfterTheFormalAnalysisTime() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        String analysisId = "analysis-SOLUSDT-future-bar";
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 8, 11, 12, 10);
+        AnalysisRunDO run = formalSchedulerRun(analysisId, "SOLUSDT", 106L);
+        run.setAnalysisTime(analysisTime);
+        when(analysisRunMapper.selectReadableByUser(analysisId, USER_ID)).thenReturn(run);
+
+        EvidenceItemDO evidence = new EvidenceItemDO();
+        evidence.setAnalysisId(analysisId);
+        evidence.setEvidenceType("价格结构");
+        evidence.setSource("MARKET_HEURISTIC");
+        evidence.setSourceProvider("BINANCE");
+        evidence.setSourceTraceId("binance-analysis-trace");
+        evidence.setObservedAt(LocalDateTime.of(2026, 8, 11, 12, 5));
+        when(evidenceItemMapper.listByAnalysisId(analysisId)).thenReturn(List.of(evidence));
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observationProjection(
+                106L, "SOLUSDT", "OBSERVING", "FRESH", analysisTime, analysisId)));
+
+        long asOfMs = analysisTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "5m", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(sourceOwnedBar(
+                "SOLUSDT", "5m", "future-5m", Instant.parse("2026-08-11T12:15:00Z")));
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "1h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(sourceOwnedBar(
+                "SOLUSDT", "1h", "source-sol-1h", Instant.parse("2026-08-11T12:00:00Z")));
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "SOLUSDT", "4h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(sourceOwnedBar(
+                "SOLUSDT", "4h", "source-sol-4h", Instant.parse("2026-08-11T12:00:00Z")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "SOLUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getProvider()).isNull();
+        assertThat(asset.getSourceId()).isNull();
+        assertThat(asset.getPriceObservedAt()).isNull();
+        assertThat(asset.getOneHourClosedAt()).isNull();
+        assertThat(asset.getFourHourClosedAt()).isNull();
     }
 
     @Test
@@ -4151,6 +4233,7 @@ class DashboardHomeServiceImplTest {
         bar.setProviderMarketType("SPOT");
         bar.setSourceTraceId(sourceTraceId);
         bar.setClosed(true);
+        bar.setSourceStatus("READY");
         bar.setFreshnessStatus("FRESH");
         return bar;
     }
