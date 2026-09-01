@@ -17,7 +17,7 @@ class StandardJarPostgreSqlV13IntegrationTest {
                 "java -jar \"${jar_path}\"",
                 "postgres:16-alpine",
                 "SELECT COUNT(*) FROM flyway_schema_history",
-                "POSTGRESQL_V1_V15=15/15_PASS");
+                "POSTGRESQL_V1_V16=16/16_PASS");
         assertThat(script).doesNotContain("-Pflyway-migration", "spring-boot:run");
     }
 }

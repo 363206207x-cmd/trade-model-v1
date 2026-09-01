@@ -166,24 +166,24 @@ SMOKE_ALLOW_EXTERNAL_CALLS=false \
 printf '%s\n' "PACKAGED_JAR_LOGIN_SESSION_LOGOUT=PASS"
 migration_count="$(docker exec "${container}" psql -U "${db_user}" -d "${database}" -Atc \
   "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL")"
-if [[ "${migration_count}" != "15" ]]; then
-  printf '%s\n' "POSTGRESQL_V1_V15=FAILED"
+if [[ "${migration_count}" != "16" ]]; then
+  printf '%s\n' "POSTGRESQL_V1_V16=FAILED"
   exit 1
 fi
-printf '%s\n' "POSTGRESQL_V1_V15=15/15_PASS"
+printf '%s\n' "POSTGRESQL_V1_V16=16/16_PASS"
 stop_app
 
 start_app
 if ! wait_ready; then
   print_startup_failure
-  printf '%s\n' "PACKAGED_JAR_EXISTING_V15_RESTART=FAILED"
+  printf '%s\n' "PACKAGED_JAR_EXISTING_V16_RESTART=FAILED"
   exit 1
 fi
-printf '%s\n' "PACKAGED_JAR_EXISTING_V15_RESTART=PASS"
+printf '%s\n' "PACKAGED_JAR_EXISTING_V16_RESTART=PASS"
 stop_app
 
 docker exec "${container}" psql -U "${db_user}" -d "${database}" -v ON_ERROR_STOP=1 -c \
-  "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '15'" >/dev/null
+  "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '16'" >/dev/null
 start_app
 for _ in $(seq 1 45); do
   if ! kill -0 "${app_pid}" 2>/dev/null; then
