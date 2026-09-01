@@ -6,6 +6,7 @@ import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.analysisrun.AnalysisTimePolicy;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.derivatives.DerivativesBusinessAssessment;
 import org.example.trademodel.derivatives.DerivativesBusinessInput;
 import org.example.trademodel.derivatives.DerivativesBusinessIntegrationService;
@@ -947,26 +948,17 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 : persistedDecision == null ? run.getDataQualityScore() : persistedDecision.getDataQualityScore();
         asset.setDataQualityScore(persistedDataQuality);
 
+        clearAnalysisMarketProvenance(asset);
         EvidenceItemDO marketEvidence = analysisMarketEvidence(analysisId, asset.getRawSymbol());
         if (marketEvidence == null) return;
         String sourceTraceId = trimToNull(marketEvidence.getSourceTraceId());
         String evidenceProvider = trimToNull(marketEvidence.getSourceProvider());
-        asset.setSourceId(sourceTraceId);
-        asset.setProvider(evidenceProvider);
-        if (sourceTraceId == null || persistedOhlcvBarMapper == null || run.getAnalysisTime() == null) return;
+        String provider = primaryPersistedOhlcvProvider();
+        String marketType = primaryPersistedOhlcvMarketType();
+        if (sourceTraceId == null || provider == null || marketType == null
+                || persistedOhlcvBarMapper == null || run.getAnalysisTime() == null
+                || !sameProviderFamily(evidenceProvider, provider)) return;
 
-        PersistedOhlcvBarDO sourceAnchor;
-        try {
-            sourceAnchor = persistedOhlcvBarMapper.selectLatestClosedBarBySourceTrace(
-                    asset.getRawSymbol(), sourceTraceId);
-        } catch (RuntimeException ignored) {
-            return;
-        }
-        if (!sameProvider(evidenceProvider, sourceAnchor)) return;
-
-        String provider = trimToNull(sourceAnchor.getProvider());
-        String marketType = trimToNull(sourceAnchor.getProviderMarketType());
-        if (provider == null || marketType == null) return;
         long analysisTimeMs = run.getAnalysisTime().toInstant(ZoneOffset.UTC).toEpochMilli();
         try {
             PersistedOhlcvBarDO price = analysisBoundClosedBar(
@@ -975,15 +967,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     asset.getRawSymbol(), "1h", provider, marketType, analysisTimeMs);
             PersistedOhlcvBarDO fourHour = analysisBoundClosedBar(
                     asset.getRawSymbol(), "4h", provider, marketType, analysisTimeMs);
+            if (!analysisBoundSourceOwned(price, asset.getRawSymbol(), "5m", provider, marketType, analysisTimeMs)
+                    || !analysisBoundSourceOwned(oneHour, asset.getRawSymbol(), "1h", provider, marketType,
+                    analysisTimeMs)
+                    || !analysisBoundSourceOwned(fourHour, asset.getRawSymbol(), "4h", provider, marketType,
+                    analysisTimeMs)) {
+                return;
+            }
+            asset.setSourceId(sourceTraceId);
             asset.setProvider(provider);
             asset.setPriceObservedAt(closedAt(price));
             asset.setOneHourClosedAt(closedAt(oneHour));
             asset.setFourHourClosedAt(closedAt(fourHour));
         } catch (RuntimeException ignored) {
-            asset.setPriceObservedAt(null);
-            asset.setOneHourClosedAt(null);
-            asset.setFourHourClosedAt(null);
+            clearAnalysisMarketProvenance(asset);
         }
+    }
+
+    private void clearAnalysisMarketProvenance(DashboardHomeVO.AssetVO asset) {
+        asset.setProvider(null);
+        asset.setSourceId(null);
+        asset.setPriceObservedAt(null);
+        asset.setOneHourClosedAt(null);
+        asset.setFourHourClosedAt(null);
     }
 
     private boolean sameAnalysisAsset(AnalysisRunDO run,
@@ -1002,14 +1008,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private EvidenceItemDO analysisMarketEvidence(String analysisId, String symbol) {
         if (evidenceItemMapper == null || !hasText(analysisId) || !hasText(symbol)) return null;
         try {
-            String sourceMarker = ":" + normalizeSymbol(symbol) + ":1H:";
             return evidenceItemMapper.listByAnalysisId(analysisId).stream()
                     .filter(Objects::nonNull)
+                    .filter(row -> EvidenceTypeConstants.PRICE_STRUCTURE.equals(trimToNull(row.getEvidenceType())))
+                    .filter(row -> EvidenceTypeConstants.EVIDENCE_SOURCE_MARKET_HEURISTIC.equals(
+                            trimToNull(row.getSource())))
                     .filter(row -> hasText(row.getSourceProvider()) && hasText(row.getSourceTraceId()))
-                    .filter(row -> {
-                        String reference = trimToNull(row.getSourceReference());
-                        return reference != null && reference.toUpperCase(Locale.ROOT).contains(sourceMarker);
-                    })
                     .max(Comparator.comparing(EvidenceItemDO::getObservedAt,
                             Comparator.nullsFirst(Comparator.naturalOrder())))
                     .orElse(null);
@@ -1018,10 +1022,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
-    private boolean sameProvider(String evidenceProvider, PersistedOhlcvBarDO sourceAnchor) {
-        return sourceAnchor != null && hasText(sourceAnchor.getProvider())
-                && evidenceProvider != null
-                && evidenceProvider.equalsIgnoreCase(sourceAnchor.getProvider());
+    private boolean sameProviderFamily(String evidenceProvider, String persistedProvider) {
+        String evidenceFamily = providerFamily(evidenceProvider);
+        String persistedFamily = providerFamily(persistedProvider);
+        return evidenceFamily != null && evidenceFamily.equals(persistedFamily);
+    }
+
+    private String providerFamily(String provider) {
+        String normalized = upper(provider);
+        return switch (normalized) {
+            case "BINANCE", "BINANCE_PUBLIC" -> "BINANCE";
+            case "KRAKEN", "KRAKEN_PUBLIC" -> "KRAKEN";
+            default -> trimToNull(normalized);
+        };
     }
 
     private PersistedOhlcvBarDO analysisBoundClosedBar(String symbol,
@@ -1031,6 +1044,25 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                         long analysisTimeMs) {
         return persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
                 symbol, timeframe, provider, marketType, analysisTimeMs);
+    }
+
+    private boolean analysisBoundSourceOwned(PersistedOhlcvBarDO row,
+                                             String symbol,
+                                             String timeframe,
+                                             String provider,
+                                             String marketType,
+                                             long analysisTimeMs) {
+        return row != null
+                && Objects.equals(normalizeSymbol(row.getSymbol()), normalizeSymbol(symbol))
+                && timeframe.equalsIgnoreCase(trimToNull(row.getTimeframe()))
+                && provider.equalsIgnoreCase(trimToNull(row.getProvider()))
+                && marketType.equalsIgnoreCase(trimToNull(row.getProviderMarketType()))
+                && Boolean.TRUE.equals(row.getClosed())
+                && hasText(row.getSourceTraceId())
+                && "READY".equalsIgnoreCase(trimToNull(row.getSourceStatus()))
+                && row.getCloseTimeMs() != null
+                && row.getCloseTimeMs() > 0
+                && row.getCloseTimeMs() <= analysisTimeMs;
     }
 
     private LocalDateTime closedAt(PersistedOhlcvBarDO row) {
