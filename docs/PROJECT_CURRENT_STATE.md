@@ -8,13 +8,48 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC Core Production Loop Automation Authorization
-Product Phase Status: V4_1_CORE_PRODUCTION_LOOP_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact core production-loop automation permission; no application implementation is included here
-Next Business Phase: FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION
-Next Business Phase Allowed: NO on this authorization branch; YES only for the exact package after Owner-approved merge and clean/synced-main validation
+Product Phase: TRINE LOGIC v4.1 Machine-Gate Owner Amendment
+Product Phase Status: MACHINE_GATE_OWNER_AMENDMENT_PENDING_MERGED_MAIN
+Current Work Package: Add the Owner-only gate amendment entry and exact package/branch/starting-SHA matcher; no B01-B04 implementation is included
+Next Business Phase: REAL_DATA_HOME_BLOCKER_CLOSURE
+Next Business Phase Allowed: NO on this amendment branch; the exact successor is allowed only after this gate amendment is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Machine-Gate Owner Amendment
+
+Owner explicitly authorized one clean-main `DOCS_GATE_OWNER_AMENDMENT` to
+resolve the recursive gate-owner lock without weakening ordinary package
+rules. This branch starts from exact `origin/main`
+`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e`; it does not contain the preserved
+business candidate's unmerged history.
+
+The machine contract registers only this successor triple:
+
+- package `REAL_DATA_HOME_BLOCKER_CLOSURE`;
+- branch `codex/v4-1-real-data-home-blocker-closure`;
+- starting full SHA `a60eff8d83c0e1d04371bd425267f1e8d0e4f95c`.
+
+Package, branch and the complete 40-character SHA must all match. Missing,
+short, inferred or incorrect values fail closed. Only the eight exact
+gate-owner/status/test paths declared in `docs/CODEX_NEXT_TASK.yml` may change
+in this amendment. Normal implementation packages remain unable to modify
+canonical gate owners, and this package has no push, PR, merge or deployment
+permission.
+
+The core production-loop authorization is effective on merged main through
+`ba40c8caf4bb8d752f8833f3a089a6f01a86fa2e`. The separate candidate
+`a60eff8d83c0e1d04371bd425267f1e8d0e4f95c` remains unmerged and requires
+bounded remediation. B01 direction/state and persistence error
+classification, B02 Home provenance, B03 card overflow and B04 favicon remain
+open; this docs/gate package fixes none of them. The amendment and successor
+cannot be reported effective or complete before their own merged-main and
+acceptance gates.
+
+Capability movement is `NONE`: no Java, API, Schema, provider, UI, Figma,
+Mobile, Telegram, deployment or automatic-trading behavior changes.
 
 ---
 
@@ -24,7 +59,7 @@ PR #1201 is closed without merge and its remote branch/commits remain
 preserved at Head `b158b7a89a4fdb9bd2254a210ecd258e26032161` for successor audit evidence.
 It is not effective merged code and is not copied into this authorization.
 
-This docs/gate-only package registers exactly
+Merged main registers exactly
 `FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION`. It freezes the bounded
 runtime contract: Asset Pool is the sole continuous opportunity source;
 observing/candidate/waiting-triggered/triggered use 15m/5m/2m/lightweight-1m
@@ -40,11 +75,11 @@ may not create a parallel stack. Three in-app Message categories and the two
 Owner-first-release Telegram categories remain unchanged; one user + planId +
 CONFIRMATION has at most one lifetime Telegram Delivery.
 
-Repository scheduler and Telegram defaults stay off. This package makes no
+Repository scheduler and Telegram defaults stay off. That authorization made no
 Java, API, Schema, runtime-config, Figma or Mobile change; accesses no secret;
 runs no provider or scheduler; sends no message; performs no deployment; and
-adds no trading capability. Capability movement is `NONE` until the separate
-implementation is reviewed, merged and accepted.
+adds no trading capability. Its authorization is effective, while the
+preserved implementation candidate remains unmerged and is not accepted.
 
 ---
 
