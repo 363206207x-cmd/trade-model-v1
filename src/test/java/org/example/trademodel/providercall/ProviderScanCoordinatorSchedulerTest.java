@@ -1,5 +1,6 @@
 package org.example.trademodel.providercall;
 
+import org.example.trademodel.ai.AiProviderReadinessService;
 import org.example.trademodel.providercall.scan.ProviderDatasetRefreshPort;
 import org.example.trademodel.providercall.scan.ProviderScanCoordinatorScheduler;
 import org.example.trademodel.providercall.scan.ProviderScanPlanService;
@@ -41,6 +42,7 @@ class ProviderScanCoordinatorSchedulerTest {
         verify(fixture.refreshPort, times(1)).refresh(eq(item), eq(ProviderDatasetType.OHLCV));
         verify(fixture.refreshPort, times(1)).refresh(eq(item), eq(ProviderDatasetType.DERIVATIVES));
         verify(fixture.refreshPort, times(1)).refresh(eq(item), eq(ProviderDatasetType.EXTERNAL_CONTEXT));
+        verify(fixture.aiReadiness, times(1)).verifyConfiguredProvidersIfDue();
     }
 
     @Test
@@ -49,7 +51,8 @@ class ProviderScanCoordinatorSchedulerTest {
 
         assertThat(fixture.scheduler.scanOnce()).isZero();
 
-        verifyNoInteractions(fixture.planService, fixture.refreshPortProvider, fixture.refreshPort);
+        verifyNoInteractions(fixture.planService, fixture.refreshPortProvider, fixture.refreshPort,
+                fixture.aiReadinessProvider, fixture.aiReadiness);
     }
 
     @Test
@@ -58,7 +61,8 @@ class ProviderScanCoordinatorSchedulerTest {
 
         assertThat(fixture.scheduler.scanOnce()).isZero();
 
-        verifyNoInteractions(fixture.planService, fixture.refreshPortProvider, fixture.refreshPort);
+        verifyNoInteractions(fixture.planService, fixture.refreshPortProvider, fixture.refreshPort,
+                fixture.aiReadinessProvider, fixture.aiReadiness);
     }
 
     @Test
@@ -68,7 +72,8 @@ class ProviderScanCoordinatorSchedulerTest {
         assertThat(fixture.scheduler.scanOnce()).isZero();
 
         verify(fixture.refreshPortProvider).getIfAvailable();
-        verifyNoInteractions(fixture.planService, fixture.refreshPort);
+        verifyNoInteractions(fixture.planService, fixture.refreshPort, fixture.aiReadinessProvider,
+                fixture.aiReadiness);
     }
 
     @Test
@@ -85,6 +90,20 @@ class ProviderScanCoordinatorSchedulerTest {
         verifyNoInteractions(fixture.refreshPort);
     }
 
+    @Test
+    void aiReadinessFailureDoesNotInterruptMarketDatasetRefresh() {
+        Fixture fixture = fixture(true, true, true);
+        ScanPlanItem item = item(Set.of(ProviderDatasetType.PRICE));
+        when(fixture.planService.planForExecution(anyString())).thenReturn(List.of(item));
+        when(fixture.aiReadiness.verifyConfiguredProvidersIfDue())
+                .thenThrow(new IllegalStateException("readiness unavailable"));
+
+        assertThat(fixture.scheduler.scanOnce()).isEqualTo(1);
+
+        verify(fixture.aiReadiness).verifyConfiguredProvidersIfDue();
+        verify(fixture.refreshPort).refresh(item, ProviderDatasetType.PRICE);
+    }
+
     @SuppressWarnings("unchecked")
     private static Fixture fixture(boolean globalEnabled, boolean providerEnabled, boolean portAvailable) {
         ProviderCallProperties properties = new ProviderCallProperties();
@@ -92,11 +111,15 @@ class ProviderScanCoordinatorSchedulerTest {
         properties.setSchedulerEnabled(true);
         ProviderScanPlanService planService = mock(ProviderScanPlanService.class);
         ObjectProvider<ProviderDatasetRefreshPort> refreshPortProvider = mock(ObjectProvider.class);
+        ObjectProvider<AiProviderReadinessService> aiReadinessProvider = mock(ObjectProvider.class);
         ProviderDatasetRefreshPort refreshPort = mock(ProviderDatasetRefreshPort.class);
+        AiProviderReadinessService aiReadiness = mock(AiProviderReadinessService.class);
         when(refreshPortProvider.getIfAvailable()).thenReturn(portAvailable ? refreshPort : null);
+        when(aiReadinessProvider.getIfAvailable()).thenReturn(aiReadiness);
         ProviderScanCoordinatorScheduler scheduler = new ProviderScanCoordinatorScheduler(
-                properties, globalEnabled, planService, refreshPortProvider);
-        return new Fixture(scheduler, planService, refreshPortProvider, refreshPort);
+                properties, globalEnabled, planService, refreshPortProvider, aiReadinessProvider);
+        return new Fixture(scheduler, planService, refreshPortProvider, refreshPort,
+                aiReadinessProvider, aiReadiness);
     }
 
     private static ScanPlanItem item(Set<ProviderDatasetType> dueDatasets) {
@@ -110,6 +133,8 @@ class ProviderScanCoordinatorSchedulerTest {
             ProviderScanCoordinatorScheduler scheduler,
             ProviderScanPlanService planService,
             ObjectProvider<ProviderDatasetRefreshPort> refreshPortProvider,
-            ProviderDatasetRefreshPort refreshPort) {
+            ProviderDatasetRefreshPort refreshPort,
+            ObjectProvider<AiProviderReadinessService> aiReadinessProvider,
+            AiProviderReadinessService aiReadiness) {
     }
 }

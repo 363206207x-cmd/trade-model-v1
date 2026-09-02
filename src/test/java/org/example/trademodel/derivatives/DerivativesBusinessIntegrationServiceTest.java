@@ -7,7 +7,9 @@ import org.example.trademodel.providercall.SnapshotFreshnessStatus;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.service.RuleConfigService;
+import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.junit.jupiter.api.Test;
@@ -205,6 +207,53 @@ class DerivativesBusinessIntegrationServiceTest {
         assertThat(result.confirmEligible()).isFalse();
         assertThat(result.pushMode()).isEqualTo("WARNING_PUSH");
         assertThat(result.pushRecheckAllowed()).isFalse();
+    }
+
+    @Test
+    void staleReadableProviderEvidenceUsesFrozenStaleVocabularyAndRealAge() {
+        DerivativesRiskSnapshot stale = snapshot(bd("0.06"), bd("0.0001"), bd("1"), bd("1000"),
+                bd("1000"), bd("0.20"), UnifiedSourceStatus.READY,
+                SnapshotFreshnessStatus.STALE_READABLE, "COMPLETE",
+                List.of(OI, FUNDING, LIQUIDATION, LONG_SHORT), List.of(), List.of(),
+                Instant.now().minusSeconds(600));
+
+        DerivativesBusinessAssessment assessment = service.evaluate(
+                input("BULLISH", bd("110"), bd("100"), all("BULLISH"), stale, true));
+        List<EvidenceItemVO> evidence = service.toEvidenceVos(assessment);
+
+        assertThat(evidence).allSatisfy(item -> {
+            assertThat(item.getFreshness()).isEqualTo("STALE");
+            assertThat(V41DecisionContractPolicy.evidenceItemContractComplete(
+                    item, assessment.analysisId())).isTrue();
+        });
+        assertThat(evidence).anySatisfy(item -> {
+            assertThat(item.getEvidenceType()).isEqualTo(DerivativesEvidenceType.DERIVATIVES_DATA_STALE.name());
+            assertThat(new BigDecimal(item.getCurrentValue())).isGreaterThanOrEqualTo(bd("599"));
+            assertThat(item.getChangeFromBaseline()).isNotBlank();
+            assertThat(item.getSourceReference()).contains("metadata.providerDataAgeSeconds");
+        });
+    }
+
+    @Test
+    void partialEvidenceCarriesActualDatasetCoverageWithoutSyntheticMetricValues() {
+        DerivativesRiskSnapshot partial = snapshot(bd("0.06"), bd("0.0001"), null, null, null, null,
+                UnifiedSourceStatus.DEGRADED, SnapshotFreshnessStatus.FRESH, "PARTIAL",
+                List.of(OI, FUNDING), List.of(LIQUIDATION, LONG_SHORT),
+                List.of(LIQUIDATION, LONG_SHORT), Instant.now());
+
+        DerivativesBusinessAssessment assessment = service.evaluate(
+                input("BULLISH", bd("110"), bd("100"), all("BULLISH"), partial, false));
+        List<EvidenceItemVO> evidence = service.toEvidenceVos(assessment);
+
+        assertThat(evidence).anySatisfy(item -> {
+            assertThat(item.getEvidenceType()).isEqualTo(DerivativesEvidenceType.DERIVATIVES_DATA_PARTIAL.name());
+            assertThat(item.getFreshness()).isEqualTo("FRESH");
+            assertThat(item.getCurrentValue()).isEqualTo("2");
+            assertThat(item.getChangeFromBaseline()).isEqualTo("0");
+            assertThat(item.getSourceReference()).contains("availableDatasets/minimumDatasetCount");
+            assertThat(V41DecisionContractPolicy.evidenceItemContractComplete(
+                    item, assessment.analysisId())).isTrue();
+        });
     }
 
     @Test
