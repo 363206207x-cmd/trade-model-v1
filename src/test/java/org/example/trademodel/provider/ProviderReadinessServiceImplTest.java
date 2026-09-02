@@ -11,6 +11,9 @@ import java.util.Arrays;
 import java.util.List;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
 import org.example.trademodel.localreal.LocalRealDataStatusService;
+import org.example.trademodel.providercall.UnifiedSourceStatus;
+import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
+import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
 import org.example.trademodel.service.readiness.ProviderReadinessServiceImpl;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.junit.jupiter.api.Test;
@@ -183,6 +186,33 @@ class ProviderReadinessServiceImplTest {
     }
 
     @Test
+    void coinGlassReadinessRequiresAllFourCapabilitiesWithinConfiguredTtl() {
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        CoinGlassProperties properties = coinGlassProperties();
+        CoinGlassProviderHealthService health = new CoinGlassProviderHealthService();
+        recordCoinGlassHealth(health, Instant.now());
+        ReflectionTestUtils.setField(service, "coinGlassProperties", properties);
+        ReflectionTestUtils.setField(service, "coinGlassProviderHealthService", health);
+
+        ProviderReadinessVO ready = service.getReadiness();
+
+        assertThat(ready.getSummary()).containsEntry("coinglassProvider", "CONNECTED");
+
+        CoinGlassProviderHealthService stale = new CoinGlassProviderHealthService();
+        recordCoinGlassHealth(stale, Instant.now().minusSeconds(61));
+        ReflectionTestUtils.setField(service, "coinGlassProviderHealthService", stale);
+
+        ProviderReadinessVO failedClosed = service.getReadiness();
+        assertThat(failedClosed.getSummary()).containsEntry("coinglassProvider", "FAIL_CLOSED");
+        assertThat(failedClosed.getProviders()).anySatisfy(provider -> {
+            if ("COINGLASS".equals(provider.getName())) {
+                assertThat(provider.getReason()).isEqualTo("COINGLASS_STALE");
+                assertThat(provider.getConnected()).isFalse();
+            }
+        });
+    }
+
+    @Test
     void readinessServiceHasNoLiveProviderClientOrderExecutionTelegramOrPushDependency() {
         List<String> forbiddenTypeNames = List.of(
                 HttpClient.class.getSimpleName(),
@@ -207,6 +237,26 @@ class ProviderReadinessServiceImplTest {
 
     private ProviderReadinessServiceImpl service(MockEnvironment environment) {
         return new ProviderReadinessServiceImpl(environment);
+    }
+
+    private CoinGlassProperties coinGlassProperties() {
+        CoinGlassProperties properties = new CoinGlassProperties();
+        properties.setEnabled(true);
+        properties.setExternalCallsEnabled(true);
+        properties.setApiKey("test-key");
+        properties.setAdvertisedRpm(300);
+        properties.setFreshTtlSeconds(60);
+        return properties;
+    }
+
+    private void recordCoinGlassHealth(CoinGlassProviderHealthService health, Instant fetchTime) {
+        for (String capability : List.of(
+                "CG_V4_OPEN_INTEREST_EXCHANGE_LIST",
+                "CG_V4_OI_WEIGHTED_FUNDING_HISTORY",
+                "CG_V4_AGGREGATED_LIQUIDATION_HISTORY",
+                "CG_V4_GLOBAL_ACCOUNT_LONG_SHORT_RATIO")) {
+            health.record(capability, UnifiedSourceStatus.READY, 200, "0", "READY", null, fetchTime);
+        }
     }
 
     private LocalRealDataStatusService.ProviderReadinessSnapshot localRealStatus(
