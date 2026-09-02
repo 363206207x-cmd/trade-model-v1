@@ -19,4 +19,25 @@ public interface AiProviderClient {
         return AiDecisionChainResult.failed(provider(), request == null ? null : request.getRole(),
                 AiProviderCallStatus.FAILED, "DECISION_CHAIN_NOT_SUPPORTED");
     }
+
+    default boolean supportsNativeBackgroundDecisionChain() {
+        return false;
+    }
+
+    default AiDecisionChainResult submitDecisionChainBackground(AiDecisionChainRequest request,
+                                                                 long timeoutOverrideMs) {
+        return AiDecisionChainResult.failed(provider(), request == null ? null : request.getRole(),
+                AiProviderCallStatus.FAILED, "BACKGROUND_DECISION_CHAIN_NOT_SUPPORTED");
+    }
+
+    default AiDecisionChainResult pollDecisionChainBackground(AiDecisionChainRequest request,
+                                                               String providerResponseId,
+                                                               long timeoutOverrideMs) {
+        return AiDecisionChainResult.failed(provider(), request == null ? null : request.getRole(),
+                AiProviderCallStatus.FAILED, "BACKGROUND_DECISION_CHAIN_NOT_SUPPORTED");
+    }
+
+    default boolean cancelDecisionChainBackground(String providerResponseId, long timeoutOverrideMs) {
+        return false;
+    }
 }

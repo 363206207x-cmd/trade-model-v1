@@ -19,6 +19,7 @@ public class AiOrchestratorProperties {
     private BigDecimal dailyBudgetUsd;
     private BigDecimal perAnalysisBudgetUsd;
     private ProviderTimeouts providerTimeouts = new ProviderTimeouts();
+    private BackgroundExecution backgroundExecution = new BackgroundExecution();
     private ModelStrategy modelStrategy = new ModelStrategy();
     private AiProviderProperties openai = new AiProviderProperties();
     private AiProviderProperties gemini = new AiProviderProperties();
@@ -61,6 +62,10 @@ public class AiOrchestratorProperties {
     public ProviderTimeouts getProviderTimeouts() { return providerTimeouts; }
     public void setProviderTimeouts(ProviderTimeouts providerTimeouts) {
         this.providerTimeouts = providerTimeouts == null ? new ProviderTimeouts() : providerTimeouts;
+    }
+    public BackgroundExecution getBackgroundExecution() { return backgroundExecution; }
+    public void setBackgroundExecution(BackgroundExecution backgroundExecution) {
+        this.backgroundExecution = backgroundExecution == null ? new BackgroundExecution() : backgroundExecution;
     }
     public ModelStrategy getModelStrategy() { return modelStrategy; }
     public void setModelStrategy(ModelStrategy modelStrategy) {
@@ -152,6 +157,66 @@ public class AiOrchestratorProperties {
                     && timeoutMs >= MIN_PROVIDER_MS
                     && timeoutMs <= MAX_PROVIDER_MS
                     && timeoutMs <= overallMs;
+        }
+    }
+
+    public static class BackgroundExecution {
+        public static final String RUNTIME_CONFIG_VERSION = "V41-AI-BACKGROUND-TIMEOUT-1";
+        public static final String INPUT_CONTRACT_VERSION = "V41-AI-INPUT-COMPACT-1";
+        public static final String PROMPT_VERSION = "V41-AI-ROLE-PROMPT-1";
+        public static final String SCHEMA_VERSION = "V41-AI-STRUCTURED-SCHEMA-1";
+
+        private boolean enabled = true;
+        private int submitAckTimeoutMs = 30_000;
+        private int gptJobDeadlineMs = 180_000;
+        private int reviewJobDeadlineMs = 120_000;
+        private int chainDeadlineMs = 300_000;
+        private int initialPollIntervalMs = 2_000;
+        private int maxPollIntervalMs = 10_000;
+        private int maxTransientRetries = 1;
+        private int structuredMaxOutputTokens = 4_000;
+        private String reasoningEffort = "medium";
+        private String textVerbosity = "low";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getSubmitAckTimeoutMs() { return submitAckTimeoutMs; }
+        public void setSubmitAckTimeoutMs(int value) { this.submitAckTimeoutMs = Math.max(1, value); }
+        public int getGptJobDeadlineMs() { return gptJobDeadlineMs; }
+        public void setGptJobDeadlineMs(int value) { this.gptJobDeadlineMs = Math.max(1, value); }
+        public int getReviewJobDeadlineMs() { return reviewJobDeadlineMs; }
+        public void setReviewJobDeadlineMs(int value) { this.reviewJobDeadlineMs = Math.max(1, value); }
+        public int getChainDeadlineMs() { return chainDeadlineMs; }
+        public void setChainDeadlineMs(int value) { this.chainDeadlineMs = Math.max(1, value); }
+        public int getInitialPollIntervalMs() { return initialPollIntervalMs; }
+        public void setInitialPollIntervalMs(int value) { this.initialPollIntervalMs = Math.max(1, value); }
+        public int getMaxPollIntervalMs() { return maxPollIntervalMs; }
+        public void setMaxPollIntervalMs(int value) { this.maxPollIntervalMs = Math.max(1, value); }
+        public int getMaxTransientRetries() { return maxTransientRetries; }
+        public void setMaxTransientRetries(int value) { this.maxTransientRetries = Math.max(0, Math.min(1, value)); }
+        public int getStructuredMaxOutputTokens() { return structuredMaxOutputTokens; }
+        public void setStructuredMaxOutputTokens(int value) { this.structuredMaxOutputTokens = Math.max(1, value); }
+        public String getReasoningEffort() { return reasoningEffort; }
+        public void setReasoningEffort(String value) {
+            this.reasoningEffort = value == null || value.isBlank() ? "medium" : value.trim();
+        }
+        public String getTextVerbosity() { return textVerbosity; }
+        public void setTextVerbosity(String value) {
+            this.textVerbosity = value == null || value.isBlank() ? "low" : value.trim();
+        }
+
+        public boolean validFrozenContract() {
+            return enabled
+                    && submitAckTimeoutMs == 30_000
+                    && gptJobDeadlineMs == 180_000
+                    && reviewJobDeadlineMs == 120_000
+                    && chainDeadlineMs == 300_000
+                    && initialPollIntervalMs == 2_000
+                    && maxPollIntervalMs == 10_000
+                    && maxTransientRetries == 1
+                    && structuredMaxOutputTokens > 0
+                    && "medium".equals(reasoningEffort)
+                    && "low".equals(textVerbosity);
         }
     }
 }

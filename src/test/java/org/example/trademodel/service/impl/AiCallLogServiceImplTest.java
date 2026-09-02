@@ -16,6 +16,7 @@ import org.example.trademodel.ai.AiReviewConflictLevel;
 import org.example.trademodel.ai.AiReviewStance;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.mapper.AiCallLogMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
@@ -36,6 +40,13 @@ import static org.mockito.Mockito.times;
 class AiCallLogServiceImplTest {
     @Mock
     private AiCallLogMapper mapper;
+
+    @BeforeEach
+    void durableWriteResults() {
+        lenient().when(mapper.insert(any(AiCallLogDO.class))).thenReturn(1);
+        lenient().when(mapper.updateCompletion(any(AiCallLogDO.class))).thenReturn(1);
+        lenient().when(mapper.updateDecisionChainTask(any(AiCallLogDO.class))).thenReturn(1);
+    }
 
     @Test
     void startCallInsertsStartedSanitizedSummaryBeforeCompletion() {
@@ -129,11 +140,15 @@ class AiCallLogServiceImplTest {
         assertThat(started.getValue().getTraceId()).isEqualTo("trace-chain-1");
         assertThat(started.getValue().getCandidateId()).isEqualTo("candidate-chain-1");
         assertThat(started.getValue().getContractType()).isEqualTo("DECISION_CHAIN_V4_1");
+        assertThat(started.getValue().getModelName()).isEqualTo("gpt-5.6-sol");
         assertThat(started.getValue().getRequestHash()).hasSize(64);
         assertThat(started.getValue().getRequestSummary()).doesNotContain("abcdefghijklmnop");
         assertThat(started.getValue().getRequestSummary())
-                .doesNotContain("plain-provider-secret", "database-secret")
-                .contains("***");
+                .doesNotContain("plain-provider-secret", "database-secret", "apiKey", "password")
+                .contains("\"evidence\":[]", "V41-AI-INPUT-COMPACT-1");
+        assertThat(started.getValue().getTaskState()).isEqualTo("QUEUED");
+        assertThat(started.getValue().getAttempt()).isEqualTo(1);
+        assertThat(started.getValue().getActiveTaskKey()).hasSize(64);
         assertThat(started.getValue().getReviewOnly()).isFalse();
         assertThat(started.getValue().getNotExecutionPlanCreation()).isFalse();
         assertThat(started.getValue().getNotFinalExecutionPlanCreation()).isTrue();
@@ -201,6 +216,23 @@ class AiCallLogServiceImplTest {
     }
 
     @Test
+    void decisionChainCompletionFailsClosedWhenDurableRowWasNotUpdated() {
+        AiCallLogServiceImpl service = new AiCallLogServiceImpl(mapper, new ObjectMapper());
+        AiCallLogDO log = new AiCallLogDO();
+        log.setCallId("missing-call");
+        AiDecisionChainResult result = new AiDecisionChainResult();
+        result.setProvider(AiProviderName.OPENAI);
+        result.setRole(AiDecisionChainRole.GPT_FINAL);
+        result.setCallStatus(AiProviderCallStatus.SUCCESS);
+        result.setPayloadJson("{\"summary\":\"candidate\"}");
+        when(mapper.updateCompletion(any(AiCallLogDO.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.completeDecisionChainCall(log, result))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("AI_TRACE_COMPLETION_NOT_PERSISTED");
+    }
+
+    @Test
     void terminalFailureTraceIsInsertedWithErrorFallbackAndLatency() {
         AiCallLogServiceImpl service = new AiCallLogServiceImpl(mapper, new ObjectMapper());
         AiDecisionChainRequest request = decisionChainRequest("evidence");
@@ -248,7 +280,7 @@ class AiCallLogServiceImplTest {
         request.setCandidateId("candidate-chain-1");
         request.setSymbol("BTCUSDT");
         request.setTimeframe("5m");
-        request.setInput(Map.of("evidence", evidence));
+        request.setInput(Map.of("decisionBundle", Map.of("ruleDirection", evidence)));
         return request;
     }
 
@@ -257,6 +289,7 @@ class AiCallLogServiceImplTest {
         properties.setEnabled(true);
         properties.setApiKey("sk-local-test");
         properties.setModel("gpt-test");
+        properties.getGptFinal().setReasoningModel("gpt-5.6-sol");
         properties.setBaseUrl("https://ai.test");
         return new AiProviderClient() {
             @Override public AiProviderName provider() { return AiProviderName.OPENAI; }

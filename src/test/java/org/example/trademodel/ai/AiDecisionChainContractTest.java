@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -212,6 +213,137 @@ class AiDecisionChainContractTest {
         assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GROK_CHALLENGE))
                 .contains("most likely failure conclusion first", "forced-flow evidence", "crowding evidence");
         assertThat(root.path("outputContract").path("additionalProperties").asBoolean()).isFalse();
+    }
+
+    @Test
+    void compactInputUsesDeterministicFactAllowlistWithoutRawCandlesOrPresentationData() throws Exception {
+        AiOrchestratorProperties properties = new AiOrchestratorProperties();
+        properties.setMaxInputChars(24_000);
+        AiDecisionChainPromptBuilder builder = new AiDecisionChainPromptBuilder(objectMapper, properties);
+        AiDecisionChainRequest request = compactRequest();
+
+        AiDecisionChainPromptBuilder.PromptPayload first = builder.build(request);
+        JsonNode input = objectMapper.readTree(first.dataJson()).path("input");
+
+        assertThat(first.truncated()).isFalse();
+        assertThat(input.path("decisionBundle").path("multiTimeframe").fieldNames())
+                .toIterable().containsExactly("4h", "1h", "15m", "5m");
+        assertThat(input.path("evidence")).hasSize(20);
+        assertThat(input.path("scores")).hasSize(8);
+        assertThat(input.path("derivativesContext").path("datasetReadings")
+                .path("openInterest").path("change5m").asText()).isEqualTo("2.1");
+        assertThat(input.path("analysis").has("rawCandles")).isFalse();
+        assertThat(input.path("decisionBundle").has("frontendCopy")).isFalse();
+        assertThat(input.path("derivativesContext").has("derivedEvidence")).isFalse();
+        assertThat(input.path("derivativesContext").path("datasetReadings").has("rawResponse")).isFalse();
+        assertThat(input.has("logs")).isFalse();
+        assertThat(first.dataJson()).doesNotContain(
+                "FORBIDDEN_RAW_CANDLE", "FORBIDDEN_FRONTEND_COPY", "FORBIDDEN_PROVIDER_SECRET");
+        assertThat(first.dataJson()).contains(
+                AiOrchestratorProperties.BackgroundExecution.INPUT_CONTRACT_VERSION,
+                AiOrchestratorProperties.BackgroundExecution.PROMPT_VERSION,
+                AiOrchestratorProperties.BackgroundExecution.SCHEMA_VERSION,
+                "algorithm-v41", "score-v41", "provider-matrix-v41");
+
+        String stableHash = first.inputHash();
+        request.setTraceId("trace-refresh-does-not-change-input");
+        request.setCandidateId("candidate-refresh-does-not-change-input");
+        ((Map<String, Object>) request.getInput().get("analysis"))
+                .put("rawCandles", List.of("FORBIDDEN_CHANGED_RAW_CANDLE"));
+        assertThat(builder.build(request).inputHash()).isEqualTo(stableHash);
+
+        ((Map<String, Object>) request.getInput().get("decisionBundle")).put("dataQuality", 91);
+        assertThat(builder.build(request).inputHash()).isNotEqualTo(stableHash);
+    }
+
+    private static AiDecisionChainRequest compactRequest() {
+        AiDecisionChainRequest request = new AiDecisionChainRequest();
+        request.setRole(AiDecisionChainRole.GPT_FINAL);
+        request.setAnalysisId("analysis-compact-1");
+        request.setTraceId("trace-compact-1");
+        request.setCandidateId("candidate-compact-1");
+        request.setSymbol("ADAUSDT");
+        request.setTimeframe("5m");
+        request.setRuleVersion("rule-v41");
+
+        Map<String, Object> analysis = new LinkedHashMap<>();
+        analysis.put("analysisId", "analysis-compact-1");
+        analysis.put("symbol", "ADAUSDT");
+        analysis.put("timeframe", "5m");
+        analysis.put("snapshotTime", "2026-09-02T00:00:00Z");
+        analysis.put("algorithmVersion", "algorithm-v41");
+        analysis.put("ruleConfigVersion", "rule-v41");
+        analysis.put("providerMatrixVersion", "provider-matrix-v41");
+        analysis.put("rawCandles", List.of("FORBIDDEN_RAW_CANDLE"));
+
+        Map<String, Object> multiTimeframe = new LinkedHashMap<>();
+        multiTimeframe.put("4h", Map.of("state", "BULLISH", "source", "BINANCE"));
+        multiTimeframe.put("1h", Map.of("state", "BULLISH", "source", "BINANCE"));
+        multiTimeframe.put("15m", Map.of("state", "WAITING", "source", "BINANCE"));
+        multiTimeframe.put("5m", Map.of("state", "WAITING", "source", "BINANCE"));
+        multiTimeframe.put("1m", Map.of("state", "FORBIDDEN_EXTRA_TIMEFRAME"));
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("ruleDirection", "BULLISH");
+        decision.put("ruleConfidence", 82);
+        decision.put("ruleRisk", "MEDIUM");
+        decision.put("rulePlanMode", "PREPARATION");
+        decision.put("multiTimeframe", multiTimeframe);
+        decision.put("dataQuality", 90);
+        decision.put("confusedScore", 12);
+        decision.put("normalizationVersion", "normalization-v41");
+        decision.put("scoreVersion", "score-v41");
+        decision.put("dataQualityVersion", "dq-v41");
+        decision.put("providerMatrixVersion", "provider-matrix-v41");
+        decision.put("frontendCopy", "FORBIDDEN_FRONTEND_COPY");
+
+        List<Map<String, Object>> evidence = new java.util.ArrayList<>();
+        for (int index = 0; index < 21; index++) {
+            evidence.add(Map.ofEntries(
+                    Map.entry("evidenceId", "evidence-" + index),
+                    Map.entry("analysisId", "analysis-compact-1"),
+                    Map.entry("type", "MARKET_STRUCTURE"),
+                    Map.entry("currentValue", String.valueOf(100 + index)),
+                    Map.entry("changeFromBaseline", "+1"),
+                    Map.entry("direction", "BULLISH"),
+                    Map.entry("strength", 80),
+                    Map.entry("confidence", 85),
+                    Map.entry("source", "BINANCE"),
+                    Map.entry("sourceReference", "closed-candle-" + index),
+                    Map.entry("sourceTraceId", "source-trace-" + index),
+                    Map.entry("observedAt", "2026-09-02T00:00:00Z"),
+                    Map.entry("freshness", "FRESH")));
+        }
+        List<Map<String, Object>> scores = new java.util.ArrayList<>();
+        for (int index = 0; index < 9; index++) {
+            scores.add(Map.of("scoreId", "score-" + index, "type", "SCORE_" + index,
+                    "value", 70 + index, "weight", 1, "direction", "BULLISH"));
+        }
+
+        Map<String, Object> readings = new LinkedHashMap<>();
+        readings.put("openInterest", Map.of("openInterestUsd", "1000", "change5m", "2.1"));
+        readings.put("funding", Map.of("weightedFundingRate", "0.0001", "extremityScore", 12));
+        readings.put("longShortRatio", Map.of("ratio", "1.02", "ratioSource", "COINGLASS"));
+        readings.put("liquidation", Map.of("longUsd5m", "10", "shortUsd5m", "20"));
+        readings.put("rawResponse", "FORBIDDEN_PROVIDER_SECRET");
+        Map<String, Object> derivatives = new LinkedHashMap<>();
+        derivatives.put("source", "COINGLASS_V4");
+        derivatives.put("sourceStatus", "VERIFIED");
+        derivatives.put("freshnessStatus", "FRESH");
+        derivatives.put("datasetReadings", readings);
+        derivatives.put("derivedEvidence", List.of(Map.of("raw", "FORBIDDEN_DUPLICATE_EVIDENCE")));
+
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("analysis", analysis);
+        input.put("opportunity", Map.of("opportunityId", "opp-1", "state", "CANDIDATE",
+                "executionPermission", "NOT_ELIGIBLE"));
+        input.put("evidence", evidence);
+        input.put("scores", scores);
+        input.put("decisionBundle", decision);
+        input.put("derivativesContext", derivatives);
+        input.put("accountRisk", Map.of("sourceStatus", "VERIFIED", "riskAllowed", true));
+        input.put("logs", List.of("FORBIDDEN_LOG_LINE"));
+        request.setInput(input);
+        return request;
     }
 
     static String gptPayload() {

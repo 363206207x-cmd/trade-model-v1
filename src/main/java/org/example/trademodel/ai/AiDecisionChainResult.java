@@ -26,6 +26,15 @@ public class AiDecisionChainResult {
     private AiRoleState roleState;
     private AiRoleDataState dataState;
     private OffsetDateTime generatedAt;
+    private AiBackgroundTaskState taskState;
+    private Integer attempt = 1;
+    private Long reasoningTokens;
+    private String failureClassification;
+    private OffsetDateTime submittedAt;
+    private OffsetDateTime startedAt;
+    private OffsetDateTime completedAt;
+    private boolean retryable;
+    private String backgroundMode;
 
     public static AiDecisionChainResult failed(AiProviderName provider, AiDecisionChainRole role,
                                                AiProviderCallStatus status, String reason) {
@@ -88,4 +97,24 @@ public class AiDecisionChainResult {
     public void setDataState(AiRoleDataState dataState) { this.dataState = dataState; }
     public OffsetDateTime getGeneratedAt() { return generatedAt; }
     public void setGeneratedAt(OffsetDateTime generatedAt) { this.generatedAt = generatedAt; }
+    public AiBackgroundTaskState getTaskState() { return taskState; }
+    public void setTaskState(AiBackgroundTaskState taskState) { this.taskState = taskState; }
+    public Integer getAttempt() { return attempt; }
+    public void setAttempt(Integer attempt) { this.attempt = attempt; }
+    public Long getReasoningTokens() { return reasoningTokens; }
+    public void setReasoningTokens(Long reasoningTokens) { this.reasoningTokens = reasoningTokens; }
+    public String getFailureClassification() { return failureClassification; }
+    public void setFailureClassification(String failureClassification) {
+        this.failureClassification = failureClassification;
+    }
+    public OffsetDateTime getSubmittedAt() { return submittedAt; }
+    public void setSubmittedAt(OffsetDateTime submittedAt) { this.submittedAt = submittedAt; }
+    public OffsetDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
+    public OffsetDateTime getCompletedAt() { return completedAt; }
+    public void setCompletedAt(OffsetDateTime completedAt) { this.completedAt = completedAt; }
+    public boolean isRetryable() { return retryable; }
+    public void setRetryable(boolean retryable) { this.retryable = retryable; }
+    public String getBackgroundMode() { return backgroundMode; }
+    public void setBackgroundMode(String backgroundMode) { this.backgroundMode = backgroundMode; }
 }

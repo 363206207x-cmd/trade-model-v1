@@ -8,6 +8,12 @@ import org.example.trademodel.ai.AiProviderReviewResult;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
+import org.example.trademodel.ai.AiDecisionChainPromptBuilder;
+import org.example.trademodel.ai.AiBackgroundTaskState;
+import org.example.trademodel.ai.AiProviderCallStatus;
+import org.example.trademodel.ai.AiRoleDataState;
+import org.example.trademodel.ai.AiRoleState;
+import org.example.trademodel.ai.AiOrchestratorProperties;
 import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.mapper.AiCallLogMapper;
@@ -20,6 +26,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,11 +69,22 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     public AiCallLogDO startDecisionChainCall(AiDecisionChainRequest request,
                                               AiProviderClient client,
                                               BigDecimal reservedCostUsd) {
+        return startDecisionChainCall(request, client, reservedCostUsd, 1);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AiCallLogDO startDecisionChainCall(AiDecisionChainRequest request,
+                                              AiProviderClient client,
+                                              BigDecimal reservedCostUsd,
+                                              int attempt) {
         AiCallLogDO log = newDecisionChainLog(request, client.provider(),
-                client.providerProperties() == null ? null : client.providerProperties().getEffectiveModel(),
-                reservedCostUsd);
+                decisionChainModel(request, client),
+                reservedCostUsd, attempt);
         log.setCallStatus("STARTED");
-        mapper.insert(log);
+        if (mapper.insert(log) != 1) {
+            throw new IllegalStateException("AI_TRACE_START_NOT_PERSISTED");
+        }
         return log;
     }
 
@@ -74,7 +93,71 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     public void completeDecisionChainCall(AiCallLogDO log, AiDecisionChainResult result) {
         if (log == null || result == null) return;
         fillDecisionChainCompletion(log, result);
-        mapper.updateCompletion(log);
+        if (mapper.updateCompletion(log) != 1) {
+            throw new IllegalStateException("AI_TRACE_COMPLETION_NOT_PERSISTED");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateDecisionChainTask(AiCallLogDO log, AiDecisionChainResult result) {
+        if (log == null || result == null) return;
+        fillDecisionChainCompletion(log, result);
+        if (mapper.updateDecisionChainTask(log) != 1) {
+            throw new IllegalStateException("AI_TRACE_TASK_STATE_NOT_PERSISTED");
+        }
+    }
+
+    @Override
+    public AiCallLogDO findLatestDecisionChainTask(String analysisId, String role) {
+        if (analysisId == null || analysisId.isBlank() || role == null || role.isBlank()) return null;
+        return mapper.selectLatestDecisionChainTask(analysisId.trim(), role.trim());
+    }
+
+    @Override
+    public AiCallLogDO findLatestDecisionChainTask(String analysisId, String role,
+                                                   String inputHash) {
+        if (analysisId == null || analysisId.isBlank() || role == null || role.isBlank()
+                || inputHash == null || inputHash.isBlank()) return null;
+        return mapper.selectLatestDecisionChainTaskByInputHash(
+                analysisId.trim(), role.trim(), inputHash.trim());
+    }
+
+    @Override
+    public AiDecisionChainResult restoreDecisionChainResult(AiCallLogDO log) {
+        if (log == null) return null;
+        AiDecisionChainResult result = new AiDecisionChainResult();
+        result.setProvider(enumValue(AiProviderName.class, log.getProviderName()));
+        result.setRole(enumValue(AiDecisionChainRole.class, log.getAiRole()));
+        result.setCallStatus(enumValue(AiProviderCallStatus.class, log.getCallStatus()));
+        result.setProviderRequestId(log.getProviderRequestId());
+        result.setSelectedModel(log.getModelName());
+        result.setPayloadJson(log.getOutputPayload());
+        result.setAuditOutput(log.getOutputPayload());
+        result.setLatencyMs(log.getLatencyMs());
+        result.setInputTokens(log.getInputTokens());
+        result.setOutputTokens(log.getOutputTokens());
+        result.setTotalTokens(log.getTotalTokens());
+        result.setReasoningTokens(log.getReasoningTokens());
+        result.setCalculatedCostUsd(log.getCalculatedCostUsd());
+        result.setReservedCostUsd(log.getReservedCostUsd());
+        result.setFallback(Boolean.TRUE.equals(log.getFallbackFlag()));
+        result.setFallbackReason(log.getFallbackReason());
+        result.setErrorCode(log.getErrorCode());
+        result.setCacheHit(Boolean.TRUE.equals(log.getCacheHit()));
+        result.setAnalysisId(log.getAnalysisId());
+        result.setTraceId(log.getTraceId());
+        result.setTaskState(enumValue(AiBackgroundTaskState.class, log.getTaskState()));
+        result.setAttempt(log.getAttempt());
+        result.setRoleState(enumValue(AiRoleState.class, log.getRoleState()));
+        result.setDataState(enumValue(AiRoleDataState.class, log.getDataState()));
+        result.setFailureClassification(log.getFailureClassification());
+        result.setSubmittedAt(utc(log.getSubmittedAt()));
+        result.setStartedAt(utc(log.getStartedAt()));
+        result.setCompletedAt(utc(log.getCompletedAt()));
+        result.setGeneratedAt(utc(log.getObservedAt()));
+        result.setBackgroundMode(log.getBackgroundMode());
+        return result;
     }
 
     @Override
@@ -87,33 +170,59 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         if (request == null || request.getRole() == null || result == null) {
             throw new IllegalArgumentException("decision-chain request, role and result are required");
         }
-        AiCallLogDO log = newDecisionChainLog(request, provider, modelName, reservedCostUsd);
+        AiCallLogDO log = newDecisionChainLog(request, provider, modelName, reservedCostUsd, 1);
         fillDecisionChainCompletion(log, result);
-        mapper.insert(log);
+        if (mapper.insert(log) != 1) {
+            throw new IllegalStateException("AI_TRACE_TERMINAL_RESULT_NOT_PERSISTED");
+        }
         return log;
     }
 
     private void fillDecisionChainCompletion(AiCallLogDO log, AiDecisionChainResult result) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         if (result.getSelectedModel() != null && !result.getSelectedModel().isBlank()) {
             log.setModelName(safe(result.getSelectedModel(), 128));
         }
-        log.setCallStatus(result.getCallStatus() == null ? "FAILED" : result.getCallStatus().name());
+        AiBackgroundTaskState taskState = result.getTaskState();
+        if (taskState == null) {
+            taskState = result.successful() ? AiBackgroundTaskState.SUCCEEDED
+                    : result.getCallStatus() == AiProviderCallStatus.TIMEOUT
+                    ? AiBackgroundTaskState.TIMED_OUT : AiBackgroundTaskState.FAILED;
+        }
+        log.setTaskState(taskState.name());
+        log.setAttempt(result.getAttempt() == null ? log.getAttempt() : result.getAttempt());
+        log.setCallStatus(taskState.active() ? "STARTED"
+                : result.getCallStatus() == null ? "FAILED" : result.getCallStatus().name());
         log.setProviderRequestId(safe(result.getProviderRequestId(), 128));
-        log.setCompletedAt(now);
+        if (result.getSubmittedAt() != null && log.getSubmittedAt() == null) {
+            log.setSubmittedAt(result.getSubmittedAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+        } else if (taskState == AiBackgroundTaskState.SUBMITTED || taskState == AiBackgroundTaskState.RUNNING) {
+            if (log.getSubmittedAt() == null) log.setSubmittedAt(now);
+        }
+        if (result.getStartedAt() != null) {
+            log.setStartedAt(result.getStartedAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+        }
+        log.setCompletedAt(taskState.terminal() ? now : null);
         log.setLatencyMs(result.getLatencyMs());
         log.setInputTokens(result.getInputTokens());
         log.setOutputTokens(result.getOutputTokens());
         log.setTotalTokens(result.getTotalTokens());
+        log.setReasoningTokens(result.getReasoningTokens());
         log.setCalculatedCostUsd(result.getCalculatedCostUsd());
         log.setFallbackFlag(result.isFallback());
         log.setFallbackReason(safe(result.getFallbackReason(), 512));
         log.setTimeoutFlag(result.getCallStatus() == org.example.trademodel.ai.AiProviderCallStatus.TIMEOUT);
         log.setErrorCode(safe(result.getErrorCode(), 128));
         log.setErrorMessage(safe(result.getFallbackReason(), 512));
+        log.setFailureClassification(safe(result.getFailureClassification(), 128));
         log.setCacheHit(result.isCacheHit());
+        log.setRoleState(result.getRoleState() == null ? null : result.getRoleState().name());
+        log.setDataState(result.getDataState() == null ? null : result.getDataState().name());
+        log.setBackgroundMode(safe(result.getBackgroundMode(), 64));
+        log.setActiveTaskKey(taskState.active()
+                ? activeTaskKey(log.getAnalysisId(), log.getAiRole(), log.getRequestHash()) : null);
         log.setObservedAt(result.getGeneratedAt() == null
-                ? now : result.getGeneratedAt().toLocalDateTime());
+                ? now : result.getGeneratedAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
         log.setResponseSummary(decisionChainResponseSummary(result));
         String auditOutput = result.getAuditOutput() == null
                 ? result.getPayloadJson() : result.getAuditOutput();
@@ -188,7 +297,7 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     }
 
     private AiCallLogDO baseLog(AiProviderRequest request, AiProviderClient client, BigDecimal reservedCostUsd) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         AiCallLogDO log = new AiCallLogDO();
         log.setCallId("ai-call-" + UUID.randomUUID());
         log.setAnalysisId(safe(request.getAnalysisId(), 64));
@@ -211,8 +320,9 @@ public class AiCallLogServiceImpl implements AiCallLogService {
     private AiCallLogDO newDecisionChainLog(AiDecisionChainRequest request,
                                             AiProviderName provider,
                                             String modelName,
-                                            BigDecimal reservedCostUsd) {
-        LocalDateTime now = LocalDateTime.now();
+                                            BigDecimal reservedCostUsd,
+                                            int attempt) {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         AiCallLogDO log = new AiCallLogDO();
         log.setCallId("ai-call-" + UUID.randomUUID());
         log.setAnalysisId(safe(request.getAnalysisId(), 64));
@@ -230,9 +340,17 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         log.setCandidateId(safe(request.getCandidateId(), 64));
         log.setCacheHit(false);
         log.setObservedAt(now);
-        String canonicalInput = canonicalDecisionChainRequest(request);
+        String canonicalInput = AiDecisionChainPromptBuilder.canonicalInputJson(objectMapper, request);
         log.setRequestSummary(truncate(canonicalInput, DECISION_CHAIN_SUMMARY_CHARS));
         log.setRequestHash(hash(canonicalInput));
+        log.setTaskState(AiBackgroundTaskState.QUEUED.name());
+        log.setAttempt(Math.max(1, attempt));
+        log.setPromptVersion(AiOrchestratorProperties.BackgroundExecution.PROMPT_VERSION);
+        log.setSchemaVersion(AiOrchestratorProperties.BackgroundExecution.SCHEMA_VERSION);
+        log.setInputContractVersion(AiOrchestratorProperties.BackgroundExecution.INPUT_CONTRACT_VERSION);
+        log.setRuntimeConfigVersion(AiOrchestratorProperties.BackgroundExecution.RUNTIME_CONFIG_VERSION);
+        log.setActiveTaskKey(activeTaskKey(
+                log.getAnalysisId(), log.getAiRole(), log.getRequestHash()));
         log.setRuleVersion(safe(request.getRuleVersion(), 32) == null
                 ? "FUNDAMENTAL_AI_V4_1" : safe(request.getRuleVersion(), 32));
         boolean reviewOnly = request.getRole() != AiDecisionChainRole.GPT_FINAL;
@@ -311,28 +429,6 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         return json(summary, 1200);
     }
 
-    private String canonicalDecisionChainRequest(AiDecisionChainRequest request) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("analysisId", request.getAnalysisId());
-        summary.put("traceId", request.getTraceId());
-        summary.put("candidateId", request.getCandidateId());
-        summary.put("opportunityId", request.getOpportunityId());
-        summary.put("requestId", request.getRequestId());
-        summary.put("ruleVersion", request.getRuleVersion());
-        summary.put("role", request.getRole() == null ? null : request.getRole().name());
-        summary.put("symbol", request.getSymbol());
-        summary.put("timeframe", request.getTimeframe());
-        summary.put("input", request.getInput());
-        try {
-            String value = objectMapper.writer()
-                    .with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-                    .writeValueAsString(summary);
-            return sanitize(value);
-        } catch (Exception exception) {
-            return "{}";
-        }
-    }
-
     private String decisionChainResponseSummary(AiDecisionChainResult result) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("role", result.getRole() == null ? null : result.getRole().name());
@@ -379,5 +475,34 @@ public class AiCallLogServiceImpl implements AiCallLogService {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    private static OffsetDateTime utc(LocalDateTime value) {
+        return value == null ? null : value.atOffset(ZoneOffset.UTC);
+    }
+
+    private static <T extends Enum<T>> T enumValue(Class<T> type, String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Enum.valueOf(type, value.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static String activeTaskKey(String analysisId, String role, String inputHash) {
+        if (analysisId == null || role == null || inputHash == null) return null;
+        return hash(analysisId + "|" + role + "|" + inputHash);
+    }
+
+    private static String decisionChainModel(AiDecisionChainRequest request,
+                                             AiProviderClient client) {
+        if (client == null || client.providerProperties() == null) return null;
+        if (request != null && request.getRole() == AiDecisionChainRole.GPT_FINAL
+                && client.provider() == AiProviderName.OPENAI) {
+            String reasoningModel = client.providerProperties().getGptFinal().getReasoningModel();
+            if (reasoningModel != null && !reasoningModel.isBlank()) return reasoningModel.trim();
+        }
+        return client.providerProperties().getEffectiveModel();
     }
 }

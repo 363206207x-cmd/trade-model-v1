@@ -98,6 +98,14 @@ public class AnalysisRunResult {
                 false, false, false, false, false, false, false);
     }
 
+    public static AnalysisRunResult queued(AnalysisRunDO run,
+                                           boolean failureRecovery,
+                                           boolean expiredLeaseRecovery) {
+        return new AnalysisRunResult("QUEUED", "ANALYSIS_BACKGROUND_QUEUED",
+                "analysis run accepted for background execution", run, null,
+                false, false, false, failureRecovery, expiredLeaseRecovery, false, false);
+    }
+
     public String getStatus() { return status; }
     public String getReasonCode() { return reasonCode; }
     public String getMessage() { return message; }
@@ -146,5 +154,9 @@ public class AnalysisRunResult {
 
     public boolean isSuccessfulAnalysisAvailable() {
         return isExecutedAnalysisAvailable() || isReusableDuplicateSuccess();
+    }
+
+    public boolean isQueued() {
+        return "QUEUED".equals(status) && hasAnalysisId();
     }
 }

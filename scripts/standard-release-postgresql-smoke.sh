@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-container="trade-model-v14-smoke-$RANDOM-$$"
-database="trade_model_v14_smoke"
+container="trade-model-v17-smoke-$RANDOM-$$"
+database="trade_model_v17_smoke"
 db_user="trade_model_smoke"
 db_password="db-$RANDOM-$RANDOM-$RANDOM"
 db_port="${STANDARD_JAR_POSTGRES_PORT:-55438}"
@@ -49,7 +49,7 @@ fi
 jar_listing="$(jar tf "${jar_path}")"
 grep -F 'BOOT-INF/lib/flyway-core-' <<<"${jar_listing}" >/dev/null
 grep -F 'BOOT-INF/lib/flyway-database-postgresql-' <<<"${jar_listing}" >/dev/null
-for version in $(seq 1 15); do
+for version in $(seq 1 17); do
   grep -F "BOOT-INF/classes/db/migration/V${version}__" <<<"${jar_listing}" >/dev/null
 done
 printf '%s\n' "STANDARD_JAR_FLYWAY_CONTENT=PASS"
@@ -166,24 +166,24 @@ SMOKE_ALLOW_EXTERNAL_CALLS=false \
 printf '%s\n' "PACKAGED_JAR_LOGIN_SESSION_LOGOUT=PASS"
 migration_count="$(docker exec "${container}" psql -U "${db_user}" -d "${database}" -Atc \
   "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL")"
-if [[ "${migration_count}" != "16" ]]; then
-  printf '%s\n' "POSTGRESQL_V1_V16=FAILED"
+if [[ "${migration_count}" != "17" ]]; then
+  printf '%s\n' "POSTGRESQL_V1_V17=FAILED"
   exit 1
 fi
-printf '%s\n' "POSTGRESQL_V1_V16=16/16_PASS"
+printf '%s\n' "POSTGRESQL_V1_V17=17/17_PASS"
 stop_app
 
 start_app
 if ! wait_ready; then
   print_startup_failure
-  printf '%s\n' "PACKAGED_JAR_EXISTING_V16_RESTART=FAILED"
+  printf '%s\n' "PACKAGED_JAR_EXISTING_V17_RESTART=FAILED"
   exit 1
 fi
-printf '%s\n' "PACKAGED_JAR_EXISTING_V16_RESTART=PASS"
+printf '%s\n' "PACKAGED_JAR_EXISTING_V17_RESTART=PASS"
 stop_app
 
 docker exec "${container}" psql -U "${db_user}" -d "${database}" -v ON_ERROR_STOP=1 -c \
-  "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '16'" >/dev/null
+  "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '17'" >/dev/null
 start_app
 for _ in $(seq 1 45); do
   if ! kill -0 "${app_pid}" 2>/dev/null; then

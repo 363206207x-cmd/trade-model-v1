@@ -7,6 +7,11 @@ import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.ai.AiRoleResultsPayload;
+import org.example.trademodel.ai.AiOrchestratorProperties;
+import org.example.trademodel.ai.AiProviderCallStatus;
+import org.example.trademodel.ai.AiBackgroundTaskState;
+import org.example.trademodel.ai.AiRoleState;
+import org.example.trademodel.ai.AiRoleDataState;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
 import org.example.trademodel.common.EvidenceTypeConstants;
 import org.example.trademodel.config.FundamentalAiV41Properties;
@@ -50,6 +55,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class DecisionChainServiceImpl implements DecisionChainService {
@@ -67,6 +77,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
     private final ObjectMapper objectMapper;
     private final AiRoleResultsCodec aiRoleResultsCodec;
     private final FundamentalAiV41Properties v41Properties;
+    private final AiOrchestratorProperties aiProperties;
 
     public DecisionChainServiceImpl(AssetPoolService assetPoolService,
                                     AssetStateService assetStateService,
@@ -79,7 +90,22 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                                     AiRoleResultsCodec aiRoleResultsCodec) {
         this(assetPoolService, assetStateService, aiOrchestratorService, conflictResolver,
                 ruleValidator, candidateMapper, conflictMapper, objectMapper, aiRoleResultsCodec,
-                FundamentalAiV41Properties.contractFixture());
+                FundamentalAiV41Properties.contractFixture(), new AiOrchestratorProperties());
+    }
+
+    public DecisionChainServiceImpl(AssetPoolService assetPoolService,
+                                    AssetStateService assetStateService,
+                                    DecisionChainAiOrchestratorService aiOrchestratorService,
+                                    AiConflictResolverService conflictResolver,
+                                    DecisionChainRuleValidator ruleValidator,
+                                    ExecutionPlanCandidateMapper candidateMapper,
+                                    ConflictResolverResultMapper conflictMapper,
+                                    ObjectMapper objectMapper,
+                                    AiRoleResultsCodec aiRoleResultsCodec,
+                                    FundamentalAiV41Properties v41Properties) {
+        this(assetPoolService, assetStateService, aiOrchestratorService, conflictResolver,
+                ruleValidator, candidateMapper, conflictMapper, objectMapper, aiRoleResultsCodec,
+                v41Properties, new AiOrchestratorProperties());
     }
 
     @Autowired
@@ -92,7 +118,8 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                                     ConflictResolverResultMapper conflictMapper,
                                     ObjectMapper objectMapper,
                                     AiRoleResultsCodec aiRoleResultsCodec,
-                                    FundamentalAiV41Properties v41Properties) {
+                                    FundamentalAiV41Properties v41Properties,
+                                    AiOrchestratorProperties aiProperties) {
         this.assetPoolService = assetPoolService;
         this.assetStateService = assetStateService;
         this.aiOrchestratorService = aiOrchestratorService;
@@ -103,10 +130,13 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         this.objectMapper = objectMapper;
         this.aiRoleResultsCodec = aiRoleResultsCodec;
         this.v41Properties = v41Properties;
+        this.aiProperties = aiProperties;
     }
 
     @Override
     public DecisionChainBuildResult build(DecisionChainBuildInput input) {
+        long chainDeadlineNanos = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(aiProperties.getBackgroundExecution().getChainDeadlineMs());
         requireInput(input);
         DecisionBundleVO decision = input.decision();
         materializeRuleResult(input);
@@ -181,24 +211,28 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 "VALIDATED_DIRECTION_PLAN_CHAIN_STARTED",
                 triggerSource(input.triggerType(), AssetStateEnum.CANDIDATE));
 
-        String candidateId = "candidate-" + UUID.randomUUID();
+        String candidateId = stableCandidateId(input, false);
         Map<String, Object> facts = commonFacts(input, opportunity);
         AiDecisionChainResult gpt = invoke(AiDecisionChainRole.GPT_FINAL, input, candidateId, facts);
-        ExecutionPlanCandidateDO candidate = gpt.successful()
-                ? candidateFromAi(input, opportunity, candidateId, gpt)
-                : candidateFromRule(input, opportunity, candidateId, gpt);
+        if (!gpt.successful()) {
+            return blockedAfterGptFailure(input, opportunity, gpt);
+        }
+        ExecutionPlanCandidateDO candidate = candidateFromAi(input, opportunity, candidateId, gpt);
 
         Map<String, Object> reviewFacts = new LinkedHashMap<>(facts);
         reviewFacts.put("executionPlanCandidate", jsonNode(candidate.getPayloadJson()));
         reviewFacts.put("candidateSource", candidate.getCandidateSource());
-        AiDecisionChainResult gemini = invoke(AiDecisionChainRole.GEMINI_REVIEW,
-                input, candidateId, reviewFacts);
+        Map<String, Object> immutableReviewFacts = Collections.unmodifiableMap(
+                new LinkedHashMap<>(reviewFacts));
+        AiRolePair reviews = invokeIndependentReviews(
+                input, candidateId, immutableReviewFacts, chainDeadlineNanos);
+        if (reviews.chainDeadlineExceeded()) {
+            return blockedAfterChainDeadline(input, opportunity, candidate, gpt,
+                    reviews.gemini(), reviews.grok());
+        }
+        AiDecisionChainResult gemini = reviews.gemini();
+        AiDecisionChainResult grok = reviews.grok();
         String geminiJson = gemini.successful() ? gemini.getPayloadJson() : fallbackGemini(gemini);
-
-        Map<String, Object> challengeFacts = new LinkedHashMap<>(reviewFacts);
-        challengeFacts.put("geminiReview", jsonNode(geminiJson));
-        AiDecisionChainResult grok = invoke(AiDecisionChainRole.GROK_CHALLENGE,
-                input, candidateId, challengeFacts);
         String grokJson = grok.successful() ? grok.getPayloadJson() : fallbackGrok(grok);
 
         ConflictResolverResultDO conflict = conflictResolver.resolveDecisionChain(
@@ -252,32 +286,45 @@ public class DecisionChainServiceImpl implements DecisionChainService {
     }
 
     private DecisionChainBuildResult buildPreview(DecisionChainBuildInput input) {
+        long chainDeadlineNanos = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(aiProperties.getBackgroundExecution().getChainDeadlineMs());
         OpportunityTransitionResult previewContext = new OpportunityTransitionResult(
                 null, input.symbol(), AssetStateEnum.OBSERVING, AssetStateEnum.OBSERVING,
                 false, false, "ANALYSIS_PREVIEW_NON_PERSISTENT", "ANALYSIS_PREVIEW",
                 "NOT_ELIGIBLE", LocalDateTime.now());
-        String candidateId = "preview-candidate-" + UUID.randomUUID();
+        String candidateId = stableCandidateId(input, true);
         Map<String, Object> facts = commonFacts(input, previewContext);
         facts.put("preview", true);
         facts.put("persistenceBoundary", "NO_PERSISTED_OPPORTUNITY_CANDIDATE_OR_FINAL");
 
         AiDecisionChainResult gpt = invoke(AiDecisionChainRole.GPT_FINAL, input, candidateId, facts);
-        ExecutionPlanCandidateDO candidate = gpt.successful()
-                ? candidateFromAi(input, previewContext, candidateId, gpt)
-                : candidateFromRule(input, previewContext, candidateId, gpt);
+        if (!gpt.successful()) {
+            RuleValidationResult blocked = RuleValidationResult.blocked(List.of("GPT_CANDIDATE_REQUIRED"));
+            applyIncompleteAiRoleResults(input.decision(), input, gpt,
+                    dependencyNotStarted(AiDecisionChainRole.GEMINI_REVIEW, "GPT_DEPENDENCY_FAILED"),
+                    dependencyNotStarted(AiDecisionChainRole.GROK_CHALLENGE, "GPT_DEPENDENCY_FAILED"));
+            return new DecisionChainBuildResult(null, null, null, blocked, null, true);
+        }
+        ExecutionPlanCandidateDO candidate = candidateFromAi(input, previewContext, candidateId, gpt);
         candidate.setOpportunityId(null);
         candidate.setCandidateStatus("PREVIEW_ONLY");
 
         Map<String, Object> reviewFacts = new LinkedHashMap<>(facts);
         reviewFacts.put("executionPlanCandidate", jsonNode(candidate.getPayloadJson()));
         reviewFacts.put("candidateSource", candidate.getCandidateSource());
-        AiDecisionChainResult gemini = invoke(AiDecisionChainRole.GEMINI_REVIEW,
-                input, candidateId, reviewFacts);
+        Map<String, Object> immutableReviewFacts = Collections.unmodifiableMap(
+                new LinkedHashMap<>(reviewFacts));
+        AiRolePair reviews = invokeIndependentReviews(
+                input, candidateId, immutableReviewFacts, chainDeadlineNanos);
+        AiDecisionChainResult gemini = reviews.gemini();
+        AiDecisionChainResult grok = reviews.grok();
+        if (reviews.chainDeadlineExceeded()) {
+            RuleValidationResult blocked = RuleValidationResult.blocked(List.of("CHAIN_DEADLINE_EXCEEDED"));
+            candidate.setCandidateStatus("REJECTED");
+            applyIncompleteAiRoleResults(input.decision(), input, gpt, gemini, grok);
+            return new DecisionChainBuildResult(null, candidate, null, blocked, null, true);
+        }
         String geminiJson = gemini.successful() ? gemini.getPayloadJson() : fallbackGemini(gemini);
-        Map<String, Object> challengeFacts = new LinkedHashMap<>(reviewFacts);
-        challengeFacts.put("geminiReview", jsonNode(geminiJson));
-        AiDecisionChainResult grok = invoke(AiDecisionChainRole.GROK_CHALLENGE,
-                input, candidateId, challengeFacts);
         String grokJson = grok.successful() ? grok.getPayloadJson() : fallbackGrok(grok);
         ConflictResolverResultDO conflict = conflictResolver.resolveDecisionChain(
                 candidate, geminiJson, grokJson, input.dataQualityScore(),
@@ -287,6 +334,149 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         applyAiRoleResults(input.decision(), input, candidate, conflict, gpt, gemini, grok);
         return new DecisionChainBuildResult(null, candidate, conflict,
                 RuleValidationResult.blocked(List.of("ANALYSIS_PREVIEW_NON_FINAL")), null, true);
+    }
+
+    private AiRolePair invokeIndependentReviews(DecisionChainBuildInput input,
+                                                String candidateId,
+                                                Map<String, Object> immutableFacts,
+                                                long chainDeadlineNanos) {
+        CompletableFuture<AiDecisionChainResult> geminiFuture = CompletableFuture.supplyAsync(
+                        () -> invoke(AiDecisionChainRole.GEMINI_REVIEW, input, candidateId, immutableFacts))
+                .exceptionally(failure -> reviewTaskFailure(AiDecisionChainRole.GEMINI_REVIEW));
+        CompletableFuture<AiDecisionChainResult> grokFuture = CompletableFuture.supplyAsync(
+                        () -> invoke(AiDecisionChainRole.GROK_CHALLENGE, input, candidateId, immutableFacts))
+                .exceptionally(failure -> reviewTaskFailure(AiDecisionChainRole.GROK_CHALLENGE));
+        long remainingNanos = chainDeadlineNanos - System.nanoTime();
+        if (remainingNanos <= 0L) {
+            geminiFuture.cancel(true);
+            grokFuture.cancel(true);
+            return new AiRolePair(chainTimeout(AiDecisionChainRole.GEMINI_REVIEW),
+                    chainTimeout(AiDecisionChainRole.GROK_CHALLENGE), true);
+        }
+        try {
+            CompletableFuture.allOf(geminiFuture, grokFuture)
+                    .get(remainingNanos, TimeUnit.NANOSECONDS);
+            return new AiRolePair(geminiFuture.join(), grokFuture.join(), false);
+        } catch (TimeoutException timeout) {
+            geminiFuture.cancel(true);
+            grokFuture.cancel(true);
+            return new AiRolePair(completedOrTimeout(geminiFuture, AiDecisionChainRole.GEMINI_REVIEW),
+                    completedOrTimeout(grokFuture, AiDecisionChainRole.GROK_CHALLENGE), true);
+        } catch (Exception failure) {
+            return new AiRolePair(completedOrFailure(geminiFuture, AiDecisionChainRole.GEMINI_REVIEW),
+                    completedOrFailure(grokFuture, AiDecisionChainRole.GROK_CHALLENGE), false);
+        }
+    }
+
+    private DecisionChainBuildResult blockedAfterGptFailure(DecisionChainBuildInput input,
+                                                            OpportunityTransitionResult opportunity,
+                                                            AiDecisionChainResult gpt) {
+        String reason = gpt != null && gpt.getTaskState() == AiBackgroundTaskState.TIMED_OUT
+                ? "GPT_JOB_DEADLINE_EXCEEDED" : "GPT_CANDIDATE_REQUIRED";
+        RuleValidationResult blocked = RuleValidationResult.blocked(List.of(reason));
+        input.decision().setFinalMarketBias(null);
+        input.decision().setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+        input.decision().setIsWorthOpening(false);
+        applyOpportunityState(input.decision(), input, opportunity, blocked);
+        applyIncompleteAiRoleResults(input.decision(), input, gpt,
+                dependencyNotStarted(AiDecisionChainRole.GEMINI_REVIEW, "GPT_DEPENDENCY_FAILED"),
+                dependencyNotStarted(AiDecisionChainRole.GROK_CHALLENGE, "GPT_DEPENDENCY_FAILED"));
+        persistOpportunityProjection(input, opportunity, null, blocked);
+        return new DecisionChainBuildResult(opportunity, null, null, blocked,
+                blockedPlan(input.rulePlan(), opportunity, null, null, blocked));
+    }
+
+    private DecisionChainBuildResult blockedAfterChainDeadline(DecisionChainBuildInput input,
+                                                               OpportunityTransitionResult opportunity,
+                                                               ExecutionPlanCandidateDO candidate,
+                                                               AiDecisionChainResult gpt,
+                                                               AiDecisionChainResult gemini,
+                                                               AiDecisionChainResult grok) {
+        RuleValidationResult blocked = RuleValidationResult.blocked(List.of("CHAIN_DEADLINE_EXCEEDED"));
+        candidate.setCandidateStatus("REJECTED");
+        input.decision().setFinalMarketBias(null);
+        input.decision().setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+        input.decision().setIsWorthOpening(false);
+        applyOpportunityState(input.decision(), input, opportunity, blocked);
+        applyIncompleteAiRoleResults(input.decision(), input, gpt, gemini, grok);
+        persistOpportunityProjection(input, opportunity, null, blocked);
+        return new DecisionChainBuildResult(opportunity, candidate, null, blocked,
+                blockedPlan(input.rulePlan(), opportunity, candidate, null, blocked));
+    }
+
+    private void applyIncompleteAiRoleResults(DecisionBundleVO decision,
+                                              DecisionChainBuildInput input,
+                                              AiDecisionChainResult gpt,
+                                              AiDecisionChainResult gemini,
+                                              AiDecisionChainResult grok) {
+        Map<AiDecisionChainRole, AiDecisionChainResult> roles = new LinkedHashMap<>();
+        roles.put(AiDecisionChainRole.GPT_FINAL, gpt);
+        roles.put(AiDecisionChainRole.GEMINI_REVIEW, gemini);
+        roles.put(AiDecisionChainRole.GROK_CHALLENGE, grok);
+        decision.setAiRoleResults(aiRoleResultsCodec.serializeDecisionChain(
+                input.analysisId(), input.traceId(), decision.getRuleMarketBias(), roles,
+                AiRoleResultsPayload.SynthesisPayload.empty()));
+    }
+
+    private static AiDecisionChainResult dependencyNotStarted(AiDecisionChainRole role, String reason) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(null, role,
+                AiProviderCallStatus.FAILED, reason);
+        result.setTaskState(AiBackgroundTaskState.CANCELLED);
+        result.setRoleState(AiRoleState.UNAVAILABLE);
+        result.setDataState(AiRoleDataState.SOURCE_UNAVAILABLE);
+        result.setFailureClassification("NOT_STARTED_DEPENDENCY_FAILED");
+        return result;
+    }
+
+    private static AiDecisionChainResult chainTimeout(AiDecisionChainRole role) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(null, role,
+                AiProviderCallStatus.TIMEOUT, "CHAIN_DEADLINE_EXCEEDED");
+        result.setTaskState(AiBackgroundTaskState.TIMED_OUT);
+        result.setRoleState(AiRoleState.ERROR);
+        result.setDataState(AiRoleDataState.AI_TIMEOUT);
+        result.setFailureClassification("CHAIN_DEADLINE_EXCEEDED");
+        return result;
+    }
+
+    private static AiDecisionChainResult reviewTaskFailure(AiDecisionChainRole role) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(null, role,
+                AiProviderCallStatus.FAILED, "REVIEW_TASK_FAILED");
+        result.setTaskState(AiBackgroundTaskState.FAILED);
+        result.setRoleState(AiRoleState.ERROR);
+        result.setDataState(AiRoleDataState.SOURCE_UNAVAILABLE);
+        result.setFailureClassification("REVIEW_TASK_FAILED");
+        return result;
+    }
+
+    private static AiDecisionChainResult completedOrTimeout(
+            CompletableFuture<AiDecisionChainResult> future, AiDecisionChainRole role) {
+        if (!future.isDone() || future.isCancelled() || future.isCompletedExceptionally()) {
+            return chainTimeout(role);
+        }
+        return future.join();
+    }
+
+    private static AiDecisionChainResult completedOrFailure(
+            CompletableFuture<AiDecisionChainResult> future, AiDecisionChainRole role) {
+        try {
+            return future.isDone() && !future.isCancelled() ? future.join()
+                    : dependencyNotStarted(role, "REVIEW_TASK_NOT_COMPLETED");
+        } catch (Exception ignored) {
+            return dependencyNotStarted(role, "REVIEW_TASK_FAILED");
+        }
+    }
+
+    private static String stableCandidateId(DecisionChainBuildInput input, boolean preview) {
+        String key = String.join("|", String.valueOf(input.analysisId()),
+                String.valueOf(input.symbol()), String.valueOf(input.timeframe()),
+                preview ? "PREVIEW" : "DECISION");
+        return (preview ? "preview-candidate-" : "candidate-")
+                + UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private record AiRolePair(AiDecisionChainResult gemini,
+                              AiDecisionChainResult grok,
+                              boolean chainDeadlineExceeded) {
     }
 
     private void materializeRuleResult(DecisionChainBuildInput input) {
@@ -393,9 +583,6 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         if (role != AiDecisionChainRole.GPT_FINAL
                 && !"GPT_FINAL".equals(facts.get("candidateSource"))) {
             failures.add("GPT_CANDIDATE_UNAVAILABLE");
-        }
-        if (role == AiDecisionChainRole.GROK_CHALLENGE && !facts.containsKey("geminiReview")) {
-            failures.add("GEMINI_REVIEW_CONTEXT_MISSING");
         }
         return failures;
     }
@@ -605,10 +792,15 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                                             OpportunityTransitionResult opportunity) {
         Map<String, Object> facts = new LinkedHashMap<>();
         DecisionBundleVO decision = input.decision();
-        facts.put("analysis", Map.of(
-                "analysisId", input.analysisId(),
-                "symbol", input.symbol(),
-                "timeframe", input.timeframe()));
+        Map<String, Object> analysisFacts = new LinkedHashMap<>();
+        analysisFacts.put("analysisId", input.analysisId());
+        analysisFacts.put("symbol", input.symbol());
+        analysisFacts.put("timeframe", input.timeframe());
+        analysisFacts.put("snapshotTime", decision.getValidFrom());
+        analysisFacts.put("algorithmVersion", decision.getNormalizationVersion());
+        analysisFacts.put("ruleConfigVersion", input.ruleVersion());
+        analysisFacts.put("providerMatrixVersion", decision.getProviderMatrixVersion());
+        facts.put("analysis", analysisFacts);
         Map<String, Object> opportunityFacts = new LinkedHashMap<>();
         opportunityFacts.put("opportunityId", opportunity == null ? null : opportunity.opportunityId());
         opportunityFacts.put("state", opportunity == null || opportunity.state() == null
@@ -631,6 +823,10 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         decisionFacts.put("multiTimeframe", decision.getMultiTimeframeDetails());
         decisionFacts.put("dataQuality", input.dataQualityScore());
         decisionFacts.put("confusedScore", decision.getConfusedScore());
+        decisionFacts.put("normalizationVersion", decision.getNormalizationVersion());
+        decisionFacts.put("scoreVersion", decision.getScoreVersion());
+        decisionFacts.put("dataQualityVersion", decision.getDataQualityVersion());
+        decisionFacts.put("providerMatrixVersion", decision.getProviderMatrixVersion());
         decisionFacts.put("riskState", opportunity == null || opportunity.state() == null
                 ? null : opportunity.state().name());
         facts.put("decisionBundle", decisionFacts);

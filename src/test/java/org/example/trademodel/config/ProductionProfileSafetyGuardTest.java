@@ -118,6 +118,49 @@ class ProductionProfileSafetyGuardTest {
     }
 
     @Test
+    void allowsAiOnlyWithExactBackgroundTimeoutAndModelEffortContract() {
+        MockEnvironment environment = safeEnvironment();
+        configureExactAiBackgroundRuntime(environment);
+
+        assertThatCode(() -> ProductionProfileSafetyGuard.validate(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBackgroundGptModelDriftFromFrozenSolModel() {
+        MockEnvironment environment = safeEnvironment();
+        configureExactAiBackgroundRuntime(environment);
+        environment.setProperty("trade-model.ai.openai.enabled", "true");
+        environment.setProperty("trade-model.ai.openai.api-key", "configured-test-key");
+        environment.setProperty("trade-model.ai.openai.base-url", "https://api.openai.test");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fast-model", "gpt-5.6-luna");
+        environment.setProperty("trade-model.ai.openai.gpt-final.reasoning-model", "gpt-5.6-luna");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[0]", "gpt-5.5");
+        environment.setProperty("trade-model.ai.openai.gpt-final.fallback-models[1]", "gpt-5.4");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production background GPT model must equal gpt-5.6-sol");
+    }
+
+    @Test
+    void rejectsAiBackgroundRuntimeWhenAnyFrozenDeadlineOrEffortDrifts() {
+        MockEnvironment environment = safeEnvironment();
+        configureExactAiBackgroundRuntime(environment);
+        environment.setProperty("trade-model.ai.background-execution.gpt-job-deadline-ms", "30000");
+        environment.setProperty("trade-model.ai.background-execution.review-job-deadline-ms", "30000");
+        environment.setProperty("trade-model.ai.background-execution.reasoning-effort", "high");
+        environment.setProperty("trade-model.ai.background-execution.text-verbosity", "medium");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("gpt-job-deadline-ms must equal 180000")
+                .hasMessageContaining("review-job-deadline-ms must equal 120000")
+                .hasMessageContaining("production GPT reasoning effort must be medium")
+                .hasMessageContaining("production GPT text verbosity must be low");
+    }
+
+    @Test
     void rejectsPublicBindUnlessExplicitlyAllowed() {
         MockEnvironment environment = safeEnvironment();
         environment.setProperty("server.address", "0.0.0.0");
@@ -755,6 +798,20 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.max-symbols", "6");
         environment.setProperty("trade-model.schedulers.ohlcv-ingestion.timeframes", "5m,15m,1h,4h");
         return environment;
+    }
+
+    private static void configureExactAiBackgroundRuntime(MockEnvironment environment) {
+        environment.setProperty("trade-model.ai.enabled", "true");
+        environment.setProperty("trade-model.ai.background-execution.enabled", "true");
+        environment.setProperty("trade-model.ai.background-execution.submit-ack-timeout-ms", "30000");
+        environment.setProperty("trade-model.ai.background-execution.gpt-job-deadline-ms", "180000");
+        environment.setProperty("trade-model.ai.background-execution.review-job-deadline-ms", "120000");
+        environment.setProperty("trade-model.ai.background-execution.chain-deadline-ms", "300000");
+        environment.setProperty("trade-model.ai.background-execution.initial-poll-interval-ms", "2000");
+        environment.setProperty("trade-model.ai.background-execution.max-poll-interval-ms", "10000");
+        environment.setProperty("trade-model.ai.background-execution.max-transient-retries", "1");
+        environment.setProperty("trade-model.ai.background-execution.reasoning-effort", "medium");
+        environment.setProperty("trade-model.ai.background-execution.text-verbosity", "low");
     }
 
     private MockEnvironment ohlcvSchedulerEnvironment() {

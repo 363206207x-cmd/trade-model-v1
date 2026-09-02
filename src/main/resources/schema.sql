@@ -1582,12 +1582,29 @@ CREATE TABLE IF NOT EXISTS tm_ai_call_log (
     not_execution_plan_creation BOOLEAN NOT NULL DEFAULT TRUE,
     not_final_execution_plan_creation BOOLEAN NOT NULL DEFAULT TRUE,
     rule_direction_preserved BOOLEAN NOT NULL DEFAULT TRUE,
+    task_state VARCHAR(32) NOT NULL DEFAULT 'QUEUED',
+    attempt INT NOT NULL DEFAULT 1,
+    role_state VARCHAR(32),
+    data_state VARCHAR(32),
+    submitted_at TIMESTAMP,
+    reasoning_tokens BIGINT,
+    failure_classification VARCHAR(128),
+    prompt_version VARCHAR(64) NOT NULL DEFAULT 'V41-AI-ROLE-PROMPT-1',
+    schema_version VARCHAR(64) NOT NULL DEFAULT 'V41-AI-STRUCTURED-SCHEMA-1',
+    input_contract_version VARCHAR(64) NOT NULL DEFAULT 'V41-AI-INPUT-COMPACT-1',
+    runtime_config_version VARCHAR(64) NOT NULL DEFAULT 'V41-AI-BACKGROUND-TIMEOUT-1',
+    background_mode VARCHAR(64),
+    active_task_key VARCHAR(160),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_ai_call_log_status CHECK (
         call_status IN ('STARTED', 'SUCCESS', 'DISABLED', 'NOT_CONFIGURED',
         'RATE_LIMITED', 'BUDGET_BLOCKED', 'TIMEOUT', 'FAILED', 'INVALID_RESPONSE')
     ),
+    CONSTRAINT ck_tm_ai_call_log_task_state CHECK (
+        task_state IN ('QUEUED', 'SUBMITTED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'TIMED_OUT', 'CANCELLED')
+    ),
+    CONSTRAINT ck_tm_ai_call_log_attempt CHECK (attempt BETWEEN 1 AND 2),
     CONSTRAINT ck_tm_ai_call_log_safety CHECK (
         manual_review_only = TRUE
         AND not_trade_instruction = TRUE
@@ -1625,6 +1642,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_status_time ON tm_ai_call_log(call
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_candidate ON tm_ai_call_log(candidate_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_opportunity ON tm_ai_call_log(opportunity_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_role ON tm_ai_call_log(ai_role, started_at);
+CREATE INDEX IF NOT EXISTS idx_tm_ai_call_log_task_state ON tm_ai_call_log(task_state, submitted_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_ai_call_log_active_task ON tm_ai_call_log(active_task_key);
 
 CREATE TABLE IF NOT EXISTS tm_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
