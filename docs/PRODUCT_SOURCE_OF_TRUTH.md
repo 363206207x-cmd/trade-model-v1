@@ -365,6 +365,39 @@ idempotency fix. This one-package ancestor rule does not authorize a wildcard,
 directory grant, gate-owner mutation by the implementation branch, or any
 other successor.
 
+### Owner-approved real Provider and Three-AI runtime closure
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not a change to the frozen scoring, direction, Plan Mode, AI-role,
+Home visual or no-trade contracts. Owner authorized exactly one bounded
+private-Staging runtime closure package from current merged main.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE` |
+| Branch | `codex/v4-1-real-provider-three-ai-runtime-closure` |
+| Starting full SHA | `52201ba2d3d39d03aee8a005064e1ccf628f2491` |
+| Gate baseline rule | authorization and implementation start from the exact merged-main SHA; package, branch and exact path allowlist fail closed |
+| Existing owners | Binance persistence/source gate, CoinGlass provider/cache/derivatives Evidence adapter, AI Provider readiness/orchestrator, AnalysisRun and Home projection |
+| Runtime objective | truthful six-asset Binance data, contract-complete CoinGlass Evidence, time-bounded Provider health, exact-model GPT/Gemini/Grok readiness and one guarded same-run chain |
+| Acceptance boundary | exact-head CI and merged-main private-Staging evidence; explicit Owner visual review remains separate |
+
+The successor may change only the nine exact existing owner and focused-test
+paths listed by `docs/CODEX_NEXT_TASK.yml`. It may normalize provider freshness
+into the existing Evidence vocabulary, attach truthful value/comparison facts
+to stale or partial status Evidence, make configured AI readiness recover via
+the existing bounded scheduler, and expire CoinGlass health according to the
+existing configured freshness TTL. Missing values remain missing and all
+Provider and AI calls remain bounded, read-only and fail closed.
+
+No Controller, DTO, Schema, migration, frontend, CSS, static asset, Product
+Source semantics, Provider Matrix, quality threshold, scoring/direction/Plan
+algorithm, AI role permission, Telegram send, Production deployment or
+automatic-trading change is authorized. `ANALYSIS_PREVIEW` may not persist or
+impersonate Opportunity, Candidate, Final Plan or position objects; persisted
+Resolver and Rule Validation evidence must come only from an already legal
+decision-chain mode.
+
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
 This is a completed subordinate machine-authorization record, not a second

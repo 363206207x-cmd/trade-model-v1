@@ -8,39 +8,40 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Final Runtime Home Access Idempotency Closure Authorization
-Product Phase Status: FINAL_RUNTIME_HOME_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact final runtime, Home contract, private-access and idempotency revalidation closure; no implementation is included in this gate package
-Next Business Phase: V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization
+Product Phase Status: REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact real Binance, CoinGlass Evidence and Three-AI runtime closure; no implementation is included in this gate package
+Next Business Phase: V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Final Runtime Home Access Idempotency Closure Authorization
+## TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization
 
-Owner revoked the prior visual acceptance and authorized one exact package to
-close the real-data Home card semantics, 1440 x 900 hierarchy, status/alert/nav
-truthfulness, Owner-Mac private access and regression validation of the already
-merged PostgreSQL-safe AnalysisRun idempotency boundary. The exact package is
-`V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE`, the exact branch is
-`codex/v4-1-final-runtime-home-access-idempotency-closure`, and its immutable
+Owner authorized one exact package to close the existing real Binance,
+CoinGlass Evidence and Three-AI runtime chain without changing the frozen Home
+visual contract. The exact package is
+`V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE`, the exact branch is
+`codex/v4-1-real-provider-three-ai-runtime-closure`, and its immutable
 product baseline remains
-`0e9bd779b10e9d3140b8ceaea0a5193a28d6264f`.
+`52201ba2d3d39d03aee8a005064e1ccf628f2491`.
 
 The authorization branch starts directly from current clean merged main while
-the exact product baseline remains an ancestor. This is allowed only for this
-package and does not weaken exact branch, package, path, gate-owner, secret,
-deployment or no-trade checks. The successor may change only the ten exact Home
-runtime, focused-test and visual-evidence paths in `docs/CODEX_NEXT_TASK.yml`.
-No Schema, migration, provider, direction/score/plan algorithm, Telegram-send,
-Figma, Mobile, Production or automatic-trading change is authorized.
+the exact product baseline is that merged-main Head. This is allowed only for
+this package and does not weaken exact branch, package, path, gate-owner,
+secret, deployment or no-trade checks. The successor may change only the nine
+exact existing Provider/Evidence/readiness owner and focused-test paths in
+`docs/CODEX_NEXT_TASK.yml`. No Schema, migration, direction/score/plan or AI
+role contract, Home layout/copy/static asset, Telegram-send, Figma, Mobile,
+Production or automatic-trading change is authorized.
 
 Capability movement in this gate package is `NONE`. Private Staging deployment
 is eligible only after the gate and implementation PRs pass exact-head checks
-and merge. Final Owner visual acceptance remains pending after Codex runtime
-and screenshot audit.
+and merge. The successor must use real, bounded, read-only Provider calls,
+preserve missing values and fail-closed semantics, and keep Owner visual
+acceptance pending after runtime evidence is collected.
 
 ---
 
