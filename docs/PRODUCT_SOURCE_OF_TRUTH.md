@@ -334,6 +334,38 @@ acceptance under the Owner's one-pass authorization. Production deployment,
 automatic trading, exchange private order APIs, fake data, weakened Final/DQ/
 source/risk gates and secret disclosure remain forbidden.
 
+### Owner-approved AnalysisRun idempotency transaction-boundary fix
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not implementation. Owner authorized exactly one confirmed defect
+closure from merged main
+`0e9bd779b10e9d3140b8ceaea0a5193a28d6264f`.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX` |
+| Branch | `codex/v4-1-analysis-run-idempotency-tx-fix` |
+| Starting full SHA | `0e9bd779b10e9d3140b8ceaea0a5193a28d6264f` |
+| Authorized defect count | `1` |
+| Canonical owner | existing `AnalysisRun` / `AnalysisIdempotencyGuard` |
+| Required invariant | preserve `uk_tm_analysis_run_idempotency_key` and return one canonical `analysisRunId` |
+| Mismatch behavior | fail closed as `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` or an existing equivalent normalized error |
+
+The implementation may change only the exact six Guard, Mapper and test paths
+listed by `docs/CODEX_NEXT_TASK.yml`. PostgreSQL must use an atomic
+conflict-safe claim or a fully rolled-back isolated transaction before reading
+the canonical row. H2 must expose the same business semantics. Sequential and
+2/10/50-way concurrent retries must produce exactly one row and one canonical
+analysis identifier, while a reused key with different normalized payload must
+fail closed.
+
+The unique constraint may not be removed or weakened. No migration, scoring,
+direction, plan, Home, provider, Telegram, position-monitoring, order,
+execution or automatic-trading behavior is authorized. The gate package may
+change only canonical gate-owner/status/test files and adds no runtime
+capability. Private Staging deployment is allowed only after exact-head CI and
+merged-main synchronization; Production remains forbidden.
+
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 
 | Attribute | Registration |
