@@ -608,8 +608,10 @@ expected_implementation_paths="$(printf '%s\n' \
   src/main/java/org/example/trademodel/ai/AiHttpTransport.java \
   src/main/java/org/example/trademodel/ai/AiOrchestratorProperties.java \
   src/main/java/org/example/trademodel/ai/AiProviderClient.java \
+  src/main/java/org/example/trademodel/ai/GeminiProviderClient.java \
   src/main/java/org/example/trademodel/ai/JdkAiHttpTransport.java \
   src/main/java/org/example/trademodel/ai/OpenAiProviderClient.java \
+  src/main/java/org/example/trademodel/ai/XaiProviderClient.java \
   src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java \
   src/main/java/org/example/trademodel/controller/AnalysisRunController.java \
   src/main/java/org/example/trademodel/entity/AiCallLogDO.java \
@@ -638,7 +640,7 @@ expected_implementation_paths="$(printf '%s\n' \
   src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
   src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the forty authorized paths"
+  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the forty-two authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "GPT background/Three-AI timeout implementation allowlist must not contain wildcards or directory-level grants"
 fi
@@ -650,7 +652,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_THIRTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_FORTY_TWO_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
