@@ -629,12 +629,13 @@ expected_implementation_paths="$(printf '%s\n' \
   src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java \
   src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java \
   src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
+  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
   src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java \
   src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java \
   src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
   src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the thirty-six authorized paths"
+  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the thirty-seven authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "GPT background/Three-AI timeout implementation allowlist must not contain wildcards or directory-level grants"
 fi

@@ -24,7 +24,7 @@ active_block_cn: "Owner 授权的 GPT 后台执行与三 AI 超时闭环精确�
 next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue the GPT background and Three-AI timeout closure."
 next_business_phase: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and thirty-six-file implementation allowlist are required after this authorization is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and thirty-seven-file implementation allowlist are required after this authorization is effective on merged main."
 
 production_deployment_readiness: "BLOCKED"
 
