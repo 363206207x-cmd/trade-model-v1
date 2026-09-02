@@ -29,7 +29,7 @@ baseline is `1c13286eb64bb5b074e960352f8e290a317eb704`.
 
 The authorization branch starts directly from that clean merged-main Head and
 does not weaken exact branch, package, path, gate-owner, secret, deployment or
-no-trade checks. The successor may change only the thirty-six exact existing
+no-trade checks. The successor may change only the thirty-seven exact existing
 AnalysisRun/AITrace/provider/orchestrator/configuration/migration and focused
 test paths in `docs/CODEX_NEXT_TASK.yml`. V1-V16, direction/score/plan or AI
 role semantics, Home layout/copy/static assets, Telegram-send, Figma, Mobile,
