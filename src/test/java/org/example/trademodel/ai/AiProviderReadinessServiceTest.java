@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -110,6 +112,55 @@ class AiProviderReadinessServiceTest {
         verify(client, times(1)).verifyExactModel("gpt-5.6-sol", 10_000L);
     }
 
+    @Test
+    void configuredProvidersAreVerifiedOnceUntilTheirExistingTtlExpires() {
+        AiOrchestratorProperties properties = fullyConfiguredProperties();
+        AiProviderClient openai = client(AiProviderName.OPENAI, successful("openai-request"));
+        AiProviderClient gemini = client(AiProviderName.GEMINI, successful("gemini-request"));
+        AiProviderClient xai = client(AiProviderName.XAI, successful("xai-request"));
+        MutableClock clock = new MutableClock(NOW);
+        AiProviderReadinessService service = new AiProviderReadinessService(
+                properties, List.of(openai, gemini, xai), 3600, clock);
+
+        assertThat(service.verifyConfiguredProvidersIfDue())
+                .extracting(AiProviderRuntimeReadiness::state)
+                .containsOnly(AiProviderReadinessState.AUTHORIZED);
+        assertThat(service.verifyConfiguredProvidersIfDue())
+                .extracting(AiProviderRuntimeReadiness::state)
+                .containsOnly(AiProviderReadinessState.AUTHORIZED);
+        verify(openai, times(1)).verifyExactModel("gpt-5.6-sol", 10_000L);
+        verify(gemini, times(1)).verifyExactModel("gemini-3.5-flash", 25_000L);
+        verify(xai, times(1)).verifyExactModel("grok-4.5", 10_000L);
+
+        clock.advance(Duration.ofSeconds(3601));
+        assertThat(service.verifyConfiguredProvidersIfDue())
+                .extracting(AiProviderRuntimeReadiness::state)
+                .containsOnly(AiProviderReadinessState.AUTHORIZED);
+        verify(openai, times(2)).verifyExactModel("gpt-5.6-sol", 10_000L);
+        verify(gemini, times(2)).verifyExactModel("gemini-3.5-flash", 25_000L);
+        verify(xai, times(2)).verifyExactModel("grok-4.5", 10_000L);
+    }
+
+    @Test
+    void oneProviderVerificationFailureDoesNotBlockOtherConfiguredProviders() {
+        AiOrchestratorProperties properties = fullyConfiguredProperties();
+        AiProviderClient openai = mock(AiProviderClient.class);
+        when(openai.provider()).thenReturn(AiProviderName.OPENAI);
+        when(openai.role()).thenReturn(AiProviderRole.GPT_RULE_REVIEW);
+        doThrow(new IllegalStateException("private-provider-detail"))
+                .when(openai).verifyExactModel("gpt-5.6-sol", 10_000L);
+        AiProviderClient gemini = client(AiProviderName.GEMINI, successful("gemini-request"));
+        AiProviderClient xai = client(AiProviderName.XAI, successful("xai-request"));
+        AiProviderReadinessService service = service(properties, List.of(openai, gemini, xai));
+
+        List<AiProviderRuntimeReadiness> readiness = service.verifyConfiguredProvidersIfDue();
+
+        assertThat(readiness).extracting(AiProviderRuntimeReadiness::state)
+                .containsExactly(AiProviderReadinessState.PROVIDER_UNAVAILABLE,
+                        AiProviderReadinessState.AUTHORIZED, AiProviderReadinessState.AUTHORIZED);
+        assertThat(readiness.toString()).doesNotContain("private-provider-detail");
+    }
+
     private static void assertFailure(String code,
                                       AiProviderCallStatus callStatus,
                                       AiProviderReadinessState expected) {
@@ -175,5 +226,49 @@ class AiProviderReadinessServiceTest {
             selected.setModel("grok-4.5");
         }
         return properties;
+    }
+
+    private static AiOrchestratorProperties fullyConfiguredProperties() {
+        AiOrchestratorProperties properties = configuredProperties(AiProviderName.OPENAI);
+        configureProvider(properties.getGemini(), AiProviderName.GEMINI);
+        configureProvider(properties.getXai(), AiProviderName.XAI);
+        return properties;
+    }
+
+    private static void configureProvider(AiProviderProperties selected, AiProviderName provider) {
+        selected.setEnabled(true);
+        selected.setApiKey("test-secret");
+        selected.setBaseUrl("https://provider.invalid");
+        selected.setRequestsPerMinute(10);
+        selected.setInputCostPerMillionUsd(new BigDecimal("1.25"));
+        selected.setOutputCostPerMillionUsd(new BigDecimal("2.50"));
+        selected.setModel(provider == AiProviderName.GEMINI ? "gemini-3.5-flash" : "grok-4.5");
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant current;
+
+        private MutableClock(Instant current) {
+            this.current = current;
+        }
+
+        private void advance(Duration duration) {
+            current = current.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return current;
+        }
     }
 }

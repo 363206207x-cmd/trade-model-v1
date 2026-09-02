@@ -59,6 +59,12 @@ public class AiProviderReadinessService {
                 .toList();
     }
 
+    public synchronized List<AiProviderRuntimeReadiness> verifyConfiguredProvidersIfDue() {
+        return List.of(AiProviderName.OPENAI, AiProviderName.GEMINI, AiProviderName.XAI).stream()
+                .map(this::verifyIfDue)
+                .toList();
+    }
+
     public AiProviderRuntimeReadiness readiness(AiProviderName provider) {
         AiProviderName safeProvider = provider == null ? AiProviderName.OPENAI : provider;
         AiProviderProperties providerProperties = providerProperties(safeProvider);
@@ -122,6 +128,12 @@ public class AiProviderReadinessService {
                 now.plusSeconds(verificationTtlSeconds), reason,
                 result == null ? null : safeRequestId(result.getProviderRequestId()), configVersion);
         return cache(readiness);
+    }
+
+    private AiProviderRuntimeReadiness verifyIfDue(AiProviderName provider) {
+        AiProviderRuntimeReadiness current = readiness(provider);
+        return current.state() == AiProviderReadinessState.MODEL_NOT_VERIFIED
+                ? reverify(provider) : current;
     }
 
     private AiProviderRuntimeReadiness prerequisite(AiProviderName provider,

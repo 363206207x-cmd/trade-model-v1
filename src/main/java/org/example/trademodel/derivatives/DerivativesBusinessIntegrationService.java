@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -63,7 +64,8 @@ public class DerivativesBusinessIntegrationService {
 
         Set<String> reasons = new LinkedHashSet<>(snapshot.reasonCodes());
         List<DerivativesEvidenceItem> evidence = new ArrayList<>();
-        boolean stale = isStale(snapshot, config.maxDataAgeSeconds);
+        Instant evaluatedAt = Instant.now();
+        boolean stale = isStale(snapshot, config.maxDataAgeSeconds, evaluatedAt);
         boolean partial = !"COMPLETE".equalsIgnoreCase(snapshot.evidenceAvailability())
                 || snapshot.availableDatasets().size() < config.minimumDatasetCount
                 || !snapshot.missingDatasets().isEmpty()
@@ -77,11 +79,14 @@ public class DerivativesBusinessIntegrationService {
         if (stale) {
             reasons.add("DERIVATIVES_STALE");
             evidence.add(item(input, snapshot, DerivativesEvidenceType.DERIVATIVES_DATA_STALE,
-                    "NEUTRAL", null, null, "GLOBAL", "metadata.freshnessStatus", "DERIVATIVES_STALE", 100, 100));
+                    "NEUTRAL", dataAgeSeconds(snapshot.providerDataTime(), evaluatedAt),
+                    BigDecimal.valueOf(config.maxDataAgeSeconds), "GLOBAL", "metadata.providerDataAgeSeconds",
+                    "DERIVATIVES_STALE", 100, 100));
         } else if (partial) {
             reasons.add("DERIVATIVES_PARTIAL");
             evidence.add(item(input, snapshot, DerivativesEvidenceType.DERIVATIVES_DATA_PARTIAL,
-                    "NEUTRAL", null, null, "GLOBAL", "availableDatasets/missingDatasets",
+                    "NEUTRAL", BigDecimal.valueOf(snapshot.availableDatasets().size()),
+                    BigDecimal.valueOf(config.minimumDatasetCount), "GLOBAL", "availableDatasets/minimumDatasetCount",
                     "DERIVATIVES_PARTIAL", 70, 70));
         }
 
@@ -306,7 +311,7 @@ public class DerivativesBusinessIntegrationService {
                     : item.currentValue().subtract(item.comparisonValue()).toPlainString());
             vo.setObservedAt(item.providerDataTime() == null ? null
                     : LocalDateTime.ofInstant(item.providerDataTime(), ZoneOffset.UTC));
-            vo.setFreshness(item.freshnessStatus() == null ? null : item.freshnessStatus().name());
+            vo.setFreshness(evidenceFreshness(item));
             result.add(vo);
         }
         return result;
@@ -532,11 +537,36 @@ public class DerivativesBusinessIntegrationService {
         }
     }
 
-    private static boolean isStale(DerivativesRiskSnapshot snapshot, int maxAgeSeconds) {
+    private static boolean isStale(DerivativesRiskSnapshot snapshot, int maxAgeSeconds, Instant evaluatedAt) {
         if (snapshot.sourceStatus() == UnifiedSourceStatus.STALE
                 || snapshot.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) return true;
         Instant dataTime = snapshot.providerDataTime();
-        return dataTime != null && dataTime.plusSeconds(maxAgeSeconds).isBefore(Instant.now());
+        return dataTime != null && dataTime.plusSeconds(maxAgeSeconds).isBefore(evaluatedAt);
+    }
+
+    private static BigDecimal dataAgeSeconds(Instant providerDataTime, Instant evaluatedAt) {
+        if (providerDataTime == null || evaluatedAt == null) return null;
+        return BigDecimal.valueOf(Math.max(0L, Duration.between(providerDataTime, evaluatedAt).getSeconds()));
+    }
+
+    private static String evidenceFreshness(DerivativesEvidenceItem item) {
+        if (item == null || item.freshnessStatus() == null) return null;
+        if (item.sourceStatus() == UnifiedSourceStatus.ERROR) return "INVALID";
+        if (item.sourceStatus() == UnifiedSourceStatus.NOT_CONFIGURED
+                || item.sourceStatus() == UnifiedSourceStatus.DISABLED
+                || item.sourceStatus() == UnifiedSourceStatus.WAITING_SYNC
+                || item.freshnessStatus() == SnapshotFreshnessStatus.UNAVAILABLE
+                || item.providerDataTime() == null) {
+            return "UNAVAILABLE";
+        }
+        if (item.sourceStatus() == UnifiedSourceStatus.STALE
+                || item.freshnessStatus() == SnapshotFreshnessStatus.STALE_READABLE) {
+            return "STALE";
+        }
+        if (item.freshnessStatus() == SnapshotFreshnessStatus.REFRESHING) {
+            return "PENDING_VERIFICATION";
+        }
+        return "FRESH";
     }
 
     private static boolean liquidationImbalance(BigDecimal longValue, BigDecimal shortValue, BigDecimal threshold) {
