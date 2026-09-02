@@ -460,6 +460,8 @@ final_runtime_home_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TA
 final_runtime_home_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_final_runtime_home_access_idempotency_closure_implementation_status)"
 real_provider_three_ai_runtime_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_provider_three_ai_runtime_closure_authorization_status)"
 real_provider_three_ai_runtime_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_provider_three_ai_runtime_closure_implementation_status)"
+gpt_background_three_ai_timeout_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_gpt_background_three_ai_timeout_closure_authorization_status)"
+gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
 local_real_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_implementation_status)"
 frontend_interaction_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml frontend_interaction_authorization_status)"
@@ -546,8 +548,10 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$analysis_run_idempotency_tx_fix_implementation_status" == "COMPLETE" ]] || fail "analysis-run idempotency fix must remain complete"
 [[ "$final_runtime_home_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "final runtime Home closure authorization must remain effective on merged main"
 [[ "$final_runtime_home_closure_implementation_status" == "COMPLETE" ]] || fail "final runtime Home closure implementation must remain complete"
-[[ "$real_provider_three_ai_runtime_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "real Provider/Three-AI runtime closure authorization must remain pending merged-main effectivity"
-[[ "$real_provider_three_ai_runtime_closure_implementation_status" == "NOT_STARTED" ]] || fail "real Provider/Three-AI runtime closure must remain not started in the gate package"
+[[ "$real_provider_three_ai_runtime_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "real Provider/Three-AI runtime closure authorization must remain effective on merged main"
+[[ "$real_provider_three_ai_runtime_closure_implementation_status" == "COMPLETE" ]] || fail "real Provider/Three-AI runtime closure must remain complete"
+[[ "$gpt_background_three_ai_timeout_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "GPT background/Three-AI timeout closure authorization must remain pending merged-main effectivity"
+[[ "$gpt_background_three_ai_timeout_closure_implementation_status" == "NOT_STARTED" ]] || fail "GPT background/Three-AI timeout closure must remain not started in the gate package"
 [[ "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "local-real authorization must remain effective on merged main"
 [[ "$local_real_implementation_status" == "COMPLETE" ]] || fail "local-real implementation must remain complete"
 [[ "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "frontend interaction authorization must be effective on merged main"
@@ -555,28 +559,28 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "real Provider/Three-AI runtime closure authorization declaration mismatch"
-[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "real Provider/Three-AI runtime closure authorization mode mismatch"
-[[ "$current_package_branch" == "codex/v4-1-real-provider-three-ai-runtime-closure-authorization" ]] || fail "real Provider/Three-AI runtime closure authorization branch mismatch"
-[[ "$current_package_starting_full_sha" == "52201ba2d3d39d03aee8a005064e1ccf628f2491" ]] || fail "real Provider/Three-AI runtime closure authorization starting SHA mismatch"
-[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "real Provider/Three-AI runtime closure authorization SHA must be full length"
-[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "real Provider/Three-AI runtime closure authorization permissions mismatch"
+[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "GPT background/Three-AI timeout closure authorization declaration mismatch"
+[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "GPT background/Three-AI timeout closure authorization mode mismatch"
+[[ "$current_package_branch" == "codex/v4-1-gpt-background-three-ai-timeout-closure-authorization" ]] || fail "GPT background/Three-AI timeout closure authorization branch mismatch"
+[[ "$current_package_starting_full_sha" == "1c13286eb64bb5b074e960352f8e290a317eb704" ]] || fail "GPT background/Three-AI timeout closure authorization starting SHA mismatch"
+[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "GPT background/Three-AI timeout closure authorization SHA must be full length"
+[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "GPT background/Three-AI timeout closure authorization permissions mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]] || fail "authorized next package phase mismatch"
-[[ "$authorized_next_package_branch" == "codex/v4-1-real-provider-three-ai-runtime-closure" ]] || fail "authorized next package branch mismatch"
-[[ "$authorized_next_package_starting_full_sha" == "52201ba2d3d39d03aee8a005064e1ccf628f2491" ]] || fail "authorized next package starting SHA mismatch"
+[[ "$authorized_next_package_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_branch" == "codex/v4-1-gpt-background-three-ai-timeout-closure" ]] || fail "authorized next package branch mismatch"
+[[ "$authorized_next_package_starting_full_sha" == "1c13286eb64bb5b074e960352f8e290a317eb704" ]] || fail "authorized next package starting SHA mismatch"
 [[ "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized next package SHA must be full length"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
-[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized real Provider/Three-AI runtime closure PR creation must be true for the one-pass task"
-[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" ]] || fail "authorized real Provider/Three-AI runtime closure push/merge/production-deployment permissions mismatch"
+[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized GPT background/Three-AI timeout closure PR creation must be true for the one-pass task"
+[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" ]] || fail "authorized GPT background/Three-AI timeout closure push/merge/production-deployment permissions mismatch"
 [[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "frontend interaction Canonical Figma Desktop permission must remain false"
 [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
 [[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_ONLY" ]] || fail "scope must remain V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_ONLY"
+[[ "$p1b_scope" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_ONLY" ]] || fail "scope must remain V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package authorization scope must be explicit"
 expected_owner_paths="$(printf '%s\n' \
   docs/CODEX_NEXT_TASK.yml \
@@ -588,27 +592,51 @@ expected_owner_paths="$(printf '%s\n' \
   scripts/codex-next-task.sh \
   scripts/check-workflow-contract.sh)"
 [[ "$(printf '%s\n' "$current_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_owner_paths" | sort)" ]] \
-  || fail "real Provider/Three-AI runtime closure authorization allowlist must contain exactly the eight gate-owner paths"
+  || fail "GPT background/Three-AI timeout closure authorization allowlist must contain exactly the eight gate-owner paths"
 if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "real Provider/Three-AI runtime closure authorization allowlist must not contain wildcards or directory-level grants"
+  fail "GPT background/Three-AI timeout closure authorization allowlist must not contain wildcards or directory-level grants"
 fi
 expected_implementation_paths="$(printf '%s\n' \
-  src/main/java/org/example/trademodel/ai/AiProviderReadinessService.java \
-  src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java \
-  src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java \
-  src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java \
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java \
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java \
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java \
+  src/main/java/org/example/trademodel/analysisrun/AnalysisRunResult.java \
+  src/main/java/org/example/trademodel/ai/AiBackgroundTaskState.java \
+  src/main/java/org/example/trademodel/ai/AiDecisionChainPromptBuilder.java \
+  src/main/java/org/example/trademodel/ai/AiDecisionChainResult.java \
+  src/main/java/org/example/trademodel/ai/AiHttpTransport.java \
+  src/main/java/org/example/trademodel/ai/AiOrchestratorProperties.java \
+  src/main/java/org/example/trademodel/ai/AiProviderClient.java \
+  src/main/java/org/example/trademodel/ai/JdkAiHttpTransport.java \
+  src/main/java/org/example/trademodel/ai/OpenAiProviderClient.java \
+  src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java \
+  src/main/java/org/example/trademodel/controller/AnalysisRunController.java \
+  src/main/java/org/example/trademodel/entity/AiCallLogDO.java \
+  src/main/java/org/example/trademodel/mapper/AiCallLogMapper.java \
+  src/main/java/org/example/trademodel/mapper/AnalysisRunMapper.java \
+  src/main/java/org/example/trademodel/service/AiCallLogService.java \
+  src/main/java/org/example/trademodel/service/impl/AiCallLogServiceImpl.java \
   src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java \
-  src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java \
-  src/test/java/org/example/trademodel/ai/AiProviderReadinessServiceTest.java \
-  src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java \
-  src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java \
-  src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java \
-  src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java \
-  src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java)"
+  src/main/java/org/example/trademodel/service/impl/DecisionChainServiceImpl.java \
+  src/main/resources/application-prod.yml \
+  src/main/resources/application.yml \
+  src/main/resources/db/migration/V17__ai_background_execution_runtime.sql \
+  src/main/resources/schema.sql \
+  src/test/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorkerTest.java \
+  src/test/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImplTest.java \
+  src/test/java/org/example/trademodel/ai/AiDecisionChainContractTest.java \
+  src/test/java/org/example/trademodel/ai/AiProviderClientAdaptersTest.java \
+  src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java \
+  src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java \
+  src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
+  src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java \
+  src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java \
+  src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
+  src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "real Provider/Three-AI implementation allowlist must contain exactly the twelve authorized paths"
+  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the thirty-six authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "real Provider/Three-AI implementation allowlist must not contain wildcards or directory-level grants"
+  fail "GPT background/Three-AI timeout implementation allowlist must not contain wildcards or directory-level grants"
 fi
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
@@ -618,7 +646,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_THIRTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
@@ -668,8 +696,8 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_REVIEW" \
-  || fail "real Provider/Three-AI runtime closure authorization review stage mismatch"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_REVIEW" \
+  || fail "GPT background/Three-AI timeout closure authorization review stage mismatch"
 for machine_identity_field in \
   "MACHINE_AUTHORIZED_PACKAGE: $authorized_next_package_phase" \
   "MACHINE_AUTHORIZED_BRANCH: $authorized_next_package_branch" \
@@ -684,11 +712,11 @@ printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "ready real Provider/Three-AI runtime closure authorization did not resolve final merge path"
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
+  || fail "ready GPT background/Three-AI timeout closure authorization did not resolve final merge path"
 
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN
-assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
@@ -716,7 +744,9 @@ for v4_1_expected in \
   "V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
   "V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
-  "V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
+  "V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "LOCAL_REAL_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "LOCAL_REAL_IMPLEMENTATION_STATUS: COMPLETE" \
   "FRONTEND_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -735,10 +765,10 @@ for v4_1_expected in \
     || fail "v4.1 handoff omitted: $v4_1_expected"
 done
 
-assert_handoff_blocked v4_1_unauthorized BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked v4_1_permission_missing BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked v4_1_unauthorized BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_SCOPE_NOT_AUTHORIZED
+assert_handoff_blocked v4_1_permission_missing BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_PERMISSIONS_INCOMPLETE
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
-  --request-package V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSUR
+  --request-package V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSUR
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package FUNDAMENTAL_AI_V4_1_AUTO_TRADING
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -826,8 +856,8 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "real Provider/Three-AI runtime closure authorization final gate stage mismatch"
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
+  || fail "GPT background/Three-AI timeout closure authorization final gate stage mismatch"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
   AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION_WITH_PR GH_QUERY --request-package "$authorized_next_package_phase"
 assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
@@ -843,11 +873,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -885,11 +915,11 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \

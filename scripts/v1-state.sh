@@ -210,6 +210,8 @@ emit_resolved_task_state() {
   printf 'V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${final_runtime_home_closure_implementation_status:-UNDECLARED}"
   printf 'V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${real_provider_three_ai_runtime_closure_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${real_provider_three_ai_runtime_closure_implementation_status:-UNDECLARED}"
+  printf 'V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${gpt_background_three_ai_timeout_closure_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${gpt_background_three_ai_timeout_closure_implementation_status:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -297,7 +299,7 @@ resolve_task_handoff() {
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
     elif { [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
-      || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]] \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]] \
       && [[ "${machine_identity_allowed:-NO}" != "YES" ]]; }; then
       current_package_block_reason="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
     elif [[ "${current_package_pr_count:-UNKNOWN}" != "0" \
@@ -310,7 +312,7 @@ resolve_task_handoff() {
 
     if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
-      || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
       if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
         next_package_block_reason="${next_task_authorization_status:-BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN}"
       elif [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
@@ -387,8 +389,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" ]]; then
       resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_REVIEW"
-    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
-      resolved_handoff_stage="V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
       resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -420,8 +422,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" ]]; then
         resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_FINAL_MERGE_PATH"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
-        resolved_handoff_stage="V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
         resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -491,6 +493,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX"
   elif [[ "$authorized_next_package_phase" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]]; then
     resolved_handoff_stage="V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
+  elif [[ "$authorized_next_package_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]]; then
+    resolved_handoff_stage="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
     resolved_handoff_stage="LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
   elif [[ "$authorized_next_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
@@ -1391,7 +1395,7 @@ evaluate_baseline_reconciliation_transition() {
   real_data_home_blocker_closure_authorization_runtime_status="AUTHORIZED"
 }
 
-evaluate_real_provider_three_ai_runtime_closure_transition() {
+evaluate_gpt_background_three_ai_timeout_closure_transition() {
   effective_task_mode="$current_package_mode"
   p1a_transition_allowed="YES"
   p1a_completion_status="PASS"
@@ -1407,29 +1411,30 @@ evaluate_real_provider_three_ai_runtime_closure_transition() {
   real_data_home_blocker_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   analysis_run_idempotency_tx_fix_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   final_runtime_home_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
-  real_provider_three_ai_runtime_closure_authorization_runtime_status="BLOCKED"
+  real_provider_three_ai_runtime_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  gpt_background_three_ai_timeout_closure_authorization_runtime_status="BLOCKED"
   local_real_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   frontend_interaction_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   multi_user_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 
-  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]] || return 0
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]] || return 0
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || return 0
-  [[ "$authorized_next_package_phase" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]] || return 0
+  [[ "$authorized_next_package_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]] || return 0
   [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || return 0
 
   if [[ "$current_package_status" != "COMPLETED" ]]; then
-    next_task_authorization_status="BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_INCOMPLETE"
+    next_task_authorization_status="BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_INCOMPLETE"
     return 0
   fi
-  if [[ "$real_provider_three_ai_runtime_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
-    next_task_authorization_status="BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_SCOPE_NOT_AUTHORIZED"
+  if [[ "$gpt_background_three_ai_timeout_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_SCOPE_NOT_AUTHORIZED"
     return 0
   fi
   if ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$current_package_starting_full_sha" != "52201ba2d3d39d03aee8a005064e1ccf628f2491" ]] \
+    || [[ "$current_package_starting_full_sha" != "1c13286eb64bb5b074e960352f8e290a317eb704" ]] \
     || [[ "$authorized_next_package_starting_full_sha" != "$current_package_starting_full_sha" ]] \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "12" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "36" ]]; then
     next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
     return 0
   fi
@@ -1439,7 +1444,7 @@ evaluate_real_provider_three_ai_runtime_closure_transition() {
     || ! is_true_flag "$current_package_push_allowed" \
     || ! is_true_flag "$current_package_merge_allowed" \
     || ! is_false_flag "$current_package_deployment_allowed"; then
-    next_task_authorization_status="BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_GATE_PERMISSIONS_INVALID"
+    next_task_authorization_status="BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_GATE_PERMISSIONS_INVALID"
     return 0
   fi
   if ! is_true_flag "$authorized_next_repository_edits_allowed" \
@@ -1451,12 +1456,12 @@ evaluate_real_provider_three_ai_runtime_closure_transition() {
     || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
     || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
-    next_task_authorization_status="BLOCKED_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_PERMISSIONS_INCOMPLETE"
+    next_task_authorization_status="BLOCKED_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_PERMISSIONS_INCOMPLETE"
     return 0
   fi
   if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
-    next_task_authorization_status="BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN"
-    real_provider_three_ai_runtime_closure_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+    gpt_background_three_ai_timeout_closure_authorization_runtime_status="PENDING_MERGED_MAIN"
     return 0
   fi
   if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
@@ -1472,13 +1477,13 @@ evaluate_real_provider_three_ai_runtime_closure_transition() {
   next_transition_allowed="YES"
   authorization_status="AUTHORIZED"
   next_task_authorization_status="ALLOWED"
-  real_provider_three_ai_runtime_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  gpt_background_three_ai_timeout_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
 evaluate_runtime_transition() {
-  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" \
-    && "$authorized_next_package_phase" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]]; then
-    evaluate_real_provider_three_ai_runtime_closure_transition
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]]; then
+    evaluate_gpt_background_three_ai_timeout_closure_transition
     return 0
   fi
 
@@ -1892,7 +1897,8 @@ machine_gate_policy_check() {
   is_true_flag "$push_allowed" || return 1
   is_true_flag "$merge_allowed" || return 1
   if [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
-    || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]]; then
+    || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
+    || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]]; then
     [[ -n "$allowed_paths" ]] || return 1
     if printf '%s\n' "$allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
       return 1
@@ -1956,7 +1962,7 @@ evaluate_machine_runtime_identity() {
   fi
 
   if [[ "$expected_package" == "$current_package_phase" ]]; then
-    if [[ "$expected_package" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]] \
+    if [[ "$expected_package" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]] \
       && is_full_git_sha "$current_package_starting_full_sha" \
       && git merge-base --is-ancestor "$current_package_starting_full_sha" origin/main >/dev/null 2>&1 \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
@@ -1989,7 +1995,8 @@ evaluate_machine_runtime_identity() {
         "$authorized_next_normalization_extra_file_count"; then
       normalized_base_valid="YES"
     elif [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
-      || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" ]] \
+      || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
+      || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]] \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
       changed_files="$(changed_paths_from_origin_main)"
       policy_allowed_paths="$authorized_next_package_allowed_paths"
@@ -2011,27 +2018,51 @@ evaluate_machine_runtime_identity() {
 
 run_exact_machine_gate_self_test() {
   local failed=0
-  local owner_package="TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION"
-  local owner_branch="codex/v4-1-real-provider-three-ai-runtime-closure-authorization"
-  local owner_sha="52201ba2d3d39d03aee8a005064e1ccf628f2491"
-  local target_package="V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
-  local target_branch="codex/v4-1-real-provider-three-ai-runtime-closure"
-  local target_sha="52201ba2d3d39d03aee8a005064e1ccf628f2491"
+  local owner_package="TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION"
+  local owner_branch="codex/v4-1-gpt-background-three-ai-timeout-closure-authorization"
+  local owner_sha="1c13286eb64bb5b074e960352f8e290a317eb704"
+  local target_package="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
+  local target_branch="codex/v4-1-gpt-background-three-ai-timeout-closure"
+  local target_sha="1c13286eb64bb5b074e960352f8e290a317eb704"
   local owner_paths target_paths
   owner_paths="$(gate_owner_paths)"
   target_paths="$(printf '%s\n' \
-    src/main/java/org/example/trademodel/ai/AiProviderReadinessService.java \
-    src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java \
-    src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java \
-    src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java \
+    src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java \
+    src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java \
+    src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java \
+    src/main/java/org/example/trademodel/analysisrun/AnalysisRunResult.java \
+    src/main/java/org/example/trademodel/ai/AiBackgroundTaskState.java \
+    src/main/java/org/example/trademodel/ai/AiDecisionChainPromptBuilder.java \
+    src/main/java/org/example/trademodel/ai/AiDecisionChainResult.java \
+    src/main/java/org/example/trademodel/ai/AiHttpTransport.java \
+    src/main/java/org/example/trademodel/ai/AiOrchestratorProperties.java \
+    src/main/java/org/example/trademodel/ai/AiProviderClient.java \
+    src/main/java/org/example/trademodel/ai/JdkAiHttpTransport.java \
+    src/main/java/org/example/trademodel/ai/OpenAiProviderClient.java \
+    src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java \
+    src/main/java/org/example/trademodel/controller/AnalysisRunController.java \
+    src/main/java/org/example/trademodel/entity/AiCallLogDO.java \
+    src/main/java/org/example/trademodel/mapper/AiCallLogMapper.java \
+    src/main/java/org/example/trademodel/mapper/AnalysisRunMapper.java \
+    src/main/java/org/example/trademodel/service/AiCallLogService.java \
+    src/main/java/org/example/trademodel/service/impl/AiCallLogServiceImpl.java \
     src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java \
-    src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java \
-    src/test/java/org/example/trademodel/ai/AiProviderReadinessServiceTest.java \
-    src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java \
-    src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java \
-    src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java \
-    src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java \
-    src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java)"
+    src/main/java/org/example/trademodel/service/impl/DecisionChainServiceImpl.java \
+    src/main/resources/application-prod.yml \
+    src/main/resources/application.yml \
+    src/main/resources/db/migration/V17__ai_background_execution_runtime.sql \
+    src/main/resources/schema.sql \
+    src/test/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorkerTest.java \
+    src/test/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImplTest.java \
+    src/test/java/org/example/trademodel/ai/AiDecisionChainContractTest.java \
+    src/test/java/org/example/trademodel/ai/AiProviderClientAdaptersTest.java \
+    src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java \
+    src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java \
+    src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
+    src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java \
+    src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java \
+    src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
+    src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java)"
 
   assert_machine_pass() {
     local name="$1"
@@ -2057,7 +2088,7 @@ run_exact_machine_gate_self_test() {
 
   assert_machine_pass EXACT_GATE_01_CORRECT_TRIPLE \
     "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "$target_sha" \
-    IMPLEMENTATION NO YES true true true true true false src/main/java/org/example/trademodel/ai/AiProviderReadinessService.java "$target_paths" YES YES
+    IMPLEMENTATION NO YES true true true true true false src/main/java/org/example/trademodel/ai/OpenAiProviderClient.java "$target_paths" YES YES
   assert_machine_blocked EXACT_GATE_02_WRONG_SHA \
     "$target_package" "$target_package" "$target_branch" "$target_branch" "$target_sha" "b60eff8d83c0e1d04371bd425267f1e8d0e4f95c" \
     IMPLEMENTATION NO YES true true true true true false "" "$target_paths" YES YES
@@ -2257,6 +2288,8 @@ load_task_package_contract() {
   final_runtime_home_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_runtime_home_access_idempotency_closure_implementation_status)"
   real_provider_three_ai_runtime_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_real_provider_three_ai_runtime_closure_authorization_status)"
   real_provider_three_ai_runtime_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_provider_three_ai_runtime_closure_implementation_status)"
+  gpt_background_three_ai_timeout_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_authorization_status)"
+  gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2316,9 +2349,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
-        real_provider_three_ai_runtime_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
-        blockers_text="REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
+        gpt_background_three_ai_timeout_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
         v4_1_implementation_status="IN_PROGRESS"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION" ]]; then
@@ -2423,9 +2456,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
-        real_provider_three_ai_runtime_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
-        blockers_text="REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
+        gpt_background_three_ai_timeout_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION" ]]; then
         v4_1_core_production_loop_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="V4_1_CORE_PRODUCTION_LOOP_NOT_AUTHORIZED"
@@ -2731,6 +2764,8 @@ final_runtime_home_closure_authorization_declared_status="$(yaml_value "$TASK_FI
 final_runtime_home_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_runtime_home_access_idempotency_closure_implementation_status)"
 real_provider_three_ai_runtime_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_real_provider_three_ai_runtime_closure_authorization_status)"
 real_provider_three_ai_runtime_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_provider_three_ai_runtime_closure_implementation_status)"
+gpt_background_three_ai_timeout_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_authorization_status)"
+gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
 local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2974,24 +3009,26 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
   if [[ "$current_package_status" != "COMPLETED" \
     || "$current_package_mode" != "DOCS_GATE_BASELINE_RECONCILIATION" \
-    || "$current_package_branch" != "codex/v4-1-real-provider-three-ai-runtime-closure-authorization" \
-    || "$current_package_starting_full_sha" != "52201ba2d3d39d03aee8a005064e1ccf628f2491" \
-    || "$authorized_next_package_phase" != "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
+    || "$current_package_branch" != "codex/v4-1-gpt-background-three-ai-timeout-closure-authorization" \
+    || "$current_package_starting_full_sha" != "1c13286eb64bb5b074e960352f8e290a317eb704" \
+    || "$authorized_next_package_phase" != "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
     || "$authorized_next_package_mode" != "IMPLEMENTATION" \
-    || "$authorized_next_package_branch" != "codex/v4-1-real-provider-three-ai-runtime-closure" \
-    || "$authorized_next_package_starting_full_sha" != "52201ba2d3d39d03aee8a005064e1ccf628f2491" \
+    || "$authorized_next_package_branch" != "codex/v4-1-gpt-background-three-ai-timeout-closure" \
+    || "$authorized_next_package_starting_full_sha" != "1c13286eb64bb5b074e960352f8e290a317eb704" \
     || "$analysis_run_idempotency_tx_fix_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$analysis_run_idempotency_tx_fix_implementation_status" != "COMPLETE" \
     || "$final_runtime_home_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$final_runtime_home_closure_implementation_status" != "COMPLETE" \
-    || "$real_provider_three_ai_runtime_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
-    || "$real_provider_three_ai_runtime_closure_implementation_status" != "NOT_STARTED" \
+    || "$real_provider_three_ai_runtime_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
+    || "$real_provider_three_ai_runtime_closure_implementation_status" != "COMPLETE" \
+    || "$gpt_background_three_ai_timeout_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$gpt_background_three_ai_timeout_closure_implementation_status" != "NOT_STARTED" \
     || "$real_data_home_blocker_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$real_data_home_blocker_closure_implementation_status" != "COMPLETE" \
-    || "$p1b_scope" != "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_ONLY" ]]; then
+    || "$p1b_scope" != "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$current_package_repository_edits_allowed" \
     || ! is_false_flag "$current_package_implementation_allowed" \
@@ -3010,7 +3047,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_R
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
     || ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "12" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "36" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi

@@ -1,24 +1,24 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "TRINE LOGIC v4.1 real Provider, CoinGlass and Three-AI runtime closure authorization"
+active_block: "TRINE LOGIC v4.1 GPT background execution and Three-AI timeout closure authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization"
-branch: "codex/v4-1-real-provider-three-ai-runtime-closure-authorization"
+module: "TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization"
+branch: "codex/v4-1-gpt-background-three-ai-timeout-closure-authorization"
 task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
+authorized_next_product_phase: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
 
-current_package_phase: "TRINE_LOGIC_V4_1_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION"
-current_package_name: "TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization"
-current_package_active_block: "Owner-authorized exact gate registration for Binance, CoinGlass, AI readiness and private-Staging runtime closure"
+current_package_phase: "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION"
+current_package_name: "TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization"
+current_package_active_block: "Owner-authorized exact gate registration for durable GPT background execution and bounded Three-AI completion"
 current_package_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-real-provider-three-ai-runtime-closure-authorization"
-current_package_starting_full_sha: "52201ba2d3d39d03aee8a005064e1ccf628f2491"
+current_package_branch: "codex/v4-1-gpt-background-three-ai-timeout-closure-authorization"
+current_package_starting_full_sha: "1c13286eb64bb5b074e960352f8e290a317eb704"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
@@ -27,13 +27,12 @@ current_package_push_allowed: true
 current_package_merge_allowed: true
 current_package_deployment_allowed: false
 current_package_requires_clean_origin_main: true
-current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact real Provider and Three-AI runtime closure"
+current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact GPT background and Three-AI timeout closure"
 current_package_allowed_scope:
-  - "Register the exact real Binance, CoinGlass evidence and Three-AI runtime closure package"
+  - "Register the exact GPT background execution and Three-AI timeout closure package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the twelve exact existing backend-owner and focused-test paths declared below"
-  - "Permit the exact starting SHA to remain an ancestor when this gate branch starts directly from newer clean merged main"
-  - "Preserve fail-closed evidence, AI role, secret, deployment, frozen-visual and no-trade rules"
+  - "Allow only the thirty-six exact backend-owner, migration, configuration and focused-test paths declared below"
+  - "Preserve providerResponseId recovery, role separation, fail-closed output, secret, frozen-visual and no-trade rules"
 current_package_allowed_paths:
   - "docs/CODEX_NEXT_TASK.yml"
   - "docs/PRODUCT_SOURCE_OF_TRUTH.md"
@@ -48,13 +47,13 @@ current_package_blocked_scope:
   - "Any wildcard, directory grant, global-policy weakening or unrelated successor permission"
   - "Provider calls, AI calls, Staging/Production deployment, Telegram send or trading before the implementation successor"
 
-authorized_next_package_phase: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
-authorized_next_package_name: "TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure"
-authorized_next_package_active_block: "Real Binance and CoinGlass evidence, durable Provider readiness, Three-AI chain and truthful existing Home projection"
+authorized_next_package_phase: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
+authorized_next_package_name: "TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure"
+authorized_next_package_active_block: "Durable OpenAI background execution, bounded Three-AI chain and restart-safe AITrace recovery"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-real-provider-three-ai-runtime-closure"
-authorized_next_package_starting_full_sha: "52201ba2d3d39d03aee8a005064e1ccf628f2491"
-authorized_next_package_risk: "B_EXACT_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE"
+authorized_next_package_branch: "codex/v4-1-gpt-background-three-ai-timeout-closure"
+authorized_next_package_starting_full_sha: "1c13286eb64bb5b074e960352f8e290a317eb704"
+authorized_next_package_risk: "B_EXACT_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
@@ -67,30 +66,54 @@ authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
 authorized_next_package_allowed_paths:
-  - "src/main/java/org/example/trademodel/ai/AiProviderReadinessService.java"
-  - "src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java"
-  - "src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java"
-  - "src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java"
+  - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java"
+  - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java"
+  - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java"
+  - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunResult.java"
+  - "src/main/java/org/example/trademodel/ai/AiBackgroundTaskState.java"
+  - "src/main/java/org/example/trademodel/ai/AiDecisionChainPromptBuilder.java"
+  - "src/main/java/org/example/trademodel/ai/AiDecisionChainResult.java"
+  - "src/main/java/org/example/trademodel/ai/AiHttpTransport.java"
+  - "src/main/java/org/example/trademodel/ai/AiOrchestratorProperties.java"
+  - "src/main/java/org/example/trademodel/ai/AiProviderClient.java"
+  - "src/main/java/org/example/trademodel/ai/JdkAiHttpTransport.java"
+  - "src/main/java/org/example/trademodel/ai/OpenAiProviderClient.java"
+  - "src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java"
+  - "src/main/java/org/example/trademodel/controller/AnalysisRunController.java"
+  - "src/main/java/org/example/trademodel/entity/AiCallLogDO.java"
+  - "src/main/java/org/example/trademodel/mapper/AiCallLogMapper.java"
+  - "src/main/java/org/example/trademodel/mapper/AnalysisRunMapper.java"
+  - "src/main/java/org/example/trademodel/service/AiCallLogService.java"
+  - "src/main/java/org/example/trademodel/service/impl/AiCallLogServiceImpl.java"
   - "src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java"
-  - "src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java"
-  - "src/test/java/org/example/trademodel/ai/AiProviderReadinessServiceTest.java"
-  - "src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java"
-  - "src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java"
-  - "src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java"
-  - "src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java"
+  - "src/main/java/org/example/trademodel/service/impl/DecisionChainServiceImpl.java"
+  - "src/main/resources/application-prod.yml"
+  - "src/main/resources/application.yml"
+  - "src/main/resources/db/migration/V17__ai_background_execution_runtime.sql"
+  - "src/main/resources/schema.sql"
+  - "src/test/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorkerTest.java"
+  - "src/test/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImplTest.java"
+  - "src/test/java/org/example/trademodel/ai/AiDecisionChainContractTest.java"
+  - "src/test/java/org/example/trademodel/ai/AiProviderClientAdaptersTest.java"
+  - "src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java"
+  - "src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java"
+  - "src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java"
   - "src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java"
-authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact real Provider and Three-AI runtime closure"
+  - "src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java"
+authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact GPT background and Three-AI timeout closure"
 
 blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_NOTIFICATION_DEPLOYMENT_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+blocked_package_status: "BLOCKED_OUTSIDE_V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "OWNER_EXPLICIT_ONE_SHOT_END_TO_END_AUTHORIZATION"
   - "AUTHORIZATION_STARTED_FROM_CLEAN_CURRENT_ORIGIN_MAIN_WITH_EXACT_STARTING_SHA_ANCESTOR"
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_THIRTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -136,41 +159,43 @@ analysis_run_idempotency_tx_fix_authorization_status: "EFFECTIVE_MERGED_MAIN"
 analysis_run_idempotency_tx_fix_implementation_status: "COMPLETE"
 v4_1_final_runtime_home_access_idempotency_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_runtime_home_access_idempotency_closure_implementation_status: "COMPLETE"
-v4_1_real_provider_three_ai_runtime_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_real_provider_three_ai_runtime_closure_implementation_status: "NOT_STARTED"
+v4_1_real_provider_three_ai_runtime_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_real_provider_three_ai_runtime_closure_implementation_status: "COMPLETE"
+v4_1_gpt_background_three_ai_timeout_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_gpt_background_three_ai_timeout_closure_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 frontend_interaction_implementation_status: "COMPLETE"
 multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"
 multi_user_implementation_status: "NOT_STARTED"
-authorized_next_package: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
-scope: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_ONLY"
+authorized_next_package: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
+scope: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk real Provider/Three-AI runtime closure with exact-head CI, merged-main and private-Staging acceptance"
+risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk GPT background/Three-AI timeout closure with exact-head CI, merged-main and private-Staging acceptance"
 
-current_pr: "NONE; create one docs/gate-only real Provider/Three-AI runtime closure authorization PR after local validation"
+current_pr: "NONE; create one docs/gate-only GPT background/Three-AI timeout closure authorization PR after local validation"
 current_package_pr: "NONE; Owner one-pass authorization permits this exact docs/gate PR and merge after exact-head checks"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED_PAUSED_TECHNICAL_DEBT; #1201 CLOSED_UNMERGED_PRESERVED_AUDIT_EVIDENCE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "disabled globally; this exact Owner-authorized reconciliation may merge only after exact-head required checks"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
+next_business_phase: "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the real Provider and Three-AI runtime closure without widening scope"
+next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the GPT background and Three-AI timeout closure without widening scope"
 
-product_phase: "TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization"
+product_phase: "TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Existing Binance/CoinGlass provider ownership, Evidence normalization, AI readiness/orchestration and truthful Home service projection"
+product_module: "Existing AnalysisRun, AITrace, OpenAI Responses adapter, Three-AI orchestrator, Resolver and Rule Validation ownership"
 
 audit_scope_modules:
-  - "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION"
+  - "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION"
   - "EXACT_PACKAGE_BRANCH_STARTING_SHA"
-  - "EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_THIRTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST"
   - "FAIL_CLOSED_WORKFLOW"
 
 audit_scope_paths:
@@ -203,7 +228,7 @@ required_product_sources:
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  This package authorizes one bounded runtime closure over existing Binance, CoinGlass, Evidence, AI readiness and Three-AI owners. It may correct Provider-to-Evidence freshness semantics, make exact-model readiness recover through the existing scheduler, enforce time-bounded CoinGlass health and prove one real guarded Three-AI chain. It creates no second business object and does not change scoring, direction, Plan Mode, Final ownership or no-trade boundaries.
+  This package authorizes one bounded runtime closure over existing AnalysisRun, AITrace, OpenAI Responses, Three-AI, Resolver and Rule Validation owners. It may persist provider-native background response identity, recover polling without resubmission, compact the frozen input contract, execute Gemini and Grok in parallel after one valid GPT Candidate, and enforce 30/180/120/300-second deadlines. It creates no second business object and does not change scoring, direction, Plan Mode, Final ownership or no-trade boundaries.
 
 design_interaction_mapping: |
   No Figma, Desktop, Mobile, route, component, layout, content or interaction change is included or authorized.
@@ -212,26 +237,26 @@ data_source_mapping: |
   This docs/gate package reads or changes no provider, database, runtime or user data. The successor may use existing read-only Binance, CoinGlass and AI configuration only for private Staging regression; it may not send Telegram or execute trades.
 
 current_implementation_gap: |
-  Real Binance data and CoinGlass-derived evidence exist on private Staging, but CoinGlass STALE_READABLE is passed into the frozen Evidence contract without semantic translation, exact-model readiness is not naturally reverified after restart, and CoinGlass health has no current-time bound. These gaps keep valid real runs outside the AI input gate and prevent truthful 5/5 readiness.
+  Real Binance, CoinGlass and exact-model readiness are effective on merged main and private Staging. The remaining blocker is that gpt-5.6-sol is still invoked synchronously under a 30-second completion timeout, so a valid long-running response is terminated before Candidate creation and Gemini, Grok, Resolver and Rule Validation never run.
 
 allowed_scope:
   - "Exact docs/gate registration, state mirrors and existing machine-gate tests only"
 
 authorized_next_allowed_scope:
-  - "COINGLASS_PROVIDER_TO_EVIDENCE_FRESHNESS_TRANSLATION"
-  - "TIME_BOUNDED_COINGLASS_HEALTH"
-  - "EXISTING_SCHEDULER_EXACT_MODEL_READINESS_REVERIFICATION"
-  - "REAL_BINANCE_AND_COINGLASS_SIX_ASSET_VALIDATION"
-  - "ONE_GUARDED_REAL_THREE_AI_CHAIN_WITH_TRACE_PERSISTENCE"
-  - "IDEMPOTENCY_NO_DUPLICATE_AND_NO_TRADE_REGRESSION"
+  - "OPENAI_RESPONSES_PROVIDER_NATIVE_BACKGROUND_SUBMIT_POLL_CANCEL"
+  - "DURABLE_AI_TRACE_TASK_STATE_AND_PROVIDER_RESPONSE_RECOVERY"
+  - "COMPACT_VERSIONED_THREE_AI_INPUT_SNAPSHOT"
+  - "GPT_CANDIDATE_THEN_PARALLEL_GEMINI_GROK"
+  - "BOUNDED_30_180_120_300_SECOND_DEADLINES_AND_ONE_TRANSIENT_RETRY"
+  - "IDEMPOTENT_RESTART_NO_DUPLICATE_PROVIDER_CANDIDATE_FINAL_OR_MESSAGE"
   - "EXACT_HEAD_CI_MERGED_MAIN_PRIVATE_STAGING_ACCEPTANCE"
 
 authorized_next_blocked_scope:
-  - "SCHEMA_OR_DATABASE_MIGRATION_CHANGE"
+  - "V1_TO_V16_MIGRATION_CHANGE_OR_DUPLICATE_BUSINESS_OBJECT"
   - "ALGORITHM_SCORE_DIRECTION_PLAN_OR_AI_ROLE_CHANGE"
   - "HOME_LAYOUT_COPY_CSS_OR_STATIC_ASSET_CHANGE"
   - "PROVIDER_MATRIX_OR_QUALITY_THRESHOLD_WEAKENING"
-  - "UNBOUNDED_PROVIDER_OR_AI_CALLS"
+  - "UNBOUNDED_PROVIDER_OR_AI_CALLS_OR_MODEL_FALLBACK"
   - "TELEGRAM_REAL_SEND"
   - "AUTO_TRADE"
   - "PRODUCTION_DEPLOYMENT"
@@ -245,7 +270,7 @@ forbidden_scope:
   - "Staging/Production deployment, provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
 
 real_scenario_requirement: |
-  This package performs no runtime scenario. Real USER/1 BNBUSDT CONFUSED sequential and concurrent acceptance belongs only to the activated successor and must not be replaced by HTTP-only evidence.
+  This package performs no runtime scenario. One fresh private-Staging ADA decision-chain run with real OpenAI, Gemini and Grok traces belongs only to the activated successor and must not be replaced by unit-test or HTTP-only evidence.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
