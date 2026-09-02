@@ -3,6 +3,7 @@ package org.example.trademodel.service.impl;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
+import org.example.trademodel.ai.AiBackgroundTaskState;
 import org.example.trademodel.ai.AiOrchestratorProperties;
 import org.example.trademodel.ai.AiProviderCallStatus;
 import org.example.trademodel.ai.AiProviderClient;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -41,9 +44,6 @@ class DecisionChainAiOrchestratorServiceImplTest {
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
-        properties.getProviderTimeouts().setOpenaiMs(3_000);
-        properties.getProviderTimeouts().setGeminiMs(4_000);
-        properties.getProviderTimeouts().setXaiMs(5_000);
         when(usageGuard.evaluate(any(), eq("analysis-1")))
                 .thenReturn(AiUsageGuardResult.allowed(new BigDecimal("0.01")));
         when(callLogService.startDecisionChainCall(any(), any(), any())).thenReturn(new AiCallLogDO());
@@ -63,9 +63,9 @@ class DecisionChainAiOrchestratorServiceImplTest {
         assertThat(service.invoke(request(AiDecisionChainRole.GROK_CHALLENGE)).getProvider())
                 .isEqualTo(AiProviderName.XAI);
 
-        verify(gpt).executeDecisionChain(any(), eq(3_000L));
-        verify(gemini).executeDecisionChain(any(), eq(4_000L));
-        verify(grok).executeDecisionChain(any(), eq(5_000L));
+        verify(gpt).executeDecisionChain(any(), eq(180_000L));
+        verify(gemini).executeDecisionChain(any(), eq(120_000L));
+        verify(grok).executeDecisionChain(any(), eq(120_000L));
         verify(callLogService, org.mockito.Mockito.times(3)).startDecisionChainCall(any(), any(), any());
         verify(callLogService, org.mockito.Mockito.times(3)).completeDecisionChainCall(any(), any());
     }
@@ -123,15 +123,13 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
-    void decisionChainUsesValidatedProviderTimeoutBeyondLegacyEightSecondFields() {
+    void decisionChainUsesVersionedBackgroundDeadlineInsteadOfLegacyTimeoutFields() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
         properties.setRequestTimeoutMs(1);
         properties.setOverallTimeoutMs(1);
-        properties.getProviderTimeouts().setOverallMs(25_000);
-        properties.getProviderTimeouts().setOpenaiMs(25_000);
         when(usageGuard.evaluate(gpt, "analysis-1"))
                 .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
         when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
@@ -143,17 +141,16 @@ class DecisionChainAiOrchestratorServiceImplTest {
 
         service.invoke(request(AiDecisionChainRole.GPT_FINAL));
 
-        verify(gpt).executeDecisionChain(any(), eq(25_000L));
+        verify(gpt).executeDecisionChain(any(), eq(180_000L));
     }
 
     @Test
-    void invalidOverallTimeoutFailsClosedWithoutCallingProvider() {
+    void disabledBackgroundRuntimeFailsClosedWithoutCallingProvider() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
-        properties.getProviderTimeouts().setOverallMs(4_999);
-        properties.getProviderTimeouts().setOpenaiMs(4_000);
+        properties.getBackgroundExecution().setEnabled(false);
         when(usageGuard.evaluate(gpt, "analysis-1"))
                 .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
         when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
@@ -170,13 +167,13 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
-    void providerTimeoutAboveOverallFailsClosedWithoutCallingProvider() {
+    void invalidBackgroundPollingWindowFailsClosedWithoutCallingProvider() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
-        properties.getProviderTimeouts().setOverallMs(20_000);
-        properties.getProviderTimeouts().setOpenaiMs(25_000);
+        properties.getBackgroundExecution().setInitialPollIntervalMs(2_000);
+        properties.getBackgroundExecution().setMaxPollIntervalMs(1_000);
         when(usageGuard.evaluate(gpt, "analysis-1"))
                 .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
         when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
@@ -187,7 +184,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
         AiDecisionChainResult result = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
 
         assertThat(result.successful()).isFalse();
-        assertThat(result.getFallbackReason()).isEqualTo("PROVIDER_TIMEOUT_CONFIG_INVALID");
+        assertThat(result.getFallbackReason()).isEqualTo("ORCHESTRATOR_TIMEOUT_CONFIG_INVALID");
         verify(gpt, never()).executeDecisionChain(any(), anyLong());
         verify(callLogService).completeDecisionChainCall(any(), eq(result));
     }
@@ -214,7 +211,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
         assertThat(first.getCallStatus()).isNotEqualTo(AiProviderCallStatus.RATE_LIMITED);
         assertThat(limited.getCallStatus()).isEqualTo(AiProviderCallStatus.RATE_LIMITED);
         assertThat(limited.getFallbackReason()).isEqualTo("ASSET_ROLE_FREQUENCY_LIMITED");
-        verify(gpt).executeDecisionChain(any(), eq(10_000L));
+        verify(gpt).executeDecisionChain(any(), eq(180_000L));
         verify(callLogService, org.mockito.Mockito.times(2)).completeDecisionChainCall(any(), any());
     }
 
@@ -493,11 +490,379 @@ class DecisionChainAiOrchestratorServiceImplTest {
                 eq(cached), eq(BigDecimal.ZERO));
     }
 
+    @Test
+    void nativeBackgroundSubmissionPollsSameResponseToSuccessAndPersistsTerminalTrace() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = allowedUsageGuard(gpt);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-native-1", 1);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any())).thenReturn(log);
+        when(gpt.submitDecisionChainBackground(any(), eq(30_000L)))
+                .thenReturn(active(AiBackgroundTaskState.QUEUED, "resp-native-1"));
+        AiDecisionChainResult completed = cacheableSuccess();
+        completed.setTaskState(AiBackgroundTaskState.SUCCEEDED);
+        completed.setProviderRequestId("resp-native-1");
+        when(gpt.pollDecisionChainBackground(any(), eq("resp-native-1"), eq(30_000L)))
+                .thenReturn(completed);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.SUCCEEDED);
+        assertThat(result.getProviderRequestId()).isEqualTo("resp-native-1");
+        verify(gpt).submitDecisionChainBackground(any(), eq(30_000L));
+        verify(gpt).pollDecisionChainBackground(any(), eq("resp-native-1"), eq(30_000L));
+        verify(callLogService, org.mockito.Mockito.atLeast(2))
+                .updateDecisionChainTask(eq(log), any());
+        verify(callLogService).completeDecisionChainCall(log, result);
+    }
+
+    @Test
+    void restartRecoveryPollsDurableResponseIdWithoutResubmissionOrSecondCharge() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-recovery-1", 1);
+        log.setProviderRequestId("resp-recovery-1");
+        log.setTaskState(AiBackgroundTaskState.RUNNING.name());
+        AiDecisionChainResult restored = active(AiBackgroundTaskState.RUNNING, "resp-recovery-1");
+        when(callLogService.findLatestDecisionChainTask(
+                eq("analysis-1"), eq(AiDecisionChainRole.GPT_FINAL.name()), any()))
+                .thenReturn(log);
+        when(callLogService.restoreDecisionChainResult(log)).thenReturn(restored);
+        AiDecisionChainResult completed = cacheableSuccess();
+        completed.setTaskState(AiBackgroundTaskState.SUCCEEDED);
+        completed.setProviderRequestId("resp-recovery-1");
+        when(gpt.pollDecisionChainBackground(any(), eq("resp-recovery-1"), eq(30_000L)))
+                .thenReturn(completed);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isTrue();
+        verify(gpt, never()).submitDecisionChainBackground(any(), anyLong());
+        verify(gpt).pollDecisionChainBackground(any(), eq("resp-recovery-1"), eq(30_000L));
+        verify(usageGuard, never()).evaluate(any(), any());
+        verify(callLogService, never()).startDecisionChainCall(any(), any(), any());
+        verify(callLogService).completeDecisionChainCall(log, result);
+    }
+
+    @Test
+    void applicationWorkerRestartFailsClosedWithoutProviderReplay() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-worker-restart", 1);
+        log.setTaskState(AiBackgroundTaskState.RUNNING.name());
+        log.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+        AiDecisionChainResult restored = active(AiBackgroundTaskState.RUNNING, null);
+        restored.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+        when(callLogService.findLatestDecisionChainTask(
+                eq("analysis-1"), eq(AiDecisionChainRole.GPT_FINAL.name()), any()))
+                .thenReturn(log);
+        when(callLogService.restoreDecisionChainResult(log)).thenReturn(restored);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.FAILED);
+        assertThat(result.getFailureClassification())
+                .isEqualTo("APPLICATION_WORKER_RESTART_RECOVERY_BLOCKED");
+        verify(gpt, never()).submitDecisionChainBackground(any(), anyLong());
+        verify(gpt, never()).pollDecisionChainBackground(any(), any(), anyLong());
+        verify(gpt, never()).executeDecisionChain(any(), anyLong());
+        verify(usageGuard, never()).evaluate(any(), any());
+        verify(callLogService).completeDecisionChainCall(log, result);
+    }
+
+    @Test
+    void concurrentApplicationWorkerIsReturnedWithoutProviderReplayOrTraceMutation() {
+        AiProviderClient gemini = client(
+                AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW);
+        AiUsageGuard usageGuard = allowedUsageGuard(gemini);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO concurrent = backgroundLog("call-concurrent-worker", 1);
+        concurrent.setTaskState(AiBackgroundTaskState.RUNNING.name());
+        concurrent.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+        AiDecisionChainResult restored = active(AiBackgroundTaskState.RUNNING, null);
+        restored.setProvider(AiProviderName.GEMINI);
+        restored.setRole(AiDecisionChainRole.GEMINI_REVIEW);
+        restored.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+        when(callLogService.findLatestDecisionChainTask(
+                eq("analysis-1"), eq(AiDecisionChainRole.GEMINI_REVIEW.name()), any()))
+                .thenReturn(null, concurrent);
+        when(callLogService.startDecisionChainCall(any(), eq(gemini), any()))
+                .thenThrow(new IllegalStateException("concurrent trace insert"));
+        when(callLogService.restoreDecisionChainResult(concurrent)).thenReturn(restored);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gemini, usageGuard, callLogService, shortPollingProperties());
+        AiDecisionChainRequest request = cacheableRequest();
+        request.setRole(AiDecisionChainRole.GEMINI_REVIEW);
+
+        AiDecisionChainResult result = service.invoke(request);
+
+        assertThat(result).isSameAs(restored);
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.RUNNING);
+        verify(gemini, never()).submitDecisionChainBackground(any(), anyLong());
+        verify(gemini, never()).pollDecisionChainBackground(any(), any(), anyLong());
+        verify(gemini, never()).executeDecisionChain(any(), anyLong());
+        verify(callLogService, never()).completeDecisionChainCall(any(), any());
+    }
+
+    @Test
+    void frozenDeadlineCalculationKeeps29_31And179SecondJobsAliveButExpiresAfter180() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 3, 0, 0);
+
+        assertThat(DecisionChainAiOrchestratorServiceImpl.remainingJobDeadlineMs(
+                now.minusSeconds(29), now, 180_000L)).isEqualTo(151_000L);
+        assertThat(DecisionChainAiOrchestratorServiceImpl.remainingJobDeadlineMs(
+                now.minusSeconds(31), now, 180_000L)).isEqualTo(149_000L);
+        assertThat(DecisionChainAiOrchestratorServiceImpl.remainingJobDeadlineMs(
+                now.minusSeconds(179), now, 180_000L)).isEqualTo(1_000L);
+        assertThat(DecisionChainAiOrchestratorServiceImpl.remainingJobDeadlineMs(
+                now.minusSeconds(181), now, 180_000L)).isZero();
+    }
+
+    @Test
+    void durableTimeoutIsImmutableAndLateProviderCompletionCannotReviveIt() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-terminal-timeout", 1);
+        log.setProviderRequestId("resp-late-completion");
+        log.setTaskState(AiBackgroundTaskState.TIMED_OUT.name());
+        AiDecisionChainResult timedOut = AiDecisionChainResult.failed(
+                AiProviderName.OPENAI, AiDecisionChainRole.GPT_FINAL,
+                AiProviderCallStatus.TIMEOUT, "GPT_JOB_DEADLINE_EXCEEDED");
+        timedOut.setTaskState(AiBackgroundTaskState.TIMED_OUT);
+        timedOut.setProviderRequestId("resp-late-completion");
+        timedOut.setFailureClassification("GPT_JOB_DEADLINE_EXCEEDED");
+        when(callLogService.findLatestDecisionChainTask(
+                eq("analysis-1"), eq(AiDecisionChainRole.GPT_FINAL.name()), any()))
+                .thenReturn(log);
+        when(callLogService.restoreDecisionChainResult(log)).thenReturn(timedOut);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result).isSameAs(timedOut);
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.TIMED_OUT);
+        verify(gpt, never()).submitDecisionChainBackground(any(), anyLong());
+        verify(gpt, never()).pollDecisionChainBackground(any(), any(), anyLong());
+        verify(gpt, never()).executeDecisionChain(any(), anyLong());
+        verify(usageGuard, never()).evaluate(any(), any());
+        verify(callLogService, never()).completeDecisionChainCall(any(), any());
+    }
+
+    @Test
+    void gptDeadlineCancelsSameProviderResponseWithoutResubmission() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = allowedUsageGuard(gpt);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-deadline", 1);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any())).thenReturn(log);
+        when(gpt.submitDecisionChainBackground(any(), eq(30_000L)))
+                .thenReturn(active(AiBackgroundTaskState.SUBMITTED, "resp-deadline"));
+        when(gpt.pollDecisionChainBackground(any(), eq("resp-deadline"), eq(30_000L)))
+                .thenReturn(active(AiBackgroundTaskState.RUNNING, "resp-deadline"));
+        AiOrchestratorProperties properties = shortPollingProperties();
+        properties.getBackgroundExecution().setGptJobDeadlineMs(10);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, properties);
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.TIMED_OUT);
+        assertThat(result.getFailureClassification()).isEqualTo("GPT_JOB_DEADLINE_EXCEEDED");
+        assertThat(result.getProviderRequestId()).isEqualTo("resp-deadline");
+        verify(gpt).submitDecisionChainBackground(any(), eq(30_000L));
+        verify(gpt, org.mockito.Mockito.atLeastOnce())
+                .pollDecisionChainBackground(any(), eq("resp-deadline"), eq(30_000L));
+        verify(gpt).cancelDecisionChainBackground("resp-deadline", 30_000L);
+        verify(callLogService).completeDecisionChainCall(log, result);
+    }
+
+    @Test
+    void transientSubmitAndPollFailuresRetryAtMostOnceWithoutChangingProviderResponseId() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = allowedUsageGuard(gpt);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO firstLog = backgroundLog("call-attempt-1", 1);
+        AiCallLogDO secondLog = backgroundLog("call-attempt-2", 2);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any())).thenReturn(firstLog);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any(), eq(2)))
+                .thenReturn(secondLog);
+        AiDecisionChainResult transientSubmit = failure(
+                "PROVIDER_HTTP_503", AiBackgroundTaskState.FAILED, true);
+        when(gpt.submitDecisionChainBackground(any(), eq(30_000L)))
+                .thenReturn(transientSubmit, active(AiBackgroundTaskState.SUBMITTED, "resp-retry-1"));
+        AiDecisionChainResult transientPoll = failure(
+                "PROVIDER_IO_FAILURE", AiBackgroundTaskState.RUNNING, true);
+        AiDecisionChainResult completed = cacheableSuccess();
+        completed.setTaskState(AiBackgroundTaskState.SUCCEEDED);
+        completed.setProviderRequestId("resp-retry-1");
+        when(gpt.pollDecisionChainBackground(any(), eq("resp-retry-1"), eq(30_000L)))
+                .thenReturn(transientPoll, completed);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getAttempt()).isEqualTo(2);
+        verify(gpt, org.mockito.Mockito.times(2))
+                .submitDecisionChainBackground(any(), eq(30_000L));
+        verify(gpt, org.mockito.Mockito.times(2))
+                .pollDecisionChainBackground(any(), eq("resp-retry-1"), eq(30_000L));
+        verify(callLogService).completeDecisionChainCall(firstLog, transientSubmit);
+        verify(callLogService).completeDecisionChainCall(secondLog, result);
+    }
+
+    @Test
+    void secondTransientPollFailureEndsTaskWithoutResubmit() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = allowedUsageGuard(gpt);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-poll-exhausted", 1);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any())).thenReturn(log);
+        when(gpt.submitDecisionChainBackground(any(), eq(30_000L)))
+                .thenReturn(active(AiBackgroundTaskState.SUBMITTED, "resp-poll-exhausted"));
+        when(gpt.pollDecisionChainBackground(any(), eq("resp-poll-exhausted"), eq(30_000L)))
+                .thenReturn(
+                        failure("PROVIDER_IO_FAILURE", AiBackgroundTaskState.RUNNING, true),
+                        failure("PROVIDER_HTTP_503", AiBackgroundTaskState.RUNNING, true));
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getTaskState()).isEqualTo(AiBackgroundTaskState.FAILED);
+        assertThat(result.getFailureClassification()).isEqualTo("TRANSIENT_POLL_RETRY_EXHAUSTED");
+        verify(gpt).submitDecisionChainBackground(any(), eq(30_000L));
+        verify(gpt, org.mockito.Mockito.times(2))
+                .pollDecisionChainBackground(any(), eq("resp-poll-exhausted"), eq(30_000L));
+    }
+
+    @Test
+    void providerBackgroundRejectionAloneUsesPersistedApplicationWorkerFallback() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = allowedUsageGuard(gpt);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO log = backgroundLog("call-fallback", 1);
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any())).thenReturn(log);
+        when(gpt.submitDecisionChainBackground(any(), eq(30_000L)))
+                .thenReturn(failure("BACKGROUND_NOT_SUPPORTED", AiBackgroundTaskState.FAILED, false));
+        when(gpt.executeDecisionChain(any(), eq(1_000L))).thenReturn(cacheableSuccess());
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getBackgroundMode()).isEqualTo("APPLICATION_PERSISTED_WORKER");
+        verify(gpt).submitDecisionChainBackground(any(), eq(30_000L));
+        verify(gpt).executeDecisionChain(any(), eq(1_000L));
+        verify(gpt, never()).pollDecisionChainBackground(any(), any(), anyLong());
+    }
+
+    @Test
+    void existingAnalysisRoleWithDifferentInputHashFailsClosedBeforeProviderCall() {
+        AiProviderClient gpt = nativeBackgroundClient();
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiCallLogDO previous = backgroundLog("call-existing", 1);
+        previous.setRequestHash("different-normalized-input-hash");
+        when(callLogService.findLatestDecisionChainTask(
+                "analysis-1", AiDecisionChainRole.GPT_FINAL.name())).thenReturn(previous);
+        DecisionChainAiOrchestratorServiceImpl service = service(
+                gpt, usageGuard, callLogService, shortPollingProperties());
+
+        AiDecisionChainResult result = service.invoke(cacheableRequest());
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getErrorCode()).isEqualTo("AI_INPUT_HASH_MISMATCH");
+        verify(gpt, never()).submitDecisionChainBackground(any(), anyLong());
+        verify(gpt, never()).executeDecisionChain(any(), anyLong());
+        verify(usageGuard, never()).evaluate(any(), any());
+    }
+
     private static AiProviderClient client(AiProviderName provider, AiProviderRole role) {
         AiProviderClient client = mock(AiProviderClient.class);
         when(client.provider()).thenReturn(provider);
         when(client.role()).thenReturn(role);
         return client;
+    }
+
+    private static AiProviderClient nativeBackgroundClient() {
+        AiProviderClient client = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        when(client.supportsNativeBackgroundDecisionChain()).thenReturn(true);
+        return client;
+    }
+
+    private static AiUsageGuard allowedUsageGuard(AiProviderClient client) {
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        when(usageGuard.evaluate(client, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        return usageGuard;
+    }
+
+    private static DecisionChainAiOrchestratorServiceImpl service(AiProviderClient client,
+                                                                   AiUsageGuard usageGuard,
+                                                                   AiCallLogService callLogService,
+                                                                   AiOrchestratorProperties properties) {
+        return new DecisionChainAiOrchestratorServiceImpl(
+                List.of(client), usageGuard, callLogService, properties);
+    }
+
+    private static AiOrchestratorProperties shortPollingProperties() {
+        AiOrchestratorProperties properties = new AiOrchestratorProperties();
+        properties.setPerAssetRoleMinIntervalMs(0L);
+        properties.getBackgroundExecution().setInitialPollIntervalMs(1);
+        properties.getBackgroundExecution().setMaxPollIntervalMs(2);
+        properties.getBackgroundExecution().setGptJobDeadlineMs(1_000);
+        return properties;
+    }
+
+    private static AiCallLogDO backgroundLog(String id, int attempt) {
+        AiCallLogDO log = new AiCallLogDO();
+        log.setCallId(id);
+        log.setAttempt(attempt);
+        log.setStartedAt(LocalDateTime.now(ZoneOffset.UTC));
+        log.setSubmittedAt(LocalDateTime.now(ZoneOffset.UTC));
+        log.setReservedCostUsd(BigDecimal.ZERO);
+        return log;
+    }
+
+    private static AiDecisionChainResult active(AiBackgroundTaskState state, String responseId) {
+        AiDecisionChainResult result = new AiDecisionChainResult();
+        result.setProvider(AiProviderName.OPENAI);
+        result.setRole(AiDecisionChainRole.GPT_FINAL);
+        result.setCallStatus(AiProviderCallStatus.STARTED);
+        result.setTaskState(state);
+        result.setProviderRequestId(responseId);
+        result.setBackgroundMode("PROVIDER_NATIVE");
+        return result;
+    }
+
+    private static AiDecisionChainResult failure(String code,
+                                                  AiBackgroundTaskState state,
+                                                  boolean retryable) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(
+                AiProviderName.OPENAI, AiDecisionChainRole.GPT_FINAL,
+                AiProviderCallStatus.FAILED, code);
+        result.setTaskState(state);
+        result.setFailureClassification(code);
+        result.setRetryable(retryable);
+        result.setBackgroundMode("PROVIDER_NATIVE");
+        return result;
     }
 
     private static AiDecisionChainRequest request(AiDecisionChainRole role) {

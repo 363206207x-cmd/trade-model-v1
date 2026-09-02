@@ -98,6 +98,7 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         validateExplicitOpenAiProvider(environment, errors);
         validateExplicitAiProvider(environment, errors, "Gemini", "trade-model.ai.gemini");
         validateExplicitAiProvider(environment, errors, "xAI", "trade-model.ai.xai");
+        validateAiBackgroundExecution(environment, errors);
 
         String serverAddress = normalizedAddress(property(environment, "server.address"));
         if (isPublicBind(serverAddress) && !isTrue(property(environment, "trade-model.production.allow-public-bind"))) {
@@ -133,6 +134,35 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
 
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Unsafe prod profile config: " + String.join("; ", errors));
+        }
+    }
+
+    private static void validateAiBackgroundExecution(Environment environment, List<String> errors) {
+        if (!isTrue(property(environment, "trade-model.ai.enabled"))) return;
+        if (!isTrue(property(environment, "trade-model.ai.background-execution.enabled"))) {
+            errors.add("production AI requires durable background execution");
+        }
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.submit-ack-timeout-ms", 30_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.gpt-job-deadline-ms", 180_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.review-job-deadline-ms", 120_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.chain-deadline-ms", 300_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.initial-poll-interval-ms", 2_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.max-poll-interval-ms", 10_000L);
+        requireExactLong(environment, errors,
+                "trade-model.ai.background-execution.max-transient-retries", 1L);
+        if (!"MEDIUM".equals(normalized(property(environment,
+                "trade-model.ai.background-execution.reasoning-effort")))) {
+            errors.add("production GPT reasoning effort must be medium");
+        }
+        if (!"LOW".equals(normalized(property(environment,
+                "trade-model.ai.background-execution.text-verbosity")))) {
+            errors.add("production GPT text verbosity must be low");
         }
     }
 
@@ -495,6 +525,9 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
                 || !org.example.trademodel.ai.OpenAiModelRouter.isApprovedGpt55(gpt55)
                 || !org.example.trademodel.ai.OpenAiModelRouter.isApprovedGpt54(gpt54)) {
             errors.add("OpenAI GPT_FINAL model routing must stay within approved GPT-5.6/5.5/5.4 models");
+        }
+        if (!"gpt-5.6-sol".equals(trim(reasoning))) {
+            errors.add("production background GPT model must equal gpt-5.6-sol");
         }
         if (isBlank(property(environment, prefix + ".base-url"))) {
             errors.add("OpenAI base URL missing for explicitly enabled production AI provider");

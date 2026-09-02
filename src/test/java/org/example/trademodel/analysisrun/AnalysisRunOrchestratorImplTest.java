@@ -2,6 +2,7 @@ package org.example.trademodel.analysisrun;
 
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.RuleConfigDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.service.AnalysisAssemblerService;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -12,6 +13,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -20,8 +22,17 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
 class AnalysisRunOrchestratorImplTest {
@@ -141,6 +152,100 @@ class AnalysisRunOrchestratorImplTest {
         assertThat(result.isDuplicateTriggerBlocked()).isTrue();
         assertThat(assembler.calls).isZero();
         assertThat(guard.failedCode).isNull();
+    }
+
+    @Test
+    void submitReturnsQueuedImmediatelyWithoutRunningAssemblerOnRequestThread() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
+        CapturingAssembler assembler = new CapturingAssembler(false);
+        AnalysisRunBackgroundWorker worker = mock(AnalysisRunBackgroundWorker.class);
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, assembler, ruleConfig("rules-2026-06"), new AnalysisRunProperties(),
+                FIXED, mock(AnalysisRunMapper.class), worker);
+
+        AnalysisRunResult result = orchestrator.submit(
+                AnalysisRunCommand.manual("ADAUSDT", "5m", "req-background", "2026-06-23T10:04:59Z"));
+
+        assertThat(result.getStatus()).isEqualTo("QUEUED");
+        assertThat(result.getReasonCode()).isEqualTo("ANALYSIS_BACKGROUND_QUEUED");
+        assertThat(result.hasAnalysisId()).isTrue();
+        assertThat(result.isNotAutoTrading()).isTrue();
+        assertThat(assembler.calls).isZero();
+        verify(worker).submit(any(AnalysisRunDO.class), any(Runnable.class));
+    }
+
+    @Test
+    void duplicateInProgressSubmissionDoesNotQueueSecondBackgroundExecution() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunBackgroundWorker worker = mock(AnalysisRunBackgroundWorker.class);
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, new CapturingAssembler(false), ruleConfig("rules-2026-06"),
+                new AnalysisRunProperties(), FIXED, mock(AnalysisRunMapper.class), worker);
+
+        AnalysisRunResult result = orchestrator.submit(
+                AnalysisRunCommand.manual("ADAUSDT", "5m", "req-duplicate", "2026-06-23T10:04:59Z"));
+
+        assertThat(result.getStatus()).isEqualTo("CONCURRENT_TRIGGER_BLOCKED");
+        assertThat(result.isConcurrentTriggerBlocked()).isTrue();
+        verify(worker, never()).submit(any(), any());
+    }
+
+    @Test
+    void fullBackgroundQueueFailsClosedAndMarksRunFailed() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
+        AnalysisRunBackgroundWorker worker = mock(AnalysisRunBackgroundWorker.class);
+        doThrow(new RejectedExecutionException("full"))
+                .when(worker).submit(any(AnalysisRunDO.class), any(Runnable.class));
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, new CapturingAssembler(false), ruleConfig("rules-2026-06"),
+                new AnalysisRunProperties(), FIXED, mock(AnalysisRunMapper.class), worker);
+
+        AnalysisRunResult result = orchestrator.submit(
+                AnalysisRunCommand.manual("ADAUSDT", "5m", "req-full", "2026-06-23T10:04:59Z"));
+
+        assertThat(result.getStatus()).isEqualTo("FAILED");
+        assertThat(guard.failedCode).isEqualTo("ANALYSIS_BACKGROUND_QUEUE_FULL");
+        assertThat(guard.failedMessage).isEqualTo("analysis background queue is full");
+    }
+
+    @Test
+    void applicationReadySchedulesEveryDurableRecoverableRunWithoutImmediateResubmit() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.IN_PROGRESS);
+        AnalysisRunMapper mapper = mock(AnalysisRunMapper.class);
+        AnalysisRunBackgroundWorker worker = mock(AnalysisRunBackgroundWorker.class);
+        AnalysisRunDO first = new AnalysisRunDO();
+        first.setAnalysisId("analysis-recover-1");
+        AnalysisRunDO second = new AnalysisRunDO();
+        second.setAnalysisId("analysis-recover-2");
+        second.setLeaseExpiresAt(LocalDateTime.of(2026, 6, 23, 10, 5, 9));
+        when(mapper.selectRecoverableBackgroundRuns(100)).thenReturn(List.of(first, second));
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, new CapturingAssembler(false), ruleConfig("rules-2026-06"),
+                new AnalysisRunProperties(), FIXED, mapper, worker);
+
+        orchestrator.resumeDurableBackgroundRuns();
+
+        verify(worker).schedule(any(Runnable.class), org.mockito.ArgumentMatchers.eq(0L));
+        verify(worker).schedule(any(Runnable.class), org.mockito.ArgumentMatchers.eq(10_100L));
+        verify(worker, never()).submit(any(), any());
+    }
+
+    @Test
+    void saturatedRecoveryQueueReschedulesBeforeClaimingDatabaseLease() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE);
+        AnalysisRunBackgroundWorker worker = mock(AnalysisRunBackgroundWorker.class);
+        doThrow(new RejectedExecutionException("full"))
+                .when(worker).submit(any(AnalysisRunDO.class), any(Runnable.class));
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, new CapturingAssembler(false), ruleConfig("rules-2026-06"),
+                new AnalysisRunProperties(), FIXED, mock(AnalysisRunMapper.class), worker);
+        AnalysisRunDO existing = new AnalysisRunDO();
+        existing.setAnalysisId("analysis-recover-queue-full");
+
+        ReflectionTestUtils.invokeMethod(orchestrator, "resumeAfterLease", existing);
+
+        assertThat(guard.requests).isEmpty();
+        verify(worker).schedule(any(Runnable.class), org.mockito.ArgumentMatchers.eq(1_000L));
     }
 
     @Test

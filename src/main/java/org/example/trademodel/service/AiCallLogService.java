@@ -22,8 +22,30 @@ public interface AiCallLogService {
         throw new UnsupportedOperationException("Decision-chain AI logging is not implemented");
     }
 
+    default AiCallLogDO startDecisionChainCall(AiDecisionChainRequest request, AiProviderClient client,
+                                               BigDecimal reservedCostUsd, int attempt) {
+        return startDecisionChainCall(request, client, reservedCostUsd);
+    }
+
     default void completeDecisionChainCall(AiCallLogDO log, AiDecisionChainResult result) {
         throw new UnsupportedOperationException("Decision-chain AI logging is not implemented");
+    }
+
+    default void updateDecisionChainTask(AiCallLogDO log, AiDecisionChainResult result) {
+        completeDecisionChainCall(log, result);
+    }
+
+    default AiCallLogDO findLatestDecisionChainTask(String analysisId, String role) {
+        return null;
+    }
+
+    default AiCallLogDO findLatestDecisionChainTask(String analysisId, String role,
+                                                    String inputHash) {
+        return findLatestDecisionChainTask(analysisId, role);
+    }
+
+    default AiDecisionChainResult restoreDecisionChainResult(AiCallLogDO log) {
+        return null;
     }
 
     default AiCallLogDO recordDecisionChainResult(AiDecisionChainRequest request,

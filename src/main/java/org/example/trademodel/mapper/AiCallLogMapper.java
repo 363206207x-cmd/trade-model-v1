@@ -33,7 +33,14 @@ public interface AiCallLogMapper {
             + "not_state_machine_override AS notStateMachineOverride, "
             + "not_execution_plan_creation AS notExecutionPlanCreation, "
             + "not_final_execution_plan_creation AS notFinalExecutionPlanCreation, "
-            + "rule_direction_preserved AS ruleDirectionPreserved, created_at AS createdAt, updated_at AS updatedAt";
+            + "rule_direction_preserved AS ruleDirectionPreserved, "
+            + "task_state AS taskState, attempt AS attempt, role_state AS roleState, data_state AS dataState, "
+            + "submitted_at AS submittedAt, reasoning_tokens AS reasoningTokens, "
+            + "failure_classification AS failureClassification, prompt_version AS promptVersion, "
+            + "schema_version AS schemaVersion, input_contract_version AS inputContractVersion, "
+            + "runtime_config_version AS runtimeConfigVersion, background_mode AS backgroundMode, "
+            + "active_task_key AS activeTaskKey, "
+            + "created_at AS createdAt, updated_at AS updatedAt";
 
     String CHARGEABLE_COST = """
             CASE
@@ -59,7 +66,9 @@ public interface AiCallLogMapper {
               review_only, manual_review_only, not_trade_instruction, not_executable, not_auto_trading,
               not_order_execution, not_user_position_creation, not_position_mutation,
               not_state_machine_override, not_execution_plan_creation, not_final_execution_plan_creation,
-              rule_direction_preserved, created_at, updated_at
+              rule_direction_preserved, task_state, attempt, role_state, data_state, submitted_at,
+              reasoning_tokens, failure_classification, prompt_version, schema_version,
+              input_contract_version, runtime_config_version, background_mode, active_task_key, created_at, updated_at
             ) VALUES (
               #{callId}, #{analysisId}, #{traceId}, #{requestId}, #{providerName}, #{modelName}, #{aiRole}, #{callStatus},
               #{providerRequestId}, #{startedAt}, #{completedAt}, #{latencyMs}, #{inputTokens}, #{outputTokens}, #{totalTokens},
@@ -70,7 +79,9 @@ public interface AiCallLogMapper {
               #{reviewOnly}, #{manualReviewOnly}, #{notTradeInstruction}, #{notExecutable}, #{notAutoTrading},
               #{notOrderExecution}, #{notUserPositionCreation}, #{notPositionMutation},
               #{notStateMachineOverride}, #{notExecutionPlanCreation}, #{notFinalExecutionPlanCreation},
-              #{ruleDirectionPreserved}, #{createdAt}, #{updatedAt}
+              #{ruleDirectionPreserved}, #{taskState}, #{attempt}, #{roleState}, #{dataState}, #{submittedAt},
+              #{reasoningTokens}, #{failureClassification}, #{promptVersion}, #{schemaVersion},
+              #{inputContractVersion}, #{runtimeConfigVersion}, #{backgroundMode}, #{activeTaskKey}, #{createdAt}, #{updatedAt}
             )
             """)
     int insert(AiCallLogDO log);
@@ -96,10 +107,50 @@ public interface AiCallLogMapper {
               cache_hit = #{cacheHit},
               observed_at = #{observedAt},
               output_payload = #{outputPayload},
+              task_state = #{taskState},
+              attempt = #{attempt},
+              role_state = #{roleState},
+              data_state = #{dataState},
+              submitted_at = #{submittedAt},
+              reasoning_tokens = #{reasoningTokens},
+              failure_classification = #{failureClassification},
+              background_mode = #{backgroundMode},
+              active_task_key = #{activeTaskKey},
               updated_at = #{updatedAt}
             WHERE call_id = #{callId}
             """)
     int updateCompletion(AiCallLogDO log);
+
+    @Update("""
+            UPDATE tm_ai_call_log SET
+              call_status = #{callStatus}, provider_request_id = #{providerRequestId},
+              task_state = #{taskState}, attempt = #{attempt}, role_state = #{roleState},
+              data_state = #{dataState}, submitted_at = #{submittedAt}, started_at = #{startedAt},
+              completed_at = #{completedAt}, latency_ms = #{latencyMs},
+              input_tokens = #{inputTokens}, output_tokens = #{outputTokens}, total_tokens = #{totalTokens},
+              reasoning_tokens = #{reasoningTokens}, calculated_cost_usd = #{calculatedCostUsd},
+              fallback_flag = #{fallbackFlag}, fallback_reason = #{fallbackReason},
+              timeout_flag = #{timeoutFlag}, error_code = #{errorCode}, error_message = #{errorMessage},
+              failure_classification = #{failureClassification}, response_summary = #{responseSummary},
+              observed_at = #{observedAt}, output_payload = #{outputPayload},
+              background_mode = #{backgroundMode}, active_task_key = #{activeTaskKey}, updated_at = #{updatedAt}
+            WHERE call_id = #{callId}
+            """)
+    int updateDecisionChainTask(AiCallLogDO log);
+
+    @Select("SELECT " + COLUMNS + " FROM tm_ai_call_log "
+            + "WHERE contract_type = 'DECISION_CHAIN_V4_1' AND analysis_id = #{analysisId} "
+            + "AND ai_role = #{role} ORDER BY attempt DESC, started_at DESC, call_id DESC LIMIT 1")
+    AiCallLogDO selectLatestDecisionChainTask(@Param("analysisId") String analysisId,
+                                              @Param("role") String role);
+
+    @Select("SELECT " + COLUMNS + " FROM tm_ai_call_log "
+            + "WHERE contract_type = 'DECISION_CHAIN_V4_1' AND analysis_id = #{analysisId} "
+            + "AND ai_role = #{role} AND request_hash = #{inputHash} "
+            + "ORDER BY attempt DESC, started_at DESC, call_id DESC LIMIT 1")
+    AiCallLogDO selectLatestDecisionChainTaskByInputHash(@Param("analysisId") String analysisId,
+                                                         @Param("role") String role,
+                                                         @Param("inputHash") String inputHash);
 
     @Select("<script>"
             + "SELECT " + COLUMNS + " FROM tm_ai_call_log "

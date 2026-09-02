@@ -5,6 +5,7 @@ import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.service.AnalysisAssemblerService;
 import org.example.trademodel.service.RuleConfigService;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,12 +25,16 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.List;
+import java.time.Duration;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(AnalysisRunOrchestratorImpl.class);
+    private static final long RECOVERY_QUEUE_RETRY_MS = 1_000L;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
     private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
@@ -44,21 +52,64 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     private final RuleConfigService ruleConfigService;
     private final AnalysisRunProperties properties;
     private final Clock clock;
+    private final AnalysisRunMapper analysisRunMapper;
+    private final AnalysisRunBackgroundWorker backgroundWorker;
 
     public AnalysisRunOrchestratorImpl(AnalysisIdempotencyGuard idempotencyGuard,
                                        AnalysisAssemblerService assemblerService,
                                        RuleConfigService ruleConfigService,
                                        AnalysisRunProperties properties,
                                        Clock analysisRunClock) {
+        this(idempotencyGuard, assemblerService, ruleConfigService, properties,
+                analysisRunClock, null, null);
+    }
+
+    @Autowired
+    public AnalysisRunOrchestratorImpl(AnalysisIdempotencyGuard idempotencyGuard,
+                                       AnalysisAssemblerService assemblerService,
+                                       RuleConfigService ruleConfigService,
+                                       AnalysisRunProperties properties,
+                                       Clock analysisRunClock,
+                                       AnalysisRunMapper analysisRunMapper,
+                                       AnalysisRunBackgroundWorker backgroundWorker) {
         this.idempotencyGuard = idempotencyGuard;
         this.assemblerService = assemblerService;
         this.ruleConfigService = ruleConfigService;
         this.properties = properties;
         this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
+        this.analysisRunMapper = analysisRunMapper;
+        this.backgroundWorker = backgroundWorker;
     }
 
     @Override
     public AnalysisRunResult run(AnalysisRunCommand command) {
+        AnalysisIdempotencyClaim claim = claim(command);
+        AnalysisRunResult existing = existingClaimResult(claim);
+        if (existing != null) return existing;
+        return executeClaim(claim);
+    }
+
+    @Override
+    public AnalysisRunResult submit(AnalysisRunCommand command) {
+        AnalysisIdempotencyClaim claim = claim(command);
+        AnalysisRunResult existing = existingClaimResult(claim);
+        if (existing != null) return existing;
+        AnalysisRunDO run = claim.getRun();
+        if (backgroundWorker == null) return executeClaim(claim);
+        try {
+            backgroundWorker.submit(run, () -> executeClaim(claim));
+            return AnalysisRunResult.queued(run,
+                    claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_FAILED,
+                    claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE);
+        } catch (RejectedExecutionException rejected) {
+            AnalysisExecutionContext context = contextFromRun(run);
+            idempotencyGuard.markFailed(context, "ANALYSIS_BACKGROUND_QUEUE_FULL",
+                    "analysis background queue is full");
+            return AnalysisRunResult.failed(run, "analysis background queue is full");
+        }
+    }
+
+    private AnalysisIdempotencyClaim claim(AnalysisRunCommand command) {
         NormalizedCommand normalized = normalize(command);
         String analysisId = AnalysisRunIds.analysisId();
         String traceId = AnalysisRunIds.traceId();
@@ -84,7 +135,10 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 LocalDateTime.now(clock).plusSeconds(properties.getIdempotency().getLeaseSeconds()),
                 normalized.ownerType(), normalized.ownerId(), normalized.assetId(), normalized.preview());
 
-        AnalysisIdempotencyClaim claim = idempotencyGuard.claim(request);
+        return idempotencyGuard.claim(request);
+    }
+
+    private static AnalysisRunResult existingClaimResult(AnalysisIdempotencyClaim claim) {
         if (claim.getStatus() == AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS) {
             return AnalysisRunResult.duplicateSuccess(claim.getRun());
         }
@@ -97,11 +151,16 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         if (claim.getStatus() == AnalysisIdempotencyClaimStatus.MAX_RECOVERY_ATTEMPTS_EXCEEDED) {
             return AnalysisRunResult.maxAttempts(claim.getRun());
         }
+        return null;
+    }
 
+    private AnalysisRunResult executeClaim(AnalysisIdempotencyClaim claim) {
         AnalysisRunDO run = claim.getRun();
         AnalysisExecutionContext context = contextFromRun(run);
         try {
-            AssetAnalysisVO analysis = assemblerService.assemble(context);
+            AssetAnalysisVO analysis = backgroundWorker == null
+                    ? assemblerService.assemble(context)
+                    : backgroundWorker.withLease(run, () -> assemblerService.assemble(context));
             boolean failedRecovery = claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_FAILED;
             boolean expiredLeaseRecovery = claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE;
             return AnalysisRunResult.executed(run, analysis, failedRecovery, expiredLeaseRecovery);
@@ -122,6 +181,43 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                 idempotencyGuard.markFailed(context, failureCode, redactedMessage);
             }
             return AnalysisRunResult.failed(run, redactedMessage);
+        }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void resumeDurableBackgroundRuns() {
+        if (analysisRunMapper == null || backgroundWorker == null) return;
+        List<AnalysisRunDO> recoverable = analysisRunMapper.selectRecoverableBackgroundRuns(100);
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (AnalysisRunDO run : recoverable) {
+            long delayMs = run.getLeaseExpiresAt() == null ? 0L
+                    : Math.max(0L, Duration.between(now, run.getLeaseExpiresAt()).toMillis() + 100L);
+            backgroundWorker.schedule(() -> resumeAfterLease(run), delayMs);
+        }
+    }
+
+    private void resumeAfterLease(AnalysisRunDO existing) {
+        try {
+            backgroundWorker.submit(existing, () -> recoverAndExecute(existing));
+        } catch (RejectedExecutionException rejected) {
+            backgroundWorker.schedule(() -> resumeAfterLease(existing), RECOVERY_QUEUE_RETRY_MS);
+        }
+    }
+
+    private void recoverAndExecute(AnalysisRunDO existing) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        AnalysisRunClaimRequest request = new AnalysisRunClaimRequest(
+                AnalysisRunIds.analysisId(), existing.getTraceId(),
+                RequestIdSupport.normalizeOrGenerate(null), existing.getIdempotencyKey(),
+                existing.getSymbol(), existing.getTimeframe(), existing.getAnalysisTime(),
+                existing.getRuleVersion(), AnalysisRunTriggerType.normalize(existing.getTriggerType()),
+                existing.getTriggerReference(), existing.getParentAnalysisId(), existing.getParentTraceId(),
+                existing.getInputSnapshotJson(), existing.getInputSnapshotHash(), AnalysisRunIds.leaseOwner(),
+                now.plusSeconds(properties.getIdempotency().getLeaseSeconds()), existing.getOwnerType(),
+                existing.getOwnerId(), existing.getAssetId(), Boolean.TRUE.equals(existing.getPreview()));
+        AnalysisIdempotencyClaim claim = idempotencyGuard.claim(request);
+        if (existingClaimResult(claim) == null) {
+            executeClaim(claim);
         }
     }
 

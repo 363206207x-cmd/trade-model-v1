@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
+import org.example.trademodel.ai.AiOrchestratorProperties;
 import org.example.trademodel.ai.AiProviderCallStatus;
 import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiRoleResultsCodec;
 import org.example.trademodel.analysisrun.AnalysisRunTriggerType;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.decisionchain.DecisionChainBuildInput;
 import org.example.trademodel.decisionchain.DecisionChainBuildResult;
 import org.example.trademodel.decisionchain.RuleValidationResult;
@@ -48,9 +50,14 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -168,9 +175,9 @@ class DecisionChainServiceImplTest {
 
         ArgumentCaptor<AiDecisionChainRequest> calls = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
         verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(calls.capture());
+        assertThat(calls.getAllValues().get(0).getRole()).isEqualTo(AiDecisionChainRole.GPT_FINAL);
         assertThat(calls.getAllValues()).extracting(AiDecisionChainRequest::getRole)
-                .containsExactly(
-                        AiDecisionChainRole.GPT_FINAL,
+                .containsExactlyInAnyOrder(AiDecisionChainRole.GPT_FINAL,
                         AiDecisionChainRole.GEMINI_REVIEW,
                         AiDecisionChainRole.GROK_CHALLENGE);
         assertThat(calls.getAllValues()).allSatisfy(call -> {
@@ -187,6 +194,148 @@ class DecisionChainServiceImplTest {
                     .keySet().stream().map(String::valueOf).toList())
                     .containsExactlyInAnyOrder("4h", "1h", "15m", "5m");
         });
+    }
+
+    @Test
+    void geminiAndGrokStartOnlyAfterGptAndConsumeSameImmutableCandidateSnapshotInParallel()
+            throws Exception {
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
+                anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
+        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(conflict(false));
+        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
+        AtomicBoolean gptCompleted = new AtomicBoolean();
+        AtomicBoolean reviewStartedBeforeGpt = new AtomicBoolean();
+        CountDownLatch bothReviewsStarted = new CountDownLatch(2);
+        CountDownLatch releaseReviews = new CountDownLatch(1);
+        List<AiDecisionChainRequest> reviewRequests = Collections.synchronizedList(new ArrayList<>());
+        when(aiOrchestratorService.invoke(any())).thenAnswer(invocation -> {
+            AiDecisionChainRequest request = invocation.getArgument(0);
+            if (request.getRole() == AiDecisionChainRole.GPT_FINAL) {
+                gptCompleted.set(true);
+                return success(request.getRole());
+            }
+            if (!gptCompleted.get()) reviewStartedBeforeGpt.set(true);
+            reviewRequests.add(request);
+            bothReviewsStarted.countDown();
+            if (!releaseReviews.await(2, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("parallel review barrier timed out");
+            }
+            return success(request.getRole());
+        });
+
+        CompletableFuture<DecisionChainBuildResult> build = CompletableFuture.supplyAsync(
+                () -> service.build(input()));
+        assertThat(bothReviewsStarted.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(build.isDone()).isFalse();
+        releaseReviews.countDown();
+        DecisionChainBuildResult result = build.get(3, TimeUnit.SECONDS);
+
+        assertThat(reviewStartedBeforeGpt.get()).isFalse();
+        assertThat(reviewRequests).hasSize(2);
+        assertThat(reviewRequests).extracting(AiDecisionChainRequest::getRole)
+                .containsExactlyInAnyOrder(
+                        AiDecisionChainRole.GEMINI_REVIEW, AiDecisionChainRole.GROK_CHALLENGE);
+        assertThat(reviewRequests.get(0).getInput()).isEqualTo(reviewRequests.get(1).getInput());
+        assertThat(reviewRequests.get(0).getInput().get("executionPlanCandidate"))
+                .isSameAs(reviewRequests.get(1).getInput().get("executionPlanCandidate"));
+        assertThat(reviewRequests).allSatisfy(request -> {
+            assertThat(request.getAnalysisId()).isEqualTo("analysis-1");
+            assertThat(request.getCandidateId()).isEqualTo(result.candidate().getCandidateId());
+            assertThat(request.getInput().get("candidateSource")).isEqualTo("GPT_FINAL");
+        });
+        verify(conflictResolver).resolveDecisionChain(
+                any(), anyString(), anyString(), any(), any(), anyString());
+        verify(ruleValidator).validate(any(), any(), any(), any());
+    }
+
+    @Test
+    void chainDeadlineStopsResolverAndFinalAfterBothReviewTasksWereStarted() throws Exception {
+        AiOrchestratorProperties timeoutProperties = new AiOrchestratorProperties();
+        timeoutProperties.getBackgroundExecution().setChainDeadlineMs(50);
+        service = new DecisionChainServiceImpl(
+                assetPoolService, assetStateService, aiOrchestratorService, conflictResolver,
+                ruleValidator, candidateMapper, conflictMapper, new ObjectMapper(), aiRoleResultsCodec,
+                FundamentalAiV41Properties.contractFixture(), timeoutProperties);
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
+                anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
+        CountDownLatch reviewsStarted = new CountDownLatch(2);
+        when(aiOrchestratorService.invoke(any())).thenAnswer(invocation -> {
+            AiDecisionChainRequest request = invocation.getArgument(0);
+            if (request.getRole() == AiDecisionChainRole.GPT_FINAL) return success(request.getRole());
+            reviewsStarted.countDown();
+            try {
+                Thread.sleep(200L);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            return success(request.getRole());
+        });
+
+        DecisionChainBuildResult result = service.build(input());
+        assertThat(reviewsStarted.await(1, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(result.candidate()).isNotNull();
+        assertThat(result.candidate().getCandidateStatus()).isEqualTo("REJECTED");
+        assertThat(result.validation().passed()).isFalse();
+        assertThat(result.validation().reasons()).containsExactly("CHAIN_DEADLINE_EXCEEDED");
+        assertThat(result.finalPlan().getFinalPlan()).isFalse();
+        verify(conflictResolver, never()).resolveDecisionChain(
+                any(), anyString(), anyString(), any(), any(), anyString());
+        verify(ruleValidator, never()).validate(any(), any(), any(), any());
+    }
+
+    @Test
+    void oneReviewFailureStillWaitsForTheOtherTerminalResultBeforeResolver() throws Exception {
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
+                anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
+        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(conflict(false));
+        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
+        CountDownLatch grokStarted = new CountDownLatch(1);
+        CountDownLatch releaseGrok = new CountDownLatch(1);
+        when(aiOrchestratorService.invoke(any())).thenAnswer(invocation -> {
+            AiDecisionChainRequest request = invocation.getArgument(0);
+            if (request.getRole() == AiDecisionChainRole.GPT_FINAL) return success(request.getRole());
+            if (request.getRole() == AiDecisionChainRole.GEMINI_REVIEW) {
+                throw new IllegalStateException("review infrastructure failed");
+            }
+            grokStarted.countDown();
+            if (!releaseGrok.await(2, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("grok review barrier timed out");
+            }
+            return success(request.getRole());
+        });
+
+        CompletableFuture<DecisionChainBuildResult> build = CompletableFuture.supplyAsync(
+                () -> service.build(input()));
+        assertThat(grokStarted.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(build.isDone()).isFalse();
+        verify(conflictResolver, never()).resolveDecisionChain(
+                any(), anyString(), anyString(), any(), any(), anyString());
+
+        releaseGrok.countDown();
+        DecisionChainBuildResult result = build.get(3, TimeUnit.SECONDS);
+
+        assertThat(result.candidate().getCandidateStatus()).isEqualTo("REJECTED");
+        assertThat(result.validation().passed()).isFalse();
+        assertThat(result.validation().reasons()).containsExactly("COMPLETE_THREE_AI_CHAIN_REQUIRED");
+        assertThat(result.finalPlan().getFinalPlan()).isFalse();
+        verify(conflictResolver).resolveDecisionChain(
+                any(), anyString(), anyString(), any(), any(), anyString());
+        verify(ruleValidator).validate(any(), any(), any(), any());
     }
 
     @Test
@@ -259,8 +408,9 @@ class DecisionChainServiceImplTest {
                 .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
         ArgumentCaptor<AiDecisionChainRequest> calls = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
         verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(calls.capture());
+        assertThat(calls.getAllValues().get(0).getRole()).isEqualTo(AiDecisionChainRole.GPT_FINAL);
         assertThat(calls.getAllValues()).extracting(AiDecisionChainRequest::getRole)
-                .containsExactly(AiDecisionChainRole.GPT_FINAL,
+                .containsExactlyInAnyOrder(AiDecisionChainRole.GPT_FINAL,
                         AiDecisionChainRole.GEMINI_REVIEW, AiDecisionChainRole.GROK_CHALLENGE);
         verify(assetStateService, never()).transition(
                 any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
@@ -270,7 +420,7 @@ class DecisionChainServiceImplTest {
     }
 
     @Test
-    void gptFailurePersistsRuleFallbackEvidenceButCannotProduceFinalPlan() {
+    void gptFailureDoesNotCreateCandidateOrRunDownstreamDecisionStages() {
         when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
         when(assetStateService.transition(
                 any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(), anyString(), anyString(), any()))
@@ -280,41 +430,24 @@ class DecisionChainServiceImplTest {
             return AiDecisionChainResult.failed(provider(request.getRole()), request.getRole(),
                     AiProviderCallStatus.TIMEOUT, "PROVIDER_TIMEOUT");
         });
-        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(conflict(false));
-        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
         when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
 
         DecisionChainBuildResult result = service.build(input());
 
-        assertThat(result.candidate().getCandidateSource()).isEqualTo("RULE_FALLBACK");
-        assertThat(result.candidate().getFallbackReason()).isEqualTo("PROVIDER_TIMEOUT");
-        assertThat(result.candidate().getWorthOpening()).isFalse();
-        assertThat(result.candidate().getEntryZone()).isNull();
-        assertThat(result.candidate().getEntrySource()).isNull();
-        assertThat(result.candidate().getStopLoss()).isNull();
-        assertThat(result.candidate().getStopSource()).isNull();
-        assertThat(result.candidate().getTakeProfitRules()).isNull();
-        assertThat(result.candidate().getTargetSource()).isNull();
-        assertThat(result.candidate().getExpectedRiskReward()).isNull();
-        assertThat(result.candidate().getExpectedRiskRewardSource()).isNull();
-        assertThat(result.candidate().getPositionSuggestion()).isNull();
-        assertThat(result.candidate().getLeverageSuggestion()).isNull();
-        assertThat(result.candidate().getAnalysisTimeframesJson()).isNull();
-        assertThat(result.candidate().getRevalidationRule()).isNull();
+        assertThat(result.candidate()).isNull();
+        assertThat(result.conflict()).isNull();
         assertThat(result.validation().passed()).isFalse();
-        assertThat(result.validation().reasons()).containsExactly("COMPLETE_THREE_AI_CHAIN_REQUIRED");
+        assertThat(result.validation().reasons()).containsExactly("GPT_CANDIDATE_REQUIRED");
         assertThat(result.finalPlan().getFinalPlan()).isFalse();
         assertThat(result.finalPlan().getChainStatus()).isEqualTo("RULE_VALIDATION_BLOCKED");
-        ArgumentCaptor<String> fallbackPayloads = ArgumentCaptor.forClass(String.class);
-        verify(conflictResolver).resolveDecisionChain(
-                any(), fallbackPayloads.capture(), fallbackPayloads.capture(), any(), any(), anyString());
-        assertThat(fallbackPayloads.getAllValues()).allSatisfy(payload ->
-                assertThat(payload).contains("\"fallback\":true"));
+        verify(aiOrchestratorService).invoke(any());
+        verify(conflictResolver, never()).resolveDecisionChain(
+                any(), anyString(), anyString(), any(), any(), anyString());
+        verify(ruleValidator, never()).validate(any(), any(), any(), any());
     }
 
     @Test
-    void incompleteEvidenceScoresAndTimeframesBlockEveryAiRoleAndUseRuleFallback() {
+    void incompleteEvidenceScoresAndTimeframesStopAfterAuditedGptInputGate() {
         DecisionChainBuildInput complete = input();
         complete.evidence().get(0).setSourceReference(null);
         complete.evidence().get(0).setSourceTraceId(null);
@@ -336,17 +469,16 @@ class DecisionChainServiceImplTest {
             return AiDecisionChainResult.failed(provider(request.getRole()), request.getRole(),
                     AiProviderCallStatus.INVALID_RESPONSE, "AI_INPUT_CONTRACT_BLOCKED");
         });
-        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(conflict(false));
-        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
         when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
 
         DecisionChainBuildResult result = service.build(incomplete);
 
-        assertThat(result.candidate().getCandidateSource()).isEqualTo("RULE_FALLBACK");
+        assertThat(result.candidate()).isNull();
+        assertThat(result.conflict()).isNull();
         ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
-        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(requests.capture());
+        verify(aiOrchestratorService).invoke(requests.capture());
         assertThat(requests.getAllValues()).allSatisfy(request -> {
+            assertThat(request.getRole()).isEqualTo(AiDecisionChainRole.GPT_FINAL);
             assertThat(request.isInputContractSatisfied()).isFalse();
             assertThat(request.getInputContractFailures()).contains(
                     "EVIDENCE_CONTRACT_INCOMPLETE",
@@ -439,7 +571,7 @@ class DecisionChainServiceImplTest {
         service.build(complete);
 
         ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
-        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(requests.capture());
+        verify(aiOrchestratorService).invoke(requests.capture());
         assertThat(requests.getAllValues()).allSatisfy(request -> {
             assertThat(request.isInputContractSatisfied()).isFalse();
             assertThat(request.getInputContractFailures())
@@ -459,7 +591,7 @@ class DecisionChainServiceImplTest {
         service.build(complete);
 
         ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
-        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(requests.capture());
+        verify(aiOrchestratorService).invoke(requests.capture());
         assertThat(requests.getAllValues()).allSatisfy(request -> {
             assertThat(request.isInputContractSatisfied()).isFalse();
             assertThat(request.getInputContractFailures())
@@ -542,9 +674,6 @@ class DecisionChainServiceImplTest {
             return AiDecisionChainResult.failed(provider(request.getRole()), request.getRole(),
                     AiProviderCallStatus.INVALID_RESPONSE, "AI_INPUT_CONTRACT_BLOCKED");
         });
-        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
-                .thenReturn(conflict(false));
-        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
         when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
     }
 

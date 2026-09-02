@@ -162,6 +162,22 @@ public interface AnalysisRunMapper {
                             @Param("versionNo") int versionNo,
                             @Param("maxAttempts") int maxAttempts);
 
+    @Update("UPDATE tm_analysis_run SET lease_expires_at = #{leaseExpiresAt}, updated_at = #{updatedAt} "
+            + "WHERE analysis_id = #{analysisId} AND status = 'STARTED' "
+            + "AND lease_owner = #{leaseOwner} AND COALESCE(version_no, 1) = #{claimVersion}")
+    int renewLease(@Param("analysisId") String analysisId,
+                   @Param("leaseOwner") String leaseOwner,
+                   @Param("claimVersion") int claimVersion,
+                   @Param("leaseExpiresAt") LocalDateTime leaseExpiresAt,
+                   @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Select("SELECT ar.* FROM tm_analysis_run ar WHERE ar.status = 'STARTED' "
+            + "AND EXISTS (SELECT 1 FROM tm_ai_call_log ai WHERE ai.analysis_id = ar.analysis_id "
+            + "AND ai.contract_type = 'DECISION_CHAIN_V4_1' "
+            + "AND ai.task_state IN ('QUEUED', 'SUBMITTED', 'RUNNING')) "
+            + "ORDER BY ar.started_at, ar.analysis_id LIMIT #{limit}")
+    List<AnalysisRunDO> selectRecoverableBackgroundRuns(@Param("limit") int limit);
+
     @Select("SELECT ((SELECT COUNT(*) FROM tm_evidence_item WHERE analysis_id = #{analysisId}) "
             + "+ (SELECT COUNT(*) FROM tm_score_item WHERE analysis_id = #{analysisId}) "
             + "+ (SELECT COUNT(*) FROM tm_decision_result WHERE analysis_id = #{analysisId}) "
@@ -172,8 +188,7 @@ public interface AnalysisRunMapper {
             + "+ (SELECT COUNT(*) FROM tm_monitor_alert WHERE analysis_id = #{analysisId}) "
             + "+ (SELECT COUNT(*) FROM tm_opportunity_log WHERE analysis_id = #{analysisId}) "
             + "+ (SELECT COUNT(*) FROM tm_missed_opportunity WHERE analysis_id = #{analysisId}) "
-            + "+ (SELECT COUNT(*) FROM tm_position_monitor_log WHERE analysis_id = #{analysisId}) "
-            + "+ (SELECT COUNT(*) FROM tm_ai_call_log WHERE analysis_id = #{analysisId}))")
+            + "+ (SELECT COUNT(*) FROM tm_position_monitor_log WHERE analysis_id = #{analysisId}))")
     Integer countPartialStateRows(String analysisId);
 
     @Select("SELECT evidence_id FROM tm_evidence_item WHERE analysis_id = #{analysisId} ORDER BY create_time, evidence_id")

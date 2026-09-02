@@ -30,6 +30,18 @@ public class JdkAiHttpTransport implements AiHttpTransport {
         return new AiHttpResponse(response.statusCode(), truncate(response.body()), response.headers().map());
     }
 
+    @Override
+    public AiHttpResponse get(AiHttpRequest request) throws IOException, InterruptedException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(request.getUrl()))
+                .timeout(request.getTimeout())
+                .GET();
+        for (var entry : request.getHeaders().entrySet()) {
+            builder.header(entry.getKey(), entry.getValue());
+        }
+        HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        return new AiHttpResponse(response.statusCode(), truncate(response.body()), response.headers().map());
+    }
+
     private static String truncate(String body) {
         if (body == null || body.length() <= MAX_RESPONSE_CHARS) {
             return body;

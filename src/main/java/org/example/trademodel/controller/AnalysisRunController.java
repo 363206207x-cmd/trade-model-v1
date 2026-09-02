@@ -46,10 +46,11 @@ public class AnalysisRunController {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest("timeframe is required"));
         }
         try {
-            AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.manualForUser(
+            AnalysisRunResult result = analysisRunOrchestrator.submit(AnalysisRunCommand.manualForUser(
                     userIdResolver.requireCurrentUserId(), request.getSymbol(), request.getTimeframe(),
                     RequestIdSupport.currentOrNew(), request.getAnalysisTime()));
-            HttpStatus status = result.isConcurrentTriggerBlocked()
+            HttpStatus status = result.isQueued() ? HttpStatus.ACCEPTED
+                    : result.isConcurrentTriggerBlocked()
                     || result.isPartialStateRecoveryBlocked()
                     || result.isMaxRecoveryAttemptsExceeded()
                     ? HttpStatus.CONFLICT : HttpStatus.OK;

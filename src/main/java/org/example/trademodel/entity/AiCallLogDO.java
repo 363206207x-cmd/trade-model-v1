@@ -55,6 +55,19 @@ public class AiCallLogDO {
     private Boolean ruleDirectionPreserved = true;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String taskState;
+    private Integer attempt = 1;
+    private String roleState;
+    private String dataState;
+    private LocalDateTime submittedAt;
+    private Long reasoningTokens;
+    private String failureClassification;
+    private String promptVersion;
+    private String schemaVersion;
+    private String inputContractVersion;
+    private String runtimeConfigVersion;
+    private String backgroundMode;
+    private String activeTaskKey;
 
     public AiCallLogDO() {
     }
@@ -202,6 +215,32 @@ public class AiCallLogDO {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getTaskState() { return taskState; }
+    public void setTaskState(String taskState) { this.taskState = taskState; }
+    public Integer getAttempt() { return attempt; }
+    public void setAttempt(Integer attempt) { this.attempt = attempt; }
+    public String getRoleState() { return roleState; }
+    public void setRoleState(String roleState) { this.roleState = roleState; }
+    public String getDataState() { return dataState; }
+    public void setDataState(String dataState) { this.dataState = dataState; }
+    public LocalDateTime getSubmittedAt() { return submittedAt; }
+    public void setSubmittedAt(LocalDateTime submittedAt) { this.submittedAt = submittedAt; }
+    public Long getReasoningTokens() { return reasoningTokens; }
+    public void setReasoningTokens(Long reasoningTokens) { this.reasoningTokens = reasoningTokens; }
+    public String getFailureClassification() { return failureClassification; }
+    public void setFailureClassification(String value) { this.failureClassification = value; }
+    public String getPromptVersion() { return promptVersion; }
+    public void setPromptVersion(String promptVersion) { this.promptVersion = promptVersion; }
+    public String getSchemaVersion() { return schemaVersion; }
+    public void setSchemaVersion(String schemaVersion) { this.schemaVersion = schemaVersion; }
+    public String getInputContractVersion() { return inputContractVersion; }
+    public void setInputContractVersion(String value) { this.inputContractVersion = value; }
+    public String getRuntimeConfigVersion() { return runtimeConfigVersion; }
+    public void setRuntimeConfigVersion(String value) { this.runtimeConfigVersion = value; }
+    public String getBackgroundMode() { return backgroundMode; }
+    public void setBackgroundMode(String backgroundMode) { this.backgroundMode = backgroundMode; }
+    public String getActiveTaskKey() { return activeTaskKey; }
+    public void setActiveTaskKey(String activeTaskKey) { this.activeTaskKey = activeTaskKey; }
 
     public Integer getTokenUsed() { return totalTokens == null ? null : totalTokens.intValue(); }
     public void setTokenUsed(Integer tokenUsed) { this.totalTokens = tokenUsed == null ? null : tokenUsed.longValue(); }

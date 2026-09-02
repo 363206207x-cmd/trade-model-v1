@@ -81,6 +81,24 @@ class AnalysisRunControllerTest {
         assertThat(orchestrator.command.isPreview()).isFalse();
     }
 
+    @Test
+    void manualRunReturnsHttp202WithStableIdsWhenBackgroundWorkIsQueued() {
+        CapturingOrchestrator orchestrator = new CapturingOrchestrator(false, true);
+        AnalysisRunController controller = controller(orchestrator, new StubTraceService());
+        AnalysisRunController.AnalysisRunRequest request = new AnalysisRunController.AnalysisRunRequest();
+        request.setSymbol("ADAUSDT");
+        request.setTimeframe("5m");
+
+        ResponseEntity<ApiResponse<AnalysisRunResult>> response = controller.run(request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(202);
+        assertThat(response.getBody().getData().getStatus()).isEqualTo("QUEUED");
+        assertThat(response.getBody().getData().getAnalysisId()).isEqualTo("ana-controller");
+        assertThat(response.getBody().getData().getTraceId()).isEqualTo("trace-controller");
+        assertThat(response.getBody().getData().isNotAutoTrading()).isTrue();
+        assertThat(response.getBody().getData().isNotOrderExecution()).isTrue();
+    }
+
     private static AnalysisRunController controller(CapturingOrchestrator orchestrator, AnalysisTraceService traceService) {
         AnalysisRunProperties properties = new AnalysisRunProperties();
         AnalysisSchedulerService scheduler = new AnalysisSchedulerService(orchestrator, properties);
@@ -91,11 +109,17 @@ class AnalysisRunControllerTest {
 
     private static final class CapturingOrchestrator implements AnalysisRunOrchestrator {
         private final boolean throwInputError;
+        private final boolean queue;
         private boolean called;
         private AnalysisRunCommand command;
 
         private CapturingOrchestrator(boolean throwInputError) {
+            this(throwInputError, false);
+        }
+
+        private CapturingOrchestrator(boolean throwInputError, boolean queue) {
             this.throwInputError = throwInputError;
+            this.queue = queue;
         }
 
         @Override
@@ -112,7 +136,9 @@ class AnalysisRunControllerTest {
             run.setSymbol(command.getSymbol());
             run.setTimeframe(command.getTimeframe());
             run.setTriggerType(command.getTriggerType().name());
-            return AnalysisRunResult.executed(run, null, false, false);
+            return queue
+                    ? AnalysisRunResult.queued(run, false, false)
+                    : AnalysisRunResult.executed(run, null, false, false);
         }
     }
 

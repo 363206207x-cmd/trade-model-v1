@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.ai.AiDecisionChainRequest;
+import org.example.trademodel.ai.AiDecisionChainPromptBuilder;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
 import org.example.trademodel.ai.AiOrchestratorProperties;
@@ -17,6 +18,7 @@ import org.example.trademodel.ai.AiUsageGuard;
 import org.example.trademodel.ai.AiUsageGuardResult;
 import org.example.trademodel.ai.AiRoleDataState;
 import org.example.trademodel.ai.AiRoleState;
+import org.example.trademodel.ai.AiBackgroundTaskState;
 import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.entity.AiCallLogDO;
 import org.example.trademodel.service.AiCallLogService;
@@ -29,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -41,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOrchestratorService {
@@ -108,6 +113,72 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             recordTerminalTrace(request, blocked.getProvider(), "NOT_CALLED_INPUT_GATE", blocked, BigDecimal.ZERO);
             return blocked;
         }
+        String inputHash;
+        try {
+            inputHash = AiDecisionChainPromptBuilder.inputHash(objectMapper, request);
+        } catch (Exception invalidInput) {
+            AiDecisionChainResult failed = AiDecisionChainResult.failed(
+                    providerName(request.getRole()), request.getRole(),
+                    AiProviderCallStatus.INVALID_RESPONSE, "AI_INPUT_NORMALIZATION_FAILED");
+            failed.setTaskState(AiBackgroundTaskState.FAILED);
+            failed.setFailureClassification("AI_INPUT_NORMALIZATION_FAILED");
+            attachRuntimeMetadata(request, failed);
+            recordTerminalTrace(request, failed.getProvider(), "NOT_CALLED_INPUT_INVALID",
+                    failed, BigDecimal.ZERO);
+            return failed;
+        }
+        AiCallLogDO durableTask = callLogService.findLatestDecisionChainTask(
+                request.getAnalysisId(), request.getRole().name(), inputHash);
+        if (durableTask == null) {
+            AiCallLogDO differentInput = callLogService.findLatestDecisionChainTask(
+                    request.getAnalysisId(), request.getRole().name());
+            if (differentInput != null && !inputHash.equals(differentInput.getRequestHash())) {
+                AiDecisionChainResult mismatch = AiDecisionChainResult.failed(
+                        providerName(request.getRole()), request.getRole(),
+                        AiProviderCallStatus.INVALID_RESPONSE, "AI_INPUT_HASH_MISMATCH");
+                mismatch.setTaskState(AiBackgroundTaskState.FAILED);
+                mismatch.setFailureClassification("AI_INPUT_HASH_MISMATCH");
+                attachRuntimeMetadata(request, mismatch);
+                recordTerminalTrace(request, mismatch.getProvider(), "NOT_CALLED_INPUT_MISMATCH",
+                        mismatch, BigDecimal.ZERO);
+                return mismatch;
+            }
+        }
+        if (durableTask != null) {
+            AiDecisionChainResult restored = callLogService.restoreDecisionChainResult(durableTask);
+            if (restored != null && restored.getTaskState() != null
+                    && restored.getTaskState().terminal()) {
+                return restored;
+            }
+            if (restored != null && restored.getTaskState() != null
+                    && restored.getTaskState().active()) {
+                AiProviderClient durableClient = clients.get(providerRole(request.getRole()));
+                if (durableClient == null) {
+                    AiDecisionChainResult missing = AiDecisionChainResult.failed(
+                            providerName(request.getRole()), request.getRole(), AiProviderCallStatus.FAILED,
+                            "DECISION_CHAIN_PROVIDER_MISSING_DURING_RECOVERY");
+                    missing.setTaskState(AiBackgroundTaskState.FAILED);
+                    attachRuntimeMetadata(request, missing);
+                    callLogService.completeDecisionChainCall(durableTask, missing);
+                    return missing;
+                }
+                if (!canResumeNativeTask(durableClient, durableTask, restored)) {
+                    String recoveryFailure = recoveryFailureCode(
+                            durableClient, durableTask, restored);
+                    AiDecisionChainResult interrupted = AiDecisionChainResult.failed(
+                            durableClient.provider(), request.getRole(), AiProviderCallStatus.FAILED,
+                            recoveryFailure);
+                    interrupted.setTaskState(AiBackgroundTaskState.FAILED);
+                    interrupted.setFailureClassification(recoveryFailure);
+                    interrupted.setBackgroundMode(restored.getBackgroundMode());
+                    interrupted.setAttempt(restored.getAttempt());
+                    attachRuntimeMetadata(request, interrupted);
+                    callLogService.completeDecisionChainCall(durableTask, interrupted);
+                    return interrupted;
+                }
+                return resumeDurableTask(request, durableClient, durableTask, restored, cacheKey(request));
+            }
+        }
         String cacheKey = cacheKey(request);
         CachedResult cachedEntry = cachedResult(cacheKey);
         if (cachedEntry != null) {
@@ -139,7 +210,7 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                     AiProviderCallStatus.FAILED, "AI_USAGE_GUARD_FAILED");
             failed.setLatencyMs(elapsedMs(startedNanos));
             attachRuntimeMetadata(request, failed);
-            recordTerminalTrace(request, client.provider(), modelName(client), failed, BigDecimal.ZERO);
+            recordTerminalTrace(request, client.provider(), modelName(client, request.getRole()), failed, BigDecimal.ZERO);
             return failed;
         }
         if (guard == null) {
@@ -147,7 +218,7 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                     AiProviderCallStatus.FAILED, "AI_USAGE_GUARD_RESULT_MISSING");
             failed.setLatencyMs(elapsedMs(startedNanos));
             attachRuntimeMetadata(request, failed);
-            recordTerminalTrace(request, client.provider(), modelName(client), failed, BigDecimal.ZERO);
+            recordTerminalTrace(request, client.provider(), modelName(client, request.getRole()), failed, BigDecimal.ZERO);
             return failed;
         }
         BigDecimal reserved = guard.getReservedCostUsd() == null
@@ -157,11 +228,22 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         try {
             log = callLogService.startDecisionChainCall(request, client, reserved);
         } catch (Exception exception) {
+            AiCallLogDO concurrent = callLogService.findLatestDecisionChainTask(
+                    request.getAnalysisId(), request.getRole().name(), inputHash);
+            AiDecisionChainResult concurrentResult = callLogService.restoreDecisionChainResult(concurrent);
+            if (concurrent != null && concurrentResult != null
+                    && concurrentResult.getTaskState() != null && concurrentResult.getTaskState().active()) {
+                if (canResumeNativeTask(client, concurrent, concurrentResult)) {
+                    return resumeDurableTask(request, client, concurrent, concurrentResult, cacheKey);
+                }
+                attachActiveRuntimeMetadata(request, concurrentResult);
+                return concurrentResult;
+            }
             AiDecisionChainResult failed = AiDecisionChainResult.failed(client.provider(), request.getRole(),
                     AiProviderCallStatus.FAILED, "AI_CALL_LOG_START_FAILED");
             failed.setLatencyMs(elapsedMs(startedNanos));
             attachRuntimeMetadata(request, failed);
-            recordTerminalTrace(request, client.provider(), modelName(client), failed, reserved);
+            recordTerminalTrace(request, client.provider(), modelName(client, request.getRole()), failed, reserved);
             return failed;
         }
         AiDecisionChainResult result;
@@ -184,7 +266,20 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                     result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
                             AiProviderCallStatus.FAILED, timeoutFailure);
                 } else {
-                    result = client.executeDecisionChain(request, effectiveTimeoutMs(client.provider()));
+                    if (request.getRole() == AiDecisionChainRole.GPT_FINAL
+                            && client.supportsNativeBackgroundDecisionChain()) {
+                        BackgroundOutcome outcome = executeNativeBackground(request, client, log, reserved, null);
+                        log = outcome.log();
+                        result = outcome.result();
+                    } else {
+                        markRunning(request, client, log, "APPLICATION_PERSISTED_WORKER");
+                        result = client.executeDecisionChain(request, effectiveTimeoutMs(request.getRole()));
+                        result.setTaskState(result.successful()
+                                ? AiBackgroundTaskState.SUCCEEDED
+                                : result.getCallStatus() == AiProviderCallStatus.TIMEOUT
+                                ? AiBackgroundTaskState.TIMED_OUT : AiBackgroundTaskState.FAILED);
+                        result.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+                    }
                 }
             } catch (Exception exception) {
                 result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
@@ -199,15 +294,177 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             }
         }
         if (result.getLatencyMs() == null) result.setLatencyMs(elapsedMs(startedNanos));
-        result.setReservedCostUsd(reserved);
+        return finish(request, client, log, result, reserved, cacheKey);
+    }
+
+    private long effectiveTimeoutMs(AiDecisionChainRole role) {
+        AiOrchestratorProperties.BackgroundExecution runtime = properties.getBackgroundExecution();
+        return role == AiDecisionChainRole.GPT_FINAL
+                ? runtime.getGptJobDeadlineMs() : runtime.getReviewJobDeadlineMs();
+    }
+
+    private String timeoutConfigurationFailure(AiProviderName provider) {
+        AiOrchestratorProperties.BackgroundExecution runtime = properties.getBackgroundExecution();
+        if (runtime == null || !runtime.isEnabled()
+                || runtime.getSubmitAckTimeoutMs() <= 0
+                || runtime.getGptJobDeadlineMs() <= 0
+                || runtime.getReviewJobDeadlineMs() <= 0
+                || runtime.getChainDeadlineMs() <= 0
+                || runtime.getInitialPollIntervalMs() <= 0
+                || runtime.getMaxPollIntervalMs() < runtime.getInitialPollIntervalMs()) {
+            return "ORCHESTRATOR_TIMEOUT_CONFIG_INVALID";
+        }
+        return null;
+    }
+
+    private AiDecisionChainResult resumeDurableTask(AiDecisionChainRequest request,
+                                                     AiProviderClient client,
+                                                     AiCallLogDO log,
+                                                     AiDecisionChainResult restored,
+                                                     String cacheKey) {
+        boolean acquired = false;
+        try {
+            concurrencyGate.acquire();
+            acquired = true;
+            BackgroundOutcome outcome = executeNativeBackground(
+                    request, client, log, log.getReservedCostUsd(), restored);
+            return finish(request, client, outcome.log(), outcome.result(),
+                    log.getReservedCostUsd(), cacheKey);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            AiDecisionChainResult interrupted = AiDecisionChainResult.failed(
+                    client.provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
+                    "BACKGROUND_RECOVERY_INTERRUPTED");
+            interrupted.setTaskState(AiBackgroundTaskState.CANCELLED);
+            return finish(request, client, log, interrupted, log.getReservedCostUsd(), cacheKey);
+        } finally {
+            if (acquired) concurrencyGate.release();
+        }
+    }
+
+    private BackgroundOutcome executeNativeBackground(AiDecisionChainRequest request,
+                                                       AiProviderClient client,
+                                                       AiCallLogDO initialLog,
+                                                       BigDecimal reserved,
+                                                       AiDecisionChainResult restored) {
+        AiOrchestratorProperties.BackgroundExecution runtime = properties.getBackgroundExecution();
+        AiCallLogDO log = initialLog;
+        AiDecisionChainResult state = restored;
+        int attempt = log.getAttempt() == null ? 1 : log.getAttempt();
+        if (state == null || state.getProviderRequestId() == null
+                || state.getProviderRequestId().isBlank()) {
+            state = client.submitDecisionChainBackground(request, runtime.getSubmitAckTimeoutMs());
+            state.setAttempt(attempt);
+            attachActiveRuntimeMetadata(request, state);
+            callLogService.updateDecisionChainTask(log, state);
+            if (state.isRetryable() && attempt <= runtime.getMaxTransientRetries()) {
+                state.setTaskState(AiBackgroundTaskState.FAILED);
+                state.setFailureClassification(defaultFailure(state, "TRANSIENT_SUBMIT_FAILURE"));
+                attachRuntimeMetadata(request, state);
+                callLogService.completeDecisionChainCall(log, state);
+                attempt++;
+                log = callLogService.startDecisionChainCall(request, client, reserved, attempt);
+                state = client.submitDecisionChainBackground(request, runtime.getSubmitAckTimeoutMs());
+                state.setAttempt(attempt);
+                attachActiveRuntimeMetadata(request, state);
+                callLogService.updateDecisionChainTask(log, state);
+            }
+            if ("BACKGROUND_NOT_SUPPORTED".equals(state.getFailureClassification())
+                    || "BACKGROUND_NOT_SUPPORTED".equals(state.getErrorCode())) {
+                markRunning(request, client, log, "APPLICATION_PERSISTED_WORKER");
+                AiDecisionChainResult fallback = client.executeDecisionChain(
+                        request, runtime.getGptJobDeadlineMs());
+                fallback.setAttempt(attempt);
+                fallback.setTaskState(fallback.successful()
+                        ? AiBackgroundTaskState.SUCCEEDED
+                        : fallback.getCallStatus() == AiProviderCallStatus.TIMEOUT
+                        ? AiBackgroundTaskState.TIMED_OUT : AiBackgroundTaskState.FAILED);
+                fallback.setBackgroundMode("APPLICATION_PERSISTED_WORKER");
+                fallback.setFailureClassification("BACKGROUND_NOT_SUPPORTED_FALLBACK");
+                return outcome(log, fallback);
+            }
+            if (state.getTaskState() != null && state.getTaskState().terminal()) {
+                return outcome(log, state);
+            }
+        }
+
+        String providerResponseId = state.getProviderRequestId();
+        long remainingDeadlineMs = remainingJobDeadlineMs(
+                log.getSubmittedAt(), LocalDateTime.now(ZoneOffset.UTC),
+                runtime.getGptJobDeadlineMs());
+        long deadlineEpochMs = System.currentTimeMillis() + remainingDeadlineMs;
+        long pollMs = runtime.getInitialPollIntervalMs();
+        int transientPollRetries = 0;
+        while (System.currentTimeMillis() < deadlineEpochMs) {
+            if (!sleepWithJitter(pollMs, deadlineEpochMs)) {
+                client.cancelDecisionChainBackground(providerResponseId, runtime.getSubmitAckTimeoutMs());
+                AiDecisionChainResult cancelled = AiDecisionChainResult.failed(
+                        client.provider(), request.getRole(), AiProviderCallStatus.TIMEOUT,
+                        "BACKGROUND_POLL_INTERRUPTED");
+                cancelled.setProviderRequestId(providerResponseId);
+                cancelled.setTaskState(AiBackgroundTaskState.CANCELLED);
+                cancelled.setFailureClassification("BACKGROUND_POLL_INTERRUPTED");
+                cancelled.setAttempt(attempt);
+                cancelled.setBackgroundMode("PROVIDER_NATIVE");
+                return outcome(log, cancelled);
+            }
+            AiDecisionChainResult polled = client.pollDecisionChainBackground(
+                    request, providerResponseId, runtime.getSubmitAckTimeoutMs());
+            polled.setProviderRequestId(providerResponseId);
+            polled.setAttempt(attempt);
+            if (polled.isRetryable()) {
+                if (transientPollRetries < runtime.getMaxTransientRetries()) {
+                    transientPollRetries++;
+                    polled.setTaskState(AiBackgroundTaskState.RUNNING);
+                    polled.setCallStatus(AiProviderCallStatus.STARTED);
+                    polled.setFallback(false);
+                    polled.setBackgroundMode("PROVIDER_NATIVE");
+                    attachActiveRuntimeMetadata(request, polled);
+                    callLogService.updateDecisionChainTask(log, polled);
+                    continue;
+                }
+                polled.setTaskState(AiBackgroundTaskState.FAILED);
+                polled.setCallStatus(AiProviderCallStatus.FAILED);
+                polled.setFallback(true);
+                polled.setFailureClassification("TRANSIENT_POLL_RETRY_EXHAUSTED");
+                polled.setFallbackReason("TRANSIENT_POLL_RETRY_EXHAUSTED");
+                polled.setErrorCode("TRANSIENT_POLL_RETRY_EXHAUSTED");
+            }
+            attachActiveRuntimeMetadata(request, polled);
+            callLogService.updateDecisionChainTask(log, polled);
+            if (polled.getTaskState() != null && polled.getTaskState().terminal()) {
+                return outcome(log, polled);
+            }
+            pollMs = Math.min(runtime.getMaxPollIntervalMs(), Math.max(1L, pollMs * 2L));
+        }
+        client.cancelDecisionChainBackground(providerResponseId, runtime.getSubmitAckTimeoutMs());
+        AiDecisionChainResult timedOut = AiDecisionChainResult.failed(
+                client.provider(), request.getRole(), AiProviderCallStatus.TIMEOUT, "GPT_JOB_DEADLINE_EXCEEDED");
+        timedOut.setProviderRequestId(providerResponseId);
+        timedOut.setTaskState(AiBackgroundTaskState.TIMED_OUT);
+        timedOut.setFailureClassification("GPT_JOB_DEADLINE_EXCEEDED");
+        timedOut.setAttempt(attempt);
+        timedOut.setBackgroundMode("PROVIDER_NATIVE");
+        return outcome(log, timedOut);
+    }
+
+    private AiDecisionChainResult finish(AiDecisionChainRequest request,
+                                         AiProviderClient client,
+                                         AiCallLogDO log,
+                                         AiDecisionChainResult result,
+                                         BigDecimal reserved,
+                                         String cacheKey) {
+        result.setReservedCostUsd(reserved == null ? BigDecimal.ZERO : reserved);
         if (result.successful()) {
             String traceabilityFailure = traceabilityFailure(request, result);
             if (traceabilityFailure != null) {
                 result.setAuditOutput(result.getPayloadJson());
                 result.setPayloadJson(null);
                 result.setCallStatus(AiProviderCallStatus.INVALID_RESPONSE);
+                result.setTaskState(AiBackgroundTaskState.FAILED);
                 result.setFallback(true);
                 result.setFallbackReason(traceabilityFailure);
+                result.setFailureClassification(traceabilityFailure);
                 result.setErrorCode(traceabilityFailure);
             }
         }
@@ -218,7 +475,7 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             result.setFallback(true);
             result.setFallbackReason("AI_CALL_LOG_COMPLETE_FAILED");
             result.setErrorCode("AI_CALL_LOG_COMPLETE_FAILED");
-            recordTerminalTrace(request, client.provider(), modelName(client), result, reserved);
+            recordTerminalTrace(request, client.provider(), modelName(client, request.getRole()), result, reserved);
         }
         if (result.successful() && !result.isCacheHit() && cacheKey != null) {
             cache(cacheKey, request, result);
@@ -226,16 +483,102 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         return result;
     }
 
-    private long effectiveTimeoutMs(AiProviderName provider) {
-        return properties.getProviderTimeouts().timeoutMs(provider);
+    private static void attachActiveRuntimeMetadata(AiDecisionChainRequest request,
+                                                    AiDecisionChainResult result) {
+        if (result == null) return;
+        result.setAnalysisId(request == null ? null : request.getAnalysisId());
+        result.setTraceId(request == null ? null : request.getTraceId());
+        if (result.getTaskState() != null && result.getTaskState().active()) {
+            result.setRoleState(AiRoleState.PARTIAL);
+        }
     }
 
-    private String timeoutConfigurationFailure(AiProviderName provider) {
-        AiOrchestratorProperties.ProviderTimeouts timeouts = properties.getProviderTimeouts();
-        if (timeouts == null || !timeouts.validOverall()) {
-            return "ORCHESTRATOR_TIMEOUT_CONFIG_INVALID";
+    private void markRunning(AiDecisionChainRequest request,
+                             AiProviderClient client,
+                             AiCallLogDO log,
+                             String backgroundMode) {
+        AiDecisionChainResult running = new AiDecisionChainResult();
+        running.setProvider(client.provider());
+        running.setRole(request.getRole());
+        running.setCallStatus(AiProviderCallStatus.STARTED);
+        running.setTaskState(AiBackgroundTaskState.RUNNING);
+        running.setAttempt(log.getAttempt());
+        running.setSelectedModel(modelName(client, request.getRole()));
+        running.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        running.setBackgroundMode(backgroundMode);
+        attachActiveRuntimeMetadata(request, running);
+        callLogService.updateDecisionChainTask(log, running);
+    }
+
+    private static BackgroundOutcome outcome(AiCallLogDO log, AiDecisionChainResult result) {
+        if (log != null && log.getStartedAt() != null && result != null) {
+            long elapsed = Math.max(0L, Duration.between(
+                    log.getStartedAt(), LocalDateTime.now(ZoneOffset.UTC)).toMillis());
+            result.setLatencyMs(elapsed);
         }
-        return timeouts.validProvider(provider) ? null : "PROVIDER_TIMEOUT_CONFIG_INVALID";
+        return new BackgroundOutcome(log, result);
+    }
+
+    static long remainingJobDeadlineMs(LocalDateTime submittedAt,
+                                       LocalDateTime nowUtc,
+                                       long jobDeadlineMs) {
+        if (jobDeadlineMs <= 0L) return 0L;
+        if (submittedAt == null || nowUtc == null) return jobDeadlineMs;
+        long elapsedMs = Math.max(0L, Duration.between(submittedAt, nowUtc).toMillis());
+        return Math.max(0L, jobDeadlineMs - elapsedMs);
+    }
+
+    private static boolean canResumeNativeTask(AiProviderClient client,
+                                               AiCallLogDO log,
+                                               AiDecisionChainResult restored) {
+        if (client == null || !client.supportsNativeBackgroundDecisionChain()) return false;
+        String mode = restored == null ? null : restored.getBackgroundMode();
+        if ((mode == null || mode.isBlank()) && log != null) mode = log.getBackgroundMode();
+        if ("APPLICATION_PERSISTED_WORKER".equals(mode)) return false;
+        String responseId = restored == null ? null : restored.getProviderRequestId();
+        if ((responseId == null || responseId.isBlank()) && log != null) {
+            responseId = log.getProviderRequestId();
+        }
+        if (responseId != null && !responseId.isBlank()) return true;
+        return restored != null && restored.getTaskState() == AiBackgroundTaskState.QUEUED;
+    }
+
+    private static String recoveryFailureCode(AiProviderClient client,
+                                              AiCallLogDO log,
+                                              AiDecisionChainResult restored) {
+        String mode = restored == null ? null : restored.getBackgroundMode();
+        if ((mode == null || mode.isBlank()) && log != null) mode = log.getBackgroundMode();
+        if ("APPLICATION_PERSISTED_WORKER".equals(mode)
+                || client == null || !client.supportsNativeBackgroundDecisionChain()) {
+            return "APPLICATION_WORKER_RESTART_RECOVERY_BLOCKED";
+        }
+        return "PROVIDER_RESPONSE_ID_MISSING_DURING_RECOVERY";
+    }
+
+    private static boolean sleepWithJitter(long intervalMs, long deadlineEpochMs) {
+        long jitter = Math.max(1L, intervalMs / 10L);
+        long requested = intervalMs + ThreadLocalRandom.current().nextLong(-jitter, jitter + 1L);
+        long remaining = Math.max(0L, deadlineEpochMs - System.currentTimeMillis());
+        long sleepMs = Math.min(Math.max(1L, requested), remaining);
+        if (sleepMs <= 0L) return true;
+        try {
+            Thread.sleep(sleepMs);
+            return true;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static String defaultFailure(AiDecisionChainResult result, String fallback) {
+        if (result == null) return fallback;
+        if (result.getFailureClassification() != null && !result.getFailureClassification().isBlank()) {
+            return result.getFailureClassification();
+        }
+        return result.getErrorCode() == null ? fallback : result.getErrorCode();
+    }
+
+    private record BackgroundOutcome(AiCallLogDO log, AiDecisionChainResult result) {
     }
 
     private boolean acquireAssetRoleFrequency(AiDecisionChainRequest request) {
@@ -359,13 +702,15 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         }
     }
 
-    private static String modelName(AiProviderClient client) {
-        if (client == null || client.providerProperties() == null
-                || client.providerProperties().getEffectiveModel() == null
-                || client.providerProperties().getEffectiveModel().isBlank()) {
-            return "UNAVAILABLE";
+    private static String modelName(AiProviderClient client, AiDecisionChainRole role) {
+        if (client == null || client.providerProperties() == null) return "UNAVAILABLE";
+        if (role == AiDecisionChainRole.GPT_FINAL && client.provider() == AiProviderName.OPENAI) {
+            String reasoningModel = client.providerProperties().getGptFinal().getReasoningModel();
+            if (reasoningModel != null && !reasoningModel.isBlank()) return reasoningModel.trim();
         }
-        return client.providerProperties().getEffectiveModel();
+        String effectiveModel = client.providerProperties().getEffectiveModel();
+        return effectiveModel == null || effectiveModel.isBlank()
+                ? "UNAVAILABLE" : effectiveModel;
     }
 
     private String traceabilityFailure(AiDecisionChainRequest request, AiDecisionChainResult result) {
@@ -818,8 +1163,28 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
         target.setFallback(source.isFallback());
         target.setFallbackReason(source.getFallbackReason());
         target.setErrorCode(source.getErrorCode());
-        target.setCalculatedCostUsd(BigDecimal.ZERO);
-        target.setReservedCostUsd(BigDecimal.ZERO);
+        target.setCalculatedCostUsd(source.getCalculatedCostUsd());
+        target.setReservedCostUsd(source.getReservedCostUsd());
+        target.setProviderRequestId(source.getProviderRequestId());
+        target.setLatencyMs(source.getLatencyMs());
+        target.setInputTokens(source.getInputTokens());
+        target.setOutputTokens(source.getOutputTokens());
+        target.setTotalTokens(source.getTotalTokens());
+        target.setReasoningTokens(source.getReasoningTokens());
+        target.setCacheHit(source.isCacheHit());
+        target.setAnalysisId(source.getAnalysisId());
+        target.setTraceId(source.getTraceId());
+        target.setRoleState(source.getRoleState());
+        target.setDataState(source.getDataState());
+        target.setGeneratedAt(source.getGeneratedAt());
+        target.setTaskState(source.getTaskState());
+        target.setAttempt(source.getAttempt());
+        target.setFailureClassification(source.getFailureClassification());
+        target.setSubmittedAt(source.getSubmittedAt());
+        target.setStartedAt(source.getStartedAt());
+        target.setCompletedAt(source.getCompletedAt());
+        target.setRetryable(source.isRetryable());
+        target.setBackgroundMode(source.getBackgroundMode());
         return target;
     }
 
