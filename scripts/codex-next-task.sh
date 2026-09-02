@@ -122,6 +122,7 @@ validate_contract_task() {
   local v4_1_core_production_loop_authorization_status v4_1_core_production_loop_implementation_status
   local real_data_home_blocker_closure_authorization_status real_data_home_blocker_closure_implementation_status
   local analysis_run_idempotency_tx_fix_authorization_status analysis_run_idempotency_tx_fix_implementation_status
+  local final_runtime_home_closure_authorization_status final_runtime_home_closure_implementation_status
   local local_real_authorization_status local_real_implementation_status multi_user_authorization_status multi_user_implementation_status
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
@@ -183,6 +184,8 @@ validate_contract_task() {
   real_data_home_blocker_closure_implementation_status="$(yaml_value "$TASK_FILE" real_data_home_blocker_closure_implementation_status)"
   analysis_run_idempotency_tx_fix_authorization_status="$(yaml_value "$TASK_FILE" analysis_run_idempotency_tx_fix_authorization_status)"
   analysis_run_idempotency_tx_fix_implementation_status="$(yaml_value "$TASK_FILE" analysis_run_idempotency_tx_fix_implementation_status)"
+  final_runtime_home_closure_authorization_status="$(yaml_value "$TASK_FILE" v4_1_final_runtime_home_access_idempotency_closure_authorization_status)"
+  final_runtime_home_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_final_runtime_home_access_idempotency_closure_implementation_status)"
   local_real_authorization_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -196,20 +199,20 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED analysis-run idempotency authorization declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure authorization declaration mismatch" >&2; failed=1; }
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
-  [[ "$current_package_branch" == "codex/v4-1-analysis-run-idempotency-tx-fix-authorization" ]] || { echo "TASK_VALIDATION_FAILED analysis-run idempotency authorization branch mismatch" >&2; failed=1; }
-  [[ "$current_package_starting_full_sha" == "0e9bd779b10e9d3140b8ceaea0a5193a28d6264f" ]] || { echo "TASK_VALIDATION_FAILED analysis-run idempotency authorization starting SHA mismatch" >&2; failed=1; }
-  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || { echo "TASK_VALIDATION_FAILED analysis-run idempotency authorization permissions mismatch" >&2; failed=1; }
+  [[ "$current_package_branch" == "codex/v4-1-final-runtime-home-access-idempotency-closure-authorization" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure authorization branch mismatch" >&2; failed=1; }
+  [[ "$current_package_starting_full_sha" == "0e9bd779b10e9d3140b8ceaea0a5193a28d6264f" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure authorization starting SHA mismatch" >&2; failed=1; }
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure authorization permissions mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized analysis-run idempotency package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized final runtime Home closure package mismatch" >&2; failed=1; }
   [[ "$authorized_next_starting_full_sha" == "$current_package_starting_full_sha" ]] || { echo "TASK_VALIDATION_FAILED implementation starting SHA must equal the authorization baseline" >&2; failed=1; }
   [[ "$authorized_next_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "TASK_VALIDATION_FAILED authorized starting SHA must be full length" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded idempotency-fix permissions are incomplete" >&2; failed=1; }
-  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "6" ]] || { echo "TASK_VALIDATION_FAILED idempotency fix must contain exactly six implementation paths" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded final-runtime Home permissions are incomplete" >&2; failed=1; }
+  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "10" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure must contain exactly ten implementation paths" >&2; failed=1; }
   if printf '%s\n' "$authorized_next_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-    echo "TASK_VALIDATION_FAILED idempotency-fix allowlist must not contain wildcards or directory grants" >&2
+    echo "TASK_VALIDATION_FAILED final-runtime Home allowlist must not contain wildcards or directory grants" >&2
     failed=1
   fi
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
@@ -220,7 +223,7 @@ validate_contract_task() {
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
   [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
-  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$real_data_home_blocker_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_data_home_blocker_closure_implementation_status" == "COMPLETE" && "$analysis_run_idempotency_tx_fix_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$analysis_run_idempotency_tx_fix_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX_ONLY" ]] || { echo "TASK_VALIDATION_FAILED idempotency authorization predecessor boundary mismatch" >&2; failed=1; }
+  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$real_data_home_blocker_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_data_home_blocker_closure_implementation_status" == "COMPLETE" && "$analysis_run_idempotency_tx_fix_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$analysis_run_idempotency_tx_fix_implementation_status" == "COMPLETE" && "$final_runtime_home_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$final_runtime_home_closure_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED final runtime Home closure predecessor boundary mismatch" >&2; failed=1; }
   [[ -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED core production-loop authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
@@ -329,6 +332,8 @@ real_data_home_blocker_closure_authorization_runtime_status="$(state_value "$sta
 real_data_home_blocker_closure_implementation_runtime_status="$(state_value "$state_text" REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS)"
 analysis_run_idempotency_tx_fix_authorization_runtime_status="$(state_value "$state_text" ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_STATUS)"
 analysis_run_idempotency_tx_fix_implementation_runtime_status="$(state_value "$state_text" ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_IMPLEMENTATION_STATUS)"
+final_runtime_home_closure_authorization_runtime_status="$(state_value "$state_text" V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_AUTHORIZATION_STATUS)"
+final_runtime_home_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_IMPLEMENTATION_STATUS)"
 local_real_authorization_runtime_status="$(state_value "$state_text" LOCAL_REAL_AUTHORIZATION_STATUS)"
 local_real_implementation_runtime_status="$(state_value "$state_text" LOCAL_REAL_IMPLEMENTATION_STATUS)"
 frontend_interaction_authorization_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_AUTHORIZATION_STATUS)"
@@ -412,10 +417,10 @@ case "$resolved_scope_profile" in
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: B01-B04 remediation resolved a forbidden Figma file." >&2; exit 1; }
-        elif [[ "$resolved_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" ]]; then
-          [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: idempotency remediation resolved with forbidden Figma permission." >&2; exit 1; }
-          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: idempotency remediation resolved with forbidden Mobile permission." >&2; exit 1; }
-          [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: idempotency remediation resolved a forbidden Figma file." >&2; exit 1; }
+        elif [[ "$resolved_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" || "$resolved_package" == "V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE" ]]; then
+          [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: bounded remediation resolved with forbidden Figma permission." >&2; exit 1; }
+          [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: bounded remediation resolved with forbidden Mobile permission." >&2; exit 1; }
+          [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: bounded remediation resolved a forbidden Figma file." >&2; exit 1; }
         elif [[ "$resolved_package" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: local-real package resolved with forbidden Mobile permission." >&2; exit 1; }
@@ -489,6 +494,8 @@ REAL_DATA_HOME_BLOCKER_CLOSURE_AUTHORIZATION_STATUS: $real_data_home_blocker_clo
 REAL_DATA_HOME_BLOCKER_CLOSURE_IMPLEMENTATION_STATUS: $real_data_home_blocker_closure_implementation_runtime_status
 ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_STATUS: $analysis_run_idempotency_tx_fix_authorization_runtime_status
 ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_IMPLEMENTATION_STATUS: $analysis_run_idempotency_tx_fix_implementation_runtime_status
+V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_AUTHORIZATION_STATUS: $final_runtime_home_closure_authorization_runtime_status
+V4_1_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE_IMPLEMENTATION_STATUS: $final_runtime_home_closure_implementation_runtime_status
 LOCAL_REAL_AUTHORIZATION_STATUS: $local_real_authorization_runtime_status
 LOCAL_REAL_IMPLEMENTATION_STATUS: $local_real_implementation_runtime_status
 FRONTEND_INTERACTION_AUTHORIZATION_STATUS: $frontend_interaction_authorization_runtime_status
