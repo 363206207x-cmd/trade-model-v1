@@ -1,5 +1,6 @@
 package org.example.trademodel.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -123,6 +124,54 @@ class AiProviderClientAdaptersTest {
         assertThat(transport.lastRequest.getBody()).doesNotContain("\"temperature\"");
         assertThat(transport.lastRequest.getBody()).doesNotContain("\"tools\"");
         assertThat(transport.lastRequest.getBody()).doesNotContain("xai-key");
+    }
+
+    @Test
+    void geminiDecisionChain_usesJsonModeAndApplicationSchemaValidation() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        properties.getBackgroundExecution().setStructuredMaxOutputTokens(3_333);
+        configure(properties.getGemini(), "gemini-key", "gemini-test", "https://gemini.test");
+        GeminiProviderClient client = new GeminiProviderClient(
+                properties, FakeTransport.responding(null), objectMapper);
+
+        AiHttpRequest request = client.buildDecisionChainHttpRequest(
+                "{}", AiDecisionChainRole.GEMINI_REVIEW, 1234, "gemini-test");
+        JsonNode body = objectMapper.readTree(request.getBody());
+
+        assertThat(body.path("generation_config").path("max_output_tokens").asInt()).isEqualTo(3_333);
+        assertThat(body.path("response_format").path("type").asText()).isEqualTo("text");
+        assertThat(body.path("response_format").path("mime_type").asText()).isEqualTo("application/json");
+        assertThat(body.path("response_format").has("schema")).isFalse();
+        assertThat(body.has("tools")).isFalse();
+
+        AiDecisionChainResult malformed = new AiDecisionChainResponseParser(objectMapper).parse(
+                AiProviderName.GEMINI, AiDecisionChainRole.GEMINI_REVIEW,
+                "{\"reviewResult\":\"APPROVE\",\"unexpected\":true}");
+        assertThat(malformed.successful()).isFalse();
+        assertThat(malformed.getFallbackReason()).startsWith("INVALID_");
+    }
+
+    @Test
+    void xaiDecisionChain_usesNativeStrictSchemaAndStructuredTokenBudget() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        properties.getBackgroundExecution().setStructuredMaxOutputTokens(3_333);
+        configure(properties.getXai(), "xai-key", "grok-test", "https://xai.test");
+        XaiProviderClient client = new XaiProviderClient(
+                properties, FakeTransport.responding(null), objectMapper);
+
+        AiHttpRequest request = client.buildDecisionChainHttpRequest(
+                "{}", AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test");
+        JsonNode body = objectMapper.readTree(request.getBody());
+        JsonNode format = body.path("text").path("format");
+
+        assertThat(body.path("max_output_tokens").asInt()).isEqualTo(3_333);
+        assertThat(format.path("type").asText()).isEqualTo("json_schema");
+        assertThat(format.path("name").asText()).isEqualTo("fundamental_ai_v41_grok_challenge");
+        assertThat(format.path("strict").asBoolean()).isTrue();
+        assertThat(format.path("schema").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(format.path("schema").path("required")).isNotEmpty();
+        assertThat(body.has("tools")).isFalse();
+        assertThat(request.getBody()).doesNotContain("xai-key");
     }
 
     @Test
