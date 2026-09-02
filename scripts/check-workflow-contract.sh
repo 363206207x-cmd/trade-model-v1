@@ -597,6 +597,7 @@ if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|doc
   fail "GPT background/Three-AI timeout closure authorization allowlist must not contain wildcards or directory-level grants"
 fi
 expected_implementation_paths="$(printf '%s\n' \
+  scripts/standard-release-postgresql-smoke.sh \
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java \
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java \
   src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java \
@@ -629,13 +630,15 @@ expected_implementation_paths="$(printf '%s\n' \
   src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java \
   src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java \
   src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
+  src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java \
   src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
+  src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java \
   src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java \
   src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java \
   src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
   src/test/java/org/example/trademodel/service/impl/DecisionChainServiceImplTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the thirty-seven authorized paths"
+  || fail "GPT background/Three-AI timeout implementation allowlist must contain exactly the forty authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "GPT background/Three-AI timeout implementation allowlist must not contain wildcards or directory-level grants"
 fi

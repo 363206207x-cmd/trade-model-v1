@@ -447,7 +447,7 @@ feasibility, account risk and source/config versions. It excludes raw candle
 walls, repeated prose, frontend copy, secrets and unrelated persistence fields.
 Structured output remains mandatory and truncation fails closed.
 
-Only the thirty-seven exact backend, migration, configuration and focused-test
+Only the forty exact backend, migration, configuration and focused-test
 paths in `docs/CODEX_NEXT_TASK.yml` are authorized. V1-V16, frontend, CSS,
 static assets, Home structure/copy, Provider algorithms, scoring/direction/Plan
 eligibility, Telegram real send, Production deployment and automatic trading
