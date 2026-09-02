@@ -29,7 +29,7 @@ baseline is `1c13286eb64bb5b074e960352f8e290a317eb704`.
 
 The authorization branch starts directly from that clean merged-main Head and
 does not weaken exact branch, package, path, gate-owner, secret, deployment or
-no-trade checks. The successor may change only the forty exact existing
+no-trade checks. The successor may change only the forty-two exact existing
 AnalysisRun/AITrace/provider/orchestrator/configuration/migration and focused
 test paths in `docs/CODEX_NEXT_TASK.yml`. V1-V16, direction/score/plan or AI
 role semantics, Home layout/copy/static assets, Telegram-send, Figma, Mobile,
@@ -37,9 +37,13 @@ Production and automatic trading remain blocked.
 
 The predecessor real Provider package is effective on merged main and private
 Staging with Binance, CoinGlass and exact-model readiness at 5/5. Its remaining
-runtime evidence found one bounded defect: `gpt-5.6-sol` is still treated as a
-30-second synchronous completion call, so no Candidate or downstream Gemini,
-Grok, Resolver and Rule Validation result can complete. The successor may
+runtime evidence first found that `gpt-5.6-sol` was treated as a 30-second
+synchronous completion call. Merged background execution now completes GPT,
+and exact-JAR private-Staging evidence narrowed the remaining bounded defects:
+Gemini rejects the oversized provider-side schema while accepting JSON mode
+with the existing strict application validator, and Grok's current adapter
+uses the compatibility token budget without provider-native strict schema.
+The successor may
 persist the existing AITrace background identity, recover the same response,
 compact the frozen input and run Gemini/Grok in parallel after GPT Candidate.
 

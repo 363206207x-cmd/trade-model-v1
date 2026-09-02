@@ -447,12 +447,20 @@ feasibility, account risk and source/config versions. It excludes raw candle
 walls, repeated prose, frontend copy, secrets and unrelated persistence fields.
 Structured output remains mandatory and truncation fails closed.
 
-Only the forty exact backend, migration, configuration and focused-test
+Only the forty-two exact backend, migration, configuration and focused-test
 paths in `docs/CODEX_NEXT_TASK.yml` are authorized. V1-V16, frontend, CSS,
 static assets, Home structure/copy, Provider algorithms, scoring/direction/Plan
 eligibility, Telegram real send, Production deployment and automatic trading
 remain blocked. No fake AI output may substitute for a failed role, and a real
 Final remains optional when Rule Validation legitimately blocks it.
+
+The same bounded package may correct the existing Gemini and xAI adapter
+request envelopes when private-Staging evidence proves a provider compatibility
+failure. Gemini may use provider JSON mode only while the existing application
+validator still enforces the complete frozen role schema. xAI may use its
+provider-native strict JSON Schema format. Both role calls use the existing
+structured-output token budget and remain fail closed on truncation or local
+schema failure. This adds no model fallback, AI authority or product field.
 
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
