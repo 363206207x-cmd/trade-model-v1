@@ -1,5 +1,6 @@
 package org.example.trademodel.service.readiness;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -8,7 +9,10 @@ import java.util.Map;
 import org.example.trademodel.ai.AiProviderReadinessService;
 import org.example.trademodel.ai.AiProviderRuntimeReadiness;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.localreal.LocalRealDataStatusService;
+import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.market.client.impl.RoutedPublicOhlcvProvider;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProviderReadinessServiceImpl implements ProviderReadinessService {
+    private static final long DEFAULT_FRESHNESS_TOLERANCE_MS = 30_000L;
     public static final String STATUS_CONNECTED = "CONNECTED";
     public static final String STATUS_CONFIGURED = "CONFIGURED";
     public static final String STATUS_NOT_CONFIGURED = "NOT_CONFIGURED";
@@ -31,6 +36,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     private AiProviderReadinessService aiProviderReadinessService;
     private CoinGlassProperties coinGlassProperties;
     private CoinGlassProviderHealthService coinGlassProviderHealthService;
+    private RoutedPublicOhlcvProvider routedPublicOhlcvProvider;
+    private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
+    private Clock clock = Clock.systemUTC();
 
     public ProviderReadinessServiceImpl(Environment environment) {
         this.environment = environment;
@@ -50,6 +58,13 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     void setCoinGlassReadiness(CoinGlassProperties properties, CoinGlassProviderHealthService healthService) {
         this.coinGlassProperties = properties;
         this.coinGlassProviderHealthService = healthService;
+    }
+
+    @Autowired(required = false)
+    void setProductionMarketDataReadiness(RoutedPublicOhlcvProvider provider,
+                                          PersistedOhlcvBarMapper mapper) {
+        this.routedPublicOhlcvProvider = provider;
+        this.persistedOhlcvBarMapper = mapper;
     }
 
     @Override
@@ -84,6 +99,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     private ProviderReadinessVO.ProviderStatusVO marketDataStatus() {
         if (localRealDataStatusService != null) {
             return localRealMarketDataStatus();
+        }
+        if (routedPublicOhlcvProvider != null && persistedOhlcvBarMapper != null) {
+            return productionMarketDataStatus();
         }
         String providerType = upper(firstNonBlank(property("position.provider.type"), "DISABLED"));
         if ("BINANCE".equals(providerType)) {
@@ -135,6 +153,119 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
                 false,
                 "UNKNOWN_MARKET_PROVIDER_TYPE"
         );
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO productionMarketDataStatus() {
+        String provider = upper(firstNonBlank(routedPublicOhlcvProvider.primaryProvider(), "UNKNOWN"));
+        String providerName = provider + "_PUBLIC_MARKET_DATA";
+        try {
+            Map<String, PublicProviderHealthSnapshot> healthByProvider = routedPublicOhlcvProvider.health();
+            PublicProviderHealthSnapshot health = healthByProvider == null
+                    ? null : healthByProvider.get(provider.toLowerCase(Locale.ROOT));
+            PersistedOhlcvBarDO latest = persistedOhlcvBarMapper.selectLatestClosedBarBySource(
+                    persistedProvider(provider), "SPOT");
+            String freshness = persistedFreshness(latest, provider);
+            boolean runtimeReady = runtimeProviderReady(health, latest);
+            boolean connected = runtimeReady && "FRESH".equals(freshness);
+
+            if (connected) {
+                return item("MARKET_DATA", providerName, STATUS_CONNECTED,
+                        true, true, true, provider + "_RUNTIME_PROVIDER_VERIFIED_FRESH");
+            }
+            if (providerHealthFailed(health)) {
+                return item("MARKET_DATA", providerName, STATUS_FAIL_CLOSED,
+                        true, true, false, providerFailureReason(provider, health));
+            }
+            if ("STALE".equals(freshness) || "INVALID".equals(freshness)) {
+                return item("MARKET_DATA", providerName, STATUS_FAIL_CLOSED,
+                        true, true, false, provider + "_MARKET_DATA_" + freshness);
+            }
+            return item("MARKET_DATA", providerName, STATUS_WAITING_SYNC,
+                    true, true, false, provider + "_RUNTIME_PROVIDER_NOT_READY");
+        } catch (RuntimeException ex) {
+            return item("MARKET_DATA", providerName, STATUS_FAIL_CLOSED,
+                    true, true, false, provider + "_RUNTIME_PROVIDER_STATUS_UNAVAILABLE");
+        }
+    }
+
+    private boolean runtimeProviderReady(PublicProviderHealthSnapshot health,
+                                         PersistedOhlcvBarDO latest) {
+        if (health == null || health.circuitOpen() || health.lastSuccessAt() == null
+                || !"UP".equals(upper(health.status()))) {
+            return false;
+        }
+        Long timeframeMs = latest == null ? null : timeframeMs(latest.getTimeframe());
+        if (timeframeMs == null) {
+            return false;
+        }
+        long ageMs = clock.millis() - health.lastSuccessAt().toEpochMilli();
+        return ageMs >= 0L && ageMs <= timeframeMs + freshnessToleranceMs();
+    }
+
+    private String persistedFreshness(PersistedOhlcvBarDO latest, String provider) {
+        if (latest == null || latest.getCloseTimeMs() == null) {
+            return "NO_DATA";
+        }
+        if (!persistedProvider(provider).equalsIgnoreCase(trim(latest.getProvider()))
+                || !"SPOT".equalsIgnoreCase(trim(latest.getProviderMarketType()))
+                || !"READY".equalsIgnoreCase(trim(latest.getSourceStatus()))
+                || !"FRESH".equalsIgnoreCase(trim(latest.getFreshnessStatus()))) {
+            return "INVALID";
+        }
+        Long timeframeMs = timeframeMs(latest.getTimeframe());
+        if (timeframeMs == null) {
+            return "INVALID";
+        }
+        long ageMs = clock.millis() - latest.getCloseTimeMs();
+        if (ageMs < 0L) {
+            return "INVALID";
+        }
+        return ageMs <= timeframeMs + freshnessToleranceMs() ? "FRESH" : "STALE";
+    }
+
+    private boolean providerHealthFailed(PublicProviderHealthSnapshot health) {
+        if (health == null) {
+            return false;
+        }
+        String status = upper(health.status());
+        return health.circuitOpen()
+                || "DEGRADED".equals(status)
+                || "REGION_RESTRICTED".equals(status)
+                || "GEO_RESTRICTED".equals(status)
+                || "ERROR".equals(status);
+    }
+
+    private String providerFailureReason(String provider, PublicProviderHealthSnapshot health) {
+        if (health != null && health.circuitOpen()) {
+            return provider + "_PROVIDER_CIRCUIT_OPEN";
+        }
+        return provider + "_RUNTIME_PROVIDER_DEGRADED";
+    }
+
+    private long freshnessToleranceMs() {
+        String configured = property("trade-model.ohlcv.freshness-tolerance-ms");
+        if (!hasText(configured)) {
+            return DEFAULT_FRESHNESS_TOLERANCE_MS;
+        }
+        try {
+            return Math.max(0L, Long.parseLong(configured.trim()));
+        } catch (NumberFormatException ex) {
+            return DEFAULT_FRESHNESS_TOLERANCE_MS;
+        }
+    }
+
+    private static Long timeframeMs(String timeframe) {
+        return switch (timeframe == null ? "" : timeframe.trim().toLowerCase(Locale.ROOT)) {
+            case "5m" -> 5L * 60_000L;
+            case "15m" -> 15L * 60_000L;
+            case "1h" -> 60L * 60_000L;
+            case "4h" -> 4L * 60L * 60_000L;
+            default -> null;
+        };
+    }
+
+    private static String persistedProvider(String provider) {
+        return "BINANCE".equalsIgnoreCase(provider) ? "BINANCE_PUBLIC" : provider;
     }
 
     private ProviderReadinessVO.ProviderStatusVO localRealMarketDataStatus() {

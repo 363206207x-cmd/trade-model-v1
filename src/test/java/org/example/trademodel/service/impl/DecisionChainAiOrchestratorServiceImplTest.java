@@ -123,12 +123,13 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
-    void decisionChainProviderTimeoutCannotExceedEightSecondContract() {
+    void decisionChainUsesValidatedProviderTimeoutBeyondLegacyEightSecondFields() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
         AiOrchestratorProperties properties = new AiOrchestratorProperties();
-        properties.setOverallTimeoutMs(25_000);
+        properties.setRequestTimeoutMs(1);
+        properties.setOverallTimeoutMs(1);
         properties.getProviderTimeouts().setOverallMs(25_000);
         properties.getProviderTimeouts().setOpenaiMs(25_000);
         when(usageGuard.evaluate(gpt, "analysis-1"))
@@ -142,7 +143,53 @@ class DecisionChainAiOrchestratorServiceImplTest {
 
         service.invoke(request(AiDecisionChainRole.GPT_FINAL));
 
-        verify(gpt).executeDecisionChain(any(), eq(8_000L));
+        verify(gpt).executeDecisionChain(any(), eq(25_000L));
+    }
+
+    @Test
+    void invalidOverallTimeoutFailsClosedWithoutCallingProvider() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiOrchestratorProperties properties = new AiOrchestratorProperties();
+        properties.getProviderTimeouts().setOverallMs(4_999);
+        properties.getProviderTimeouts().setOpenaiMs(4_000);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenReturn(new AiCallLogDO());
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, properties);
+
+        AiDecisionChainResult result = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getFallbackReason()).isEqualTo("ORCHESTRATOR_TIMEOUT_CONFIG_INVALID");
+        verify(gpt, never()).executeDecisionChain(any(), anyLong());
+        verify(callLogService).completeDecisionChainCall(any(), eq(result));
+    }
+
+    @Test
+    void providerTimeoutAboveOverallFailsClosedWithoutCallingProvider() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        AiOrchestratorProperties properties = new AiOrchestratorProperties();
+        properties.getProviderTimeouts().setOverallMs(20_000);
+        properties.getProviderTimeouts().setOpenaiMs(25_000);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenReturn(new AiCallLogDO());
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, properties);
+
+        AiDecisionChainResult result = service.invoke(request(AiDecisionChainRole.GPT_FINAL));
+
+        assertThat(result.successful()).isFalse();
+        assertThat(result.getFallbackReason()).isEqualTo("PROVIDER_TIMEOUT_CONFIG_INVALID");
+        verify(gpt, never()).executeDecisionChain(any(), anyLong());
+        verify(callLogService).completeDecisionChainCall(any(), eq(result));
     }
 
     @Test
@@ -167,7 +214,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
         assertThat(first.getCallStatus()).isNotEqualTo(AiProviderCallStatus.RATE_LIMITED);
         assertThat(limited.getCallStatus()).isEqualTo(AiProviderCallStatus.RATE_LIMITED);
         assertThat(limited.getFallbackReason()).isEqualTo("ASSET_ROLE_FREQUENCY_LIMITED");
-        verify(gpt).executeDecisionChain(any(), eq(8_000L));
+        verify(gpt).executeDecisionChain(any(), eq(10_000L));
         verify(callLogService, org.mockito.Mockito.times(2)).completeDecisionChainCall(any(), any());
     }
 

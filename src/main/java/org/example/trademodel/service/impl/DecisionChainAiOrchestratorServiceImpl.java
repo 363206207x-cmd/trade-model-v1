@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOrchestratorService {
-    private static final long MAX_DECISION_CHAIN_TIMEOUT_MS = 8_000L;
     private static final Set<String> CACHE_VOLATILE_FIELDS = Set.of(
             "analysisId", "traceId", "requestId", "opportunityId", "candidateId",
             "evidenceId", "scoreId", "sourceTraceId");
@@ -180,12 +179,12 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                     AiProviderCallStatus.RATE_LIMITED, "AI_CONCURRENCY_LIMITED");
         } else {
             try {
-                long timeoutMs = effectiveTimeoutMs(client.provider());
-                if (timeoutMs <= 0L) {
+                String timeoutFailure = timeoutConfigurationFailure(client.provider());
+                if (timeoutFailure != null) {
                     result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
-                            AiProviderCallStatus.FAILED, "AI_TIMEOUT_NOT_CONFIGURED");
+                            AiProviderCallStatus.FAILED, timeoutFailure);
                 } else {
-                    result = client.executeDecisionChain(request, timeoutMs);
+                    result = client.executeDecisionChain(request, effectiveTimeoutMs(client.provider()));
                 }
             } catch (Exception exception) {
                 result = AiDecisionChainResult.failed(client.provider(), request.getRole(),
@@ -228,16 +227,15 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
     }
 
     private long effectiveTimeoutMs(AiProviderName provider) {
-        long requestOverall = properties.getOverallTimeoutMs();
-        long providerGroupOverall = properties.getProviderTimeouts() == null
-                ? requestOverall : properties.getProviderTimeouts().getOverallMs();
-        long providerTimeout = properties.getProviderTimeouts() == null
-                ? properties.getRequestTimeoutMs() : properties.getProviderTimeouts().timeoutMs(provider);
-        if (requestOverall <= 0 || providerGroupOverall <= 0 || providerTimeout <= 0) {
-            return 0L;
+        return properties.getProviderTimeouts().timeoutMs(provider);
+    }
+
+    private String timeoutConfigurationFailure(AiProviderName provider) {
+        AiOrchestratorProperties.ProviderTimeouts timeouts = properties.getProviderTimeouts();
+        if (timeouts == null || !timeouts.validOverall()) {
+            return "ORCHESTRATOR_TIMEOUT_CONFIG_INVALID";
         }
-        return Math.min(MAX_DECISION_CHAIN_TIMEOUT_MS,
-                Math.min(providerTimeout, Math.min(providerGroupOverall, requestOverall)));
+        return timeouts.validProvider(provider) ? null : "PROVIDER_TIMEOUT_CONFIG_INVALID";
     }
 
     private boolean acquireAssetRoleFrequency(AiDecisionChainRequest request) {

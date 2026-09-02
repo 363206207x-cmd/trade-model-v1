@@ -1,16 +1,26 @@
 package org.example.trademodel.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.net.http.HttpClient;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.localreal.LocalRealDataStatusService;
+import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
+import org.example.trademodel.market.client.impl.RoutedPublicOhlcvProvider;
 import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
@@ -186,6 +196,97 @@ class ProviderReadinessServiceImplTest {
     }
 
     @Test
+    void productionRuntimeRequiresCachedProviderSuccessAndSourceOwnedFreshClosedBar() {
+        Instant now = Instant.parse("2026-09-02T10:00:00Z");
+        RoutedPublicOhlcvProvider routed = mock(RoutedPublicOhlcvProvider.class);
+        PersistedOhlcvBarMapper mapper = mock(PersistedOhlcvBarMapper.class);
+        when(routed.primaryProvider()).thenReturn("BINANCE");
+        when(routed.health()).thenReturn(Map.of("binance", providerHealth("BINANCE", "UP", now.minusSeconds(20))));
+        when(mapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
+                .thenReturn(closedBar("BINANCE_PUBLIC", "5m", now.minusSeconds(60)));
+        ProviderReadinessServiceImpl service = productionService(routed, mapper, now);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("CONNECTED");
+        assertThat(readiness.getDataSourceText()).isEqualTo("Binance public data / CONNECTED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("BINANCE_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isTrue();
+                assertThat(provider.getReason()).isEqualTo("BINANCE_RUNTIME_PROVIDER_VERIFIED_FRESH");
+            }
+        });
+        verify(mapper).selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT");
+        verify(routed, never()).fetchClosedBars(anyString(), anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void productionRuntimeFailsClosedWhenPersistedClosedBarIsStale() {
+        Instant now = Instant.parse("2026-09-02T10:00:00Z");
+        RoutedPublicOhlcvProvider routed = mock(RoutedPublicOhlcvProvider.class);
+        PersistedOhlcvBarMapper mapper = mock(PersistedOhlcvBarMapper.class);
+        when(routed.primaryProvider()).thenReturn("BINANCE");
+        when(routed.health()).thenReturn(Map.of("binance", providerHealth("BINANCE", "UP", now.minusSeconds(20))));
+        when(mapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
+                .thenReturn(closedBar("BINANCE_PUBLIC", "5m", now.minusSeconds(6 * 60L)));
+        ProviderReadinessServiceImpl service = productionService(routed, mapper, now);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("FAIL_CLOSED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("BINANCE_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("BINANCE_MARKET_DATA_STALE");
+            }
+        });
+    }
+
+    @Test
+    void productionRuntimeDoesNotInferConnectedFromFreshPersistenceWithoutCurrentRuntimeHealth() {
+        Instant now = Instant.parse("2026-09-02T10:00:00Z");
+        RoutedPublicOhlcvProvider routed = mock(RoutedPublicOhlcvProvider.class);
+        PersistedOhlcvBarMapper mapper = mock(PersistedOhlcvBarMapper.class);
+        when(routed.primaryProvider()).thenReturn("BINANCE");
+        when(routed.health()).thenReturn(Map.of("binance", providerHealth("BINANCE", "NOT_USED", null)));
+        when(mapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
+                .thenReturn(closedBar("BINANCE_PUBLIC", "5m", now.minusSeconds(60)));
+        ProviderReadinessServiceImpl service = productionService(routed, mapper, now);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("WAITING_SYNC");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("BINANCE_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("BINANCE_RUNTIME_PROVIDER_NOT_READY");
+            }
+        });
+    }
+
+    @Test
+    void productionRuntimeRejectsPersistedBarOwnedByAnotherProvider() {
+        Instant now = Instant.parse("2026-09-02T10:00:00Z");
+        RoutedPublicOhlcvProvider routed = mock(RoutedPublicOhlcvProvider.class);
+        PersistedOhlcvBarMapper mapper = mock(PersistedOhlcvBarMapper.class);
+        when(routed.primaryProvider()).thenReturn("BINANCE");
+        when(routed.health()).thenReturn(Map.of("binance", providerHealth("BINANCE", "UP", now.minusSeconds(20))));
+        when(mapper.selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT"))
+                .thenReturn(closedBar("KRAKEN", "5m", now.minusSeconds(60)));
+        ProviderReadinessServiceImpl service = productionService(routed, mapper, now);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getMarketDataProviderStatus()).isEqualTo("FAIL_CLOSED");
+        assertThat(readiness.getProviders()).anySatisfy(provider -> {
+            if ("BINANCE_PUBLIC_MARKET_DATA".equals(provider.getName())) {
+                assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getReason()).isEqualTo("BINANCE_MARKET_DATA_INVALID");
+            }
+        });
+    }
+
+    @Test
     void coinGlassReadinessRequiresAllFourCapabilitiesWithinConfiguredTtl() {
         ProviderReadinessServiceImpl service = service(new MockEnvironment());
         CoinGlassProperties properties = coinGlassProperties();
@@ -237,6 +338,33 @@ class ProviderReadinessServiceImplTest {
 
     private ProviderReadinessServiceImpl service(MockEnvironment environment) {
         return new ProviderReadinessServiceImpl(environment);
+    }
+
+    private ProviderReadinessServiceImpl productionService(RoutedPublicOhlcvProvider routed,
+                                                            PersistedOhlcvBarMapper mapper,
+                                                            Instant now) {
+        ProviderReadinessServiceImpl service = service(new MockEnvironment()
+                .withProperty("trade-model.ohlcv.freshness-tolerance-ms", "30000"));
+        ReflectionTestUtils.setField(service, "routedPublicOhlcvProvider", routed);
+        ReflectionTestUtils.setField(service, "persistedOhlcvBarMapper", mapper);
+        ReflectionTestUtils.setField(service, "clock", Clock.fixed(now, ZoneOffset.UTC));
+        return service;
+    }
+
+    private PublicProviderHealthSnapshot providerHealth(String provider, String status, Instant lastSuccessAt) {
+        return new PublicProviderHealthSnapshot(provider, status, lastSuccessAt, null, false, null);
+    }
+
+    private PersistedOhlcvBarDO closedBar(String provider, String timeframe, Instant closeTime) {
+        PersistedOhlcvBarDO bar = new PersistedOhlcvBarDO();
+        bar.setProvider(provider);
+        bar.setProviderMarketType("SPOT");
+        bar.setTimeframe(timeframe);
+        bar.setCloseTimeMs(closeTime.toEpochMilli());
+        bar.setClosed(true);
+        bar.setSourceStatus("READY");
+        bar.setFreshnessStatus("FRESH");
+        return bar;
     }
 
     private CoinGlassProperties coinGlassProperties() {
