@@ -31,11 +31,19 @@ product baseline remains
 The authorization branch starts directly from current clean merged main while
 the exact product baseline is that merged-main Head. This is allowed only for
 this package and does not weaken exact branch, package, path, gate-owner,
-secret, deployment or no-trade checks. The successor may change only the nine
+secret, deployment or no-trade checks. The successor may change only the twelve
 exact existing Provider/Evidence/readiness owner and focused-test paths in
 `docs/CODEX_NEXT_TASK.yml`. No Schema, migration, direction/score/plan or AI
 role contract, Home layout/copy/static asset, Telegram-send, Figma, Mobile,
 Production or automatic-trading change is authorized.
+
+Private-Staging evidence after the first implementation merge proved two
+additional existing-owner gaps: production readiness was not consuming the
+already persisted and runtime-verified Binance source, and the decision-chain
+adapter capped provider-specific timeouts at the obsolete eight-second
+compatibility value. The amended exact allowlist adds only those two existing
+production owners and the existing decision-chain focused test; it does not
+authorize a new Provider, algorithm, object, endpoint, or UI behavior.
 
 Capability movement in this gate package is `NONE`. Private Staging deployment
 is eligible only after the gate and implementation PRs pass exact-head checks

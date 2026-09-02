@@ -24,7 +24,7 @@ active_block_cn: "Owner 授权的真实 Binance、CoinGlass 与三 AI 运行链�
 next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue the real Provider and Three-AI runtime closure."
 next_business_phase: "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and nine-file implementation allowlist are required after this authorization is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and twelve-file implementation allowlist are required after this authorization is effective on merged main."
 
 production_deployment_readiness: "BLOCKED"
 

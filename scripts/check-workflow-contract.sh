@@ -597,13 +597,16 @@ expected_implementation_paths="$(printf '%s\n' \
   src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java \
   src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java \
   src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java \
+  src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java \
+  src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java \
   src/test/java/org/example/trademodel/ai/AiProviderReadinessServiceTest.java \
   src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java \
   src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java \
   src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java \
-  src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java)"
+  src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java \
+  src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "real Provider/Three-AI implementation allowlist must contain exactly the nine authorized paths"
+  || fail "real Provider/Three-AI implementation allowlist must contain exactly the twelve authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "real Provider/Three-AI implementation allowlist must not contain wildcards or directory-level grants"
 fi
@@ -615,7 +618,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_NINE_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
