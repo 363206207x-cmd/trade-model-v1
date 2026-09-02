@@ -105,6 +105,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private static final int DEFAULT_LIMIT = 6;
     private static final int MAX_LIMIT = 12;
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+    private static final Map<String, String> ASSET_DISPLAY_NAMES = Map.ofEntries(
+            Map.entry("BTC", "Bitcoin"),
+            Map.entry("ETH", "Ethereum"),
+            Map.entry("SOL", "Solana"),
+            Map.entry("BNB", "BNB"),
+            Map.entry("XRP", "XRP"),
+            Map.entry("ADA", "Cardano"),
+            Map.entry("DOGE", "Dogecoin"),
+            Map.entry("LINK", "Chainlink"),
+            Map.entry("AAVE", "Aave"),
+            Map.entry("TAO", "Bittensor"),
+            Map.entry("SUI", "Sui"),
+            Map.entry("ARB", "Arbitrum")
+    );
     private static final String BOUNDARY_INCOMPLETE_VALID_PERIOD = "边界不足，等待结构确认";
     private static final Pattern LEGACY_VALID_PERIOD_RANGE = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*~\\s*"
@@ -612,7 +626,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 "riskLevel",
                 "系统风险",
                 null,
-                "—",
+                "当前不可查看",
                 "未取得系统级风险生产者",
                 "SOURCE_UNAVAILABLE",
                 null
@@ -662,13 +676,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             hotMeta.put("triggerValue", systemStatus.getHotResetTriggerValue());
             hotMeta.put("time", systemStatus.getHotResetTime());
         }
+        String hotResetStateLabel = Boolean.TRUE.equals(hotResetFired) ? "已触发" : "关闭";
         DashboardHomeVO.StatusCardVO hotReset = card(
                 "hotReset",
                 "热重置",
                 hotResetFired,
-                hotResetFired == null ? "—" : Boolean.TRUE.equals(hotResetFired) ? "已触发" : "关闭",
-                hotResetFired == null ? "未取得 Hot Reset 状态" : "正式系统状态",
+                hotResetLabel(hotResetFired, systemStatus != null ? systemStatus.getHotResetSymbol() : null,
+                        hotResetStateLabel),
+                hotResetFired == null ? "未取得 Hot Reset 状态"
+                        : Boolean.TRUE.equals(hotResetFired) ? "正式系统事件及作用域" : "正式系统状态",
                 hotResetFired == null ? "SOURCE_UNAVAILABLE"
+                        : Boolean.TRUE.equals(hotResetFired) && !hasText(systemStatus.getHotResetSymbol())
+                        ? "TRIGGERED_SCOPE_UNKNOWN"
                         : Boolean.TRUE.equals(hotResetFired) ? "TRIGGERED" : "INACTIVE",
                 null
         );
@@ -735,12 +754,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.PositionVO> positions = positionRows == null
                 ? List.of() : positionRows.allRows();
         if (positions.isEmpty()) {
-            return card("accountStatus", "账户·已录入", 0, "—",
+            return card("accountStatus", "账户·已录入", 0, "0 笔",
                     "活动持仓 0", "EMPTY", 0);
         }
+        String highestRisk = positions.stream()
+                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .map(DashboardHomeVO.PositionVO::getRiskLevel)
+                .filter(this::recognizedPositionRisk)
+                .max(Comparator.comparingInt(this::positionRiskRank))
+                .orElse(null);
+        String riskSummary = highestRisk == null ? "待评估" : riskLabel(highestRisk) + "风险";
+        String coverage = accountRiskCoverage(positionRows);
+        String positionCountLabel = positions.size() + " 笔";
         return card("accountStatus", "账户·已录入", positions.size(),
-                positions.size() + " 笔",
-                "全部活动持仓（OPEN + PARTIALLY_CLOSED）", "AVAILABLE", positions.size());
+                positionCountLabel + " · " + riskSummary,
+                "活动持仓（OPEN + PARTIALLY_CLOSED） · " + coverage,
+                highestRisk == null ? "PARTIAL" : "AVAILABLE", positions.size());
     }
 
     private int positionRiskRank(String riskLevel) {
@@ -760,16 +789,32 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return card("serviceAvailability", "服务可用性", null, "—",
                     "未取得正式可用数与服务总数", "SOURCE_UNAVAILABLE", null);
         }
-        long available = providers.stream()
+        List<ProviderReadinessVO.ProviderStatusVO> activeProviders = providers.stream()
+                .filter(Objects::nonNull)
+                .filter(provider -> Boolean.TRUE.equals(provider.getEnabled())
+                        || Boolean.TRUE.equals(provider.getConnected()))
+                .toList();
+        if (activeProviders.isEmpty()) {
+            return card("serviceAvailability", "服务可用性", 0, "未启用",
+                    "ProviderReadiness.providers 中没有启用的运行能力", "NOT_APPLICABLE", 0);
+        }
+        long available = activeProviders.stream()
                 .filter(provider -> Boolean.TRUE.equals(provider.getConnected()))
                 .filter(provider -> "CONNECTED".equalsIgnoreCase(trimToNull(provider.getStatus())))
                 .count();
-        int total = providers.size();
+        int total = activeProviders.size();
         String status = available == total ? "AVAILABLE"
                 : available > 0 ? "PARTIAL" : "UNAVAILABLE";
         return card("serviceAvailability", "服务可用性", available,
                 available + "/" + total + " 可用",
-                "ProviderReadiness.providers", status, total);
+                "ProviderReadiness.providers（仅启用的运行能力）", status, total);
+    }
+
+    private String hotResetLabel(Boolean fired, String symbol, String stateLabel) {
+        if (fired == null) return "当前不可查看";
+        if (!fired) return stateLabel;
+        String scope = toDisplaySymbol(symbol);
+        return stateLabel + " · " + (hasText(scope) ? scope : "作用域未知");
     }
 
     private List<DashboardHomeVO.AlertRowVO> buildAlerts(List<MonitorAlertDO> alerts) {
@@ -860,7 +905,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             usedAssetIds.add(projection.assetId());
             usedSymbols.add(symbol);
             asset.setAssetId(projection.assetId());
-            asset.setName(projection.name());
+            asset.setName(canonicalAssetName(symbol, projection.name()));
             if (projection.sourceDecision() != null) {
                 asset.setAnalysisId(projection.analysisId());
                 asset.setOpportunityId(projection.opportunityId());
@@ -892,6 +937,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                         decision.getOneHourOpportunityQuality()));
                 asset.setFourHourTrendLabel(fourHourTrendLabel(asset.getFinalMarketBias(),
                         decision.getFourHourTrendAlignment()));
+            } else {
+                applyNonFinalCardSemantics(asset);
             }
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
@@ -1094,12 +1141,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setAiDecisionResult(null);
         asset.setDataQualityScore(null);
         asset.setMarketBias(null);
-        asset.setMarketBiasLabel(null);
+        asset.setMarketBiasLabel("观望");
         asset.setCompositeScore(null);
         asset.setConfidenceLevel(null);
-        asset.setConfidenceLabel(null);
+        asset.setConfidenceLabel("—");
         asset.setRiskLevel(null);
-        asset.setRiskLabel(null);
+        asset.setRiskLabel("未知");
         asset.setWorthOpening(null);
         clearCardFinalProjection(asset);
         asset.setOpportunityState(observationState);
@@ -1111,8 +1158,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setRankingReason(trimToNull(projection.rankingReason()));
         asset.setLatestAnalysisTime(formalAnalysisId == null ? null : projection.analysisTime());
         asset.setCurrentConclusion(observationStateLabel(observationState));
-        asset.setOneHourOpportunityLabel(observationOneHourLabel(observationState));
-        asset.setFourHourTrendLabel(observationFourHourLabel(projection));
+        asset.setOneHourOpportunityLabel("1小时数据不足");
+        asset.setFourHourTrendLabel("4小时数据不足");
         applyPersistedMarketData(asset, normalizeSymbol(projection.symbol()));
         asset.setDataFreshness(missingFormalAnalysis
                 ? "NEVER_SCANNED" : trimToNull(projection.freshness()));
@@ -1122,6 +1169,22 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setModuleState("NEVER_SCANNED".equalsIgnoreCase(observationState)
                 ? "MISSING" : "PARTIAL");
         return asset;
+    }
+
+    private void applyNonFinalCardSemantics(DashboardHomeVO.AssetVO asset) {
+        if (asset == null) return;
+        asset.setMarketBias(null);
+        asset.setMarketBiasLabel("观望");
+        asset.setConfidenceLevel(null);
+        asset.setConfidenceLabel("—");
+        asset.setRiskLevel(null);
+        asset.setRiskLabel("未知");
+        asset.setWorthOpening(null);
+        asset.setOneHourOpportunityLabel("1小时数据不足");
+        asset.setFourHourTrendLabel("4小时数据不足");
+        setFieldSource(asset, "direction", "MISSING");
+        setFieldSource(asset, "confidence", "MISSING");
+        setFieldSource(asset, "riskLevel", "MISSING");
     }
 
     private void clearCardFinalProjection(DashboardHomeVO.AssetVO asset) {
@@ -1157,22 +1220,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (MarketBiasPolicy.bullishFamily(bias)) return "4小时趋势偏多";
         if (MarketBiasPolicy.bearishFamily(bias)) return "4小时趋势偏空";
         return "4小时趋势震荡";
-    }
-
-    private String observationOneHourLabel(String state) {
-        return switch (state == null ? "" : state.trim().toUpperCase(Locale.ROOT)) {
-            case "NO_QUALIFIED_OPPORTUNITY" -> "1小时观察";
-            case "CANDIDATE" -> "1小时计划生成中";
-            default -> "1小时待验证";
-        };
-    }
-
-    private String observationFourHourLabel(HomeTopAssetProjection projection) {
-        if (projection == null || "STALE".equalsIgnoreCase(projection.freshness())
-                || "NEVER_SCANNED".equalsIgnoreCase(projection.freshness())) {
-            return "4小时数据不足";
-        }
-        return "4小时趋势待验证";
     }
 
     private String authoritativeObservationAnalysisId(HomeTopAssetProjection projection, Long userId) {
@@ -1514,6 +1561,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             setFieldSource(asset, field, "MISSING");
         }
         return asset;
+    }
+
+    private String canonicalAssetName(String symbol, String suppliedName) {
+        String normalized = normalizeSymbol(symbol);
+        if (normalized == null) return trimToNull(suppliedName);
+        String base = normalized.endsWith("USDT") && normalized.length() > 4
+                ? normalized.substring(0, normalized.length() - 4) : normalized;
+        String supplied = trimToNull(suppliedName);
+        if (supplied != null
+                && !supplied.equalsIgnoreCase(base)
+                && !normalizeSymbol(supplied).equals(normalized)) {
+            return supplied;
+        }
+        return ASSET_DISPLAY_NAMES.getOrDefault(base, supplied != null ? supplied : base);
     }
 
     private void applyDataQuality(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {

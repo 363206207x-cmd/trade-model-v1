@@ -64,10 +64,15 @@ class ApprovedFigmaHomeRuntimeContractTest {
         assertThat(cardRule).contains("height: 120px", "padding: 8px 10px")
                 .doesNotContain("overflow: hidden");
         assertThat(css).contains(
-                ".opportunity-final { display: grid; grid-template-columns: 1fr;",
-                ".opportunity-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));",
+                "grid-template-rows: repeat(4, minmax(0, 1fr))",
+                ".opportunity-final { display: flex;",
+                ".opportunity-metrics { display: flex;",
                 ".opportunity-context { min-width: 0; display: flex;",
                 ".opportunity-context span { min-width: 0; white-space: nowrap;");
+        assertThat(css.substring(css.indexOf(".opportunity-final {"), css.indexOf(".opportunity-price")))
+                .doesNotContain("text-overflow: ellipsis");
+        assertThat(css.substring(css.indexOf(".opportunity-context {"), css.indexOf(".section-empty")))
+                .doesNotContain("text-overflow: ellipsis");
     }
 
     @Test
@@ -90,8 +95,30 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "开仓被冲突阻断：冲突升高", "多模型冲突升高", "多周期收敛弱",
                 "ERROR: \"读取失败\"", "WARN: \"需关注\"", "NOT_CALLED: \"尚未调用\"",
                 "REGION_RESTRICTED: \"当前区域不可用\"", "PARTIAL: \"数据不完整\"",
-                "userFacingAlertMessage(alert.message)")
+                "var alertScope = has(alert.symbol)",
+                "alertScope + \" · \" + userFacingAlertMessage(alert.message)")
                 .doesNotContain("querySelector(\"strong\").textContent = text(alert.message");
+    }
+
+    @Test
+    void homeKeepsExactlyFivePrimaryRoutesAndGroupsSecondaryTools() throws Exception {
+        String html = Files.readString(HOME);
+        String script = Files.readString(SCRIPT);
+        String primaryNav = html.substring(html.indexOf("<nav class=\"rail-nav\""),
+                html.indexOf("</nav>", html.indexOf("<nav class=\"rail-nav\"")));
+        String secondaryNav = html.substring(html.indexOf("<nav class=\"rail-footer\""),
+                html.indexOf("</nav>", html.indexOf("<nav class=\"rail-footer\"")));
+
+        assertThat(primaryNav).contains(
+                        "href=\"/dashboard\"", "href=\"/positions\"", "href=\"/analysis\"",
+                        "href=\"/messages\"", "href=\"/me\"")
+                .doesNotContain("/asset-pool", "/calendar", "#systemStatusStrip");
+        assertThat(count(primaryNav, "<a ")).isEqualTo(5);
+        assertThat(secondaryNav).contains(
+                "aria-label=\"次级工具\"", "aria-label=\"资产池\" title=\"资产池\"",
+                "aria-label=\"事件日历\" title=\"事件日历\"",
+                "aria-label=\"系统状态\" title=\"系统状态\"");
+        assertThat(html + script).doesNotContain("?continue", "&continue", "continue=");
     }
 
     @Test
@@ -104,7 +131,8 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "validOpportunityCard(asset) || validObservationCard(asset)", ".slice(0, 6)",
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "has(asset.confidenceLevel)", "has(asset.riskLevel)",
-                "String(asset && asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
+                "[\"OBSERVATION\", \"DECISION\"].indexOf(slotType) >= 0",
+                "asset.marketBiasLabel", "asset.confidenceLabel", "asset.riskLabel",
                 "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
@@ -175,19 +203,20 @@ class ApprovedFigmaHomeRuntimeContractTest {
         assertThat(script).contains(
                 "var assets = all.filter(function (asset)",
                 "validOpportunityCard(asset) || validObservationCard(asset)",
-                "String(asset.slotType || \"\").toUpperCase() === \"OBSERVATION\"",
                 ".slice(0, 6)",
-                "setText(\"opportunityHeading\", \"资产\")",
+                "setText(\"opportunityHeading\", [\"机会资产\", assets.length].join(\" · \"))",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"]",
-                "function observationCard(asset, selected)",
-                "function opportunityDataNotice(asset)", "周期冲突", "数据过期",
+                "function assetTicker(asset)",
+                "asset.marketBiasLabel", "asset.confidenceLabel", "asset.riskLabel",
                 "await api(\"/api/asset-pool\", { method: \"POST\"",
                 "await api(\"/api/asset-pool/search/\"",
                 "window.location.assign(\"/analysis/\"")
                 .doesNotContain(
+                        "function observationCard(asset, selected)",
+                        "<small>状态</small>", "<small>数据</small>", "数据新鲜",
                         "assetPoolSymbols.size", "assetPoolCount + assets.length",
                         "selectedSearchAsset.opportunityScore", "selectedSearchAsset.opportunityId");
     }
@@ -224,5 +253,15 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "const dirty = JSON.stringify(formJson(form)) !== form.dataset.initialSettings",
                 "save.hidden = !dirty",
                 "save.classList.toggle(\"is-dirty\", dirty)");
+    }
+
+    private static int count(String value, String needle) {
+        int total = 0;
+        int index = 0;
+        while ((index = value.indexOf(needle, index)) >= 0) {
+            total++;
+            index += needle.length();
+        }
+        return total;
     }
 }

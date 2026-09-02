@@ -183,6 +183,7 @@
         if (slotType === "DEFAULT_SLOT") return false;
         return symbolOf(asset)
             && has(asset && asset.assetId)
+            && has(asset && asset.name)
             && slotType === "DECISION"
             && has(asset && (asset.opportunityId || asset.primaryOpportunityId))
             && has(asset && asset.analysisId)
@@ -199,7 +200,9 @@
         if (slotType === "DEFAULT_SLOT") return false;
         return symbolOf(asset)
             && has(asset && asset.assetId)
-            && String(asset && asset.slotType || "").toUpperCase() === "OBSERVATION"
+            && has(asset && asset.name)
+            && asset.hasFinal !== true
+            && ["OBSERVATION", "DECISION"].indexOf(slotType) >= 0
             && ["OBSERVING", "NO_QUALIFIED_OPPORTUNITY", "STALE", "NEVER_SCANNED", "RANGE", "WAIT",
                 "CANDIDATE", "HIGH_RISK", "BLOCKED", "CONFUSED", "INVALIDATED", "COOLING"].indexOf(state) >= 0;
     }
@@ -241,7 +244,8 @@
         alertNode.hidden = !alert;
         eventNode.hidden = !event;
         if (alert) {
-            alertNode.querySelector("strong").textContent = userFacingAlertMessage(alert.message);
+            var alertScope = has(alert.symbol) ? label(alert.symbol, "全局") : "全局";
+            alertNode.querySelector("strong").textContent = alertScope + " · " + userFacingAlertMessage(alert.message);
             alertNode.querySelector("em").textContent = alertTokenLabel(alert.level, "高优先级");
             alertNode.querySelector("time").textContent = has(alert.time) ? time(alert.time) : "";
         }
@@ -287,80 +291,32 @@
             + '" data-direction-maturity="' + escapeHtml(provenance.directionMaturity || "")
             + '" data-home-tier="' + escapeHtml(provenance.homeTier || "") + '"';
     }
+    function assetTicker(asset) {
+        var display = text(asset && asset.symbol, "").trim().toUpperCase();
+        if (display.indexOf("/") > 0) return display.split("/")[0];
+        var raw = symbolOf(asset);
+        return raw.endsWith("USDT") ? raw.slice(0, -4) : raw;
+    }
     function opportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
-        var finalBias = label(asset.finalMarketBias, "—");
-        var confidence = text(asset.confidenceLabel, label(asset.confidenceLevel, "当前不可查看"));
-        var risk = text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
-        var oneHour = text(asset.oneHourOpportunityLabel, "1小时待验证");
+        var ticker = assetTicker(asset);
+        var direction = text(asset.marketBiasLabel, "—");
+        var confidence = text(asset.confidenceLabel, "—");
+        var risk = text(asset.riskLabel, "—");
+        var oneHour = text(asset.oneHourOpportunityLabel, "1小时数据不足");
         var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
         var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "—";
-        var dataNotice = opportunityDataNotice(asset);
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
             + String(isSelected) + '" data-symbol="'
             + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
-            + escapeHtml(symbol + " 最终决策上下文") + '"><header><div class="asset-identity"><strong>'
-            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
-            + (dataNotice ? " · " + escapeHtml(dataNotice) : "")
-            + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
-            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(finalBias)
-            + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong>' + escapeHtml(confidence)
-            + '</strong></span><span><small>风险</small><strong>' + escapeHtml(risk)
-            + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
-            + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
-    }
-    function opportunityDataNotice(asset) {
-        var state = String(asset && asset.dataFreshness || "").toUpperCase();
-        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
-        if (state === "STALE") return "数据过期";
-        return "";
-    }
-    function observationStateText(asset) {
-        var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
-        return {
-            OBSERVING: "观察中",
-            NO_QUALIFIED_OPPORTUNITY: "暂无合格机会",
-            STALE: "数据过期",
-            NEVER_SCANNED: "等待首次扫描",
-            RANGE: "震荡",
-            WAIT: "观望",
-            CANDIDATE: "计划生成中",
-            HIGH_RISK: "高风险观察",
-            BLOCKED: "当前受限",
-            CONFUSED: "当前受限",
-            INVALIDATED: "已失效",
-            COOLING: "冷却中"
-        }[state] || "观察中";
-    }
-    function observationDataText(asset) {
-        var state = String(asset && asset.dataFreshness || "").toUpperCase();
-        if (state === "TIMEFRAME_CONFLICT") return "周期冲突";
-        if (state === "STALE") return "数据过期";
-        if (state === "NEVER_SCANNED") return "尚未扫描";
-        if (state === "FRESH" || state === "READY") return "数据新鲜";
-        return "状态待同步";
-    }
-    function observationCard(asset, selected) {
-        var symbol = symbolOf(asset);
-        var isSelected = symbol === selected;
-        var state = observationStateText(asset);
-        var direction = asset.hasFinal === true && has(asset.finalMarketBias)
-            ? label(asset.finalMarketBias, "待验证")
-            : state === "震荡" ? "震荡" : state === "观望" ? "观望" : "待验证";
-        var oneHour = text(asset.oneHourOpportunityLabel, "1小时待验证");
-        var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
-        var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "—";
-        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "")
-            + '" tabindex="0" role="button" aria-pressed="' + String(isSelected)
-            + '" data-symbol="' + escapeHtml(symbol)
-            + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
-            + escapeHtml(symbol + " 观察状态，" + state) + '"><header><div class="asset-identity"><strong>'
-            + escapeHtml(text(asset.name, symbol.replace(/USDT$/, ""))) + "</strong><small>" + escapeHtml(symbol)
+            + escapeHtml(symbol + " 首页资产上下文") + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
+            + escapeHtml(text(asset.name, "名称不可用"))
             + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
             + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(direction)
-            + '</b></span></div><div class="opportunity-metrics"><span><small>状态</small><strong>' + escapeHtml(state)
-            + '</strong></span><span><small>数据</small><strong>' + escapeHtml(observationDataText(asset))
+            + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong>' + escapeHtml(confidence)
+            + '</strong></span><span><small>风险</small><strong>' + escapeHtml(risk)
             + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
     }
@@ -380,12 +336,8 @@
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
-        setText("opportunityHeading", "资产");
-        grid.innerHTML = assets.map(function (asset) {
-            return String(asset.slotType || "").toUpperCase() === "OBSERVATION"
-                ? observationCard(asset, selected)
-                : opportunityCard(asset, selected);
-        }).join("");
+        setText("opportunityHeading", ["机会资产", assets.length].join(" · "));
+        grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
         grid.hidden = assets.length === 0;
         empty.hidden = assets.length !== 0;
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {
