@@ -8,13 +8,36 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Baseline Reconciliation Gate
-Product Phase Status: BASELINE_RECONCILIATION_PENDING_MERGED_MAIN
-Current Work Package: Reconcile the four exact a60/main product-gate files and register a one-time normalized successor; no B01-B04 implementation is included
-Next Business Phase: REAL_DATA_HOME_BLOCKER_CLOSURE
-Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after reconciliation is effective on merged main and its direct-child normalization proves all four files
+Product Phase: TRINE LOGIC v4.1 Analysis Run Idempotency Transaction Boundary Authorization
+Product Phase Status: IDEMPOTENCY_FIX_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact analysis-run idempotency transaction-boundary fix; no implementation is included in this gate package
+Next Business Phase: ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX
+Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Analysis Run Idempotency Transaction Boundary Authorization
+
+Owner authorized one end-to-end closure for the confirmed PostgreSQL defect in
+the existing `AnalysisRun` owner. The exact implementation package is
+`ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX`, the exact branch is
+`codex/v4-1-analysis-run-idempotency-tx-fix`, and the immutable starting
+baseline is `0e9bd779b10e9d3140b8ceaea0a5193a28d6264f`.
+
+This gate package changes only the eight canonical gate-owner/status/test
+files. The successor is limited to the exact Guard, Mapper and four test paths
+declared in `docs/CODEX_NEXT_TASK.yml`. It must preserve
+`uk_tm_analysis_run_idempotency_key`, use a PostgreSQL-safe atomic claim,
+fail closed on idempotency payload mismatch, and prove H2/PostgreSQL parity plus
+2/10/50-way concurrency. No migration, scoring, direction, plan, Home,
+provider, Telegram, position, execution or automatic-trading change is
+authorized.
+
+Capability movement in this gate package is `NONE`. Implementation, private
+Staging deployment and runtime acceptance become eligible only after this
+authorization is merged and the exact machine gate resolves the successor.
 
 ---
 
