@@ -13,23 +13,23 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "TRINE LOGIC v4.1 Analysis Run Idempotency Transaction Boundary Authorization"
-product_phase_status: "IDEMPOTENCY_FIX_AUTHORIZATION_PENDING_MERGED_MAIN"
+product_phase: "TRINE LOGIC v4.1 Final Runtime Home Access Idempotency Closure Authorization"
+product_phase_status: "FINAL_RUNTIME_HOME_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "Owner-authorized exact machine gate for one analysis-run idempotency transaction defect"
-active_block_cn: "Owner 授权的单一分析幂等事务边界缺陷精确机器门禁"
+active_block: "Owner-authorized exact machine gate for final runtime Home and private-access closure"
+active_block_cn: "Owner 授权的最终运行时首页与私有访问闭环精确机器门禁"
 
-next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue the single analysis-run idempotency transaction-boundary fix."
-next_business_phase: "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX"
+next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue the final runtime and Home closure."
+next_business_phase: "V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and six-file implementation allowlist are required after this authorization is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and ten-file implementation allowlist are required after this authorization is effective on merged main."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "NONE; one docs/gate-only idempotency-fix authorization PR is authorized after local validation"
-current_branch: "codex/v4-1-analysis-run-idempotency-tx-fix-authorization"
+current_pr: "NONE; one docs/gate-only final-runtime Home closure authorization PR is authorized after local validation"
+current_branch: "codex/v4-1-final-runtime-home-access-idempotency-closure-authorization"
 current_package_pr: "NONE; Owner one-pass authorization permits exact-head push/PR/merge"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
@@ -41,11 +41,11 @@ v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_C
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_authorized_package: "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX"
+v4_1_authorized_package: "V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-analysis-run-idempotency-tx-fix"
+v4_1_authorized_successor_branch: "codex/v4-1-final-runtime-home-access-idempotency-closure"
 v4_1_authorized_successor_starting_full_sha: "0e9bd779b10e9d3140b8ceaea0a5193a28d6264f"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
@@ -65,8 +65,10 @@ v4_1_machine_gate_owner_amendment_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_baseline_reconciliation_gate_status: "EFFECTIVE_MERGED_MAIN"
 real_data_home_blocker_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
 real_data_home_blocker_closure_implementation_status: "COMPLETE"
-analysis_run_idempotency_tx_fix_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-analysis_run_idempotency_tx_fix_implementation_status: "NOT_STARTED"
+analysis_run_idempotency_tx_fix_authorization_status: "EFFECTIVE_MERGED_MAIN"
+analysis_run_idempotency_tx_fix_implementation_status: "COMPLETE"
+v4_1_final_runtime_home_access_idempotency_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_final_runtime_home_access_idempotency_closure_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"

@@ -334,11 +334,41 @@ acceptance under the Owner's one-pass authorization. Production deployment,
 automatic trading, exchange private order APIs, fake data, weakened Final/DQ/
 source/risk gates and secret disclosure remain forbidden.
 
-### Owner-approved AnalysisRun idempotency transaction-boundary fix
+### Owner-approved final runtime, Home, access and idempotency closure
 
 This is a subordinate machine-authorization record, not a second Product
-Source and not implementation. Owner authorized exactly one confirmed defect
-closure from merged main
+Source. Owner revoked the prior Home visual acceptance and authorized exactly
+one final private-Staging closure package.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_FINAL_RUNTIME_HOME_ACCESS_IDEMPOTENCY_CLOSURE` |
+| Branch | `codex/v4-1-final-runtime-home-access-idempotency-closure` |
+| Starting full SHA | `0e9bd779b10e9d3140b8ceaea0a5193a28d6264f` |
+| Gate baseline rule | exact starting SHA must be an ancestor; the authorization branch must start directly from current clean merged main |
+| Ranking contract | existing `V41-HOME-RANK-1`; qualified opportunities first, then real user-pool observations, stable selected-asset retention |
+| Card contract | symbol/full name plus real price; direction, confidence/risk and 1h/4h context; missing values map to `观望`, `—`, `未知` and explicit data-insufficient text |
+| Wide layout | true 1440 x 900 uses 6x1 cards, 70:30 Position/Plan with 320px Plan minimum, and visible AI Workspace entry |
+| Acceptance | Codex runtime/visual audit first; explicit new Owner acceptance is required and prior acceptance is superseded |
+
+The successor may change only the ten exact Home runtime, focused-test and
+visual-evidence paths listed by `docs/CODEX_NEXT_TASK.yml`. Status-bar and alert
+content must remain source-owned and fail closed; primary navigation remains
+Home, Positions, Analysis, Messages and Me. The existing AnalysisRun
+idempotency boundary is regression-tested, not replaced. No DTO, API, Schema,
+migration, provider, scoring, direction, Plan Mode, Telegram-send, Figma,
+Mobile, Production or automatic-trading change is authorized.
+
+The exact product baseline remains immutable even though the authorization
+branch starts from a newer clean merged main containing the completed
+idempotency fix. This one-package ancestor rule does not authorize a wildcard,
+directory grant, gate-owner mutation by the implementation branch, or any
+other successor.
+
+### Owner-approved AnalysisRun idempotency transaction-boundary fix
+
+This is a completed subordinate machine-authorization record, not a second
+Product Source. Owner authorized exactly one confirmed defect closure from merged main
 `0e9bd779b10e9d3140b8ceaea0a5193a28d6264f`.
 
 | Attribute | Exact value |
@@ -351,8 +381,8 @@ closure from merged main
 | Required invariant | preserve `uk_tm_analysis_run_idempotency_key` and return one canonical `analysisRunId` |
 | Mismatch behavior | fail closed as `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` or an existing equivalent normalized error |
 
-The implementation may change only the exact six Guard, Mapper and test paths
-listed by `docs/CODEX_NEXT_TASK.yml`. PostgreSQL must use an atomic
+The implementation changed only the historical exact six Guard, Mapper and
+test paths registered by its authorization. PostgreSQL uses an atomic
 conflict-safe claim or a fully rolled-back isolated transaction before reading
 the canonical row. H2 must expose the same business semantics. Sequential and
 2/10/50-way concurrent retries must produce exactly one row and one canonical
@@ -361,10 +391,9 @@ fail closed.
 
 The unique constraint may not be removed or weakened. No migration, scoring,
 direction, plan, Home, provider, Telegram, position-monitoring, order,
-execution or automatic-trading behavior is authorized. The gate package may
-change only canonical gate-owner/status/test files and adds no runtime
-capability. Private Staging deployment is allowed only after exact-head CI and
-merged-main synchronization; Production remains forbidden.
+execution or automatic-trading behavior was authorized. PRs #1209 and #1210
+made the authorization and implementation effective on merged main and private
+Staging. Production remains forbidden.
 
 ### PS-FUNDAMENTAL-AI-LOCAL-REAL-AUTHORIZATION
 
