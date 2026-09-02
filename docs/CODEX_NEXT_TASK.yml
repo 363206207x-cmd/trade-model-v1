@@ -31,7 +31,7 @@ current_package_next_action: "Validate, push, review and merge this docs/gate-on
 current_package_allowed_scope:
   - "Register the exact GPT background execution and Three-AI timeout closure package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the thirty-seven exact backend-owner, migration, configuration and focused-test paths declared below"
+  - "Allow only the forty exact backend-owner, migration, configuration and focused-test paths declared below"
   - "Preserve providerResponseId recovery, role separation, fail-closed output, secret, frozen-visual and no-trade rules"
 current_package_allowed_paths:
   - "docs/CODEX_NEXT_TASK.yml"
@@ -66,6 +66,7 @@ authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
 authorized_next_package_allowed_paths:
+  - "scripts/standard-release-postgresql-smoke.sh"
   - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java"
   - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java"
   - "src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java"
@@ -98,7 +99,9 @@ authorized_next_package_allowed_paths:
   - "src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java"
   - "src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java"
   - "src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java"
   - "src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java"
   - "src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java"
   - "src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java"
   - "src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java"

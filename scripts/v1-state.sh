@@ -1434,7 +1434,7 @@ evaluate_gpt_background_three_ai_timeout_closure_transition() {
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
     || [[ "$current_package_starting_full_sha" != "1c13286eb64bb5b074e960352f8e290a317eb704" ]] \
     || [[ "$authorized_next_package_starting_full_sha" != "$current_package_starting_full_sha" ]] \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "37" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "40" ]]; then
     next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
     return 0
   fi
@@ -2027,6 +2027,7 @@ run_exact_machine_gate_self_test() {
   local owner_paths target_paths
   owner_paths="$(gate_owner_paths)"
   target_paths="$(printf '%s\n' \
+    scripts/standard-release-postgresql-smoke.sh \
     src/main/java/org/example/trademodel/analysisrun/AnalysisRunBackgroundWorker.java \
     src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestrator.java \
     src/main/java/org/example/trademodel/analysisrun/AnalysisRunOrchestratorImpl.java \
@@ -2059,7 +2060,9 @@ run_exact_machine_gate_self_test() {
     src/test/java/org/example/trademodel/ai/OpenAiBackgroundDecisionChainTest.java \
     src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java \
     src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
+    src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java \
     src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
+    src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java \
     src/test/java/org/example/trademodel/postgresql/V17AiBackgroundMigrationContractTest.java \
     src/test/java/org/example/trademodel/service/impl/AiCallLogServiceImplTest.java \
     src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java \
@@ -3048,7 +3051,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIME
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
     || ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "37" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "40" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
