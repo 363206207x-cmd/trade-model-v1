@@ -31,7 +31,7 @@ current_package_next_action: "Validate, push, review and merge this docs/gate-on
 current_package_allowed_scope:
   - "Register the exact real Binance, CoinGlass evidence and Three-AI runtime closure package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the nine exact existing backend-owner and focused-test paths declared below"
+  - "Allow only the twelve exact existing backend-owner and focused-test paths declared below"
   - "Permit the exact starting SHA to remain an ancestor when this gate branch starts directly from newer clean merged main"
   - "Preserve fail-closed evidence, AI role, secret, deployment, frozen-visual and no-trade rules"
 current_package_allowed_paths:
@@ -71,11 +71,14 @@ authorized_next_package_allowed_paths:
   - "src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java"
   - "src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java"
   - "src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java"
+  - "src/main/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java"
   - "src/test/java/org/example/trademodel/ai/AiProviderReadinessServiceTest.java"
   - "src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java"
   - "src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java"
   - "src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java"
   - "src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/DecisionChainAiOrchestratorServiceImplTest.java"
 authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact real Provider and Three-AI runtime closure"
 
 blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_NOTIFICATION_DEPLOYMENT_OR_AUTOMATIC_TRADING"
@@ -87,7 +90,7 @@ next_task_authorization_conditions:
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_NINE_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -167,7 +170,7 @@ product_module: "Existing Binance/CoinGlass provider ownership, Evidence normali
 audit_scope_modules:
   - "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION"
   - "EXACT_PACKAGE_BRANCH_STARTING_SHA"
-  - "EXACT_NINE_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_TWELVE_PATH_IMPLEMENTATION_ALLOWLIST"
   - "FAIL_CLOSED_WORKFLOW"
 
 audit_scope_paths:
