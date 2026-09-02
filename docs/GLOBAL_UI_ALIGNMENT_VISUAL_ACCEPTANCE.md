@@ -1,5 +1,18 @@
 # Global UI Alignment Visual Acceptance
 
+> **SUPERSEDED / OWNER VISUAL ACCEPTANCE REVOKED**
+>
+> Effective: 2026-09-02 (Asia/Shanghai)
+>
+> Reason: the preserved screenshots do not prove the final four-layer asset-card
+> contract or the exact 1440 x 900 runtime layout, the runtime summary reported
+> `1/6` services available without the enabled-service scope, and Owner access to
+> the private Staging Home was not established. All evidence below remains as
+> historical implementation evidence only and cannot establish current Owner
+> acceptance.
+>
+> `CURRENT_OWNER_VISUAL_ACCEPTANCE: PENDING_OWNER`
+
 Date: 2026-08-21
 Runtime: `ui-review`, Java 17, local H2, external providers/AI/Telegram/schedulers disabled
 Baseline: `af58dc7e7ae6c33f87daf78986fbfafc538a8340`

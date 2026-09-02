@@ -20,7 +20,12 @@
         <a href="/messages" aria-label="消息"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="rail-label">消息</span></a>
         <a href="/me" aria-label="我的"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="rail-label">我的</span></a>
     </nav>
-    <div class="rail-footer"><a href="/asset-pool"><svg aria-hidden="true"><use href="/icons/app-shell.svg#pool"/></svg><span class="rail-label">资产池</span></a><a href="/calendar"><svg aria-hidden="true"><use href="/icons/app-shell.svg#calendar"/></svg><span class="rail-label">事件日历</span></a><a href="#systemStatusStrip"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></a><form th:action="@{/logout}" method="post"><button type="submit" aria-label="退出登录"><svg aria-hidden="true"><use href="/icons/app-shell.svg#logout"/></svg><span class="rail-label">退出登录</span></button></form></div>
+    <nav class="rail-footer" aria-label="次级工具">
+        <a href="/asset-pool" aria-label="资产池" title="资产池"><svg aria-hidden="true"><use href="/icons/app-shell.svg#pool"/></svg><span class="rail-label">资产池</span></a>
+        <a href="/calendar" aria-label="事件日历" title="事件日历"><svg aria-hidden="true"><use href="/icons/app-shell.svg#calendar"/></svg><span class="rail-label">事件日历</span></a>
+        <a href="#systemStatusStrip" aria-label="系统状态" title="系统状态"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></a>
+        <form th:action="@{/logout}" method="post"><button type="submit" aria-label="退出登录" title="退出登录"><svg aria-hidden="true"><use href="/icons/app-shell.svg#logout"/></svg><span class="rail-label">退出登录</span></button></form>
+    </nav>
 </aside>
 <div class="home-stage">
     <header class="home-page-header" data-component-family="PageHeader">

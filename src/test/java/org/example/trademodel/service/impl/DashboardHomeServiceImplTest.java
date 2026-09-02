@@ -210,7 +210,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                 .containsExactly("LINKUSDT", "AAVEUSDT");
         assertThat(home.getAssets().get(0).getAssetId()).isEqualTo(101L);
-        assertThat(home.getAssets().get(0).getName()).isEqualTo("LINKUSDT");
+        assertThat(home.getAssets().get(0).getName()).isEqualTo("Chainlink");
         assertThat(home.getAssets().get(0).getOpportunityId()).isEqualTo("opportunity-link");
         assertThat(home.getAssets().get(0).getAnalysisId()).isEqualTo("analysis-LINKUSDT");
         assertThat(home.getAssets().get(0).getOpportunityScore()).isEqualTo(94);
@@ -430,8 +430,14 @@ class DashboardHomeServiceImplTest {
         assertThat(btc.getPrimaryOpportunityId()).isNull();
         assertThat(btc.getOpportunityScore()).isNull();
         assertThat(btc.getMarketBias()).isNull();
+        assertThat(btc.getName()).isEqualTo("Bitcoin");
+        assertThat(btc.getMarketBiasLabel()).isEqualTo("观望");
         assertThat(btc.getConfidenceLevel()).isNull();
+        assertThat(btc.getConfidenceLabel()).isEqualTo("—");
         assertThat(btc.getRiskLevel()).isNull();
+        assertThat(btc.getRiskLabel()).isEqualTo("未知");
+        assertThat(btc.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
+        assertThat(btc.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
         assertThat(btc.getPlanMode()).isNull();
         assertThat(btc.getHasFinal()).isFalse();
         assertThat(btc.getFinalMarketBias()).isNull();
@@ -532,6 +538,14 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getFinalMarketBias()).isNull();
             assertThat(asset.getFinalPlanMode()).isNull();
             assertThat(asset.getFinalPlanLifecycle()).isNull();
+            assertThat(asset.getMarketBias()).isNull();
+            assertThat(asset.getMarketBiasLabel()).isEqualTo("观望");
+            assertThat(asset.getConfidenceLevel()).isNull();
+            assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+            assertThat(asset.getRiskLevel()).isNull();
+            assertThat(asset.getRiskLabel()).isEqualTo("未知");
+            assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
+            assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
         });
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
@@ -617,10 +631,10 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getDataQuality().getValue()).isNull();
         assertThat(home.getSystemState().getDataQuality().getHelper()).isEqualTo("未取得正式全局更新时间");
         assertThat(home.getSystemState().getRiskLevel().getValue()).isNull();
-        assertThat(home.getSystemState().getRiskLevel().getValueLabel()).isEqualTo("—");
+        assertThat(home.getSystemState().getRiskLevel().getValueLabel()).isEqualTo("当前不可查看");
         assertThat(home.getSystemState().getMarketTrend().getValue()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("1 笔");
+                .isEqualTo("1 笔 · 待评估");
         assertThat(home.getSystemState().getAiConflict().getValue())
                 .isEqualTo("LEVEL_2_MINOR_DISAGREEMENT");
         assertThat(home.getSystemState().getAiConflict().getValueLabel()).isEqualTo("轻微分歧");
@@ -805,7 +819,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getSystemState().getDataQuality().getValue())
                 .isEqualTo(Instant.parse("2026-08-20T09:56:00Z"));
         assertThat(home.getSystemState().getDataQuality().getValueLabel()).isNull();
-        assertThat(home.getSystemState().getServiceAvailability().getValueLabel()).isEqualTo("1/3 可用");
+        assertThat(home.getSystemState().getServiceAvailability().getValueLabel()).isEqualTo("1/1 可用");
         assertThat(home.getDiagnostics().getMarketDataProvider()).isEqualTo("CONNECTED");
         assertThat(home.getDiagnostics().getProviderReadiness()).isSameAs(readiness);
     }
@@ -1011,7 +1025,7 @@ class DashboardHomeServiceImplTest {
         assertThat(homePosition.getFundingCoverage()).isEqualTo("UNKNOWN");
         assertThat(homePosition.getAccountImpactPct()).isNull();
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("1 笔");
+                .isEqualTo("1 笔 · 低风险");
         assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("COMPLETE");
     }
 
@@ -1034,7 +1048,7 @@ class DashboardHomeServiceImplTest {
 
         assertWaitingMonitorData(row);
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("1 笔");
+                .isEqualTo("1 笔 · 待评估");
         assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("UNKNOWN");
     }
 
@@ -1780,7 +1794,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("EXTREME");
         assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("COMPLETE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("4 笔");
+                .isEqualTo("4 笔 · 极高风险");
     }
 
     @Test
@@ -1806,7 +1820,7 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getPositionAggregate().getHighestTrustedRisk()).isEqualTo("HIGH");
         assertThat(home.getPositionAggregate().getCoverageState()).isEqualTo("PARTIAL_COVERAGE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("4 笔");
+                .isEqualTo("4 笔 · 高风险");
     }
 
     @Test
@@ -2629,10 +2643,10 @@ class DashboardHomeServiceImplTest {
         assertThat(ethState.getMarketTrend().getValue()).isNull();
         assertThat(ethState.getMarketTrend().getValueLabel()).isEqualTo("— / 当前不可查看");
         assertThat(ethState.getRiskLevel().getValue()).isNull();
-        assertThat(ethState.getRiskLevel().getValueLabel()).isEqualTo("—");
+        assertThat(ethState.getRiskLevel().getValueLabel()).isEqualTo("当前不可查看");
         assertThat(ethState.getDataQuality().getValue()).isNull();
         assertThat(ethState.getDataQuality().getValueLabel()).isEqualTo("—");
-        assertThat(ethState.getServiceAvailability().getValueLabel()).isEqualTo("0/3 可用");
+        assertThat(ethState.getServiceAvailability().getValueLabel()).isEqualTo("未启用");
         assertThat(btcState.getMarketTrend().getValueLabel()).isEqualTo(ethState.getMarketTrend().getValueLabel());
         assertThat(btcState.getRiskLevel().getValueLabel()).isEqualTo(ethState.getRiskLevel().getValueLabel());
         assertThat(btcState.getDataQuality().getValueLabel()).isEqualTo(ethState.getDataQuality().getValueLabel());

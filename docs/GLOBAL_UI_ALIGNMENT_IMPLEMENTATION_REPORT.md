@@ -1,5 +1,14 @@
 # Global Semantic Audit Closure And Frozen UI Alignment Report
 
+> **SUPERSEDED / OWNER VISUAL ACCEPTANCE REVOKED**
+>
+> Effective: 2026-09-02 (Asia/Shanghai). The prior visual conclusion is retained
+> for lineage but is no longer an active release gate. It predates the final
+> four-layer Home asset-card contract, exact 1440 x 900 proof, enabled-service
+> availability projection, and verified Owner access to private Staging.
+>
+> `CURRENT_OWNER_VISUAL_ACCEPTANCE: PENDING_OWNER`
+
 Date: 2026-08-21
 Branch: `codex/frontend-interaction-runtime-closure`
 PR: `#1195` (Draft, unmerged)
