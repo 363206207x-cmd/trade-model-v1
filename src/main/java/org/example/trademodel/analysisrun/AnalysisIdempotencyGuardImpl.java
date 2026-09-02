@@ -1,5 +1,7 @@
 package org.example.trademodel.analysisrun;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -10,6 +12,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 @Service
@@ -17,6 +24,16 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
     private static final String STATUS_STARTED = "STARTED";
     private static final String STATUS_SUCCESS = "SUCCESS";
     private static final String STATUS_FAILED = "FAILED";
+    private static final String PAYLOAD_MISMATCH = "IDEMPOTENCY_KEY_PAYLOAD_MISMATCH";
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> NON_CANONICAL_SNAPSHOT_FIELDS = Set.of(
+            "analysisTime",
+            "requestId",
+            "traceId",
+            "triggerType",
+            "triggerReference",
+            "parentAnalysisId",
+            "parentTraceId");
     private static final Pattern AUTHORIZATION = Pattern.compile("(?i)(authorization\\s*[:=]\\s*)([^,;]+)");
     private static final Pattern SECRET_PARAM = Pattern.compile("(?i)(api[_-]?key|token|access[_-]?token|secret)=([^&\\s]+)");
     private static final Pattern URL_QUERY = Pattern.compile("https?://([^\\s?]+)\\?[^\\s]+", Pattern.CASE_INSENSITIVE);
@@ -39,11 +56,27 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
 
     @Override
     public AnalysisIdempotencyClaim claim(AnalysisRunClaimRequest request) {
-        return transactionTemplate.execute(status -> claimInTransaction(request));
+        LocalDateTime now = LocalDateTime.now(clock);
+        AnalysisRunDO run = newStartedRun(request, now);
+        DuplicateKeyException fallbackCollision = null;
+        Integer inserted;
+        try {
+            inserted = transactionTemplate.execute(status -> analysisRunMapper.insertStartedIfAbsent(run));
+        } catch (DuplicateKeyException duplicate) {
+            // Non-PostgreSQL fallback variants may still signal a collision. The
+            // failed transaction has ended before the canonical row is read.
+            fallbackCollision = duplicate;
+            inserted = 0;
+        }
+        if (Integer.valueOf(1).equals(inserted)) {
+            return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.CLAIMED_NEW, run,
+                    "CLAIMED_NEW", "new analysis run claimed");
+        }
+        DuplicateKeyException collision = fallbackCollision;
+        return transactionTemplate.execute(status -> handleExisting(request, now, collision));
     }
 
-    private AnalysisIdempotencyClaim claimInTransaction(AnalysisRunClaimRequest request) {
-        LocalDateTime now = LocalDateTime.now(clock);
+    private static AnalysisRunDO newStartedRun(AnalysisRunClaimRequest request, LocalDateTime now) {
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(request.getAnalysisId());
         run.setSymbol(request.getSymbol());
@@ -73,21 +106,19 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
         run.setAssetId(request.getAssetId());
         run.setPreview(request.isPreview());
         run.setAnalysisMode(request.isPreview() ? "ANALYSIS_PREVIEW" : "OPPORTUNITY_DECISION");
-        try {
-            analysisRunMapper.insertStarted(run);
-            return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.CLAIMED_NEW, run,
-                    "CLAIMED_NEW", "new analysis run claimed");
-        } catch (DuplicateKeyException duplicate) {
-            return handleExisting(request, now);
-        }
+        return run;
     }
 
-    private AnalysisIdempotencyClaim handleExisting(AnalysisRunClaimRequest request, LocalDateTime now) {
+    private AnalysisIdempotencyClaim handleExisting(AnalysisRunClaimRequest request, LocalDateTime now,
+                                                     DuplicateKeyException fallbackCollision) {
         AnalysisRunDO existing = analysisRunMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (existing == null) {
-            return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.IN_PROGRESS, null,
-                    "IDEMPOTENCY_ROW_MISSING", "duplicate key was observed but the row could not be loaded");
+            if (fallbackCollision != null) {
+                throw fallbackCollision;
+            }
+            throw new IllegalStateException("IDEMPOTENCY_ROW_MISSING");
         }
+        requireCanonicalPayloadMatch(request, existing);
         String status = existing.getStatus();
         if (STATUS_SUCCESS.equals(status)) {
             return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS, existing,
@@ -106,6 +137,62 @@ public class AnalysisIdempotencyGuardImpl implements AnalysisIdempotencyGuard {
         }
         return new AnalysisIdempotencyClaim(AnalysisIdempotencyClaimStatus.IN_PROGRESS, existing,
                 "IDEMPOTENCY_UNKNOWN_STATUS", "analysis run has an unknown status");
+    }
+
+    private static void requireCanonicalPayloadMatch(AnalysisRunClaimRequest request, AnalysisRunDO existing) {
+        boolean matches = equalsIgnoreCase(request.getSymbol(), existing.getSymbol())
+                && Objects.equals(request.getTimeframe(), existing.getTimeframe())
+                && Objects.equals(canonicalBucket(request.getAnalysisTime(), request.getTimeframe()),
+                canonicalBucket(existing.getAnalysisTime(), existing.getTimeframe()))
+                && Objects.equals(trimToNull(request.getRuleVersion()), trimToNull(existing.getRuleVersion()))
+                && equalsIgnoreCase(request.getOwnerType(), existing.getOwnerType())
+                && Objects.equals(request.getOwnerId(), existing.getOwnerId())
+                && Objects.equals(request.getAssetId(), existing.getAssetId())
+                && Objects.equals(request.isPreview(), Boolean.TRUE.equals(existing.getPreview()))
+                && Objects.equals(request.isPreview() ? "ANALYSIS_PREVIEW" : "OPPORTUNITY_DECISION",
+                existing.getAnalysisMode())
+                && Objects.equals(canonicalInputFingerprint(request.getInputSnapshotJson()),
+                canonicalInputFingerprint(existing.getInputSnapshotJson()));
+        if (!matches) {
+            throw new AnalysisRunInputException(PAYLOAD_MISMATCH,
+                    "idempotency key does not match the canonical analysis input");
+        }
+    }
+
+    private static LocalDateTime canonicalBucket(LocalDateTime analysisTime, String timeframe) {
+        if (analysisTime == null || timeframe == null) {
+            return null;
+        }
+        return AnalysisTimePolicy.canonicalBucket(analysisTime, timeframe);
+    }
+
+    private static String canonicalInputFingerprint(String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.isBlank()) {
+            return "";
+        }
+        try {
+            Map<String, Object> fields = JSON.readValue(snapshotJson, new TypeReference<>() { });
+            NON_CANONICAL_SNAPSHOT_FIELDS.forEach(fields::remove);
+            return JSON.writeValueAsString(new TreeMap<>(fields));
+        } catch (Exception ignored) {
+            return snapshotJson.trim();
+        }
+    }
+
+    private static boolean equalsIgnoreCase(String left, String right) {
+        return Objects.equals(normalizeCase(left), normalizeCase(right));
+    }
+
+    private static String normalizeCase(String value) {
+        String normalized = trimToNull(value);
+        return normalized != null ? normalized.toUpperCase(Locale.ROOT) : null;
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private AnalysisIdempotencyClaim recoverFailed(AnalysisRunClaimRequest request, AnalysisRunDO existing, LocalDateTime now) {

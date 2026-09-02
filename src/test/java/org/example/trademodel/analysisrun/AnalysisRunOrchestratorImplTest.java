@@ -130,6 +130,20 @@ class AnalysisRunOrchestratorImplTest {
     }
 
     @Test
+    void duplicateSuccessNeverReentersAssemblerOrCreatesDownstreamState() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS);
+        CapturingAssembler assembler = new CapturingAssembler(false);
+
+        AnalysisRunResult result = orchestrator(guard, assembler, "rules-2026-06")
+                .run(AnalysisRunCommand.manual("BNBUSDT", "5m", "req-duplicate", "2026-06-23T10:04:59Z"));
+
+        assertThat(result.getStatus()).isEqualTo("EXISTING_SUCCESS");
+        assertThat(result.isDuplicateTriggerBlocked()).isTrue();
+        assertThat(assembler.calls).isZero();
+        assertThat(guard.failedCode).isNull();
+    }
+
+    @Test
     void executionFailureRedactsSensitiveMessageBeforeAuditAndResponse() {
         CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
         AnalysisRunResult result = orchestrator(guard, new CapturingAssembler(true), "rules-2026-06")
@@ -276,6 +290,7 @@ class AnalysisRunOrchestratorImplTest {
     private static final class CapturingAssembler implements AnalysisAssemblerService {
         private final RuntimeException failure;
         private AnalysisExecutionContext context;
+        private int calls;
 
         private CapturingAssembler(boolean fail) {
             this.failure = fail
@@ -294,6 +309,7 @@ class AnalysisRunOrchestratorImplTest {
 
         @Override
         public AssetAnalysisVO assemble(AnalysisExecutionContext context) {
+            calls++;
             this.context = context;
             if (failure != null) {
                 throw failure;

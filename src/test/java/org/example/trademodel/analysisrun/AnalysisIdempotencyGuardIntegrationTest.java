@@ -7,6 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DuplicateKeyException;
@@ -21,7 +23,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,28 +70,72 @@ class AnalysisIdempotencyGuardIntegrationTest {
     }
 
     @Test
-    void tenConcurrentSameRequestProduceOneStartedRunAndNineInProgressResults() throws Exception {
-        int workers = 10;
-        CyclicBarrier barrier = new CyclicBarrier(workers);
-        ExecutorService pool = Executors.newFixedThreadPool(workers);
-        List<Future<AnalysisIdempotencyClaim>> futures = new ArrayList<>();
-        for (int i = 0; i < workers; i++) {
-            int idx = i;
-            futures.add(pool.submit(() -> {
-                barrier.await(3, TimeUnit.SECONDS);
-                return guard.claim(request("ana-it-concurrent-" + idx, "trace-it-concurrent-" + idx,
-                        "req-it-concurrent", "it-concurrent", AnalysisRunTriggerType.MANUAL_API,
-                        "req-it-concurrent", "lease-it-concurrent-" + idx));
-            }));
+    void tenSequentialSameRequestsReuseOneCanonicalRun() {
+        List<AnalysisIdempotencyClaim> claims = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            claims.add(guard.claim(request("ana-it-sequential-" + i, "trace-it-sequential-" + i,
+                    "req-it-sequential-" + i, "it-sequential", AnalysisRunTriggerType.MANUAL_API,
+                    "req-it-sequential-" + i, "lease-it-sequential-" + i)));
         }
 
-        List<AnalysisIdempotencyClaimStatus> statuses = collectStatuses(futures);
-        pool.shutdownNow();
+        assertCanonicalClaims(claims, 10);
+        assertThat(rowCount("it-sequential")).isEqualTo(1);
+    }
 
-        assertThat(statuses).contains(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
-        assertThat(statuses.stream().filter(AnalysisIdempotencyClaimStatus.CLAIMED_NEW::equals).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(AnalysisIdempotencyClaimStatus.IN_PROGRESS::equals).count()).isEqualTo(9);
-        assertThat(rowCount("it-concurrent")).isEqualTo(1);
+    @ParameterizedTest(name = "{0} concurrent H2 claims reuse one canonical analysis run")
+    @ValueSource(ints = {2, 10, 50})
+    void concurrentSameRequestsReuseOneCanonicalRun(int workers) throws Exception {
+        String key = "it-concurrent-" + workers;
+
+        List<AnalysisIdempotencyClaim> claims = concurrentClaims(workers, key);
+
+        assertCanonicalClaims(claims, workers);
+        assertThat(rowCount(key)).isEqualTo(1);
+    }
+
+    @Test
+    void differentKeysCreateDifferentAnalysisRuns() {
+        AnalysisIdempotencyClaim first = guard.claim(request("ana-it-key-a", "trace-it-key-a", "req-it-key-a",
+                "it-key-a", AnalysisRunTriggerType.MANUAL_API, "req-it-key-a", "lease-it-key-a"));
+        AnalysisIdempotencyClaim second = guard.claim(request("ana-it-key-b", "trace-it-key-b", "req-it-key-b",
+                "it-key-b", AnalysisRunTriggerType.MANUAL_API, "req-it-key-b", "lease-it-key-b"));
+
+        assertThat(first.getRun().getAnalysisId()).isNotEqualTo(second.getRun().getAnalysisId());
+        assertThat(rowCount("it-key-a")).isEqualTo(1);
+        assertThat(rowCount("it-key-b")).isEqualTo(1);
+    }
+
+    @Test
+    void sameKeyWithDifferentCanonicalSnapshotFailsClosed() {
+        guard.claim(request("ana-it-payload-a", "trace-it-payload-a", "req-it-payload-a", "it-payload",
+                AnalysisRunTriggerType.MANUAL_API, "req-it-payload-a", "lease-it-payload-a",
+                "{\"symbol\":\"BTCUSDT\",\"strategy\":\"A\"}"));
+
+        assertThatThrownBy(() -> guard.claim(request("ana-it-payload-b", "trace-it-payload-b",
+                "req-it-payload-b", "it-payload", AnalysisRunTriggerType.MANUAL_API,
+                "req-it-payload-b", "lease-it-payload-b",
+                "{\"symbol\":\"BTCUSDT\",\"strategy\":\"B\"}")))
+                .isInstanceOfSatisfying(AnalysisRunInputException.class,
+                        error -> assertThat(error.getReasonCode())
+                                .isEqualTo("IDEMPOTENCY_KEY_PAYLOAD_MISMATCH"));
+        assertThat(rowCount("it-payload")).isEqualTo(1);
+    }
+
+    @Test
+    void duplicateClaimLeavesFollowingTransactionHealthyForReadAndWrite() {
+        AnalysisIdempotencyClaim first = guard.claim(request("ana-it-health-a", "trace-it-health-a",
+                "req-it-health-a", "it-health", AnalysisRunTriggerType.MANUAL_API,
+                "req-it-health-a", "lease-it-health-a"));
+        AnalysisIdempotencyClaim duplicate = guard.claim(request("ana-it-health-b", "trace-it-health-b",
+                "req-it-health-b", "it-health", AnalysisRunTriggerType.MANUAL_API,
+                "req-it-health-b", "lease-it-health-b"));
+        AnalysisIdempotencyClaim next = guard.claim(request("ana-it-health-next", "trace-it-health-next",
+                "req-it-health-next", "it-health-next", AnalysisRunTriggerType.MANUAL_API,
+                "req-it-health-next", "lease-it-health-next"));
+
+        assertThat(duplicate.getRun().getAnalysisId()).isEqualTo(first.getRun().getAnalysisId());
+        assertThat(next.getStatus()).isEqualTo(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
+        assertThat(mapper.selectById(next.getRun().getAnalysisId())).isNotNull();
     }
 
     @Test
@@ -163,6 +208,38 @@ class AnalysisIdempotencyGuardIntegrationTest {
         return statuses;
     }
 
+    private List<AnalysisIdempotencyClaim> concurrentClaims(int workers, String key) throws Exception {
+        CyclicBarrier barrier = new CyclicBarrier(workers);
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
+        try {
+            List<Future<AnalysisIdempotencyClaim>> futures = new ArrayList<>();
+            for (int i = 0; i < workers; i++) {
+                int index = i;
+                futures.add(pool.submit(() -> {
+                    barrier.await(15, TimeUnit.SECONDS);
+                    return guard.claim(request("ana-" + key + "-" + index, "trace-" + key + "-" + index,
+                            "req-" + key + "-" + index, key, AnalysisRunTriggerType.MANUAL_API,
+                            "req-" + key + "-" + index, "lease-" + key + "-" + index));
+                }));
+            }
+            List<AnalysisIdempotencyClaim> claims = new ArrayList<>();
+            for (Future<AnalysisIdempotencyClaim> future : futures) {
+                claims.add(future.get(30, TimeUnit.SECONDS));
+            }
+            return claims;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static void assertCanonicalClaims(List<AnalysisIdempotencyClaim> claims, int expectedCount) {
+        assertThat(claims).hasSize(expectedCount);
+        assertThat(claims.stream().filter(claim ->
+                claim.getStatus() == AnalysisIdempotencyClaimStatus.CLAIMED_NEW)).hasSize(1);
+        assertThat(claims).extracting(claim -> claim.getRun().getAnalysisId()).containsOnly(
+                claims.get(0).getRun().getAnalysisId());
+    }
+
     private AnalysisExecutionContext context(AnalysisRunDO run) {
         return new AnalysisExecutionContext(
                 run.getAnalysisId(),
@@ -188,6 +265,12 @@ class AnalysisIdempotencyGuardIntegrationTest {
 
     private AnalysisRunClaimRequest request(String analysisId, String traceId, String requestId, String key,
                                             AnalysisRunTriggerType triggerType, String triggerReference, String leaseOwner) {
+        return request(analysisId, traceId, requestId, key, triggerType, triggerReference, leaseOwner, "{}");
+    }
+
+    private AnalysisRunClaimRequest request(String analysisId, String traceId, String requestId, String key,
+                                            AnalysisRunTriggerType triggerType, String triggerReference,
+                                            String leaseOwner, String snapshotJson) {
         return new AnalysisRunClaimRequest(
                 analysisId,
                 traceId,
@@ -201,7 +284,7 @@ class AnalysisIdempotencyGuardIntegrationTest {
                 triggerReference,
                 null,
                 null,
-                "{}",
+                snapshotJson,
                 "hash-" + analysisId,
                 leaseOwner,
                 future());
