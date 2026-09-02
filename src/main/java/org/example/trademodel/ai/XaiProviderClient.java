@@ -61,8 +61,14 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
         body.put("model", selectedModel);
         body.put("instructions", AiDecisionChainPromptBuilder.systemInstruction(role));
         body.put("input", promptJson);
-        body.put("max_output_tokens", maxOutputTokens());
+        body.put("max_output_tokens", properties.getBackgroundExecution().getStructuredMaxOutputTokens());
         body.put("reasoning", Map.of("effort", "low"));
+        Map<String, Object> format = new LinkedHashMap<>();
+        format.put("type", "json_schema");
+        format.put("name", "fundamental_ai_v41_grok_challenge");
+        format.put("strict", true);
+        format.put("schema", AiDecisionChainSchema.responseJsonSchema(role));
+        body.put("text", Map.of("format", format));
         body.put("store", false);
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
                 json(body), timeoutOverrideMs);

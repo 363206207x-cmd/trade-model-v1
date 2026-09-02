@@ -115,7 +115,8 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
                                                           long timeoutOverrideMs,
                                                           String selectedModel) throws Exception {
         Map<String, Object> generationConfig = new LinkedHashMap<>();
-        generationConfig.put("max_output_tokens", Math.max(INTERACTIONS_MAX_OUTPUT_TOKENS, maxOutputTokens()));
+        generationConfig.put("max_output_tokens",
+                properties.getBackgroundExecution().getStructuredMaxOutputTokens());
         generationConfig.put("temperature", 0);
         generationConfig.put("seed", 42);
         generationConfig.put("thinking_level", "minimal");
@@ -124,7 +125,6 @@ public class GeminiProviderClient extends AbstractSafeAiProviderClient {
         Map<String, Object> responseFormat = new LinkedHashMap<>();
         responseFormat.put("type", "text");
         responseFormat.put("mime_type", "application/json");
-        responseFormat.put("schema", AiDecisionChainSchema.responseJsonSchema(role));
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", canonicalModelName(selectedModel));
