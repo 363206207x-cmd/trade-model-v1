@@ -382,13 +382,21 @@ private-Staging runtime closure package from current merged main.
 | Runtime objective | truthful six-asset Binance data, contract-complete CoinGlass Evidence, time-bounded Provider health, exact-model GPT/Gemini/Grok readiness and one guarded same-run chain |
 | Acceptance boundary | exact-head CI and merged-main private-Staging evidence; explicit Owner visual review remains separate |
 
-The successor may change only the nine exact existing owner and focused-test
+The successor may change only the twelve exact existing owner and focused-test
 paths listed by `docs/CODEX_NEXT_TASK.yml`. It may normalize provider freshness
 into the existing Evidence vocabulary, attach truthful value/comparison facts
 to stale or partial status Evidence, make configured AI readiness recover via
 the existing bounded scheduler, and expire CoinGlass health according to the
 existing configured freshness TTL. Missing values remain missing and all
 Provider and AI calls remain bounded, read-only and fail closed.
+
+Runtime evidence may also close two proven wiring defects through those exact
+existing owners: production Provider readiness may consume only cached runtime
+health plus source-owned persisted closed candles, and the decision-chain AI
+adapter may honor the already frozen bounded provider-specific timeout values
+instead of the obsolete eight-second compatibility cap. This does not authorize
+a new Provider, scoring/direction/Plan rule, persistence object, endpoint, or
+visual behavior.
 
 No Controller, DTO, Schema, migration, frontend, CSS, static asset, Product
 Source semantics, Provider Matrix, quality threshold, scoring/direction/Plan
