@@ -28,6 +28,41 @@ public interface AnalysisRunMapper {
             + "#{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode})")
     int insertStarted(AnalysisRunDO analysisRun);
 
+    @Insert("INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, rule_version, trace_id, status, "
+            + "idempotency_key, request_id, trigger_type, trigger_reference, parent_analysis_id, parent_trace_id, "
+            + "input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, lease_expires_at, started_at, created_at, updated_at, version_no, "
+            + "owner_type, owner_id, asset_id, preview, analysis_mode) "
+            + "VALUES(#{analysisId}, #{symbol}, #{timeframe}, #{analysisTime}, #{ruleVersion}, #{traceId}, #{status}, "
+            + "#{idempotencyKey}, #{requestId}, #{triggerType}, #{triggerReference}, #{parentAnalysisId}, #{parentTraceId}, "
+            + "#{inputSnapshotJson}, #{inputSnapshotHash}, #{attemptCount}, #{leaseOwner}, #{leaseExpiresAt}, #{startedAt}, #{createdAt}, #{updatedAt}, #{versionNo}, "
+            + "#{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode})")
+    @Insert(value = "MERGE INTO tm_analysis_run target USING (VALUES(#{analysisId}, #{symbol}, #{timeframe}, #{analysisTime}, #{ruleVersion}, "
+            + "#{traceId}, #{status}, #{idempotencyKey}, #{requestId}, #{triggerType}, #{triggerReference}, #{parentAnalysisId}, #{parentTraceId}, "
+            + "#{inputSnapshotJson}, #{inputSnapshotHash}, #{attemptCount}, #{leaseOwner}, #{leaseExpiresAt}, #{startedAt}, #{createdAt}, #{updatedAt}, "
+            + "#{versionNo}, #{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode})) "
+            + "incoming(analysis_id, symbol, timeframe, analysis_time, rule_version, trace_id, status, idempotency_key, request_id, trigger_type, "
+            + "trigger_reference, parent_analysis_id, parent_trace_id, input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, "
+            + "lease_expires_at, started_at, created_at, updated_at, version_no, owner_type, owner_id, asset_id, preview, analysis_mode) "
+            + "ON target.idempotency_key = incoming.idempotency_key WHEN NOT MATCHED THEN INSERT(analysis_id, symbol, timeframe, analysis_time, "
+            + "rule_version, trace_id, status, idempotency_key, request_id, trigger_type, trigger_reference, parent_analysis_id, parent_trace_id, "
+            + "input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, lease_expires_at, started_at, created_at, updated_at, version_no, "
+            + "owner_type, owner_id, asset_id, preview, analysis_mode) VALUES(incoming.analysis_id, incoming.symbol, incoming.timeframe, "
+            + "incoming.analysis_time, incoming.rule_version, incoming.trace_id, incoming.status, incoming.idempotency_key, incoming.request_id, "
+            + "incoming.trigger_type, incoming.trigger_reference, incoming.parent_analysis_id, incoming.parent_trace_id, incoming.input_snapshot_json, "
+            + "incoming.input_snapshot_hash, incoming.attempt_count, incoming.lease_owner, incoming.lease_expires_at, incoming.started_at, "
+            + "incoming.created_at, incoming.updated_at, incoming.version_no, incoming.owner_type, incoming.owner_id, incoming.asset_id, "
+            + "incoming.preview, incoming.analysis_mode)", databaseId = "h2")
+    @Insert(value = "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, rule_version, trace_id, status, "
+            + "idempotency_key, request_id, trigger_type, trigger_reference, parent_analysis_id, parent_trace_id, "
+            + "input_snapshot_json, input_snapshot_hash, attempt_count, lease_owner, lease_expires_at, started_at, created_at, updated_at, version_no, "
+            + "owner_type, owner_id, asset_id, preview, analysis_mode) "
+            + "VALUES(#{analysisId}, #{symbol}, #{timeframe}, #{analysisTime}, #{ruleVersion}, #{traceId}, #{status}, "
+            + "#{idempotencyKey}, #{requestId}, #{triggerType}, #{triggerReference}, #{parentAnalysisId}, #{parentTraceId}, "
+            + "#{inputSnapshotJson}, #{inputSnapshotHash}, #{attemptCount}, #{leaseOwner}, #{leaseExpiresAt}, #{startedAt}, #{createdAt}, #{updatedAt}, #{versionNo}, "
+            + "#{ownerType}, #{ownerId}, #{assetId}, #{preview}, #{analysisMode}) ON CONFLICT (idempotency_key) DO NOTHING",
+            databaseId = "postgresql")
+    int insertStartedIfAbsent(AnalysisRunDO analysisRun);
+
     @Select("SELECT * FROM tm_analysis_run WHERE analysis_id = #{analysisId}")
     AnalysisRunDO selectById(String analysisId);
 

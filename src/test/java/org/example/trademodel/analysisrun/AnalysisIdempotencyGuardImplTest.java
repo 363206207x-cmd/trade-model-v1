@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,7 +44,7 @@ class AnalysisIdempotencyGuardImplTest {
 
     @Test
     void newClaimInsertsStartedRun() {
-        when(mapper.insertStarted(any())).thenReturn(1);
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(1);
 
         AnalysisIdempotencyClaim claim = guard.claim(request("idem-new"));
 
@@ -54,7 +55,7 @@ class AnalysisIdempotencyGuardImplTest {
 
     @Test
     void duplicateSuccessBlocksReExecution() {
-        when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
         when(mapper.selectByIdempotencyKey("idem-success")).thenReturn(row("ana-success", "SUCCESS", 1, null));
 
         AnalysisIdempotencyClaim claim = guard.claim(request("idem-success"));
@@ -65,7 +66,7 @@ class AnalysisIdempotencyGuardImplTest {
 
     @Test
     void activeStartedLeaseBlocksConcurrentTrigger() {
-        when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
         when(mapper.selectByIdempotencyKey("idem-active"))
                 .thenReturn(row("ana-active", "STARTED", 1, LocalDateTime.of(2026, 6, 23, 10, 2)));
 
@@ -76,7 +77,7 @@ class AnalysisIdempotencyGuardImplTest {
 
     @Test
     void failedRunWithPartialStateBlocksRecovery() {
-        when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
         AnalysisRunDO failed = row("ana-failed", "FAILED", 1, null);
         when(mapper.selectByIdempotencyKey("idem-partial")).thenReturn(failed);
         when(mapper.countPartialStateRows("ana-failed")).thenReturn(2);
@@ -89,7 +90,7 @@ class AnalysisIdempotencyGuardImplTest {
 
     @Test
     void expiredLeaseCanBeRecoveredAtomically() {
-        when(mapper.insertStarted(any())).thenThrow(new DuplicateKeyException("dup"));
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
         AnalysisRunDO expired = row("ana-expired", "STARTED", 1, LocalDateTime.of(2026, 6, 23, 9, 59));
         AnalysisRunDO recovered = row("ana-expired", "STARTED", 2, LocalDateTime.of(2026, 6, 23, 10, 2));
         when(mapper.selectByIdempotencyKey("idem-expired")).thenReturn(expired);
@@ -102,6 +103,56 @@ class AnalysisIdempotencyGuardImplTest {
 
         assertThat(claim.getStatus()).isEqualTo(AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE);
         assertThat(claim.getRun().getAttemptCount()).isEqualTo(2);
+    }
+
+    @Test
+    void fallbackDuplicateIsReadOnlyAfterTheFailedInsertTransactionEnds() {
+        when(mapper.insertStartedIfAbsent(any())).thenThrow(new DuplicateKeyException("dup"));
+        when(mapper.selectByIdempotencyKey("idem-success"))
+                .thenReturn(row("ana-success", "SUCCESS", 1, null));
+
+        AnalysisIdempotencyClaim claim = guard.claim(request("idem-success"));
+
+        assertThat(claim.getStatus()).isEqualTo(AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS);
+    }
+
+    @Test
+    void duplicateWithoutCanonicalIdempotencyRowRemainsARealPersistenceFailure() {
+        DuplicateKeyException collision = new DuplicateKeyException("analysis id collision");
+        when(mapper.insertStartedIfAbsent(any())).thenThrow(collision);
+        when(mapper.selectByIdempotencyKey("idem-id-collision")).thenReturn(null);
+
+        assertThatThrownBy(() -> guard.claim(request("idem-id-collision")))
+                .isSameAs(collision);
+    }
+
+    @Test
+    void sameKeyWithDifferentCanonicalInputFailsClosed() {
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
+        AnalysisRunDO existing = row("ana-mismatch", "STARTED", 1,
+                LocalDateTime.of(2026, 6, 23, 10, 2));
+        existing.setOwnerId(42L);
+        when(mapper.selectByIdempotencyKey("idem-mismatch")).thenReturn(existing);
+
+        assertThatThrownBy(() -> guard.claim(request("idem-mismatch")))
+                .isInstanceOfSatisfying(AnalysisRunInputException.class,
+                        error -> assertThat(error.getReasonCode())
+                                .isEqualTo("IDEMPOTENCY_KEY_PAYLOAD_MISMATCH"));
+    }
+
+    @Test
+    void requestAndTraceMetadataDoNotChangeCanonicalInputFingerprint() {
+        when(mapper.insertStartedIfAbsent(any())).thenReturn(0);
+        AnalysisRunDO existing = row("ana-metadata", "SUCCESS", 1, null);
+        existing.setInputSnapshotJson("{\"symbol\":\"BTCUSDT\",\"canonicalAnalysisTimeBucket\":\"2026-06-23T10:00\","
+                + "\"requestId\":\"old\",\"traceId\":\"old\",\"triggerType\":\"SCHEDULED\"}");
+        when(mapper.selectByIdempotencyKey("idem-metadata")).thenReturn(existing);
+        AnalysisRunClaimRequest request = request("idem-metadata",
+                "{\"traceId\":\"new\",\"requestId\":\"new\",\"triggerType\":\"MANUAL_API\","
+                        + "\"canonicalAnalysisTimeBucket\":\"2026-06-23T10:00\",\"symbol\":\"BTCUSDT\"}");
+
+        assertThat(guard.claim(request).getStatus())
+                .isEqualTo(AnalysisIdempotencyClaimStatus.DUPLICATE_SUCCESS);
     }
 
     @Test
@@ -129,10 +180,14 @@ class AnalysisIdempotencyGuardImplTest {
     }
 
     private static AnalysisRunClaimRequest request(String key) {
+        return request(key, "{}");
+    }
+
+    private static AnalysisRunClaimRequest request(String key, String snapshotJson) {
         return new AnalysisRunClaimRequest("ana-new", "trace-new", "req-test", key,
                 "BTCUSDT", "1m", LocalDateTime.of(2026, 6, 23, 10, 0), "v1.0",
                 AnalysisRunTriggerType.MANUAL_API, "req-test", null, null,
-                "{}", "hash", "lease-test", LocalDateTime.of(2026, 6, 23, 10, 2));
+                snapshotJson, "hash", "lease-test", LocalDateTime.of(2026, 6, 23, 10, 2));
     }
 
     private static AnalysisRunDO row(String analysisId, String status, int attempts, LocalDateTime leaseExpiresAt) {
@@ -140,6 +195,8 @@ class AnalysisIdempotencyGuardImplTest {
         row.setAnalysisId(analysisId);
         row.setSymbol("BTCUSDT");
         row.setTimeframe("1m");
+        row.setAnalysisTime(LocalDateTime.of(2026, 6, 23, 10, 0));
+        row.setRuleVersion("v1.0");
         row.setTraceId("trace-" + analysisId);
         row.setRequestId("req-test");
         row.setIdempotencyKey("idem-" + analysisId);
@@ -148,6 +205,12 @@ class AnalysisIdempotencyGuardImplTest {
         row.setAttemptCount(attempts);
         row.setLeaseExpiresAt(leaseExpiresAt);
         row.setVersionNo(1);
+        row.setInputSnapshotJson("{}");
+        row.setInputSnapshotHash("hash");
+        row.setOwnerType("SYSTEM");
+        row.setOwnerId(0L);
+        row.setPreview(false);
+        row.setAnalysisMode("OPPORTUNITY_DECISION");
         return row;
     }
 
