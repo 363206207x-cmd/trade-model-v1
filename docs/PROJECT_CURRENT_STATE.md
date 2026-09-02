@@ -8,42 +8,40 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization
-Product Phase Status: REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact real Binance, CoinGlass Evidence and Three-AI runtime closure; no implementation is included in this gate package
-Next Business Phase: V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE
+Product Phase: TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization
+Product Phase Status: GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact GPT background execution and Three-AI timeout closure; no implementation is included in this gate package
+Next Business Phase: V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Real Provider and Three-AI Runtime Closure Authorization
+## TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization
 
-Owner authorized one exact package to close the existing real Binance,
-CoinGlass Evidence and Three-AI runtime chain without changing the frozen Home
-visual contract. The exact package is
-`V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE`, the exact branch is
-`codex/v4-1-real-provider-three-ai-runtime-closure`, and its immutable
-product baseline remains
-`52201ba2d3d39d03aee8a005064e1ccf628f2491`.
+Owner authorized one exact package to replace the obsolete synchronous GPT
+completion timeout with durable background execution and bounded Three-AI
+completion without changing the frozen Home visual contract. The exact package
+is `V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE`, the exact branch is
+`codex/v4-1-gpt-background-three-ai-timeout-closure`, and its immutable product
+baseline is `1c13286eb64bb5b074e960352f8e290a317eb704`.
 
-The authorization branch starts directly from current clean merged main while
-the exact product baseline is that merged-main Head. This is allowed only for
-this package and does not weaken exact branch, package, path, gate-owner,
-secret, deployment or no-trade checks. The successor may change only the twelve
-exact existing Provider/Evidence/readiness owner and focused-test paths in
-`docs/CODEX_NEXT_TASK.yml`. No Schema, migration, direction/score/plan or AI
-role contract, Home layout/copy/static asset, Telegram-send, Figma, Mobile,
-Production or automatic-trading change is authorized.
+The authorization branch starts directly from that clean merged-main Head and
+does not weaken exact branch, package, path, gate-owner, secret, deployment or
+no-trade checks. The successor may change only the thirty-six exact existing
+AnalysisRun/AITrace/provider/orchestrator/configuration/migration and focused
+test paths in `docs/CODEX_NEXT_TASK.yml`. V1-V16, direction/score/plan or AI
+role semantics, Home layout/copy/static assets, Telegram-send, Figma, Mobile,
+Production and automatic trading remain blocked.
 
-Private-Staging evidence after the first implementation merge proved two
-additional existing-owner gaps: production readiness was not consuming the
-already persisted and runtime-verified Binance source, and the decision-chain
-adapter capped provider-specific timeouts at the obsolete eight-second
-compatibility value. The amended exact allowlist adds only those two existing
-production owners and the existing decision-chain focused test; it does not
-authorize a new Provider, algorithm, object, endpoint, or UI behavior.
+The predecessor real Provider package is effective on merged main and private
+Staging with Binance, CoinGlass and exact-model readiness at 5/5. Its remaining
+runtime evidence found one bounded defect: `gpt-5.6-sol` is still treated as a
+30-second synchronous completion call, so no Candidate or downstream Gemini,
+Grok, Resolver and Rule Validation result can complete. The successor may
+persist the existing AITrace background identity, recover the same response,
+compact the frozen input and run Gemini/Grok in parallel after GPT Candidate.
 
 Capability movement in this gate package is `NONE`. Private Staging deployment
 is eligible only after the gate and implementation PRs pass exact-head checks

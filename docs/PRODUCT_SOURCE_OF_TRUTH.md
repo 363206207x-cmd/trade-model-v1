@@ -406,6 +406,54 @@ impersonate Opportunity, Candidate, Final Plan or position objects; persisted
 Resolver and Rule Validation evidence must come only from an already legal
 decision-chain mode.
 
+### Owner-approved GPT background and Three-AI timeout closure
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not a change to the frozen scoring, direction, Plan Mode, AI-role,
+Home visual or no-trade contracts. The preceding real Provider runtime package
+is effective on merged main. Owner authorized exactly one bounded successor to
+close the remaining synchronous GPT timeout on private Staging.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE` |
+| Branch | `codex/v4-1-gpt-background-three-ai-timeout-closure` |
+| Starting full SHA | `1c13286eb64bb5b074e960352f8e290a317eb704` |
+| Gate baseline rule | authorization and implementation start from the exact merged-main SHA; package, branch and exact path allowlist fail closed |
+| Existing owners | `AnalysisRun`, `AITrace` (`tm_ai_call_log`), OpenAI Responses adapter, Three-AI orchestrator, Candidate, Conflict Resolver and Rule Validation |
+| Runtime objective | provider-native OpenAI background submit/poll/recovery, one GPT Candidate, parallel Gemini/Grok and a bounded fail-closed 300-second chain |
+| Acceptance boundary | exact-head CI and merged-main private-Staging real-provider evidence; explicit Owner visual review remains separate |
+
+The 30-second OpenAI limit is the submit-or-ack deadline, not the full GPT
+reasoning deadline. GPT may run for at most 180 seconds. Gemini and Grok each
+have a 120-second deadline and start in parallel only after one valid GPT
+Candidate. The whole chain has a 300-second deadline and at most one retry for
+an explicitly transient transport failure. The configured GPT model remains
+`gpt-5.6-sol`, reasoning effort is `medium`, text verbosity is `low`, and no
+model fallback is authorized for the acceptance call.
+
+The successor may extend the existing AITrace persistence with one forward-only
+V17 migration and the H2 schema mirror only where required to retain
+`providerResponseId`, attempt, task state, role/data state, submit/start/finish
+times, token breakdown, failure classification and prompt/schema versions.
+Submitted or running work must recover by polling the same provider response;
+restart, refresh and duplicate triggers must not resubmit or duplicate a
+Candidate, Final, alert, Message or Telegram event.
+
+The versioned compact input keeps the frozen four-timeframe summaries,
+source-owned Evidence identifiers and freshness, eight scores, CoinGlass
+readings, rule direction/confidence/risk/Plan Mode, confused score, execution
+feasibility, account risk and source/config versions. It excludes raw candle
+walls, repeated prose, frontend copy, secrets and unrelated persistence fields.
+Structured output remains mandatory and truncation fails closed.
+
+Only the thirty-six exact backend, migration, configuration and focused-test
+paths in `docs/CODEX_NEXT_TASK.yml` are authorized. V1-V16, frontend, CSS,
+static assets, Home structure/copy, Provider algorithms, scoring/direction/Plan
+eligibility, Telegram real send, Production deployment and automatic trading
+remain blocked. No fake AI output may substitute for a failed role, and a real
+Final remains optional when Rule Validation legitimately blocks it.
+
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
 This is a completed subordinate machine-authorization record, not a second
