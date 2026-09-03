@@ -619,9 +619,16 @@ expected_implementation_paths="$(printf '%s\n' \
   src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java \
   src/test/java/org/example/trademodel/postgresql/V18PersistentSessionMigrationContractTest.java \
   src/test/java/org/example/trademodel/service/MarketDataSchedulerRuntimeStatusTest.java \
-  src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java)"
+  src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java \
+  src/test/java/org/example/trademodel/config/ControlledStagingConfigTreeSecretInjectionTest.java \
+  src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java \
+  src/test/java/org/example/trademodel/security/PersonalLoginSessionSecurityTest.java \
+  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
+  scripts/standard-release-postgresql-smoke.sh \
+  src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java \
+  src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java)"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "official-domain session and runtime visibility implementation allowlist must contain exactly the seventeen authorized paths"
+  || fail "official-domain session and runtime visibility implementation allowlist must contain exactly the twenty-four authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "official-domain session and runtime visibility implementation allowlist must not contain wildcards or directory-level grants"
 fi
@@ -633,7 +640,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_SEVENTEEN_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_TWENTY_FOUR_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \

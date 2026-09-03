@@ -24,7 +24,7 @@ active_block_cn: "Owner 授权的正式域名、持久登录与运行状态闭�
 next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue the official-domain, persistent-login and runtime-visibility closure."
 next_business_phase: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and seventeen-file implementation allowlist are required after this authorization is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and twenty-four-file implementation allowlist are required after this authorization is effective on merged main."
 
 production_deployment_readiness: "BLOCKED"
 

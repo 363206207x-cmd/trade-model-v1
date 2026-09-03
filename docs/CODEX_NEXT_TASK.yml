@@ -31,7 +31,7 @@ current_package_next_action: "Validate, push, review and merge this docs/gate-on
 current_package_allowed_scope:
   - "Register the exact official-domain, persistent-login and runtime-visibility closure package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the seventeen exact dependency, configuration, migration, scheduler, Home projection and focused-test paths declared below"
+  - "Allow only the twenty-four exact dependency, configuration, migration, scheduler, Home projection and focused-test paths declared below"
   - "Preserve login-only anonymous access, authenticated business surfaces, loopback origin, fixed session lifetime, frozen Home layout and no-trade rules"
 current_package_allowed_paths:
   - "docs/CODEX_NEXT_TASK.yml"
@@ -83,6 +83,13 @@ authorized_next_package_allowed_paths:
   - "src/test/java/org/example/trademodel/postgresql/V18PersistentSessionMigrationContractTest.java"
   - "src/test/java/org/example/trademodel/service/MarketDataSchedulerRuntimeStatusTest.java"
   - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/config/ControlledStagingConfigTreeSecretInjectionTest.java"
+  - "src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java"
+  - "src/test/java/org/example/trademodel/security/PersonalLoginSessionSecurityTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java"
+  - "scripts/standard-release-postgresql-smoke.sh"
+  - "src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java"
 authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact official-domain, persistent-login and real runtime-status closure"
 
 blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_NOTIFICATION_DEPLOYMENT_OR_AUTOMATIC_TRADING"
@@ -94,7 +101,7 @@ next_task_authorization_conditions:
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_SEVENTEEN_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_TWENTY_FOUR_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -180,7 +187,7 @@ product_module: "Existing Spring Security boundary, Cloudflare Tunnel ingress, A
 audit_scope_modules:
   - "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION"
   - "EXACT_PACKAGE_BRANCH_STARTING_SHA"
-  - "EXACT_SEVENTEEN_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_TWENTY_FOUR_PATH_IMPLEMENTATION_ALLOWLIST"
   - "FAIL_CLOSED_WORKFLOW"
 
 audit_scope_paths:
