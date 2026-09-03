@@ -2,20 +2,32 @@ package org.example.trademodel.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 @Component
 public class XaiProviderClient extends AbstractSafeAiProviderClient {
+    private static final List<String> EVIDENCE_REFERENCE_FIELDS = List.of(
+            "evidenceId", "source", "sourceReference", "sourceTraceId");
+    private static final List<String> OUTPUT_REFERENCE_FIELDS = List.of(
+            "evidenceRefs", "sourceRefs");
+    private static final int GROK_REFERENCE_SCHEMA_COUNT = 5;
+
     private final AiOrchestratorProperties properties;
+    private final ObjectMapper objectMapper;
 
     public XaiProviderClient(AiOrchestratorProperties properties,
                              AiHttpTransport transport,
                              ObjectMapper objectMapper) {
         super(properties, transport, objectMapper);
         this.properties = properties;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -67,7 +79,7 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
         format.put("type", "json_schema");
         format.put("name", "fundamental_ai_v41_grok_challenge");
         format.put("strict", true);
-        format.put("schema", AiDecisionChainSchema.responseJsonSchema(role));
+        format.put("schema", constrainedDecisionChainSchema(promptJson, role));
         body.put("text", Map.of("format", format));
         body.put("store", false);
         AiHttpRequest request = baseRequest(joinUrl(providerProperties().getBaseUrl(), "/v1/responses"),
@@ -76,6 +88,68 @@ public class XaiProviderClient extends AbstractSafeAiProviderClient {
         headers.put("Authorization", "Bearer " + providerProperties().getApiKey());
         request.setHeaders(headers);
         return request;
+    }
+
+    private JsonNode constrainedDecisionChainSchema(String promptJson,
+                                                    AiDecisionChainRole role) throws Exception {
+        JsonNode schema = objectMapper.valueToTree(AiDecisionChainSchema.responseJsonSchema(role));
+        if (role != AiDecisionChainRole.GROK_CHALLENGE) {
+            return schema;
+        }
+
+        List<String> allowedReferences = allowedEvidenceReferences(promptJson);
+        if (allowedReferences.isEmpty()) {
+            throw new IllegalArgumentException("GROK_EVIDENCE_REFERENCES_REQUIRED");
+        }
+        ArrayNode allowedValues = objectMapper.valueToTree(allowedReferences);
+        int constrainedSchemas = constrainReferenceItems(schema, allowedValues);
+        if (constrainedSchemas != GROK_REFERENCE_SCHEMA_COUNT) {
+            throw new IllegalStateException("GROK_REFERENCE_SCHEMA_INCOMPLETE");
+        }
+        return schema;
+    }
+
+    private List<String> allowedEvidenceReferences(String promptJson) throws Exception {
+        JsonNode evidence = objectMapper.readTree(promptJson).path("input").path("evidence");
+        TreeSet<String> references = new TreeSet<>();
+        if (evidence.isArray()) {
+            for (JsonNode row : evidence) {
+                for (String field : EVIDENCE_REFERENCE_FIELDS) {
+                    JsonNode value = row.path(field);
+                    if (value.isTextual() && !value.asText().isBlank()) {
+                        references.add(value.asText().trim());
+                    }
+                }
+            }
+        }
+        return List.copyOf(references);
+    }
+
+    private static int constrainReferenceItems(JsonNode node, ArrayNode allowedValues) {
+        if (node == null) {
+            return 0;
+        }
+        int constrained = 0;
+        if (node.isObject()) {
+            JsonNode properties = node.path("properties");
+            if (properties instanceof ObjectNode propertyObject) {
+                for (String field : OUTPUT_REFERENCE_FIELDS) {
+                    JsonNode items = propertyObject.path(field).path("items");
+                    if (items instanceof ObjectNode itemSchema) {
+                        itemSchema.set("enum", allowedValues.deepCopy());
+                        constrained++;
+                    }
+                }
+            }
+            for (JsonNode child : node) {
+                constrained += constrainReferenceItems(child, allowedValues);
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                constrained += constrainReferenceItems(child, allowedValues);
+            }
+        }
+        return constrained;
     }
 
     @Override
