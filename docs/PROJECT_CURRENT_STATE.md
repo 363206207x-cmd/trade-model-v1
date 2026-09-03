@@ -8,50 +8,43 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization
-Product Phase Status: GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact GPT background execution and Three-AI timeout closure; no implementation is included in this gate package
-Next Business Phase: V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization
+Product Phase Status: CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact cross-device secure-domain closure; no implementation or Funnel activation is included in this gate package
+Next Business Phase: V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 GPT Background and Three-AI Timeout Closure Authorization
+## TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization
 
-Owner authorized one exact package to replace the obsolete synchronous GPT
-completion timeout with durable background execution and bounded Three-AI
-completion without changing the frozen Home visual contract. The exact package
-is `V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE`, the exact branch is
-`codex/v4-1-gpt-background-three-ai-timeout-closure`, and its immutable product
-baseline is `1c13286eb64bb5b074e960352f8e290a317eb704`.
+Owner authorized one exact package to expose the existing Staging application
+through its current Tailscale hostname and Funnel while preserving the existing
+Spring Security Session boundary. The exact package is
+`V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE`, the exact branch is
+`codex/v4-1-cross-device-secure-domain-access`, and its immutable baseline is
+`075aeb1b570cfc06d5465e7284f148d71ad7bd62`.
 
-The authorization branch starts directly from that clean merged-main Head and
-does not weaken exact branch, package, path, gate-owner, secret, deployment or
-no-trade checks. The successor may change only the forty-two exact existing
-AnalysisRun/AITrace/provider/orchestrator/configuration/migration and focused
-test paths in `docs/CODEX_NEXT_TASK.yml`. V1-V16, direction/score/plan or AI
-role semantics, Home layout/copy/static assets, Telegram-send, Figma, Mobile,
-Production and automatic trading remain blocked.
+Read-only preflight confirms the application is healthy on loopback and the
+current hostname is tailnet-only through Serve. HTTPS already emits a Secure,
+HttpOnly, SameSite=Lax Session cookie, HSTS, frame denial and MIME-sniffing
+protection; CSRF and bounded login attempts are active. The one application
+security gap is the absence of an explicit Referrer-Policy response header.
 
-The predecessor real Provider package is effective on merged main and private
-Staging with Binance, CoinGlass and exact-model readiness at 5/5. Its remaining
-runtime evidence first found that `gpt-5.6-sol` was treated as a 30-second
-synchronous completion call. Merged background execution now completes GPT,
-and exact-JAR private-Staging evidence narrowed the remaining bounded defects:
-Gemini rejects the oversized provider-side schema while accepting JSON mode
-with the existing strict application validator, and Grok's current adapter
-uses the compatibility token budget without provider-native strict schema.
-The successor may
-persist the existing AITrace background identity, recover the same response,
-compact the frozen input and run Gemini/Grok in parallel after GPT Candidate.
+The successor may change only `SecurityConfig.java` and its existing access
+control contract test. It may then merge the exact reviewed Head, deploy that
+same merged-main revision to private Staging, activate Funnel only to
+`127.0.0.1:8081`, and prove public login plus fail-closed anonymous business
+access from a non-Tailnet client. It may not expose origin port 8081, database,
+debug or internal task surfaces, enable registration, change UI/business data,
+call paid AI, send Telegram, deploy Production or execute a trade.
 
-Capability movement in this gate package is `NONE`. Private Staging deployment
-is eligible only after the gate and implementation PRs pass exact-head checks
-and merge. The successor must use real, bounded, read-only Provider calls,
-preserve missing values and fail-closed semantics, and keep Owner visual
-acceptance pending after runtime evidence is collected.
+The prior GPT background and Three-AI timeout package is complete and effective
+on merged main `075aeb1b570cfc06d5465e7284f148d71ad7bd62`. Capability movement in
+this gate package is `NONE`; no Funnel or application change occurs until this
+authorization is effective on merged main.
 
 ---
 

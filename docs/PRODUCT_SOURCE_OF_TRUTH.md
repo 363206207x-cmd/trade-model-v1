@@ -462,6 +462,41 @@ provider-native strict JSON Schema format. Both role calls use the existing
 structured-output token budget and remain fail closed on truncation or local
 schema failure. This adds no model fallback, AI authority or product field.
 
+That package is complete and effective on merged main
+`075aeb1b570cfc06d5465e7284f148d71ad7bd62`.
+
+### Owner-approved cross-device secure domain access closure
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not a change to the frozen Home, data, AI, Position Monitoring or
+no-trade contracts. Owner authorized one bounded successor to make the existing
+Staging hostname reachable from ordinary HTTPS clients through Tailscale
+Funnel while preserving the existing authenticated application boundary.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE` |
+| Branch | `codex/v4-1-cross-device-secure-domain-access` |
+| Starting full SHA | `075aeb1b570cfc06d5465e7284f148d71ad7bd62` |
+| Gate baseline rule | authorization and implementation start from the exact merged-main SHA; package, branch and exact path allowlist fail closed |
+| Existing owners | Spring Security Session/login/CSRF/rate-limit boundary and Tailscale Serve/Funnel ingress |
+| Runtime objective | public HTTPS login, authenticated Dashboard, anonymous business-data denial and loopback-only origin |
+| Acceptance boundary | exact-head CI, merged-main Staging deployment, non-Tailnet public-client evidence and reversible Funnel configuration |
+
+Only the two exact implementation paths in `docs/CODEX_NEXT_TASK.yml` are
+authorized. The application change is limited to an explicit
+`strict-origin-when-cross-origin` Referrer-Policy and focused access-control
+evidence. Runtime activation may change only the existing Tailscale ingress
+from tailnet-only Serve to Funnel backed by `127.0.0.1:8081`; no public origin
+8081, database or new SSH rule is allowed.
+
+Anonymous clients may read only the login page, its minimum static resources,
+favicon and minimal detail-free health probes. Dashboard and every business,
+account, Provider, AI, Position, Plan and internal-task surface remain
+authenticated. Registration, Swagger, H2 Console, debug/admin internals,
+Figma, Mobile, frontend visuals, business data, Provider/AI logic, Telegram
+real send, Production deployment and automatic trading remain blocked.
+
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
 This is a completed subordinate machine-authorization record, not a second
