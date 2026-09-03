@@ -1,24 +1,24 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "TRINE LOGIC v4.1 cross-device secure domain access closure authorization"
+active_block: "TRINE LOGIC v4.1 official domain, persistent login and runtime visibility closure authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization"
-branch: "codex/v4-1-cross-device-secure-domain-access-authorization"
+module: "TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization"
+branch: "codex/v4-1-official-domain-session-runtime-visibility-authorization"
 task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE"
+authorized_next_product_phase: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
 
-current_package_phase: "TRINE_LOGIC_V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION"
-current_package_name: "TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization"
-current_package_active_block: "Owner-authorized exact gate registration for public HTTPS Funnel access with authenticated business surfaces"
+current_package_phase: "TRINE_LOGIC_V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION"
+current_package_name: "TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization"
+current_package_active_block: "Owner-authorized exact gate registration for official-domain ingress, persistent login and real scheduler visibility"
 current_package_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-cross-device-secure-domain-access-authorization"
-current_package_starting_full_sha: "075aeb1b570cfc06d5465e7284f148d71ad7bd62"
+current_package_branch: "codex/v4-1-official-domain-session-runtime-visibility-authorization"
+current_package_starting_full_sha: "ddd29f1b08512bf2d782a2db5c610b72932ec95e"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
@@ -27,12 +27,12 @@ current_package_push_allowed: true
 current_package_merge_allowed: true
 current_package_deployment_allowed: false
 current_package_requires_clean_origin_main: true
-current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact cross-device secure domain access closure"
+current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact official-domain, persistent-login and runtime-visibility closure"
 current_package_allowed_scope:
-  - "Register the exact cross-device secure domain access closure package"
+  - "Register the exact official-domain, persistent-login and runtime-visibility closure package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the two exact existing security configuration and focused-test paths declared below"
-  - "Preserve login-only anonymous access, authenticated business surfaces, loopback origin, secret, frozen-visual and no-trade rules"
+  - "Allow only the seventeen exact dependency, configuration, migration, scheduler, Home projection and focused-test paths declared below"
+  - "Preserve login-only anonymous access, authenticated business surfaces, loopback origin, fixed session lifetime, frozen Home layout and no-trade rules"
 current_package_allowed_paths:
   - "docs/CODEX_NEXT_TASK.yml"
   - "docs/PRODUCT_SOURCE_OF_TRUTH.md"
@@ -45,15 +45,15 @@ current_package_allowed_paths:
 current_package_blocked_scope:
   - "Java, SQL, Schema, Flyway, frontend, CSS, static asset or business-test changes in this gate branch"
   - "Any wildcard, directory grant, global-policy weakening or unrelated successor permission"
-  - "Funnel activation, Staging/Production deployment, Provider calls, AI calls, Telegram send or trading before the implementation successor"
+  - "DNS, proxy, Tunnel, Staging/Production deployment, Provider calls, AI calls, Telegram send or trading before the implementation successor"
 
-authorized_next_package_phase: "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE"
-authorized_next_package_name: "TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure"
-authorized_next_package_active_block: "Tailscale Funnel public HTTPS with strict anonymous/authenticated boundary and closed origin ports"
+authorized_next_package_phase: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
+authorized_next_package_name: "TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure"
+authorized_next_package_active_block: "Official Cloudflare Tunnel ingress, PostgreSQL-backed Spring Session and real scheduler status in the existing Home strip"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-cross-device-secure-domain-access"
-authorized_next_package_starting_full_sha: "075aeb1b570cfc06d5465e7284f148d71ad7bd62"
-authorized_next_package_risk: "B_EXACT_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE"
+authorized_next_package_branch: "codex/v4-1-official-domain-session-runtime-visibility"
+authorized_next_package_starting_full_sha: "ddd29f1b08512bf2d782a2db5c610b72932ec95e"
+authorized_next_package_risk: "B_EXACT_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
@@ -66,20 +66,35 @@ authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
 authorized_next_package_allowed_paths:
-  - "src/main/java/org/example/trademodel/config/SecurityConfig.java"
+  - "pom.xml"
+  - "src/main/resources/application.yml"
+  - "src/main/resources/application-prod.yml"
+  - "src/main/resources/db/migration/V18__persistent_http_session.sql"
+  - "src/main/java/org/example/trademodel/config/ProductionProfileSafetyGuard.java"
+  - "src/main/java/org/example/trademodel/service/MarketDataScheduler.java"
+  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/vo/DashboardHomeVO.java"
+  - "src/main/resources/static/js/home-runtime.js"
+  - "src/test/java/org/example/trademodel/config/ProductionProfileSafetyGuardTest.java"
+  - "src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java"
   - "src/test/java/org/example/trademodel/security/AuthAccessControlSecurityTest.java"
-authorized_next_package_next_action: "After this authorization is effective on merged main, add the missing explicit Referrer-Policy, validate, merge, deploy the exact main Head and activate the existing Tailscale Funnel"
+  - "src/test/java/org/example/trademodel/security/PersistentJdbcSessionContractTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/V18PersistentSessionMigrationContractTest.java"
+  - "src/test/java/org/example/trademodel/service/MarketDataSchedulerRuntimeStatusTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact official-domain, persistent-login and real runtime-status closure"
 
 blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_NOTIFICATION_DEPLOYMENT_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+blocked_package_status: "BLOCKED_OUTSIDE_V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "OWNER_EXPLICIT_ONE_SHOT_END_TO_END_AUTHORIZATION"
   - "AUTHORIZATION_STARTED_FROM_CLEAN_CURRENT_ORIGIN_MAIN_WITH_EXACT_STARTING_SHA_ANCESTOR"
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_TWO_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_SEVENTEEN_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -129,41 +144,43 @@ v4_1_real_provider_three_ai_runtime_closure_authorization_status: "EFFECTIVE_MER
 v4_1_real_provider_three_ai_runtime_closure_implementation_status: "COMPLETE"
 v4_1_gpt_background_three_ai_timeout_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_gpt_background_three_ai_timeout_closure_implementation_status: "COMPLETE"
-v4_1_cross_device_secure_domain_access_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_cross_device_secure_domain_access_closure_implementation_status: "NOT_STARTED"
+v4_1_cross_device_secure_domain_access_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_cross_device_secure_domain_access_closure_implementation_status: "COMPLETE"
+v4_1_official_domain_session_runtime_visibility_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_official_domain_session_runtime_visibility_closure_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 frontend_interaction_implementation_status: "COMPLETE"
 multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"
 multi_user_implementation_status: "NOT_STARTED"
-authorized_next_package: "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE"
-scope: "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_ONLY"
+authorized_next_package: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
+scope: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk public HTTPS access closure with exact-head CI, merged-main and Staging security acceptance"
+risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk official-domain, PostgreSQL Session and scheduler-visibility closure with exact-head CI, merged-main and Staging acceptance"
 
-current_pr: "NONE; create one docs/gate-only cross-device secure-domain authorization PR after local validation"
+current_pr: "NONE; create one docs/gate-only official-domain/session/runtime-visibility authorization PR after local validation"
 current_package_pr: "NONE; Owner one-pass authorization permits this exact docs/gate PR and merge after exact-head checks"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED_PAUSED_TECHNICAL_DEBT; #1201 CLOSED_UNMERGED_PRESERVED_AUDIT_EVIDENCE"
 block_next_business_phase_only: true
 a_risk_auto_merge_rule: "disabled globally; this exact Owner-authorized reconciliation may merge only after exact-head required checks"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE"
+next_business_phase: "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the cross-device secure-domain closure without widening scope"
+next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the official-domain/session/runtime-visibility closure without widening scope"
 
-product_phase: "TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization"
+product_phase: "TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Existing Spring Security Session boundary and Tailscale Serve/Funnel staging ingress"
+product_module: "Existing Spring Security boundary, Cloudflare Tunnel ingress, Analysis scheduler and Home status strip"
 
 audit_scope_modules:
-  - "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION"
+  - "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION"
   - "EXACT_PACKAGE_BRANCH_STARTING_SHA"
-  - "EXACT_TWO_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_SEVENTEEN_PATH_IMPLEMENTATION_ALLOWLIST"
   - "FAIL_CLOSED_WORKFLOW"
 
 audit_scope_paths:
@@ -178,9 +195,9 @@ audit_scope_paths:
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "OWNER_EXPLICIT_CROSS_DEVICE_HTTPS_AUTHORIZATION"
+  - "OWNER_EXPLICIT_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_AUTHORIZATION"
   - "EXACT_STARTING_SHA_AND_FILE_SCOPE"
-  - "EXISTING_SESSION_SECURITY_AND_TAILSCALE_INGRESS_OWNERS"
+  - "EXISTING_SESSION_SECURITY_CLOUDFLARE_INGRESS_SCHEDULER_AND_HOME_PROJECTION_OWNERS"
   - "NO_BUSINESS_DIFF"
   - "NO_AUTOMATIC_ACTION"
 
@@ -196,31 +213,32 @@ required_product_sources:
   - PS-FORMAL-BUSINESS-CONTRACT
 
 product_contract_mapping: |
-  This package authorizes one bounded access closure over the existing Spring Security Session boundary and Tailscale staging ingress. It may add the missing explicit Referrer-Policy, activate the existing Funnel to the loopback-only application port, and validate anonymous denial plus authenticated Home access. It creates no product capability and does not change any business owner or no-trade boundary.
+  This package authorizes one bounded closure over the existing Spring Security boundary, Cloudflare Tunnel, Analysis scheduler and Home status strip. It may persist the unchanged 30-minute Session in PostgreSQL, expose real scheduler and AnalysisRun evidence through the existing Home field, bind trinelogic.com, redirect www and retire the legacy public Funnel. It creates no trading capability and changes no product algorithm.
 
 design_interaction_mapping: |
-  No Figma, Desktop, Mobile, route, component, layout, content or interaction change is included or authorized.
+  No Figma, Mobile, route, component or layout change is authorized. The only user-visible change is the value and safe timestamp rendered inside the existing Home system-status slot.
 
 data_source_mapping: |
-  This docs/gate package reads or changes no provider, database, runtime or user data. The successor may inspect existing Staging authentication and health surfaces only; it may not call paid AI, send Telegram, mutate business data or execute trades.
+  This docs/gate package reads or changes no provider, database, runtime or user data. The successor may add Spring Session infrastructure tables, derive runtime status from the real scheduler heartbeat and persisted AnalysisRun owner, and change only official ingress configuration. It may not call paid AI, send Telegram, mutate business data or execute trades.
 
 current_implementation_gap: |
-  The application is healthy on loopback and privately reachable through Tailscale Serve, with Secure/HttpOnly/SameSite cookies, CSRF, bounded login failures, HSTS, frame denial and MIME-sniffing protection. Cross-device access is blocked because Funnel is off, and runtime header evidence shows the otherwise complete HTTPS boundary lacks an explicit Referrer-Policy.
+  The official root currently resolves through the existing Cloudflare Tunnel but is intercepted by a second Cloudflare Access login, www is absent, servlet Sessions are in process memory, and the Home system slot incorrectly reads an unrelated risk card. The scheduler really runs, but its heartbeat, scan times, result and failure state are not projected.
 
 allowed_scope:
   - "Exact docs/gate registration, state mirrors and existing machine-gate tests only"
 
 authorized_next_allowed_scope:
-  - "EXPLICIT_STRICT_ORIGIN_WHEN_CROSS_ORIGIN_REFERRER_POLICY"
-  - "TAILSCALE_FUNNEL_HTTPS_TO_LOOPBACK_8081"
+  - "TRINELOGIC_COM_CLOUDFLARE_TUNNEL_HTTPS_AND_WWW_PERMANENT_REDIRECT"
+  - "POSTGRESQL_SPRING_SESSION_WITH_UNCHANGED_SECURE_COOKIE_AND_TIMEOUT"
+  - "REAL_SCHEDULER_HEARTBEAT_SCAN_RESULT_ACTIVE_ANALYSIS_AND_SAFE_FAILURE_PROJECTION"
+  - "EXISTING_HOME_SYSTEM_STATUS_SLOT_ONLY"
   - "ANONYMOUS_LOGIN_ONLY_AND_BUSINESS_API_DENIAL"
-  - "SECURE_HTTPONLY_SAMESITE_SESSION_CSRF_AND_RATE_LIMIT_VALIDATION"
-  - "PUBLIC_ORIGIN_8081_CLOSED_AND_MINIMAL_HEALTH_EXPOSURE"
+  - "LEGACY_TS_NET_PUBLIC_FUNNEL_DISABLED_AND_PRIVATE_ROLLBACK_READY"
   - "EXACT_HEAD_CI_MERGED_MAIN_STAGING_AND_NON_TAILNET_ACCEPTANCE"
 
 authorized_next_blocked_scope:
-  - "SCHEMA_MIGRATION_OR_BUSINESS_OBJECT_CHANGE"
-  - "HOME_LAYOUT_COPY_CSS_OR_STATIC_ASSET_CHANGE"
+  - "BUSINESS_SCHEMA_OR_OBJECT_CHANGE_OUTSIDE_SPRING_SESSION_INFRASTRUCTURE"
+  - "HOME_LAYOUT_CSS_TEMPLATE_ASSET_CARD_PLAN_POSITION_OR_AI_WORKSPACE_CHANGE"
   - "PROVIDER_AI_SCORING_DIRECTION_PLAN_OR_POSITION_CHANGE"
   - "PUBLIC_ORIGIN_8081_DATABASE_OR_NEW_SSH_RULE"
   - "PUBLIC_REGISTRATION_SWAGGER_H2_DEBUG_OR_INTERNAL_TASK_EXPOSURE"
@@ -234,10 +252,10 @@ blocked_scope:
 
 forbidden_scope:
   - "Java, SQL, Schema, Flyway, frontend, CSS, static asset or business-test changes in this gate package"
-  - "Funnel activation, Staging/Production deployment, Provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
+  - "DNS/proxy mutation, Staging/Production deployment, Provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
 
 real_scenario_requirement: |
-  This package performs no runtime scenario. Public DNS/TLS/login and anonymous-denial evidence from a non-Tailnet client belongs only to the activated successor; authenticated Dashboard validation may use only the Owner's secure browser session.
+  This package performs no runtime scenario. Official DNS/TLS/login, persistent refresh, two real scan cycles, anonymous denial and legacy-Funnel retirement belong only to the activated successor; authenticated Dashboard validation may use only the Owner's secure browser session.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
