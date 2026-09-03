@@ -8,19 +8,48 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization
-Product Phase Status: OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact official-domain, persistent-login and runtime-visibility closure; no implementation, DNS/proxy mutation or deployment is included in this gate package
-Next Business Phase: V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure Authorization
+Product Phase Status: OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact official-domain, real Home analysis, on-demand Preview, semantic color and Telegram closure; no implementation, DNS/proxy mutation, Telegram send or deployment is included in this gate package
+Next Business Phase: V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization
+## TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure Authorization
 
-Owner authorized one exact package over existing owners. The package is
+Owner authorized one exact successor over existing owners. The package is
+`V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE`, the branch is
+`codex/v4-1-official-domain-home-analysis-telegram-closure`, and the immutable
+baseline is `aa683013f401cceb289b7bbc245a8ea75e00f3c1`.
+
+Read-only preflight confirms the persistent Session and scheduler-visibility
+predecessor is complete on merged main. The remaining Home defect is a
+projection fallback: formal non-Final Decision rows are discarded before the
+Home card is built, then missing direction is rendered as `观望`. Asset-search
+click currently selects a symbol without submitting the existing idempotent
+background Preview owner. Semantic state colors and final Cloudflare/Telegram
+Staging acceptance also remain incomplete.
+
+The successor may change only the twenty exact existing Home ranking,
+Dashboard projection, Asset Pool Preview, Analysis trace, frontend JS/CSS and
+focused-test paths in `docs/CODEX_NEXT_TASK.yml`. It may complete the already
+authorized Cloudflare and existing Telegram runtime configuration after
+exact-head merge. No new object, Schema, Provider, algorithm threshold, Home
+structure, Position/Final ownership, Figma, Mobile, Production or trading
+capability is allowed.
+
+Capability movement in this gate package is `NONE`; no Java, frontend,
+Cloudflare, Telegram, Staging or data change occurs before merged-main
+authorization.
+
+---
+
+## TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure
+
+Owner authorized one exact predecessor package over existing owners. The package is
 `V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE`, the branch is
 `codex/v4-1-official-domain-session-runtime-visibility`, and the immutable
 baseline is `ddd29f1b08512bf2d782a2db5c610b72932ec95e`.
@@ -40,8 +69,9 @@ of the legacy public Funnel. Only the twenty-four exact paths in
 `docs/CODEX_NEXT_TASK.yml` are authorized. No template, CSS, product algorithm,
 Provider, AI, Position, Plan, Telegram, Production or trading change is allowed.
 
-Capability movement in this gate package is `NONE`; no Java, SQL, runtime,
-Cloudflare, Staging or data change occurs before merged-main authorization.
+That authorization and implementation are complete on merged main
+`aa683013f401cceb289b7bbc245a8ea75e00f3c1` through PRs #1228-#1230. It remains
+predecessor evidence and does not independently authorize the current package.
 
 ---
 

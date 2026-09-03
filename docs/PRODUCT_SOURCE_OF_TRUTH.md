@@ -536,6 +536,51 @@ disabled; it may remain tailnet-only emergency access. MX/TXT/verification
 records, domain ownership and renewal, origin ports, Provider/AI algorithms,
 Telegram sending, Production deployment and automatic trading remain blocked.
 
+That authorization and implementation are complete and effective on merged
+main `aa683013f401cceb289b7bbc245a8ea75e00f3c1` through PRs #1228-#1230.
+
+### Owner-approved official domain, real Home analysis, on-demand analysis, semantic color and Telegram closure
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not a change to the frozen decision thresholds, Final/Position
+ownership, Home structure or no-trade contract. Owner authorized one bounded
+successor to complete the official root-domain ingress, project existing real
+AnalysisRun/Decision facts into the six Home cards, submit idempotent
+background `ANALYSIS_PREVIEW` runs from asset search, apply bounded semantic
+status colors and accept the existing Telegram channel on private Staging.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE` |
+| Branch | `codex/v4-1-official-domain-home-analysis-telegram-closure` |
+| Starting full SHA | `aa683013f401cceb289b7bbc245a8ea75e00f3c1` |
+| Gate baseline rule | authorization and implementation start from the exact merged-main SHA; package, branch and exact path allowlist fail closed |
+| Existing owners | Asset Pool, AnalysisRun/background worker, DecisionResult, Home projection, semantic frontend state, Message/ChannelDelivery/Telegram dispatcher and Cloudflare Tunnel |
+| Runtime objective | official apex HTTPS, six evidence-owned Home cards, click-to-submit Preview with trace recovery, shared semantic colors and one controlled Staging Telegram channel test |
+| Acceptance boundary | exact-head CI, merged main, same-SHA Staging, DB/API/UI six-asset reconciliation, BTC/ETH/SOL Preview recovery, one Telegram test delivery and zero trade actions |
+
+Only the twenty exact implementation and focused-test paths in
+`docs/CODEX_NEXT_TASK.yml` are authorized. A non-Final Home card may expose
+the same formal scan's validated direction, confidence, risk, 1h/4h context,
+data state and provenance, but it may not invent a Final bias or Final mode.
+`WAIT`/neutral with sufficient data remains distinct from unavailable or
+insufficient data. Search Preview must reuse the existing AnalysisRun
+idempotency key, background worker and owner-scoped trace API; it cannot create
+an Opportunity, Candidate, Final, Position, business alert or Telegram event.
+
+Semantic visual changes are limited to direction, risk, runtime, freshness and
+blocking-state text tokens. No Home module order, card geometry, 70:30 layout,
+AI workspace structure or Figma source may change. Telegram continues to use
+the existing Message and ChannelDelivery owners and the three frozen eligible
+event categories. Runtime authorization permits exactly one explicitly marked
+channel test after readiness, never a fixture opportunity or position send.
+
+Cloudflare mutations are limited to the existing Tunnel apex route, permanent
+`www` redirect, HTTPS/security headers, authenticated HTML/API cache bypass and
+retirement of the legacy public ts.net Funnel after acceptance. Unrelated DNS,
+origin ports, Provider algorithms, AI thresholds, Schema, Production and all
+automatic trading remain blocked.
+
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
 This is a completed subordinate machine-authorization record, not a second
