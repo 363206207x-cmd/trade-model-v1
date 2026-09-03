@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AiProviderClientAdaptersTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -160,7 +161,7 @@ class AiProviderClientAdaptersTest {
                 properties, FakeTransport.responding(null), objectMapper);
 
         AiHttpRequest request = client.buildDecisionChainHttpRequest(
-                "{}", AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test");
+                grokPrompt(), AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test");
         JsonNode body = objectMapper.readTree(request.getBody());
         JsonNode format = body.path("text").path("format");
 
@@ -172,6 +173,52 @@ class AiProviderClientAdaptersTest {
         assertThat(format.path("schema").path("required")).isNotEmpty();
         assertThat(body.has("tools")).isFalse();
         assertThat(request.getBody()).doesNotContain("xai-key");
+    }
+
+    @Test
+    void xaiDecisionChain_constrainsAllGrokReferencesToCurrentEvidence() throws Exception {
+        AiOrchestratorProperties properties = properties();
+        configure(properties.getXai(), "xai-key", "grok-test", "https://xai.test");
+        XaiProviderClient client = new XaiProviderClient(
+                properties, FakeTransport.responding(null), objectMapper);
+
+        AiHttpRequest request = client.buildDecisionChainHttpRequest(
+                grokPrompt(), AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test");
+        JsonNode schema = objectMapper.readTree(request.getBody())
+                .path("text").path("format").path("schema");
+        List<String> expected = List.of(
+                "BINANCE", "COINGLASS", "coinglass://ADAUSDT/open-interest",
+                "deriv-open-interest", "ev-market-1", "market://ADAUSDT/5m",
+                "trace-derivatives-1", "trace-market-1");
+
+        assertThat(referenceEnum(schema, "failurePaths", "sourceRefs"))
+                .containsExactlyElementsOf(expected);
+        for (String collection : List.of(
+                "opposingScenarios", "externalEventRisks", "microstructureRisks", "watchIndicators")) {
+            assertThat(referenceEnum(schema, collection, "evidenceRefs"))
+                    .containsExactlyElementsOf(expected);
+        }
+        assertThat(referenceEnum(schema, "failurePaths", "sourceRefs"))
+                .doesNotContain("decisionBundle.multiTimeframe",
+                        "derivativesContext.businessAssessment",
+                        "derivativesContext.datasetReadings.openInterest");
+    }
+
+    @Test
+    void xaiDecisionChain_failsClosedBeforeProviderCallWhenEvidenceReferencesAreMissing() {
+        AiOrchestratorProperties properties = properties();
+        configure(properties.getXai(), "xai-key", "grok-test", "https://xai.test");
+        XaiProviderClient client = new XaiProviderClient(
+                properties, FakeTransport.responding(null), objectMapper);
+
+        assertThatThrownBy(() -> client.buildDecisionChainHttpRequest(
+                "{\"input\":{\"evidence\":[]}}",
+                AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("GROK_EVIDENCE_REFERENCES_REQUIRED");
+        assertThatThrownBy(() -> client.buildDecisionChainHttpRequest(
+                "{", AiDecisionChainRole.GROK_CHALLENGE, 1234, "grok-test"))
+                .isInstanceOf(com.fasterxml.jackson.core.JsonProcessingException.class);
     }
 
     @Test
@@ -310,6 +357,25 @@ class AiProviderClientAdaptersTest {
         request.setEvidenceSummary("review-only evidence");
         request.setScoreSummary("score=90");
         return request;
+    }
+
+    private static String grokPrompt() {
+        return """
+                {"input":{"evidence":[
+                  {"evidenceId":"ev-market-1","source":"BINANCE","sourceReference":"market://ADAUSDT/5m","sourceTraceId":"trace-market-1"},
+                  {"evidenceId":"deriv-open-interest","source":"COINGLASS","sourceReference":"coinglass://ADAUSDT/open-interest","sourceTraceId":"trace-derivatives-1"}
+                ]}}
+                """;
+    }
+
+    private static List<String> referenceEnum(JsonNode schema,
+                                              String collection,
+                                              String referenceField) {
+        JsonNode values = schema.path("properties").path(collection).path("items")
+                .path("properties").path(referenceField).path("items").path("enum");
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        values.forEach(value -> result.add(value.asText()));
+        return List.copyOf(result);
     }
 
     private static final class FakeTransport implements AiHttpTransport {
