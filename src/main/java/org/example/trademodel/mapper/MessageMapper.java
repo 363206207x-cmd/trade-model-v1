@@ -50,7 +50,8 @@ public interface MessageMapper {
     @Select("SELECT m.* FROM tm_message m LEFT JOIN tm_channel_delivery d "
             + "ON d.message_id = m.message_id AND d.channel = 'TELEGRAM' "
             + "WHERE d.delivery_id IS NULL AND m.not_trade_instruction = TRUE "
-            + "AND m.not_order_execution = TRUE AND COALESCE(m.body, '') <> '' AND ("
+            + "AND m.not_order_execution = TRUE AND COALESCE(m.body, '') <> '' "
+            + "AND (m.expires_at IS NULL OR m.expires_at > #{now}) AND ("
             + "(m.category = 'HIGH_PERMISSION_OPPORTUNITY' AND m.title = '【可复核执行计划】' "
             + "AND m.dedupe_key LIKE 'TG1|OPPORTUNITY_READY|CONFIRMATION|%' "
             + "AND m.source_type IN ('FINAL_PLAN', 'PUSH_SNAPSHOT') "
@@ -63,6 +64,27 @@ public interface MessageMapper {
             + "AND m.body LIKE '%操作：打开系统重新校验' "
             + "AND m.body NOT LIKE '%不构成交易指令%' AND m.body NOT LIKE '%系统不会自动%' "
             + "AND m.body NOT LIKE '%站内消息查看%') OR "
+            + "(m.category = 'OPPORTUNITY_PLAN_SAFETY_CHANGE' AND m.title = '【原计划需要重新验证】' "
+            + "AND ((m.source_type = 'FINAL_PLAN' AND COALESCE(m.plan_id, '') <> '' "
+            + "AND m.source_id = m.plan_id) OR (m.source_type = 'OPPORTUNITY' "
+            + "AND COALESCE(m.plan_id, '') = '' AND COALESCE(m.source_id, '') <> '')) "
+            + "AND COALESCE(m.symbol, '') <> '' AND COALESCE(m.trace_id, '') <> '' "
+            + "AND m.body LIKE '资产：%' AND m.body LIKE '%\n变化：%' "
+            + "AND m.body LIKE '%\n原因：%' "
+            + "AND m.body LIKE '%\n当前状态：暂不视为有效机会\n恢复条件：%' "
+            + "AND m.body NOT LIKE '%不构成交易指令%' AND m.body NOT LIKE '%系统不会自动%' "
+            + "AND m.body NOT LIKE '%站内消息查看%' AND ("
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|CONFUSED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|HIGH_CONFUSED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|LIQUIDITY_TRAP|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|HOT_RESET|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|FINAL_INVALIDATED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|RISK_BLOCKED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|EXECUTION_DRIFT|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|PLAN_EXPIRED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|DATA_QUALITY_BLOCKED|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|SOURCE_INVALID|%' OR "
+            + "m.dedupe_key LIKE 'TG1|PLAN_SAFETY_CHANGE|NEEDS_REVALIDATION|%')) OR "
             + "(m.category = 'POSITION_LOGIC_RISK_CHANGE' AND m.title = '【持仓需关注】' "
             + "AND m.source_type = 'POSITION_MONITOR' AND COALESCE(m.source_id, '') <> '' "
             + "AND m.position_id IS NOT NULL AND COALESCE(m.symbol, '') <> '' "
@@ -82,7 +104,8 @@ public interface MessageMapper {
             + "m.dedupe_key LIKE 'TG1|POSITION_RISK_CHANGE|TAKE_PROFIT_REACHED|%' OR "
             + "m.dedupe_key LIKE 'TG1|POSITION_RISK_CHANGE|STRONG_REVERSAL|%'))) "
             + "ORDER BY m.created_at ASC, m.message_id ASC LIMIT #{limit}")
-    List<MessageDO> listTelegramDeliveryOrphans(@Param("limit") int limit);
+    List<MessageDO> listTelegramDeliveryOrphans(@Param("now") LocalDateTime now,
+                                                 @Param("limit") int limit);
 
     @Update("UPDATE tm_message SET read_state = 'READ', updated_at = #{updatedAt} "
             + "WHERE message_id = #{messageId} AND user_id = #{userId}")

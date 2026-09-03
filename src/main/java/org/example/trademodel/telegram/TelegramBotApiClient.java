@@ -47,7 +47,7 @@ public class TelegramBotApiClient implements TelegramClient {
             payload.put("reply_markup", Map.of("inline_keyboard", List.of(List.of(Map.of(
                     "text", message.buttonLabel(), "url", message.buttonUrl())))));
         }
-        return post("sendMessage", payload, false);
+        return post("sendMessage", payload, ResponseKind.SEND_MESSAGE);
     }
 
     @Override
@@ -56,10 +56,19 @@ public class TelegramBotApiClient implements TelegramClient {
             return TelegramClientResult.failure(0, configurationState(), "NOT_CONFIGURED",
                     "Telegram provider probe is not configured", null, false);
         }
-        return post("getMe", Map.of(), true);
+        return post("getMe", Map.of(), ResponseKind.GET_ME);
     }
 
-    private TelegramClientResult post(String method, Map<String, Object> payload, boolean botProbe) {
+    @Override
+    public TelegramClientResult getChat() {
+        if (!properties.configuredForExternalDelivery()) {
+            return TelegramClientResult.failure(0, configurationState(), "NOT_CONFIGURED",
+                    "Telegram recipient probe is not configured", null, false);
+        }
+        return post("getChat", Map.of("chat_id", properties.getChatId()), ResponseKind.GET_CHAT);
+    }
+
+    private TelegramClientResult post(String method, Map<String, Object> payload, ResponseKind responseKind) {
         try {
             String body = objectMapper.writeValueAsString(payload);
             HttpRequest request = HttpRequest.newBuilder(endpoint(method))
@@ -68,7 +77,7 @@ public class TelegramBotApiClient implements TelegramClient {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return parse(response.statusCode(), response.body(), botProbe);
+            return parse(response.statusCode(), response.body(), responseKind);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return providerFailure("INTERRUPTED");
@@ -82,7 +91,7 @@ public class TelegramBotApiClient implements TelegramClient {
         return URI.create(root + "/bot" + properties.getBotToken().trim() + "/" + method);
     }
 
-    private TelegramClientResult parse(int status, String responseBody, boolean botProbe) {
+    private TelegramClientResult parse(int status, String responseBody, ResponseKind responseKind) {
         JsonNode root;
         try {
             root = objectMapper.readTree(responseBody == null ? "" : responseBody);
@@ -93,9 +102,7 @@ public class TelegramBotApiClient implements TelegramClient {
         boolean ok = root.path("ok").asBoolean(false);
         if (status >= 200 && status < 300 && ok) {
             JsonNode result = root.path("result");
-            String reference = botProbe ? null : text(result, "message_id");
-            String username = botProbe ? text(result, "username") : null;
-            return TelegramClientResult.success(status, reference, username);
+            return verifiedSuccess(status, result, responseKind);
         }
         int providerCode = root.path("error_code").asInt(status);
         String description = TelegramSecretSanitizer.sanitize(root.path("description").asText(null), properties);
@@ -136,5 +143,59 @@ public class TelegramBotApiClient implements TelegramClient {
     private static String text(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? null : value.asText();
+    }
+
+    private TelegramClientResult verifiedSuccess(int status, JsonNode result, ResponseKind responseKind) {
+        if (responseKind == ResponseKind.GET_ME) {
+            String username = text(result, "username");
+            if (!result.path("is_bot").asBoolean(false) || !positiveNumber(text(result, "id"))
+                    || !hasText(username)) {
+                return unverified(status, "BOT_IDENTITY_UNVERIFIED",
+                        "Telegram bot identity was missing from the provider response");
+            }
+            return TelegramClientResult.success(status, null, username.trim(), null);
+        }
+
+        JsonNode chat = responseKind == ResponseKind.GET_CHAT ? result : result.path("chat");
+        String chatId = text(chat, "id");
+        String chatType = text(chat, "type");
+        String actualRecipient = TelegramSecretSanitizer.recipientFingerprint(chatId);
+        String configuredRecipient = TelegramSecretSanitizer.recipientFingerprint(properties.getChatId());
+        if (!"private".equals(chatType) || configuredRecipient == null
+                || !configuredRecipient.equals(actualRecipient)) {
+            return unverified(status, "RECIPIENT_IDENTITY_MISMATCH",
+                    "Telegram recipient identity did not match the configured private chat");
+        }
+        if (responseKind == ResponseKind.GET_CHAT) {
+            return TelegramClientResult.success(status, null, null, actualRecipient);
+        }
+
+        String reference = text(result, "message_id");
+        JsonNode sender = result.path("from");
+        String username = text(sender, "username");
+        if (!positiveNumber(reference) || !sender.path("is_bot").asBoolean(false) || !hasText(username)) {
+            return unverified(status, "DELIVERY_RECEIPT_UNVERIFIED",
+                    "Telegram delivery receipt did not contain a verifiable message and bot identity");
+        }
+        return TelegramClientResult.success(status, reference, username.trim(), actualRecipient);
+    }
+
+    private static boolean positiveNumber(String value) {
+        return value != null && value.matches("[1-9][0-9]*");
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static TelegramClientResult unverified(int status, String code, String message) {
+        return TelegramClientResult.failure(status, TelegramReadinessState.DEGRADED,
+                code, message, null, false);
+    }
+
+    private enum ResponseKind {
+        GET_ME,
+        GET_CHAT,
+        SEND_MESSAGE
     }
 }

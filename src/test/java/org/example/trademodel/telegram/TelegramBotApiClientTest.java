@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TelegramBotApiClientTest {
     private static final String TOKEN = "TEST_TOKEN";
-    private static final String CHAT_ID = "TEST_CHAT_ID";
+    private static final String CHAT_ID = "41001";
 
     private final ObjectMapper json = new ObjectMapper();
     private final AtomicReference<Response> response = new AtomicReference<>();
@@ -46,8 +46,9 @@ class TelegramBotApiClientTest {
     }
 
     @Test
-    void getMeAndSendMessageUsePostAndParseProviderIdentifiers() throws Exception {
-        respond(200, "{\"ok\":true,\"result\":{\"id\":7,\"username\":\"test_bot\"}}");
+    void probesBotAndPrivateRecipientBeforeParsingVerifiedDeliveryReceipt() throws Exception {
+        respond(200, "{\"ok\":true,\"result\":{\"id\":7,\"is_bot\":true,"
+                + "\"username\":\"test_bot\"}}");
         TelegramBotApiClient client = client();
 
         TelegramClientResult probe = client.getMe();
@@ -57,17 +58,68 @@ class TelegramBotApiClientTest {
         assertThat(request.get().method()).isEqualTo("POST");
         assertThat(request.get().path()).isEqualTo("/bot" + TOKEN + "/getMe");
 
-        respond(200, "{\"ok\":true,\"result\":{\"message_id\":41}}");
+        respond(200, "{\"ok\":true,\"result\":{\"id\":41001,\"type\":\"private\"}}");
+        TelegramClientResult recipient = client.getChat();
+
+        assertThat(recipient.success()).isTrue();
+        assertThat(recipient.recipientFingerprint())
+                .isEqualTo(TelegramSecretSanitizer.recipientFingerprint(CHAT_ID));
+        assertThat(request.get().path()).isEqualTo("/bot" + TOKEN + "/getChat");
+        assertThat(json.readTree(request.get().body()).path("chat_id").asText()).isEqualTo(CHAT_ID);
+
+        respond(200, "{\"ok\":true,\"result\":{\"message_id\":41,"
+                + "\"from\":{\"id\":7,\"is_bot\":true,\"username\":\"test_bot\"},"
+                + "\"chat\":{\"id\":41001,\"type\":\"private\"}}}");
         TelegramClientResult sent = client.sendMessage(
                 new TelegramOutboundMessage("人工复核", "打开并重新校验", "https://app.example.test/recheck/9"));
 
         assertThat(sent.success()).isTrue();
         assertThat(sent.providerReference()).isEqualTo("41");
+        assertThat(sent.botUsername()).isEqualTo("test_bot");
+        assertThat(sent.recipientFingerprint()).isEqualTo(recipient.recipientFingerprint());
         JsonNode payload = json.readTree(request.get().body());
         assertThat(payload.path("chat_id").asText()).isEqualTo(CHAT_ID);
         assertThat(payload.path("text").asText()).isEqualTo("人工复核");
         assertThat(payload.has("parse_mode")).isFalse();
+        assertThat(payload.has("message_thread_id")).isFalse();
         assertThat(payload.path("reply_markup").path("inline_keyboard").isArray()).isTrue();
+    }
+
+    @Test
+    void incompleteOrMismatchedProviderSuccessNeverBecomesVerifiedDelivery() {
+        assertUnverifiedSend("{\"ok\":true,\"result\":{\"message_id\":41}}",
+                "RECIPIENT_IDENTITY_MISMATCH");
+        assertUnverifiedSend("{\"ok\":true,\"result\":{\"message_id\":41,"
+                        + "\"from\":{\"is_bot\":true,\"username\":\"test_bot\"},"
+                        + "\"chat\":{\"id\":99999,\"type\":\"private\"}}}",
+                "RECIPIENT_IDENTITY_MISMATCH");
+        assertUnverifiedSend("{\"ok\":true,\"result\":{"
+                        + "\"from\":{\"is_bot\":true,\"username\":\"test_bot\"},"
+                        + "\"chat\":{\"id\":41001,\"type\":\"private\"}}}",
+                "DELIVERY_RECEIPT_UNVERIFIED");
+        assertUnverifiedSend("{\"ok\":true,\"result\":{\"message_id\":41,"
+                        + "\"from\":{\"is_bot\":false,\"username\":\"test_bot\"},"
+                        + "\"chat\":{\"id\":41001,\"type\":\"private\"}}}",
+                "DELIVERY_RECEIPT_UNVERIFIED");
+        assertUnverifiedSend("{\"ok\":true,\"result\":{\"message_id\":41,"
+                        + "\"from\":{\"is_bot\":true,\"username\":\"test_bot\"},"
+                        + "\"chat\":{\"id\":41001,\"type\":\"group\"}}}",
+                "RECIPIENT_IDENTITY_MISMATCH");
+    }
+
+    @Test
+    void botAndRecipientProbesFailClosedOnIdentityMismatch() {
+        respond(200, "{\"ok\":true,\"result\":{\"id\":7,\"is_bot\":false,"
+                + "\"username\":\"test_bot\"}}");
+        TelegramClientResult bot = client().getMe();
+        assertThat(bot.success()).isFalse();
+        assertThat(bot.errorCode()).isEqualTo("BOT_IDENTITY_UNVERIFIED");
+
+        respond(200, "{\"ok\":true,\"result\":{\"id\":99999,\"type\":\"private\"}}");
+        TelegramClientResult chat = client().getChat();
+        assertThat(chat.success()).isFalse();
+        assertThat(chat.errorCode()).isEqualTo("RECIPIENT_IDENTITY_MISMATCH");
+        assertThat(chat.retryable()).isFalse();
     }
 
     @Test
@@ -133,6 +185,14 @@ class TelegramBotApiClientTest {
         assertThat(result.errorCode()).isEqualTo(code);
         assertThat(result.readinessState()).isEqualTo(state);
         assertThat(result.retryable()).isEqualTo(retryable);
+    }
+
+    private void assertUnverifiedSend(String body, String code) {
+        respond(200, body);
+        TelegramClientResult result = client().sendMessage(new TelegramOutboundMessage("test", null, null));
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorCode()).isEqualTo(code);
+        assertThat(result.retryable()).isFalse();
     }
 
     private TelegramBotApiClient client() {
