@@ -17,8 +17,12 @@ public class AnalysisTraceSnapshot {
     private final String analysisMode;
     private final Boolean preview;
     private final String traceStatus;
+    private final String errorCode;
     private final List<String> missingSegments;
     private final LocalDateTime generatedAt;
+    private final LocalDateTime startedAt;
+    private final LocalDateTime completedAt;
+    private final LocalDateTime updatedAt;
     private final String triggerType;
     private final String triggerReference;
     private final String parentAnalysisId;
@@ -66,7 +70,11 @@ public class AnalysisTraceSnapshot {
         this.preview = run.getPreview();
         this.missingSegments = missingSegments(evidenceIds, scoreIds, decisionIds, executionPlanIds);
         this.traceStatus = traceStatus(run.getStatus(), this.missingSegments);
+        this.errorCode = run.getErrorCode();
         this.generatedAt = LocalDateTime.now();
+        this.startedAt = run.getStartedAt();
+        this.completedAt = run.getCompletedAt();
+        this.updatedAt = run.getUpdatedAt();
         this.triggerType = run.getTriggerType();
         this.triggerReference = run.getTriggerReference();
         this.parentAnalysisId = run.getParentAnalysisId();
@@ -94,8 +102,12 @@ public class AnalysisTraceSnapshot {
     public String getAnalysisMode() { return analysisMode; }
     public Boolean getPreview() { return preview; }
     public String getTraceStatus() { return traceStatus; }
+    public String getErrorCode() { return errorCode; }
     public List<String> getMissingSegments() { return missingSegments; }
     public LocalDateTime getGeneratedAt() { return generatedAt; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
     public String getTriggerType() { return triggerType; }
     public String getTriggerReference() { return triggerReference; }
     public String getParentAnalysisId() { return parentAnalysisId; }

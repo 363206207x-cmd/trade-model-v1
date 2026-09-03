@@ -60,6 +60,7 @@ class HomeUiReviewRuntimeContractTest {
     @Test
     void opportunityCardRendererExecutesPressedStateContractWithoutVisibleCurrentBadge() throws Exception {
         String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String semanticClass = slice(source, "function semanticClass(value)", "function toneText(value, raw)");
         String stateBadge = slice(source, "function stateBadge(asset)", "function opportunityCard(asset, selected)");
         String opportunityCard = slice(source, "function opportunityCard(asset, selected)", "function renderOpportunities(home)");
         String nodeScript = """
@@ -74,10 +75,11 @@ class HomeUiReviewRuntimeContractTest {
                 function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
                 %s
                 %s
+                %s
                 const assets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map((symbol, index) => ({
                   symbol, name: ['Bitcoin', 'Ethereum', 'Solana'][index], opportunityState: index === 2 ? 'HIGH_RISK' : 'WAITING_TRIGGER',
                   finalPlanMode: 'PREPARATION', finalMarketBias: 'BULLISH', confidenceLevel: 'HIGH',
-                  marketBiasLabel: '偏多',
+                  marketBias: 'BULLISH', marketBiasLabel: '偏多',
                   confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
                   riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
                   fourHourTrendLabel: '4小时趋势偏多', hasFinal: true
@@ -92,13 +94,13 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
-                assert.equal(eth.includes('<small>风险</small><strong>高</strong>'), true);
+                assert.equal(eth.includes('<small>风险</small><strong class="semantic-value semantic-bearish">高</strong>'), true);
                 assert.equal(eth.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(eth.includes('<small>状态</small>'), false);
                 assert.equal(eth.includes('<small>数据</small>'), false);
                 assert.equal(eth.includes('数据新鲜'), false);
                 console.log('HOME_OPPORTUNITY_PRESSED_STATE=PASS');
-                """.formatted(stateBadge, opportunityCard);
+                """.formatted(semanticClass, stateBadge, opportunityCard);
 
         Process process = new ProcessBuilder("node", "-e", nodeScript)
                 .directory(Path.of("").toAbsolutePath().toFile())
@@ -135,6 +137,7 @@ class HomeUiReviewRuntimeContractTest {
     @Test
     void homeCardRuntimePreservesBackendOrderAndSeparatesObservationSemantics() throws Exception {
         String source = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String semanticClass = slice(source, "function semanticClass(value)", "function toneText(value, raw)");
         String validators = slice(source, "function eligibleOpportunity(asset)", "function selectedFinalAccess(home)");
         String renderers = slice(source, "function stateBadge(asset)", "function trustedMonitor(position)");
         String nodeScript = """
@@ -153,6 +156,7 @@ class HomeUiReviewRuntimeContractTest {
                 function time(value) { return has(value) ? String(value) : '—'; }
                 function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
                 function loadHome() {}
+                %s
                 const nodes = {
                   opportunityGrid: { innerHTML: '', hidden: false, querySelectorAll: () => [] },
                   opportunityEmpty: { hidden: false },
@@ -165,16 +169,16 @@ class HomeUiReviewRuntimeContractTest {
                 const observation = {
                   assetId: 1, symbol: 'ETHUSDT', name: 'Ethereum', slotType: 'OBSERVATION',
                   opportunityState: 'NO_QUALIFIED_OPPORTUNITY', dataFreshness: 'FRESH',
-                  marketBiasLabel: '观望', confidenceLabel: '—', riskLabel: '未知',
-                  oneHourOpportunityLabel: '1小时数据不足', fourHourTrendLabel: '4小时数据不足',
+                  marketBiasLabel: '暂不可判断', confidenceLabel: '—', riskLabel: '暂不可判断',
+                  oneHourOpportunityLabel: '1小时分析未完成', fourHourTrendLabel: '4小时分析未完成',
                   latestAnalysisTime: '2026-08-30T10:00:00Z'
                 };
                 const blockedObservation = {
                   assetId: 2, symbol: 'BTCUSDT', name: 'Bitcoin', slotType: 'DECISION',
                   analysisId: 'analysis-btc', opportunityId: 'opportunity-btc', opportunityScore: 0,
                   opportunityState: 'HIGH_RISK', finalPlanMode: 'BLOCKED', dataFreshness: 'STALE',
-                  marketBiasLabel: '观望', confidenceLabel: '—', riskLabel: '未知',
-                  oneHourOpportunityLabel: '1小时数据不足', fourHourTrendLabel: '4小时数据不足', hasFinal: false
+                  marketBiasLabel: '暂不可判断', confidenceLabel: '—', riskLabel: '暂不可判断',
+                  oneHourOpportunityLabel: '1小时数据已过期', fourHourTrendLabel: '4小时数据已过期', hasFinal: false
                 };
                 assert.equal(validObservationCard(observation), true);
                 assert.equal(validOpportunityCard(blockedObservation), false);
@@ -184,11 +188,11 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(validOpportunityCard({ ...blockedObservation, slotType: 'DECISION', analysisId: null }), false);
                 const observationHtml = opportunityCard(observation, '');
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
-                assert.equal(observationHtml.includes('<small>方向</small><b>观望</b>'), true);
+                assert.equal(observationHtml.includes('<small>方向</small><b class="semantic-value semantic-neutral">暂不可判断</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong>—</strong>'), true);
-                assert.equal(observationHtml.includes('<small>风险</small><strong>未知</strong>'), true);
-                assert.match(observationHtml, /1小时数据不足/);
-                assert.match(observationHtml, /4小时数据不足/);
+                assert.equal(observationHtml.includes('<small>风险</small><strong class="semantic-value semantic-neutral">暂不可判断</strong>'), true);
+                assert.match(observationHtml, /1小时分析未完成/);
+                assert.match(observationHtml, /4小时分析未完成/);
                 assert.equal(observationHtml.includes('<small>状态</small>'), false);
                 assert.equal(observationHtml.includes('<small>数据</small>'), false);
                 assert.equal(observationHtml.includes('数据新鲜'), false);
@@ -214,7 +218,7 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(nodes.opportunityGrid.innerHTML.includes('DEFAULT_SLOT'), false);
                 assert.equal(nodes.opportunityHeading.textContent, '机会资产 · 6');
                 console.log('HOME_REAL_CARD_RUNTIME=PASS');
-                """.formatted(validators, renderers);
+                """.formatted(semanticClass, validators, renderers);
 
         Process process = new ProcessBuilder("node", "-e", nodeScript)
                 .directory(Path.of("").toAbsolutePath().toFile())

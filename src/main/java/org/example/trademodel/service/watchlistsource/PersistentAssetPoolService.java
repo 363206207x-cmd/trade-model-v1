@@ -127,7 +127,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
         MarketAssetDTO marketAsset = marketAssetCatalog.requireTradable(symbol);
         String normalized = normalizeSymbol(marketAsset.symbol());
         String effectiveTimeframe = timeframe == null || timeframe.isBlank() ? "5m" : timeframe.trim();
-        AnalysisRunResult result = analysisRunOrchestrator.run(AnalysisRunCommand.preview(
+        AnalysisRunResult result = analysisRunOrchestrator.submit(AnalysisRunCommand.preview(
                 userId, normalized, effectiveTimeframe, RequestIdSupport.generate(), null));
         return new AssetAnalysisPreviewDTO(
                 normalized,

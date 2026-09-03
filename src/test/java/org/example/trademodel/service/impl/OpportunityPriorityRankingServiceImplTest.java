@@ -4,6 +4,7 @@ import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
 import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AssetStateMapper;
@@ -176,7 +177,7 @@ class OpportunityPriorityRankingServiceImplTest {
             assertThat(asset.opportunityScore()).isNull();
             assertThat(asset.finalMarketBias()).isNull();
             assertThat(asset.finalPlanMode()).isNull();
-            assertThat(asset.sourceDecision()).isNull();
+            assertThat(asset.sourceDecision()).isSameAs(decision);
         });
     }
 
@@ -269,7 +270,7 @@ class OpportunityPriorityRankingServiceImplTest {
         HomeTopAssetProjection highRisk = ranked.get(0);
         assertThat(highRisk.opportunityState()).isEqualTo("HIGH_RISK");
         assertThat(highRisk.sourceDecision()).isNotNull();
-        assertThat(ranked.get(3).sourceDecision()).isNull();
+        assertThat(ranked.get(3).sourceDecision()).isSameAs(decisionRows.get(2));
     }
 
     @Test
@@ -484,6 +485,44 @@ class OpportunityPriorityRankingServiceImplTest {
                 .thenReturn(List.of(state));
 
         assertThat(service.rankForHome(USER_ID, 6)).isEmpty();
+    }
+
+    @Test
+    void newerPreviewDecisionCannotShadowTheFormalAssetPoolDecision() {
+        String symbol = "BTCUSDT";
+        String formalAnalysisId = "analysis-BTCUSDT";
+        String previewAnalysisId = "preview-BTCUSDT";
+        DecisionResultVO previewDecision = decision(symbol, 99, "HIGH", "LOW",
+                "CONFIRMATION", "LEVEL_1_CONSISTENT", 99);
+        previewDecision.setAnalysisId(previewAnalysisId);
+        DecisionResult storedFormal = new DecisionResult();
+        storedFormal.setDecisionId("decision-formal-BTCUSDT");
+        storedFormal.setAnalysisId(formalAnalysisId);
+        storedFormal.setSymbol(symbol);
+        storedFormal.setMarketBiasHierarchy("BEARISH");
+        storedFormal.setValidatedMarketBias("BEARISH");
+        storedFormal.setDirectionDataState("READY");
+        storedFormal.setFinalConfidence(73);
+        storedFormal.setRiskLevel("MEDIUM");
+        storedFormal.setOneHourOpportunityQuality(76);
+        storedFormal.setFourHourTrendAlignment(81);
+        storedFormal.setDataQualityScore(92);
+        storedFormal.setOpportunityScore(77);
+        storedFormal.setFinalPlanMode("PREPARATION");
+        storedFormal.setAiConflictLevel("LEVEL_2_MINOR_DISAGREEMENT");
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(List.of(symbol)));
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(
+                anyList(), eq("USER"), eq(USER_ID))).thenReturn(List.of(previewDecision));
+        when(decisionResultMapper.selectLatestByAnalysisId(formalAnalysisId)).thenReturn(storedFormal);
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(List.of(state(symbol)));
+
+        assertThat(service.rankForHome(USER_ID, 6)).singleElement().satisfies(asset -> {
+            assertThat(asset.analysisId()).isEqualTo(formalAnalysisId);
+            assertThat(asset.sourceDecision()).isNotSameAs(previewDecision);
+            assertThat(asset.sourceDecision().getValidatedMarketBias()).isEqualTo("BEARISH");
+            assertThat(asset.sourceDecision().getDirectionDataState()).isEqualTo("READY");
+        });
     }
 
     private static List<AssetPoolAssetDTO> pool(List<String> symbols) {

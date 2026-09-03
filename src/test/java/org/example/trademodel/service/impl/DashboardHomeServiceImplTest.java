@@ -433,13 +433,13 @@ class DashboardHomeServiceImplTest {
         assertThat(btc.getOpportunityScore()).isNull();
         assertThat(btc.getMarketBias()).isNull();
         assertThat(btc.getName()).isEqualTo("Bitcoin");
-        assertThat(btc.getMarketBiasLabel()).isEqualTo("观望");
+        assertThat(btc.getMarketBiasLabel()).isEqualTo("暂不可判断");
         assertThat(btc.getConfidenceLevel()).isNull();
         assertThat(btc.getConfidenceLabel()).isEqualTo("—");
         assertThat(btc.getRiskLevel()).isNull();
-        assertThat(btc.getRiskLabel()).isEqualTo("未知");
-        assertThat(btc.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
-        assertThat(btc.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
+        assertThat(btc.getRiskLabel()).isEqualTo("暂不可判断");
+        assertThat(btc.getOneHourOpportunityLabel()).isEqualTo("1小时分析未完成");
+        assertThat(btc.getFourHourTrendLabel()).isEqualTo("4小时分析未完成");
         assertThat(btc.getPlanMode()).isNull();
         assertThat(btc.getHasFinal()).isFalse();
         assertThat(btc.getFinalMarketBias()).isNull();
@@ -528,6 +528,11 @@ class DashboardHomeServiceImplTest {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 92, 20,
                 "LEVEL_1_CONSISTENT", true, "{\"state\":\"HIGH_RISK\"}");
         decision.setPlanMode("CONFIRMATION");
+        decision.setValidatedMarketBias("BULLISH");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(84);
+        decision.setOneHourOpportunityQuality(78);
+        decision.setFourHourTrendAlignment(81);
         when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
                 projection(101L, decision, 92, "opportunity-high-risk", "HIGH_RISK")));
 
@@ -540,20 +545,83 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getFinalMarketBias()).isNull();
             assertThat(asset.getFinalPlanMode()).isNull();
             assertThat(asset.getFinalPlanLifecycle()).isNull();
-            assertThat(asset.getMarketBias()).isNull();
-            assertThat(asset.getMarketBiasLabel()).isEqualTo("观望");
-            assertThat(asset.getConfidenceLevel()).isNull();
-            assertThat(asset.getConfidenceLabel()).isEqualTo("—");
-            assertThat(asset.getRiskLevel()).isNull();
-            assertThat(asset.getRiskLabel()).isEqualTo("未知");
-            assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
-            assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
+            assertThat(asset.getMarketBias()).isEqualTo("BULLISH");
+            assertThat(asset.getMarketBiasLabel()).isEqualTo("偏多");
+            assertThat(asset.getConfidenceLevel()).isEqualTo("84");
+            assertThat(asset.getConfidenceLabel()).isEqualTo("84%");
+            assertThat(asset.getRiskLevel()).isEqualTo("HIGH");
+            assertThat(asset.getRiskLabel()).isEqualTo("高");
+            assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时机会较强");
+            assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时趋势偏多");
         });
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
         assertThat(home.getExecutionSuggestion().getTakeProfitRules()).isNull();
+    }
+
+    @Test
+    void fiveMarketBiasesProjectFromTheSameReadyDecisionWithoutRequiringAFinalPlan() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        List<String> biases = List.of("STRONG_BULLISH", "BULLISH", "WAIT", "BEARISH", "STRONG_BEARISH");
+        List<String> expected = List.of("强偏多", "偏多", "观望", "偏空", "强偏空");
+        List<HomeTopAssetProjection> projections = new ArrayList<>();
+        for (int index = 0; index < biases.size(); index++) {
+            String symbol = "BIAS" + index + "USDT";
+            DecisionResultVO decision = decision(symbol, biases.get(index), "HIGH", "MEDIUM", 91, 18,
+                    "LEVEL_1_CONSISTENT", false, "{\"state\":\"OBSERVING\"}");
+            decision.setValidatedMarketBias("WAIT".equals(biases.get(index)) ? null : biases.get(index));
+            decision.setDirectionDataState("READY");
+            decision.setFinalConfidence(70 + index);
+            decision.setOneHourOpportunityQuality(72);
+            decision.setFourHourTrendAlignment(75);
+            projections.add(projection(200L + index, decision, null, null, "OBSERVING"));
+        }
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(projections);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6, null);
+
+        assertThat(home.getAssets()).hasSize(5);
+        for (int index = 0; index < biases.size(); index++) {
+            DashboardHomeVO.AssetVO asset = home.getAssets().get(index);
+            assertThat(asset.getMarketBias()).isEqualTo(biases.get(index));
+            assertThat(asset.getMarketBiasLabel()).isEqualTo(expected.get(index));
+            assertThat(asset.getConfidenceLabel()).isEqualTo((70 + index) + "%");
+            assertThat(asset.getRiskLevel()).isEqualTo("MEDIUM");
+            assertThat(asset.getHasFinal()).isFalse();
+            assertThat(asset.getFinalMarketBias()).isNull();
+            assertThat(asset.getFinalPlanMode()).isNull();
+        }
+    }
+
+    @Test
+    void insufficientDirectionDataCannotFallBackToWaitOrRiskValues() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        DecisionResultVO decision = decision("BTCUSDT", "WAIT", "HIGH", "HIGH", 64, 20,
+                "LEVEL_2_MINOR_DISAGREEMENT", false, "{\"state\":\"OBSERVING\"}");
+        decision.setDirectionDataState("INSUFFICIENT_DATA");
+        decision.setFinalConfidence(74);
+        decision.setOneHourOpportunityQuality(62);
+        decision.setFourHourTrendAlignment(58);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(101L, decision, null, null, "OBSERVING")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, null, 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getConfidenceLevel()).isNull();
+        assertThat(asset.getRiskLevel()).isNull();
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
     }
 
     @Test

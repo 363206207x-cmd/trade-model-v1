@@ -3,8 +3,10 @@ package org.example.trademodel.controller;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -60,7 +62,11 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "id=\"topUpDefaultAssets\"", "id=\"resetDefaultAssets\"", "id=\"scanAssetPool\"");
         assertThat(script).contains(
                 "/api/asset-pool/search?query=", "/analysis-preview?timeframe=5m",
-                "previewAsset(analysisSelectedAsset.symbol)", "updatePoolScanCta",
+                "previewAsset(analysisSelectedAsset.symbol)",
+                "await previewAsset(result.dataset.analysisSymbol)",
+                "ANALYSIS_POLL_TIMEOUT_MS = 300000", "/api/analysis/runs/",
+                "window.history.pushState", "resumeAnalysis(activeAnalysisId)",
+                "analysisSubmissionPromise", "updatePoolScanCta",
                 "/api/asset-pool/defaults/top-up", "/api/asset-pool/defaults/reset",
                 "renderAnalysisScores(analysisAudit.scores || [])",
                 "renderAnalysisEvidence(analysisAudit.evidence || [])",
@@ -77,8 +83,129 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "scan.textContent = \"重新扫描\"",
                 "const scanButton = event.currentTarget",
                 "finally { scanButton.disabled = false; }");
+        assertThat(script).doesNotContain(
+                "analysisSelectedAsset = item;\\n                    renderAnalysisSelection();\\n                    window.location.assign(\"/analysis/\"");
         assertThat(controller).contains(
                 "@PostMapping(\"/defaults/top-up\")", "@PostMapping(\"/defaults/reset\")");
+    }
+
+    @Test
+    void analysisPreviewRuntimeDeduplicatesSubmissionPollsAndRecoversAfterRefresh() throws Exception {
+        String source = Files.readString(SCRIPT);
+        String semantic = slice(source, "function semanticClass(value)", "function stateBadge(value)");
+        String previewRuntime = slice(source, "function analysisFailureMessage(errorCode)",
+                "function selectedBatchSymbols()");
+        String resumeRuntime = slice(source, "async function resumeAnalysis(analysisId)",
+                "function renderAnalysisSearchResults(items)");
+        String nodeScript = """
+                const assert = require('node:assert/strict');
+                function fakeNode() {
+                  return { textContent: '', innerHTML: '', hidden: false, disabled: false, className: '',
+                    classList: { add() {}, remove() {}, toggle() {} } };
+                }
+                const nodes = Object.fromEntries([
+                  'startAnalysisPreview', 'analysisMode', 'analysisModeBoundary', 'analysisDataQuality',
+                  'analysisRoleContent', 'analysisTimeframesSection', 'analysisEvidenceSection',
+                  'analysisScoresSection', 'analysisConflictSummary', 'analysisAiLayout'
+                ].map(id => [id, fakeNode()]));
+                var document = { getElementById: id => nodes[id] || null };
+                var root = { dataset: {} };
+                var window = {
+                  location: { origin: 'https://example.test', pathname: '/analysis', search: '?returnTo=%%2Fdashboard' },
+                  history: { pushes: [], pushState(state, title, target) { this.pushes.push(target); } },
+                  setTimeout
+                };
+                function hasValue(value) { return value !== null && value !== undefined && value !== ''; }
+                function text(value, fallback) { return hasValue(value) ? String(value) : (fallback || '当前不可查看'); }
+                function escapeHtml(value) { return text(value, ''); }
+                function formatTime(value) { return hasValue(value) ? String(value) : '当前不可查看'; }
+                function factGrid(items) { return JSON.stringify(items); }
+                function safeReturnTo(value, fallback) { return value || fallback; }
+                function updateAnalysisRoleLabels() {}
+                function announce() {}
+                let analysisSelectedAsset = { symbol: 'BTCUSDT' };
+                let analysisMode = null;
+                let activeAnalysisId = '';
+                let analysisSubmissionPromise = null;
+                let analysisPollGeneration = 0;
+                const ANALYSIS_POLL_INTERVAL_MS = 0;
+                const ANALYSIS_POLL_TIMEOUT_MS = 1000;
+                let postCount = 0;
+                let getCount = 0;
+                let loadCount = 0;
+                let apiMode = 'submit';
+                async function api(url, options) {
+                  if (options && options.method === 'POST') {
+                    postCount += 1;
+                    return { analysisId: 'analysis-preview-1', traceId: 'trace-preview-1', status: 'QUEUED' };
+                  }
+                  getCount += 1;
+                  if (apiMode === 'refresh' || getCount > 1) {
+                    return { analysisId: url.split('/').pop(), traceId: 'trace-preview-1', status: 'SUCCESS' };
+                  }
+                  return { analysisId: 'analysis-preview-1', traceId: 'trace-preview-1', status: 'STARTED' };
+                }
+                async function loadAnalysis() { loadCount += 1; return true; }
+                %s
+                %s
+                %s
+                (async function () {
+                  const [first, second] = await Promise.all([
+                    previewAsset('BTCUSDT'), previewAsset('BTCUSDT')
+                  ]);
+                  assert.equal(postCount, 1);
+                  assert.equal(first.analysisId, 'analysis-preview-1');
+                  assert.equal(second.analysisId, 'analysis-preview-1');
+                  assert.equal(activeAnalysisId, 'analysis-preview-1');
+                  assert.deepEqual(window.history.pushes, ['/analysis/analysis-preview-1?returnTo=%%2Fdashboard']);
+                  assert.equal(loadCount, 1);
+                  apiMode = 'refresh';
+                  activeAnalysisId = 'analysis-preview-1';
+                  await resumeAnalysis(activeAnalysisId);
+                  assert.equal(loadCount, 2);
+                  assert.match(analysisFailureMessage('AUTHORITATIVE_OHLCV_UNAVAILABLE'), /市场数据/);
+                  assert.match(analysisFailureMessage('PROVIDER_TIMEOUT'), /时限/);
+                  console.log('ANALYSIS_PREVIEW_RUNTIME=PASS');
+                })().catch(error => { console.error(error); process.exitCode = 1; });
+                """.formatted(semantic, previewRuntime, resumeRuntime);
+
+        Process process = new ProcessBuilder("node", "-e", nodeScript)
+                .directory(Path.of("").toAbsolutePath().toFile())
+                .redirectErrorStream(true)
+                .start();
+        boolean completed = process.waitFor(30, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertThat(completed).as(output).isTrue();
+        assertThat(process.exitValue()).as(output).isZero();
+        assertThat(output).contains("ANALYSIS_PREVIEW_RUNTIME=PASS");
+    }
+
+    @Test
+    void semanticStatusColorsUseTheSingleApprovedTokenSet() throws Exception {
+        String homeScript = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String workspaceScript = Files.readString(SCRIPT);
+        String homeCss = Files.readString(HOME_STYLE);
+        String workspaceCss = Files.readString(STYLE);
+        String tokens = "--semantic-strong-bullish: #166534;\n"
+                + "    --semantic-bullish: #15803D;\n"
+                + "    --semantic-neutral: #64748B;\n"
+                + "    --semantic-bearish: #DC2626;\n"
+                + "    --semantic-strong-bearish: #991B1B;\n"
+                + "    --semantic-medium-risk: #B45309;\n"
+                + "    --semantic-analyzing: #2563EB;";
+
+        assertThat(homeCss).contains(tokens);
+        assertThat(workspaceCss).contains(tokens);
+        assertThat(homeScript + workspaceScript).contains(
+                "semantic-strong-bullish", "semantic-bullish", "semantic-neutral",
+                "semantic-bearish", "semantic-strong-bearish", "semantic-medium-risk",
+                "semantic-analyzing");
+        assertThat(homeScript).contains(
+                "semanticClass(asset.marketBias)", "semanticClass(asset.riskLevel)",
+                "applySemanticClass(\"statusSystem\"");
+        assertThat(homeCss + workspaceCss).doesNotContain(
+                ".opportunity-card.semantic-bullish", ".surface.semantic-bearish");
     }
 
     @Test
@@ -105,5 +232,13 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "Preview 不创建机会", "计划不会自动变成持仓",
                 "仅展示通过 Rule Validation", "复核不会产生交易授权",
                 "资产池是机会发现的唯一入口", "Telegram", "telegram");
+    }
+
+    private static String slice(String value, String start, String end) {
+        int startIndex = value.indexOf(start);
+        int endIndex = value.indexOf(end, startIndex + start.length());
+        assertThat(startIndex).isGreaterThanOrEqualTo(0);
+        assertThat(endIndex).isGreaterThan(startIndex);
+        return value.substring(startIndex, endIndex);
     }
 }

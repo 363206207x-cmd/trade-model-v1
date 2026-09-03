@@ -22,6 +22,11 @@
     let analysisSelectedAsset = null;
     let analysisPoolSymbols = new Set();
     let analysisMode = null;
+    let activeAnalysisId = resourceId;
+    let analysisSubmissionPromise = null;
+    let analysisPollGeneration = 0;
+    const ANALYSIS_POLL_INTERVAL_MS = 1500;
+    const ANALYSIS_POLL_TIMEOUT_MS = 300000;
 
     const labels = {
         LONG: "做多", SHORT: "做空",
@@ -208,9 +213,21 @@
         return raw || "当前不可查看";
     }
 
+    function semanticClass(value) {
+        const normalized = String(value || "").trim().toUpperCase();
+        if (["STRONG_BULLISH", "STRONG_LONG"].includes(normalized)) return "semantic-strong-bullish";
+        if (["BULLISH", "LONG", "WEAK_BULLISH", "WEAK_LONG", "LOW", "READY", "SUCCESS", "RUNNING"].includes(normalized)) return "semantic-bullish";
+        if (["WAIT", "RANGE", "NEUTRAL", "STALE", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "UNKNOWN", "NEVER_SCANNED"].includes(normalized)) return "semantic-neutral";
+        if (["STRONG_BEARISH", "STRONG_SHORT", "EXTREME", "BLOCKED"].includes(normalized)) return "semantic-strong-bearish";
+        if (["BEARISH", "SHORT", "WEAK_BEARISH", "WEAK_SHORT", "HIGH", "FAILED", "ERROR", "STOPPED"].includes(normalized)) return "semantic-bearish";
+        if (normalized === "MEDIUM") return "semantic-medium-risk";
+        if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS"].includes(normalized)) return "semantic-analyzing";
+        return "semantic-neutral";
+    }
+
     function stateBadge(value) {
         const raw = text(value, "UNKNOWN").toUpperCase();
-        return '<span class="state-badge" data-state="' + escapeHtml(raw.toLowerCase()) + '">' + escapeHtml(label(raw)) + "</span>";
+        return '<span class="state-badge ' + semanticClass(raw) + '" data-state="' + escapeHtml(raw.toLowerCase()) + '">' + escapeHtml(label(raw)) + "</span>";
     }
 
     function taskStateBadge(view) {
@@ -451,10 +468,136 @@
         await loadAssetPool();
     }
 
+    function analysisFailureMessage(errorCode) {
+        const normalized = String(errorCode || "").trim().toUpperCase();
+        if (normalized.includes("AUTHORITATIVE_OHLCV") || normalized.includes("INSUFFICIENT_DATA")) {
+            return "可信市场数据尚未就绪，暂时无法完成分析。";
+        }
+        if (normalized.includes("REAL_MARKET") || normalized.includes("SOURCE_UNAVAILABLE")) {
+            return "市场数据来源当前不可用，分析已安全停止。";
+        }
+        if (normalized.includes("TIMEOUT") || normalized.includes("PROVIDER")) {
+            return "分析服务未在时限内返回，当前不会构造结果。";
+        }
+        if (normalized.includes("MULTI_TIMEFRAME") || normalized.includes("TIMEFRAME_CONFLICT")) {
+            return "多周期证据存在冲突，本次分析未形成可展示结论。";
+        }
+        if (normalized.includes("RULE") || normalized.includes("VALIDATION")) {
+            return "规则校验未通过，本次分析已安全停止。";
+        }
+        return "分析未完成，当前不会构造 AI 输出。";
+    }
+
+    function analysisStatus(snapshot) {
+        return String(snapshot?.status || snapshot?.traceStatus || "UNKNOWN").trim().toUpperCase();
+    }
+
+    function setAnalysisActionState(running) {
+        const action = document.getElementById("startAnalysisPreview");
+        if (!action) return;
+        action.disabled = running || !analysisSelectedAsset?.symbol;
+        action.textContent = running ? "正在分析" : "重新分析";
+    }
+
+    function setAnalysisSectionsVisible(visible) {
+        ["analysisTimeframesSection", "analysisEvidenceSection", "analysisScoresSection"].forEach(function (id) {
+            const section = document.getElementById(id);
+            if (section) section.hidden = !visible;
+        });
+        const conflictSummary = document.getElementById("analysisConflictSummary");
+        if (conflictSummary) conflictSummary.hidden = true;
+        document.getElementById("analysisAiLayout")?.classList.remove("has-conflict");
+    }
+
+    function renderAnalysisRunState(snapshot, state, message) {
+        const normalized = String(state || analysisStatus(snapshot)).toUpperCase();
+        const running = ["STARTED", "QUEUED", "RUNNING", "IN_PROGRESS"].includes(normalized);
+        analysisMode = "ANALYSIS_PREVIEW";
+        document.getElementById("analysisMode").textContent = "按需分析预览";
+        document.getElementById("analysisMode").className = semanticClass(running ? "ANALYZING" : normalized);
+        document.getElementById("analysisModeBoundary").textContent = message;
+        updateAnalysisRoleLabels(analysisMode);
+        setAnalysisSectionsVisible(false);
+        const statusText = running ? "正在分析" : "分析未完成";
+        document.getElementById("analysisDataQuality").innerHTML = factGrid([
+            ["运行状态", statusText, semanticClass(running ? "ANALYZING" : "FAILED")],
+            ["分析标识", text(snapshot?.analysisId || activeAnalysisId)],
+            ["Trace", text(snapshot?.traceId)],
+            ["更新时间", formatTime(snapshot?.updatedAt || snapshot?.startedAt || snapshot?.generatedAt)]
+        ]);
+        const target = document.getElementById("analysisRoleContent");
+        if (target) {
+            target.innerHTML = '<div class="empty-state"><strong class="' + semanticClass(running ? "ANALYZING" : "FAILED") + '">'
+                + escapeHtml(statusText) + '</strong><span>' + escapeHtml(message) + "</span></div>";
+        }
+        setAnalysisActionState(running);
+    }
+
+    function updateAnalysisLocation(analysisId) {
+        if (!analysisId) return;
+        activeAnalysisId = String(analysisId);
+        root.dataset.resourceId = activeAnalysisId;
+        const query = new URLSearchParams(window.location.search);
+        const returnTo = query.get("returnTo");
+        const suffix = returnTo ? "?returnTo=" + encodeURIComponent(safeReturnTo(returnTo, "/dashboard")) : "";
+        const target = "/analysis/" + encodeURIComponent(activeAnalysisId) + suffix;
+        if (window.location.pathname + window.location.search !== target) {
+            window.history.pushState({ analysisId: activeAnalysisId }, "", target);
+        }
+    }
+
+    function waitFor(milliseconds) {
+        return new Promise(function (resolve) { window.setTimeout(resolve, milliseconds); });
+    }
+
+    async function monitorAnalysis(analysisId) {
+        const generation = ++analysisPollGeneration;
+        const deadline = Date.now() + ANALYSIS_POLL_TIMEOUT_MS;
+        while (generation === analysisPollGeneration && Date.now() <= deadline) {
+            try {
+                const snapshot = await api("/api/analysis/runs/" + encodeURIComponent(analysisId));
+                const status = analysisStatus(snapshot);
+                if (status === "SUCCESS") {
+                    if (await loadAnalysis(analysisId, true)) {
+                        setAnalysisActionState(false);
+                        announce("分析已完成");
+                        return snapshot;
+                    }
+                } else if (status === "FAILED") {
+                    const reason = analysisFailureMessage(snapshot?.errorCode);
+                    renderAnalysisRunState(snapshot, status, reason);
+                    announce(reason);
+                    return snapshot;
+                } else {
+                    renderAnalysisRunState(snapshot, status, "正在基于真实市场数据执行三角色分析，请保持页面打开。");
+                }
+            } catch (_) {
+                renderAnalysisRunState({ analysisId: analysisId }, "STARTED", "正在等待分析状态同步，请保持页面打开。");
+            }
+            await waitFor(ANALYSIS_POLL_INTERVAL_MS);
+        }
+        if (generation === analysisPollGeneration) {
+            renderAnalysisRunState({ analysisId: analysisId }, "STARTED", "分析仍在后台运行。稍后刷新页面可继续查看，不会重复提交。");
+            setAnalysisActionState(false);
+        }
+        return null;
+    }
+
     async function previewAsset(symbol) {
-        const result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol) + "/analysis-preview?timeframe=5m", { method: "POST" });
-        if (!result?.analysisId) throw new Error("预览未返回分析标识");
-        window.location.assign("/analysis/" + encodeURIComponent(result.analysisId));
+        if (analysisSubmissionPromise) return analysisSubmissionPromise;
+        analysisSubmissionPromise = (async function () {
+            renderAnalysisRunState({ symbol: symbol }, "QUEUED", "正在创建或复用该资产的真实分析任务。");
+            const result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol) + "/analysis-preview?timeframe=5m", { method: "POST" });
+            if (!result?.analysisId) throw new Error(analysisFailureMessage(result?.reasonCode));
+            updateAnalysisLocation(result.analysisId);
+            renderAnalysisRunState(result, result.status, "分析任务已受理，正在等待真实结果。");
+            return monitorAnalysis(result.analysisId);
+        })();
+        try {
+            return await analysisSubmissionPromise;
+        } finally {
+            analysisSubmissionPromise = null;
+        }
     }
 
     function selectedBatchSymbols() {
@@ -1130,15 +1273,16 @@
         ]);
     }
 
-    function renderRolePrimary(title, value, note) {
+    function renderRolePrimary(title, value, note, semanticValue) {
         return '<section class="ai-role-primary"><span>' + escapeHtml(title) + '</span><strong>'
-            + escapeHtml(value) + '</strong>' + (note ? '<small>' + escapeHtml(note) + '</small>' : "") + '</section>';
+            + '<span class="' + semanticClass(semanticValue || value) + '">' + escapeHtml(value) + '</span></strong>'
+            + (note ? '<small>' + escapeHtml(note) + '</small>' : "") + '</section>';
     }
 
     function renderPreviewRole(role, payload) {
         const head = renderRoleMetadata(payload);
         if (role === "GPT_FINAL") {
-            return head + renderRolePrimary("方向假设", label(payload.coreJudgment?.marketBias), "按需分析预览 · 非 Opportunity")
+            return head + renderRolePrimary("方向假设", label(payload.coreJudgment?.marketBias), "按需分析预览 · 非 Opportunity", payload.coreJudgment?.marketBias)
                 + factGrid([["形成依据", text(payload.coreJudgment?.text || payload.summary)]])
                 + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
                 + renderRoleCollection("反对证据", payload.opposingEvidence, payload.opposingEvidenceState);
@@ -1168,8 +1312,8 @@
                 ["摘要", lifecycleActionText(candidate.summary, payload.coreJudgment?.opportunityState)]
             ]) : '<p class="muted">Candidate 当前不可查看</p>';
             return head + renderRolePrimary("GPT Candidate · 非 Final",
-                candidate ? label(candidate.planMode) : "当前不可查看", "候选参与方式") + factGrid([
-                ["方向判断", label(payload.coreJudgment?.marketBias)],
+                candidate ? label(candidate.planMode) : "当前不可查看", "候选参与方式", candidate?.planMode) + factGrid([
+                ["方向判断", label(payload.coreJudgment?.marketBias), semanticClass(payload.coreJudgment?.marketBias)],
                 ["机会进度", label(payload.coreJudgment?.opportunityState)],
                 ["计划边界", "Candidate · 非 Final"]
             ]) + renderRoleCollection("支持证据", payload.supportingEvidence, payload.supportingEvidenceState)
@@ -1188,7 +1332,7 @@
                     ["恢复条件", text(suggestion.recoveryCondition || payload.recoveryCondition)]
                 ]) + '</section>' : review !== "APPROVE"
                     ? '<section class="ai-structured-section"><h4>Before → After</h4><p class="muted">调整前后当前不可查看</p></section>' : "";
-            return head + renderRolePrimary("复核结果", reviewResultLabel(review), "审查对象：Candidate") + factGrid([
+            return head + renderRolePrimary("复核结果", reviewResultLabel(review), "审查对象：Candidate", review) + factGrid([
                 ["对 Candidate 的影响", text(payload.finalDirectionImpact)],
                 ["恢复条件", text(payload.recoveryCondition || suggestion?.recoveryCondition)]
             ]) + beforeAfter
@@ -1197,7 +1341,7 @@
                 + renderRoleCollection("风险低估", payload.underestimatedRisks, payload.underestimatedRisksState);
         }
         const failureState = failurePathView(payload.failurePathState, payload.failurePaths);
-        return head + renderRolePrimary("失败路径状态", failureState.label, "Grok 反方挑战") + factGrid([
+        return head + renderRolePrimary("失败路径状态", failureState.label, "Grok 反方挑战", payload.failurePathState) + factGrid([
             ["挑战摘要", text(payload.challengeSummary || payload.summary)],
             ["对当前方向的挑战", text(payload.currentDirectionChallenge)],
             ["重大反证", payload.majorCounterEvidence === true ? "是" : payload.majorCounterEvidence === false ? "否" : "当前不可查看"]
@@ -1255,10 +1399,11 @@
         });
     }
 
-    async function loadAnalysis() {
-        if (!resourceId) return;
+    async function loadAnalysis(analysisId, silentFailure) {
+        const requestedAnalysisId = analysisId || activeAnalysisId;
+        if (!requestedAnalysisId) return false;
         try {
-            analysisAudit = await api("/api/ai/audit-chain?analysisId=" + encodeURIComponent(resourceId));
+            analysisAudit = await api("/api/ai/audit-chain?analysisId=" + encodeURIComponent(requestedAnalysisId));
             const analysis = analysisAudit.analysis || {};
             const modeView = analysisModeGate(analysis.analysisMode);
             analysisMode = modeView.mode;
@@ -1306,8 +1451,35 @@
             if (diffPanel) diffPanel.hidden = true;
             selectAnalysisAsset({ symbol: analysis.symbol, baseAsset: String(analysis.symbol || "").replace(/USDT$/, ""), quoteAsset: "USDT" }, { preserveMode: true });
             renderAiRole("GPT_FINAL");
+            return true;
         } catch (_) {
-            empty(document.getElementById("analysisRoleContent"), "分析当前不可查看", "未返回可信分析链，当前不会构造 AI 输出。");
+            if (!silentFailure) {
+                empty(document.getElementById("analysisRoleContent"), "分析当前不可查看", "未返回可信分析链，当前不会构造 AI 输出。");
+            }
+            return false;
+        }
+    }
+
+    async function resumeAnalysis(analysisId) {
+        if (!analysisId) return;
+        try {
+            const snapshot = await api("/api/analysis/runs/" + encodeURIComponent(analysisId));
+            activeAnalysisId = String(snapshot?.analysisId || analysisId);
+            const status = analysisStatus(snapshot);
+            if (status === "SUCCESS") {
+                if (!await loadAnalysis(activeAnalysisId, true)) {
+                    await monitorAnalysis(activeAnalysisId);
+                }
+                return;
+            }
+            if (status === "FAILED") {
+                renderAnalysisRunState(snapshot, status, analysisFailureMessage(snapshot?.errorCode));
+                return;
+            }
+            renderAnalysisRunState(snapshot, status, "正在恢复该分析的真实执行进度。");
+            await monitorAnalysis(activeAnalysisId);
+        } catch (_) {
+            empty(document.getElementById("analysisRoleContent"), "分析当前不可查看", "没有找到该用户可访问的可信 AnalysisRun。");
         }
     }
 
@@ -1370,17 +1542,33 @@
             timer = window.setTimeout(function () { searchAnalysisAssets(search.value); }, 180);
         });
         document.getElementById("analysisSearchButton")?.addEventListener("click", function () { searchAnalysisAssets(search?.value || ""); });
-        document.getElementById("analysisAssetResults")?.addEventListener("click", function (event) {
+        document.getElementById("analysisAssetResults")?.addEventListener("click", async function (event) {
             const result = event.target.closest("[data-analysis-symbol]");
             if (!result) return;
             selectAnalysisAsset({ symbol: result.dataset.analysisSymbol, baseAsset: result.dataset.analysisName, quoteAsset: result.dataset.analysisQuote });
+            result.disabled = true;
+            try {
+                await previewAsset(result.dataset.analysisSymbol);
+            } catch (error) {
+                const reason = error?.message || "分析任务未受理";
+                renderAnalysisRunState({ symbol: result.dataset.analysisSymbol }, "FAILED", reason);
+                announce(reason);
+            } finally {
+                result.disabled = false;
+            }
         });
         document.getElementById("startAnalysisPreview")?.addEventListener("click", async function (event) {
             if (!analysisSelectedAsset?.symbol) return;
             event.currentTarget.disabled = true;
             event.currentTarget.textContent = "分析中";
             try { await previewAsset(analysisSelectedAsset.symbol); }
-            catch (error) { announce(error.message); event.currentTarget.disabled = false; event.currentTarget.textContent = "开始预览"; }
+            catch (error) {
+                const reason = error?.message || "分析任务未受理";
+                renderAnalysisRunState({ symbol: analysisSelectedAsset.symbol }, "FAILED", reason);
+                announce(reason);
+            } finally {
+                setAnalysisActionState(false);
+            }
         });
         document.getElementById("addAnalysisAsset")?.addEventListener("click", async function () {
             if (!analysisSelectedAsset?.symbol) return;
@@ -1393,12 +1581,12 @@
         api("/api/asset-pool").then(function (items) {
             analysisPoolSymbols = new Set((items || []).map(function (item) { return String(item.symbol || "").toUpperCase(); }));
             const requested = new URLSearchParams(window.location.search).get("asset");
-            if (requested && !resourceId) searchAnalysisAssets(requested).then(function () {
+            if (requested && !activeAnalysisId) searchAnalysisAssets(requested).then(function () {
                 const match = document.querySelector('[data-analysis-symbol="' + CSS.escape(requested.toUpperCase()) + '"]');
                 if (match) match.click();
             });
         }).catch(function () { analysisPoolSymbols = new Set(); });
-        loadAnalysis();
+        if (activeAnalysisId) resumeAnalysis(activeAnalysisId);
     }
 
     async function loadMessages() {

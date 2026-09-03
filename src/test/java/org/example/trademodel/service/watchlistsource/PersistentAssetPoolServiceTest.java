@@ -321,21 +321,14 @@ class PersistentAssetPoolServiceTest {
     }
 
     @Test
-    void searchedAssetPreviewRunsThreeAiAnalysisWithoutMutatingPoolOrDecisionOwners() {
+    void searchedAssetPreviewQueuesThreeAiAnalysisWithoutMutatingPoolOrDecisionOwners() {
         when(marketAssetCatalog.requireTradable("aave/usdt"))
                 .thenReturn(new MarketAssetDTO("AAVEUSDT", "AAVE", "USDT", "SPOT"));
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId("preview-analysis-1");
         run.setTraceId("preview-trace-1");
-        run.setStatus("SUCCESS");
-        DecisionBundleVO decision = new DecisionBundleVO();
-        decision.setAiRoleResults("""
-                {"roles":{"GPT_FINAL":{},"GEMINI_REVIEW":{},"GROK_CHALLENGE":{}}}
-                """);
-        AssetAnalysisVO analysis = new AssetAnalysisVO();
-        analysis.setAnalysisId("preview-analysis-1");
-        analysis.setDecisionBundle(decision);
-        when(analysisRunOrchestrator.run(any())).thenReturn(AnalysisRunResult.executed(run, analysis, false, false));
+        run.setStatus("STARTED");
+        when(analysisRunOrchestrator.submit(any())).thenReturn(AnalysisRunResult.queued(run, false, false));
 
         AssetAnalysisPreviewDTO preview = service.analyzePreviewForUser(31L, "aave/usdt", "15m");
 
@@ -346,10 +339,10 @@ class PersistentAssetPoolServiceTest {
         assertThat(preview.finalPlanPersisted()).isFalse();
         assertThat(preview.symbol()).isEqualTo("AAVEUSDT");
         assertThat(preview.analysisId()).isEqualTo("preview-analysis-1");
-        assertThat(preview.analysis().getDecisionBundle().getAiRoleResults())
-                .contains("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        assertThat(preview.status()).isEqualTo("QUEUED");
+        assertThat(preview.analysis()).isNull();
         ArgumentCaptor<AnalysisRunCommand> command = ArgumentCaptor.forClass(AnalysisRunCommand.class);
-        verify(analysisRunOrchestrator).run(command.capture());
+        verify(analysisRunOrchestrator).submit(command.capture());
         assertThat(command.getValue().getTriggerType()).isEqualTo(AnalysisRunTriggerType.ANALYSIS_PREVIEW);
         assertThat(command.getValue().isPreview()).isTrue();
         assertThat(command.getValue().getOwnerType()).isEqualTo("USER");
