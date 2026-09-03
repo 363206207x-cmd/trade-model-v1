@@ -112,7 +112,8 @@ validate_contract_task() {
   local current_package_edits current_package_implementation current_package_pr current_package_push current_package_merge current_package_deployment
   local authorized_next_phase authorized_next_mode authorized_next_starting_full_sha
   local authorized_next_edits authorized_next_implementation authorized_next_pr blocked_package blocked_status
-  local authorized_next_push authorized_next_merge authorized_next_deployment authorized_next_allowed_paths
+  local authorized_next_push authorized_next_merge authorized_next_deployment
+  local authorized_next_staging_deployment authorized_next_production_deployment authorized_next_allowed_paths
   local p1b_1_status p1b_authorization_status home_core_data_status home_core_data_implementation_status p1b_scope
   local product_p1b_status product_p2_status p2_authorization_status p2_implementation_status
   local product_v4_1_authorization v4_1_design_status v4_1_authorization_status v4_1_implementation_status
@@ -153,6 +154,8 @@ validate_contract_task() {
   authorized_next_push="$(yaml_value "$TASK_FILE" authorized_next_package_push_allowed)"
   authorized_next_merge="$(yaml_value "$TASK_FILE" authorized_next_package_merge_allowed)"
   authorized_next_deployment="$(yaml_value "$TASK_FILE" authorized_next_package_deployment_allowed)"
+  authorized_next_staging_deployment="$(yaml_value "$TASK_FILE" authorized_next_package_staging_deployment_allowed)"
+  authorized_next_production_deployment="$(yaml_value "$TASK_FILE" authorized_next_package_production_deployment_allowed)"
   authorized_next_allowed_paths="$(yaml_list "$TASK_FILE" authorized_next_package_allowed_paths)"
   authorized_next_canonical_figma="$(yaml_value "$TASK_FILE" authorized_next_package_canonical_figma_desktop_implementation_allowed)"
   authorized_next_mobile="$(yaml_value "$TASK_FILE" authorized_next_package_mobile_implementation_allowed)"
@@ -191,6 +194,8 @@ validate_contract_task() {
   real_provider_three_ai_runtime_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_provider_three_ai_runtime_closure_implementation_status)"
   gpt_background_three_ai_timeout_closure_authorization_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_authorization_status)"
   gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
+  cross_device_secure_domain_access_closure_authorization_status="$(yaml_value "$TASK_FILE" v4_1_cross_device_secure_domain_access_closure_authorization_status)"
+  cross_device_secure_domain_access_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_cross_device_secure_domain_access_closure_implementation_status)"
   local_real_authorization_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -204,20 +209,20 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI timeout closure authorization declaration mismatch" >&2; failed=1; }
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED cross-device secure-domain authorization declaration mismatch" >&2; failed=1; }
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
-  [[ "$current_package_branch" == "codex/v4-1-gpt-background-three-ai-timeout-closure-authorization" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI timeout closure authorization branch mismatch" >&2; failed=1; }
-  [[ "$current_package_starting_full_sha" == "1c13286eb64bb5b074e960352f8e290a317eb704" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI timeout closure authorization starting SHA mismatch" >&2; failed=1; }
-  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI timeout closure authorization permissions mismatch" >&2; failed=1; }
+  [[ "$current_package_branch" == "codex/v4-1-cross-device-secure-domain-access-authorization" ]] || { echo "TASK_VALIDATION_FAILED cross-device secure-domain authorization branch mismatch" >&2; failed=1; }
+  [[ "$current_package_starting_full_sha" == "075aeb1b570cfc06d5465e7284f148d71ad7bd62" ]] || { echo "TASK_VALIDATION_FAILED cross-device secure-domain authorization starting SHA mismatch" >&2; failed=1; }
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || { echo "TASK_VALIDATION_FAILED cross-device secure-domain authorization permissions mismatch" >&2; failed=1; }
   [[ -n "$authorized_next_phase" && "$authorized_next_phase" != "$current_package_phase" ]] || { echo "TASK_VALIDATION_FAILED authorized next package must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized GPT background/Three-AI timeout closure package mismatch" >&2; failed=1; }
+  [[ "$authorized_next_phase" == "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE" && "$authorized_next_mode" == "IMPLEMENTATION" ]] || { echo "TASK_VALIDATION_FAILED authorized cross-device secure-domain package mismatch" >&2; failed=1; }
   [[ "$authorized_next_starting_full_sha" == "$current_package_starting_full_sha" ]] || { echo "TASK_VALIDATION_FAILED implementation starting SHA must equal the authorization baseline" >&2; failed=1; }
   [[ "$authorized_next_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "TASK_VALIDATION_FAILED authorized starting SHA must be full length" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
-  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded GPT background/Three-AI permissions are incomplete" >&2; failed=1; }
-  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "42" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI closure must contain exactly forty-two implementation paths" >&2; failed=1; }
+  [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_staging_deployment" == "true" && "$authorized_next_production_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded cross-device access permissions are incomplete" >&2; failed=1; }
+  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "2" ]] || { echo "TASK_VALIDATION_FAILED cross-device access closure must contain exactly two implementation paths" >&2; failed=1; }
   if printf '%s\n' "$authorized_next_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-    echo "TASK_VALIDATION_FAILED GPT background/Three-AI allowlist must not contain wildcards or directory grants" >&2
+    echo "TASK_VALIDATION_FAILED cross-device access allowlist must not contain wildcards or directory grants" >&2
     failed=1
   fi
   [[ -n "$blocked_package" && "$blocked_package" != "$current_package_phase" && "$blocked_package" != "$authorized_next_phase" && "$blocked_status" == BLOCKED_* ]] || { echo "TASK_VALIDATION_FAILED blocked successor declaration mismatch" >&2; failed=1; }
@@ -228,7 +233,7 @@ validate_contract_task() {
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
   [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
-  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$real_data_home_blocker_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_data_home_blocker_closure_implementation_status" == "COMPLETE" && "$analysis_run_idempotency_tx_fix_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$analysis_run_idempotency_tx_fix_implementation_status" == "COMPLETE" && "$final_runtime_home_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$final_runtime_home_closure_implementation_status" == "COMPLETE" && "$real_provider_three_ai_runtime_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_provider_three_ai_runtime_closure_implementation_status" == "COMPLETE" && "$gpt_background_three_ai_timeout_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$gpt_background_three_ai_timeout_closure_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED GPT background/Three-AI predecessor boundary mismatch" >&2; failed=1; }
+  [[ "$v4_1_telegram_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_implementation_status" == "COMPLETE" && "$v4_1_telegram_remediation_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_telegram_remediation_implementation_status" == "NOT_STARTED" && "$v4_1_core_production_loop_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_core_production_loop_implementation_status" == "NOT_STARTED" && "$real_data_home_blocker_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_data_home_blocker_closure_implementation_status" == "COMPLETE" && "$analysis_run_idempotency_tx_fix_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$analysis_run_idempotency_tx_fix_implementation_status" == "COMPLETE" && "$final_runtime_home_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$final_runtime_home_closure_implementation_status" == "COMPLETE" && "$real_provider_three_ai_runtime_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$real_provider_three_ai_runtime_closure_implementation_status" == "COMPLETE" && "$gpt_background_three_ai_timeout_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$gpt_background_three_ai_timeout_closure_implementation_status" == "COMPLETE" && "$cross_device_secure_domain_access_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$cross_device_secure_domain_access_closure_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED cross-device access predecessor boundary mismatch" >&2; failed=1; }
   [[ -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_SOURCE_MAPPING.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_OWNERSHIP_MAP.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION.md && -f docs/TRINE_LOGIC_CORE_PRODUCTION_LOOP_AUTOMATION_AUTHORIZATION_VALIDATION.md && -f docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md ]] || { echo "TASK_VALIDATION_FAILED core production-loop authorization artifacts are missing" >&2; failed=1; }
   if [[ "$matrix_status" != "DONE" || "$effective" != "EFFECTIVE_MERGED_MAIN" ]]; then
     [[ "$task_allowed" == "false" || "$task_allowed" == "NO" ]] || { echo "TASK_VALIDATION_FAILED next business phase must be blocked while current phase is not effective" >&2; failed=1; }
@@ -343,6 +348,8 @@ real_provider_three_ai_runtime_closure_authorization_runtime_status="$(state_val
 real_provider_three_ai_runtime_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_IMPLEMENTATION_STATUS)"
 gpt_background_three_ai_timeout_closure_authorization_runtime_status="$(state_value "$state_text" V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_STATUS)"
 gpt_background_three_ai_timeout_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS)"
+cross_device_secure_domain_access_closure_authorization_runtime_status="$(state_value "$state_text" V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION_STATUS)"
+cross_device_secure_domain_access_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_IMPLEMENTATION_STATUS)"
 local_real_authorization_runtime_status="$(state_value "$state_text" LOCAL_REAL_AUTHORIZATION_STATUS)"
 local_real_implementation_runtime_status="$(state_value "$state_text" LOCAL_REAL_IMPLEMENTATION_STATUS)"
 frontend_interaction_authorization_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_AUTHORIZATION_STATUS)"
@@ -426,7 +433,7 @@ case "$resolved_scope_profile" in
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: B01-B04 remediation resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: B01-B04 remediation resolved a forbidden Figma file." >&2; exit 1; }
-        elif [[ "$resolved_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" || "$resolved_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" || "$resolved_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]]; then
+        elif [[ "$resolved_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" || "$resolved_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" || "$resolved_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" || "$resolved_package" == "V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE" ]]; then
           [[ "$canonical_figma_desktop_implementation_allowed" == "false" ]] || { echo "STOP: bounded remediation resolved with forbidden Figma permission." >&2; exit 1; }
           [[ "$mobile_implementation_allowed" == "false" ]] || { echo "STOP: bounded remediation resolved with forbidden Mobile permission." >&2; exit 1; }
           [[ "$canonical_figma_file_key" == "NONE" ]] || { echo "STOP: bounded remediation resolved a forbidden Figma file." >&2; exit 1; }
@@ -509,6 +516,8 @@ V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_AUTHORIZATION_STATUS: $real_provider
 V4_1_REAL_PROVIDER_THREE_AI_RUNTIME_CLOSURE_IMPLEMENTATION_STATUS: $real_provider_three_ai_runtime_closure_implementation_runtime_status
 V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION_STATUS: $gpt_background_three_ai_timeout_closure_authorization_runtime_status
 V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: $gpt_background_three_ai_timeout_closure_implementation_runtime_status
+V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION_STATUS: $cross_device_secure_domain_access_closure_authorization_runtime_status
+V4_1_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_IMPLEMENTATION_STATUS: $cross_device_secure_domain_access_closure_implementation_runtime_status
 LOCAL_REAL_AUTHORIZATION_STATUS: $local_real_authorization_runtime_status
 LOCAL_REAL_IMPLEMENTATION_STATUS: $local_real_implementation_runtime_status
 FRONTEND_INTERACTION_AUTHORIZATION_STATUS: $frontend_interaction_authorization_runtime_status
