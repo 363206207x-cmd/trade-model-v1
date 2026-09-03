@@ -628,6 +628,30 @@ This subordinate authorization does not create a second v4.1 Product Source.
 Its exact successor remains blocked until this record is effective on clean,
 synchronized merged main.
 
+### PS-TRINE-LOGIC-V4-1-TELEGRAM-FULL-INTERACTION-USABILITY-CLOSURE
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC v4.1 Telegram Blocker Closure, Full Interaction Audit and Consolidated Usability Remediation Authorization |
+| Repository path | `docs/PRODUCT_SOURCE_OF_TRUTH.md` |
+| Version/date | Owner authorization `2026-09-03`; effective only after merged-main validation |
+| Authority | Bounded implementation authorization subordinate to the canonical v4.1 Product Source, final interaction source, Position Monitoring source and frozen Telegram contract |
+| Package | `V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE` |
+| Branch | `codex/v4-1-telegram-interaction-usability-closure` |
+| Starting merged-main SHA | `b5e52d501becf675f4299fc7c5d389707de81af0` |
+| Exact implementation paths | The sixty literal paths in `docs/CODEX_NEXT_TASK.yml`; no wildcard, directory or prefix grant |
+| Required order | close both Telegram blockers, validate/merge/deploy, audit every existing route without fixes, freeze one finding report, then consolidate all P0/P1 and reproducible contract P2 fixes |
+| Telegram acceptance | preserve Message as sole business fact owner; recover all three canonical categories; require real provider success and durable Telegram message ID; permit one controlled Staging receipt only after bot/recipient preflight |
+| Interaction acceptance | verify existing fourteen routes, eleven overlays, Home/Plan/Three-AI trace identity, manual-position form/date/time/value preservation, Recheck, desktop/mobile, errors and accessibility |
+| Forbidden reinterpretations | no new product semantics, Schema/Flyway, Provider or algorithm change, fake data, Figma/Mobile implementation, Production deployment or automatic trade |
+
+The Owner-authorized successor is a closure over existing owners, not a new
+message, position, analysis, plan or UI object family. The earlier
+`V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE` authorization and
+implementation are complete on merged main
+`b5e52d501becf675f4299fc7c5d389707de81af0`; they are predecessor evidence
+and do not independently authorize this successor.
+
 ### PS-FIGMA-BASELINE
 
 Repository record: `docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`, SHA-256 `fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851`.

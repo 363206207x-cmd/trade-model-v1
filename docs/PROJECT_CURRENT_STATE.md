@@ -8,13 +8,43 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure Authorization
-Product Phase Status: OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact official-domain, real Home analysis, on-demand Preview, semantic color and Telegram closure; no implementation, DNS/proxy mutation, Telegram send or deployment is included in this gate package
-Next Business Phase: V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization
+Product Phase Status: TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact Telegram durable-delivery and full-interaction usability closure; no implementation, Telegram send or deployment is included in this gate package
+Next Business Phase: V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization
+
+Owner authorized one exact successor over existing Message, ChannelDelivery,
+Telegram, Home, Workspace, UserPosition, AnalysisRun, Decision and Trace
+owners. The package is `V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE`,
+the branch is `codex/v4-1-telegram-interaction-usability-closure`, and the
+immutable baseline is `b5e52d501becf675f4299fc7c5d389707de81af0`.
+
+Read-only preflight confirms the predecessor implementation is complete on
+that merged main. Two runtime blockers remain: the canonical safety-change
+Message category is omitted from Telegram orphan reconciliation, and a prior
+provider-success probe did not produce an Owner-confirmed receipt. Position
+entry date/time interaction, value preservation and every existing route and
+control also require one audit-first real-browser pass before any UI fix.
+
+The successor may change only the sixty exact paths in
+`docs/CODEX_NEXT_TASK.yml`. It must close and deploy the Telegram repair
+first, perform the full interaction audit without edits, freeze
+`docs/TRINE_LOGIC_V4_1_FULL_INTERACTION_AUDIT.md`, then consolidate all P0,
+P1 and reproducible frozen-contract P2 repairs. It may send at most one
+controlled Staging Telegram message after bot/recipient preflight.
+
+Capability movement in this gate package is `NONE`. No Java, frontend,
+Schema, runtime configuration, Telegram delivery, Staging or business-data
+change occurs before merged-main authorization. Product source, Figma,
+Provider algorithms, Production and every automatic-trading action remain
+blocked.
 
 ---
 
@@ -41,9 +71,10 @@ exact-head merge. No new object, Schema, Provider, algorithm threshold, Home
 structure, Position/Final ownership, Figma, Mobile, Production or trading
 capability is allowed.
 
-Capability movement in this gate package is `NONE`; no Java, frontend,
-Cloudflare, Telegram, Staging or data change occurs before merged-main
-authorization.
+That authorization and implementation are complete on merged main
+`b5e52d501becf675f4299fc7c5d389707de81af0` through PRs #1231-#1232.
+It remains predecessor evidence and does not independently authorize the
+current package.
 
 ---
 
