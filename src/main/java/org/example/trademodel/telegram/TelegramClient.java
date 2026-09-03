@@ -4,4 +4,6 @@ public interface TelegramClient {
     TelegramClientResult sendMessage(TelegramOutboundMessage message);
 
     TelegramClientResult getMe();
+
+    TelegramClientResult getChat();
 }

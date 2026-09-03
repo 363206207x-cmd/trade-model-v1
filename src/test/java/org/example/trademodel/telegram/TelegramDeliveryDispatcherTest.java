@@ -31,18 +31,28 @@ class TelegramDeliveryDispatcherTest {
 
     private TelegramProperties properties;
     private TelegramDeliveryDispatcher dispatcher;
+    private String recipientFingerprint;
 
     @BeforeEach
     void setUp() {
         properties = new TelegramProperties();
+        properties.setEnabled(true);
+        properties.setExternalCallsEnabled(true);
+        properties.setBotToken("TEST_TOKEN");
+        properties.setChatId("41001");
         properties.setDispatchEnabled(true);
         properties.setMaxAttempts(3);
         properties.setRetryBaseSeconds(5);
         properties.setRetryMaxSeconds(300);
         dispatcher = new TelegramDeliveryDispatcher(
                 properties, client, readiness, formatter, deliveryService, messageMapper, true);
+        recipientFingerprint = TelegramSecretSanitizer.recipientFingerprint(properties.getChatId());
         org.mockito.Mockito.lenient().when(deliveryService.extendClaimForProviderCall(any())).thenReturn(true);
         org.mockito.Mockito.lenient().when(deliveryService.completeClaim(any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(client.getMe())
+                .thenReturn(TelegramClientResult.success(200, null, "test_bot", null));
+        org.mockito.Mockito.lenient().when(client.getChat())
+                .thenReturn(TelegramClientResult.success(200, null, null, recipientFingerprint));
     }
 
     @Test
@@ -52,16 +62,18 @@ class TelegramDeliveryDispatcherTest {
         TelegramOutboundMessage outbound = new TelegramOutboundMessage("人工复核", null, null);
         when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message);
         when(formatter.format(message)).thenReturn(outbound);
-        when(client.sendMessage(outbound)).thenReturn(TelegramClientResult.success(200, "provider-9", null));
+        when(client.sendMessage(outbound)).thenReturn(verifiedSuccess("9"));
 
         dispatcher.dispatchOne(delivery);
 
         assertThat(delivery.getStatus()).isEqualTo("SENT");
-        assertThat(delivery.getProviderReference()).isEqualTo("provider-9");
+        assertThat(delivery.getProviderReference()).isEqualTo("9");
         assertThat(delivery.getDeliveredAt()).isNotNull();
         assertThat(delivery.getNextAttemptAt()).isNull();
         verify(deliveryService).extendClaimForProviderCall(delivery);
         verify(deliveryService).reconcileProviderSuccess(delivery);
+        verify(client).getMe();
+        verify(client).getChat();
         verify(client, times(1)).sendMessage(outbound);
     }
 
@@ -81,7 +93,7 @@ class TelegramDeliveryDispatcherTest {
     @Test
     void providerSuccessNeverSchedulesAutomaticRetryWhenSentReconciliationIsUnconfirmed() {
         ChannelDeliveryDO delivery = delivery(1);
-        stubMessage(delivery, TelegramClientResult.success(200, "provider-9", null));
+        stubMessage(delivery, verifiedSuccess("9"));
         when(deliveryService.reconcileProviderSuccess(delivery)).thenReturn(false);
 
         dispatcher.dispatchOne(delivery);
@@ -90,6 +102,63 @@ class TelegramDeliveryDispatcherTest {
         assertThat(delivery.getNextAttemptAt()).isNull();
         verify(client, times(1)).sendMessage(any());
         verify(deliveryService).reconcileProviderSuccess(delivery);
+    }
+
+    @Test
+    void changedRecipientConfigurationFailsClosedBeforeAnyProviderCall() {
+        ChannelDeliveryDO delivery = delivery(1);
+        delivery.setRecipientFingerprint(TelegramSecretSanitizer.recipientFingerprint("99999"));
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message());
+
+        dispatcher.dispatchOne(delivery);
+
+        assertThat(delivery.getStatus()).isEqualTo("FAILED");
+        assertThat(delivery.getErrorCode()).isEqualTo("RECIPIENT_CONFIGURATION_CHANGED");
+        assertThat(delivery.getNextAttemptAt()).isNull();
+        verify(client, never()).getMe();
+        verify(client, never()).getChat();
+        verify(client, never()).sendMessage(any());
+    }
+
+    @Test
+    void failedBotOrRecipientPreflightNeverCallsSendMessage() {
+        ChannelDeliveryDO botMismatch = delivery(1);
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message());
+        when(client.getMe()).thenReturn(TelegramClientResult.failure(
+                200, TelegramReadinessState.DEGRADED, "BOT_IDENTITY_UNVERIFIED", "bad bot", null, false));
+
+        dispatcher.dispatchOne(botMismatch);
+
+        assertThat(botMismatch.getStatus()).isEqualTo("FAILED");
+        assertThat(botMismatch.getErrorCode()).isEqualTo("BOT_IDENTITY_UNVERIFIED");
+        verify(client, never()).sendMessage(any());
+
+        org.mockito.Mockito.reset(client);
+        when(client.getMe()).thenReturn(TelegramClientResult.success(200, null, "test_bot", null));
+        when(client.getChat()).thenReturn(TelegramClientResult.failure(
+                200, TelegramReadinessState.DEGRADED,
+                "RECIPIENT_IDENTITY_MISMATCH", "bad recipient", null, false));
+        ChannelDeliveryDO recipientMismatch = delivery(2);
+
+        dispatcher.dispatchOne(recipientMismatch);
+
+        assertThat(recipientMismatch.getStatus()).isEqualTo("FAILED");
+        assertThat(recipientMismatch.getErrorCode()).isEqualTo("RECIPIENT_IDENTITY_MISMATCH");
+        verify(client, never()).sendMessage(any());
+    }
+
+    @Test
+    void providerOkWithoutMatchingBotRecipientAndMessageIdFailsClosedWithoutRetry() {
+        ChannelDeliveryDO delivery = delivery(1);
+        stubMessage(delivery, TelegramClientResult.success(200, null, "other_bot", recipientFingerprint));
+
+        dispatcher.dispatchOne(delivery);
+
+        assertThat(delivery.getStatus()).isEqualTo("FAILED");
+        assertThat(delivery.getErrorCode()).isEqualTo("DELIVERY_RECEIPT_UNVERIFIED");
+        assertThat(delivery.getProviderReference()).isNull();
+        assertThat(delivery.getDeliveredAt()).isNull();
+        assertThat(delivery.getNextAttemptAt()).isNull();
     }
 
     @Test
@@ -165,7 +234,8 @@ class TelegramDeliveryDispatcherTest {
     @Test
     void dispatchCycleRecoversCrashClaimsBeforeClaimingDueRows() {
         when(readiness.canAttemptDelivery()).thenReturn(true);
-        when(messageMapper.listTelegramDeliveryOrphans(20)).thenReturn(List.of());
+        when(messageMapper.listTelegramDeliveryOrphans(any(LocalDateTime.class), org.mockito.ArgumentMatchers.eq(20)))
+                .thenReturn(List.of());
         when(deliveryService.claimDue(20)).thenReturn(List.of());
 
         assertThat(dispatcher.dispatchDue()).isZero();
@@ -177,12 +247,30 @@ class TelegramDeliveryDispatcherTest {
     }
 
     @Test
+    void laterOrphanRecoveryQueuesCanonicalSafetyMessageAfterCommitListenerFailure() {
+        MessageDO safety = HighValueAlertPolicyTest.eligibleSafetyMessage();
+        safety.setMessageId("message-safety");
+        safety.setExpiresAt(LocalDateTime.now(Clock.systemUTC()).plusMinutes(5));
+        when(messageMapper.listTelegramDeliveryOrphans(any(LocalDateTime.class), org.mockito.ArgumentMatchers.eq(20)))
+                .thenReturn(List.of(safety));
+        when(deliveryService.queueTelegram(41L, "message-safety"))
+                .thenThrow(new IllegalStateException("after-commit queue unavailable"))
+                .thenReturn(new ChannelDeliveryDO());
+
+        assertThat(dispatcher.reconcileOrphanedMessages()).isZero();
+        assertThat(dispatcher.reconcileOrphanedMessages()).isEqualTo(1);
+
+        verify(deliveryService, times(2)).queueTelegram(41L, "message-safety");
+    }
+
+    @Test
     void concurrentDispatchCyclesProduceOneExternalCallForOneAtomicClaim() {
         ChannelDeliveryDO delivery = delivery(1);
         when(readiness.canAttemptDelivery()).thenReturn(true);
-        when(messageMapper.listTelegramDeliveryOrphans(20)).thenReturn(List.of());
+        when(messageMapper.listTelegramDeliveryOrphans(any(LocalDateTime.class), org.mockito.ArgumentMatchers.eq(20)))
+                .thenReturn(List.of());
         when(deliveryService.claimDue(20)).thenReturn(List.of(delivery), List.of());
-        stubMessage(delivery, TelegramClientResult.success(200, "provider-9", null));
+        stubMessage(delivery, verifiedSuccess("9"));
 
         assertThat(dispatcher.dispatchDue()).isEqualTo(1);
         assertThat(dispatcher.dispatchDue()).isZero();
@@ -198,7 +286,7 @@ class TelegramDeliveryDispatcherTest {
         when(client.sendMessage(outbound)).thenReturn(result);
     }
 
-    private static ChannelDeliveryDO delivery(int attempts) {
+    private ChannelDeliveryDO delivery(int attempts) {
         ChannelDeliveryDO delivery = new ChannelDeliveryDO();
         delivery.setDeliveryId("delivery-" + attempts);
         delivery.setMessageId("message-1");
@@ -206,7 +294,13 @@ class TelegramDeliveryDispatcherTest {
         delivery.setStatus("SENDING");
         delivery.setAttemptCount(attempts);
         delivery.setClaimToken("claim-" + attempts);
+        delivery.setRecipientFingerprint(recipientFingerprint);
         return delivery;
+    }
+
+    private TelegramClientResult verifiedSuccess(String providerReference) {
+        return TelegramClientResult.success(
+                200, providerReference, "test_bot", recipientFingerprint);
     }
 
     private static MessageDO message() {

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.Clock;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 public class TelegramDeliveryDispatcher {
@@ -56,7 +57,9 @@ public class TelegramDeliveryDispatcher {
 
     public int reconcileOrphanedMessages() {
         int queued = 0;
-        for (MessageDO message : messageMapper.listTelegramDeliveryOrphans(properties.getDeliveryBatchSize())) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (MessageDO message : messageMapper.listTelegramDeliveryOrphans(
+                now, properties.getDeliveryBatchSize())) {
             try {
                 deliveryService.queueTelegram(message.getUserId(), message.getMessageId());
                 queued++;
@@ -82,20 +85,37 @@ public class TelegramDeliveryDispatcher {
             suppressExpired(delivery, now);
             return;
         }
+        String configuredRecipient = TelegramSecretSanitizer.recipientFingerprint(properties.getChatId());
+        if (configuredRecipient == null || !configuredRecipient.equals(delivery.getRecipientFingerprint())) {
+            terminal(delivery, "RECIPIENT_CONFIGURATION_CHANGED",
+                    "Telegram recipient no longer matches the queued delivery", 0);
+            return;
+        }
         if (!deliveryService.extendClaimForProviderCall(delivery)) {
             deliveryService.failClosedOutcome(delivery.getDeliveryId(), "DELIVERY_CLAIM_LOST",
                     "Delivery claim was not valid before provider call; manual review required");
             return;
         }
-        TelegramClientResult result;
-        try {
-            result = client.sendMessage(formatter.format(message));
-        } catch (RuntimeException unexpected) {
-            result = TelegramClientResult.failure(0, TelegramReadinessState.PROVIDER_UNAVAILABLE,
-                    "PROVIDER_UNAVAILABLE", "Telegram delivery failed", null, true);
+
+        TelegramClientResult botProbe = providerCall(client::getMe);
+        if (!botProbe.success() || !hasText(botProbe.botUsername())) {
+            completeProviderFailure(delivery, botProbe);
+            return;
         }
+        readinessService.observe(botProbe);
+        TelegramClientResult recipientProbe = providerCall(client::getChat);
+        if (!recipientProbe.success()
+                || !configuredRecipient.equals(recipientProbe.recipientFingerprint())) {
+            completeProviderFailure(delivery, recipientProbe.success()
+                    ? identityFailure("RECIPIENT_IDENTITY_MISMATCH",
+                    "Telegram recipient probe did not match the queued delivery")
+                    : recipientProbe);
+            return;
+        }
+
+        TelegramClientResult result = providerCall(() -> client.sendMessage(formatter.format(message)));
         readinessService.observe(result);
-        if (result.success()) {
+        if (result.success() && verifiedReceipt(result, botProbe.botUsername(), configuredRecipient)) {
             delivery.setStatus(TelegramDeliveryStatus.SENT.name());
             delivery.setProviderReference(result.providerReference());
             delivery.setDeliveredAt(LocalDateTime.now(clock));
@@ -107,6 +127,14 @@ public class TelegramDeliveryDispatcher {
             deliveryService.reconcileProviderSuccess(delivery);
             return;
         }
+        completeProviderFailure(delivery, result.success()
+                ? identityFailure("DELIVERY_RECEIPT_UNVERIFIED",
+                "Telegram provider receipt did not match the verified bot and recipient")
+                : result);
+    }
+
+    private void completeProviderFailure(ChannelDeliveryDO delivery, TelegramClientResult result) {
+        readinessService.observe(result);
         if (result.retryable() && safeAttempts(delivery) < properties.getMaxAttempts()) {
             int delay = retryDelaySeconds(delivery, result.retryAfterSeconds());
             delivery.setStatus(TelegramDeliveryStatus.RETRYING.name());
@@ -173,5 +201,38 @@ public class TelegramDeliveryDispatcher {
 
     private static int safeAttempts(ChannelDeliveryDO delivery) {
         return delivery.getAttemptCount() == null ? 0 : delivery.getAttemptCount();
+    }
+
+    private static boolean verifiedReceipt(TelegramClientResult result, String botUsername,
+                                           String recipientFingerprint) {
+        return positiveProviderReference(result.providerReference())
+                && botUsername.equals(result.botUsername())
+                && recipientFingerprint.equals(result.recipientFingerprint());
+    }
+
+    private static boolean positiveProviderReference(String value) {
+        return value != null && value.matches("[1-9][0-9]*");
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static TelegramClientResult providerCall(Supplier<TelegramClientResult> call) {
+        try {
+            TelegramClientResult result = call.get();
+            return result == null
+                    ? TelegramClientResult.failure(0, TelegramReadinessState.PROVIDER_UNAVAILABLE,
+                    "PROVIDER_UNAVAILABLE", "Telegram provider returned no result", null, true)
+                    : result;
+        } catch (RuntimeException unexpected) {
+            return TelegramClientResult.failure(0, TelegramReadinessState.PROVIDER_UNAVAILABLE,
+                    "PROVIDER_UNAVAILABLE", "Telegram provider call failed", null, true);
+        }
+    }
+
+    private static TelegramClientResult identityFailure(String code, String message) {
+        return TelegramClientResult.failure(200, TelegramReadinessState.DEGRADED,
+                code, message, null, false);
     }
 }

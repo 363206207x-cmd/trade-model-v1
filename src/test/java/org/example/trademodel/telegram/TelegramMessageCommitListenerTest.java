@@ -14,13 +14,15 @@ import static org.mockito.Mockito.verify;
 class TelegramMessageCommitListenerTest {
 
     @Test
-    void onlyCanonicalTwoCategoryEventsQueueAfterCommit() throws Exception {
+    void allThreeCanonicalCategoriesQueueAfterCommitAndMalformedEventsRemainInAppOnly() throws Exception {
         ChannelDeliveryService delivery = mock(ChannelDeliveryService.class);
         TelegramMessageCommitListener listener = new TelegramMessageCommitListener(delivery);
 
         listener.afterMessageCommit(new MessageRecordedEvent("message-1", 41L, "ordinary-message"));
         listener.afterMessageCommit(new MessageRecordedEvent(
-                "message-safety", 41L, "TG1|HOT_RESET|CONFUSED|4|9|FINAL_PLAN|hash"));
+                "message-malformed-safety", 41L, "TG1|HOT_RESET|CONFUSED|4|9|FINAL_PLAN|hash"));
+        listener.afterMessageCommit(new MessageRecordedEvent(
+                "message-safety", 41L, "TG1|PLAN_SAFETY_CHANGE|HOT_RESET|4|9|FINAL_PLAN|hash"));
         listener.afterMessageCommit(new MessageRecordedEvent(
                 "message-legacy", 41L, "TG1|OPPORTUNITY_READY|TRIGGERED|3|9|FINAL_PLAN|hash"));
         listener.afterMessageCommit(new MessageRecordedEvent(
@@ -29,10 +31,11 @@ class TelegramMessageCommitListenerTest {
                 "message-position", 41L, "TG1|POSITION_RISK_CHANGE|RISK_HIGH|3|9|USER_POSITION|hash"));
 
         verify(delivery, never()).queueTelegram(41L, "message-1");
-        verify(delivery, never()).queueTelegram(41L, "message-safety");
+        verify(delivery, never()).queueTelegram(41L, "message-malformed-safety");
         verify(delivery, never()).queueTelegram(41L, "message-legacy");
         verify(delivery).queueTelegram(41L, "message-plan");
         verify(delivery).queueTelegram(41L, "message-position");
+        verify(delivery).queueTelegram(41L, "message-safety");
 
         TransactionalEventListener annotation = TelegramMessageCommitListener.class
                 .getMethod("afterMessageCommit", MessageRecordedEvent.class)
