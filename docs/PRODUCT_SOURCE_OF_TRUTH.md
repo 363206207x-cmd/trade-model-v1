@@ -519,7 +519,7 @@ existing Home system-status slot.
 | Runtime objective | official root-domain HTTPS, permanent www redirect, refresh-safe Session and evidence-owned system status with last scan time |
 | Acceptance boundary | exact-head CI, merged main, same-SHA Staging, non-Tailnet access, 20 refreshes, six asset switches and two real scan cycles |
 
-Only the seventeen exact implementation paths in `docs/CODEX_NEXT_TASK.yml`
+Only the twenty-four exact implementation paths in `docs/CODEX_NEXT_TASK.yml`
 are authorized. The successor may add Spring Session JDBC and a forward-only
 V18 infrastructure migration without changing the existing 30-minute lifetime,
 Secure/HttpOnly/SameSite cookie or CSRF boundary. It may expose real scheduler

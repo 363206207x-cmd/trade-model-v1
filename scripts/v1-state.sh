@@ -1439,7 +1439,7 @@ evaluate_official_domain_session_runtime_visibility_closure_transition() {
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
     || [[ "$current_package_starting_full_sha" != "ddd29f1b08512bf2d782a2db5c610b72932ec95e" ]] \
     || [[ "$authorized_next_package_starting_full_sha" != "$current_package_starting_full_sha" ]] \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "17" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "24" ]]; then
     next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
     return 0
   fi
@@ -2052,7 +2052,14 @@ run_exact_machine_gate_self_test() {
     src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java \
     src/test/java/org/example/trademodel/postgresql/V18PersistentSessionMigrationContractTest.java \
     src/test/java/org/example/trademodel/service/MarketDataSchedulerRuntimeStatusTest.java \
-    src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java)"
+    src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java \
+    src/test/java/org/example/trademodel/config/ControlledStagingConfigTreeSecretInjectionTest.java \
+    src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java \
+    src/test/java/org/example/trademodel/security/PersonalLoginSessionSecurityTest.java \
+    src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
+    scripts/standard-release-postgresql-smoke.sh \
+    src/test/java/org/example/trademodel/postgresql/StandardJarPostgreSqlV13IntegrationTest.java \
+    src/test/java/org/example/trademodel/postgresql/PackagedJarExistingV13RestartTest.java)"
 
   assert_machine_pass() {
     local name="$1"
@@ -3053,7 +3060,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_OFFICIAL_DOMAIN_SESSION_RUNT
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
     || ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "17" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "24" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi

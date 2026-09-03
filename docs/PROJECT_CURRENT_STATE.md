@@ -36,7 +36,7 @@ The successor may add PostgreSQL-backed Spring Session with the unchanged
 30-minute cookie contract, a forward-only V18 infrastructure migration, real
 scheduler heartbeat and AnalysisRun projection into the existing Home status
 slot, official root-domain routing, a permanent `www` redirect, and retirement
-of the legacy public Funnel. Only the seventeen exact paths in
+of the legacy public Funnel. Only the twenty-four exact paths in
 `docs/CODEX_NEXT_TASK.yml` are authorized. No template, CSS, product algorithm,
 Provider, AI, Position, Plan, Telegram, Production or trading change is allowed.
 

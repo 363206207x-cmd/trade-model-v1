@@ -220,7 +220,7 @@ validate_contract_task() {
   [[ "$authorized_next_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "TASK_VALIDATION_FAILED authorized starting SHA must be full length" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
   [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_staging_deployment" == "true" && "$authorized_next_production_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded official-domain session and runtime visibility permissions are incomplete" >&2; failed=1; }
-  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "17" ]] || { echo "TASK_VALIDATION_FAILED official-domain session and runtime visibility closure must contain exactly seventeen implementation paths" >&2; failed=1; }
+  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "24" ]] || { echo "TASK_VALIDATION_FAILED official-domain session and runtime visibility closure must contain exactly twenty-four implementation paths" >&2; failed=1; }
   if printf '%s\n' "$authorized_next_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     echo "TASK_VALIDATION_FAILED official-domain session and runtime visibility allowlist must not contain wildcards or directory grants" >&2
     failed=1
