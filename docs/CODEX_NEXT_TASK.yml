@@ -1,24 +1,24 @@
 compatibility_status: "DERIVED_ONLY"
-active_block: "TRINE LOGIC v4.1 official domain, real Home analysis, on-demand analysis, semantic color and Telegram closure authorization"
+active_block: "TRINE LOGIC v4.1 Telegram blocker and full interaction usability closure authorization"
 current_phase: "P0-0"
 current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
-module: "TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure Authorization"
-branch: "codex/v4-1-official-domain-home-analysis-telegram-authorization"
+module: "TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization"
+branch: "codex/v4-1-telegram-interaction-usability-authorization"
 task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 authorized_next_task_mode: "IMPLEMENTATION"
 current_effective_status: "PENDING_MERGED_MAIN"
-authorized_next_product_phase: "V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE"
+authorized_next_product_phase: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
 
-current_package_phase: "TRINE_LOGIC_V4_1_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_AUTHORIZATION"
-current_package_name: "TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure Authorization"
-current_package_active_block: "Owner-authorized exact gate registration for official-domain ingress, real Home projection, asynchronous Preview analysis, semantic status color and Staging Telegram acceptance"
+current_package_phase: "TRINE_LOGIC_V4_1_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION"
+current_package_name: "TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization"
+current_package_active_block: "Owner-authorized exact gate registration for Telegram durable delivery, complete interaction audit and consolidated usability remediation"
 current_package_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-official-domain-home-analysis-telegram-authorization"
-current_package_starting_full_sha: "aa683013f401cceb289b7bbc245a8ea75e00f3c1"
+current_package_branch: "codex/v4-1-telegram-interaction-usability-authorization"
+current_package_starting_full_sha: "b5e52d501becf675f4299fc7c5d389707de81af0"
 current_package_risk: "A"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
@@ -27,12 +27,12 @@ current_package_push_allowed: true
 current_package_merge_allowed: true
 current_package_deployment_allowed: false
 current_package_requires_clean_origin_main: true
-current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact official-domain, real Home analysis, Preview analysis, semantic color and Telegram closure"
+current_package_next_action: "Validate, push, review and merge this docs/gate-only authorization, then continue the exact Telegram blocker and full-interaction usability closure"
 current_package_allowed_scope:
-  - "Register the exact official-domain, real Home analysis, on-demand Preview analysis, semantic color and Telegram closure package"
+  - "Register the exact Telegram durable delivery, complete interaction audit and consolidated usability remediation package"
   - "Bind the exact implementation branch and 40-character starting SHA"
-  - "Allow only the twenty exact existing Home, Asset Pool Preview, Analysis trace, frontend semantic-state and focused-test paths declared below"
-  - "Preserve the completed Session/runtime-status work, login-only anonymous access, frozen Home structure, Final/Position ownership and no-trade rules"
+  - "Allow only the sixty exact existing Telegram, Home, Workspace, manual-position, controller and focused-test paths declared below"
+  - "Preserve the completed official-domain, Session, runtime-status, frozen Home, Final/Position ownership and no-trade contracts"
 current_package_allowed_paths:
   - "docs/CODEX_NEXT_TASK.yml"
   - "docs/PRODUCT_SOURCE_OF_TRUTH.md"
@@ -45,15 +45,15 @@ current_package_allowed_paths:
 current_package_blocked_scope:
   - "Java, SQL, Schema, Flyway, frontend, CSS, static asset or business-test changes in this gate branch"
   - "Any wildcard, directory grant, global-policy weakening or unrelated successor permission"
-  - "DNS, proxy, Tunnel, Staging/Production deployment, Provider calls, AI calls, Telegram send or trading before the implementation successor"
+  - "Production deployment, Provider policy changes, product-source/Figma/Mobile changes, fake data, automatic trading or more than one controlled Telegram send"
 
-authorized_next_package_phase: "V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE"
-authorized_next_package_name: "TRINE LOGIC v4.1 Official Domain, Real Home Analysis, On-Demand Analysis, Semantic Color and Telegram Closure"
-authorized_next_package_active_block: "Official Cloudflare ingress, evidence-owned six-card Home projection, idempotent background Preview analysis, bounded semantic color and existing Telegram channel acceptance"
+authorized_next_package_phase: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
+authorized_next_package_name: "TRINE LOGIC v4.1 Telegram Blocker Closure, Full Interaction Audit and Consolidated Usability Remediation"
+authorized_next_package_active_block: "Durable three-category Telegram delivery, one controlled Staging receipt, full browser interaction audit and consolidated frozen-contract usability fixes"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-official-domain-home-analysis-telegram-closure"
-authorized_next_package_starting_full_sha: "aa683013f401cceb289b7bbc245a8ea75e00f3c1"
-authorized_next_package_risk: "B_EXACT_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE"
+authorized_next_package_branch: "codex/v4-1-telegram-interaction-usability-closure"
+authorized_next_package_starting_full_sha: "b5e52d501becf675f4299fc7c5d389707de81af0"
+authorized_next_package_risk: "B_EXACT_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
 authorized_next_package_implementation_pr_allowed: true
@@ -66,38 +66,78 @@ authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
 authorized_next_package_allowed_paths:
-  - "src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java"
-  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/mapper/MessageMapper.java"
+  - "src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java"
+  - "src/main/java/org/example/trademodel/service/ChannelDeliveryService.java"
+  - "src/main/java/org/example/trademodel/controller/TelegramNotificationController.java"
+  - "src/main/java/org/example/trademodel/controller/DesktopWorkspaceController.java"
+  - "src/main/java/org/example/trademodel/controller/UserPositionController.java"
+  - "src/main/java/org/example/trademodel/controller/WorkspaceRuntimeController.java"
+  - "src/main/java/org/example/trademodel/controller/WorkspacePositionMonitoringController.java"
   - "src/main/java/org/example/trademodel/controller/AssetPoolController.java"
-  - "src/main/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolService.java"
-  - "src/main/java/org/example/trademodel/analysistrace/AnalysisTraceSnapshot.java"
+  - "src/main/java/org/example/trademodel/service/impl/UserPositionServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java"
+  - "src/main/java/org/example/trademodel/dto/req/CreateUserPositionReq.java"
+  - "src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java"
+  - "src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramBotApiClient.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramClient.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramClientResult.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramProperties.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramReadinessService.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramSecretSanitizer.java"
+  - "src/main/resources/templates/home.html"
+  - "src/main/resources/templates/workspace.html"
   - "src/main/resources/static/js/home-runtime.js"
   - "src/main/resources/static/js/workspace.js"
+  - "src/main/resources/static/js/frontend-contract.js"
   - "src/main/resources/static/css/home.css"
   - "src/main/resources/static/css/workspace.css"
-  - "src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java"
+  - "docs/TRINE_LOGIC_V4_1_FULL_INTERACTION_AUDIT.md"
+  - "src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramBotApiClientTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramReadinessServiceTest.java"
+  - "src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java"
+  - "src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramSecurityArchitectureContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/TelegramNotificationControllerTest.java"
+  - "src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java"
+  - "src/test/java/org/example/trademodel/service/MessageFactServiceTest.java"
+  - "src/test/java/org/example/trademodel/controller/UserPositionControllerTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/UserPositionServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/controller/WorkspacePositionCloseEntryRuntimeContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/WorkspacePositionMonitoringControllerTest.java"
   - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java"
   - "src/test/java/org/example/trademodel/controller/AssetPoolControllerTaskSemanticsTest.java"
-  - "src/test/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolServiceTest.java"
-  - "src/test/java/org/example/trademodel/analysistrace/AnalysisTraceServiceImplTest.java"
   - "src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java"
   - "src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java"
   - "src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java"
   - "src/test/java/org/example/trademodel/controller/FundamentalAiV41FrontendRuntimeAlignmentContractTest.java"
   - "src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java"
-  - "src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java"
-authorized_next_package_next_action: "After this authorization is effective on merged main, implement, validate, merge and privately stage the exact official-domain, Home analysis, Preview, semantic color and Telegram closure"
+  - "src/test/java/org/example/trademodel/controller/FrontendContractNodeMatrixTest.java"
+  - "src/test/java/org/example/trademodel/controller/B123OwnerCopyAndPositionDetailContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/WorkspaceUiReviewPositionRuntimeTest.java"
+  - "src/test/java/org/example/trademodel/controller/FullInteractionUsabilityContractTest.java"
+authorized_next_package_next_action: "After this authorization is effective on merged main, close Telegram blockers, freeze the full interaction audit, consolidate confirmed usability fixes, validate, merge and privately stage the exact implementation"
 
-blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_NOTIFICATION_DEPLOYMENT_OR_AUTOMATIC_TRADING"
-blocked_package_status: "BLOCKED_OUTSIDE_V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_CONTRACT"
-next_task_authorization_status: "BLOCKED_PENDING_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+blocked_package_phase: "UNSCOPED_V4_1_PRODUCT_FIGMA_MOBILE_PROVIDER_PRODUCTION_OR_AUTOMATIC_TRADING"
+blocked_package_status: "BLOCKED_OUTSIDE_V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_CONTRACT"
+next_task_authorization_status: "BLOCKED_PENDING_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION_MERGED_MAIN"
 next_task_authorization_conditions:
   - "OWNER_EXPLICIT_ONE_SHOT_END_TO_END_AUTHORIZATION"
   - "AUTHORIZATION_STARTED_FROM_CLEAN_CURRENT_ORIGIN_MAIN_WITH_EXACT_STARTING_SHA_ANCESTOR"
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_TWENTY_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_SIXTY_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -151,42 +191,45 @@ v4_1_cross_device_secure_domain_access_closure_authorization_status: "EFFECTIVE_
 v4_1_cross_device_secure_domain_access_closure_implementation_status: "COMPLETE"
 v4_1_official_domain_session_runtime_visibility_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_official_domain_session_runtime_visibility_closure_implementation_status: "COMPLETE"
-v4_1_official_domain_home_analysis_telegram_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_official_domain_home_analysis_telegram_closure_implementation_status: "NOT_STARTED"
+v4_1_official_domain_home_analysis_telegram_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_official_domain_home_analysis_telegram_closure_implementation_status: "COMPLETE"
+v4_1_telegram_full_interaction_usability_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_telegram_full_interaction_usability_closure_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 frontend_interaction_implementation_status: "COMPLETE"
 multi_user_authorization_status: "EFFECTIVE_MERGED_MAIN"
 multi_user_implementation_status: "NOT_STARTED"
-authorized_next_package: "V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE"
-scope: "V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE_ONLY"
+authorized_next_package: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
+scope: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_ONLY"
 implementation_allowed: false
 read_only_product_audit_scope_contract: "NO_CODE_NO_TEST_NO_BUSINESS_PR_NO_CLOSED_DEBT_CHANGES"
-risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk official-domain, real Home analysis, idempotent Preview, semantic color and Telegram closure with exact-head CI, merged-main and Staging acceptance"
+risk: "A-risk docs/gate-only authorization; successor is one bounded B-risk Telegram durable-delivery and full interaction usability closure with exact-head CI, merged-main and private Staging acceptance"
 
-current_pr: "NONE; create one docs/gate-only official-domain/Home-analysis/Telegram closure authorization PR after local validation"
+current_pr: "NONE; create one docs/gate-only Telegram/full-interaction usability authorization PR after local validation"
 current_package_pr: "NONE; Owner one-pass authorization permits this exact docs/gate PR and merge after exact-head checks"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 closed_technical_debt_prs: "#1156 CLOSED_PAUSED_TECHNICAL_DEBT; #1201 CLOSED_UNMERGED_PRESERVED_AUDIT_EVIDENCE"
 block_next_business_phase_only: true
-a_risk_auto_merge_rule: "disabled globally; this exact Owner-authorized reconciliation may merge only after exact-head required checks"
+a_risk_auto_merge_rule: "disabled globally; this exact Owner-authorized package may merge only after exact-head required checks"
 production_deployment_readiness: "BLOCKED"
-next_business_phase: "V41_OFFICIAL_DOMAIN_HOME_ANALYSIS_TELEGRAM_CLOSURE"
+next_business_phase: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
 next_business_phase_allowed: false
 p4_allowed: false
-next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the official-domain/Home-analysis/Preview/color/Telegram closure without widening scope"
+next_allowed_action: "Validate, push and merge the exact docs/gate authorization, then continue the Telegram blocker and full interaction usability closure without widening scope"
 
-product_phase: "TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization"
+product_phase: "TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization"
 product_direction: "PRODUCT_FIRST"
 product_authority: "PRODUCT_SOURCE_OF_TRUTH"
-product_module: "Existing Spring Security boundary, Cloudflare Tunnel ingress, Analysis scheduler and Home status strip"
+product_module: "Existing Message/ChannelDelivery/Telegram owners and existing Home/Workspace/UserPosition interaction surfaces"
 
 audit_scope_modules:
-  - "V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION"
+  - "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION"
   - "EXACT_PACKAGE_BRANCH_STARTING_SHA"
-  - "EXACT_TWENTY_FOUR_PATH_IMPLEMENTATION_ALLOWLIST"
-  - "FAIL_CLOSED_WORKFLOW"
+  - "EXACT_SIXTY_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "AUDIT_FIRST_THEN_CONSOLIDATED_REMEDIATION"
+  - "FAIL_CLOSED_NO_TRADE_WORKFLOW"
 
 audit_scope_paths:
   - "docs/CODEX_NEXT_TASK.yml"
@@ -200,10 +243,10 @@ audit_scope_paths:
 
 audit_scope_source_domains:
   - "UNIQUE_V4_1_PRODUCT_SOURCE"
-  - "OWNER_EXPLICIT_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_AUTHORIZATION"
+  - "OWNER_EXPLICIT_TELEGRAM_FULL_INTERACTION_USABILITY_AUTHORIZATION"
   - "EXACT_STARTING_SHA_AND_FILE_SCOPE"
-  - "EXISTING_SESSION_SECURITY_CLOUDFLARE_INGRESS_SCHEDULER_AND_HOME_PROJECTION_OWNERS"
-  - "NO_BUSINESS_DIFF"
+  - "EXISTING_MESSAGE_CHANNEL_DELIVERY_TELEGRAM_HOME_WORKSPACE_USER_POSITION_OWNERS"
+  - "NO_FAKE_DATA"
   - "NO_AUTOMATIC_ACTION"
 
 product_source_gate:
@@ -212,43 +255,42 @@ product_source_gate:
 
 required_product_sources:
   - PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN
-  - PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION
-  - PS-TRINE-LOGIC-CORE-PRODUCTION-LOOP-AUTOMATION-AUTHORIZATION
+  - PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION
   - PS-POSITION-MONITORING
   - PS-FORMAL-BUSINESS-CONTRACT
+  - PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
 
 product_contract_mapping: |
-  This package authorizes one bounded closure over the existing Spring Security boundary, Cloudflare Tunnel, Analysis scheduler and Home status strip. It may persist the unchanged 30-minute Session in PostgreSQL, expose real scheduler and AnalysisRun evidence through the existing Home field, bind trinelogic.com, redirect www and retire the legacy public Funnel. It creates no trading capability and changes no product algorithm.
+  The successor closes durable delivery for all three frozen Message categories without creating a second message owner, then audits every existing official-domain interaction before one consolidated remediation. Candidate, Final, UserPosition, PositionMonitor and Recheck identities stay separate; no UI state, notification or AI result authorizes a trade.
 
 design_interaction_mapping: |
-  No Figma, Mobile, route, component or layout change is authorized. The only user-visible change is the value and safe timestamp rendered inside the existing Home system-status slot.
+  The existing fourteen routes, eleven overlays, Home six-card and 70/30 structure remain authoritative. The successor may repair only reproducible interaction, state, form, accessibility and responsive defects on the exact Home/Workspace surfaces after the audit list is frozen; it may not redesign Figma or expand route scope.
 
 data_source_mapping: |
-  This docs/gate package reads or changes no provider, database, runtime or user data. The successor may add Spring Session infrastructure tables, derive runtime status from the real scheduler heartbeat and persisted AnalysisRun owner, and change only official ingress configuration. It may not call paid AI, send Telegram, mutate business data or execute trades.
+  Telegram success is Telegram API success plus configured bot/recipient identity agreement and a durable provider message ID on ChannelDelivery. Home cards, plans and AI content must resolve from consistent AnalysisRun/Decision/Trace owners. Manual position fields remain Owner-scoped UserPosition facts and tests use isolated databases rather than fake Staging records.
 
 current_implementation_gap: |
-  The official root currently resolves through the existing Cloudflare Tunnel but is intercepted by a second Cloudflare Access login, www is absent, servlet Sessions are in process memory, and the Home system slot incorrectly reads an unrelated risk card. The scheduler really runs, but its heartbeat, scan times, result and failure state are not projected.
+  Safety-change Messages can remain permanently orphaned because listTelegramDeliveryOrphans omits the canonical safety category. A previous provider-level controlled send reported success without Owner receipt, so channel identity and durable receipt remain unaccepted. Position form date/time interaction and value preservation plus all route controls still require one complete real-browser audit.
 
 allowed_scope:
   - "Exact docs/gate registration, state mirrors and existing machine-gate tests only"
 
 authorized_next_allowed_scope:
-  - "TRINELOGIC_COM_CLOUDFLARE_TUNNEL_HTTPS_AND_WWW_PERMANENT_REDIRECT"
-  - "POSTGRESQL_SPRING_SESSION_WITH_UNCHANGED_SECURE_COOKIE_AND_TIMEOUT"
-  - "REAL_SCHEDULER_HEARTBEAT_SCAN_RESULT_ACTIVE_ANALYSIS_AND_SAFE_FAILURE_PROJECTION"
-  - "EXISTING_HOME_SYSTEM_STATUS_SLOT_ONLY"
-  - "ANONYMOUS_LOGIN_ONLY_AND_BUSINESS_API_DENIAL"
-  - "LEGACY_TS_NET_PUBLIC_FUNNEL_DISABLED_AND_PRIVATE_ROLLBACK_READY"
-  - "EXACT_HEAD_CI_MERGED_MAIN_STAGING_AND_NON_TAILNET_ACCEPTANCE"
+  - "THREE_CATEGORY_TELEGRAM_ORPHAN_RECOVERY_AND_DURABLE_PROVIDER_MESSAGE_ID"
+  - "ONE_CONTROLLED_STAGING_TELEGRAM_RECEIPT_AFTER_BOT_RECIPIENT_PREFLIGHT"
+  - "AUDIT_FIRST_ALL_EXISTING_OFFICIAL_DOMAIN_ROUTES_CONTROLS_AND_STATES"
+  - "FROZEN_FINDING_REPORT_BEFORE_ANY_INTERACTION_FIX"
+  - "CONSOLIDATED_P0_P1_AND_REPRODUCIBLE_CONTRACT_P2_REMEDIATION"
+  - "OWNER_SCOPED_POSITION_FORM_TIME_PICKER_VALUE_PRESERVATION"
+  - "HOME_CARD_PLAN_AI_TRACE_AND_CONFIDENCE_CONSISTENCY"
+  - "EXACT_HEAD_CI_MERGED_MAIN_PRIVATE_STAGING_AND_BROWSER_REACCEPTANCE"
 
 authorized_next_blocked_scope:
-  - "BUSINESS_SCHEMA_OR_OBJECT_CHANGE_OUTSIDE_SPRING_SESSION_INFRASTRUCTURE"
-  - "HOME_LAYOUT_CSS_TEMPLATE_ASSET_CARD_PLAN_POSITION_OR_AI_WORKSPACE_CHANGE"
-  - "PROVIDER_AI_SCORING_DIRECTION_PLAN_OR_POSITION_CHANGE"
-  - "PUBLIC_ORIGIN_8081_DATABASE_OR_NEW_SSH_RULE"
-  - "PUBLIC_REGISTRATION_SWAGGER_H2_DEBUG_OR_INTERNAL_TASK_EXPOSURE"
-  - "TELEGRAM_REAL_SEND"
-  - "AUTO_TRADE"
+  - "PRODUCT_SOURCE_FIGMA_MOBILE_ROUTE_OR_HOME_STRUCTURE_REDESIGN"
+  - "SCHEMA_FLYWAY_PROVIDER_ALGORITHM_THRESHOLD_OR_DIRECTION_RULE_CHANGE"
+  - "FAKE_POSITION_FAKE_FINAL_FAKE_AI_OR_FAKE_PROVIDER_STATE"
+  - "MORE_THAN_ONE_CONTROLLED_TELEGRAM_SEND_OR_ANY_FAKE_MARKET_ALERT"
+  - "AUTO_OPEN_CLOSE_REDUCE_ADD_REVERSE_ORDER_OR_TRADE"
   - "PRODUCTION_DEPLOYMENT"
 
 blocked_scope:
@@ -257,10 +299,10 @@ blocked_scope:
 
 forbidden_scope:
   - "Java, SQL, Schema, Flyway, frontend, CSS, static asset or business-test changes in this gate package"
-  - "DNS/proxy mutation, Staging/Production deployment, Provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
+  - "Staging/Production deployment, Provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
 
 real_scenario_requirement: |
-  This package performs no runtime scenario. Official DNS/TLS/login, persistent refresh, two real scan cycles, anonymous denial and legacy-Funnel retirement belong only to the activated successor; authenticated Dashboard validation may use only the Owner's secure browser session.
+  This gate package performs no runtime scenario. The successor must use the real official domain and Owner session, isolate synthetic persistence tests from Staging, prove one controlled Telegram receipt, and rerun every frozen audit interaction on one merged Staging SHA.
 
 hard_boundaries:
   auto_trading: "BLOCKED"
@@ -274,10 +316,11 @@ hard_boundaries:
   canonical_figma_desktop_implementation: "BLOCKED"
   noncanonical_figma_change: "BLOCKED"
   mobile_implementation: "BLOCKED"
+  production_deployment: "BLOCKED"
 
 checks:
   - "Authorization exact package, branch, full starting SHA and eight-file gate scope pass"
-  - "Successor exact package, branch, ancestor starting SHA and two-file implementation scope pass"
+  - "Successor exact package, branch, ancestor starting SHA and sixty-file implementation scope pass"
   - "Missing, short or wrong SHA; wrong package/branch; wildcard or out-of-scope file fails closed"
   - "Ordinary implementation packages cannot modify canonical gate owners"
   - "Application/API/Schema/frontend/business-test changed-file count is zero in this gate package"
