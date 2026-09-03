@@ -115,7 +115,8 @@ class GlobalFrozenUiAlignmentContractTest {
                 .doesNotContain("Decision Workspace", ">AI 分析</span>", "GPT 候选判断", "Gemini 可信度复核");
         assertThat(script)
                 .contains(
-                        "statusValue(state.marketTrend)", "statusValue(state.riskLevel)",
+                        "statusValue(state.marketTrend)", "header.systemRuntimeLabel",
+                        "header.lastCompletedScanAt", "上次扫描",
                         "has(state.dataQuality?.value)", "statusValue(state.serviceAvailability",
                         "statusValue(state.accountStatus", "statusValue(state.hotReset",
                         "GPT 综合判断 · 非最终计划", "方向判断", "机会进度", "候选参与方式",

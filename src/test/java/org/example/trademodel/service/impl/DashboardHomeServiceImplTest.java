@@ -53,6 +53,7 @@ import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
+import org.example.trademodel.service.MarketDataScheduler;
 import org.example.trademodel.service.OpportunityLogService;
 import org.example.trademodel.service.OpportunityPriorityRankingService;
 import org.example.trademodel.service.PersistedOhlcvQueryService;
@@ -85,6 +86,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -2625,6 +2627,114 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void headerReportsUnknownWhenNoSchedulerEvidenceExists() {
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("UNKNOWN");
+        assertThat(header.getSystemRuntimeLabel()).isEqualTo("状态未知");
+        assertThat(header.getSchedulerHeartbeatAt()).isNull();
+        assertThat(header.getLastScanResult()).isNull();
+    }
+
+    @Test
+    void successfulManualAnalysisDoesNotFabricateSchedulerScanTime() {
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("UNKNOWN");
+        assertThat(header.getLastCompletedScanAt()).isNull();
+        verify(analysisRunMapper, never()).selectLatestSuccessfulCompletedAt();
+    }
+
+    @Test
+    void headerReportsRunningOnlyFromFreshSuccessfulSchedulerHeartbeat() {
+        MarketDataScheduler scheduler = mock(MarketDataScheduler.class);
+        Instant completedAt = Instant.parse("2026-09-03T06:20:00Z");
+        when(scheduler.runtimeStatus()).thenReturn(runtimeStatus(
+                true, false, true, completedAt, completedAt.minusSeconds(5), completedAt,
+                completedAt.plusSeconds(60), "SUCCESS", null));
+        service.setMarketDataScheduler(scheduler);
+
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("RUNNING");
+        assertThat(header.getSystemRuntimeLabel()).isEqualTo("运行中");
+        assertThat(header.getSchedulerHeartbeatAt()).isEqualTo(completedAt);
+        assertThat(header.getLastCompletedScanAt()).isEqualTo(completedAt);
+        assertThat(header.getNextScheduledScanAt()).isEqualTo(completedAt.plusSeconds(60));
+        assertThat(header.getLastScanResult()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void activePersistedAnalysisTakesPriorityOverCompletedHeartbeat() {
+        AnalysisRunDO active = new AnalysisRunDO();
+        active.setAnalysisId("analysis-active");
+        active.setStatus("STARTED");
+        active.setStartedAt(LocalDateTime.of(2026, 9, 3, 6, 21));
+        when(analysisRunMapper.selectRecoverableBackgroundRuns(1)).thenReturn(List.of(active));
+
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("ANALYZING");
+        assertThat(header.getSystemRuntimeLabel()).isEqualTo("分析中");
+        assertThat(header.getScanStartedAt()).isEqualTo(Instant.parse("2026-09-03T06:21:00Z"));
+    }
+
+    @Test
+    void failedAndStaleHeartbeatsRemainDistinctRuntimeStates() {
+        MarketDataScheduler scheduler = mock(MarketDataScheduler.class);
+        Instant completedAt = Instant.parse("2026-09-03T06:22:00Z");
+        service.setMarketDataScheduler(scheduler);
+        when(scheduler.runtimeStatus()).thenReturn(runtimeStatus(
+                true, false, true, completedAt, completedAt.minusSeconds(2), completedAt,
+                completedAt.plusSeconds(60), "FAILED", "SCHEDULED_SCAN_FAILED:IllegalStateException"));
+
+        DashboardHomeVO.HeaderVO failed = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+        assertThat(failed.getSystemRuntimeState()).isEqualTo("ERROR");
+        assertThat(failed.getSystemRuntimeLabel()).isEqualTo("运行异常");
+        assertThat(failed.getLastScanFailureReason()).isEqualTo("SCHEDULED_SCAN_FAILED:IllegalStateException");
+
+        when(scheduler.runtimeStatus()).thenReturn(runtimeStatus(
+                true, false, false, completedAt, completedAt.minusSeconds(2), completedAt,
+                completedAt.plusSeconds(60), "SUCCESS", null));
+        DashboardHomeVO.HeaderVO stale = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+        assertThat(stale.getSystemRuntimeState()).isEqualTo("NOT_RUNNING");
+        assertThat(stale.getSystemRuntimeLabel()).isEqualTo("未运行");
+    }
+
+    @Test
+    void runningCycleWithExpiredHeartbeatReportsTimeoutInsteadOfAnalyzingForever() {
+        MarketDataScheduler scheduler = mock(MarketDataScheduler.class);
+        Instant heartbeatAt = Instant.parse("2026-09-03T06:22:00Z");
+        service.setMarketDataScheduler(scheduler);
+        when(scheduler.runtimeStatus()).thenReturn(runtimeStatus(
+                true, true, false, heartbeatAt, heartbeatAt, null,
+                null, null, null));
+
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("ERROR");
+        assertThat(header.getSystemRuntimeLabel()).isEqualTo("运行异常");
+        assertThat(header.getLastScanFailureReason()).isEqualTo("SCHEDULED_SCAN_HEARTBEAT_TIMEOUT");
+    }
+
+    @Test
+    void partialProviderReadinessDoesNotTurnHealthySchedulerIntoNotRunning() {
+        MarketDataScheduler scheduler = mock(MarketDataScheduler.class);
+        Instant completedAt = Instant.parse("2026-09-03T06:23:00Z");
+        when(scheduler.runtimeStatus()).thenReturn(runtimeStatus(
+                true, false, true, completedAt, completedAt.minusSeconds(1), completedAt,
+                completedAt.plusSeconds(60), "SUCCESS", null));
+        service.setMarketDataScheduler(scheduler);
+        when(providerReadinessService.getReadiness())
+                .thenReturn(providerReadiness("STALE", "PARTIAL_SUCCESS", "STALE", "真实数据部分过期"));
+
+        DashboardHomeVO.HeaderVO header = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getHeader();
+
+        assertThat(header.getSystemRuntimeState()).isEqualTo("RUNNING");
+        assertThat(header.getSystemRuntimeLabel()).isEqualTo("运行中");
+    }
+
+    @Test
     void systemStripUsesMacroAndAggregateOwnersInsteadOfSelectedAsset() {
         DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "LOW", "HIGH", 80, 0,
                 "LEVEL_1_CONSISTENT", true, "{\"state\":\"WAITING_TRIGGER\"}");
@@ -4264,6 +4374,21 @@ class DashboardHomeServiceImplTest {
                 .filter(tab -> role.equals(tab.getRole()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static MarketDataScheduler.RuntimeStatus runtimeStatus(
+            boolean enabled,
+            boolean running,
+            boolean heartbeatFresh,
+            Instant heartbeatAt,
+            Instant startedAt,
+            Instant completedAt,
+            Instant nextScheduledAt,
+            String result,
+            String failureReason) {
+        return new MarketDataScheduler.RuntimeStatus(
+                enabled, running, heartbeatFresh, heartbeatAt, startedAt, completedAt,
+                nextScheduledAt, result, failureReason, 0, Duration.ofMinutes(3));
     }
 
     private ProviderReadinessVO providerReadiness(String marketStatus,

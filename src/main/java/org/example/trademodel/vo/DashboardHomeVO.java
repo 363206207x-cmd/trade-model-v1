@@ -194,6 +194,14 @@ public class DashboardHomeVO {
         private String aiStatusLabel = "等待同步";
         private String dataSourceText = "WAITING_SYNC";
         private Instant updatedAt;
+        private String systemRuntimeState = "UNKNOWN";
+        private String systemRuntimeLabel = "状态未知";
+        private Instant schedulerHeartbeatAt;
+        private Instant scanStartedAt;
+        private Instant lastCompletedScanAt;
+        private Instant nextScheduledScanAt;
+        private String lastScanResult;
+        private String lastScanFailureReason;
 
         public String getPageTitle() {
             return pageTitle;
@@ -242,6 +250,23 @@ public class DashboardHomeVO {
         public void setUpdatedAt(Instant updatedAt) {
             this.updatedAt = updatedAt;
         }
+
+        public String getSystemRuntimeState() { return systemRuntimeState; }
+        public void setSystemRuntimeState(String systemRuntimeState) { this.systemRuntimeState = systemRuntimeState; }
+        public String getSystemRuntimeLabel() { return systemRuntimeLabel; }
+        public void setSystemRuntimeLabel(String systemRuntimeLabel) { this.systemRuntimeLabel = systemRuntimeLabel; }
+        public Instant getSchedulerHeartbeatAt() { return schedulerHeartbeatAt; }
+        public void setSchedulerHeartbeatAt(Instant schedulerHeartbeatAt) { this.schedulerHeartbeatAt = schedulerHeartbeatAt; }
+        public Instant getScanStartedAt() { return scanStartedAt; }
+        public void setScanStartedAt(Instant scanStartedAt) { this.scanStartedAt = scanStartedAt; }
+        public Instant getLastCompletedScanAt() { return lastCompletedScanAt; }
+        public void setLastCompletedScanAt(Instant lastCompletedScanAt) { this.lastCompletedScanAt = lastCompletedScanAt; }
+        public Instant getNextScheduledScanAt() { return nextScheduledScanAt; }
+        public void setNextScheduledScanAt(Instant nextScheduledScanAt) { this.nextScheduledScanAt = nextScheduledScanAt; }
+        public String getLastScanResult() { return lastScanResult; }
+        public void setLastScanResult(String lastScanResult) { this.lastScanResult = lastScanResult; }
+        public String getLastScanFailureReason() { return lastScanFailureReason; }
+        public void setLastScanFailureReason(String lastScanFailureReason) { this.lastScanFailureReason = lastScanFailureReason; }
     }
 
     public static class ModuleStatesVO {

@@ -117,6 +117,8 @@ class ControlledStagingConfigTreeSecretInjectionTest {
         properties.put("server.servlet.session.cookie.http-only", "true");
         properties.put("server.servlet.session.cookie.same-site", "lax");
         properties.put("server.servlet.session.cookie.secure", "true");
+        properties.put("spring.session.jdbc.initialize-schema", "never");
+        properties.put("server.forward-headers-strategy", "framework");
         properties.put("management.endpoints.web.exposure.include", "health");
         properties.put("trade-model.security.rate-limit.enabled", "true");
         properties.put("trade-model.security.rate-limit.requests-per-minute", "120");

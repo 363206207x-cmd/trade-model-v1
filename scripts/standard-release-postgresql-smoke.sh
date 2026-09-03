@@ -166,20 +166,20 @@ SMOKE_ALLOW_EXTERNAL_CALLS=false \
 printf '%s\n' "PACKAGED_JAR_LOGIN_SESSION_LOGOUT=PASS"
 migration_count="$(docker exec "${container}" psql -U "${db_user}" -d "${database}" -Atc \
   "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version IS NOT NULL")"
-if [[ "${migration_count}" != "17" ]]; then
-  printf '%s\n' "POSTGRESQL_V1_V17=FAILED"
+if [[ "${migration_count}" != "18" ]]; then
+  printf '%s\n' "POSTGRESQL_V1_V18=FAILED"
   exit 1
 fi
-printf '%s\n' "POSTGRESQL_V1_V17=17/17_PASS"
+printf '%s\n' "POSTGRESQL_V1_V18=18/18_PASS"
 stop_app
 
 start_app
 if ! wait_ready; then
   print_startup_failure
-  printf '%s\n' "PACKAGED_JAR_EXISTING_V17_RESTART=FAILED"
+  printf '%s\n' "PACKAGED_JAR_EXISTING_V18_RESTART=FAILED"
   exit 1
 fi
-printf '%s\n' "PACKAGED_JAR_EXISTING_V17_RESTART=PASS"
+printf '%s\n' "PACKAGED_JAR_EXISTING_V18_RESTART=PASS"
 stop_app
 
 docker exec "${container}" psql -U "${db_user}" -d "${database}" -v ON_ERROR_STOP=1 -c \

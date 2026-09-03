@@ -1,12 +1,17 @@
 server:
   port: ${SERVER_PORT:8081}
   address: ${SERVER_ADDRESS:127.0.0.1}
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:
         secure: ${TRADE_MODEL_SESSION_COOKIE_SECURE:true}
 
 spring:
+  session:
+    jdbc:
+      initialize-schema: never
+
   flyway:
     enabled: true
     locations: classpath:db/migration

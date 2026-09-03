@@ -5,6 +5,7 @@ server:
     session:
       timeout: ${TRADE_MODEL_SESSION_TIMEOUT:30m}
       cookie:
+        name: JSESSIONID
         http-only: true
         same-site: lax
         secure: ${TRADE_MODEL_SESSION_COOKIE_SECURE:false}
@@ -13,8 +14,12 @@ spring:
   application:
     name: trade-model-v1
 
+  session:
+    jdbc:
+      initialize-schema: embedded
+
   # H2 development uses schema.sql. Production explicitly enables the single
-  # Flyway V1-V13 owner in application-prod.yml.
+  # versioned Flyway owner in application-prod.yml.
   flyway:
     enabled: false
 

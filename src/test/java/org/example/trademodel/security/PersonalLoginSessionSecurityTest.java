@@ -1,6 +1,6 @@
 package org.example.trademodel.security;
 
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Cookie;
 import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.mapper.PersonalUserMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,10 +9,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
@@ -112,15 +119,12 @@ class PersonalLoginSessionSecurityTest {
                 .andExpect(authenticated().withUsername(USERNAME))
                 .andReturn();
 
-        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
-        assertThat(session).isNotNull();
-        mockMvc.perform(get("/dashboard").session(session))
-                .andExpect(status().isOk())
-                .andExpect(authenticated().withUsername(USERNAME));
+        Cookie session = sessionCookie(login);
+        mockMvc.perform(get("/dashboard").cookie(session))
+                .andExpect(status().isOk());
 
-        mockMvc.perform(get("/dashboard/mobile").session(session))
+        mockMvc.perform(get("/dashboard/mobile").cookie(session))
                 .andExpect(status().isOk())
-                .andExpect(authenticated().withUsername(USERNAME))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 三角色复核")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("data-asset-search-toggle")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("data-asset-add")))
@@ -135,13 +139,14 @@ class PersonalLoginSessionSecurityTest {
 
     @Test
     void mobileSavedRequestReturnsToMobileProjectionAfterLogin() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        mockMvc.perform(get("/dashboard/mobile").session(session))
+        MvcResult protectedRequest = mockMvc.perform(get("/dashboard/mobile"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(redirectedUrlPattern("**/login"))
+                .andReturn();
+        Cookie preAuthenticationSession = sessionCookie(protectedRequest);
 
         mockMvc.perform(post("/login")
-                        .session(session)
+                        .cookie(preAuthenticationSession)
                         .with(csrf())
                         .param("username", USERNAME)
                         .param("password", PASSWORD))
@@ -151,28 +156,91 @@ class PersonalLoginSessionSecurityTest {
 
     @Test
     void loginMigratesPreAuthenticationSessionId() throws Exception {
-        MockHttpSession before = new MockHttpSession();
-        String originalId = before.getId();
+        MvcResult protectedRequest = mockMvc.perform(get("/dashboard"))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+        Cookie before = sessionCookie(protectedRequest);
 
         MvcResult result = mockMvc.perform(post("/login")
-                        .session(before)
+                        .cookie(before)
                         .with(csrf())
                         .param("username", USERNAME)
                         .param("password", PASSWORD))
                 .andExpect(authenticated().withUsername(USERNAME))
                 .andReturn();
 
-        HttpSession after = result.getRequest().getSession(false);
-        assertThat(after).isNotNull();
-        assertThat(after.getId()).isNotEqualTo(originalId);
+        Cookie after = sessionCookie(result);
+        assertThat(after.getValue()).isNotEqualTo(before.getValue());
+        mockMvc.perform(get("/dashboard").cookie(after))
+                .andExpect(status().isOk());
     }
 
     @Test
     void authenticatedUserVisitingLoginReturnsToDashboard() throws Exception {
-        MockHttpSession session = loginSession();
-        mockMvc.perform(get("/login").session(session))
+        Cookie session = loginSessionCookie();
+        mockMvc.perform(get("/login").cookie(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/dashboard"));
+    }
+
+    @Test
+    void persistentSessionSurvivesTwentyRefreshesAndSixAssetSelections() throws Exception {
+        Cookie session = loginSessionCookie();
+
+        for (int refresh = 0; refresh < 20; refresh++) {
+            mockMvc.perform(get("/dashboard").cookie(copyCookie(session)))
+                    .andExpect(status().isOk());
+        }
+
+        for (String symbol : List.of("BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SOLUSDT")) {
+            mockMvc.perform(get("/api/dashboard/home")
+                            .queryParam("selectedSymbol", symbol)
+                            .cookie(copyCookie(session)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void persistentSessionSurvivesDirectLinksAndPageRoundTrips() throws Exception {
+        Cookie session = loginSessionCookie();
+
+        for (String path : List.of(
+                "/dashboard?asset=BTCUSDT",
+                "/analysis",
+                "/positions",
+                "/messages",
+                "/me",
+                "/dashboard?asset=SOLUSDT")) {
+            mockMvc.perform(get(path).cookie(copyCookie(session)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void concurrentHomeApiRequestsKeepPersistentSessionAuthenticated() throws Exception {
+        Cookie session = loginSessionCookie();
+        ExecutorService executor = Executors.newFixedThreadPool(6);
+        try {
+            List<Callable<Integer>> requests = new ArrayList<>();
+            for (String symbol : List.of(
+                    "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SOLUSDT",
+                    "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SOLUSDT")) {
+                requests.add(() -> mockMvc.perform(get("/api/dashboard/home")
+                                .queryParam("selectedSymbol", symbol)
+                                .cookie(copyCookie(session)))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus());
+            }
+
+            List<Future<Integer>> responses = executor.invokeAll(requests);
+            for (Future<Integer> response : responses) {
+                assertThat(response.get(30, TimeUnit.SECONDS)).isEqualTo(200);
+            }
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Test
@@ -253,26 +321,41 @@ class PersonalLoginSessionSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(unauthenticated());
 
-        MockHttpSession session = loginSession();
-        mockMvc.perform(post("/logout").session(session))
+        Cookie session = loginSessionCookie();
+        mockMvc.perform(post("/logout").cookie(session))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/dashboard").session(session))
+        mockMvc.perform(get("/dashboard").cookie(session))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/logout").session(session).with(csrf()))
+        mockMvc.perform(post("/logout").cookie(session).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?logout=true"))
                 .andExpect(unauthenticated());
 
-        mockMvc.perform(get("/dashboard"))
+        mockMvc.perform(get("/dashboard").cookie(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("**/login"));
     }
 
-    private MockHttpSession loginSession() throws Exception {
+    private Cookie loginSessionCookie() throws Exception {
         MvcResult result = mockMvc.perform(formLogin().user(USERNAME).password(PASSWORD))
                 .andExpect(authenticated().withUsername(USERNAME))
                 .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
+        return sessionCookie(result);
+    }
+
+    private static Cookie sessionCookie(MvcResult result) {
+        Cookie cookie = result.getResponse().getCookie("JSESSIONID");
+        assertThat(cookie).as("persistent session cookie").isNotNull();
+        return cookie;
+    }
+
+    private static Cookie copyCookie(Cookie source) {
+        Cookie copy = new Cookie(source.getName(), source.getValue());
+        copy.setPath(source.getPath());
+        copy.setSecure(source.getSecure());
+        copy.setHttpOnly(source.isHttpOnly());
+        copy.setMaxAge(source.getMaxAge());
+        return copy;
     }
 }
