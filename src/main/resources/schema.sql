@@ -645,6 +645,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_real_position_symbol_status ON tm_real_positio
 CREATE TABLE IF NOT EXISTS tm_user_position (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT,
+    submission_id VARCHAR(128),
+    close_submission_id VARCHAR(128),
     asset_symbol VARCHAR(32) NOT NULL,
     side VARCHAR(10) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -695,6 +697,10 @@ CREATE INDEX IF NOT EXISTS idx_tm_user_position_user_status_opened_at
     ON tm_user_position(user_id, status, opened_at);
 CREATE INDEX IF NOT EXISTS idx_tm_user_position_final_plan
     ON tm_user_position(final_plan_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_submission
+    ON tm_user_position(user_id, submission_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_close_submission
+    ON tm_user_position(user_id, close_submission_id);
 CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     position_id BIGINT NOT NULL,

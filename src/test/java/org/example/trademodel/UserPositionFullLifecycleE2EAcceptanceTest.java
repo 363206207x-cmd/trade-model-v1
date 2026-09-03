@@ -172,7 +172,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
         assertThat(monitorResult.isNotPositionMutation()).isTrue();
         verify(userPositionMapper, never()).manualCloseByIdAndUserId(
                 anyLong(), anyLong(), any(LocalDateTime.class), any(BigDecimal.class),
-                anyString(), any(LocalDateTime.class));
+                anyString(), anyString(), any(LocalDateTime.class));
 
         List<PositionMonitorLogDTO> monitorLogs = monitorLogService
                 .listAllByPositionIdForUserReview(USER_ID, opened.getId());
@@ -266,7 +266,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                 .sorted(Comparator.comparing(UserPositionDO::getId).reversed())
                 .collect(Collectors.toList()));
         when(mapper.manualCloseByIdAndUserId(anyLong(), anyLong(), any(LocalDateTime.class),
-                any(BigDecimal.class), anyString(), any(LocalDateTime.class)))
+                any(BigDecimal.class), anyString(), anyString(), any(LocalDateTime.class)))
                 .thenAnswer(invocation -> {
                     Long positionId = invocation.getArgument(0);
                     Long userId = invocation.getArgument(1);
@@ -277,7 +277,8 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
                     row.setClosedAt(invocation.getArgument(2));
                     row.setClosePrice(invocation.getArgument(3));
                     row.setCloseReason(invocation.getArgument(4));
-                    row.setUpdatedAt(invocation.getArgument(5));
+                    row.setCloseSubmissionId(invocation.getArgument(5));
+                    row.setUpdatedAt(invocation.getArgument(6));
                     row.setStatus("CLOSED");
                     return 1;
                 });
@@ -285,6 +286,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
 
     private static CreateUserPositionReq openPositionRequest() {
         CreateUserPositionReq req = new CreateUserPositionReq();
+        req.setSubmissionId("acceptance-open:user-position");
         req.setAssetSymbol("btcusdt");
         req.setSide("LONG");
         req.setEntryPrice(new BigDecimal("100"));
@@ -301,6 +303,7 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
 
     private static CloseUserPositionReq closePositionRequest() {
         CloseUserPositionReq req = new CloseUserPositionReq();
+        req.setSubmissionId("acceptance-close:user-position");
         req.setClosePrice(new BigDecimal("112"));
         req.setCloseReason("manual acceptance close");
         req.setClosedAt(LocalDateTime.of(2024, 1, 1, 12, 0));

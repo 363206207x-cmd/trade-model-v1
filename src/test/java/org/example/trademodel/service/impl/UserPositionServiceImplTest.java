@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,6 +66,7 @@ class UserPositionServiceImplTest {
         UserPositionDO row = captor.getValue();
         assertThat(row.getAssetSymbol()).isEqualTo("BTCUSDT");
         assertThat(row.getUserId()).isEqualTo(USER_ID);
+        assertThat(row.getSubmissionId()).isEqualTo("open-submission-1");
         assertThat(row.getSide()).isEqualTo("LONG");
         assertThat(row.getStatus()).isEqualTo("OPEN");
         assertThat(row.getEntryPrice()).isEqualByComparingTo("100.50");
@@ -235,11 +237,11 @@ class UserPositionServiceImplTest {
                 .thenReturn(partiallyClosed, closedAfterPartial);
         when(userPositionMapper.manualCloseByIdAndUserId(
                 eq(7L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
-                eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+                eq(new BigDecimal("105.25")), eq("manual exit"), eq("close-submission-1"), any()))
                 .thenReturn(1);
         when(userPositionMapper.manualCloseByIdAndUserId(
                 eq(8L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
-                eq(new BigDecimal("106.25")), eq("manual exit"), any()))
+                eq(new BigDecimal("106.25")), eq("manual exit"), eq("close-submission-1"), any()))
                 .thenReturn(1);
 
         UserPositionVO vo = service.manualCloseForUser(7L, USER_ID, closeRequest("105.25", "manual exit"));
@@ -254,22 +256,29 @@ class UserPositionServiceImplTest {
         assertThat(partialVo.getClosePrice()).isEqualByComparingTo("106.25");
         verify(userPositionMapper).manualCloseByIdAndUserId(
                 eq(7L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
-                eq(new BigDecimal("105.25")), eq("manual exit"), any());
+                eq(new BigDecimal("105.25")), eq("manual exit"), eq("close-submission-1"), any());
         verify(userPositionMapper).manualCloseByIdAndUserId(
                 eq(8L), eq(USER_ID), eq(LocalDateTime.of(2026, 6, 22, 9, 0)),
-                eq(new BigDecimal("106.25")), eq("manual exit"), any());
+                eq(new BigDecimal("106.25")), eq("manual exit"), eq("close-submission-1"), any());
     }
 
     @Test
-    void closingClosedPositionFailsClosed() {
-        when(userPositionMapper.selectByIdAndUserId(9L, USER_ID)).thenReturn(row(9L, "CLOSED"));
+    void repeatedCloseWithSameSubmissionReturnsCanonicalClosedPosition() {
+        UserPositionDO closed = row(9L, "CLOSED");
+        closed.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        closed.setClosePrice(new BigDecimal("105.25"));
+        closed.setCloseReason("already closed");
+        closed.setCloseSubmissionId("close-submission-1");
+        when(userPositionMapper.selectByIdAndUserId(9L, USER_ID)).thenReturn(closed);
 
-        assertThatThrownBy(() -> service.manualCloseForUser(9L, USER_ID, closeRequest("105.25", "already closed")))
-                .isInstanceOf(UserPositionConflictException.class)
-                .hasMessageContaining("not OPEN");
+        UserPositionVO result = service.manualCloseForUser(
+                9L, USER_ID, closeRequest("105.25", "already closed"));
+
+        assertThat(result.getStatus()).isEqualTo("CLOSED");
+        assertThat(result.getCloseSubmissionId()).isEqualTo("close-submission-1");
 
         verify(userPositionMapper, never()).manualCloseByIdAndUserId(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -286,7 +295,7 @@ class UserPositionServiceImplTest {
                 .hasMessageContaining("Forbidden UserPosition input field");
 
         verify(userPositionMapper, never()).manualCloseByIdAndUserId(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -338,16 +347,19 @@ class UserPositionServiceImplTest {
     }
 
     @Test
-    void twoConcurrentCloseRequestsProduceOneSuccessAndOneConflict() throws Exception {
+    void twoConcurrentCloseRequestsReturnOneCanonicalClosedPosition() throws Exception {
         AtomicBoolean closedState = new AtomicBoolean(false);
         UserPositionDO open = row(81L, "OPEN");
         UserPositionDO closed = row(81L, "CLOSED");
         closed.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
         closed.setClosePrice(new BigDecimal("105.25"));
+        closed.setCloseReason("manual exit");
+        closed.setCloseSubmissionId("close-submission-1");
         when(userPositionMapper.selectByIdAndUserId(81L, USER_ID))
                 .thenAnswer(invocation -> closedState.get() ? closed : open);
         when(userPositionMapper.manualCloseByIdAndUserId(
-                eq(81L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"), any()))
+                eq(81L), eq(USER_ID), any(), eq(new BigDecimal("105.25")), eq("manual exit"),
+                eq("close-submission-1"), any()))
                 .thenAnswer(invocation -> closedState.compareAndSet(false, true) ? 1 : 0);
 
         CountDownLatch start = new CountDownLatch(1);
@@ -358,8 +370,7 @@ class UserPositionServiceImplTest {
             start.countDown();
             List<Object> results = List.of(first.get(), second.get());
 
-            assertThat(results.stream().filter(UserPositionVO.class::isInstance)).hasSize(1);
-            assertThat(results.stream().filter(UserPositionConflictException.class::isInstance)).hasSize(1);
+            assertThat(results.stream().filter(UserPositionVO.class::isInstance)).hasSize(2);
             assertThat(closedState).isTrue();
         } finally {
             executor.shutdownNow();
@@ -367,18 +378,42 @@ class UserPositionServiceImplTest {
     }
 
     @Test
-    void repeatedManualOpenIsNotSilentlyDeduplicatedOrRetried() {
+    void repeatedManualOpenWithSameSubmissionReturnsOneCanonicalPosition() {
         AtomicLong ids = new AtomicLong(100L);
+        AtomicReference<UserPositionDO> stored = new AtomicReference<>();
+        when(userPositionMapper.selectBySubmissionIdAndUserId("open-submission-1", USER_ID))
+                .thenAnswer(invocation -> stored.get());
         when(userPositionMapper.insert(any())).thenAnswer(invocation -> {
-            invocation.<UserPositionDO>getArgument(0).setId(ids.incrementAndGet());
+            UserPositionDO row = invocation.getArgument(0);
+            row.setId(ids.incrementAndGet());
+            stored.set(row);
             return 1;
         });
 
         UserPositionVO first = service.manualOpenForUser(USER_ID, validOpenRequest());
         UserPositionVO second = service.manualOpenForUser(USER_ID, validOpenRequest());
 
-        assertThat(first.getId()).isNotEqualTo(second.getId());
-        verify(userPositionMapper, times(2)).insert(any());
+        assertThat(first.getId()).isEqualTo(second.getId());
+        verify(userPositionMapper, times(1)).insert(any());
+    }
+
+    @Test
+    void reusedOpenSubmissionWithDifferentPayloadFailsClosed() {
+        UserPositionDO original = row(101L, "OPEN");
+        original.setSubmissionId("open-submission-1");
+        original.setOpenedAt(LocalDateTime.of(2024, 1, 1, 10, 0));
+        original.setStopLoss(new BigDecimal("95.00"));
+        original.setTakeProfit(new BigDecimal("120.00"));
+        original.setSourceRefId("manual-note-1");
+        when(userPositionMapper.selectBySubmissionIdAndUserId("open-submission-1", USER_ID))
+                .thenReturn(original);
+        CreateUserPositionReq changed = validOpenRequest();
+        changed.setQuantity(new BigDecimal("0.50"));
+
+        assertThatThrownBy(() -> service.manualOpenForUser(USER_ID, changed))
+                .isInstanceOf(UserPositionConflictException.class)
+                .hasMessageContaining("payload does not match");
+        verify(userPositionMapper, never()).insert(any());
     }
 
     private Object closeAfter(CountDownLatch start) {
@@ -404,6 +439,7 @@ class UserPositionServiceImplTest {
     private static CreateUserPositionReq validOpenRequest() {
         CreateUserPositionReq request = new CreateUserPositionReq();
         request.setAssetSymbol(" btcusdt ");
+        request.setSubmissionId("open-submission-1");
         request.setSide("LONG");
         request.setEntryPrice(new BigDecimal("100.50"));
         request.setQuantity(new BigDecimal("0.25"));
@@ -419,6 +455,7 @@ class UserPositionServiceImplTest {
     private static CloseUserPositionReq closeRequest(String price, String reason) {
         CloseUserPositionReq request = new CloseUserPositionReq();
         request.setClosePrice(new BigDecimal(price));
+        request.setSubmissionId("close-submission-1");
         request.setCloseReason(reason);
         request.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
         return request;

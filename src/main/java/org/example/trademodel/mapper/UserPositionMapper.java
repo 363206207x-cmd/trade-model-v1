@@ -16,11 +16,11 @@ import java.util.List;
 public interface UserPositionMapper {
 
     @Insert("INSERT INTO tm_user_position(" +
-            "user_id, asset_symbol, side, status, entry_price, quantity, leverage, stop_loss, take_profit, opened_at, " +
+            "user_id, submission_id, close_submission_id, asset_symbol, side, status, entry_price, quantity, leverage, stop_loss, take_profit, opened_at, " +
             "closed_at, close_price, close_reason, source_type, source_ref_id, final_plan_id, manual_review_required, " +
             "not_trade_instruction, not_auto_trading, not_order_execution, not_position_sync, created_at, updated_at" +
             ") VALUES (" +
-            "#{userId}, #{assetSymbol}, #{side}, #{status}, #{entryPrice}, #{quantity}, #{leverage}, #{stopLoss}, #{takeProfit}, " +
+            "#{userId}, #{submissionId}, #{closeSubmissionId}, #{assetSymbol}, #{side}, #{status}, #{entryPrice}, #{quantity}, #{leverage}, #{stopLoss}, #{takeProfit}, " +
             "#{openedAt}, #{closedAt}, #{closePrice}, #{closeReason}, #{sourceType}, #{sourceRefId}, #{finalPlanId}, " +
             "#{manualReviewRequired}, #{notTradeInstruction}, #{notAutoTrading}, #{notOrderExecution}, " +
             "#{notPositionSync}, #{createdAt}, #{updatedAt}" +
@@ -30,6 +30,14 @@ public interface UserPositionMapper {
 
     @Select("SELECT * FROM tm_user_position WHERE id = #{id} AND user_id = #{userId}")
     UserPositionDO selectByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    @Select("SELECT * FROM tm_user_position WHERE user_id = #{userId} AND submission_id = #{submissionId}")
+    UserPositionDO selectBySubmissionIdAndUserId(@Param("submissionId") String submissionId,
+                                                 @Param("userId") Long userId);
+
+    @Select("SELECT * FROM tm_user_position WHERE user_id = #{userId} AND close_submission_id = #{submissionId}")
+    UserPositionDO selectByCloseSubmissionIdAndUserId(@Param("submissionId") String submissionId,
+                                                      @Param("userId") Long userId);
 
     @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id = #{userId} AND status IN ('OPEN', 'PARTIALLY_CLOSED') " +
@@ -78,6 +86,7 @@ public interface UserPositionMapper {
 
     @Update("UPDATE tm_user_position SET " +
             "status = 'CLOSED', closed_at = #{closedAt}, close_price = #{closePrice}, close_reason = #{closeReason}, " +
+            "close_submission_id = #{submissionId}, " +
             "updated_at = #{updatedAt} " +
             "WHERE id = #{id} AND user_id = #{userId} AND status IN ('OPEN', 'PARTIALLY_CLOSED')")
     int manualCloseByIdAndUserId(@Param("id") Long id,
@@ -85,5 +94,19 @@ public interface UserPositionMapper {
                                  @Param("closedAt") LocalDateTime closedAt,
                                  @Param("closePrice") BigDecimal closePrice,
                                  @Param("closeReason") String closeReason,
+                                 @Param("submissionId") String submissionId,
                                  @Param("updatedAt") LocalDateTime updatedAt);
+
+    /**
+     * Compatibility entry point for historical tests and non-request migrations. New owner actions must use the
+     * submission-aware overload above.
+     */
+    default int manualCloseByIdAndUserId(Long id,
+                                         Long userId,
+                                         LocalDateTime closedAt,
+                                         BigDecimal closePrice,
+                                         String closeReason,
+                                         LocalDateTime updatedAt) {
+        return manualCloseByIdAndUserId(id, userId, closedAt, closePrice, closeReason, null, updatedAt);
+    }
 }

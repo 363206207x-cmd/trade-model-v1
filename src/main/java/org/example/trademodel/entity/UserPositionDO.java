@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 public class UserPositionDO {
     private Long id;
     private Long userId;
+    private String submissionId;
+    private String closeSubmissionId;
     private String assetSymbol;
     private String side;
     private String status;
@@ -43,6 +45,22 @@ public class UserPositionDO {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public String getSubmissionId() {
+        return submissionId;
+    }
+
+    public void setSubmissionId(String submissionId) {
+        this.submissionId = submissionId;
+    }
+
+    public String getCloseSubmissionId() {
+        return closeSubmissionId;
+    }
+
+    public void setCloseSubmissionId(String closeSubmissionId) {
+        this.closeSubmissionId = closeSubmissionId;
     }
 
     public String getAssetSymbol() {

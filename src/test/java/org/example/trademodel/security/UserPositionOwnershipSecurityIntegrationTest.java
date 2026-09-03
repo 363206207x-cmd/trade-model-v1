@@ -526,6 +526,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
     private static String validManualOpenJson() {
         return """
                 {
+                  "submission_id": "ownership-open:manual-position",
                   "asset_symbol": "ETHUSDT",
                   "side": "LONG",
                   "entry_price": 2000,
@@ -540,7 +541,7 @@ class UserPositionOwnershipSecurityIntegrationTest {
     }
 
     private static String closeJson() {
-        return "{\"close_price\": 105, \"closed_at\": \"2026-07-01T09:00:00\", "
+        return "{\"submission_id\": \"ownership-close:manual-position\", \"close_price\": 105, \"closed_at\": \"2026-07-01T09:00:00\", "
                 + "\"close_reason\": \"manual close\"}";
     }
 

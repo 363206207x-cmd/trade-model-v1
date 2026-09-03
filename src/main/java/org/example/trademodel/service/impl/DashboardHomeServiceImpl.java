@@ -55,7 +55,9 @@ import org.example.trademodel.service.OpportunityPriorityRankingService;
 import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
+import org.example.trademodel.service.PlanRevalidationService;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
@@ -153,6 +155,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
     private MarketDataScheduler marketDataScheduler;
+    private PlanRevalidationService planRevalidationService;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -252,6 +255,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     @Autowired(required = false)
     void setMarketDataScheduler(MarketDataScheduler marketDataScheduler) {
         this.marketDataScheduler = marketDataScheduler;
+    }
+
+    @Autowired(required = false)
+    void setPlanRevalidationService(PlanRevalidationService planRevalidationService) {
+        this.planRevalidationService = planRevalidationService;
     }
 
     @Autowired(required = false)
@@ -379,7 +387,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
-        home.setDerivatives(buildDerivativesSummary(normalizedSelected, selectedDecision));
+        DashboardHomeVO.DerivativesSummaryVO derivativesSummary = buildDerivativesSummary(
+                normalizedSelected, selectedDecision);
+        home.setDerivatives(derivativesSummary);
+        if (selectedContext != null && derivativesSummary != null
+                && upper(derivativesSummary.getSource()).startsWith("COINGLASS")) {
+            selectedContext.setCoinGlassDataAt(derivativesSummary.getDataTime());
+        }
         home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
                 pushInboxContext, providerReadiness, positionRowsResult));
         home.setSafety(new DashboardHomeVO.SafetyVO());
@@ -1060,6 +1074,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (!sameAnalysisAsset(run, asset, projection)) return;
 
         asset.setAnalysisId(run.getAnalysisId());
+        asset.setAnalysisRunId(run.getAnalysisId());
         asset.setAnalysisVersion(run.getVersionNo());
         asset.setConfigurationVersion(trimToNull(run.getRuleVersion()));
 
@@ -1072,6 +1087,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 persistedDecision = null;
             }
         }
+        asset.setDecisionId(projectedDecision != null
+                ? trimToNull(projectedDecision.getDecisionId())
+                : persistedDecision == null ? null : trimToNull(persistedDecision.getDecisionId()));
+        asset.setTraceId(trimToNull(run.getTraceId()));
+        LocalDateTime calculatedAt = projectedDecision != null && projectedDecision.getCreateTime() != null
+                ? projectedDecision.getCreateTime()
+                : persistedDecision != null && persistedDecision.getCreateTime() != null
+                ? persistedDecision.getCreateTime()
+                : run.getCompletedAt() != null ? run.getCompletedAt() : run.getAnalysisTime();
+        asset.setDirectionCalculatedAt(calculatedAt);
+        if (calculatedAt != null) {
+            asset.setDecisionAgeSeconds(Math.max(0L,
+                    Duration.between(calculatedAt, LocalDateTime.now(planValidityClock)).getSeconds()));
+        }
         asset.setProviderMatrixVersion(projectedDecision != null
                 ? trimToNull(projectedDecision.getProviderMatrixVersion())
                 : persistedDecision == null ? null : trimToNull(persistedDecision.getProviderMatrixVersion()));
@@ -1082,14 +1111,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
         clearAnalysisMarketProvenance(asset);
         EvidenceItemDO marketEvidence = analysisMarketEvidence(analysisId, asset.getRawSymbol());
-        if (marketEvidence == null) return;
+        if (marketEvidence == null) {
+            failClosedDirectionProvenance(asset, "DIRECTION_MARKET_EVIDENCE_UNAVAILABLE");
+            return;
+        }
         String sourceTraceId = trimToNull(marketEvidence.getSourceTraceId());
         String evidenceProvider = trimToNull(marketEvidence.getSourceProvider());
         String provider = primaryPersistedOhlcvProvider();
         String marketType = primaryPersistedOhlcvMarketType();
         if (sourceTraceId == null || provider == null || marketType == null
                 || persistedOhlcvBarMapper == null || run.getAnalysisTime() == null
-                || !sameProviderFamily(evidenceProvider, provider)) return;
+                || !sameProviderFamily(evidenceProvider, provider)) {
+            failClosedDirectionProvenance(asset, "DIRECTION_MARKET_PROVENANCE_UNAVAILABLE");
+            return;
+        }
 
         long analysisTimeMs = run.getAnalysisTime().toInstant(ZoneOffset.UTC).toEpochMilli();
         try {
@@ -1104,6 +1139,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     analysisTimeMs)
                     || !analysisBoundSourceOwned(fourHour, asset.getRawSymbol(), "4h", provider, marketType,
                     analysisTimeMs)) {
+                failClosedDirectionProvenance(asset, "DIRECTION_TIMEFRAME_PROVENANCE_UNAVAILABLE");
                 return;
             }
             asset.setSourceId(sourceTraceId);
@@ -1111,9 +1147,43 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             asset.setPriceObservedAt(closedAt(price));
             asset.setOneHourClosedAt(closedAt(oneHour));
             asset.setFourHourClosedAt(closedAt(fourHour));
+            asset.setPriceAtDecision(price.getClosePrice());
+            asset.setPriceDriftPct(priceDriftPct(asset.getPriceAtDecision(), asset.getLatestPrice()));
+            boolean oneHourRecalculated = asset.getLatestOneHourClosedAt() != null
+                    && asset.getOneHourClosedAt() != null
+                    && !asset.getOneHourClosedAt().isBefore(asset.getLatestOneHourClosedAt());
+            boolean fourHourIncluded = asset.getLatestFourHourClosedAt() != null
+                    && asset.getFourHourClosedAt() != null
+                    && !asset.getFourHourClosedAt().isBefore(asset.getLatestFourHourClosedAt());
+            asset.setNewOneHourCloseRecalculation(oneHourRecalculated);
+            asset.setLatestFourHourCloseIncluded(fourHourIncluded);
+            boolean hasCurrentDirection = hasText(asset.getMarketBias());
+            boolean latestClosedTimeframesIncluded = oneHourRecalculated && fourHourIncluded;
+            PriceInvalidation priceInvalidation = evaluatePlanInvalidation(
+                    asset.getPlanInvalidationLevel(), asset.getFinalMarketBias(), asset.getLatestPrice());
+            if (hasCurrentDirection && !latestClosedTimeframesIncluded) {
+                markDirectionAwaitingReanalysis(asset);
+            }
+            if (priceInvalidation.hit()) {
+                markDirectionAwaitingReanalysis(asset);
+            }
+            if (priceInvalidation.hit()) {
+                requestPlanRevalidationIfNeeded(asset, "PRICE_CROSSED_PLAN_INVALIDATION_LEVEL");
+            } else if (hasCurrentDirection && !latestClosedTimeframesIncluded) {
+                requestPlanRevalidationIfNeeded(asset, oneHourRecalculated
+                        ? "NEW_4H_CLOSE_AFTER_DIRECTION_CALCULATION"
+                        : "NEW_1H_CLOSE_AFTER_DIRECTION_CALCULATION");
+            }
         } catch (RuntimeException ignored) {
-            clearAnalysisMarketProvenance(asset);
+            failClosedDirectionProvenance(asset, "DIRECTION_MARKET_PROVENANCE_UNAVAILABLE");
         }
+    }
+
+    private void failClosedDirectionProvenance(DashboardHomeVO.AssetVO asset, String reason) {
+        clearAnalysisMarketProvenance(asset);
+        if (!hasText(asset.getMarketBias())) return;
+        markDirectionAwaitingReanalysis(asset);
+        requestPlanRevalidationIfNeeded(asset, reason);
     }
 
     private void clearAnalysisMarketProvenance(DashboardHomeVO.AssetVO asset) {
@@ -1122,6 +1192,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setPriceObservedAt(null);
         asset.setOneHourClosedAt(null);
         asset.setFourHourClosedAt(null);
+        asset.setPriceAtDecision(null);
+        asset.setPriceDriftPct(null);
+        asset.setNewOneHourCloseRecalculation(null);
+        asset.setLatestFourHourCloseIncluded(null);
     }
 
     private boolean sameAnalysisAsset(AnalysisRunDO run,
@@ -1419,6 +1493,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         ExecutionPlanDO plan = resolution.executionPlan();
         String lifecycle = trimToNull(plan.getPlanLifecycleState());
+        asset.setPlanId(trimToNull(plan.getPlanId()));
+        asset.setTraceId(firstNonBlank(trimToNull(plan.getTraceId()), resolution.sourceTraceId()));
+        asset.setPlanInvalidationLevel(planInvalidationLevel(plan));
+        asset.setPlanState(lifecycle);
         boolean visibleLifecycle = "CURRENT".equals(lifecycle) || "NEEDS_REVALIDATION".equals(lifecycle);
         boolean validated = Boolean.TRUE.equals(plan.getFinalPlan())
                 && "PASS".equals(trimToNull(plan.getRuleValidationStatus()))
@@ -1432,6 +1510,97 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setFinalMarketBias(trimToNull(plan.getFinalMarketBias()));
         asset.setFinalPlanMode(trimToNull(plan.getFinalPlanMode()));
         asset.setFinalPlanLifecycle(lifecycle);
+    }
+
+    private void markDirectionAwaitingReanalysis(DashboardHomeVO.AssetVO asset) {
+        asset.setDirectionMaturity("STALE_REANALYSIS_REQUIRED");
+        asset.setMarketBias(null);
+        asset.setMarketBiasLabel("待重新分析");
+        asset.setConfidenceLevel(null);
+        asset.setConfidenceLabel("待重新计算");
+        asset.setRiskLevel(null);
+        asset.setRiskLabel("待重新计算");
+        asset.setHasFinal(false);
+        asset.setFinalMarketBias(null);
+        asset.setFinalPlanMode(null);
+        setFieldSource(asset, "direction", "INVALID");
+        setFieldSource(asset, "confidence", "INVALID");
+        setFieldSource(asset, "riskLevel", "INVALID");
+    }
+
+    private void requestPlanRevalidationIfNeeded(DashboardHomeVO.AssetVO asset, String reason) {
+        if (asset == null || !hasText(asset.getPlanId())) return;
+        if (!"CURRENT".equalsIgnoreCase(asset.getPlanState())) {
+            if ("NEEDS_REVALIDATION".equalsIgnoreCase(asset.getPlanState())) return;
+            return;
+        }
+        if (planRevalidationService == null) {
+            asset.setPlanState("BLOCKED");
+            return;
+        }
+        try {
+            planRevalidationService.requestSystem(
+                    asset.getPlanId(), PlanRevalidationTriggerTypeEnum.DATA_REFRESH, reason);
+            asset.setPlanState("NEEDS_REVALIDATION");
+        } catch (RuntimeException failure) {
+            asset.setPlanState("BLOCKED");
+        }
+    }
+
+    private String planInvalidationLevel(ExecutionPlanDO plan) {
+        if (plan == null) return null;
+        String structured = trimToNull(plan.getInvalidCondition());
+        if (structured != null) {
+            try {
+                JsonNode root = objectMapper.readTree(structured);
+                if (root != null && root.isObject()) {
+                    JsonNode below = root.get("invalidPriceBelow");
+                    if (below != null && below.isNumber()) return "invalidPriceBelow=" + below.decimalValue();
+                    JsonNode above = root.get("invalidPriceAbove");
+                    if (above != null && above.isNumber()) return "invalidPriceAbove=" + above.decimalValue();
+                }
+            } catch (Exception ignored) {
+                // Human-readable invalidation text remains review-only; only structured numeric values are evaluated.
+            }
+        }
+        BigDecimal stop = exactDecimal(plan.getStopLoss());
+        return stop == null ? null : "stopLoss=" + stop.stripTrailingZeros().toPlainString();
+    }
+
+    private PriceInvalidation evaluatePlanInvalidation(String invalidationLevel,
+                                                       String direction,
+                                                       BigDecimal latestPrice) {
+        if (!positive(latestPrice) || !hasText(invalidationLevel)) return PriceInvalidation.notHit();
+        String[] pair = invalidationLevel.split("=", 2);
+        if (pair.length != 2) return PriceInvalidation.notHit();
+        BigDecimal level = exactDecimal(pair[1]);
+        if (!positive(level)) return PriceInvalidation.notHit();
+        boolean hit = switch (pair[0]) {
+            case "invalidPriceBelow" -> latestPrice.compareTo(level) < 0;
+            case "invalidPriceAbove" -> latestPrice.compareTo(level) > 0;
+            case "stopLoss" -> MarketBiasPolicy.bearishFamily(direction)
+                    ? latestPrice.compareTo(level) > 0
+                    : MarketBiasPolicy.bullishFamily(direction) && latestPrice.compareTo(level) < 0;
+            default -> false;
+        };
+        return new PriceInvalidation(hit, level);
+    }
+
+    private BigDecimal exactDecimal(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null || !normalized.matches("[+-]?\\d+(?:\\.\\d+)?")) return null;
+        try {
+            return new BigDecimal(normalized);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private BigDecimal priceDriftPct(BigDecimal priceAtDecision, BigDecimal latestPrice) {
+        if (!positive(priceAtDecision) || !positive(latestPrice)) return null;
+        return latestPrice.subtract(priceAtDecision)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(priceAtDecision, 4, RoundingMode.HALF_UP);
     }
 
     private List<DashboardHomeVO.AssetVO> buildLegacyConstructorAssets(List<DecisionResultVO> decisions,
@@ -1614,6 +1783,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         Map<String, String> timeframeFreshness = new LinkedHashMap<>();
         PersistedOhlcvBarDO latest = null;
+        PersistedOhlcvBarDO latestOneHour = null;
+        PersistedOhlcvBarDO latestFourHour = null;
         try {
             for (String timeframe : List.of("5m", "15m", "1h", "4h")) {
                 List<PersistedOhlcvBarDO> rows = latestClosedWindowFromPrimarySource(symbol, timeframe, 1);
@@ -1621,6 +1792,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 timeframeFreshness.put(timeframe, timeframeLatest == null
                         ? "NO_DATA" : firstNonBlank(timeframeLatest.getFreshnessStatus(), "UNKNOWN"));
                 if ("5m".equals(timeframe)) latest = timeframeLatest;
+                if ("1h".equals(timeframe)) latestOneHour = timeframeLatest;
+                if ("4h".equals(timeframe)) latestFourHour = timeframeLatest;
             }
         } catch (RuntimeException ignored) {
             asset.setDataFreshness("ERROR");
@@ -1632,6 +1805,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return;
         }
         asset.setTimeframeFreshness(Map.copyOf(timeframeFreshness));
+        asset.setLatestOneHourClosedAt(closedAt(latestOneHour));
+        asset.setLatestFourHourClosedAt(closedAt(latestFourHour));
+        asset.setMarketDataAsOf(maxTime(
+                asset.getLatestPriceAt(), asset.getLatestOneHourClosedAt(), asset.getLatestFourHourClosedAt()));
         if (latest == null) {
             LocalRealAssetReadiness readiness = localRealReadinessService == null
                     ? null : localRealReadinessService.asset(symbol);
@@ -1652,8 +1829,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             setFieldSource(asset, "dataQuality", "ERROR");
         } else {
             asset.setLatestPrice(latest.getClosePrice());
+            asset.setLatestPriceAt(closedAt(latest));
             setFieldSource(asset, "latestPrice", "REAL");
         }
+        asset.setMarketDataAsOf(maxTime(
+                asset.getLatestPriceAt(), asset.getLatestOneHourClosedAt(), asset.getLatestFourHourClosedAt()));
         boolean allFresh = timeframeFreshness.values().stream().allMatch("FRESH"::equalsIgnoreCase);
         boolean anyData = timeframeFreshness.values().stream().anyMatch(value -> !"NO_DATA".equals(value));
         if (!"ERROR".equals(asset.getDataFreshness())) {
@@ -3816,6 +3996,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private record AiRoleStats(int successful, int support, int challenge, int abstain) {
         int adjudicative() {
             return support + challenge;
+        }
+    }
+
+    private record PriceInvalidation(boolean hit, BigDecimal level) {
+        private static PriceInvalidation notHit() {
+            return new PriceInvalidation(false, null);
         }
     }
 

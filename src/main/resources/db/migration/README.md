@@ -14,6 +14,7 @@ Current migration files:
 - `V8__personal_user_session_authentication.sql`: personal `tm_user` identity storage for BCrypt-backed form login and server-side Session authentication; runtime bootstrap requires explicit credentials.
 - `V9__user_position_ownership_foundation.sql`: nullable canonical `tm_user_position.user_id` ownership plus owner-scoped review feedback keys, indexes, and restrictive foreign keys; legacy position rows remain unclaimed and legacy review rows remain shared, with no automatic ownership backfill.
 - `V10__position_monitoring_backend_contract.sql`: independent Position Monitoring semantics, source trust, and freshness contract.
+- `V19__user_position_submission_idempotency.sql`: owner-scoped stable submission identities and database uniqueness for manual position open/close retries; historical rows remain untouched with null identities.
 
 `src/main/resources/schema.sql` remains the H2 local/test bootstrap path. It is intentionally separate from the PostgreSQL Flyway migration path.
 

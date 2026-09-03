@@ -60,6 +60,7 @@ import org.example.trademodel.service.PersistedOhlcvQueryService;
 import org.example.trademodel.testsupport.FrozenFinalExecutionPlanTestFixture;
 import org.example.trademodel.service.PositionMonitorLogService;
 import org.example.trademodel.service.PositionSyncService;
+import org.example.trademodel.service.PlanRevalidationService;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.service.readiness.ProviderReadinessService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
@@ -162,6 +163,8 @@ class DashboardHomeServiceImplTest {
     private DecisionResultMapper decisionResultMapper;
     @Mock
     private ExecutionPlanMapper executionPlanMapper;
+    @Mock
+    private PlanRevalidationService planRevalidationService;
     private DashboardHomeServiceImpl service;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -315,6 +318,229 @@ class DashboardHomeServiceImplTest {
                 .andExpect(jsonPath("$.data.assets[0].homeTier").value("TIER_2"))
                 .andExpect(jsonPath("$.data.assets[0].finalMarketBias").doesNotExist());
         verify(persistedOhlcvBarMapper, never()).selectLatestClosedBarBySourceTrace(anyString(), anyString());
+    }
+
+    @Test
+    void newerClosedOneHourBarNeverMixesOldStrongDirectionWithCurrentPrice() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+        service.setPlanRevalidationService(planRevalidationService);
+        service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-09-03T14:30:00Z"), ZoneOffset.UTC));
+
+        DecisionResultVO decision = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 88, 10,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(82);
+        decision.setOneHourOpportunityQuality(78);
+        decision.setFourHourTrendAlignment(84);
+        decision.setPlanMode("CONFIRMATION");
+        decision.setInvalidCondition("{\"invalidPriceAbove\":2450}");
+        decision.setStopLoss("2450");
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 9, 3, 12, 10);
+        decision.setCreateTime(analysisTime);
+        AnalysisRunDO run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 202L);
+        run.setAnalysisTime(analysisTime);
+        run.setTraceId("trace-eth-2391");
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
+
+        ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-2391");
+        plan.setTraceId("trace-eth-2391");
+        plan.setPlanLifecycleState("CURRENT");
+        EvidenceItemDO evidence = marketEvidence(decision.getAnalysisId(), "ETHUSDT", "trace-price-eth");
+        when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of(evidence));
+
+        PersistedOhlcvBarDO latestFive = sourceOwnedBar("ETHUSDT", "5m", "latest-5m",
+                Instant.parse("2026-09-03T14:25:00Z"));
+        latestFive.setClosePrice(new BigDecimal("2418"));
+        PersistedOhlcvBarDO latestOne = sourceOwnedBar("ETHUSDT", "1h", "latest-1h",
+                Instant.parse("2026-09-03T14:00:00Z"));
+        PersistedOhlcvBarDO latestFour = sourceOwnedBar("ETHUSDT", "4h", "latest-4h",
+                Instant.parse("2026-09-03T12:00:00Z"));
+        stubLatestClosedBars("ETHUSDT", latestFive, latestOne, latestFour);
+
+        PersistedOhlcvBarDO decisionPrice = sourceOwnedBar("ETHUSDT", "5m", "decision-5m",
+                Instant.parse("2026-09-03T12:05:00Z"));
+        decisionPrice.setClosePrice(new BigDecimal("2391"));
+        PersistedOhlcvBarDO decisionOne = sourceOwnedBar("ETHUSDT", "1h", "decision-1h",
+                Instant.parse("2026-09-03T12:00:00Z"));
+        PersistedOhlcvBarDO decisionFour = sourceOwnedBar("ETHUSDT", "4h", "decision-4h",
+                Instant.parse("2026-09-03T12:00:00Z"));
+        stubAnalysisBoundBars("ETHUSDT", analysisTime, decisionPrice, decisionOne, decisionFour);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(202L, decision, 94, "opportunity-eth", "CANDIDATE")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "ETHUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getLatestPrice()).isEqualByComparingTo("2418");
+        assertThat(asset.getLatestPriceAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 14, 25));
+        assertThat(asset.getMarketDataAsOf()).isEqualTo(LocalDateTime.of(2026, 9, 3, 14, 25));
+        assertThat(asset.getLatestOneHourClosedAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 14, 0));
+        assertThat(asset.getLatestFourHourClosedAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 12, 0));
+        assertThat(asset.getPriceAtDecision()).isEqualByComparingTo("2391");
+        assertThat(asset.getPriceDriftPct()).isEqualByComparingTo("1.1292");
+        assertThat(asset.getAnalysisRunId()).isEqualTo(decision.getAnalysisId());
+        assertThat(asset.getDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(asset.getTraceId()).isEqualTo("trace-eth-2391");
+        assertThat(asset.getDirectionCalculatedAt()).isEqualTo(analysisTime);
+        assertThat(asset.getDecisionAgeSeconds()).isEqualTo(8_400L);
+        assertThat(asset.getNewOneHourCloseRecalculation()).isFalse();
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("待重新分析");
+        assertThat(asset.getConfidenceLabel()).isEqualTo("待重新计算");
+        assertThat(asset.getRiskLabel()).isEqualTo("待重新计算");
+        assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
+        verify(planRevalidationService).requestSystem(
+                "plan-eth-2391", org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
+                "NEW_1H_CLOSE_AFTER_DIRECTION_CALCULATION");
+    }
+
+    @Test
+    void strongBearishMayRemainWhenLatestClosedTimeframesWereRecalculated() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+        service.setPlanRevalidationService(planRevalidationService);
+        service.setPlanValidityClock(Clock.fixed(Instant.parse("2026-09-03T14:30:00Z"), ZoneOffset.UTC));
+        DecisionResultVO decision = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 90, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(84);
+        decision.setOneHourOpportunityQuality(79);
+        decision.setFourHourTrendAlignment(86);
+        decision.setPlanMode("CONFIRMATION");
+        decision.setInvalidCondition("{\"invalidPriceAbove\":2450}");
+        decision.setStopLoss("2450");
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 9, 3, 14, 10);
+        decision.setCreateTime(analysisTime);
+        AnalysisRunDO run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 203L);
+        run.setAnalysisTime(analysisTime);
+        run.setTraceId("trace-eth-2418");
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
+        ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-2418");
+        plan.setTraceId("trace-eth-2418");
+        plan.setPlanLifecycleState("CURRENT");
+        when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of(
+                marketEvidence(decision.getAnalysisId(), "ETHUSDT", "trace-price-eth-current")));
+
+        PersistedOhlcvBarDO five = sourceOwnedBar("ETHUSDT", "5m", "current-5m",
+                Instant.parse("2026-09-03T14:05:00Z"));
+        five.setClosePrice(new BigDecimal("2418"));
+        PersistedOhlcvBarDO one = sourceOwnedBar("ETHUSDT", "1h", "current-1h",
+                Instant.parse("2026-09-03T14:00:00Z"));
+        PersistedOhlcvBarDO four = sourceOwnedBar("ETHUSDT", "4h", "current-4h",
+                Instant.parse("2026-09-03T12:00:00Z"));
+        stubLatestClosedBars("ETHUSDT", five, one, four);
+        stubAnalysisBoundBars("ETHUSDT", analysisTime, five, one, four);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(203L, decision, 95, "opportunity-eth-current", "CANDIDATE")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "ETHUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(asset.getConfidenceLabel()).isEqualTo("84%");
+        assertThat(asset.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(asset.getNewOneHourCloseRecalculation()).isTrue();
+        assertThat(asset.getLatestFourHourCloseIncluded()).isTrue();
+        assertThat(asset.getPlanState()).isEqualTo("CURRENT");
+        verify(planRevalidationService, never()).requestSystem(anyString(), any(), anyString());
+    }
+
+    @Test
+    void currentPriceAboveBearishInvalidationLevelBlocksDirectionAndRevalidatesPlan() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+        service.setPlanRevalidationService(planRevalidationService);
+        DecisionResultVO decision = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 90, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(84);
+        decision.setOneHourOpportunityQuality(79);
+        decision.setFourHourTrendAlignment(86);
+        decision.setPlanMode("CONFIRMATION");
+        decision.setInvalidCondition("{\"invalidPriceAbove\":2450}");
+        decision.setStopLoss("2450");
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 7, 1, 11, 50);
+        decision.setCreateTime(analysisTime);
+        AnalysisRunDO run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 204L);
+        run.setAnalysisTime(analysisTime);
+        run.setTraceId("trace-eth-invalidation");
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
+        ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-invalidation");
+        plan.setPlanLifecycleState("CURRENT");
+        when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of(
+                marketEvidence(decision.getAnalysisId(), "ETHUSDT", "trace-price-eth-invalidation")));
+
+        PersistedOhlcvBarDO five = sourceOwnedBar("ETHUSDT", "5m", "invalidation-5m",
+                Instant.parse("2026-07-01T11:45:00Z"));
+        five.setClosePrice(new BigDecimal("2460"));
+        PersistedOhlcvBarDO one = sourceOwnedBar("ETHUSDT", "1h", "invalidation-1h",
+                Instant.parse("2026-07-01T11:00:00Z"));
+        PersistedOhlcvBarDO four = sourceOwnedBar("ETHUSDT", "4h", "invalidation-4h",
+                Instant.parse("2026-07-01T08:00:00Z"));
+        stubLatestClosedBars("ETHUSDT", five, one, four);
+        stubAnalysisBoundBars("ETHUSDT", analysisTime, five, one, four);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(204L, decision, 95, "opportunity-eth-invalidation", "CANDIDATE")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "ETHUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getPlanInvalidationLevel()).isEqualTo("invalidPriceAbove=2450");
+        assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("待重新分析");
+        verify(planRevalidationService).requestSystem(
+                "plan-eth-invalidation", org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
+                "PRICE_CROSSED_PLAN_INVALIDATION_LEVEL");
+    }
+
+    @Test
+    void missingOwnedMarketEvidenceNeverLeavesAStrongDirectionBesideCurrentPrice() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+        service.setPlanRevalidationService(planRevalidationService);
+        DecisionResultVO decision = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 90, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(84);
+        decision.setPlanMode("CONFIRMATION");
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 7, 1, 11, 50);
+        decision.setCreateTime(analysisTime);
+        AnalysisRunDO run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 205L);
+        run.setAnalysisTime(analysisTime);
+        when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
+        ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-missing-provenance");
+        plan.setPlanLifecycleState("CURRENT");
+        when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of());
+
+        PersistedOhlcvBarDO five = sourceOwnedBar("ETHUSDT", "5m", "latest-5m",
+                Instant.parse("2026-07-01T11:45:00Z"));
+        five.setClosePrice(new BigDecimal("2418"));
+        PersistedOhlcvBarDO one = sourceOwnedBar("ETHUSDT", "1h", "latest-1h",
+                Instant.parse("2026-07-01T11:00:00Z"));
+        PersistedOhlcvBarDO four = sourceOwnedBar("ETHUSDT", "4h", "latest-4h",
+                Instant.parse("2026-07-01T08:00:00Z"));
+        stubLatestClosedBars("ETHUSDT", five, one, four);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(205L, decision, 95, "opportunity-eth-missing-provenance", "CANDIDATE")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, "ETHUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getLatestPrice()).isEqualByComparingTo("2418");
+        assertThat(asset.getPriceAtDecision()).isNull();
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("待重新分析");
+        assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
+        verify(planRevalidationService).requestSystem(
+                "plan-eth-missing-provenance",
+                org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
+                "DIRECTION_MARKET_EVIDENCE_UNAVAILABLE");
     }
 
     @Test
@@ -4428,6 +4654,46 @@ class DashboardHomeServiceImplTest {
         bar.setSourceStatus("READY");
         bar.setFreshnessStatus("FRESH");
         return bar;
+    }
+
+    private EvidenceItemDO marketEvidence(String analysisId, String symbol, String sourceTraceId) {
+        EvidenceItemDO evidence = new EvidenceItemDO();
+        evidence.setAnalysisId(analysisId);
+        evidence.setEvidenceType("价格结构");
+        evidence.setSource("MARKET_HEURISTIC");
+        evidence.setSourceProvider("BINANCE");
+        evidence.setSourceReference("BINANCE|PRICE|BINANCE:SPOT:NONE:" + symbol + "|" + symbol
+                + "|GLOBAL|source-v1");
+        evidence.setSourceTraceId(sourceTraceId);
+        return evidence;
+    }
+
+    private void stubLatestClosedBars(String symbol,
+                                      PersistedOhlcvBarDO fiveMinute,
+                                      PersistedOhlcvBarDO oneHour,
+                                      PersistedOhlcvBarDO fourHour) {
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, "5m", "BINANCE_PUBLIC", "SPOT", 1)).thenReturn(List.of(fiveMinute));
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, "15m", "BINANCE_PUBLIC", "SPOT", 1)).thenReturn(List.of(fiveMinute));
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, "1h", "BINANCE_PUBLIC", "SPOT", 1)).thenReturn(List.of(oneHour));
+        lenient().when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, "4h", "BINANCE_PUBLIC", "SPOT", 1)).thenReturn(List.of(fourHour));
+    }
+
+    private void stubAnalysisBoundBars(String symbol,
+                                       LocalDateTime analysisTime,
+                                       PersistedOhlcvBarDO fiveMinute,
+                                       PersistedOhlcvBarDO oneHour,
+                                       PersistedOhlcvBarDO fourHour) {
+        long asOfMs = analysisTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                symbol, "5m", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(fiveMinute);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                symbol, "1h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(oneHour);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                symbol, "4h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(fourHour);
     }
 
     private DashboardHomeVO.AssetVO asset(DashboardHomeVO home, String symbol) {

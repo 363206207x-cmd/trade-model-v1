@@ -452,10 +452,15 @@ pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: any
 .overlay::backdrop { background: rgba(23, 25, 28, 0.32); backdrop-filter: blur(2px); }
 .overlay-header { position: sticky; top: 0; z-index: 2; display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .overlay-header h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.overlay-header small { display: block; margin-top: 4px; color: var(--text-muted); font-size: 10px; font-weight: 400; }
 .overlay-header button { min-height: 30px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
 .overlay-content { display: grid; gap: 12px; padding: 16px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .overlay-actions { justify-content: flex-end; margin-top: 4px; }
+.overlay-form-status { min-height: 18px; margin: 0; color: var(--text-muted); font-size: 11px; }
+.overlay-form-status.is-error { color: var(--negative); }
+.position-inline-actions { display: flex; align-items: center; gap: 10px; }
+.position-close-inline { padding: 0; border: 0; background: transparent; color: var(--negative); font-size: 11px; font-weight: 600; cursor: pointer; }
 
 @media (max-width: 1180px) {
     .workspace-main, .workspace-page-header { padding-left: 24px; padding-right: 24px; }

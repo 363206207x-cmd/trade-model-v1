@@ -96,10 +96,17 @@ public class PlanRevalidationService {
         if (plan == null || !Boolean.TRUE.equals(plan.getFinalPlan())) {
             throw new IllegalArgumentException("validated final plan is required");
         }
+        if ("NEEDS_REVALIDATION".equalsIgnoreCase(plan.getPlanLifecycleState())) {
+            return recordMapper.listByPlanId(planId, 1).stream().findFirst().orElse(null);
+        }
         LocalDateTime now = LocalDateTime.now(clock);
         String normalizedReason = required(reason, "reason");
         int updated = planMapper.markNeedsRevalidation(planId, normalizedReason, now);
         if (updated != 1) {
+            ExecutionPlanDO current = planMapper.selectByPlanId(planId);
+            if (current != null && "NEEDS_REVALIDATION".equalsIgnoreCase(current.getPlanLifecycleState())) {
+                return recordMapper.listByPlanId(planId, 1).stream().findFirst().orElse(null);
+            }
             throw new IllegalStateException("plan is not eligible for revalidation");
         }
         return recordSystemTrigger(plan, triggerType, normalizedReason, now);

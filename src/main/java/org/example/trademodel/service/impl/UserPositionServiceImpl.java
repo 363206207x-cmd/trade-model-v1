@@ -16,6 +16,7 @@ import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,6 +56,7 @@ public class UserPositionServiceImpl implements UserPositionService {
             throw new IllegalArgumentException("manual open request is required");
         }
         rejectForbiddenInputFields(request.getExtraFields());
+        String submissionId = requireSubmissionId(request.getSubmissionId());
         String assetSymbol = normalizeAssetSymbol(request.getAssetSymbol());
         UserPositionSideEnum side = UserPositionSideEnum.parse(request.getSide());
         UserPositionSourceTypeEnum sourceType = UserPositionSourceTypeEnum.parseExplicit(request.getSourceType());
@@ -74,6 +77,7 @@ public class UserPositionServiceImpl implements UserPositionService {
 
         UserPositionDO row = new UserPositionDO();
         row.setUserId(userId);
+        row.setSubmissionId(submissionId);
         row.setAssetSymbol(assetSymbol);
         row.setSide(side.name());
         row.setStatus(STATUS_OPEN);
@@ -92,10 +96,22 @@ public class UserPositionServiceImpl implements UserPositionService {
         applySafetyFlags(row);
         row.setCreatedAt(now);
         row.setUpdatedAt(now);
-        if (userPositionMapper.insert(row) != 1) {
-            throw new IllegalStateException("UserPosition insert failed");
+        UserPositionDO existing = userPositionMapper.selectBySubmissionIdAndUserId(submissionId, userId);
+        if (existing != null) {
+            return toVo(requireSameOpenPayload(existing, row));
         }
-        return toVo(row);
+        try {
+            if (userPositionMapper.insert(row) != 1) {
+                throw new IllegalStateException("UserPosition insert failed");
+            }
+            return toVo(row);
+        } catch (DuplicateKeyException duplicate) {
+            UserPositionDO canonical = userPositionMapper.selectBySubmissionIdAndUserId(submissionId, userId);
+            if (canonical == null) {
+                throw duplicate;
+            }
+            return toVo(requireSameOpenPayload(canonical, row));
+        }
     }
 
     @Override
@@ -108,13 +124,11 @@ public class UserPositionServiceImpl implements UserPositionService {
             throw new IllegalArgumentException("manual close request is required");
         }
         rejectForbiddenInputFields(request.getExtraFields());
+        String submissionId = requireSubmissionId(request.getSubmissionId());
         BigDecimal closePrice = requirePositive(request.getClosePrice(), "close_price");
         UserPositionDO existing = userPositionMapper.selectByIdAndUserId(id, userId);
         if (existing == null) {
             throw new UserPositionNotFoundException();
-        }
-        if (!isActivePositionStatus(existing.getStatus())) {
-            throw new UserPositionConflictException("UserPosition is not OPEN or PARTIALLY_CLOSED");
         }
         LocalDateTime now = UtcLocalTimePolicy.now(clock);
         LocalDateTime closedAt = request.getClosedAt();
@@ -127,20 +141,34 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (existing.getOpenedAt() != null && closedAt.isBefore(existing.getOpenedAt())) {
             throw new IllegalArgumentException("closed_at must not be before opened_at");
         }
-        int updated = userPositionMapper.manualCloseByIdAndUserId(
-                id,
-                userId,
-                closedAt,
-                closePrice,
-                trimToNull(request.getCloseReason()),
-                now
-        );
+        String closeReason = trimToNull(request.getCloseReason());
+        if (!isActivePositionStatus(existing.getStatus())) {
+            return toVo(requireSameClosePayload(existing, submissionId, closedAt, closePrice, closeReason));
+        }
+        int updated;
+        try {
+            updated = userPositionMapper.manualCloseByIdAndUserId(
+                    id,
+                    userId,
+                    closedAt,
+                    closePrice,
+                    closeReason,
+                    submissionId,
+                    now
+            );
+        } catch (DuplicateKeyException duplicate) {
+            UserPositionDO canonical = userPositionMapper.selectByCloseSubmissionIdAndUserId(submissionId, userId);
+            if (canonical == null || !Objects.equals(canonical.getId(), id)) {
+                throw new UserPositionConflictException("close submission_id was already used for another position");
+            }
+            return toVo(requireSameClosePayload(canonical, submissionId, closedAt, closePrice, closeReason));
+        }
         if (updated != 1) {
             UserPositionDO current = userPositionMapper.selectByIdAndUserId(id, userId);
             if (current == null) {
                 throw new UserPositionNotFoundException();
             }
-            throw new UserPositionConflictException("UserPosition close state changed concurrently");
+            return toVo(requireSameClosePayload(current, submissionId, closedAt, closePrice, closeReason));
         }
         UserPositionDO closed = userPositionMapper.selectByIdAndUserId(id, userId);
         if (closed == null) {
@@ -211,6 +239,8 @@ public class UserPositionServiceImpl implements UserPositionService {
         }
         UserPositionVO vo = new UserPositionVO();
         vo.setId(row.getId());
+        vo.setSubmissionId(row.getSubmissionId());
+        vo.setCloseSubmissionId(row.getCloseSubmissionId());
         vo.setAssetSymbol(row.getAssetSymbol());
         vo.setSide(row.getSide());
         vo.setStatus(row.getStatus());
@@ -256,6 +286,53 @@ public class UserPositionServiceImpl implements UserPositionService {
             return null;
         }
         return requirePositive(value, fieldName);
+    }
+
+    private static String requireSubmissionId(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new IllegalArgumentException("submission_id is required");
+        }
+        if (normalized.length() > 128 || !normalized.matches("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")) {
+            throw new IllegalArgumentException("submission_id must be 8-128 safe characters");
+        }
+        return normalized;
+    }
+
+    private static UserPositionDO requireSameOpenPayload(UserPositionDO existing, UserPositionDO requested) {
+        if (!Objects.equals(existing.getAssetSymbol(), requested.getAssetSymbol())
+                || !Objects.equals(existing.getSide(), requested.getSide())
+                || !sameNumber(existing.getEntryPrice(), requested.getEntryPrice())
+                || !sameNumber(existing.getQuantity(), requested.getQuantity())
+                || !sameNumber(existing.getLeverage(), requested.getLeverage())
+                || !sameNumber(existing.getStopLoss(), requested.getStopLoss())
+                || !sameNumber(existing.getTakeProfit(), requested.getTakeProfit())
+                || !Objects.equals(existing.getOpenedAt(), requested.getOpenedAt())
+                || !Objects.equals(existing.getSourceType(), requested.getSourceType())
+                || !Objects.equals(existing.getSourceRefId(), requested.getSourceRefId())
+                || !Objects.equals(existing.getFinalPlanId(), requested.getFinalPlanId())) {
+            throw new UserPositionConflictException("submission_id payload does not match the original position");
+        }
+        return existing;
+    }
+
+    private static UserPositionDO requireSameClosePayload(UserPositionDO existing,
+                                                          String submissionId,
+                                                          LocalDateTime closedAt,
+                                                          BigDecimal closePrice,
+                                                          String closeReason) {
+        if (!"CLOSED".equals(existing.getStatus())
+                || !Objects.equals(existing.getCloseSubmissionId(), submissionId)
+                || !Objects.equals(existing.getClosedAt(), closedAt)
+                || !sameNumber(existing.getClosePrice(), closePrice)
+                || !Objects.equals(existing.getCloseReason(), closeReason)) {
+            throw new UserPositionConflictException("UserPosition close state does not match this submission_id");
+        }
+        return existing;
+    }
+
+    private static boolean sameNumber(BigDecimal left, BigDecimal right) {
+        return left == null ? right == null : right != null && left.compareTo(right) == 0;
     }
 
     private static void rejectForbiddenInputFields(Map<String, Object> extraFields) {

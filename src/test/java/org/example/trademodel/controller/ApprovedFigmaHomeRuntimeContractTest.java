@@ -225,6 +225,28 @@ class ApprovedFigmaHomeRuntimeContractTest {
     }
 
     @Test
+    void homePositionEntryStaysInPlaceAndPreservesOneSubmissionAcrossRetries() throws Exception {
+        String html = Files.readString(HOME);
+        String script = Files.readString(SCRIPT);
+
+        assertThat(html).contains(
+                "data-open-position-entry", "id=\"homePositionEntryDialog\"",
+                "id=\"homePositionEntryForm\"", "name=\"openedAt\" type=\"datetime-local\"",
+                "name=\"submissionId\" type=\"hidden\"", "id=\"homePositionEntryStatus\"",
+                "id=\"homePositionCloseDialog\"", "name=\"closedAt\" type=\"datetime-local\"")
+                .doesNotContain("href=\"/positions/new\"");
+        assertThat(script).contains(
+                "function stableSubmissionId(prefix)", "trine.position.openDraft",
+                "trine.position.closeDraft.", "restoreForm(form, draft)",
+                "form.elements.submissionId.value = stableSubmissionId(\"position-open\")",
+                "form.elements.submissionId.value = stableSubmissionId(\"position-close\")",
+                "button.disabled = busy", "正在保存", "持仓录入成功", "平仓记录成功",
+                "event.preventDefault()", "内容已保留；请使用取消或关闭按钮退出",
+                "await loadHome(selectedSymbol)", "data-close-position-id")
+                .doesNotContain("window.location.assign(\"/positions\")");
+    }
+
+    @Test
     void assetPoolBatchManagementExecutesItsSourceDefinedActions() throws Exception {
         String html = Files.readString(WORKSPACE);
         String script = Files.readString(WORKSPACE_SCRIPT);
