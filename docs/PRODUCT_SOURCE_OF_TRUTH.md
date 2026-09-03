@@ -497,6 +497,45 @@ authenticated. Registration, Swagger, H2 Console, debug/admin internals,
 Figma, Mobile, frontend visuals, business data, Provider/AI logic, Telegram
 real send, Production deployment and automatic trading remain blocked.
 
+That authorization and its two-file implementation are complete and effective
+on merged main `ddd29f1b08512bf2d782a2db5c610b72932ec95e`.
+
+### Owner-approved official domain, persistent login and runtime visibility closure
+
+This is a subordinate machine-authorization record, not a second Product
+Source and not a change to the frozen Home, decision, AI, Position Monitoring
+or no-trade contracts. Owner authorized one bounded successor to make
+`https://trinelogic.com` the official Staging entry, persist the existing
+server-owned login Session, and project real scheduler evidence into the
+existing Home system-status slot.
+
+| Attribute | Exact value |
+|---|---|
+| Package | `V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE` |
+| Branch | `codex/v4-1-official-domain-session-runtime-visibility` |
+| Starting full SHA | `ddd29f1b08512bf2d782a2db5c610b72932ec95e` |
+| Gate baseline rule | authorization and implementation start from the exact merged-main SHA; package, branch and exact path allowlist fail closed |
+| Existing owners | Spring Security Session/cookie/CSRF boundary, PostgreSQL/Flyway, Cloudflare Tunnel, Analysis scheduler/AnalysisRun and Dashboard Home projection |
+| Runtime objective | official root-domain HTTPS, permanent www redirect, refresh-safe Session and evidence-owned system status with last scan time |
+| Acceptance boundary | exact-head CI, merged main, same-SHA Staging, non-Tailnet access, 20 refreshes, six asset switches and two real scan cycles |
+
+Only the seventeen exact implementation paths in `docs/CODEX_NEXT_TASK.yml`
+are authorized. The successor may add Spring Session JDBC and a forward-only
+V18 infrastructure migration without changing the existing 30-minute lifetime,
+Secure/HttpOnly/SameSite cookie or CSRF boundary. It may expose real scheduler
+heartbeat, start/completion/result/next-run evidence and an active persisted
+AnalysisRun through additive Header fields, then render only the existing Home
+`系统` value. No template, CSS, card, Position, Plan or AI workspace change is
+authorized.
+
+Cloudflare changes are limited to the existing Tunnel root route, removal of
+the redundant Access challenge from the TRINE application entry, a permanent
+`www` to apex redirect, cache bypass for authenticated HTML/API, and preserving
+loopback-only origin. After acceptance the legacy ts.net public Funnel must be
+disabled; it may remain tailnet-only emergency access. MX/TXT/verification
+records, domain ownership and renewal, origin ports, Provider/AI algorithms,
+Telegram sending, Production deployment and automatic trading remain blocked.
+
 ### Owner-approved AnalysisRun idempotency transaction-boundary fix
 
 This is a completed subordinate machine-authorization record, not a second

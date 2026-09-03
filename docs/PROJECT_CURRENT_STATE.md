@@ -8,13 +8,40 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Cross-Device Secure Domain Access Closure Authorization
-Product Phase Status: CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact cross-device secure-domain closure; no implementation or Funnel activation is included in this gate package
-Next Business Phase: V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization
+Product Phase Status: OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register one exact official-domain, persistent-login and runtime-visibility closure; no implementation, DNS/proxy mutation or deployment is included in this gate package
+Next Business Phase: V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Official Domain, Persistent Login and Runtime Visibility Closure Authorization
+
+Owner authorized one exact package over existing owners. The package is
+`V41_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE`, the branch is
+`codex/v4-1-official-domain-session-runtime-visibility`, and the immutable
+baseline is `ddd29f1b08512bf2d782a2db5c610b72932ec95e`.
+
+Read-only preflight confirms that `trinelogic.com` already resolves through the
+existing Cloudflare Tunnel, but a Cloudflare Access challenge currently creates
+a second login boundary and `www` is absent. The application Session remains
+in servlet process memory, so a service restart loses authentication. The Home
+system slot currently reads an unrelated risk card although the real scheduler
+runs and logs completed cycles.
+
+The successor may add PostgreSQL-backed Spring Session with the unchanged
+30-minute cookie contract, a forward-only V18 infrastructure migration, real
+scheduler heartbeat and AnalysisRun projection into the existing Home status
+slot, official root-domain routing, a permanent `www` redirect, and retirement
+of the legacy public Funnel. Only the seventeen exact paths in
+`docs/CODEX_NEXT_TASK.yml` are authorized. No template, CSS, product algorithm,
+Provider, AI, Position, Plan, Telegram, Production or trading change is allowed.
+
+Capability movement in this gate package is `NONE`; no Java, SQL, runtime,
+Cloudflare, Staging or data change occurs before merged-main authorization.
 
 ---
 
@@ -33,18 +60,16 @@ HttpOnly, SameSite=Lax Session cookie, HSTS, frame denial and MIME-sniffing
 protection; CSRF and bounded login attempts are active. The one application
 security gap is the absence of an explicit Referrer-Policy response header.
 
-The successor may change only `SecurityConfig.java` and its existing access
-control contract test. It may then merge the exact reviewed Head, deploy that
-same merged-main revision to private Staging, activate Funnel only to
-`127.0.0.1:8081`, and prove public login plus fail-closed anonymous business
-access from a non-Tailnet client. It may not expose origin port 8081, database,
-debug or internal task surfaces, enable registration, change UI/business data,
-call paid AI, send Telegram, deploy Production or execute a trade.
+The authorization and implementation are complete on merged main
+`ddd29f1b08512bf2d782a2db5c610b72932ec95e`. The implementation added only the
+explicit Referrer-Policy and its focused security evidence, then validated the
+reversible Funnel boundary without exposing origin port 8081, database, debug
+or internal task surfaces. It did not enable registration, change UI/business
+data, call paid AI, send Telegram, deploy Production or execute a trade.
 
-The prior GPT background and Three-AI timeout package is complete and effective
-on merged main `075aeb1b570cfc06d5465e7284f148d71ad7bd62`. Capability movement in
-this gate package is `NONE`; no Funnel or application change occurs until this
-authorization is effective on merged main.
+The prior GPT background and Three-AI timeout package remains complete and
+effective. This predecessor is historical evidence and does not independently
+authorize the new official-domain/session/runtime-visibility package.
 
 ---
 
