@@ -25,6 +25,13 @@
     --danger: var(--negative);
     --danger-soft: #FEF3F2;
     --rail: #111827;
+    --semantic-strong-bullish: #166534;
+    --semantic-bullish: #15803D;
+    --semantic-neutral: #64748B;
+    --semantic-bearish: #DC2626;
+    --semantic-strong-bearish: #991B1B;
+    --semantic-medium-risk: #B45309;
+    --semantic-analyzing: #2563EB;
     font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -194,6 +201,13 @@ a { color: inherit; text-decoration: none; }
 .tone-negative { color: var(--negative); }
 .tone-info { color: var(--accent); }
 .tone-unknown { color: var(--unknown); }
+.semantic-strong-bullish { color: var(--semantic-strong-bullish); }
+.semantic-bullish { color: var(--semantic-bullish); }
+.semantic-neutral { color: var(--semantic-neutral); }
+.semantic-bearish { color: var(--semantic-bearish); }
+.semantic-strong-bearish { color: var(--semantic-strong-bearish); }
+.semantic-medium-risk { color: var(--semantic-medium-risk); }
+.semantic-analyzing { color: var(--semantic-analyzing); }
 .position-detail-link { justify-self: start; color: var(--accent); font-size: 10px; }
 .module-empty { min-height: 198px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; color: var(--muted); }
 .module-empty strong, .module-empty span { display: block; }

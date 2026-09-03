@@ -5,6 +5,7 @@ import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -66,13 +67,24 @@ class AnalysisTraceServiceImplTest {
     @Test
     void startedAndFailedRunsExposeRunningAndFailedTraceStatus() {
         AnalysisRunMapper mapper = mock(AnalysisRunMapper.class);
-        when(mapper.selectById("ana-running")).thenReturn(run("ana-running", "trace-running", "req-running", "STARTED"));
-        when(mapper.selectById("ana-failed")).thenReturn(run("ana-failed", "trace-failed", "req-failed", "FAILED"));
+        AnalysisRunDO running = run("ana-running", "trace-running", "req-running", "STARTED");
+        running.setStartedAt(LocalDateTime.of(2026, 9, 3, 12, 0));
+        running.setUpdatedAt(LocalDateTime.of(2026, 9, 3, 12, 1));
+        AnalysisRunDO failed = run("ana-failed", "trace-failed", "req-failed", "FAILED");
+        failed.setErrorCode("AUTHORITATIVE_OHLCV_UNAVAILABLE");
+        failed.setCompletedAt(LocalDateTime.of(2026, 9, 3, 12, 2));
+        when(mapper.selectById("ana-running")).thenReturn(running);
+        when(mapper.selectById("ana-failed")).thenReturn(failed);
 
         AnalysisTraceServiceImpl service = new AnalysisTraceServiceImpl(mapper);
 
         assertThat(service.byAnalysisId("ana-running").getTraceStatus()).isEqualTo("RUNNING");
+        assertThat(service.byAnalysisId("ana-running").getStartedAt()).isEqualTo(running.getStartedAt());
+        assertThat(service.byAnalysisId("ana-running").getUpdatedAt()).isEqualTo(running.getUpdatedAt());
         assertThat(service.byAnalysisId("ana-failed").getTraceStatus()).isEqualTo("FAILED");
+        assertThat(service.byAnalysisId("ana-failed").getErrorCode())
+                .isEqualTo("AUTHORITATIVE_OHLCV_UNAVAILABLE");
+        assertThat(service.byAnalysisId("ana-failed").getCompletedAt()).isEqualTo(failed.getCompletedAt());
     }
 
     @Test

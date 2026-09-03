@@ -7,6 +7,7 @@ import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.entity.AssetStateDO;
+import org.example.trademodel.entity.DecisionResult;
 import org.example.trademodel.enums.AssetStateEnum;
 import org.example.trademodel.enums.PlanModeEnum;
 import org.example.trademodel.mapper.AnalysisRunMapper;
@@ -16,6 +17,7 @@ import org.example.trademodel.service.OpportunityPriorityRankingService;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
 import org.example.trademodel.vo.DecisionResultVO;
 import org.example.trademodel.vo.HomeTopAssetProjection;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -89,9 +91,11 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
         }
 
         List<String> symbols = List.copyOf(poolBySymbol.keySet());
-        List<DecisionResultVO> decisions = safe(decisionResultMapper
+        List<DecisionResultVO> queriedDecisions = safe(decisionResultMapper
                 .findLatestDecisionResultsForSymbolsJoined(symbols, "USER", userId));
         List<AssetStateDO> states = safe(assetStateMapper.listByOwnerAndSymbols(symbols, "USER", userId));
+        List<DecisionResultVO> decisions = sourceOwnedDecisions(
+                poolBySymbol, states, queriedDecisions, userId);
         LocalDateTime now = LocalDateTime.now(clock);
 
         List<HomeTopAssetProjection> opportunities = decisions.stream()
@@ -123,7 +127,7 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
             if (tierOneSymbols.contains(symbol)) continue;
             HomeTopAssetProjection observation = decisionObservations.get(symbol);
             if (observation == null) {
-                observation = observationProjection(asset, states, userId, now);
+                observation = observationProjection(asset, states, decisions, userId, now);
             }
             if (observation != null) tierTwo.add(observation);
         }
@@ -238,6 +242,7 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
 
     private HomeTopAssetProjection observationProjection(AssetPoolAssetDTO asset,
                                                           List<AssetStateDO> states,
+                                                          List<DecisionResultVO> decisions,
                                                           Long userId,
                                                           LocalDateTime now) {
         List<ObservationState> observations = states.stream()
@@ -259,11 +264,82 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
                 + "|ASSET_STATE=" + assetState;
         String conflictState = "TIMEFRAME_CONFLICT".equals(primary.dataStatus())
                 ? "TIMEFRAME_CONFLICT" : "ALIGNED";
+        DecisionResultVO sourceDecision = exactDecision(
+                decisions, analysisId, normalize(asset.symbol()), primary.timeframe());
         return new HomeTopAssetProjection(
                 asset.assetId(), normalize(asset.symbol()), asset.displayName(), null, null, null,
-                null, null, null, null, primary.dataStatus(), primary.ageSeconds(), 0L, 0,
+                null, null, null,
+                sourceDecision == null ? null : sourceDecision.getDataQualityScore(),
+                primary.dataStatus(), primary.ageSeconds(), 0L, 0,
                 rankingReason, analysisId, null, state, null, primary.timeframe(), null, 0,
-                conflictState, primary.finishedAt(), null);
+                conflictState, primary.finishedAt(), sourceDecision);
+    }
+
+    private List<DecisionResultVO> sourceOwnedDecisions(
+            Map<String, AssetPoolAssetDTO> poolBySymbol,
+            List<AssetStateDO> states,
+            List<DecisionResultVO> queriedDecisions,
+            Long userId) {
+        Map<String, DecisionResultVO> byAnalysisId = safe(queriedDecisions).stream()
+                .filter(Objects::nonNull)
+                .filter(row -> text(row.getAnalysisId()) != null)
+                .collect(Collectors.toMap(row -> text(row.getAnalysisId()), row -> row,
+                        (left, right) -> left, LinkedHashMap::new));
+        Map<String, DecisionResultVO> verified = new LinkedHashMap<>();
+        for (AssetStateDO state : safe(states)) {
+            String symbol = normalize(state == null ? null : state.getSymbol());
+            AssetPoolAssetDTO asset = symbol == null ? null : poolBySymbol.get(symbol);
+            if (!exactUserState(state, asset, userId)) continue;
+            String analysisId = text(state.getLastAnalysisId());
+            String timeframe = normalizeTimeframe(state.getTimeframe());
+            AnalysisRunDO run = formalAssetPoolRun(analysisId, asset, userId, timeframe);
+            if (run == null) continue;
+            DecisionResultVO decision = byAnalysisId.get(analysisId);
+            if (!sameDecisionRun(decision, run)) {
+                decision = persistedDecision(run);
+            }
+            if (sameDecisionRun(decision, run)) {
+                verified.putIfAbsent(analysisId, decision);
+            }
+        }
+        return List.copyOf(verified.values());
+    }
+
+    private DecisionResultVO persistedDecision(AnalysisRunDO run) {
+        if (run == null || text(run.getAnalysisId()) == null) return null;
+        try {
+            DecisionResult stored = decisionResultMapper.selectLatestByAnalysisId(run.getAnalysisId());
+            if (stored == null) return null;
+            DecisionResultVO decision = new DecisionResultVO();
+            BeanUtils.copyProperties(stored, decision);
+            decision.setTimeframe(run.getTimeframe());
+            decision.setAnalysisTime(run.getAnalysisTime());
+            return decision;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean sameDecisionRun(DecisionResultVO decision, AnalysisRunDO run) {
+        return decision != null && run != null
+                && Objects.equals(text(decision.getAnalysisId()), text(run.getAnalysisId()))
+                && Objects.equals(normalize(decision.getSymbol()), normalize(run.getSymbol()))
+                && Objects.equals(normalizeTimeframe(decision.getTimeframe()),
+                normalizeTimeframe(run.getTimeframe()));
+    }
+
+    private static DecisionResultVO exactDecision(List<DecisionResultVO> decisions,
+                                                   String analysisId,
+                                                   String symbol,
+                                                   String timeframe) {
+        return safe(decisions).stream()
+                .filter(Objects::nonNull)
+                .filter(row -> Objects.equals(text(row.getAnalysisId()), text(analysisId)))
+                .filter(row -> Objects.equals(normalize(row.getSymbol()), normalize(symbol)))
+                .filter(row -> Objects.equals(normalizeTimeframe(row.getTimeframe()),
+                        normalizeTimeframe(timeframe)))
+                .findFirst()
+                .orElse(null);
     }
 
     private ObservationState observationState(AssetStateDO state,
@@ -638,7 +714,7 @@ public class OpportunityPriorityRankingServiceImpl implements OpportunityPriorit
                 row.stabilitySeconds(), 0, "SLOT_TYPE=OBSERVATION|" + row.rankingReason(),
                 row.analysisId(), row.opportunityId(), state, row.primaryOpportunityId(),
                 row.primaryTimeframe(), null, row.secondaryOpportunityCount(),
-                row.timeframeConflictState(), row.analysisTime(), null);
+                row.timeframeConflictState(), row.analysisTime(), row.sourceDecision());
     }
 
     private List<HomeTopAssetProjection> applyTierOneHysteresis(Long userId,

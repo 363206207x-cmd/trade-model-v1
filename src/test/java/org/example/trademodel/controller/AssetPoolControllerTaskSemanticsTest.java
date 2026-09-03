@@ -66,6 +66,34 @@ class AssetPoolControllerTaskSemanticsTest {
     }
 
     @Test
+    void queuedPreviewIsAcceptedAsBackgroundWorkInsteadOfReportedAsFailure() {
+        AssetAnalysisPreviewDTO result = preview("QUEUED", "ANALYSIS_BACKGROUND_QUEUED");
+        when(assetPoolService.analyzePreviewForUser(41L, "BTCUSDT", "5m")).thenReturn(result);
+
+        controller.analyzePreview("BTCUSDT", "5m");
+
+        verify(asyncTaskService).complete(task, false, "ANALYSIS_RUN_QUEUED");
+        verify(asyncTaskService, never()).fail(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void concurrentPreviewReusesTheCanonicalBackgroundRun() {
+        AssetAnalysisPreviewDTO result = preview("CONCURRENT_TRIGGER_BLOCKED", "IDEMPOTENCY_IN_PROGRESS");
+        when(assetPoolService.analyzePreviewForUser(41L, "BTCUSDT", "5m")).thenReturn(result);
+
+        controller.analyzePreview("BTCUSDT", "5m");
+
+        verify(asyncTaskService).complete(task, false, "ANALYSIS_RUN_IN_PROGRESS");
+        verify(asyncTaskService, never()).fail(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void thrownAuthoritativeFailureDoesNotPersistTheRawTechnicalMessage() {
         when(assetPoolService.analyzePreviewForUser(41L, "BTCUSDT", "5m"))
                 .thenThrow(new IllegalStateException("AUTHORITATIVE_OHLCV_UNAVAILABLE:5m"));

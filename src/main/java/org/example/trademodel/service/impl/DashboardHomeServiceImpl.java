@@ -986,6 +986,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
             usedAssetIds.add(projection.assetId());
             usedSymbols.add(symbol);
+            if (isObservationProjection(projection)) {
+                asset.setSlotType("OBSERVATION");
+            }
             asset.setAssetId(projection.assetId());
             asset.setName(canonicalAssetName(symbol, projection.name()));
             if (projection.sourceDecision() != null) {
@@ -1020,7 +1023,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 asset.setFourHourTrendLabel(fourHourTrendLabel(asset.getFinalMarketBias(),
                         decision.getFourHourTrendAlignment()));
             } else {
-                applyNonFinalCardSemantics(asset);
+                applyNonFinalCardSemantics(asset, projection.sourceDecision(), projection);
             }
             if (projection.opportunityScore() != null) {
                 asset.setCompositeScore(projection.opportunityScore());
@@ -1223,12 +1226,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setAiDecisionResult(null);
         asset.setDataQualityScore(null);
         asset.setMarketBias(null);
-        asset.setMarketBiasLabel("观望");
+        asset.setMarketBiasLabel("暂不可判断");
         asset.setCompositeScore(null);
         asset.setConfidenceLevel(null);
         asset.setConfidenceLabel("—");
         asset.setRiskLevel(null);
-        asset.setRiskLabel("未知");
+        asset.setRiskLabel("暂不可判断");
         asset.setWorthOpening(null);
         clearCardFinalProjection(asset);
         asset.setOpportunityState(observationState);
@@ -1240,8 +1243,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setRankingReason(trimToNull(projection.rankingReason()));
         asset.setLatestAnalysisTime(formalAnalysisId == null ? null : projection.analysisTime());
         asset.setCurrentConclusion(observationStateLabel(observationState));
-        asset.setOneHourOpportunityLabel("1小时数据不足");
-        asset.setFourHourTrendLabel("4小时数据不足");
+        asset.setOneHourOpportunityLabel(unavailableTimeframeLabel("1小时", null, projection));
+        asset.setFourHourTrendLabel(unavailableTimeframeLabel("4小时", null, projection));
         applyPersistedMarketData(asset, normalizeSymbol(projection.symbol()));
         asset.setDataFreshness(missingFormalAnalysis
                 ? "NEVER_SCANNED" : trimToNull(projection.freshness()));
@@ -1253,20 +1256,80 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return asset;
     }
 
-    private void applyNonFinalCardSemantics(DashboardHomeVO.AssetVO asset) {
+    private void applyNonFinalCardSemantics(DashboardHomeVO.AssetVO asset,
+                                            DecisionResultVO decision,
+                                            HomeTopAssetProjection projection) {
         if (asset == null) return;
-        asset.setMarketBias(null);
-        asset.setMarketBiasLabel("观望");
-        asset.setConfidenceLevel(null);
-        asset.setConfidenceLabel("—");
-        asset.setRiskLevel(null);
-        asset.setRiskLabel("未知");
         asset.setWorthOpening(null);
-        asset.setOneHourOpportunityLabel("1小时数据不足");
-        asset.setFourHourTrendLabel("4小时数据不足");
-        setFieldSource(asset, "direction", "MISSING");
-        setFieldSource(asset, "confidence", "MISSING");
-        setFieldSource(asset, "riskLevel", "MISSING");
+        String marketBias = trustedAnalysisBias(decision);
+        if (marketBias == null) {
+            asset.setMarketBias(null);
+            asset.setMarketBiasLabel("暂不可判断");
+            asset.setConfidenceLevel(null);
+            asset.setConfidenceLabel("—");
+            asset.setRiskLevel(null);
+            asset.setRiskLabel("暂不可判断");
+            asset.setOneHourOpportunityLabel(unavailableTimeframeLabel("1小时", decision, projection));
+            asset.setFourHourTrendLabel(unavailableTimeframeLabel("4小时", decision, projection));
+            setFieldSource(asset, "direction", analysisFieldState(decision));
+            setFieldSource(asset, "confidence", "MISSING");
+            setFieldSource(asset, "riskLevel", "MISSING");
+            return;
+        }
+
+        asset.setMarketBias(marketBias);
+        asset.setMarketBiasLabel(biasLabel(marketBias));
+        Integer confidence = decision.getFinalConfidence();
+        asset.setConfidenceLevel(confidence == null ? null : String.valueOf(confidence));
+        asset.setConfidenceLabel(confidence == null ? "—" : confidence + "%");
+        String riskLevel = trimToNull(decision.getRiskLevel());
+        asset.setRiskLevel(riskLevel);
+        asset.setRiskLabel(riskLevel == null ? "暂不可判断" : riskLabel(riskLevel));
+        asset.setOneHourOpportunityLabel(decision.getOneHourOpportunityQuality() == null
+                ? "1小时分析未完成" : oneHourOpportunityLabel(decision.getOneHourOpportunityQuality()));
+        asset.setFourHourTrendLabel(decision.getFourHourTrendAlignment() == null
+                ? "4小时分析未完成" : fourHourTrendLabel(marketBias, decision.getFourHourTrendAlignment()));
+        setFieldSource(asset, "direction", "DERIVED");
+        setFieldSource(asset, "confidence", confidence == null ? "MISSING" : "DERIVED");
+        setFieldSource(asset, "riskLevel", hasText(asset.getRiskLevel()) ? "DERIVED" : "MISSING");
+    }
+
+    private boolean isObservationProjection(HomeTopAssetProjection projection) {
+        return projection != null && hasText(projection.rankingReason())
+                && projection.rankingReason().startsWith("SLOT_TYPE=OBSERVATION|");
+    }
+
+    private String trustedAnalysisBias(DecisionResultVO decision) {
+        if (decision == null || !"READY".equals(upper(decision.getDirectionDataState()))) {
+            return null;
+        }
+        String validated = trimToNull(decision.getValidatedMarketBias());
+        if (validated != null) return upper(validated);
+        String neutral = upper(decision.getMarketBiasHierarchy());
+        return "RANGE".equals(neutral) || "WAIT".equals(neutral) ? neutral : null;
+    }
+
+    private String analysisFieldState(DecisionResultVO decision) {
+        return switch (upper(decision == null ? null : decision.getDirectionDataState())) {
+            case "INSUFFICIENT_DATA" -> "MISSING";
+            case "STALE", "SOURCE_UNAVAILABLE", "MULTI_TIMEFRAME_CONFLICT" -> "INVALID";
+            default -> "MISSING";
+        };
+    }
+
+    private String unavailableTimeframeLabel(String timeframe,
+                                             DecisionResultVO decision,
+                                             HomeTopAssetProjection projection) {
+        String state = upper(decision == null ? null : decision.getDirectionDataState());
+        if (!hasText(state)) state = upper(projection == null ? null : projection.freshness());
+        return switch (state) {
+            case "INSUFFICIENT_DATA" -> timeframe + "数据不足";
+            case "STALE" -> timeframe + "数据已过期";
+            case "SOURCE_UNAVAILABLE" -> timeframe + "来源不可用";
+            case "MULTI_TIMEFRAME_CONFLICT", "TIMEFRAME_CONFLICT" -> timeframe + "方向冲突";
+            case "NEVER_SCANNED" -> timeframe + "等待分析";
+            default -> timeframe + "分析未完成";
+        };
     }
 
     private void clearCardFinalProjection(DashboardHomeVO.AssetVO asset) {

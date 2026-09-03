@@ -170,8 +170,26 @@
         if (["HIGH", "EXTREME", "INVALIDATED", "STRONG_REVERSAL", "SHARPLY_INCREASED", "BLOCKED", "PLAN_INVALIDATED", "INVALID"].indexOf(normalized) >= 0) return "negative";
         return "unknown";
     }
+    function semanticClass(value) {
+        var normalized = String(value || "").trim().toUpperCase();
+        if (normalized === "STRONG_BULLISH" || normalized === "STRONG_LONG") return " semantic-strong-bullish";
+        if (["BULLISH", "LONG", "WEAK_BULLISH", "WEAK_LONG", "LOW", "RUNNING", "READY", "SUCCESS"].indexOf(normalized) >= 0) return " semantic-bullish";
+        if (["WAIT", "RANGE", "NEUTRAL", "STALE", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "UNKNOWN", "NEVER_SCANNED"].indexOf(normalized) >= 0) return " semantic-neutral";
+        if (normalized === "STRONG_BEARISH" || normalized === "STRONG_SHORT" || normalized === "EXTREME" || normalized === "BLOCKED") return " semantic-strong-bearish";
+        if (["BEARISH", "SHORT", "WEAK_BEARISH", "WEAK_SHORT", "HIGH", "FAILED", "ERROR", "STOPPED"].indexOf(normalized) >= 0) return " semantic-bearish";
+        if (normalized === "MEDIUM") return " semantic-medium-risk";
+        if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS"].indexOf(normalized) >= 0) return " semantic-analyzing";
+        return " semantic-neutral";
+    }
     function toneText(value, raw) {
-        return '<span class="semantic-value tone-' + semanticTone(raw) + '">' + escapeHtml(value) + "</span>";
+        return '<span class="semantic-value tone-' + semanticTone(raw) + semanticClass(raw) + '">' + escapeHtml(value) + "</span>";
+    }
+    function applySemanticClass(id, raw) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        Array.from(node.classList).filter(function (name) { return name.indexOf("semantic-") === 0; })
+            .forEach(function (name) { node.classList.remove(name); });
+        semanticClass(raw).trim().split(/\s+/).filter(Boolean).forEach(function (name) { node.classList.add(name); });
     }
     function eligibleOpportunity(asset) {
         var state = String(asset && (asset.opportunityState || asset.assetState) || "").toUpperCase();
@@ -204,7 +222,7 @@
             && asset.hasFinal !== true
             && ["OBSERVATION", "DECISION"].indexOf(slotType) >= 0
             && ["OBSERVING", "NO_QUALIFIED_OPPORTUNITY", "STALE", "NEVER_SCANNED", "RANGE", "WAIT",
-                "CANDIDATE", "HIGH_RISK", "BLOCKED", "CONFUSED", "INVALIDATED", "COOLING"].indexOf(state) >= 0;
+                "CANDIDATE", "WAITING_TRIGGER", "TRIGGERED", "HIGH_RISK", "BLOCKED", "CONFUSED", "INVALIDATED", "COOLING"].indexOf(state) >= 0;
     }
     function selectedFinalAccess(home) {
         var plan = home && home.executionSuggestion || {};
@@ -229,7 +247,9 @@
         var completedScan = header.lastCompletedScanAt;
         setText("statusSystem", runtimeLabel
             + (has(completedScan) ? " · 上次扫描 " + clockTime(completedScan) : ""));
+        applySemanticClass("statusSystem", header.systemRuntimeStatus || runtimeLabel);
         setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "—");
+        applySemanticClass("statusData", has(state.dataQuality?.value) ? "READY" : "UNKNOWN");
         setText("statusService", statusValue(state.serviceAvailability, "—"));
         setText("statusAccount", statusValue(state.accountStatus, "—"));
         setText("statusReset", statusValue(state.hotReset, "—"));
@@ -269,7 +289,7 @@
             && String(asset.finalPlanLifecycle || "").toUpperCase() === "NEEDS_REVALIDATION";
         var visible = revalidating ? "正在重验" : view.label;
         var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
-        return '<span class="state-badge' + tone + '">' + escapeHtml(visible) + "</span>";
+        return '<span class="state-badge' + tone + semanticClass(asset.opportunityState || asset.assetState) + '">' + escapeHtml(visible) + "</span>";
     }
     function assetProvenance(asset) {
         return {
@@ -318,9 +338,9 @@
             + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
             + escapeHtml(text(asset.name, "名称不可用"))
             + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
-            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b>' + escapeHtml(direction)
+            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b class="semantic-value' + semanticClass(asset.marketBias) + '">' + escapeHtml(direction)
             + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong>' + escapeHtml(confidence)
-            + '</strong></span><span><small>风险</small><strong>' + escapeHtml(risk)
+            + '</strong></span><span><small>风险</small><strong class="semantic-value' + semanticClass(asset.riskLevel) + '">' + escapeHtml(risk)
             + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
     }

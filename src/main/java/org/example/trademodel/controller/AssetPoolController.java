@@ -67,6 +67,8 @@ public class AssetPoolController {
             AssetAnalysisPreviewDTO result = assetPoolService.analyzePreviewForUser(userId, symbol, timeframe);
             if (previewSucceeded(result)) {
                 asyncTaskService.complete(task, false, "COMPLETE");
+            } else if (previewAccepted(result)) {
+                asyncTaskService.complete(task, false, previewStage(result));
             } else {
                 String reasonCode = result == null || result.reasonCode() == null
                         ? "ANALYSIS_PREVIEW_FAILED" : result.reasonCode();
@@ -87,6 +89,19 @@ public class AssetPoolController {
                     "RECOVERED_EXPIRED_LEASE_EXECUTED", "EXISTING_SUCCESS" -> true;
             default -> false;
         };
+    }
+
+    private static boolean previewAccepted(AssetAnalysisPreviewDTO result) {
+        if (result == null || result.status() == null || result.analysisId() == null) return false;
+        return switch (result.status().trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "QUEUED", "CONCURRENT_TRIGGER_BLOCKED" -> true;
+            default -> false;
+        };
+    }
+
+    private static String previewStage(AssetAnalysisPreviewDTO result) {
+        return "CONCURRENT_TRIGGER_BLOCKED".equalsIgnoreCase(result.status())
+                ? "ANALYSIS_RUN_IN_PROGRESS" : "ANALYSIS_RUN_QUEUED";
     }
 
     private static String previewFailureMessage(String reasonCode) {
