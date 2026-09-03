@@ -123,6 +123,12 @@ public class ProductionProfileSafetyGuard implements ApplicationRunner {
         if (!isTrue(property(environment, "server.servlet.session.cookie.secure"))) {
             errors.add("production session cookie must be Secure");
         }
+        if (!"NEVER".equals(normalized(property(environment, "spring.session.jdbc.initialize-schema")))) {
+            errors.add("production Spring Session schema must be owned by Flyway");
+        }
+        if (!"FRAMEWORK".equals(normalized(property(environment, "server.forward-headers-strategy")))) {
+            errors.add("production forwarded headers must use the framework strategy");
+        }
 
         validateProductionSchedulerPolicy(environment, errors);
         validateCoreProductionLoopPolicy(environment, errors);

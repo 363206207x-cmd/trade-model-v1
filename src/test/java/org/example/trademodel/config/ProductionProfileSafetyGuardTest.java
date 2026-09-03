@@ -282,6 +282,26 @@ class ProductionProfileSafetyGuardTest {
                 .hasMessageContaining("production actuator web exposure must be limited to health");
     }
 
+    @Test
+    void rejectsRuntimeOwnedProductionSessionSchema() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("spring.session.jdbc.initialize-schema", "always");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production Spring Session schema must be owned by Flyway");
+    }
+
+    @Test
+    void rejectsUntrustedForwardedHeaderStrategy() {
+        MockEnvironment environment = safeEnvironment();
+        environment.setProperty("server.forward-headers-strategy", "none");
+
+        assertThatThrownBy(() -> ProductionProfileSafetyGuard.validate(environment))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("production forwarded headers must use the framework strategy");
+    }
+
 
     @Test
     void rejectsMissingProductionSchedulerPolicy() {
@@ -754,6 +774,8 @@ class ProductionProfileSafetyGuardTest {
         environment.setProperty("server.servlet.session.cookie.http-only", "true");
         environment.setProperty("server.servlet.session.cookie.same-site", "lax");
         environment.setProperty("server.servlet.session.cookie.secure", "true");
+        environment.setProperty("spring.session.jdbc.initialize-schema", "never");
+        environment.setProperty("server.forward-headers-strategy", "framework");
         environment.setProperty("management.endpoints.web.exposure.include", "health");
         environment.setProperty("trade-model.security.rate-limit.enabled", "true");
         environment.setProperty("trade-model.security.rate-limit.requests-per-minute", "120");

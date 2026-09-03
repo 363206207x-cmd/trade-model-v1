@@ -37,6 +37,12 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- Durable authenticated sessions for the production PostgreSQL runtime. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-jdbc</artifactId>
+        </dependency>
+
         <!-- Minimal production health/readiness observability. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -144,12 +144,15 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "completeFailurePath", "failurePathStateView", "来源不可用",
                 "plan.stopZone || plan.stopLoss", "止损", "失效条件",
                 "collectionStateLabel", "形成原因", "支持证据", "反对证据",
-                "has(header.updatedAt)", "clockTime(header.updatedAt)")
+                "has(header.updatedAt)", "clockTime(header.updatedAt)",
+                "header.systemRuntimeLabel", "header.lastCompletedScanAt",
+                "上次扫描")
                 .doesNotContain(
                         "candidate.summary, why", "[].concat(role.evidenceGaps",
                         "role.evidenceGapsState || role.logicConflictsState", "label(role.planModeImpact",
                         "renderDerivatives", "衍生品实况 · 数据时间独立标注",
                         "维持 Candidate", "GPT Candidate · 非 Final", "Candidate Mode",
+                        "setText(\"statusSystem\", statusValue(state.riskLevel))",
                         "AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER",
                         "const assets = [", "BTCUSDT,ETHUSDT", "82, 87");
     }

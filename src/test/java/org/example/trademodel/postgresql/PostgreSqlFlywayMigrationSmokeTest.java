@@ -150,7 +150,9 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "tm_user_registration_guard",
                     "tm_owner_password_setup_token",
                     "tm_async_task",
-                    "tm_event_asset_relation"));
+                    "tm_event_asset_relation",
+                    "spring_session",
+                    "spring_session_attributes"));
             assertIndexesExist(connection, List.of(
                     "idx_tm_user_position_status_opened_at",
                     "idx_tm_user_position_user_status_opened_at",
@@ -175,7 +177,10 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "uk_tm_review_result_analysis_scope",
                     "idx_tm_review_result_user_update",
                     "uk_tm_persisted_ohlcv_bar_source",
-                    "idx_tm_persisted_ohlcv_bar_ingestion_run"));
+                    "idx_tm_persisted_ohlcv_bar_ingestion_run",
+                    "spring_session_ix1",
+                    "spring_session_ix2",
+                    "spring_session_ix3"));
             assertOhlcvProvenanceColumnsExist(connection);
             assertProviderScanProfileV5ColumnsExist(connection);
             assertProviderScanRuleDefaultsExist(connection);

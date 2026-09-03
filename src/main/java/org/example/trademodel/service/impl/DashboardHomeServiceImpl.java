@@ -46,6 +46,7 @@ import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.service.DashboardHomeService;
 import org.example.trademodel.service.ConfusedStatePolicy;
+import org.example.trademodel.service.MarketDataScheduler;
 import org.example.trademodel.service.MarketBiasPolicy;
 import org.example.trademodel.service.DecisionService;
 import org.example.trademodel.service.MonitorService;
@@ -151,6 +152,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
+    private MarketDataScheduler marketDataScheduler;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -248,6 +250,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     @Autowired(required = false)
+    void setMarketDataScheduler(MarketDataScheduler marketDataScheduler) {
+        this.marketDataScheduler = marketDataScheduler;
+    }
+
+    @Autowired(required = false)
     void setOriginalPlanSources(DecisionResultMapper decisionResultMapper,
                                 ExecutionPlanMapper executionPlanMapper,
                                 AnalysisRunMapper analysisRunMapper) {
@@ -338,7 +345,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         Instant globalDataUpdatedAt = latestPersistedClosedBarAt();
         DashboardHomeVO home = new DashboardHomeVO();
-        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness, aiDecision));
+        home.setHeader(buildHeader(systemStatus, positionSyncStatus, externalContext, providerReadiness,
+                aiDecision, schedulerRuntimeProjection()));
         home.setSystemState(buildSystemState(systemStatus, decisions, aiDecision, providerReadiness,
                 positionRowsResult, globalDataUpdatedAt));
         home.setAlerts(buildAlerts(alerts));
@@ -563,7 +571,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                  PositionSyncStatusVO positionSyncStatus,
                                                  ExternalContextSnapshot externalContext,
                                                  ProviderReadinessVO providerReadiness,
-                                                 DashboardHomeVO.AiDecisionVO aiDecision) {
+                                                 DashboardHomeVO.AiDecisionVO aiDecision,
+                                                 SchedulerRuntimeProjection schedulerRuntime) {
         DashboardHomeVO.HeaderVO header = new DashboardHomeVO.HeaderVO();
         header.setPageTitle("首页总览");
         header.setDataStatus(firstNonBlank(systemStatus != null ? systemStatus.getStatus() : null, "WAITING_SYNC"));
@@ -577,7 +586,80 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "WAITING_SYNC"));
         }
         header.setUpdatedAt(null);
+        header.setSystemRuntimeState(schedulerRuntime.state());
+        header.setSystemRuntimeLabel(schedulerRuntime.label());
+        header.setSchedulerHeartbeatAt(schedulerRuntime.heartbeatAt());
+        header.setScanStartedAt(schedulerRuntime.startedAt());
+        header.setLastCompletedScanAt(schedulerRuntime.completedAt());
+        header.setNextScheduledScanAt(schedulerRuntime.nextScheduledAt());
+        header.setLastScanResult(schedulerRuntime.result());
+        header.setLastScanFailureReason(schedulerRuntime.failureReason());
         return header;
+    }
+
+    private SchedulerRuntimeProjection schedulerRuntimeProjection() {
+        MarketDataScheduler.RuntimeStatus runtime = marketDataScheduler == null
+                ? null : marketDataScheduler.runtimeStatus();
+        AnalysisRunDO active = activeAnalysisRun();
+
+        Instant startedAt = runtime != null ? runtime.startedAt() : null;
+        if (active != null && active.getStartedAt() != null) {
+            startedAt = active.getStartedAt().toInstant(ZoneOffset.UTC);
+        }
+        Instant completedAt = runtime == null ? null : runtime.completedAt();
+
+        if (runtime != null && runtime.running()
+                && runtime.heartbeatAt() != null && !runtime.heartbeatFresh()) {
+            return new SchedulerRuntimeProjection("ERROR", "运行异常",
+                    runtime.heartbeatAt(), startedAt, completedAt, runtime.nextScheduledAt(),
+                    runtime.result(), "SCHEDULED_SCAN_HEARTBEAT_TIMEOUT");
+        }
+        if (active != null || runtime != null && runtime.running()) {
+            return new SchedulerRuntimeProjection("ANALYZING", "分析中",
+                    runtime == null ? null : runtime.heartbeatAt(), startedAt, completedAt,
+                    runtime == null ? null : runtime.nextScheduledAt(),
+                    runtime == null ? null : runtime.result(),
+                    runtime == null ? null : runtime.failureReason());
+        }
+        if (runtime == null) {
+            return SchedulerRuntimeProjection.unknown();
+        }
+        if (!runtime.enabled()) {
+            return new SchedulerRuntimeProjection("NOT_RUNNING", "未运行",
+                    runtime.heartbeatAt(), startedAt, completedAt, runtime.nextScheduledAt(),
+                    runtime.result(), runtime.failureReason());
+        }
+        if (runtime.heartbeatAt() == null) {
+            return SchedulerRuntimeProjection.unknown();
+        }
+        if (!runtime.heartbeatFresh()) {
+            return new SchedulerRuntimeProjection("NOT_RUNNING", "未运行",
+                    runtime.heartbeatAt(), startedAt, completedAt, runtime.nextScheduledAt(),
+                    runtime.result(), runtime.failureReason());
+        }
+        if ("FAILED".equals(runtime.result())) {
+            return new SchedulerRuntimeProjection("ERROR", "运行异常",
+                    runtime.heartbeatAt(), startedAt, completedAt, runtime.nextScheduledAt(),
+                    runtime.result(), runtime.failureReason());
+        }
+        if ("SUCCESS".equals(runtime.result())) {
+            return new SchedulerRuntimeProjection("RUNNING", "运行中",
+                    runtime.heartbeatAt(), startedAt, completedAt, runtime.nextScheduledAt(),
+                    runtime.result(), null);
+        }
+        return SchedulerRuntimeProjection.unknown();
+    }
+
+    private AnalysisRunDO activeAnalysisRun() {
+        if (analysisRunMapper == null) {
+            return null;
+        }
+        try {
+            List<AnalysisRunDO> active = analysisRunMapper.selectRecoverableBackgroundRuns(1);
+            return active == null || active.isEmpty() ? null : active.get(0);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private String headerAiStatus(ProviderReadinessVO providerReadiness,
@@ -3687,6 +3769,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private record MonitorReadResult(PositionMonitorLogDTO log, boolean failed) {
+    }
+
+    private record SchedulerRuntimeProjection(String state,
+                                              String label,
+                                              Instant heartbeatAt,
+                                              Instant startedAt,
+                                              Instant completedAt,
+                                              Instant nextScheduledAt,
+                                              String result,
+                                              String failureReason) {
+        private static SchedulerRuntimeProjection unknown() {
+            return new SchedulerRuntimeProjection(
+                    "UNKNOWN", "状态未知", null, null, null, null, null, null);
+        }
     }
 
     private record AssetStateResolution(String value, String sourceStatus) {

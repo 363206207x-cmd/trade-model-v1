@@ -222,9 +222,13 @@
     }
 
     function renderStatus(home) {
+        var header = home.header || {};
         var state = home.systemState || {};
         setText("statusEnvironment", statusValue(state.marketTrend));
-        setText("statusSystem", statusValue(state.riskLevel));
+        var runtimeLabel = has(header.systemRuntimeLabel) ? header.systemRuntimeLabel : "状态未知";
+        var completedScan = header.lastCompletedScanAt;
+        setText("statusSystem", runtimeLabel
+            + (has(completedScan) ? " · 上次扫描 " + clockTime(completedScan) : ""));
         setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "—");
         setText("statusService", statusValue(state.serviceAvailability, "—"));
         setText("statusAccount", statusValue(state.accountStatus, "—"));
