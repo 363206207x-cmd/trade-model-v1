@@ -536,6 +536,10 @@ public class DashboardHomeVO {
         private String name;
         private Long assetId;
         private String analysisId;
+        private String analysisRunId;
+        private String decisionId;
+        private String traceId;
+        private String planId;
         private Integer analysisVersion;
         private String configurationVersion;
         private String providerMatrixVersion;
@@ -544,6 +548,19 @@ public class DashboardHomeVO {
         private LocalDateTime priceObservedAt;
         private LocalDateTime oneHourClosedAt;
         private LocalDateTime fourHourClosedAt;
+        private LocalDateTime latestOneHourClosedAt;
+        private LocalDateTime latestFourHourClosedAt;
+        private LocalDateTime latestPriceAt;
+        private LocalDateTime marketDataAsOf;
+        private LocalDateTime directionCalculatedAt;
+        private Long decisionAgeSeconds;
+        private BigDecimal priceAtDecision;
+        private BigDecimal priceDriftPct;
+        private String planInvalidationLevel;
+        private String planState;
+        private Boolean newOneHourCloseRecalculation;
+        private Boolean latestFourHourCloseIncluded;
+        private Instant coinGlassDataAt;
         private String freshnessStatus;
         private String directionMaturity;
         private String homeTier;
@@ -647,6 +664,15 @@ public class DashboardHomeVO {
             this.analysisId = analysisId;
         }
 
+        public String getAnalysisRunId() { return analysisRunId; }
+        public void setAnalysisRunId(String value) { this.analysisRunId = value; }
+        public String getDecisionId() { return decisionId; }
+        public void setDecisionId(String value) { this.decisionId = value; }
+        public String getTraceId() { return traceId; }
+        public void setTraceId(String value) { this.traceId = value; }
+        public String getPlanId() { return planId; }
+        public void setPlanId(String value) { this.planId = value; }
+
         public Integer getAnalysisVersion() { return analysisVersion; }
         public void setAnalysisVersion(Integer analysisVersion) { this.analysisVersion = analysisVersion; }
         public String getConfigurationVersion() { return configurationVersion; }
@@ -666,6 +692,37 @@ public class DashboardHomeVO {
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getFourHourClosedAt() { return fourHourClosedAt; }
         public void setFourHourClosedAt(LocalDateTime fourHourClosedAt) { this.fourHourClosedAt = fourHourClosedAt; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getLatestOneHourClosedAt() { return latestOneHourClosedAt; }
+        public void setLatestOneHourClosedAt(LocalDateTime value) { this.latestOneHourClosedAt = value; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getLatestFourHourClosedAt() { return latestFourHourClosedAt; }
+        public void setLatestFourHourClosedAt(LocalDateTime value) { this.latestFourHourClosedAt = value; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getLatestPriceAt() { return latestPriceAt; }
+        public void setLatestPriceAt(LocalDateTime value) { this.latestPriceAt = value; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getMarketDataAsOf() { return marketDataAsOf; }
+        public void setMarketDataAsOf(LocalDateTime value) { this.marketDataAsOf = value; }
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        public LocalDateTime getDirectionCalculatedAt() { return directionCalculatedAt; }
+        public void setDirectionCalculatedAt(LocalDateTime value) { this.directionCalculatedAt = value; }
+        public Long getDecisionAgeSeconds() { return decisionAgeSeconds; }
+        public void setDecisionAgeSeconds(Long value) { this.decisionAgeSeconds = value; }
+        public BigDecimal getPriceAtDecision() { return priceAtDecision; }
+        public void setPriceAtDecision(BigDecimal value) { this.priceAtDecision = value; }
+        public BigDecimal getPriceDriftPct() { return priceDriftPct; }
+        public void setPriceDriftPct(BigDecimal value) { this.priceDriftPct = value; }
+        public String getPlanInvalidationLevel() { return planInvalidationLevel; }
+        public void setPlanInvalidationLevel(String value) { this.planInvalidationLevel = value; }
+        public String getPlanState() { return planState; }
+        public void setPlanState(String value) { this.planState = value; }
+        public Boolean getNewOneHourCloseRecalculation() { return newOneHourCloseRecalculation; }
+        public void setNewOneHourCloseRecalculation(Boolean value) { this.newOneHourCloseRecalculation = value; }
+        public Boolean getLatestFourHourCloseIncluded() { return latestFourHourCloseIncluded; }
+        public void setLatestFourHourCloseIncluded(Boolean value) { this.latestFourHourCloseIncluded = value; }
+        public Instant getCoinGlassDataAt() { return coinGlassDataAt; }
+        public void setCoinGlassDataAt(Instant value) { this.coinGlassDataAt = value; }
         public String getFreshnessStatus() { return freshnessStatus; }
         public void setFreshnessStatus(String freshnessStatus) { this.freshnessStatus = freshnessStatus; }
         public String getDirectionMaturity() { return directionMaturity; }

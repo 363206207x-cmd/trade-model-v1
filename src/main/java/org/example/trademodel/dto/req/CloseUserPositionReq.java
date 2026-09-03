@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class CloseUserPositionReq {
+    @JsonAlias({"submission_id", "idempotencyKey", "idempotency_key"})
+    private String submissionId;
     @JsonAlias("close_price")
     private BigDecimal closePrice;
     @JsonAlias("close_reason")
@@ -19,6 +21,14 @@ public class CloseUserPositionReq {
 
     @JsonIgnore
     private final Map<String, Object> extraFields = new LinkedHashMap<>();
+
+    public String getSubmissionId() {
+        return submissionId;
+    }
+
+    public void setSubmissionId(String submissionId) {
+        this.submissionId = submissionId;
+    }
 
     @JsonAnySetter
     public void putExtraField(String name, Object value) {

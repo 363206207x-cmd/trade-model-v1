@@ -25,6 +25,7 @@
     let activeAnalysisId = resourceId;
     let analysisSubmissionPromise = null;
     let analysisPollGeneration = 0;
+    let activeClosePositionId = resourceId;
     const ANALYSIS_POLL_INTERVAL_MS = 1500;
     const ANALYSIS_POLL_TIMEOUT_MS = 300000;
 
@@ -295,10 +296,20 @@
         });
         document.querySelectorAll("dialog.overlay").forEach(function (dialog) {
             dialog.addEventListener("click", function (event) {
-                if (event.target === dialog) closeOverlay(dialog);
+                if (event.target !== dialog) return;
+                const form = dialog.querySelector("form[data-dirty='true']");
+                if (form) {
+                    announce("表单内容已保留；请使用取消或关闭按钮退出");
+                    return;
+                }
+                closeOverlay(dialog);
             });
             dialog.addEventListener("cancel", function (event) {
                 event.preventDefault();
+                if (dialog.querySelector("form[data-dirty='true']")) {
+                    announce("表单内容已保留；请使用取消或关闭按钮退出");
+                    return;
+                }
                 closeOverlay(dialog);
             });
         });
@@ -762,9 +773,12 @@
         ] : [];
         const detailHref = "/positions/" + encodeURIComponent(positionId) + "?returnTo=" + encodeURIComponent(positionListReturnTo("active"));
         const detailLink = showDetailLink ? '<a class="text-action" href="' + detailHref + '">查看详情</a>' : "";
+        const closeAction = showDetailLink && positionCloseActionVisible(userPosition.status)
+            ? '<button class="position-close-inline" type="button" data-direct-close-position="' + escapeHtml(positionId) + '" data-direct-close-symbol="' + escapeHtml(symbol) + '">记录平仓</button>' : "";
+        const inlineActions = '<div class="position-inline-actions">' + detailLink + closeAction + '</div>';
         const monitoring = trusted
-            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + detailLink + '</section>'
-            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong>' + detailLink + '</section>';
+            ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + inlineActions + '</section>'
+            : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong>' + inlineActions + '</section>';
         return '<article class="position-card position-row' + (trusted ? " is-trusted" : " is-untrusted") + '" data-position-id="' + escapeHtml(positionId) + '">'
             + '<header class="position-identity"><div><strong>' + escapeHtml(symbol) + '</strong><span>' + escapeHtml(label(direction)) + '</span></div><small>' + escapeHtml(typeof frontendContract.positionSourceLabel === "function" ? frontendContract.positionSourceLabel(userPosition.sourceType) : label(userPosition.sourceType, "来源不可查看")) + '</small></header>'
             + '<section class="position-facts">' + factGrid(facts) + '</section>'
@@ -873,6 +887,53 @@
         return Object.fromEntries(new FormData(form).entries());
     }
 
+    function stableSubmissionId(prefix) {
+        const value = window.crypto && typeof window.crypto.randomUUID === "function"
+            ? window.crypto.randomUUID()
+            : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        return prefix + ":" + value;
+    }
+
+    function localDateTimeValue(date) {
+        const offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    }
+
+    function readPositionDraft(key) {
+        try { return JSON.parse(window.sessionStorage.getItem(key) || "null"); }
+        catch (_) { return null; }
+    }
+
+    function writePositionDraft(key, values) {
+        try { window.sessionStorage.setItem(key, JSON.stringify(values)); }
+        catch (_) { /* The database idempotency constraint remains authoritative. */ }
+    }
+
+    function removePositionDraft(key) {
+        try { window.sessionStorage.removeItem(key); }
+        catch (_) { /* no-op */ }
+    }
+
+    function restorePositionForm(form, values) {
+        Object.entries(values || {}).forEach(function (entry) {
+            if (form.elements[entry[0]]) form.elements[entry[0]].value = entry[1];
+        });
+    }
+
+    function setPositionFormStatus(id, message, error) {
+        const node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = message || "";
+        node.classList.toggle("is-error", error === true);
+    }
+
+    function setPositionSubmitBusy(form, busy, idleLabel) {
+        const button = form?.querySelector('button[type="submit"]');
+        if (!button) return;
+        button.disabled = busy;
+        button.textContent = busy ? "正在保存" : idleLabel;
+    }
+
     function manualCloseSubmitGate(formPositionId, requestedPositionId, reviewMode) {
         if (!requestedPositionId) return "MISSING_POSITION_ID";
         if (String(formPositionId || "") !== String(requestedPositionId)) return "POSITION_ID_MISMATCH";
@@ -890,9 +951,16 @@
     function prepareManualPositionForm() {
         const form = document.getElementById("actualPositionForm");
         if (!form) return;
+        const draft = readPositionDraft("trine.position.openDraft");
         form.reset();
         form.elements.sourceType.value = "MANUAL_INDEPENDENT";
         form.elements.finalPlanId.value = "";
+        form.elements.submissionId.value = stableSubmissionId("position-open");
+        form.elements.openedAt.value = localDateTimeValue(new Date());
+        if (draft) restorePositionForm(form, draft);
+        writePositionDraft("trine.position.openDraft", formJson(form));
+        form.dataset.dirty = draft ? "true" : "false";
+        setPositionFormStatus("actualPositionFormStatus", draft ? "已恢复未提交内容" : "", false);
     }
 
     function numericPlanValue(value) {
@@ -912,6 +980,8 @@
         if (!form || !plan?.planId || !plan?.analysisId) return;
         const analysis = await api("/api/analysis/runs/" + encodeURIComponent(plan.analysisId));
         form.reset();
+        form.elements.submissionId.value = stableSubmissionId("position-open");
+        form.elements.openedAt.value = localDateTimeValue(new Date());
         form.elements.finalPlanId.value = plan.planId;
         form.elements.sourceType.value = "SYSTEM_PLAN_POSITION";
         form.elements.assetSymbol.value = text(analysis.symbol, "");
@@ -919,38 +989,95 @@
         if (side) form.elements.side.value = side;
         form.elements.stopLoss.value = numericPlanValue(plan.stopLoss);
         form.elements.takeProfit.value = numericPlanValue(plan.takeProfitRules);
+        writePositionDraft("trine.position.openDraft", formJson(form));
+        form.dataset.dirty = "true";
+    }
+
+    function prepareClosePositionForm(positionId, symbol) {
+        const form = document.getElementById("closePositionForm");
+        if (!form || !positionId) return;
+        activeClosePositionId = String(positionId);
+        const key = "trine.position.closeDraft." + activeClosePositionId;
+        const draft = readPositionDraft(key);
+        form.reset();
+        form.elements.submissionId.value = stableSubmissionId("position-close");
+        form.elements.closedAt.value = localDateTimeValue(new Date());
+        if (draft) restorePositionForm(form, draft);
+        writePositionDraft(key, formJson(form));
+        form.dataset.positionId = activeClosePositionId;
+        form.dataset.dirty = draft ? "true" : "false";
+        const heading = document.getElementById("closePositionHeading");
+        if (heading) heading.textContent = "记录平仓" + (symbol ? " · " + symbol : "");
+        setPositionFormStatus("closePositionFormStatus", draft ? "已恢复未提交内容" : "", false);
     }
 
     function bindPositionForms() {
         document.addEventListener("click", function (event) {
             const opener = event.target.closest('[data-open-overlay="actual-position"]');
             if (opener && opener.id !== "planActualPositionAction") prepareManualPositionForm();
+            const detailClose = event.target.closest('[data-open-overlay="close-position"]');
+            if (detailClose) prepareClosePositionForm(resourceId, "");
+            const directClose = event.target.closest("[data-direct-close-position]");
+            if (directClose) {
+                event.preventDefault();
+                prepareClosePositionForm(directClose.dataset.directClosePosition, directClose.dataset.directCloseSymbol);
+                openOverlay("close-position", directClose);
+            }
         }, true);
+        document.getElementById("actualPositionForm")?.addEventListener("input", function (event) {
+            event.currentTarget.dataset.dirty = "true";
+            writePositionDraft("trine.position.openDraft", formJson(event.currentTarget));
+        });
+        document.getElementById("closePositionForm")?.addEventListener("input", function (event) {
+            event.currentTarget.dataset.dirty = "true";
+            writePositionDraft("trine.position.closeDraft." + activeClosePositionId, formJson(event.currentTarget));
+        });
         document.getElementById("actualPositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
             const values = formJson(event.currentTarget);
             values.sourceType = values.finalPlanId ? "SYSTEM_PLAN_POSITION" : "MANUAL_INDEPENDENT";
             if (values.openedAt) values.openedAt = new Date(values.openedAt).toISOString().slice(0, 19);
+            setPositionSubmitBusy(event.currentTarget, true, "确认录入");
+            setPositionFormStatus("actualPositionFormStatus", "正在保存", false);
             try {
                 await api("/api/user-positions/manual-open", { method: "POST", body: JSON.stringify(values) });
+                removePositionDraft("trine.position.openDraft");
+                event.currentTarget.dataset.dirty = "false";
                 closeOverlay(event.currentTarget.closest("dialog"));
-                announce("真实持仓已录入");
+                announce("持仓录入成功");
                 if (pageKey === "positions") await loadPositions();
-            } catch (error) { announce(error.message); }
+            } catch (error) {
+                setPositionFormStatus("actualPositionFormStatus", error.message, true);
+                announce(error.message);
+            } finally { setPositionSubmitBusy(event.currentTarget, false, "确认录入"); }
         });
         document.getElementById("closePositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
-            const gate = manualCloseSubmitGate(event.currentTarget.dataset.positionId, resourceId, uiReviewMode);
+            const requestedPositionId = activeClosePositionId || resourceId;
+            const gate = manualCloseSubmitGate(event.currentTarget.dataset.positionId, requestedPositionId, uiReviewMode);
             if (gate === "MISSING_POSITION_ID") return announce("缺少持仓标识");
             if (gate === "POSITION_ID_MISMATCH") return announce("持仓标识不一致，未提交");
             if (gate === "UI_REVIEW_READ_ONLY") return announce("UI-review 只读验收不提交平仓");
             const values = formJson(event.currentTarget);
             if (values.closedAt) values.closedAt = new Date(values.closedAt).toISOString().slice(0, 19);
+            setPositionSubmitBusy(event.currentTarget, true, "确认记录");
+            setPositionFormStatus("closePositionFormStatus", "正在保存", false);
             try {
-                await api("/api/user-positions/" + encodeURIComponent(resourceId) + "/manual-close", { method: "POST", body: JSON.stringify(values) });
+                await api("/api/user-positions/" + encodeURIComponent(requestedPositionId) + "/manual-close", { method: "POST", body: JSON.stringify(values) });
+                removePositionDraft("trine.position.closeDraft." + requestedPositionId);
+                event.currentTarget.dataset.dirty = "false";
                 closeOverlay(event.currentTarget.closest("dialog"));
-                window.location.assign("/positions?tab=history");
-            } catch (error) { announce(error.message); }
+                announce("平仓记录成功");
+                if (pageKey === "positions") {
+                    activeClosePositionId = "";
+                    await loadPositions();
+                } else {
+                    window.location.assign("/positions?tab=history");
+                }
+            } catch (error) {
+                setPositionFormStatus("closePositionFormStatus", error.message, true);
+                announce(error.message);
+            } finally { setPositionSubmitBusy(event.currentTarget, false, "确认记录"); }
         });
     }
 

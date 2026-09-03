@@ -25,17 +25,25 @@ public class AccessLoggingFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         long startedAt = System.currentTimeMillis();
+        boolean completedNormally = false;
         try {
             filterChain.doFilter(request, response);
+            completedNormally = true;
         } finally {
             long durationMs = Math.max(0, System.currentTimeMillis() - startedAt);
             log.info(SensitiveLogSanitizer.accessLog(
                     request.getMethod(),
                     request.getRequestURI(),
-                    response.getStatus(),
+                    statusForLog(response.getStatus(), completedNormally),
                     durationMs,
                     RequestIdSupport.currentOrNew(),
                     request.getRemoteAddr()));
         }
+    }
+
+    static int statusForLog(int responseStatus, boolean completedNormally) {
+        return !completedNormally && responseStatus < 400
+                ? HttpServletResponse.SC_INTERNAL_SERVER_ERROR
+                : responseStatus;
     }
 }

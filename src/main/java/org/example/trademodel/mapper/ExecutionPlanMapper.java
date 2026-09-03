@@ -75,7 +75,7 @@ public interface ExecutionPlanMapper {
 
     @Update("UPDATE tm_execution_plan SET needs_revalidation = TRUE, revalidation_reason = #{reason}, "
             + "revalidation_required_at = #{requiredAt}, plan_lifecycle_state = 'NEEDS_REVALIDATION' "
-            + "WHERE plan_id = #{planId} AND final_plan = TRUE AND plan_lifecycle_state IN ('CURRENT', 'NEEDS_REVALIDATION')")
+            + "WHERE plan_id = #{planId} AND final_plan = TRUE AND plan_lifecycle_state = 'CURRENT'")
     int markNeedsRevalidation(@Param("planId") String planId,
                               @Param("reason") String reason,
                               @Param("requiredAt") java.time.LocalDateTime requiredAt);

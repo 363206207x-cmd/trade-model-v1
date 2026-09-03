@@ -12,6 +12,7 @@
     var assetPoolSymbols = new Set();
     var assetPoolCount = 0;
     var searchActionBusy = false;
+    var activeClosePositionId = "";
     var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
 
@@ -155,8 +156,9 @@
         if (request.body && !(request.body instanceof FormData)) request.headers["Content-Type"] = "application/json";
         if (csrfToken && csrfHeader && request.method && request.method !== "GET") request.headers[csrfHeader] = csrfToken;
         var response = await fetch(url, request);
-        if (!response.ok) throw new Error("请求失败（" + response.status + "）");
-        return apiData(await response.json());
+        var payload = await response.json().catch(function () { return null; });
+        if (!response.ok) throw new Error(text(payload && payload.msg, "请求失败（" + response.status + "）"));
+        return apiData(payload);
     }
 
     function statusValue(card, fallback) {
@@ -305,7 +307,17 @@
             freshnessStatus: has(asset && asset.freshnessStatus) ? String(asset.freshnessStatus) : null,
             dataQualityScore: has(asset && asset.dataQualityScore) ? Number(asset.dataQualityScore) : null,
             directionMaturity: has(asset && asset.directionMaturity) ? String(asset.directionMaturity) : null,
-            homeTier: has(asset && asset.homeTier) ? String(asset.homeTier) : null
+            homeTier: has(asset && asset.homeTier) ? String(asset.homeTier) : null,
+            decisionId: has(asset && asset.decisionId) ? String(asset.decisionId) : null,
+            traceId: has(asset && asset.traceId) ? String(asset.traceId) : null,
+            latestPriceAt: has(asset && asset.latestPriceAt) ? String(asset.latestPriceAt) : null,
+            priceAtDecision: has(asset && asset.priceAtDecision) ? String(asset.priceAtDecision) : null,
+            marketDataAsOf: has(asset && asset.marketDataAsOf) ? String(asset.marketDataAsOf) : null,
+            directionCalculatedAt: has(asset && asset.directionCalculatedAt) ? String(asset.directionCalculatedAt) : null,
+            decisionAgeSeconds: has(asset && asset.decisionAgeSeconds) ? String(asset.decisionAgeSeconds) : null,
+            priceDriftPct: has(asset && asset.priceDriftPct) ? String(asset.priceDriftPct) : null,
+            planInvalidationLevel: has(asset && asset.planInvalidationLevel) ? String(asset.planInvalidationLevel) : null,
+            planState: has(asset && asset.planState) ? String(asset.planState) : null
         };
     }
     function provenanceAttributes(asset) {
@@ -313,7 +325,17 @@
         return ' data-analysis-id="' + escapeHtml(provenance.analysisId || "")
             + '" data-analysis-version="' + escapeHtml(has(provenance.analysisVersion) ? provenance.analysisVersion : "")
             + '" data-direction-maturity="' + escapeHtml(provenance.directionMaturity || "")
-            + '" data-home-tier="' + escapeHtml(provenance.homeTier || "") + '"';
+            + '" data-home-tier="' + escapeHtml(provenance.homeTier || "")
+            + '" data-decision-id="' + escapeHtml(provenance.decisionId || "")
+            + '" data-trace-id="' + escapeHtml(provenance.traceId || "")
+            + '" data-latest-price-at="' + escapeHtml(provenance.latestPriceAt || "")
+            + '" data-price-at-decision="' + escapeHtml(provenance.priceAtDecision || "")
+            + '" data-market-data-as-of="' + escapeHtml(provenance.marketDataAsOf || "")
+            + '" data-direction-calculated-at="' + escapeHtml(provenance.directionCalculatedAt || "")
+            + '" data-decision-age-seconds="' + escapeHtml(provenance.decisionAgeSeconds || "")
+            + '" data-price-drift-pct="' + escapeHtml(provenance.priceDriftPct || "")
+            + '" data-plan-invalidation-level="' + escapeHtml(provenance.planInvalidationLevel || "")
+            + '" data-plan-state="' + escapeHtml(provenance.planState || "") + '"';
     }
     function assetTicker(asset) {
         var display = text(asset && asset.symbol, "").trim().toUpperCase();
@@ -424,6 +446,10 @@
         var source = typeof contract.positionSourceLabel === "function"
             ? contract.positionSourceLabel(position.sourceType) : label(position.sourceType, "来源不可用");
         var detailLink = positionDetailLink(position.positionId);
+        var closeAction = /^\d+$/.test(String(position.positionId || ""))
+            ? '<button class="position-close-button" type="button" data-close-position-id="' + escapeHtml(position.positionId) + '" data-close-position-symbol="' + escapeHtml(symbolOf(position)) + '">记录平仓</button>'
+            : "";
+        var positionActions = '<div class="position-row-actions">' + detailLink + closeAction + '</div>';
         var pnlCoverage = trusted && has(position.pnlCoverage)
             ? "盈亏仅含标记价格、开仓价和数量；费用、资金费率、部分成交及追加仓位覆盖未知"
             : "";
@@ -441,8 +467,8 @@
                 + positionFact("风险趋势", trend, position.riskTrend, "center") + "</div>"
                 + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, position.monitorConclusion, "narrative")
                 + positionFact("建议动作", action, position.suggestedAction, "narrative")
-                + detailLink + '</div>'
-            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + detailLink + '</div>';
+                + positionActions + '</div>'
+            : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + positionActions + '</div>';
         return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted")
             + '"' + (pnlCoverage ? ' title="' + escapeHtml(pnlCoverage) + '"' : '')
             + ' aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " "
@@ -709,6 +735,149 @@
         }
     }
 
+    function stableSubmissionId(prefix) {
+        var value = window.crypto && typeof window.crypto.randomUUID === "function"
+            ? window.crypto.randomUUID()
+            : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        return prefix + ":" + value;
+    }
+    function readDraft(key) {
+        try { return JSON.parse(window.sessionStorage.getItem(key) || "null"); }
+        catch (_) { return null; }
+    }
+    function writeDraft(key, value) {
+        try { window.sessionStorage.setItem(key, JSON.stringify(value)); }
+        catch (_) { /* The server idempotency contract remains authoritative when storage is unavailable. */ }
+    }
+    function removeDraft(key) {
+        try { window.sessionStorage.removeItem(key); }
+        catch (_) { /* no-op */ }
+    }
+    function localDateTimeValue(date) {
+        var offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    }
+    function formSnapshot(form) {
+        return Object.fromEntries(new FormData(form).entries());
+    }
+    function restoreForm(form, values) {
+        Object.entries(values || {}).forEach(function (entry) {
+            if (form.elements[entry[0]]) form.elements[entry[0]].value = entry[1];
+        });
+    }
+    function setFormStatus(id, message, tone) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = message || "";
+        node.classList.toggle("is-error", tone === "error");
+        node.classList.toggle("is-success", tone === "success");
+    }
+    function setSubmitBusy(form, busy, busyText, idleText) {
+        var button = form && form.querySelector('button[type="submit"]');
+        if (!button) return;
+        button.disabled = busy;
+        button.textContent = busy ? busyText : idleText;
+    }
+    function openEntryDialog(trigger) {
+        var dialog = document.getElementById("homePositionEntryDialog");
+        var form = document.getElementById("homePositionEntryForm");
+        var key = "trine.position.openDraft";
+        var draft = readDraft(key);
+        form.reset();
+        form.elements.sourceType.value = "MANUAL_INDEPENDENT";
+        form.elements.submissionId.value = stableSubmissionId("position-open");
+        form.elements.openedAt.value = localDateTimeValue(new Date());
+        if (selectedSymbol) form.elements.assetSymbol.value = selectedSymbol;
+        if (draft) restoreForm(form, draft);
+        writeDraft(key, formSnapshot(form));
+        dialog.dataset.restoreFocusId = trigger && trigger.id || "";
+        setFormStatus("homePositionEntryStatus", draft ? "已恢复未提交内容" : "", "");
+        dialog.showModal();
+        form.querySelector("input, select")?.focus();
+    }
+    function openCloseDialog(positionId, symbol, trigger) {
+        var dialog = document.getElementById("homePositionCloseDialog");
+        var form = document.getElementById("homePositionCloseForm");
+        var key = "trine.position.closeDraft." + positionId;
+        var draft = readDraft(key);
+        activeClosePositionId = positionId;
+        form.reset();
+        form.elements.submissionId.value = stableSubmissionId("position-close");
+        form.elements.closedAt.value = localDateTimeValue(new Date());
+        if (draft) restoreForm(form, draft);
+        writeDraft(key, formSnapshot(form));
+        document.getElementById("homePositionCloseHeading").textContent = "记录平仓 · " + symbol;
+        dialog.dataset.restoreFocusId = trigger && trigger.id || "";
+        setFormStatus("homePositionCloseStatus", draft ? "已恢复未提交内容" : "", "");
+        dialog.showModal();
+        form.querySelector("input")?.focus();
+    }
+    function closePositionDialog(dialog) {
+        if (dialog && dialog.open) dialog.close();
+    }
+    function bindPositionActions() {
+        var entryForm = document.getElementById("homePositionEntryForm");
+        var closeForm = document.getElementById("homePositionCloseForm");
+        document.addEventListener("click", function (event) {
+            var openEntry = event.target.closest("[data-open-position-entry]");
+            if (openEntry) { event.preventDefault(); openEntryDialog(openEntry); return; }
+            var openClose = event.target.closest("[data-close-position-id]");
+            if (openClose) { event.preventDefault(); openCloseDialog(openClose.dataset.closePositionId, openClose.dataset.closePositionSymbol, openClose); return; }
+            var close = event.target.closest("[data-close-position-dialog]");
+            if (close) { event.preventDefault(); closePositionDialog(close.closest("dialog")); }
+        });
+        [entryForm, closeForm].forEach(function (form) {
+            form?.addEventListener("input", function () {
+                var key = form === entryForm ? "trine.position.openDraft" : "trine.position.closeDraft." + activeClosePositionId;
+                writeDraft(key, formSnapshot(form));
+            });
+            form?.closest("dialog")?.addEventListener("cancel", function (event) {
+                event.preventDefault();
+                setFormStatus(form === entryForm ? "homePositionEntryStatus" : "homePositionCloseStatus", "内容已保留；请使用取消或关闭按钮退出", "");
+            });
+        });
+        entryForm?.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            var values = formSnapshot(entryForm);
+            if (values.openedAt) values.openedAt = new Date(values.openedAt).toISOString().slice(0, 19);
+            setSubmitBusy(entryForm, true, "正在保存", "确认录入");
+            setFormStatus("homePositionEntryStatus", "正在保存", "");
+            try {
+                await api("/api/user-positions/manual-open", { method: "POST", body: JSON.stringify(values) });
+                removeDraft("trine.position.openDraft");
+                setText("positionActionStatus", "持仓录入成功");
+                announce("持仓录入成功");
+                closePositionDialog(entryForm.closest("dialog"));
+                entryForm.reset();
+                await loadHome(selectedSymbol);
+            } catch (error) {
+                setFormStatus("homePositionEntryStatus", error.message, "error");
+                announce(error.message);
+            } finally { setSubmitBusy(entryForm, false, "正在保存", "确认录入"); }
+        });
+        closeForm?.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            var positionId = activeClosePositionId;
+            var values = formSnapshot(closeForm);
+            if (values.closedAt) values.closedAt = new Date(values.closedAt).toISOString().slice(0, 19);
+            setSubmitBusy(closeForm, true, "正在保存", "确认记录");
+            setFormStatus("homePositionCloseStatus", "正在保存", "");
+            try {
+                await api("/api/user-positions/" + encodeURIComponent(positionId) + "/manual-close", { method: "POST", body: JSON.stringify(values) });
+                removeDraft("trine.position.closeDraft." + positionId);
+                setText("positionActionStatus", "平仓记录成功");
+                announce("平仓记录成功");
+                closePositionDialog(closeForm.closest("dialog"));
+                closeForm.reset();
+                activeClosePositionId = "";
+                await loadHome(selectedSymbol);
+            } catch (error) {
+                setFormStatus("homePositionCloseStatus", error.message, "error");
+                announce(error.message);
+            } finally { setSubmitBusy(closeForm, false, "正在保存", "确认记录"); }
+        });
+    }
+
     function setSearchPopoverOpen(open) {
         var input = document.getElementById("homeAssetSearch");
         var popover = document.getElementById("homeAssetSearchPopover");
@@ -900,6 +1069,7 @@
 
     bindSearch();
     bindTabs();
+    bindPositionActions();
     var requested = typeof contract.readUrlParam === "function" ? contract.readUrlParam("asset") : new URLSearchParams(window.location.search).get("asset");
     loadHome(requested || "");
 })();

@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,6 +95,48 @@ class PlanRevalidationServiceTest {
             assertThat(record.getNotTradeInstruction()).isTrue();
             assertThat(record.getNotOrderExecution()).isTrue();
         });
+    }
+
+    @Test
+    void repeatedSystemRequestReturnsExistingRecordWithoutDuplicateQueue() {
+        ExecutionPlanDO plan = finalPlan();
+        plan.setPlanLifecycleState("NEEDS_REVALIDATION");
+        PlanRevalidationRecordDO existing = new PlanRevalidationRecordDO();
+        existing.setRecordId("revalidation-existing");
+        when(planMapper.selectByPlanId("plan-1")).thenReturn(plan);
+        when(recordMapper.listByPlanId("plan-1", 1)).thenReturn(java.util.List.of(existing));
+
+        PlanRevalidationRecordDO first = service.requestSystem(
+                "plan-1", PlanRevalidationTriggerTypeEnum.DATA_REFRESH, "STALE_ANALYSIS");
+        PlanRevalidationRecordDO second = service.requestSystem(
+                "plan-1", PlanRevalidationTriggerTypeEnum.DATA_REFRESH, "STALE_ANALYSIS");
+
+        assertThat(first).isSameAs(existing);
+        assertThat(second).isSameAs(existing);
+        verify(planMapper, never()).markNeedsRevalidation(any(), any(), any());
+        verify(recordMapper, never()).insert(any());
+        verify(asyncTaskService, never()).queueForSystem(any(), any(), any(), any());
+    }
+
+    @Test
+    void losingAtomicSystemTransitionReturnsConcurrentCanonicalRecord() {
+        ExecutionPlanDO initial = finalPlan();
+        initial.setPlanLifecycleState("CURRENT");
+        ExecutionPlanDO transitioned = finalPlan();
+        transitioned.setPlanLifecycleState("NEEDS_REVALIDATION");
+        PlanRevalidationRecordDO canonical = new PlanRevalidationRecordDO();
+        canonical.setRecordId("revalidation-concurrent");
+        when(planMapper.selectByPlanId("plan-1")).thenReturn(initial, transitioned);
+        when(planMapper.markNeedsRevalidation(eq("plan-1"), eq("STALE_ANALYSIS"), any())).thenReturn(0);
+        when(recordMapper.listByPlanId("plan-1", 1)).thenReturn(java.util.List.of(canonical));
+
+        PlanRevalidationRecordDO actual = service.requestSystem(
+                "plan-1", PlanRevalidationTriggerTypeEnum.DATA_REFRESH, "STALE_ANALYSIS");
+
+        assertThat(actual).isSameAs(canonical);
+        verify(planMapper, times(2)).selectByPlanId("plan-1");
+        verify(recordMapper, never()).insert(any());
+        verify(asyncTaskService, never()).queueForSystem(any(), any(), any(), any());
     }
 
     private static ExecutionPlanDO finalPlan() {

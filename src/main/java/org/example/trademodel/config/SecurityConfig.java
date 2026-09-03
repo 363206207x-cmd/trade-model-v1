@@ -1,7 +1,10 @@
 package org.example.trademodel.config;
 
+import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.regex.Pattern;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.trademodel.security.AuthAuditAuthenticationEntryPoint;
 import org.example.trademodel.security.PersonalLogoutSuccessHandler;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,10 +24,15 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final Pattern PERSISTED_SESSION_ID = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
@@ -76,5 +84,31 @@ public class SecurityConfig {
     @Bean
     public static PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    CookieSerializer cookieSerializer(
+            @Value("${server.servlet.session.cookie.name:JSESSIONID}") String cookieName,
+            @Value("${server.servlet.session.cookie.http-only:true}") boolean httpOnly,
+            @Value("${server.servlet.session.cookie.secure:false}") boolean secure,
+            @Value("${server.servlet.session.cookie.same-site:lax}") String sameSite) {
+        DefaultCookieSerializer serializer = new DefaultCookieSerializer() {
+            @Override
+            public List<String> readCookieValues(HttpServletRequest request) {
+                try {
+                    return super.readCookieValues(request).stream()
+                            .filter(PERSISTED_SESSION_ID.asMatchPredicate())
+                            .toList();
+                } catch (IllegalArgumentException invalidLegacyCookie) {
+                    return List.of();
+                }
+            }
+        };
+        serializer.setCookieName(cookieName);
+        serializer.setCookiePath("/");
+        serializer.setUseHttpOnlyCookie(httpOnly);
+        serializer.setUseSecureCookie(secure);
+        serializer.setSameSite(sameSite);
+        return serializer;
     }
 }

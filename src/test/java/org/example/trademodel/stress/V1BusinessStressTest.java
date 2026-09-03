@@ -185,7 +185,7 @@ class V1BusinessStressTest {
                 .contains("LOGIC_VALID", "NEAR_STOP_LOSS", "PLAN_INVALIDATED",
                         "NEAR_TAKE_PROFIT", "HIGH_RISK_OBSERVATION");
         verify(harness.userPositionMapper(), never())
-                .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), anyString(), any());
+                .manualCloseByIdAndUserId(anyLong(), anyLong(), any(), any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -220,7 +220,7 @@ class V1BusinessStressTest {
         verify(mapper).insert(any(UserPositionDO.class));
         verify(mapper).manualCloseByIdAndUserId(
                 eq(opened.getId()), eq(USER_ID), any(), eq(new BigDecimal("112")),
-                eq("paper stress close"), any());
+                eq("paper stress close"), eq("stress-close:paper-position"), any());
         assertNoForbiddenExecutableFields(UserPositionVO.class, PositionMonitorResultDTO.class, RecheckResult.class);
     }
 
@@ -529,6 +529,7 @@ class V1BusinessStressTest {
 
     private static CreateUserPositionReq openPaperPositionRequest(String planId) {
         CreateUserPositionReq req = new CreateUserPositionReq();
+        req.setSubmissionId("stress-open:" + planId);
         req.setAssetSymbol("BTCUSDT");
         req.setSide("LONG");
         req.setEntryPrice(new BigDecimal("100"));
@@ -544,6 +545,7 @@ class V1BusinessStressTest {
 
     private static CloseUserPositionReq closePaperPositionRequest() {
         CloseUserPositionReq req = new CloseUserPositionReq();
+        req.setSubmissionId("stress-close:paper-position");
         req.setClosePrice(new BigDecimal("112"));
         req.setCloseReason("paper stress close");
         req.setClosedAt(LocalDateTime.of(2024, 1, 1, 12, 0));
@@ -564,7 +566,7 @@ class V1BusinessStressTest {
                 .filter(row -> "OPEN".equals(row.getStatus()))
                 .sorted(Comparator.comparing(UserPositionDO::getId))
                 .collect(Collectors.toList()));
-        when(mapper.manualCloseByIdAndUserId(anyLong(), eq(USER_ID), any(), any(), anyString(), any()))
+        when(mapper.manualCloseByIdAndUserId(anyLong(), eq(USER_ID), any(), any(), anyString(), anyString(), any()))
                 .thenAnswer(invocation -> {
                     UserPositionDO row = positions.get(invocation.getArgument(0));
                     if (row == null || !USER_ID.equals(row.getUserId()) || !"OPEN".equals(row.getStatus())) {
@@ -573,7 +575,8 @@ class V1BusinessStressTest {
                     row.setClosedAt(invocation.getArgument(2));
                     row.setClosePrice(invocation.getArgument(3));
                     row.setCloseReason(invocation.getArgument(4));
-                    row.setUpdatedAt(invocation.getArgument(5));
+                    row.setCloseSubmissionId(invocation.getArgument(5));
+                    row.setUpdatedAt(invocation.getArgument(6));
                     row.setStatus("CLOSED");
                     return 1;
                 });

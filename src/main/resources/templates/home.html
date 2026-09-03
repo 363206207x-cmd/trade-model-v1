@@ -74,10 +74,10 @@
             <section class="module position-module" aria-labelledby="positionHeading" data-component-family="PositionCard">
                 <header class="module-header position-header">
                     <h2 id="positionHeading">持仓监控</h2>
-                    <div class="position-header-actions"><span id="positionAggregate">活动 0 · 最高风险 暂无评估 · 等待评估</span><a href="/positions">查看全部</a></div>
+                    <div class="position-header-actions"><span id="positionActionStatus" role="status"></span><span id="positionAggregate">活动 0 · 最高风险 暂无评估 · 等待评估</span><button class="text-button" type="button" data-open-position-entry>录入持仓</button><a href="/positions">查看全部</a></div>
                 </header>
                 <div class="position-list" id="positionList"></div>
-                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无持仓</strong></div><a class="secondary-action" href="/positions">录入持仓</a></div>
+                <div class="module-empty" id="positionEmpty" hidden><div><strong>暂无持仓</strong><span>在首页录入后会立即刷新持仓监控。</span></div><button class="secondary-action" type="button" data-open-position-entry>录入持仓</button></div>
             </section>
             <section class="module plan-module" aria-labelledby="planHeading" data-component-family="PlanSummaryCard">
                 <header class="module-header"><div><h2 id="planHeading">执行计划</h2><span id="planAsset">未选择资产</span></div><a id="planDetailLink" href="/analysis" hidden>查看详情</a></header>
@@ -98,6 +98,24 @@
         </section>
     </main>
 </div>
+<dialog class="home-dialog" id="homePositionEntryDialog" aria-labelledby="homePositionEntryHeading">
+    <form id="homePositionEntryForm" class="home-dialog-content">
+        <header class="home-dialog-header"><div><h2 id="homePositionEntryHeading">录入实际持仓</h2><p>仅记录用户已完成的手动开仓，不会向交易所下单。</p></div><button type="button" data-close-position-dialog aria-label="关闭录入窗口">关闭</button></header>
+        <div class="home-form-grid"><label>资产<input name="assetSymbol" required autocomplete="off"></label><label>方向<select name="side"><option value="LONG">做多</option><option value="SHORT">做空</option></select></label><label>实际开仓价<input name="entryPrice" type="number" step="any" min="0" required></label><label>实际开仓时间<input name="openedAt" type="datetime-local" required></label><label>数量<input name="quantity" type="number" step="any" min="0" required></label><label>杠杆<input name="leverage" type="number" step="any" min="0" required></label><label>止损<input name="stopLoss" type="number" step="any" min="0"></label><label>目标<input name="takeProfit" type="number" step="any" min="0"></label></div>
+        <input name="sourceType" type="hidden" value="MANUAL_INDEPENDENT"><input name="submissionId" type="hidden">
+        <p class="home-form-status" id="homePositionEntryStatus" role="status"></p>
+        <footer class="home-dialog-actions"><button class="home-button secondary" type="button" data-close-position-dialog>取消</button><button class="home-button primary" type="submit">确认录入</button></footer>
+    </form>
+</dialog>
+<dialog class="home-dialog compact" id="homePositionCloseDialog" aria-labelledby="homePositionCloseHeading">
+    <form id="homePositionCloseForm" class="home-dialog-content">
+        <header class="home-dialog-header"><div><h2 id="homePositionCloseHeading">记录平仓</h2><p>仅记录用户已完成的手动平仓，不会向交易所下单。</p></div><button type="button" data-close-position-dialog aria-label="关闭平仓窗口">关闭</button></header>
+        <label>实际平仓价格<input name="closePrice" type="number" step="any" min="0" required></label><label>实际平仓时间<input name="closedAt" type="datetime-local" required></label><label>结果备注<textarea name="closeReason" rows="3" required></textarea></label>
+        <input name="submissionId" type="hidden">
+        <p class="home-form-status" id="homePositionCloseStatus" role="status"></p>
+        <footer class="home-dialog-actions"><button class="home-button secondary" type="button" data-close-position-dialog>取消</button><button class="home-button primary" type="submit">确认记录</button></footer>
+    </form>
+</dialog>
 <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js"></script>
 <script th:src="@{/js/home-runtime.js}" src="/js/home-runtime.js" defer></script>
 </body>
