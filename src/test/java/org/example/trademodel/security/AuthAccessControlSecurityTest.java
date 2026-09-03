@@ -67,6 +67,17 @@ class AuthAccessControlSecurityTest {
     }
 
     @Test
+    void publicAndProtectedHttpsResponsesExposeExplicitBrowserSecurityHeaders() throws Exception {
+        for (String path : List.of("/login", "/dashboard", "/api/dashboard/home")) {
+            mockMvc.perform(get(path).secure(true))
+                    .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                    .andExpect(header().string("X-Frame-Options", "DENY"))
+                    .andExpect(header().exists("Strict-Transport-Security"));
+        }
+    }
+
+    @Test
     void dashboardHomeApiRequiresAuthenticationAndAllowsSessionPrincipal() throws Exception {
         mockMvc.perform(get("/api/dashboard/home"))
                 .andExpect(status().isUnauthorized());
