@@ -610,9 +610,9 @@ expected_implementation_paths="$(printf '%s\n' \
   src/main/java/org/example/trademodel/entity/TelegramChannelTestAuditDO.java \
   src/main/java/org/example/trademodel/mapper/TelegramChannelTestAuditMapper.java \
   src/main/java/org/example/trademodel/service/TelegramChannelTestService.java \
-  src/main/java/org/example/trademodel/mapper/MessageMapper.java \
-  src/main/java/org/example/trademodel/mapper/ChannelDeliveryMapper.java \
-  src/main/java/org/example/trademodel/service/ChannelDeliveryService.java \
+  src/test/java/org/example/trademodel/controller/FundamentalAiV41CanonicalDesktopInteractionContractTest.java \
+  src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java \
+  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
   src/main/java/org/example/trademodel/controller/TelegramNotificationController.java \
   src/main/java/org/example/trademodel/controller/SystemController.java \
   src/main/java/org/example/trademodel/controller/AiDecisionAuditController.java \
