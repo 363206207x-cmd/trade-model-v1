@@ -652,6 +652,29 @@ implementation are complete on merged main
 `b5e52d501becf675f4299fc7c5d389707de81af0`; they are predecessor evidence
 and do not independently authorize this successor.
 
+### PS-TRINE-LOGIC-V4-1-INTERACTION-AUDIT-CONSOLIDATED-REMEDIATION
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation and Final Re-Acceptance Authorization |
+| Version/date | Owner authorization `2026-09-04`; effective only after merged-main validation |
+| Package / branch | `V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION` / `codex/v4-1-interaction-audit-consolidated-remediation` |
+| Frozen audit baseline | `782fb97987da1a09671c3450298f000abc341942` |
+| Frozen finding input | `/private/tmp/trine-v41-interaction-audit-782fb979/AUDIT_REPORT.md`: 26 steps, 15 PASS, 7 PARTIAL, 4 FAIL; no rediscovery audit |
+| Exact implementation paths | The literal paths in `docs/CODEX_NEXT_TASK.yml`; no wildcard, directory or prefix grant |
+| Required output | Close all four FAIL and every explicit frozen-contract defect in the seven PARTIAL findings, merge exact-head, deploy exact merged main to private Staging, then repeat the same 26 formal-domain steps |
+| Responsive boundary | Existing-surface responsive safety only; no new Mobile page, route, navigation, product semantics or Figma implementation |
+| Forbidden reinterpretations | no direction/score/Confused/Plan-Mode change, fake data, forced AI/Final Plan, real-position cleanup, Telegram send by this task, Production deployment or automatic trade |
+
+PR #1235 and PR #1236 are effective predecessor implementations on this
+baseline. The successor must reuse the existing Message, ChannelDelivery,
+Telegram, runtime-status, AnalysisRun, Decision, Trace, ExecutionPlan and
+UserPosition owners. Telegram O10 may add durable channel-test audit semantics
+under ChannelDelivery, but cannot create a second business-message owner or
+expand the three frozen business-notification categories. Existing three
+groups / twenty-five suspected duplicate positions remain immutable pending a
+separate Owner decision.
+
 ### PS-FIGMA-BASELINE
 
 Repository record: `docs/FE04_POSITION_MONITORING_IMPLEMENTATION_FREEZE.md`, SHA-256 `fbb0fcd2987a9f98e85646bb73efa4925aaf79295ca4e72394ed5c6d3650d851`.
