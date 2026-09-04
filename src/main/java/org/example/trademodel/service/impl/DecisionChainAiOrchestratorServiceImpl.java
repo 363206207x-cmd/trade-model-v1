@@ -456,7 +456,10 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
                                          String cacheKey) {
         result.setReservedCostUsd(reserved == null ? BigDecimal.ZERO : reserved);
         if (result.successful()) {
-            String traceabilityFailure = traceabilityFailure(request, result);
+            String traceabilityFailure = canonicalizeGptEvidenceFacts(request, result);
+            if (traceabilityFailure == null) {
+                traceabilityFailure = traceabilityFailure(request, result);
+            }
             if (traceabilityFailure != null) {
                 result.setAuditOutput(result.getPayloadJson());
                 result.setPayloadJson(null);
@@ -481,6 +484,67 @@ public class DecisionChainAiOrchestratorServiceImpl implements DecisionChainAiOr
             cache(cacheKey, request, result);
         }
         return result;
+    }
+
+    private String canonicalizeGptEvidenceFacts(AiDecisionChainRequest request,
+                                                AiDecisionChainResult result) {
+        if (request == null || request.getRole() != AiDecisionChainRole.GPT_FINAL) return null;
+        try {
+            JsonNode parsed = objectMapper.readTree(result.getPayloadJson());
+            if (!(parsed instanceof ObjectNode root)) {
+                return "AI_OUTPUT_TRACEABILITY_PARSE_FAILED";
+            }
+            Map<String, Map<String, Object>> evidenceById = allowedEvidenceById(request);
+            String failure = canonicalizeEvidenceArray(
+                    root.path("supportingEvidence"), request, evidenceById);
+            if (failure != null) return failure;
+            failure = canonicalizeEvidenceArray(
+                    root.path("opposingEvidence"), request, evidenceById);
+            if (failure != null) return failure;
+            result.setPayloadJson(objectMapper.writeValueAsString(root));
+            return null;
+        } catch (Exception exception) {
+            return "AI_OUTPUT_TRACEABILITY_PARSE_FAILED";
+        }
+    }
+
+    private void setCanonicalEvidenceFact(ObjectNode row,
+                                          String outputField,
+                                          Object value) {
+        if (value == null) {
+            row.remove(outputField);
+        } else {
+            row.set(outputField, objectMapper.valueToTree(value));
+        }
+    }
+
+    private String canonicalizeEvidenceArray(JsonNode rows,
+                                             AiDecisionChainRequest request,
+                                             Map<String, Map<String, Object>> evidenceById) {
+        if (!rows.isArray()) return "AI_OUTPUT_EVIDENCE_TRACEABILITY_INVALID";
+        for (JsonNode item : rows) {
+            if (!(item instanceof ObjectNode row)) {
+                return "AI_OUTPUT_EVIDENCE_TRACEABILITY_INVALID";
+            }
+            String evidenceId = row.path("evidenceId").asText(null);
+            String analysisId = row.path("analysisId").asText(null);
+            Map<String, Object> expected = evidenceId == null ? null : evidenceById.get(evidenceId);
+            if (expected == null || analysisId == null
+                    || !analysisId.equals(request.getAnalysisId())) {
+                return "AI_OUTPUT_EVIDENCE_TRACEABILITY_INVALID";
+            }
+            setCanonicalEvidenceFact(row, "type", expected.get("type"));
+            setCanonicalEvidenceFact(row, "source", expected.get("source"));
+            setCanonicalEvidenceFact(row, "currentValue", expected.get("currentValue"));
+            setCanonicalEvidenceFact(row, "change", expected.get("changeFromBaseline"));
+            setCanonicalEvidenceFact(row, "direction", expected.get("direction"));
+            setCanonicalEvidenceFact(row, "strength", expected.get("strength"));
+            setCanonicalEvidenceFact(row, "confidence", expected.get("confidence"));
+            setCanonicalEvidenceFact(row, "observedAt", expected.get("observedAt"));
+            setCanonicalEvidenceFact(row, "freshness", expected.get("freshness"));
+            setCanonicalEvidenceFact(row, "analysisId", request.getAnalysisId());
+        }
+        return null;
     }
 
     private static void attachActiveRuntimeMetadata(AiDecisionChainRequest request,
