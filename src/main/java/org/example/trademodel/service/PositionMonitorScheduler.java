@@ -2,6 +2,7 @@ package org.example.trademodel.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -35,7 +36,14 @@ public class PositionMonitorScheduler {
             return;
         }
         try {
-            positionMonitorService.monitorClaimedOpenPositionsForSystem();
+            PositionMonitorBatchResultDTO batch = positionMonitorService.monitorClaimedOpenPositionsForSystem();
+            if (batch == null) {
+                log.warn("[position-monitor-scheduler] batch completed without a result summary");
+                return;
+            }
+            log.info("[position-monitor-scheduler] batch completed total={} success={} failure={} blocked={}",
+                    batch.getTotalCount(), batch.getSuccessCount(),
+                    batch.getFailureCount(), batch.getBlockedCount());
         } catch (RuntimeException ex) {
             log.warn("[position-monitor-scheduler] batch skipped: {}", ex.getMessage());
         }

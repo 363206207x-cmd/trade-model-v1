@@ -275,7 +275,7 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
-    void validEvidenceIdCannotHideFabricatedEvidenceFacts() {
+    void validEvidenceIdentityHydratesImmutableFactsFromAuthoritativeInput() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiUsageGuard usageGuard = mock(AiUsageGuard.class);
         AiCallLogService callLogService = mock(AiCallLogService.class);
@@ -290,10 +290,34 @@ class DecisionChainAiOrchestratorServiceImplTest {
 
         AiDecisionChainResult result = service.invoke(traceableRequest(AiDecisionChainRole.GPT_FINAL));
 
+        assertThat(result.successful()).isTrue();
+        assertThat(result.getFallbackReason()).isNull();
+        assertThat(result.getPayloadJson())
+                .contains("\"source\":\"verified-source\"")
+                .doesNotContain("fabricated-source");
+    }
+
+    @Test
+    void canonicalEvidenceHydrationStillRejectsWrongAnalysisIdentity() {
+        AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
+        AiUsageGuard usageGuard = mock(AiUsageGuard.class);
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        when(usageGuard.evaluate(gpt, "analysis-1"))
+                .thenReturn(AiUsageGuardResult.allowed(BigDecimal.ZERO));
+        when(callLogService.startDecisionChainCall(any(), eq(gpt), any()))
+                .thenReturn(new AiCallLogDO());
+        AiDecisionChainResult providerResult = traceableGptSuccess("source-1");
+        providerResult.setPayloadJson(providerResult.getPayloadJson()
+                .replace("\"analysisId\":\"analysis-1\"", "\"analysisId\":\"analysis-2\""));
+        when(gpt.executeDecisionChain(any(), anyLong())).thenReturn(providerResult);
+        DecisionChainAiOrchestratorServiceImpl service = new DecisionChainAiOrchestratorServiceImpl(
+                List.of(gpt), usageGuard, callLogService, new AiOrchestratorProperties());
+
+        AiDecisionChainResult result = service.invoke(traceableRequest(AiDecisionChainRole.GPT_FINAL));
+
         assertThat(result.successful()).isFalse();
-        assertThat(result.getFallbackReason()).isEqualTo("AI_OUTPUT_EVIDENCE_FACT_MISMATCH");
+        assertThat(result.getFallbackReason()).isEqualTo("AI_OUTPUT_EVIDENCE_TRACEABILITY_INVALID");
         assertThat(result.getPayloadJson()).isNull();
-        assertThat(result.getAuditOutput()).contains("fabricated-source");
     }
 
     @Test

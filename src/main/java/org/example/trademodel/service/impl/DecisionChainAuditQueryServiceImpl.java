@@ -230,10 +230,21 @@ public class DecisionChainAuditQueryServiceImpl implements DecisionChainAuditQue
     private static DecisionChainAuditVO.AiTraceStage toTrace(AiCallLogDO row) {
         return new DecisionChainAuditVO.AiTraceStage(row.getCallId(), row.getTraceId(), row.getRequestId(),
                 row.getAnalysisId(), row.getOpportunityId(), row.getCandidateId(), row.getAiRole(),
-                row.getProviderName(), row.getModelName(), row.getRequestHash(), row.getRequestSummary(),
-                row.getOutputPayload(), row.getCallStatus(), row.getErrorCode(), row.getErrorMessage(),
+                row.getProviderName(), row.getModelName(), row.getRequestHash(), auditTraceSummary(row),
+                null, row.getCallStatus(), row.getErrorCode(), null,
                 row.getFallbackFlag(), row.getFallbackReason(), row.getCacheHit(), row.getInputTokens(),
                 row.getOutputTokens(), row.getCalculatedCostUsd(), row.getLatencyMs(), row.getObservedAt(), row.getCreatedAt());
+    }
+
+    private static String auditTraceSummary(AiCallLogDO row) {
+        String status = clean(row == null ? null : row.getCallStatus());
+        if (status == null) return "AI 调用状态已记录";
+        return switch (status.toUpperCase(java.util.Locale.ROOT)) {
+            case "SUCCESS", "SUCCEEDED", "COMPLETED" -> "AI 调用已完成";
+            case "STARTED", "QUEUED", "RUNNING", "IN_PROGRESS" -> "AI 调用进行中";
+            case "SKIPPED", "NOT_CALLED" -> "AI 调用未执行，已使用规则路径";
+            default -> "AI 调用未完成，已安全回退";
+        };
     }
 
     private static DecisionChainAuditVO.RuleValidationStage toValidation(ExecutionPlanDO row) {
