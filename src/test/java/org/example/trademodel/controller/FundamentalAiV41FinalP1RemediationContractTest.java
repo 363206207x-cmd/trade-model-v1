@@ -197,6 +197,8 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "正在加载已有分析记录。",
                 "function schedulerObservationText(readiness, header)",
                 "[\"-\", \"—\", \"N/A\", \"NA\", \"NULL\"].includes(normalized)",
+                "const displayed = hasValue(status)",
+                "[\"-\", \"—\", \"N/A\", \"NA\", \"NULL\"].includes(String(displayed).trim().toUpperCase())",
                 "function lastScanResultText(header)",
                 "updatePoolScanCta();\n        Promise.all([loadAssetPool(), loadTasks()])",
                 "已完成（结果摘要未记录）")
