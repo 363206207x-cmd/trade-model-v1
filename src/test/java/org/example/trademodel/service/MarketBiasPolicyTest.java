@@ -68,6 +68,22 @@ class MarketBiasPolicyTest {
         assertThat(assessment.ruleMarketBias()).isEqualTo("BULLISH");
     }
 
+    @Test
+    void opposingCoreDirectionsBeyondConfiguredDispersionFailClosed() {
+        FundamentalAiV41Properties properties = FundamentalAiV41Properties.contractFixture();
+        MarketBiasPolicy.DirectionAssessment assessment = MarketBiasPolicy.assessDirection(
+                flat(), flat(), descendingRankedWindow(20), rankedWindow(58),
+                properties.getMultiTimeframe(), properties.getNormalization());
+
+        assertThat(assessment.normalized4hDirectionScore()).isPositive();
+        assertThat(assessment.normalized1hDirectionScore()).isNegative();
+        assertThat(assessment.normalized4hDirectionScore()
+                .subtract(assessment.normalized1hDirectionScore()).abs())
+                .isGreaterThan(properties.getMultiTimeframe().getMaximumTrendScoreDifference());
+        assertThat(assessment.ruleMarketBias()).isEqualTo("WAIT");
+        assertThat(assessment.directionDataState()).isEqualTo("MULTI_TIMEFRAME_CONFLICT");
+    }
+
     private static String classify(List<String[]> five, List<String[]> fifteen,
                                    List<String[]> oneHour, List<String[]> fourHour) {
         return MarketBiasPolicy.classify(five, fifteen, oneHour, fourHour);
@@ -104,6 +120,15 @@ class MarketBiasPolicyTest {
             bars.add(bar("100", String.valueOf(101 + index)));
         }
         bars.add(bar("100", String.valueOf(101 + finalCloseRank)));
+        return bars;
+    }
+
+    private static List<String[]> descendingRankedWindow(int finalCloseRank) {
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 59; index++) {
+            bars.add(bar("100", String.valueOf(99 - index)));
+        }
+        bars.add(bar("100", String.valueOf(41 + finalCloseRank)));
         return bars;
     }
 
