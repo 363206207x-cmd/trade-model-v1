@@ -76,6 +76,10 @@ class DecisionChainAuditQueryServiceImplTest {
         DecisionChainAuditVO audit = result.orElseThrow();
         assertThat(audit.getAiTraces()).extracting(DecisionChainAuditVO.AiTraceStage::role)
                 .containsExactly("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
+        assertThat(audit.getAiTraces()).allSatisfy(trace -> {
+            assertThat(trace.inputSummary()).isEqualTo("AI 调用已完成");
+            assertThat(trace.outputJson()).isNull();
+        });
         assertThat(audit.getConflictResolver().getResolverResultId()).isEqualTo("resolver-1");
         assertThat(audit.getRuleValidation().validationResultId()).isEqualTo("validation-1");
         assertThat(audit.getFinalExecutionPlan().getPlanId()).isEqualTo("final-1");
@@ -171,6 +175,8 @@ class DecisionChainAuditQueryServiceImplTest {
         row.setCandidateId("candidate-1");
         row.setAiRole(role);
         row.setCallStatus("SUCCESS");
+        row.setRequestSummary("{\"accountRisk\":{\"grossNotional\":\"sensitive\"}}");
+        row.setOutputPayload("{\"rawProviderPayload\":true}");
         return row;
     }
 

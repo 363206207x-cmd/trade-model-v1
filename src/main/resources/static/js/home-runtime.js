@@ -572,6 +572,14 @@
         return "<dl>" + items.map(function (item) { return "<div><dt>" + escapeHtml(item[0]) + "</dt><dd>" + escapeHtml(text(item[1], "当前不可查看")) + "</dd></div>"; }).join("") + "</dl>";
     }
 
+    function scanRuntimeText(header) {
+        var state = String(header && (header.scanState || header.scanTaskState) || "").toUpperCase();
+        if (["QUEUED", "RUNNING", "SCANNING", "IN_PROGRESS"].indexOf(state) >= 0) return "扫描任务执行中";
+        if (has(header && header.lastScanResult)) return label(header.lastScanResult, "最近一次扫描已完成");
+        if (has(header && header.lastCompletedScanAt)) return "最近一次扫描已完成";
+        return "尚无完成记录";
+    }
+
     async function openHomeStatus(trigger) {
         var dialog = document.getElementById("homeStatusDialog");
         var target = document.getElementById("homeStatusDetail");
@@ -600,7 +608,7 @@
                 ["应用状态", label(readiness.status, "当前不可查看")],
                 ["数据库", label(readiness.databaseStatus, "当前不可查看")],
                 ["调度器", label(readiness.schedulerObservationStatus || header.systemRuntimeState, "当前不可查看")],
-                ["扫描状态", text(header.systemRuntimeLabel, label(header.systemRuntimeState, "当前不可查看"))],
+                ["扫描状态", scanRuntimeText(header)],
                 ["调度心跳", time(header.schedulerHeartbeatAt)],
                 ["本轮开始", time(header.scanStartedAt)],
                 ["上次成功完成", time(header.lastCompletedScanAt)],
@@ -943,6 +951,8 @@
     function bindPositionActions() {
         var entryForm = document.getElementById("homePositionEntryForm");
         var closeForm = document.getElementById("homePositionCloseForm");
+        preserveDateTimeDialogOnEscape(entryForm, "homePositionEntryStatus");
+        preserveDateTimeDialogOnEscape(closeForm, "homePositionCloseStatus");
         document.addEventListener("click", function (event) {
             var openEntry = event.target.closest("[data-open-position-entry]");
             if (openEntry) { event.preventDefault(); openEntryDialog(openEntry); return; }
@@ -1000,6 +1010,17 @@
                 setFormStatus("homePositionCloseStatus", error.message, "error");
                 announce(error.message);
             } finally { setSubmitBusy(closeForm, false, "正在保存", "确认记录"); }
+        });
+    }
+
+    function preserveDateTimeDialogOnEscape(form, statusId) {
+        form?.querySelectorAll('input[type="datetime-local"]').forEach(function (input) {
+            input.addEventListener("keydown", function (event) {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                setFormStatus(statusId, "日期时间内容已保留；可继续选择或使用取消按钮退出", "");
+            }, true);
         });
     }
 

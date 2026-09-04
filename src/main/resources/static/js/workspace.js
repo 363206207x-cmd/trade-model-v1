@@ -151,6 +151,26 @@
         return result;
     }
 
+    const messageReasonLabels = Object.freeze({
+        PRICE_MOVE_RATIO: "价格变化幅度",
+        OPEN_INTEREST_CHANGE_RATIO: "持仓量变化幅度",
+        LIQUIDITY_CHANGE_RATIO: "流动性变化幅度",
+        SYSTEMIC_SHOCK_SEVERITY: "系统性冲击强度",
+        CONFIG_THRESHOLD: "触发阈值"
+    });
+
+    function messageBodyText(item) {
+        const raw = text(item?.body || item?.reason, "暂无补充说明");
+        const symbol = text(item?.symbol || item?.assetSymbol, "").trim();
+        const marker = "〔关联资产〕";
+        const protectedAsset = symbol ? raw.split(symbol).join(marker) : raw;
+        const readable = Object.entries(messageReasonLabels).reduce(function (value, entry) {
+            return value.replace(new RegExp("\\b" + entry[0] + "\\b", "g"), entry[1]);
+        }, protectedAsset);
+        return humanReason(readable, "详细原因已记录，请打开关联详情查看")
+            .split(marker).join(symbol || "未关联资产");
+    }
+
     function shortId(value) {
         const raw = text(value, "");
         if (!raw) return "未形成";
@@ -438,6 +458,14 @@
         }
     }
 
+    function scanRuntimeText(header) {
+        const state = String(header?.scanState || header?.scanTaskState || "").toUpperCase();
+        if (["QUEUED", "RUNNING", "SCANNING", "IN_PROGRESS"].includes(state)) return "扫描任务执行中";
+        if (hasValue(header?.lastScanResult)) return humanReason(header.lastScanResult, "最近一次扫描已完成");
+        if (hasValue(header?.lastCompletedScanAt)) return "最近一次扫描已完成";
+        return "尚无完成记录";
+    }
+
     async function loadSystemStatus() {
         const target = document.getElementById("statusRecoveryContent");
         if (!target) return;
@@ -452,7 +480,7 @@
                 ["应用状态", label(readiness?.status, "当前不可查看")],
                 ["数据库", label(readiness?.databaseStatus, "当前不可查看")],
                 ["调度器", label(readiness?.schedulerObservationStatus || header.systemRuntimeState, "当前不可查看")],
-                ["扫描状态", text(header.systemRuntimeLabel, label(header.systemRuntimeState, "当前不可查看"))],
+                ["扫描状态", scanRuntimeText(header)],
                 ["数据状态", label(header.dataStatus, "等待同步")],
                 ["数据来源", humanReason(header.dataSourceText, "数据来源当前不可查看")],
                 ["AI 服务", text(header.aiStatusLabel, "等待同步")],
@@ -522,7 +550,7 @@
         if (!scan) return;
         const poolEmpty = assetPoolItems.length === 0;
         const poolTasks = latestTasks.filter(function (task) { return task.taskType === "POOL_SCAN"; });
-        const sharedState = String(poolScanRuntime?.systemRuntimeState || "").toUpperCase();
+        const sharedState = String(poolScanRuntime?.scanState || poolScanRuntime?.scanTaskState || "").toUpperCase();
         const sharedResult = String(poolScanRuntime?.lastScanResult || "").toUpperCase();
         const sharedRunning = ["QUEUED", "RUNNING", "SCANNING", "IN_PROGRESS"].includes(sharedState);
         const sharedFailed = hasValue(poolScanRuntime?.lastScanFailureReason)
@@ -1200,6 +1228,8 @@
     }
 
     function bindPositionForms() {
+        preserveDateTimeDialogOnEscape(document.getElementById("actualPositionForm"), "actualPositionFormStatus");
+        preserveDateTimeDialogOnEscape(document.getElementById("closePositionForm"), "closePositionFormStatus");
         document.addEventListener("click", function (event) {
             const opener = event.target.closest('[data-open-overlay="actual-position"]');
             if (opener && opener.id !== "planActualPositionAction") prepareManualPositionForm();
@@ -1266,6 +1296,17 @@
                 setPositionFormStatus("closePositionFormStatus", error.message, true);
                 announce(error.message);
             } finally { setPositionSubmitBusy(event.currentTarget, false, "确认记录"); }
+        });
+    }
+
+    function preserveDateTimeDialogOnEscape(form, statusId) {
+        form?.querySelectorAll('input[type="datetime-local"]').forEach(function (input) {
+            input.addEventListener("keydown", function (event) {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                setPositionFormStatus(statusId, "日期时间内容已保留；可继续选择或使用取消按钮退出", false);
+            }, true);
         });
     }
 
@@ -1986,7 +2027,7 @@
                 const asset = text(item.symbol || item.assetSymbol, "未关联资产");
                 return '<article class="message-item" data-message-id="' + escapeHtml(item.messageId) + '"><div><strong>'
                     + escapeHtml(humanReason(item.title, label(item.category, messageType))) + '</strong><p>'
-                    + escapeHtml(humanReason(item.body || item.reason, "暂无补充说明")) + '</p><small>'
+                    + escapeHtml(messageBodyText(item)) + '</p><small>'
                     + escapeHtml(messageType + " · " + asset + " · " + formatTime(item.createdAt))
                     + ' · 站内消息</small></div><div><span class="state-badge">'
                     + escapeHtml(label(item.readState, "状态待同步")) + '</span>' + primaryAction + "</div></article>";
@@ -2270,7 +2311,17 @@
             const payload = audit.aiRoleResults?.roles?.[role] || {};
             return { title: title, owner: roleLabel(role), status: payload.roleState || trace.status || "NOT_RECORDED", id: payload.traceId || trace.traceId || trace.callId,
                 time: payload.generatedAt || trace.observedAt || trace.createdAt, source: [trace.provider, trace.model].filter(Boolean).join(" · ") || "模型来源当前不可查看",
-                summary: humanReason(payload.summary || trace.inputSummary || trace.fallbackReason || trace.errorMessage, "角色输出状态已记录"), version: candidate.ruleVersion };
+                summary: auditRoleSummary(payload, trace), version: candidate.ruleVersion };
+        }
+        function auditRoleSummary(payload, trace) {
+            if (hasValue(payload?.summary)) return humanReason(payload.summary, "角色输出状态已记录");
+            const reason = String(trace?.fallbackReason || trace?.errorCode || "").toUpperCase();
+            if (reason.includes("EVIDENCE_FACT_MISMATCH")) return "AI 证据事实字段不一致，已安全回退";
+            if (reason.includes("BUDGET") || reason.includes("QUOTA")) return "AI 预算门禁已阻断，本轮使用规则路径";
+            if (["SUCCESS", "SUCCEEDED", "COMPLETED"].includes(String(trace?.status || "").toUpperCase())) return "AI 调用已完成";
+            if (["STARTED", "QUEUED", "RUNNING", "IN_PROGRESS"].includes(String(trace?.status || "").toUpperCase())) return "AI 调用进行中";
+            if (hasValue(trace?.callId || trace?.traceId)) return "AI 调用未完成，已安全回退";
+            return "角色输出尚未形成";
         }
         function renderAuditStage(stage) {
             return '<article class="audit-step"><div><strong>' + escapeHtml(stage.title) + '</strong><p>' + escapeHtml(stage.owner) + '</p></div><div class="audit-step-main"><p class="audit-step-summary">'

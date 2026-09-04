@@ -79,8 +79,31 @@ class InteractionAuditConsolidatedRemediationContractTest {
                 "1 小时机会质量", "4 小时趋势一致性", "方向或置信度不完整，已按待重新分析处理",
                 "Market Data", "AnalysisRun", "Direction", "Opportunity / Candidate",
                 "Rule Validation", "没有强制生成最终计划", "复制完整 ID",
-                "humanReason(item.body || item.reason")
-                .doesNotContain("multiTimeframeStates || analysisAudit.decisionBundle?.multiTimeframeState");
+                "messageBodyText(item)", "auditRoleSummary(payload, trace)")
+                .doesNotContain(
+                        "multiTimeframeStates || analysisAudit.decisionBundle?.multiTimeframeState",
+                        "payload.summary || trace.inputSummary",
+                        "humanReason(item.body || item.reason");
+    }
+
+    @Test
+    void scanStateAndDateTimeOverlaysUseInteractionSpecificState() throws Exception {
+        String homeScript = Files.readString(HOME_SCRIPT);
+        String workspaceScript = Files.readString(SCRIPT);
+
+        assertThat(workspaceScript).contains(
+                "poolScanRuntime?.scanState",
+                "scanRuntimeText(header)",
+                "preserveDateTimeDialogOnEscape",
+                "input[type=\"datetime-local\"]")
+                .doesNotContain(
+                        "const sharedState = String(poolScanRuntime?.systemRuntimeState",
+                        "[\"扫描状态\", text(header.systemRuntimeLabel");
+        assertThat(homeScript).contains(
+                "scanRuntimeText(header)",
+                "preserveDateTimeDialogOnEscape",
+                "input[type=\"datetime-local\"]")
+                .doesNotContain("[\"扫描状态\", text(header.systemRuntimeLabel");
     }
 
     @Test
