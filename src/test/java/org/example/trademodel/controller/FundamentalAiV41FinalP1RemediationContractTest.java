@@ -196,7 +196,9 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "openPoolAssetDetail(result.dataset.searchSymbol, result)",
                 "正在加载已有分析记录。",
                 "function schedulerObservationText(readiness, header)",
+                "[\"-\", \"—\", \"N/A\", \"NA\", \"NULL\"].includes(normalized)",
                 "function lastScanResultText(header)",
+                "updatePoolScanCta();\n        Promise.all([loadAssetPool(), loadTasks()])",
                 "已完成（结果摘要未记录）")
                 .doesNotContain(
                         "[\"调度器\", label(readiness?.schedulerObservationStatus || header.systemRuntimeState, \"当前不可查看\")]",
