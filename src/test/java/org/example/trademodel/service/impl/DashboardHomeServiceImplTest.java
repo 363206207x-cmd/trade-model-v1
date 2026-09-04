@@ -225,6 +225,40 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void selectedRankedAssetOutsideRequestedLimitRemainsVisibleForSmallHomeSurfaces() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        DecisionResultVO btc = decision("BTCUSDT", "BULLISH", "HIGH", "LOW", 92, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        DecisionResultVO sol = decision("SOLUSDT", "BULLISH", "HIGH", "LOW", 90, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        DecisionResultVO xrp = decision("XRPUSDT", "BULLISH", "HIGH", "LOW", 88, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        DecisionResultVO eth = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 86, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(101L, btc, 94, "opportunity-btc", "CANDIDATE"),
+                projection(102L, sol, 92, "opportunity-sol", "CANDIDATE"),
+                projection(103L, xrp, 90, "opportunity-xrp", "CANDIDATE"),
+                projection(104L, eth, 88, "opportunity-eth", "CANDIDATE")));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "ETHUSDT", 3, null);
+
+        assertThat(home.getAssets()).hasSize(3);
+        assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("BTCUSDT", "SOLUSDT", "ETHUSDT");
+        assertThat(home.getSelectedSymbol()).isEqualTo("ETHUSDT");
+        assertThat(home.getSelectedAssetContext()).isNotNull();
+        assertThat(home.getSelectedAssetContext().getRawSymbol()).isEqualTo("ETHUSDT");
+        assertThat(home.getSelectedContextState()).isEqualTo("RANKED");
+        verify(rankingService).rankForHome(USER_ID, 6);
+        verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
+    }
+
+    @Test
     void homeProjectionBindsPersistedProvenanceToTheSameAnalysisVersion() throws Exception {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);

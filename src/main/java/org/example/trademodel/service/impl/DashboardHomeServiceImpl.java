@@ -301,7 +301,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         ProviderReadinessVO providerReadiness = safeProviderReadiness();
         boolean rankingEnabled = opportunityPriorityRankingService != null;
         RankingReadResult rankingRead = rankingEnabled
-                ? safeHomeRanking(userId, effectiveLimit)
+                ? safeHomeRanking(userId, Math.max(effectiveLimit, DEFAULT_LIMIT))
                 : new RankingReadResult(List.of(), false);
         List<String> focusSymbols = rankingEnabled
                 ? rankingRead.rows().stream().map(HomeTopAssetProjection::symbol).toList()
@@ -330,7 +330,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             selectedDecisionReadFailed = lookup.failed();
         }
         List<DashboardHomeVO.AssetVO> assets = rankingEnabled
-                ? buildRankedAssets(rankingRead.rows(), effectiveLimit, userId)
+                ? buildRankedAssets(rankingRead.rows(), effectiveLimit, userId, normalizedSelected)
                 : buildAssets(decisions, selectedDecision, normalizedSelected, focusSymbols, effectiveLimit);
         if (!rankingEnabled && normalizedRequest == null && !hasRenderableAsset(assets, normalizedSelected)) {
             String firstRenderableSymbol = firstRenderableAssetSymbol(assets);
@@ -978,12 +978,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private List<DashboardHomeVO.AssetVO> buildRankedAssets(
             List<HomeTopAssetProjection> projections,
             int limit,
-            Long userId) {
+            Long userId,
+            String selectedSymbol) {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         Set<Long> usedAssetIds = new LinkedHashSet<>();
         Set<String> usedSymbols = new LinkedHashSet<>();
-        for (HomeTopAssetProjection projection : projections == null
-                ? List.<HomeTopAssetProjection>of() : projections) {
+        for (HomeTopAssetProjection projection : rankedProjectionsForDisplay(
+                projections, selectedSymbol, limit)) {
             if (assets.size() >= limit) {
                 break;
             }
@@ -1047,6 +1048,33 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             assets.add(asset);
         }
         return assets;
+    }
+
+    private List<HomeTopAssetProjection> rankedProjectionsForDisplay(
+            List<HomeTopAssetProjection> projections,
+            String selectedSymbol,
+            int limit) {
+        List<HomeTopAssetProjection> source = projections == null ? List.of() : projections;
+        String normalizedSelected = normalizeSymbol(selectedSymbol);
+        if (normalizedSelected == null || limit <= 0 || source.size() <= limit) {
+            return source;
+        }
+        int selectedIndex = -1;
+        for (int index = 0; index < source.size(); index++) {
+            HomeTopAssetProjection projection = source.get(index);
+            if (projection != null
+                    && normalizedSelected.equals(normalizeSymbol(projection.symbol()))) {
+                selectedIndex = index;
+                break;
+            }
+        }
+        if (selectedIndex < 0 || selectedIndex < limit) {
+            return source;
+        }
+        List<HomeTopAssetProjection> prioritized = new ArrayList<>(source);
+        HomeTopAssetProjection selected = prioritized.remove(selectedIndex);
+        prioritized.add(Math.min(limit - 1, prioritized.size()), selected);
+        return prioritized;
     }
 
     private void applyAnalysisProvenance(DashboardHomeVO.AssetVO asset,
