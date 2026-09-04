@@ -8,13 +8,32 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization
-Product Phase Status: TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register one exact Telegram durable-delivery and full-interaction usability closure; no implementation, Telegram send or deployment is included in this gate package
-Next Business Phase: V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation Authorization
+Product Phase Status: INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact frozen 26-step interaction-audit remediation; no implementation, Telegram send or deployment is included in this gate package
+Next Business Phase: V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
+
+---
+
+## TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation Authorization
+
+The Owner-authorized successor is
+`V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION` on
+`codex/v4-1-interaction-audit-consolidated-remediation`, anchored to frozen
+audit baseline `782fb97987da1a09671c3450298f000abc341942`. The existing
+26-step report (15 PASS, 7 PARTIAL, 4 FAIL) is the sole finding input; no
+rediscovery audit is authorized.
+
+This gate package changes no business capability. After merged-main
+effectivity, the successor may change only the literal allowlisted paths in
+`docs/CODEX_NEXT_TASK.yml`, then deploy its exact merged-main SHA to private
+Staging and repeat the same 26 formal-domain steps. Production, direction or
+score algorithms, automatic trading, real Telegram sends by this task, and
+all changes to the existing three groups / twenty-five suspected duplicate
+positions remain blocked.
 
 ---
 

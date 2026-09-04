@@ -13,23 +13,23 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "TRINE LOGIC v4.1 Telegram Blocker and Full Interaction Usability Closure Authorization"
-product_phase_status: "TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
+product_phase: "TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation Authorization"
+product_phase_status: "INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "Owner-authorized exact machine gate for Telegram blocker closure and consolidated interaction usability remediation"
-active_block_cn: "Owner 授权的 Telegram 阻断关闭与全页面交互可用性集中修复精确机器门禁"
+active_block: "Owner-authorized exact machine gate for the frozen 26-step interaction-audit remediation"
+active_block_cn: "Owner 授权的已冻结26步交互审计集中修复精确机器门禁"
 
-next_required_action: "Validate, push and merge the exact docs/gate authorization, then continue Telegram blocker closure, full interaction audit and consolidated remediation."
-next_business_phase: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
+next_required_action: "Validate, push and merge this exact docs/gate authorization, then continue the frozen interaction-audit remediation without rediscovery."
+next_business_phase: "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character starting SHA and sixty-file implementation allowlist are required after this authorization is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character audit baseline SHA and literal-path implementation allowlist are required after this authorization is effective on merged main."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "NONE; one docs/gate-only Telegram/full-interaction usability authorization PR is authorized after local validation"
-current_branch: "codex/v4-1-telegram-interaction-usability-authorization"
+current_pr: "NONE; one docs/gate-only frozen interaction-audit remediation authorization PR is authorized after local validation"
+current_branch: "codex/v4-1-interaction-audit-consolidated-remediation-authorization"
 current_package_pr: "NONE; Owner one-pass authorization permits exact-head push/PR/merge"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
@@ -41,12 +41,12 @@ v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_C
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_authorized_package: "V41_TELEGRAM_FULL_INTERACTION_USABILITY_CLOSURE"
+v4_1_authorized_package: "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-telegram-interaction-usability-closure"
-v4_1_authorized_successor_starting_full_sha: "b5e52d501becf675f4299fc7c5d389707de81af0"
+v4_1_authorized_successor_branch: "codex/v4-1-interaction-audit-consolidated-remediation"
+v4_1_authorized_successor_starting_full_sha: "782fb97987da1a09671c3450298f000abc341942"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
 v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
@@ -79,8 +79,10 @@ v4_1_official_domain_session_runtime_visibility_closure_authorization_status: "E
 v4_1_official_domain_session_runtime_visibility_closure_implementation_status: "COMPLETE"
 v4_1_official_domain_home_analysis_telegram_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_official_domain_home_analysis_telegram_closure_implementation_status: "COMPLETE"
-v4_1_telegram_full_interaction_usability_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
-v4_1_telegram_full_interaction_usability_closure_implementation_status: "NOT_STARTED"
+v4_1_telegram_full_interaction_usability_closure_authorization_status: "EFFECTIVE_MERGED_MAIN"
+v4_1_telegram_full_interaction_usability_closure_implementation_status: "COMPLETE"
+v4_1_interaction_audit_consolidated_remediation_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_interaction_audit_consolidated_remediation_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
