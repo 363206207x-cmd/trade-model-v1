@@ -1442,7 +1442,7 @@ evaluate_real_logic_chain_closure_transition() {
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
     || [[ "$current_package_starting_full_sha" != "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] \
     || [[ "$authorized_next_package_starting_full_sha" != "$current_package_starting_full_sha" ]] \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "93" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "96" ]]; then
     next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
     return 0
   fi
@@ -3055,7 +3055,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUT
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
     || ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "93" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "96" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
