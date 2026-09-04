@@ -473,7 +473,12 @@
         if (["-", "—", "N/A", "NA", "NULL"].includes(normalized)) {
             return "调度状态当前不可查看";
         }
-        return hasValue(status) ? label(status, "调度状态当前不可查看") : "调度状态当前不可查看";
+        const displayed = hasValue(status)
+            ? label(status, "调度状态当前不可查看")
+            : "调度状态当前不可查看";
+        return ["-", "—", "N/A", "NA", "NULL"].includes(String(displayed).trim().toUpperCase())
+            ? "调度状态当前不可查看"
+            : displayed;
     }
 
     function lastScanResultText(header) {
