@@ -18,6 +18,7 @@
     let restoreFocus = null;
     let analysisAudit = null;
     let assetPoolItems = [];
+    let assetPoolLoaded = false;
     let latestTasks = [];
     let poolScanRuntime = null;
     let telegramStatus = null;
@@ -466,6 +467,19 @@
         return "尚无完成记录";
     }
 
+    function schedulerObservationText(readiness, header) {
+        const status = readiness?.schedulerObservationStatus || header?.systemRuntimeState;
+        return hasValue(status) ? label(status, "调度状态当前不可查看") : "调度状态当前不可查看";
+    }
+
+    function lastScanResultText(header) {
+        if (hasValue(header?.lastScanResult)) {
+            return humanReason(header.lastScanResult, "已完成（结果摘要未记录）");
+        }
+        if (hasValue(header?.lastCompletedScanAt)) return "已完成（结果摘要未记录）";
+        return "尚无完成记录";
+    }
+
     async function loadSystemStatus() {
         const target = document.getElementById("statusRecoveryContent");
         if (!target) return;
@@ -479,7 +493,7 @@
             target.innerHTML = '<section class="status-recovery-summary">' + factGrid([
                 ["应用状态", label(readiness?.status, "当前不可查看")],
                 ["数据库", label(readiness?.databaseStatus, "当前不可查看")],
-                ["调度器", label(readiness?.schedulerObservationStatus || header.systemRuntimeState, "当前不可查看")],
+                ["调度器", schedulerObservationText(readiness, header)],
                 ["扫描状态", scanRuntimeText(header)],
                 ["数据状态", label(header.dataStatus, "等待同步")],
                 ["数据来源", humanReason(header.dataSourceText, "数据来源当前不可查看")],
@@ -488,7 +502,7 @@
                 ["本轮开始", formatTime(header.scanStartedAt)],
                 ["上次成功完成", formatTime(header.lastCompletedScanAt)],
                 ["下次计划扫描", formatTime(header.nextScheduledScanAt)],
-                ["上次扫描结果", humanReason(header.lastScanResult, "尚无完成记录")]
+                ["上次扫描结果", lastScanResultText(header)]
             ]) + '</section><section class="safety-notice"><strong>'
                 + escapeHtml(failed ? "上次扫描需要处理" : "恢复条件") + '</strong><p>'
                 + escapeHtml(failed ? humanReason(header.lastScanFailureReason, "查看任务中心并在原因消除后手动重试。")
@@ -521,6 +535,7 @@
             const items = result[0] || [];
             poolScanRuntime = result[1]?.header || null;
             assetPoolItems = items;
+            assetPoolLoaded = true;
             renderAssetPoolRows(items);
             const batch = document.getElementById("poolBatchList");
             if (batch) batch.innerHTML = items.map(function (asset) {
@@ -538,6 +553,7 @@
             updatePoolScanCta();
         } catch (_) {
             assetPoolItems = [];
+            assetPoolLoaded = true;
             empty(document.getElementById("assetPoolRows")?.parentElement, "资产池当前不可查看", "未返回可信资产池数据。请稍后重试。");
             updatePoolScanCta(true);
         }
@@ -548,6 +564,7 @@
         const topUp = document.getElementById("topUpDefaultAssets");
         const status = document.getElementById("poolScanStatus");
         if (!scan) return;
+        const loading = !assetPoolLoaded && loadFailed !== true;
         const poolEmpty = assetPoolItems.length === 0;
         const poolTasks = latestTasks.filter(function (task) { return task.taskType === "POOL_SCAN"; });
         const sharedState = String(poolScanRuntime?.scanState || poolScanRuntime?.scanTaskState || "").toUpperCase();
@@ -562,14 +579,18 @@
         const completed = sharedCompleted || (!poolScanRuntime && poolTasks.some(function (task) { return task.state === "SUCCEEDED"; }));
         scan.classList.remove("button-primary");
         scan.classList.add("button-secondary");
-        scan.disabled = poolEmpty || running || loadFailed === true;
+        scan.disabled = loading || poolEmpty || running || loadFailed === true;
         if (topUp) {
+            topUp.disabled = loading || loadFailed === true;
             topUp.classList.toggle("button-primary", poolEmpty);
             topUp.classList.toggle("button-secondary", !poolEmpty);
         }
         if (loadFailed === true) {
             scan.textContent = "当前不可扫描";
             if (status) status.textContent = "资产池状态当前不可查看";
+        } else if (loading) {
+            scan.textContent = "正在加载";
+            if (status) status.textContent = "正在加载资产池";
         } else if (poolEmpty) {
             scan.textContent = "扫描资产池";
             if (status) status.textContent = "请先添加观察资产";
@@ -596,7 +617,16 @@
         if (!target) return;
         if (!items.length) return empty(target, "未找到资产", "请尝试其他名称或交易对。"), undefined;
         target.innerHTML = items.map(function (asset) {
-            return '<button class="search-result" type="button" data-search-symbol="' + escapeHtml(asset.symbol) + '" data-preview="' + (previewMode ? "true" : "false") + '"><span><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.baseAsset, "市场资产")) + ' / ' + escapeHtml(text(asset.quoteAsset, "")) + '</small></span><em>' + (previewMode ? "分析" : "加入") + "</em></button>";
+            const symbol = String(asset.symbol || "").toUpperCase();
+            const alreadyObserved = !previewMode && assetPoolItems.some(function (item) {
+                return String(item.symbol || "").toUpperCase() === symbol;
+            });
+            return '<button class="search-result" type="button" data-search-symbol="' + escapeHtml(symbol)
+                + '" data-preview="' + (previewMode ? "true" : "false") + '" data-existing-pool="'
+                + (alreadyObserved ? "true" : "false") + '"><span><strong>' + escapeHtml(symbol)
+                + '</strong><small>' + escapeHtml(text(asset.baseAsset, "市场资产")) + ' / '
+                + escapeHtml(text(asset.quoteAsset, "")) + '</small></span><em>'
+                + (previewMode ? "分析" : alreadyObserved ? "已观察" : "加入") + "</em></button>";
         }).join("");
     }
 
@@ -616,6 +646,14 @@
         await api("/api/asset-pool", { method: "POST", body: JSON.stringify({ symbol: symbol, focusEnabled: true }) });
         announce(symbol + " 已加入资产池");
         await loadAssetPool();
+    }
+
+    function openPoolAssetDetail(symbol, trigger) {
+        const target = document.getElementById("poolAssetDetailContent");
+        if (!target || !symbol) return;
+        target.innerHTML = '<h3>' + escapeHtml(symbol) + '</h3><p>该资产的历史分析与机会记录会独立保留。</p><a class="button button-secondary" href="/analysis?asset=' + encodeURIComponent(symbol) + '">按需分析</a>';
+        trigger?.closest("dialog")?.close();
+        openOverlay("pool-asset-detail", trigger);
     }
 
     function analysisFailureMessage(errorCode) {
@@ -888,15 +926,14 @@
                 if (result) {
                     result.disabled = true;
                     if (result.dataset.preview === "true") await previewAsset(result.dataset.searchSymbol);
+                    else if (result.dataset.existingPool === "true") openPoolAssetDetail(result.dataset.searchSymbol, result);
                     else await addAsset(result.dataset.searchSymbol);
                 } else if (remove && window.confirm("从观察资产池移除 " + remove.dataset.removeAsset + "？历史记录会保留。")) {
                     await api("/api/asset-pool/" + encodeURIComponent(remove.dataset.removeAsset), { method: "DELETE" });
                     announce(remove.dataset.removeAsset + " 已移除");
                     await loadAssetPool();
                 } else if (detail) {
-                    const target = document.getElementById("poolAssetDetailContent");
-                    target.innerHTML = '<h3>' + escapeHtml(detail.dataset.poolDetail) + '</h3><p>该资产的历史分析与机会记录会独立保留。</p><a class="button button-secondary" href="/analysis?asset=' + encodeURIComponent(detail.dataset.poolDetail) + '">按需分析</a>';
-                    openOverlay("pool-asset-detail", detail);
+                    openPoolAssetDetail(detail.dataset.poolDetail, detail);
                 }
             } catch (error) {
                 announce(error.message);
@@ -1851,6 +1888,7 @@
 
     async function resumeAnalysis(analysisId) {
         if (!analysisId) return;
+        renderAnalysisRunState({ analysisId: analysisId }, "RUNNING", "正在加载已有分析记录。");
         try {
             const snapshot = await api("/api/analysis/runs/" + encodeURIComponent(analysisId));
             activeAnalysisId = String(snapshot?.analysisId || analysisId);

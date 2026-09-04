@@ -182,6 +182,29 @@ class FundamentalAiV41FinalP1RemediationContractTest {
     }
 
     @Test
+    void auditFollowupKeepsLoadingAndExistingAssetStatesTruthful() throws Exception {
+        String script = Files.readString(SCRIPT);
+
+        assertThat(script).contains(
+                "let assetPoolLoaded = false",
+                "assetPoolLoaded = true",
+                "正在加载资产池",
+                "const alreadyObserved = !previewMode && assetPoolItems.some",
+                "data-existing-pool=\"",
+                "alreadyObserved ? \"已观察\" : \"加入\"",
+                "result.dataset.existingPool === \"true\"",
+                "openPoolAssetDetail(result.dataset.searchSymbol, result)",
+                "正在加载已有分析记录。",
+                "function schedulerObservationText(readiness, header)",
+                "function lastScanResultText(header)",
+                "已完成（结果摘要未记录）")
+                .doesNotContain(
+                        "[\"调度器\", label(readiness?.schedulerObservationStatus || header.systemRuntimeState, \"当前不可查看\")]",
+                        "[\"上次扫描结果\", humanReason(header.lastScanResult, \"尚无完成记录\")]"
+                );
+    }
+
+    @Test
     void semanticStatusColorsUseTheSingleApprovedTokenSet() throws Exception {
         String homeScript = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
         String workspaceScript = Files.readString(SCRIPT);
