@@ -235,7 +235,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             throw new IllegalArgumentException("UserPosition side must be LONG or SHORT");
         }
         String assetSymbol = requireText(position.getAssetSymbol(), "asset_symbol");
-        if (systemScope) {
+        String positionSource = normalize(position.getSourceType());
+        boolean manualIndependent = "MANUAL_INDEPENDENT".equals(positionSource)
+                || "MANUAL".equals(positionSource)
+                || "MANUAL_POSITION".equals(positionSource);
+        if (systemScope && !manualIndependent) {
             requireBinanceClosedWindows(assetSymbol);
         }
         MarkPriceContext markPrice = readMarkPrice(assetSymbol);
@@ -246,10 +250,6 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             reasons.addAll(derivativesAssessment.reasonCodes());
         }
 
-        String positionSource = normalize(position.getSourceType());
-        boolean manualIndependent = "MANUAL_INDEPENDENT".equals(positionSource)
-                || "MANUAL".equals(positionSource)
-                || "MANUAL_POSITION".equals(positionSource);
         PlanContext planContext = manualIndependent
                 ? PlanContext.notApplicable()
                 : resolvePlanContext(position, reasons);
@@ -372,9 +372,11 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             sourceStatus = PositionMonitorSourceStatusEnum.PENDING_VERIFICATION;
         }
         boolean trustedMonitorResult = sourceStatus == PositionMonitorSourceStatusEnum.VERIFIED;
+        boolean basePriceOnly = manualIndependent && !trustedMonitorResult;
 
         RecordPositionMonitorLogCommand command = new RecordPositionMonitorLogCommand();
         command.setPositionId(position.getId());
+        command.setMonitorRunKey(monitorRunKey(position.getId(), markPrice.observedAt()));
         command.setAnalysisId((!manualIndependent && planContext.missing) || currentAnalysisId == null
                 ? PositionMonitorSourceContract.UNVERIFIED_ANALYSIS_ID
                 : currentAnalysisId);
@@ -439,6 +441,16 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
             result.setSuggestedManualActionText(suggestedAction == null
                     ? null : suggestedActionText(suggestedAction));
             applyPnl(result, side, position.getEntryPrice(), markPrice.price(), position.getQuantity());
+        } else if (basePriceOnly) {
+            result.setCurrentPrice(markPrice.price());
+            result.setMarkPrice(markPrice.price());
+            result.setMarkPriceSource(markPrice.source());
+            result.setMarkPriceObservedAt(markPrice.observedAt());
+            result.setMarkPriceFresh(true);
+            result.setEntryLogicStatus(PositionEntryLogicStatusEnum.NOT_APPLICABLE.name());
+            result.setLogicStatus(PositionEntryLogicStatusEnum.NOT_APPLICABLE.name());
+            result.setDirectionSupportStatus("NOT_APPLICABLE");
+            applyPnl(result, side, position.getEntryPrice(), markPrice.price(), position.getQuantity());
         } else {
             result.setMarkPriceFresh(false);
         }
@@ -447,11 +459,17 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         result.setMonitorLogId(log.getLogId());
         result.setMonitoredAt(log.getCreatedAt());
         result.setLastMonitorTime(log.getCreatedAt());
-        result.setDataState(dataState(sourceStatus, monitorConclusion, riskTrend).name());
-        if (highValueAlertMessageService != null) {
+        result.setDataState(basePriceOnly ? PositionMonitorDataStateEnum.PARTIAL.name()
+                : dataState(sourceStatus, monitorConclusion, riskTrend).name());
+        if (highValueAlertMessageService != null && trustedMonitorResult) {
             highValueAlertMessageService.recordPosition(position, log, result);
         }
         return result;
+    }
+
+    private static String monitorRunKey(Long positionId, LocalDateTime observedAt) {
+        LocalDateTime bucket = observedAt == null ? null : observedAt.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        return "position-monitor:" + positionId + ":" + bucket;
     }
 
     private void requireBinanceClosedWindows(String symbol) {

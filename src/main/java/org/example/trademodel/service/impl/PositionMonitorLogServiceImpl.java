@@ -18,6 +18,7 @@ import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -149,6 +150,11 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         rejectAutomaticExecutionWords("risk_snapshot", riskSnapshot);
 
         PositionMonitorLogDO row = new PositionMonitorLogDO();
+        String monitorRunKey = optionalText(command.getMonitorRunKey());
+        if (monitorRunKey != null && monitorRunKey.length() > 180) {
+            throw new IllegalArgumentException("monitor_run_key is too long");
+        }
+        row.setMonitorRunKey(monitorRunKey);
         row.setPositionId(positionId);
         row.setAnalysisId(analysisId);
         row.setExecutionPlanId(executionPlanId);
@@ -171,7 +177,23 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
         row.setRiskSnapshot(riskSnapshot);
         row.setTraceId(traceId);
         row.setCreatedAt(recordedAt);
-        int inserted = positionMonitorLogMapper.insert(row);
+        int inserted;
+        if (monitorRunKey == null) {
+            inserted = positionMonitorLogMapper.insert(row);
+        } else {
+            try {
+                inserted = positionMonitorLogMapper.insertIfAbsent(row);
+            } catch (DuplicateKeyException duplicate) {
+                inserted = 0;
+            }
+            if (inserted == 0) {
+                PositionMonitorLogDO canonical = positionMonitorLogMapper.selectByMonitorRunKey(monitorRunKey);
+                if (canonical == null || !positionId.equals(canonical.getPositionId())) {
+                    throw new IllegalStateException("PositionMonitorLog idempotency claim mismatch");
+                }
+                return toDto(canonical);
+            }
+        }
         if (inserted != 1) {
             throw new IllegalStateException("PositionMonitorLog insert failed");
         }

@@ -53,11 +53,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -194,6 +196,41 @@ class DecisionChainServiceImplTest {
                     .keySet().stream().map(String::valueOf).toList())
                     .containsExactlyInAnyOrder("4h", "1h", "15m", "5m");
         });
+    }
+
+    @Test
+    void everyExplicitBullishAndBearishDirectionProducesQueryablePlanResult() {
+        AtomicReference<String> activeBias = new AtomicReference<>("BULLISH");
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
+                anyString(), anyString(), any()))
+                .thenAnswer(invocation -> opportunity(invocation.getArgument(1), "ADVISORY_ALLOWED"));
+        when(aiOrchestratorService.invoke(any())).thenAnswer(invocation ->
+                success(((AiDecisionChainRequest) invocation.getArgument(0)).getRole(), activeBias.get()));
+        when(conflictResolver.resolveDecisionChain(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenAnswer(invocation -> conflict(false, invocation.<ExecutionPlanCandidateDO>getArgument(0)
+                        .getRuleDirection()));
+        when(ruleValidator.validate(any(), any(), any(), any())).thenReturn(RuleValidationResult.pass());
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
+
+        for (String bias : List.of("STRONG_BULLISH", "BULLISH", "WEAK_BULLISH",
+                "WEAK_BEARISH", "BEARISH", "STRONG_BEARISH")) {
+            activeBias.set(bias);
+            DecisionChainBuildInput input = input();
+            input.decision().setMarketBiasHierarchy(bias);
+            input.decision().setRuleMarketBias(bias);
+            input.decision().setValidatedMarketBias(bias);
+
+            DecisionChainBuildResult result = service.build(input);
+
+            assertThat(result.candidate()).as(bias).isNotNull();
+            assertThat(result.candidate().getRuleDirection()).as(bias).isEqualTo(bias);
+            assertThat(result.finalPlan()).as(bias).isNotNull();
+            assertThat(result.finalPlan().getFinalMarketBias()).as(bias).isEqualTo(bias);
+            assertThat(result.finalPlan().getFinalPlanMode()).as(bias)
+                    .isIn("CONFIRMATION", "PREPARATION", "REDUCED", "BLOCKED");
+        }
     }
 
     @Test
@@ -847,6 +884,13 @@ class DecisionChainServiceImplTest {
         return result;
     }
 
+    private static ConflictResolverResultDO conflict(boolean confused, String bias) {
+        ConflictResolverResultDO result = conflict(confused);
+        result.setRuleDirection(bias);
+        result.setBiasAfter(bias);
+        return result;
+    }
+
     private static AiDecisionChainResult success(AiDecisionChainRole role) {
         AiDecisionChainResult result = new AiDecisionChainResult();
         result.setProvider(provider(role));
@@ -895,6 +939,14 @@ class DecisionChainServiceImplTest {
                      "riskAdjustment":"UNCHANGED","planModeImpact":"UNCHANGED"}
                     """;
         });
+        return result;
+    }
+
+    private static AiDecisionChainResult success(AiDecisionChainRole role, String bias) {
+        AiDecisionChainResult result = success(role);
+        result.setPayloadJson(result.getPayloadJson()
+                .replace("BULLISH", bias)
+                .replace("bullish", bias.toLowerCase(Locale.ROOT)));
         return result;
     }
 

@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 @Component
 public class PositionMonitorScheduler {
 
@@ -14,6 +17,7 @@ public class PositionMonitorScheduler {
     private final PositionMonitorService positionMonitorService;
     private final boolean schedulersEnabled;
     private final boolean positionMonitorSchedulerEnabled;
+    private final ConcurrentMap<Long, Long> pendingInitialMonitors = new ConcurrentHashMap<>();
 
     public PositionMonitorScheduler(
             PositionMonitorService positionMonitorService,
@@ -35,6 +39,38 @@ public class PositionMonitorScheduler {
         } catch (RuntimeException ex) {
             log.warn("[position-monitor-scheduler] batch skipped: {}", ex.getMessage());
         }
+    }
+
+    public void requestInitialMonitor(Long positionId, Long userId) {
+        if (positionId == null || positionId <= 0) {
+            throw new IllegalArgumentException("positionId is required");
+        }
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        pendingInitialMonitors.put(positionId, userId);
+    }
+
+    @Scheduled(initialDelayString = "${trade-model.schedulers.position-monitor.initial-request-delay-ms:1000}",
+            fixedDelayString = "${trade-model.schedulers.position-monitor.initial-request-rate-ms:1000}")
+    public void monitorInitialRequestsScheduled() {
+        if (!scheduledExecutionEnabled() || pendingInitialMonitors.isEmpty()) {
+            return;
+        }
+        var claimed = java.util.Map.copyOf(pendingInitialMonitors);
+        for (var request : claimed.entrySet()) {
+            try {
+                positionMonitorService.monitorUserPositionForUser(request.getKey(), request.getValue());
+                pendingInitialMonitors.remove(request.getKey(), request.getValue());
+            } catch (RuntimeException ex) {
+                log.warn("[position-monitor-scheduler] initial position retained for retry positionId={}",
+                        request.getKey());
+            }
+        }
+    }
+
+    int pendingInitialMonitorCount() {
+        return pendingInitialMonitors.size();
     }
 
     boolean scheduledExecutionEnabled() {

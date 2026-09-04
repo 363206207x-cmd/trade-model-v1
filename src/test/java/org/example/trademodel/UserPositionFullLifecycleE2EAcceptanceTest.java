@@ -51,6 +51,7 @@ import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.PositionMonitorService;
 import org.example.trademodel.service.PositionMonitorLogService;
+import org.example.trademodel.service.PositionMonitorScheduler;
 import org.example.trademodel.service.ReviewService;
 import org.example.trademodel.service.impl.PositionMonitorServiceImpl;
 import org.example.trademodel.service.impl.UserPositionServiceImpl;
@@ -70,6 +71,34 @@ class UserPositionFullLifecycleE2EAcceptanceTest {
     private static final String PLAN_ID = "plan-p3-e2e-user-position";
     private static final String ANALYSIS_ID = "analysis-p3-e2e-user-position";
     private static final Long USER_ID = 17L;
+
+    @Test
+    void manualOpenQueuesOneInitialBaseMonitoringRequestWithoutTradingAction() {
+        UserPositionMapper mapper = mock(UserPositionMapper.class);
+        ExecutionPlanMapper planMapper = mock(ExecutionPlanMapper.class);
+        PositionMonitorScheduler monitorScheduler = mock(PositionMonitorScheduler.class);
+        doAnswer(invocation -> {
+            UserPositionDO row = invocation.getArgument(0);
+            row.setId(3101L);
+            return 1;
+        }).when(mapper).insert(any(UserPositionDO.class));
+        UserPositionServiceImpl service = new UserPositionServiceImpl(mapper, planMapper, monitorScheduler);
+        CreateUserPositionReq request = openPositionRequest();
+        request.setSourceType("MANUAL_INDEPENDENT");
+        request.setFinalPlanId(null);
+        request.setSourceRefId(null);
+
+        UserPositionVO opened = service.manualOpenForUser(USER_ID, request);
+
+        assertThat(opened.getId()).isEqualTo(3101L);
+        assertThat(opened.isNotTradeInstruction()).isTrue();
+        assertThat(opened.isNotAutoTrading()).isTrue();
+        assertThat(opened.isNotOrderExecution()).isTrue();
+        verify(monitorScheduler).requestInitialMonitor(3101L, USER_ID);
+        verify(mapper, never()).manualCloseByIdAndUserId(
+                anyLong(), anyLong(), any(LocalDateTime.class), any(BigDecimal.class),
+                anyString(), anyString(), any(LocalDateTime.class));
+    }
 
     @Test
     void activeMonitorAndClosedReviewUseSameSourceResolution()

@@ -254,7 +254,10 @@ public class DecisionEngineService {
             boolean multiTfConvergence = directionAssessment.structurallyReady()
                     && directional(ruleMarketBias)
                     && sameDirection(directionAssessment.normalized4hDirectionScore(),
-                    directionAssessment.normalized1hDirectionScore());
+                    directionAssessment.normalized1hDirectionScore())
+                    && directionAssessment.normalized4hDirectionScore()
+                    .subtract(directionAssessment.normalized1hDirectionScore()).abs()
+                    .compareTo(v41Properties.getMultiTimeframe().getMaximumTrendScoreDifference()) <= 0;
             int convergenceScore = multiTfConvergence ? 15 : -10;
 
             // ==================== 2. 规则层基础方向 + AI review-only 编排 ====================

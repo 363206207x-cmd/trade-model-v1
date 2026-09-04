@@ -58,28 +58,77 @@ public class AssetPoolController {
     @PostMapping("/search/{symbol}/analysis-preview")
     public ApiResponse<AssetAnalysisPreviewDTO> analyzePreview(
             @PathVariable String symbol,
-            @RequestParam(defaultValue = "5m") String timeframe) {
+            @RequestParam(defaultValue = "5m") String timeframe,
+            @RequestParam(required = false) String submissionId) {
         Long userId = userIdResolver.requireCurrentUserId();
-        AsyncTaskDO task = asyncTaskService.queueForUser(
-                userId, "ANALYSIS_PREVIEW", "ASSET", symbol, null);
-        asyncTaskService.markRunning(task, "ANALYSIS");
+        String normalizedSymbol = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.ROOT);
+        String normalizedTimeframe = timeframe == null ? "5m" : timeframe.trim().toLowerCase(java.util.Locale.ROOT);
+        String taskKey = "analysis-preview:" + userId + ":" + normalizedSymbol + ":" + normalizedTimeframe
+                + (submissionId == null || submissionId.isBlank() ? "" : ":" + submissionId.trim());
+        AsyncTaskDO task = asyncTaskService.queueIdempotentForUser(
+                userId, "ANALYSIS_PREVIEW", "ASSET", normalizedSymbol + ":" + normalizedTimeframe,
+                null, taskKey);
+        if ("FAILED".equalsIgnoreCase(task.getState()) || "PARTIAL".equalsIgnoreCase(task.getState())) {
+            task = asyncTaskService.retryForUser(userId, task.getTaskId());
+        }
+        if (!"QUEUED".equalsIgnoreCase(task.getState())) {
+            return ApiResponse.success(existingTaskPreview(normalizedSymbol, normalizedTimeframe, task));
+        }
+        if (!asyncTaskService.claimForExecution(task, "ANALYSIS")) {
+            return ApiResponse.success(existingTaskPreview(normalizedSymbol, normalizedTimeframe, task));
+        }
         try {
             AssetAnalysisPreviewDTO result = assetPoolService.analyzePreviewForUser(userId, symbol, timeframe);
+            if (result != null && result.analysisId() != null && !result.analysisId().isBlank()) {
+                asyncTaskService.bindResultIdentity(task, result.analysisId(), result.traceId());
+            }
             if (previewSucceeded(result)) {
                 asyncTaskService.complete(task, false, "COMPLETE");
             } else if (previewAccepted(result)) {
-                asyncTaskService.complete(task, false, previewStage(result));
+                if (!terminalTask(task)) {
+                    asyncTaskService.markRunning(task, previewStage(result));
+                }
             } else {
                 String reasonCode = result == null || result.reasonCode() == null
                         ? "ANALYSIS_PREVIEW_FAILED" : result.reasonCode();
                 asyncTaskService.fail(task, reasonCode, previewFailureMessage(reasonCode));
             }
-            return ApiResponse.success(result);
+            String responseState = terminalTask(task) ? task.getState()
+                    : previewSucceeded(result) ? "SUCCEEDED"
+                    : previewAccepted(result) ? "RUNNING" : "FAILED";
+            String responseStage = terminalTask(task) ? task.getStage()
+                    : previewAccepted(result) ? previewStage(result) : task.getStage();
+            return ApiResponse.success(result == null ? null
+                    : result.withTask(task.getTaskId(), responseState, responseStage));
         } catch (RuntimeException exception) {
             String reasonCode = previewExceptionReason(exception);
             asyncTaskService.fail(task, reasonCode, previewFailureMessage(reasonCode));
             throw exception;
         }
+    }
+
+    private static AssetAnalysisPreviewDTO existingTaskPreview(String symbol,
+                                                                String timeframe,
+                                                                AsyncTaskDO task) {
+        String state = task.getState() == null ? "RUNNING" : task.getState();
+        String status = "SUCCEEDED".equalsIgnoreCase(state) ? "EXISTING_SUCCESS"
+                : "FAILED".equalsIgnoreCase(state) ? "FAILED" : "QUEUED";
+        return new AssetAnalysisPreviewDTO(
+                symbol, timeframe, task.getResultResourceId(), task.getTraceId(), status,
+                "EXISTING_TASK", true, false, false, false, false, null)
+                .withTask(task.getTaskId(), state, task.getStage());
+    }
+
+    private static boolean terminalTask(AsyncTaskDO task) {
+        if (task == null || task.getState() == null) return false;
+        return switch (task.getState().trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "SUCCEEDED", "FAILED", "PARTIAL", "CANCELLED" -> true;
+            default -> false;
+        };
+    }
+
+    public ApiResponse<AssetAnalysisPreviewDTO> analyzePreview(String symbol, String timeframe) {
+        return analyzePreview(symbol, timeframe, null);
     }
 
     private static boolean previewSucceeded(AssetAnalysisPreviewDTO result) {

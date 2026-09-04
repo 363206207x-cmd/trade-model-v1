@@ -66,6 +66,13 @@ public final class MarketBiasPolicy {
                 .add(oneHour.multiply(config.getOneHourWeight()))
                 .setScale(4, RoundingMode.HALF_UP);
         String bias = criticalConflict ? "WAIT" : classifyStructuralBias(structural);
+        boolean strongDispersion = ("STRONG_BULLISH".equals(bias) || "STRONG_BEARISH".equals(bias))
+                && fourHour.signum() == oneHour.signum()
+                && fourHour.subtract(oneHour).abs()
+                .compareTo(config.getMaximumTrendScoreDifference()) > 0;
+        if (strongDispersion) {
+            bias = "STRONG_BULLISH".equals(bias) ? "BULLISH" : "BEARISH";
+        }
         return new DirectionAssessment(bias,
                 criticalConflict ? "MULTI_TIMEFRAME_CONFLICT" : "READY",
                 structural, fourHour, oneHour, fifteenMinute, fiveMinute,

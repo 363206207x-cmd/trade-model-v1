@@ -84,6 +84,29 @@ class InteractionAuditConsolidatedRemediationContractTest {
     }
 
     @Test
+    void onDemandAnalysisUsesStableSubmissionAndRecoversCanonicalTaskIdentity() throws Exception {
+        String homeScript = Files.readString(HOME_SCRIPT);
+        String workspaceScript = Files.readString(SCRIPT);
+
+        assertThat(homeScript).contains("sessionStorage", "analysis-preview:", "submissionId", "taskId");
+        assertThat(workspaceScript).contains("sessionStorage", "analysis-preview:", "submissionId",
+                "taskId", "/api/workspace/tasks?limit=30");
+        assertThat(homeScript).contains("clearAnalysisPreview(previewSymbol)");
+        assertThat(workspaceScript).contains("clearAnalysisPreview(snapshot?.symbol || analysisSelectedAsset?.symbol)");
+    }
+
+    @Test
+    void strongDirectionRequiresFinalConfidenceInWorkspaceAndAuditProjection() throws Exception {
+        String workspace = Files.readString(Path.of("src/main/resources/static/js/workspace.js"));
+
+        assertThat(workspace).contains("function trustedDirectionProjection");
+        assertThat(workspace).contains("/^STRONG_(BULLISH|BEARISH)$/");
+        assertThat(workspace).contains("trustedDirectionProjection(direction, decision.finalConfidence, confidence)");
+        assertThat(workspace).contains("directionTrusted = directionProjection.trusted");
+        assertThat(workspace).contains("directionReady = directionProjection.trusted");
+    }
+
+    @Test
     void positionDetailAndNavigationAreCompleteAndAccessible() throws Exception {
         String html = Files.readString(HTML);
         String script = Files.readString(SCRIPT);

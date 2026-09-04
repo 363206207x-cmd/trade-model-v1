@@ -89,6 +89,24 @@ class PositionMonitorLogServiceImplTest {
     }
 
     @Test
+    void repeatedMonitorRunKeyReturnsCanonicalLogWithoutDuplicateInsert() {
+        when(userPositionMapper.selectByIdAndUserId(7L, USER_ID)).thenReturn(position(7L, "OPEN"));
+        PositionMonitorLogDO canonical = logRow(301L, 7L, "ana-p0-4", "LOGIC_VALID", "CONTINUE_HOLD",
+                LocalDateTime.now());
+        canonical.setMonitorRunKey("position-monitor:7:2026-09-04T08:00");
+        when(positionMonitorLogMapper.insertIfAbsent(any())).thenReturn(0);
+        when(positionMonitorLogMapper.selectByMonitorRunKey("position-monitor:7:2026-09-04T08:00"))
+                .thenReturn(canonical);
+        RecordPositionMonitorLogCommand command = command("LOGIC_VALID", "LOW", "CONTINUE_HOLD");
+        command.setMonitorRunKey("position-monitor:7:2026-09-04T08:00");
+
+        PositionMonitorLogDTO result = service.recordMonitorRunForUser(USER_ID, command);
+
+        assertThat(result.getLogId()).isEqualTo(301L);
+        verify(positionMonitorLogMapper, never()).insert(any());
+    }
+
+    @Test
     void recordMonitorRunAllowsWeakenedInvalidatedAndHighRiskScenarios() {
         when(userPositionMapper.selectByIdAndUserId(7L, USER_ID))
                 .thenReturn(position(7L, "PARTIALLY_CLOSED"));

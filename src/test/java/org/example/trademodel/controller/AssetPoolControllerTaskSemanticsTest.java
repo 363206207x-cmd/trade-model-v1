@@ -1,5 +1,6 @@
 package org.example.trademodel.controller;
 
+import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.assetpool.AssetAnalysisPreviewDTO;
 import org.example.trademodel.entity.AsyncTaskDO;
 import org.example.trademodel.providercall.instrument.ProviderCapabilityRegistry;
@@ -12,9 +13,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class AssetPoolControllerTaskSemanticsTest {
@@ -33,9 +36,14 @@ class AssetPoolControllerTaskSemanticsTest {
         task = new AsyncTaskDO();
         task.setTaskId("task-preview-1");
         task.setOwnerId(41L);
+        task.setOwnerType("USER");
+        task.setState("QUEUED");
         when(userIdResolver.requireCurrentUserId()).thenReturn(41L);
-        when(asyncTaskService.queueForUser(41L, "ANALYSIS_PREVIEW", "ASSET", "BTCUSDT", null))
+        when(asyncTaskService.queueIdempotentForUser(
+                41L, "ANALYSIS_PREVIEW", "ASSET", "BTCUSDT:5m", null,
+                "analysis-preview:41:BTCUSDT:5m"))
                 .thenReturn(task);
+        lenient().when(asyncTaskService.claimForExecution(task, "ANALYSIS")).thenReturn(true);
     }
 
     @Test
@@ -58,6 +66,7 @@ class AssetPoolControllerTaskSemanticsTest {
 
         controller.analyzePreview("BTCUSDT", "5m");
 
+        verify(asyncTaskService).bindResultIdentity(task, "analysis-1", "trace-1");
         verify(asyncTaskService).complete(task, false, "COMPLETE");
         verify(asyncTaskService, never()).fail(
                 org.mockito.ArgumentMatchers.any(),
@@ -70,13 +79,16 @@ class AssetPoolControllerTaskSemanticsTest {
         AssetAnalysisPreviewDTO result = preview("QUEUED", "ANALYSIS_BACKGROUND_QUEUED");
         when(assetPoolService.analyzePreviewForUser(41L, "BTCUSDT", "5m")).thenReturn(result);
 
-        controller.analyzePreview("BTCUSDT", "5m");
+        ApiResponse<AssetAnalysisPreviewDTO> response = controller.analyzePreview("BTCUSDT", "5m");
 
-        verify(asyncTaskService).complete(task, false, "ANALYSIS_RUN_QUEUED");
+        verify(asyncTaskService).markRunning(task, "ANALYSIS_RUN_QUEUED");
+        verify(asyncTaskService, never()).complete(task, false, "ANALYSIS_RUN_QUEUED");
         verify(asyncTaskService, never()).fail(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+        assertThat(response.getData().taskId()).isEqualTo("task-preview-1");
+        assertThat(response.getData().taskState()).isEqualTo("RUNNING");
     }
 
     @Test
@@ -86,11 +98,46 @@ class AssetPoolControllerTaskSemanticsTest {
 
         controller.analyzePreview("BTCUSDT", "5m");
 
-        verify(asyncTaskService).complete(task, false, "ANALYSIS_RUN_IN_PROGRESS");
+        verify(asyncTaskService).markRunning(task, "ANALYSIS_RUN_IN_PROGRESS");
+        verify(asyncTaskService, never()).complete(task, false, "ANALYSIS_RUN_IN_PROGRESS");
         verify(asyncTaskService, never()).fail(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void analysisThatFinishesBeforeBindingIsNeverRegressedBackToRunning() {
+        AssetAnalysisPreviewDTO result = preview("QUEUED", "ANALYSIS_BACKGROUND_QUEUED");
+        when(assetPoolService.analyzePreviewForUser(41L, "BTCUSDT", "5m")).thenReturn(result);
+        when(asyncTaskService.bindResultIdentity(task, "analysis-1", "trace-1"))
+                .thenAnswer(invocation -> {
+                    task.setState("SUCCEEDED");
+                    task.setStage("COMPLETE");
+                    return task;
+                });
+
+        ApiResponse<AssetAnalysisPreviewDTO> response = controller.analyzePreview("BTCUSDT", "5m");
+
+        verify(asyncTaskService, never()).markRunning(task, "ANALYSIS_RUN_QUEUED");
+        assertThat(response.getData().taskState()).isEqualTo("SUCCEEDED");
+        assertThat(response.getData().taskStage()).isEqualTo("COMPLETE");
+    }
+
+    @Test
+    void completedCanonicalTaskReturnsItsOriginalAnalysisIdentityWithoutRerun() {
+        task.setState("SUCCEEDED");
+        task.setStage("COMPLETE");
+        task.setResultResourceId("analysis-original");
+        task.setTraceId("trace-original");
+
+        ApiResponse<AssetAnalysisPreviewDTO> response = controller.analyzePreview("BTCUSDT", "5m");
+
+        assertThat(response.getData().analysisId()).isEqualTo("analysis-original");
+        assertThat(response.getData().traceId()).isEqualTo("trace-original");
+        assertThat(response.getData().taskId()).isEqualTo("task-preview-1");
+        assertThat(response.getData().taskState()).isEqualTo("SUCCEEDED");
+        verify(assetPoolService, never()).analyzePreviewForUser(41L, "BTCUSDT", "5m");
     }
 
     @Test

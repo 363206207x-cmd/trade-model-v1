@@ -205,15 +205,11 @@ public class AnalysisSchedulerService {
         if (claim.state() == AssetStateEnum.TRIGGERED) triggeredLightweightCount.incrementAndGet();
 
         LightweightAssessment assessment = lightweightAssessment(claim);
-        boolean coinGlassReady = coinGlassReady();
-        boolean requestFull = assessment.fullAnalysisCondition() && coinGlassReady;
+        boolean requestFull = assessment.fullAnalysisCondition();
         String result = !assessment.fresh()
                 ? "DATA_NOT_READY"
-                : assessment.fullAnalysisCondition() && !coinGlassReady
-                ? "BLOCKED_EXTERNAL_CREDENTIAL"
                 : requestFull ? assessment.fullAnalysisReason() : "NO_MATERIAL_CHANGE";
-        String failureReason = !assessment.fresh() ? assessment.failureReason()
-                : assessment.fullAnalysisCondition() && !coinGlassReady ? "COINGLASS_NOT_CONFIGURED" : null;
+        String failureReason = !assessment.fresh() ? assessment.failureReason() : null;
         if (!requestFull) {
             assetStateService.completeScheduledScan(claim, LocalDateTime.now(clock), result, failureReason,
                     assessment.dataFreshness(), assessment.structureSignature(), assessment.latestCloseTimeMs(),
@@ -257,6 +253,8 @@ public class AnalysisSchedulerService {
         Map<String, String> trends = new LinkedHashMap<>();
         Long latestDecisionClose = null;
         BigDecimal latestDecisionPrice = null;
+        Long latestOneHourClose = null;
+        Long latestFourHourClose = null;
         for (String timeframe : properties.getScheduler().getRequiredMarketTimeframes()) {
             PersistedOhlcvReadinessResult readiness = persistedOhlcvQueryService.evaluateReadinessForSource(
                     claim.identity().symbol(), timeframe, properties.getScheduler().getRequiredClosedBars(),
@@ -267,6 +265,8 @@ public class AnalysisSchedulerService {
                 return LightweightAssessment.notReady(reason);
             }
             trends.put(timeframe, trend(readiness.getBars()));
+            if ("1h".equals(timeframe)) latestOneHourClose = readiness.getLatestCloseTimeMs();
+            if ("4h".equals(timeframe)) latestFourHourClose = readiness.getLatestCloseTimeMs();
             if (timeframe.equals(properties.getScheduler().getDecisionTimeframe())) {
                 latestDecisionClose = readiness.getLatestCloseTimeMs();
                 List<PersistedOhlcvBarDO> bars = readiness.getBars();
@@ -279,15 +279,26 @@ public class AnalysisSchedulerService {
         String riskPrecheck = riskPrecheck(claim.risk());
         PlanPrecheck planPrecheck = planPrecheck(claim, LocalDateTime.now(clock));
         String signature = structureSignature(trends)
+                + ";CORE_CLOSES=1h:" + latestOneHourClose + ",4h:" + latestFourHourClose
                 + ";RISK=" + riskPrecheck + ";PLAN=" + planPrecheck.status();
         String previousFullSignature = scanText(claim.previousExtJson(), "latestFullStructureSignature");
         Long previousFullClose = scanLong(claim.previousExtJson(), "latestFullAnalysisCloseTimeMs");
+        Long previousOneHourClose = firstNonNull(
+                scanLong(claim.previousExtJson(), "latestFull1hCloseTimeMs"),
+                scanSignatureClose(previousFullSignature, "1h"));
+        Long previousFourHourClose = firstNonNull(
+                scanLong(claim.previousExtJson(), "latestFull4hCloseTimeMs"),
+                scanSignatureClose(previousFullSignature, "4h"));
         String previousFullHotReset = scanText(claim.previousExtJson(), "latestFullHotResetAt");
-        boolean materialSinceFull = !signature.equals(previousFullSignature);
+        boolean materialSinceFull = !comparableStructureSignature(signature)
+                .equals(comparableStructureSignature(previousFullSignature));
         boolean hotResetPending = claim.hotResetTime() != null
                 && !claim.hotResetTime().toString().equals(previousFullHotReset);
         boolean newClosedCandle = latestDecisionClose != null
                 && (previousFullClose == null || latestDecisionClose > previousFullClose);
+        boolean newCoreClosedCandle = previousFullClose != null
+                && (newer(latestOneHourClose, previousOneHourClose)
+                || newer(latestFourHourClose, previousFourHourClose));
         boolean promotion = claim.state() == AssetStateEnum.OBSERVING && alignedForPromotion(trends);
         boolean stateRecalculation = newClosedCandle
                 && (claim.state() == AssetStateEnum.CANDIDATE
@@ -296,15 +307,45 @@ public class AnalysisSchedulerService {
                 && materialSinceFull;
         boolean otherMaterialRecheck = materialSinceFull
                 && (claim.state() == AssetStateEnum.HIGH_RISK || claim.state() == AssetStateEnum.CONFUSED);
-        boolean full = hotResetPending || promotion || stateRecalculation
+        boolean full = hotResetPending || newCoreClosedCandle || promotion || stateRecalculation
                 || triggeredMaterialRecheck || otherMaterialRecheck;
         String reason = hotResetPending ? "HOT_RESET_RECALCULATION"
+                : newCoreClosedCandle ? "NEW_CORE_CLOSED_CANDLE_RECALCULATION"
                 : promotion ? "PROMOTION_SIGNAL"
                 : stateRecalculation ? "NEW_CLOSED_CANDLE_RECALCULATION"
                 : triggeredMaterialRecheck ? "TRIGGERED_MATERIAL_EVIDENCE_CHANGE"
                 : otherMaterialRecheck ? "MATERIAL_EVIDENCE_CHANGE" : "NO_MATERIAL_CHANGE";
         return new LightweightAssessment(true, "FRESH:BINANCE_PUBLIC:SPOT", null,
                 signature, latestDecisionClose, full, reason);
+    }
+
+    private static boolean newer(Long current, Long previous) {
+        return current != null && (previous == null || current > previous);
+    }
+
+    private static Long firstNonNull(Long primary, Long fallback) {
+        return primary == null ? fallback : primary;
+    }
+
+    private static Long scanSignatureClose(String signature, String timeframe) {
+        if (signature == null || timeframe == null) return null;
+        String marker = timeframe + ":";
+        int start = signature.indexOf(marker);
+        if (start < 0) return null;
+        start += marker.length();
+        int end = start;
+        while (end < signature.length() && Character.isDigit(signature.charAt(end))) end++;
+        if (end == start) return null;
+        try {
+            return Long.valueOf(signature.substring(start, end));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String comparableStructureSignature(String signature) {
+        if (signature == null) return "";
+        return signature.replaceFirst(";CORE_CLOSES=1h:[0-9]+,4h:[0-9]+", "");
     }
 
     public boolean marketDataReady(String symbol) {

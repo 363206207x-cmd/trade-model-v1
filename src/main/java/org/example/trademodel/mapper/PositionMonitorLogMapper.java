@@ -12,7 +12,7 @@ import java.util.List;
 @Mapper
 public interface PositionMonitorLogMapper {
 
-    String BASE_SELECT = "SELECT log_id AS logId, position_id AS positionId, analysis_id AS analysisId, "
+    String BASE_SELECT = "SELECT log_id AS logId, monitor_run_key AS monitorRunKey, position_id AS positionId, analysis_id AS analysisId, "
             + "execution_plan_id AS executionPlanId, current_price AS currentPrice, "
             + "mark_price_source AS markPriceSource, logic_status AS logicStatus, "
             + "entry_logic_status AS entryLogicStatus, monitor_conclusion AS monitorConclusion, "
@@ -23,7 +23,7 @@ public interface PositionMonitorLogMapper {
             + "decision_snapshot AS decisionSnapshot, risk_snapshot AS riskSnapshot, trace_id AS traceId, "
             + "created_at AS createdAt FROM tm_position_monitor_log ";
 
-    String OWNER_SCOPED_SELECT = "SELECT l.log_id AS logId, l.position_id AS positionId, "
+    String OWNER_SCOPED_SELECT = "SELECT l.log_id AS logId, l.monitor_run_key AS monitorRunKey, l.position_id AS positionId, "
             + "l.analysis_id AS analysisId, l.execution_plan_id AS executionPlanId, "
             + "l.current_price AS currentPrice, l.mark_price_source AS markPriceSource, "
             + "l.logic_status AS logicStatus, l.entry_logic_status AS entryLogicStatus, "
@@ -50,6 +50,32 @@ public interface PositionMonitorLogMapper {
             + ")")
     @Options(useGeneratedKeys = true, keyProperty = "logId", keyColumn = "log_id")
     int insert(PositionMonitorLogDO row);
+
+    @Insert(value = "INSERT INTO tm_position_monitor_log("
+            + "monitor_run_key, position_id, analysis_id, execution_plan_id, current_price, mark_price_source, "
+            + "entry_logic_status, monitor_conclusion, reversal_status, risk_change_reason, risk_level, risk_trend, "
+            + "suggested_action, source_status, observed_at, fresh_until, reason, evidence_snapshot, score_snapshot, "
+            + "decision_snapshot, risk_snapshot, trace_id, created_at) SELECT #{monitorRunKey}, #{positionId}, "
+            + "#{analysisId}, #{executionPlanId}, #{currentPrice}, #{markPriceSource}, #{entryLogicStatus}, "
+            + "#{monitorConclusion}, #{reversalStatus}, #{riskChangeReason}, #{riskLevel}, #{riskTrend}, "
+            + "#{suggestedAction}, #{monitorSourceStatus}, #{observedAt}, #{freshUntil}, #{reason}, "
+            + "#{evidenceSnapshot}, #{scoreSnapshot}, #{decisionSnapshot}, #{riskSnapshot}, #{traceId}, #{createdAt} "
+            + "WHERE NOT EXISTS (SELECT 1 FROM tm_position_monitor_log WHERE monitor_run_key = #{monitorRunKey})")
+    @Insert(value = "INSERT INTO tm_position_monitor_log("
+            + "monitor_run_key, position_id, analysis_id, execution_plan_id, current_price, mark_price_source, "
+            + "entry_logic_status, monitor_conclusion, reversal_status, risk_change_reason, risk_level, risk_trend, "
+            + "suggested_action, source_status, observed_at, fresh_until, reason, evidence_snapshot, score_snapshot, "
+            + "decision_snapshot, risk_snapshot, trace_id, created_at) VALUES (#{monitorRunKey}, #{positionId}, "
+            + "#{analysisId}, #{executionPlanId}, #{currentPrice}, #{markPriceSource}, #{entryLogicStatus}, "
+            + "#{monitorConclusion}, #{reversalStatus}, #{riskChangeReason}, #{riskLevel}, #{riskTrend}, "
+            + "#{suggestedAction}, #{monitorSourceStatus}, #{observedAt}, #{freshUntil}, #{reason}, "
+            + "#{evidenceSnapshot}, #{scoreSnapshot}, #{decisionSnapshot}, #{riskSnapshot}, #{traceId}, #{createdAt}) "
+            + "ON CONFLICT (monitor_run_key) DO NOTHING", databaseId = "postgresql")
+    @Options(useGeneratedKeys = true, keyProperty = "logId", keyColumn = "log_id")
+    int insertIfAbsent(PositionMonitorLogDO row);
+
+    @Select(BASE_SELECT + "WHERE monitor_run_key = #{monitorRunKey}")
+    PositionMonitorLogDO selectByMonitorRunKey(@Param("monitorRunKey") String monitorRunKey);
 
     @Select(BASE_SELECT + "WHERE log_id = #{logId}")
     PositionMonitorLogDO selectById(@Param("logId") Long logId);
