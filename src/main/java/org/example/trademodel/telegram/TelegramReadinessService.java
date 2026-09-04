@@ -38,6 +38,15 @@ public class TelegramReadinessService {
         return observed != null && observed.state() == TelegramReadinessState.READY
                 ? observed.botUsername() : null;
     }
+    public String recipientFingerprint() {
+        ProviderState observed = providerState.get();
+        return observed != null && observed.state() == TelegramReadinessState.READY
+                ? observed.recipientFingerprint() : null;
+    }
+    public LocalDateTime observedAt() {
+        ProviderState observed = providerState.get();
+        return observed == null ? null : observed.observedAt();
+    }
     public String reasonCode() {
         TelegramReadinessState configuration = configurationState();
         if (configuration != TelegramReadinessState.DEGRADED) return configuration.name();
@@ -48,7 +57,10 @@ public class TelegramReadinessService {
 
     public void observe(TelegramClientResult result) {
         if (result == null) return;
-        providerState.set(new ProviderState(result.readinessState(), result.botUsername(),
+        ProviderState previous = providerState.get();
+        providerState.set(new ProviderState(result.readinessState(),
+                hasText(result.botUsername()) ? result.botUsername() : previous == null ? null : previous.botUsername(),
+                hasText(result.recipientFingerprint()) ? result.recipientFingerprint() : previous == null ? null : previous.recipientFingerprint(),
                 result.errorCode(), LocalDateTime.now(clock)));
     }
 
@@ -62,7 +74,11 @@ public class TelegramReadinessService {
         return TelegramReadinessState.DEGRADED;
     }
 
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private record ProviderState(TelegramReadinessState state, String botUsername,
-                                 String reasonCode, LocalDateTime observedAt) {
+                                 String recipientFingerprint, String reasonCode, LocalDateTime observedAt) {
     }
 }

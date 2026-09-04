@@ -117,7 +117,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
         assertThat(secondaryNav).contains(
                 "aria-label=\"次级工具\"", "aria-label=\"资产池\" title=\"资产池\"",
                 "aria-label=\"事件日历\" title=\"事件日历\"",
-                "aria-label=\"系统状态\" title=\"系统状态\"");
+                "aria-label=\"系统状态与恢复\"", "title=\"系统状态\"");
         assertThat(html + script).doesNotContain("?continue", "&continue", "continue=");
     }
 
@@ -168,8 +168,8 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "ROLE_STATE_VIEWS.UNAVAILABLE",
                 "COLLECTION_STATE_VIEWS.SOURCE_UNAVAILABLE");
         assertThat(script).contains(
-                "return /^[A-Z][A-Z0-9_]*$/.test(raw) ? \"—\" : raw;",
-                "statusValue(state.serviceAvailability, \"—\")");
+                "return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || \"当前不可查看\") : raw;",
+                "statusValue(state.serviceAvailability, \"等待同步\")");
     }
 
     @Test

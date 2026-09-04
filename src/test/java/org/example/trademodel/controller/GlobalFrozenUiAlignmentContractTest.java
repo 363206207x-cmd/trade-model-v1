@@ -135,7 +135,7 @@ class GlobalFrozenUiAlignmentContractTest {
     }
 
     @Test
-    void primaryPagesFollowFrozenIaAndExposeNoTelegramUi() throws Exception {
+    void primaryPagesFollowFrozenIaAndExposeOwnerOnlyTelegramUi() throws Exception {
         String html = Files.readString(WORKSPACE);
         String script = Files.readString(WORKSPACE_JS);
         assertOrdered(html, "<h2 id=\"positionsHeading\">持仓监控</h2>", "accountRiskCoverage", "活动持仓",
@@ -145,9 +145,10 @@ class GlobalFrozenUiAlignmentContractTest {
                 "analysisEvidence", "analysisScores", "AIRoleTabs");
         assertOrdered(html, "消息中心", "messageUnreadCount", "OPPORTUNITY_PLAN", "POSITION_RISK", "SYSTEM", "messageList");
         assertOrdered(html, "settings-anchors", "risk-preference", "asset-pool-sources");
-        assertThat(html + script).contains("开始预览", "positionRows", "renderPositionRows", "data-message-group")
+        assertThat(html + script).contains("开始预览", "positionRows", "renderPositionRows", "data-message-group",
+                        "Telegram 通知", "telegramChannelStatus", "O10", "真实测试发送门禁未开启")
                 .doesNotContain("SystemStatusBar", "workspace-system-status", "workspaceDataStatus", "workspaceAiStatus",
-                        "Telegram", "telegram", "data-retry-telegram", "ChannelDeliveryStatus", "O10",
+                        "data-retry-telegram", "ChannelDeliveryStatus", "botToken", "chatId",
                         "async function loadTasks() {\n    async function loadTasks() {");
     }
 
@@ -177,7 +178,8 @@ class GlobalFrozenUiAlignmentContractTest {
                 "新的机会升级、计划安全变化、持仓重大风险和系统异常会显示在这里",
                 "id=\"saveSettings\" hidden disabled>保存更改",
                 "id=\"requestPlanRevalidation\" hidden disabled")
-                .doesNotContain("workspace-system-status", "Telegram", "通知设置");
+                .contains("Telegram 通知", "通道测试、非交易指令")
+                .doesNotContain("workspace-system-status", "通知设置", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID");
         assertThat(workspaceScript).contains(
                 "position-untrusted-state", "monitorUnavailableText",
                 "taskIndicator.hidden = activeTaskCount === 0",
