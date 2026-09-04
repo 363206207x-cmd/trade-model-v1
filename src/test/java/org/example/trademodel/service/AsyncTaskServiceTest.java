@@ -1,6 +1,8 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.entity.AsyncTaskDO;
+import org.example.trademodel.entity.AnalysisRunDO;
+import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.mapper.AsyncTaskMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -21,6 +23,8 @@ import static org.mockito.Mockito.when;
 class AsyncTaskServiceTest {
     @Mock
     private AsyncTaskMapper mapper;
+    @Mock
+    private AnalysisRunMapper analysisRunMapper;
 
     private AsyncTaskService service;
 
@@ -41,6 +45,78 @@ class AsyncTaskServiceTest {
         assertThat(system.getOwnerId()).isZero();
         assertThat(user.getState()).isEqualTo("QUEUED");
         assertThat(system.getState()).isEqualTo("QUEUED");
+    }
+
+    @Test
+    void repeatedPreviewSubmissionReusesOnePersistentTaskIdentity() {
+        when(mapper.insertIfAbsent(any())).thenReturn(1, 0);
+        AsyncTaskDO canonical = persisted("QUEUED", 0, 2);
+        canonical.setTaskId("task-canonical-preview");
+        canonical.setTaskType("ANALYSIS_PREVIEW");
+        canonical.setResourceType("ASSET");
+        canonical.setResourceId("BTCUSDT:5m");
+        canonical.setIdempotencyKey("preview:41:BTCUSDT:5m");
+        when(mapper.selectByIdempotencyKey("USER", 41L, "preview:41:BTCUSDT:5m"))
+                .thenReturn(canonical);
+
+        AsyncTaskDO first = service.queueIdempotentForUser(
+                41L, "ANALYSIS_PREVIEW", "ASSET", "BTCUSDT:5m", null,
+                "preview:41:BTCUSDT:5m");
+        AsyncTaskDO retry = service.queueIdempotentForUser(
+                41L, "ANALYSIS_PREVIEW", "ASSET", "BTCUSDT:5m", null,
+                "preview:41:BTCUSDT:5m");
+
+        assertThat(first.getTaskId()).isEqualTo("task-canonical-preview");
+        assertThat(retry.getTaskId()).isEqualTo(first.getTaskId());
+        assertThat(retry.getState()).isEqualTo("QUEUED");
+    }
+
+    @Test
+    void queuedTaskHasOneAtomicExecutionClaimAcrossConcurrentWorkers() {
+        AsyncTaskDO task = persisted("QUEUED", 0, 2);
+        when(mapper.claimQueued(any(), any(), any(), any())).thenReturn(1, 0);
+
+        assertThat(service.claimForExecution(task, "ANALYSIS")).isTrue();
+        assertThat(service.claimForExecution(task, "ANALYSIS")).isFalse();
+
+        verify(mapper, org.mockito.Mockito.times(2)).claimQueued(
+                org.mockito.ArgumentMatchers.eq(task.getTaskId()),
+                org.mockito.ArgumentMatchers.eq("ANALYSIS"), any(), any());
+    }
+
+    @Test
+    void analysisIdentityIsPersistedOnTaskForRefreshRecovery() {
+        AsyncTaskDO task = persisted("RUNNING", 0, 2);
+        when(mapper.updateResultIdentity(task)).thenReturn(1);
+
+        AsyncTaskDO bound = service.bindResultIdentity(task, "analysis-41", "trace-41");
+
+        assertThat(bound.getResultResourceId()).isEqualTo("analysis-41");
+        assertThat(bound.getTraceId()).isEqualTo("trace-41");
+        verify(mapper).updateResultIdentity(task);
+    }
+
+    @Test
+    void bindingAResultThatAlreadyFinishedClosesTheCanonicalTaskRace() {
+        service = new AsyncTaskService(mapper, analysisRunMapper);
+        AsyncTaskDO task = persisted("RUNNING", 0, 2);
+        AnalysisRunDO run = new AnalysisRunDO();
+        run.setAnalysisId("analysis-finished-before-bind");
+        run.setStatus("SUCCESS");
+        when(mapper.updateResultIdentity(task)).thenReturn(1);
+        when(analysisRunMapper.selectById("analysis-finished-before-bind")).thenReturn(run);
+        when(mapper.completeByResultResourceId(
+                org.mockito.ArgumentMatchers.eq("analysis-finished-before-bind"),
+                org.mockito.ArgumentMatchers.eq("SUCCEEDED"),
+                org.mockito.ArgumentMatchers.eq("COMPLETE"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(), any(), any())).thenReturn(1);
+
+        service.bindResultIdentity(task, "analysis-finished-before-bind", "trace-finished");
+
+        assertThat(task.getState()).isEqualTo("SUCCEEDED");
+        assertThat(task.getStage()).isEqualTo("COMPLETE");
+        assertThat(task.getCompletedAt()).isNotNull();
     }
 
     @Test

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class RecordPositionMonitorLogCommand {
+    private String monitorRunKey;
     private Long positionId;
     private String analysisId;
     private String executionPlanId;
@@ -27,6 +28,8 @@ public class RecordPositionMonitorLogCommand {
     private String riskSnapshot;
     private String traceId;
 
+    public String getMonitorRunKey() { return monitorRunKey; }
+    public void setMonitorRunKey(String monitorRunKey) { this.monitorRunKey = monitorRunKey; }
     public Long getPositionId() { return positionId; }
     public void setPositionId(Long positionId) { this.positionId = positionId; }
     public String getAnalysisId() { return analysisId; }

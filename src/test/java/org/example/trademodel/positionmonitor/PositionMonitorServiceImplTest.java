@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -447,6 +448,24 @@ class PositionMonitorServiceImplTest {
     }
 
     @Test
+    void manualIndependentPositionKeepsFreshBinanceBaseMonitoringWithoutAnalysisContext() {
+        UserPositionDO position = position(114L, "LONG", "OPEN", null, "90", "120");
+        arrange(position, "101.25", risk("LOW", false), null);
+        when(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTC")).thenReturn(null);
+
+        PositionMonitorResultDTO result = service.monitorUserPositionForUser(114L, USER_ID);
+
+        assertThat(result.getCurrentPrice()).isEqualByComparingTo("101.25");
+        assertThat(result.getMarkPrice()).isEqualByComparingTo("101.25");
+        assertThat(result.isMarkPriceFresh()).isTrue();
+        assertThat(result.getEntryLogicStatus()).isEqualTo("NOT_APPLICABLE");
+        assertThat(result.getDirectionSupportStatus()).isEqualTo("NOT_APPLICABLE");
+        assertThat(result.getDataState()).isEqualTo("PARTIAL");
+        assertThat(result.getReasonCodes()).contains("MONITOR_RESULT_MISSING");
+        assertThat(result.getReasonCodes()).doesNotContain("SOURCE_UNAVAILABLE");
+    }
+
+    @Test
     void positionSourceRefAnalysisWithPlansAAndB_monitorNeverLogsBAsOriginalSource() {
         UserPositionDO position = position(131L, "LONG", "OPEN", null, "90", "120");
         position.setSourceType("SYSTEM_PLAN_POSITION");
@@ -755,6 +774,27 @@ class PositionMonitorServiceImplTest {
                         "AUTHORITATIVE_OHLCV_UNAVAILABLE:15m:LATEST_BAR_TOO_OLD"));
         verify(marketQuoteClient, never()).fetch24hTicker(anyString());
         verify(positionMonitorLogService, never()).recordMonitorRunForSystem(any());
+    }
+
+    @Test
+    void systemBatchKeepsManualIndependentBaseMonitoringWhenOptionalWindowsAreStale() {
+        UserPositionDO position = position(30L, "LONG", "OPEN", null, "90", "120");
+        when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
+        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("102.5")));
+
+        PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
+
+        assertThat(batch.getSuccessCount()).isEqualTo(1);
+        assertThat(batch.getFailureCount()).isZero();
+        assertThat(batch.getResults()).singleElement().satisfies(result -> {
+            assertThat(result.getCurrentPrice()).isEqualByComparingTo("102.5");
+            assertThat(result.isMarkPriceFresh()).isTrue();
+            assertThat(result.getEntryLogicStatus()).isEqualTo("NOT_APPLICABLE");
+        });
+        verify(persistedOhlcvQueryService, never()).evaluateReadinessForSource(
+                eq("BTCUSDT"), anyString(), anyInt(), anyLong(),
+                eq("BINANCE_PUBLIC"), eq("SPOT"));
+        verify(positionMonitorLogService).recordMonitorRunForSystem(any());
     }
 
     @Test

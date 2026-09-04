@@ -1378,12 +1378,25 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return null;
         }
         String validated = trimToNull(decision.getValidatedMarketBias());
+        if (isStrongBias(validated) && decision.getFinalConfidence() == null) {
+            return null;
+        }
         if (validated != null) return upper(validated);
         String neutral = upper(decision.getMarketBiasHierarchy());
         return "RANGE".equals(neutral) || "WAIT".equals(neutral) ? neutral : null;
     }
 
+    private boolean isStrongBias(String value) {
+        String normalized = upper(value);
+        return "STRONG_BULLISH".equals(normalized) || "STRONG_BEARISH".equals(normalized);
+    }
+
     private String analysisFieldState(DecisionResultVO decision) {
+        if (decision != null && "READY".equals(upper(decision.getDirectionDataState()))
+                && isStrongBias(decision.getValidatedMarketBias())
+                && decision.getFinalConfidence() == null) {
+            return "INVALID";
+        }
         return switch (upper(decision == null ? null : decision.getDirectionDataState())) {
             case "INSUFFICIENT_DATA" -> "MISSING";
             case "STALE", "SOURCE_UNAVAILABLE", "MULTI_TIMEFRAME_CONFLICT" -> "INVALID";
@@ -2492,19 +2505,20 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         ExecutionPlanDO executionPlan = assetPlan.executionPlan();
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
+                executionPlan,
+                LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
+        if (planState != PersistedPlanState.ACTIVE) {
+            blockPersistedAssetPlan(suggestion, executionPlan, planState);
+            applyPersistedPlanAudit(suggestion, assetPlan, executionPlan);
+            return suggestion;
+        }
         boolean boundaryComplete = trimPlanValue(executionPlan.getEntryZone()) != null
                 && trimPlanValue(executionPlan.getStopLoss()) != null
                 && trimPlanValue(executionPlan.getTakeProfitRules()) != null;
         if (!boundaryComplete) {
             blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "当前暂无完整执行计划",
                     BOUNDARY_INCOMPLETE_VALID_PERIOD);
-            return suggestion;
-        }
-        PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
-                executionPlan,
-                LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
-        if (planState != PersistedPlanState.ACTIVE) {
-            blockPersistedAssetPlan(suggestion, executionPlan, planState);
             return suggestion;
         }
         PlanValidity planValidity = resolvePlanValidity(executionPlan);
@@ -2587,22 +2601,72 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private void blockPersistedAssetPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
                                          ExecutionPlanDO executionPlan,
                                          PersistedPlanState planState) {
+        String persistedReason = firstPlanReason(executionPlan);
         switch (planState) {
             case MISSING -> blockSuggestion(suggestion, "PLAN_MISSING", "当前暂无完整执行计划",
                     "执行计划不存在或当前不可查看");
             case INVALID -> blockSuggestion(suggestion, "PLAN_INVALID", "当前执行计划不可用",
                     "执行计划已失效，等待重新分析");
             case BLOCKED -> blockSuggestion(suggestion, "PLAN_BLOCKED", "当前执行计划已阻断",
-                    "执行计划未通过来源或风险门控");
+                    persistedReason == null ? "执行计划未通过来源或风险门控" : persistedReason);
             case REVALIDATION_REQUIRED -> blockSuggestion(suggestion, "REVALIDATION_REQUIRED",
                     "执行计划需要重新验证", revalidationReviewCopy(executionPlan));
             case REVIEW_ONLY -> blockSuggestion(suggestion, "PLAN_REVIEW_ONLY",
                     "当前计划仅供历史复核", "该计划不能作为当前资产的可用计划");
-            case INCOMPLETE -> blockSuggestion(suggestion, "PLAN_INCOMPLETE", "当前暂无完整执行计划",
-                    "执行计划状态、来源或边界信息不完整");
+            case INCOMPLETE -> {
+                boolean boundaryComplete = trimPlanValue(executionPlan.getEntryZone()) != null
+                        && trimPlanValue(executionPlan.getStopLoss()) != null
+                        && trimPlanValue(executionPlan.getTakeProfitRules()) != null;
+                blockSuggestion(suggestion,
+                        boundaryComplete ? "PLAN_INCOMPLETE" : "BOUNDARY_INCOMPLETE",
+                        "当前暂无完整执行计划",
+                        boundaryComplete
+                                ? "执行计划状态、来源或边界信息不完整"
+                                : BOUNDARY_INCOMPLETE_VALID_PERIOD);
+            }
             case ACTIVE -> blockSuggestion(suggestion, "PLAN_STATE_ERROR", "当前执行计划状态异常",
                     "执行计划状态校验不一致");
         }
+    }
+
+    private void applyPersistedPlanAudit(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                         AssetExecutionPlanResolution resolution,
+                                         ExecutionPlanDO plan) {
+        if (suggestion == null || resolution == null || plan == null) return;
+        boolean queryablePlanResult = Boolean.TRUE.equals(plan.getFinalPlan())
+                || "BLOCKED".equalsIgnoreCase(trimToNull(plan.getExecutionPlanStatus()))
+                || "BLOCKED".equalsIgnoreCase(trimToNull(plan.getRuleValidationStatus()))
+                || Boolean.TRUE.equals(plan.getNeedsRevalidation());
+        if (queryablePlanResult) {
+            suggestion.setSourceAnalysisId(resolution.analysisId());
+            suggestion.setSourceExecutionPlanId(resolution.executionPlanId());
+            suggestion.setSourceTraceId(resolution.sourceTraceId());
+        }
+        suggestion.setValidationStatus(trimToNull(plan.getRuleValidationStatus()));
+        suggestion.setValidationReasons(trimToNull(plan.getValidationReasons()));
+        suggestion.setRuleVetoReason(trimToNull(plan.getRuleVetoReason()));
+        suggestion.setSourceStatus(trimToNull(plan.getSourceStatus()));
+        suggestion.setChainStatus(trimToNull(plan.getChainStatus()));
+        suggestion.setCandidateId(trimToNull(plan.getCandidateId()));
+        suggestion.setResolverResultId(trimToNull(plan.getResolverResultId()));
+        suggestion.setValidationResultId(trimToNull(plan.getValidationResultId()));
+        suggestion.setFinalPlan(Boolean.TRUE.equals(plan.getFinalPlan()));
+        suggestion.setPlanLifecycleState(trimToNull(plan.getPlanLifecycleState()));
+        suggestion.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
+        suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
+        suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
+        suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
+    }
+
+    private String firstPlanReason(ExecutionPlanDO plan) {
+        if (plan == null) return null;
+        return java.util.stream.Stream.of(plan.getValidationReasons(), plan.getRuleVetoReason(),
+                        plan.getSourceBlockerReasons(), plan.getSourceMissingReasons(),
+                        plan.getExecutionFeasibilityReason(), plan.getRevalidationReason())
+                .map(this::trimToNull)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {
@@ -2619,7 +2683,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             List<OpportunityLogDTO> relations = opportunityLogService.queryForSystem(
                     analysisId, decisionId, null, symbol, null, null, null, null, 2);
             if (relations == null || relations.isEmpty()) {
-                return AssetExecutionPlanResolution.missing("未找到决策与执行计划的精确持久化关系");
+                ExecutionPlanDO direct = executionPlanMapper.selectLatestByDecisionIdentity(
+                        analysisId, decisionId);
+                if (direct == null) {
+                    return AssetExecutionPlanResolution.missing("未找到决策与执行计划的精确持久化关系");
+                }
+                return validateExactPlanIdentity(direct, analysisId, decisionId, symbol, null);
             }
             LinkedHashSet<String> planIds = new LinkedHashSet<>();
             for (OpportunityLogDTO relation : relations) {
@@ -2644,22 +2713,34 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (plan == null) {
                 return AssetExecutionPlanResolution.missing("精确执行计划记录不存在");
             }
-            if (!planId.equals(trimToNull(plan.getPlanId()))
-                    || !analysisId.equals(trimToNull(plan.getAnalysisId()))) {
-                return AssetExecutionPlanResolution.error("执行计划记录与精确关系不一致");
-            }
-            AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
-            if (run == null
-                    || !analysisId.equals(trimToNull(run.getAnalysisId()))
-                    || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
-                return AssetExecutionPlanResolution.error("分析来源与当前资产身份不一致");
-            }
-            return new AssetExecutionPlanResolution(
-                    ExactPlanIdentityState.READY, plan, analysisId, planId,
-                    trimToNull(run.getTraceId()), null);
+            return validateExactPlanIdentity(plan, analysisId, decisionId, symbol, planId);
         } catch (RuntimeException ignored) {
             return AssetExecutionPlanResolution.error("执行计划精确身份读取失败");
         }
+    }
+
+    private AssetExecutionPlanResolution validateExactPlanIdentity(ExecutionPlanDO plan,
+                                                                    String analysisId,
+                                                                    String decisionId,
+                                                                    String symbol,
+                                                                    String relatedPlanId) {
+        String planId = trimToNull(plan == null ? null : plan.getPlanId());
+        String planDecisionId = trimToNull(plan == null ? null : plan.getDecisionId());
+        if (plan == null || planId == null
+                || relatedPlanId != null && !relatedPlanId.equals(planId)
+                || !analysisId.equals(trimToNull(plan.getAnalysisId()))
+                || planDecisionId != null && !decisionId.equals(planDecisionId)) {
+            return AssetExecutionPlanResolution.error("执行计划记录与精确关系不一致");
+        }
+        AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
+        if (run == null
+                || !analysisId.equals(trimToNull(run.getAnalysisId()))
+                || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
+            return AssetExecutionPlanResolution.error("分析来源与当前资产身份不一致");
+        }
+        return new AssetExecutionPlanResolution(
+                ExactPlanIdentityState.READY, plan, analysisId, planId,
+                trimToNull(run.getTraceId()), null);
     }
 
     private DashboardHomeVO.ExecutionSuggestionVO buildPositionSelectionSuggestion(

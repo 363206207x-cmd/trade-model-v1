@@ -42,7 +42,8 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
         for (UserPositionVO position : userPositionService.listOpenPositionsForUser(userId)) {
             items.add(project(userId, position, true));
         }
-        boolean complete = !items.isEmpty() && items.stream().allMatch(ItemProjection::monitorAvailable);
+        boolean complete = !items.isEmpty() && items.stream()
+                .allMatch(item -> "AVAILABLE".equals(item.collectionState()));
         String coverage = items.isEmpty() ? "NO_POSITION" : complete ? "COMPLETE" : "PARTIAL_COVERAGE";
         return new CollectionProjection(List.copyOf(items), items.size(), coverage);
     }
@@ -70,9 +71,12 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
         }
         LocalDateTime asOf = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         boolean trusted = includeLiveMonitor && trusted(monitor, asOf);
+        boolean basePricePartial = includeLiveMonitor && basePricePartial(position, monitor, asOf);
         DashboardHomeVO.PositionVO view = base(position);
         if (trusted) {
             applyTrusted(view, position, monitor);
+        } else if (basePricePartial) {
+            applyBasePricePartial(view, position, monitor);
         } else {
             applyUnavailable(view, includeLiveMonitor ? trustState(monitor, asOf) : "CLOSED");
         }
@@ -86,8 +90,9 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
                 view.setSourceTraceId(source.sourceTraceId());
             }
         }
-        return new ItemProjection(position, view, trusted,
-                trusted ? "AVAILABLE" : includeLiveMonitor ? view.getMonitorTrustState() : "CLOSED");
+        return new ItemProjection(position, view, trusted || basePricePartial,
+                trusted ? "AVAILABLE" : basePricePartial ? "PARTIAL"
+                        : includeLiveMonitor ? view.getMonitorTrustState() : "CLOSED");
     }
 
     private DashboardHomeVO.PositionVO base(UserPositionVO position) {
@@ -116,6 +121,30 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
                 && hasText(log.getReversalStatus()) && hasText(log.getRiskChangeReason())
                 && hasText(log.getRiskLevel()) && hasText(log.getRiskTrend())
                 && hasText(log.getSuggestedAction());
+    }
+
+    private boolean basePricePartial(UserPositionVO position, PositionMonitorLogDTO log, LocalDateTime asOf) {
+        return position != null && "MANUAL_INDEPENDENT".equalsIgnoreCase(position.getSourceType())
+                && log != null && "PENDING_VERIFICATION".equalsIgnoreCase(log.getMonitorSourceStatus())
+                && positive(log.getCurrentPrice()) && hasText(log.getMarkPriceSource())
+                && log.getObservedAt() != null && log.getFreshUntil() != null
+                && !asOf.isBefore(log.getObservedAt()) && asOf.isBefore(log.getFreshUntil());
+    }
+
+    private void applyBasePricePartial(DashboardHomeVO.PositionVO view, UserPositionVO position,
+                                       PositionMonitorLogDTO log) {
+        view.setMarkPrice(log.getCurrentPrice());
+        view.setCurrentPrice(log.getCurrentPrice());
+        view.setMarkPriceSource(log.getMarkPriceSource());
+        view.setMarkPriceObservedAt(log.getObservedAt());
+        view.setMarkPriceFresh(true);
+        applyPnl(view, position, log.getCurrentPrice());
+        view.setEntryLogicStatus("NOT_APPLICABLE");
+        view.setMonitorTrustState("BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING");
+        view.setDataState("PARTIAL");
+        view.setModuleState("PARTIAL");
+        view.setLastMonitorAt(log.getCreatedAt());
+        view.setLastMonitorTime(log.getCreatedAt());
     }
 
     private void applyTrusted(DashboardHomeVO.PositionVO view, UserPositionVO position,

@@ -5,6 +5,7 @@ import org.example.trademodel.entity.RuleConfigDO;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.service.AnalysisAssemblerService;
 import org.example.trademodel.service.RuleConfigService;
+import org.example.trademodel.service.AsyncTaskService;
 import org.example.trademodel.vo.AssetAnalysisVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -138,6 +139,22 @@ class AnalysisRunOrchestratorImplTest {
         assertThat(assembler.context.getClaimVersion()).isEqualTo(1);
         assertThat(assembler.context.getAttemptCount()).isEqualTo(1);
         assertThat(assembler.context.getCanonicalAnalysisTimeBucket()).isEqualTo(LocalDateTime.of(2026, 6, 23, 10, 0));
+    }
+
+    @Test
+    void completedAnalysisClosesAnyAlreadyBoundCanonicalAsyncTask() {
+        CapturingGuard guard = new CapturingGuard(AnalysisIdempotencyClaimStatus.CLAIMED_NEW);
+        AsyncTaskService asyncTaskService = mock(AsyncTaskService.class);
+        AnalysisRunProperties properties = new AnalysisRunProperties();
+        AnalysisRunOrchestratorImpl orchestrator = new AnalysisRunOrchestratorImpl(
+                guard, new CapturingAssembler(false), ruleConfig("rules-2026-06"), properties,
+                FIXED, null, null, asyncTaskService);
+
+        AnalysisRunResult result = orchestrator.run(
+                AnalysisRunCommand.manual("BTCUSDT", "5m", "req-task-close", "2026-06-23T10:04:59Z"));
+
+        verify(asyncTaskService).completeForAnalysisResult(
+                result.getAnalysisId(), true, null, null);
     }
 
     @Test

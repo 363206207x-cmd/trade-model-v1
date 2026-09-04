@@ -11,6 +11,8 @@ public class AsyncTaskDO {
     private String stage;
     private String resourceType;
     private String resourceId;
+    private String resultResourceId;
+    private String idempotencyKey;
     private String traceId;
     private Integer retryCount;
     private Integer maxRetries;
@@ -37,6 +39,10 @@ public class AsyncTaskDO {
     public void setResourceType(String value) { this.resourceType = value; }
     public String getResourceId() { return resourceId; }
     public void setResourceId(String value) { this.resourceId = value; }
+    public String getResultResourceId() { return resultResourceId; }
+    public void setResultResourceId(String value) { this.resultResourceId = value; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String value) { this.idempotencyKey = value; }
     public String getTraceId() { return traceId; }
     public void setTraceId(String value) { this.traceId = value; }
     public Integer getRetryCount() { return retryCount; }

@@ -272,6 +272,16 @@
         return "semantic-neutral";
     }
 
+    function trustedDirectionProjection(direction, finalConfidence, visibleConfidence) {
+        const normalized = String(direction || "").trim().toUpperCase();
+        const strongDirection = /^STRONG_(BULLISH|BEARISH)$/.test(normalized);
+        return {
+            trusted: hasValue(direction)
+                && visibleConfidence !== "当前不可查看"
+                && (!strongDirection || hasValue(finalConfidence))
+        };
+    }
+
     function stateBadge(value) {
         const raw = text(value, "UNKNOWN").toUpperCase();
         return '<span class="state-badge ' + semanticClass(raw) + '" data-state="' + escapeHtml(raw.toLowerCase()) + '">' + escapeHtml(label(raw)) + "</span>";
@@ -671,6 +681,7 @@
                 const status = analysisStatus(snapshot);
                 if (status === "SUCCESS") {
                     if (await loadAnalysis(analysisId, true)) {
+                        clearAnalysisPreview(snapshot?.symbol || analysisSelectedAsset?.symbol);
                         setAnalysisActionState(false);
                         announce("分析已完成");
                         return snapshot;
@@ -695,11 +706,67 @@
         return null;
     }
 
+    function stableSubmissionId(prefix) {
+        const value = window.crypto && typeof window.crypto.randomUUID === "function"
+            ? window.crypto.randomUUID()
+            : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        return prefix + ":" + value;
+    }
+
+    function analysisPreviewStorageKey(symbol) {
+        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":5m";
+    }
+
+    function analysisPreviewSubmission(symbol) {
+        const key = analysisPreviewStorageKey(symbol);
+        let saved;
+        try { saved = JSON.parse(window.sessionStorage.getItem(key) || "null"); }
+        catch (_) { saved = null; }
+        saved = saved || {};
+        if (!saved.submissionId) saved.submissionId = stableSubmissionId("analysis-preview");
+        saved.symbol = String(symbol || "").trim().toUpperCase();
+        saved.timeframe = "5m";
+        try { window.sessionStorage.setItem(key, JSON.stringify(saved)); }
+        catch (_) { /* The server task identity remains authoritative. */ }
+        return saved;
+    }
+
+    function rememberAnalysisPreview(symbol, saved, result) {
+        const next = Object.assign({}, saved || {}, {
+            taskId: result?.taskId,
+            taskState: result?.taskState,
+            taskStage: result?.taskStage,
+            analysisId: result?.analysisId,
+            traceId: result?.traceId
+        });
+        try { window.sessionStorage.setItem(analysisPreviewStorageKey(symbol), JSON.stringify(next)); }
+        catch (_) { /* The server task identity remains authoritative. */ }
+        return next;
+    }
+
+    function clearAnalysisPreview(symbol) {
+        if (!symbol) return;
+        try { window.sessionStorage.removeItem(analysisPreviewStorageKey(symbol)); }
+        catch (_) { /* The completed analysis identity remains available in the current URL. */ }
+    }
+
     async function previewAsset(symbol) {
         if (analysisSubmissionPromise) return analysisSubmissionPromise;
         analysisSubmissionPromise = (async function () {
             renderAnalysisRunState({ symbol: symbol }, "QUEUED", "正在创建或复用该资产的真实分析任务。");
-            const result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol) + "/analysis-preview?timeframe=5m", { method: "POST" });
+            let previewState = analysisPreviewSubmission(symbol);
+            const result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol)
+                + "/analysis-preview?timeframe=5m&submissionId="
+                + encodeURIComponent(previewState.submissionId), { method: "POST" });
+            previewState = rememberAnalysisPreview(symbol, previewState, result);
+            if (!result?.analysisId && result?.taskId) {
+                const recovered = await recoverAnalysisPreviewTask(result.taskId);
+                if (recovered?.resultResourceId) {
+                    result.analysisId = recovered.resultResourceId;
+                    result.traceId = recovered.traceId;
+                    rememberAnalysisPreview(symbol, previewState, result);
+                }
+            }
             if (!result?.analysisId) throw new Error(analysisFailureMessage(result?.reasonCode));
             updateAnalysisLocation(result.analysisId);
             renderAnalysisRunState(result, result.status, "分析任务已受理，正在等待真实结果。");
@@ -1001,11 +1068,18 @@
         return Object.fromEntries(new FormData(form).entries());
     }
 
-    function stableSubmissionId(prefix) {
-        const value = window.crypto && typeof window.crypto.randomUUID === "function"
-            ? window.crypto.randomUUID()
-            : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-        return prefix + ":" + value;
+    async function recoverAnalysisPreviewTask(taskId) {
+        if (!taskId) return null;
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const tasks = await api("/api/workspace/tasks?limit=30") || [];
+            const task = tasks.find(function (item) { return item?.taskId === taskId; });
+            if (task?.resultResourceId) return task;
+            if (["FAILED", "CANCELLED"].includes(String(task?.state || "").toUpperCase())) {
+                throw new Error(text(task?.errorMessage, "分析任务未完成"));
+            }
+            await waitFor(500);
+        }
+        return null;
     }
 
     function localDateTimeValue(date) {
@@ -1683,7 +1757,8 @@
             const direction = decision.validatedMarketBias || decision.finalMarketBias || decision.ruleMarketBias || candidate.ruleDirection;
             const confidence = hasValue(decision.finalConfidence) ? formatNumber(decision.finalConfidence, { maximumFractionDigits: 0 }) + " / 100"
                 : label(decision.confidenceLevel || candidate.ruleConfidence || candidate.confidenceLevel, "当前不可查看");
-            const directionTrusted = hasValue(direction) && confidence !== "当前不可查看";
+            const directionProjection = trustedDirectionProjection(direction, decision.finalConfidence, confidence);
+            const directionTrusted = directionProjection.trusted;
             document.getElementById("analysisDataQuality").innerHTML = factGrid([
                 ["数据质量", hasValue(analysis.dataQualityScore) ? formatNumber(analysis.dataQualityScore, { maximumFractionDigits: 0 }) : "当前不可查看"],
                 ["方向结论", directionTrusted ? label(direction) : "待重新分析", semanticClass(directionTrusted ? direction : "UNKNOWN")],
@@ -2167,7 +2242,8 @@
         const direction = decision.validatedMarketBias || decision.finalMarketBias || decision.ruleMarketBias || candidate.ruleDirection;
         const confidence = hasValue(decision.finalConfidence) ? formatNumber(decision.finalConfidence, { maximumFractionDigits: 0 }) + " / 100"
             : label(decision.confidenceLevel || candidate.ruleConfidence || candidate.confidenceLevel, "当前不可查看");
-        const directionReady = hasValue(direction) && confidence !== "当前不可查看";
+        const directionProjection = trustedDirectionProjection(direction, decision.finalConfidence, confidence);
+        const directionReady = directionProjection.trusted;
         const rows = [
             { title: "Market Data", owner: "EvidenceItem", status: evidence.length ? "RECORDED" : "NOT_RECORDED", id: evidence[0]?.evidenceId,
                 time: maxEvidenceTime, source: sources || "来源当前不可查看", summary: evidence.length + " 条可信证据输入", version: analysis.ruleVersion },

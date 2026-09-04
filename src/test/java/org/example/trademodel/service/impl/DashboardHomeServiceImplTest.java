@@ -825,6 +825,33 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void strongDirectionWithoutVisibleConfidenceFailsClosedInsteadOfLookingCurrent() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        DecisionResultVO decision = decision("ETHUSDT", "STRONG_BEARISH", "HIGH", "HIGH", 91, 18,
+                "LEVEL_1_CONSISTENT", false, "{\"state\":\"OBSERVING\"}");
+        decision.setValidatedMarketBias("STRONG_BEARISH");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(null);
+        decision.setOneHourOpportunityQuality(72);
+        decision.setFourHourTrendAlignment(75);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(201L, decision, null, null, "OBSERVING")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, null, 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getConfidenceLevel()).isNull();
+        assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "INVALID")
+                .containsEntry("confidence", "MISSING");
+    }
+
+    @Test
     void insufficientDirectionDataCannotFallBackToWaitOrRiskValues() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
@@ -1814,6 +1841,47 @@ class DashboardHomeServiceImplTest {
                 .containsExactly(302L);
         assertUnavailableAssetExecutionPlan(home.getExecutionSuggestion(), "PLAN_BLOCKED");
         assertThat(home.getExecutionSuggestion().getStatus()).isNotEqualTo("POSITION_MONITORING");
+    }
+
+    @Test
+    void blockedDirectionalPlanWithoutBoundariesRemainsVisibleByExactDecisionIdentity() {
+        DecisionResultVO decision = completePlanDecision("ETHUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("BLOCKED");
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setChainStatus("RULE_VALIDATION_BLOCKED");
+        plan.setFinalPlan(false);
+        plan.setPlanLifecycleState("INVALIDATED");
+        plan.setValidationReasons("COMPLETE_THREE_AI_CHAIN_REQUIRED");
+        plan.setRuleVetoReason("COMPLETE_THREE_AI_CHAIN_REQUIRED");
+        plan.setRevalidationRule("等待三 AI 成功后重新分析");
+        plan.setEntryZone(null);
+        plan.setStopLoss(null);
+        plan.setTakeProfitRules(null);
+        when(opportunityLogService.queryForSystem(
+                decision.getAnalysisId(), decision.getDecisionId(), null, "ETHUSDT",
+                null, null, null, null, 2)).thenReturn(List.of());
+        when(executionPlanMapper.selectLatestByDecisionIdentity(
+                decision.getAnalysisId(), decision.getDecisionId())).thenReturn(plan);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "ETHUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(suggestion.getStatus()).isEqualTo("PLAN_BLOCKED");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
+        assertThat(suggestion.getValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(suggestion.getValidationReasons()).contains("COMPLETE_THREE_AI_CHAIN_REQUIRED");
+        assertThat(suggestion.getChainStatus()).isEqualTo("RULE_VALIDATION_BLOCKED");
+        assertThat(suggestion.getRevalidationRule()).isEqualTo("等待三 AI 成功后重新分析");
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
+        assertThat(suggestion.getFinalPlan()).isFalse();
     }
 
     @Test
@@ -3575,8 +3643,6 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getBlockedReason()).isNotBlank();
         assertThat(suggestion.getPositionMode()).isFalse();
         assertThat(suggestion.getPositionMonitor()).isNull();
-        assertThat(suggestion.getSourceExecutionPlanId()).isNull();
-        assertThat(suggestion.getSourceTraceId()).isNull();
         assertThat(suggestion.getDirection()).isNull();
         assertThat(suggestion.getEntryZone()).isNull();
         assertThat(suggestion.getStopLoss()).isNull();

@@ -74,6 +74,7 @@ class PositionMonitoringProjectionServiceTest {
     @Test
     void trustStatesRemainPositionLocalAndFailClosed() {
         UserPositionVO position = position(9L, "AAVEUSDT");
+        position.setSourceType("SYSTEM_PLAN_POSITION");
         when(userPositionService.findByIdForUser(9L, 7L)).thenReturn(position);
 
         PositionMonitorLogDTO pending = trusted(9L, new BigDecimal("101"));
@@ -95,6 +96,34 @@ class PositionMonitoringProjectionServiceTest {
         when(monitorLogService.listByPositionIdForUser(7L, 9L, 1))
                 .thenReturn(List.of(trusted(9L, new BigDecimal("101"))));
         assertThat(service.findForUser(7L, 9L).monitorAvailable()).isTrue();
+    }
+
+    @Test
+    void manualIndependentPendingContextStillProjectsFreshBasePriceAsPartial() {
+        UserPositionVO position = position(13L, "ETHUSDT");
+        when(userPositionService.findByIdForUser(13L, 7L)).thenReturn(position);
+        PositionMonitorLogDTO partial = trusted(13L, new BigDecimal("2529.10"));
+        partial.setAnalysisId(null);
+        partial.setExecutionPlanId(null);
+        partial.setEntryLogicStatus(null);
+        partial.setMonitorConclusion(null);
+        partial.setReversalStatus(null);
+        partial.setRiskChangeReason(null);
+        partial.setRiskLevel(null);
+        partial.setRiskTrend(null);
+        partial.setSuggestedAction(null);
+        partial.setMonitorSourceStatus("PENDING_VERIFICATION");
+        when(monitorLogService.listByPositionIdForUser(7L, 13L, 1)).thenReturn(List.of(partial));
+
+        PositionMonitoringProjectionService.ItemProjection result = service.findForUser(7L, 13L);
+
+        assertThat(result.monitorAvailable()).isTrue();
+        assertThat(result.collectionState()).isEqualTo("PARTIAL");
+        assertThat(result.monitor().getCurrentPrice()).isEqualByComparingTo("2529.10");
+        assertThat(result.monitor().getMarkPriceFresh()).isTrue();
+        assertThat(result.monitor().getEntryLogicStatus()).isEqualTo("NOT_APPLICABLE");
+        assertThat(result.monitor().getDataState()).isEqualTo("PARTIAL");
+        assertThat(result.monitor().getModuleState()).isEqualTo("PARTIAL");
     }
 
     @Test
