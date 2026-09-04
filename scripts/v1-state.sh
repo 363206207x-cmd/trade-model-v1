@@ -214,8 +214,8 @@ emit_resolved_task_state() {
   printf 'V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${gpt_background_three_ai_timeout_closure_implementation_status:-UNDECLARED}"
   printf 'V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${official_domain_session_runtime_visibility_closure_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${official_domain_session_runtime_visibility_closure_implementation_status:-UNDECLARED}"
-  printf 'V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_STATUS: %s\n' "${interaction_audit_consolidated_remediation_authorization_runtime_status:-BLOCKED}"
-  printf 'V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_IMPLEMENTATION_STATUS: %s\n' "${interaction_audit_consolidated_remediation_implementation_status:-UNDECLARED}"
+  printf 'V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${real_logic_chain_closure_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_REAL_LOGIC_CHAIN_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${real_logic_chain_closure_implementation_status:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -303,7 +303,7 @@ resolve_task_handoff() {
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
     elif { [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
-      || "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]] \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]] \
       && [[ "${machine_identity_allowed:-NO}" != "YES" ]]; }; then
       current_package_block_reason="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
     elif [[ "${current_package_pr_count:-UNKNOWN}" != "0" \
@@ -316,7 +316,7 @@ resolve_task_handoff() {
 
     if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
-      || "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
       if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
         next_package_block_reason="${next_task_authorization_status:-BLOCKED_PENDING_AUTHORIZATION_MERGED_MAIN}"
       elif [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
@@ -393,8 +393,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" ]]; then
       resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_REVIEW"
-    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
-      resolved_handoff_stage="V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
       resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -426,8 +426,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="V4_1_BASELINE_RECONCILIATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" ]]; then
         resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_FINAL_MERGE_PATH"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
-        resolved_handoff_stage="V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
         resolved_handoff_stage="LOCAL_REAL_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE_AUTHORIZATION" ]]; then
@@ -499,8 +499,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" ]]; then
     resolved_handoff_stage="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
-  elif [[ "$authorized_next_package_phase" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]]; then
-    resolved_handoff_stage="V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION"
+  elif [[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]]; then
+    resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
     resolved_handoff_stage="LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT"
   elif [[ "$authorized_next_package_phase" == "FRONTEND_INTERACTION_RUNTIME_CLOSURE" ]]; then
@@ -1401,7 +1401,7 @@ evaluate_baseline_reconciliation_transition() {
   real_data_home_blocker_closure_authorization_runtime_status="AUTHORIZED"
 }
 
-evaluate_interaction_audit_consolidated_remediation_transition() {
+evaluate_real_logic_chain_closure_transition() {
   effective_task_mode="$current_package_mode"
   p1a_transition_allowed="YES"
   p1a_completion_status="PASS"
@@ -1420,29 +1420,29 @@ evaluate_interaction_audit_consolidated_remediation_transition() {
   real_provider_three_ai_runtime_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   gpt_background_three_ai_timeout_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   official_domain_session_runtime_visibility_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
-  interaction_audit_consolidated_remediation_authorization_runtime_status="BLOCKED"
+  real_logic_chain_closure_authorization_runtime_status="BLOCKED"
   local_real_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   frontend_interaction_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
   multi_user_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 
-  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]] || return 0
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]] || return 0
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || return 0
-  [[ "$authorized_next_package_phase" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]] || return 0
+  [[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] || return 0
   [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || return 0
 
   if [[ "$current_package_status" != "COMPLETED" ]]; then
-    next_task_authorization_status="BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_INCOMPLETE"
+    next_task_authorization_status="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_INCOMPLETE"
     return 0
   fi
-  if [[ "$interaction_audit_consolidated_remediation_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
-    next_task_authorization_status="BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_SCOPE_NOT_AUTHORIZED"
+  if [[ "$real_logic_chain_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" ]]; then
+    next_task_authorization_status="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED"
     return 0
   fi
   if ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$current_package_starting_full_sha" != "782fb97987da1a09671c3450298f000abc341942" ]] \
+    || [[ "$current_package_starting_full_sha" != "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] \
     || [[ "$authorized_next_package_starting_full_sha" != "$current_package_starting_full_sha" ]] \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "79" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "93" ]]; then
     next_task_authorization_status="BLOCKED_INVALID_OR_MISSING_STARTING_FULL_SHA"
     return 0
   fi
@@ -1452,7 +1452,7 @@ evaluate_interaction_audit_consolidated_remediation_transition() {
     || ! is_true_flag "$current_package_push_allowed" \
     || ! is_true_flag "$current_package_merge_allowed" \
     || ! is_false_flag "$current_package_deployment_allowed"; then
-    next_task_authorization_status="BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_GATE_PERMISSIONS_INVALID"
+    next_task_authorization_status="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_GATE_PERMISSIONS_INVALID"
     return 0
   fi
   if ! is_true_flag "$authorized_next_repository_edits_allowed" \
@@ -1466,12 +1466,12 @@ evaluate_interaction_audit_consolidated_remediation_transition() {
     || ! is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
     || ! is_false_flag "$authorized_next_mobile_implementation_allowed" \
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]]; then
-    next_task_authorization_status="BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_PERMISSIONS_INCOMPLETE"
+    next_task_authorization_status="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE"
     return 0
   fi
   if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
-    next_task_authorization_status="BLOCKED_PENDING_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_MERGED_MAIN"
-    interaction_audit_consolidated_remediation_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+    real_logic_chain_closure_authorization_runtime_status="PENDING_MERGED_MAIN"
     return 0
   fi
   if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
@@ -1487,13 +1487,13 @@ evaluate_interaction_audit_consolidated_remediation_transition() {
   next_transition_allowed="YES"
   authorization_status="AUTHORIZED"
   next_task_authorization_status="ALLOWED"
-  interaction_audit_consolidated_remediation_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
+  real_logic_chain_closure_authorization_runtime_status="EFFECTIVE_MERGED_MAIN"
 }
 
 evaluate_runtime_transition() {
-  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" \
-    && "$authorized_next_package_phase" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]]; then
-    evaluate_interaction_audit_consolidated_remediation_transition
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]]; then
+    evaluate_real_logic_chain_closure_transition
     return 0
   fi
 
@@ -1909,7 +1909,7 @@ machine_gate_policy_check() {
   if [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
     || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
     || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
-    || "$expected_package" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]]; then
+    || "$expected_package" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]]; then
     [[ -n "$allowed_paths" ]] || return 1
     if printf '%s\n' "$allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
       return 1
@@ -1973,7 +1973,7 @@ evaluate_machine_runtime_identity() {
   fi
 
   if [[ "$expected_package" == "$current_package_phase" ]]; then
-    if [[ "$expected_package" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]] \
+    if [[ "$expected_package" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]] \
       && is_full_git_sha "$current_package_starting_full_sha" \
       && git merge-base --is-ancestor "$current_package_starting_full_sha" origin/main >/dev/null 2>&1 \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
@@ -2008,7 +2008,7 @@ evaluate_machine_runtime_identity() {
     elif [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
       || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
       || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
-      || "$expected_package" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]] \
+      || "$expected_package" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
       changed_files="$(changed_paths_from_origin_main)"
       policy_allowed_paths="$authorized_next_package_allowed_paths"
@@ -2030,94 +2030,25 @@ evaluate_machine_runtime_identity() {
 
 run_exact_machine_gate_self_test() {
   local failed=0
-  local owner_package="TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION"
-  local owner_branch="codex/v4-1-interaction-audit-consolidated-remediation-authorization"
-  local owner_sha="782fb97987da1a09671c3450298f000abc341942"
-  local target_package="V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION"
-  local target_branch="codex/v4-1-interaction-audit-consolidated-remediation"
-  local target_sha="782fb97987da1a09671c3450298f000abc341942"
+  local owner_package="TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION"
+  local owner_branch="codex/v4-1-real-logic-chain-closure-authorization"
+  local owner_sha="b6904ba7c12759ab8a89da40991f9809cdc73e24"
+  local target_package="V41_REAL_LOGIC_CHAIN_CLOSURE"
+  local target_branch="codex/v4-1-real-logic-chain-closure"
+  local target_sha="b6904ba7c12759ab8a89da40991f9809cdc73e24"
   local owner_paths target_paths
   owner_paths="$(gate_owner_paths)"
-  target_paths="$(printf '%s\n' \
-  src/main/java/org/example/trademodel/entity/TelegramChannelTestAuditDO.java \
-  src/main/java/org/example/trademodel/mapper/TelegramChannelTestAuditMapper.java \
-  src/main/java/org/example/trademodel/service/TelegramChannelTestService.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41CanonicalDesktopInteractionContractTest.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java \
-  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
-  src/main/java/org/example/trademodel/controller/TelegramNotificationController.java \
-  src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java \
-  src/main/java/org/example/trademodel/controller/AiDecisionAuditController.java \
-  src/main/java/org/example/trademodel/controller/AnalysisDetailController.java \
-  src/main/java/org/example/trademodel/controller/UserConfigController.java \
-  src/main/java/org/example/trademodel/controller/DesktopWorkspaceController.java \
-  src/main/java/org/example/trademodel/controller/UserPositionController.java \
-  src/main/java/org/example/trademodel/controller/WorkspaceRuntimeController.java \
-  src/main/java/org/example/trademodel/controller/WorkspacePositionMonitoringController.java \
-  src/main/java/org/example/trademodel/controller/AssetPoolController.java \
-  src/main/java/org/example/trademodel/service/impl/UserPositionServiceImpl.java \
-  src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java \
-  src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java \
-  src/main/java/org/example/trademodel/service/DecisionChainAuditQueryService.java \
-  src/main/java/org/example/trademodel/service/impl/DecisionChainAuditQueryServiceImpl.java \
-  src/main/java/org/example/trademodel/vo/DecisionChainAuditVO.java \
-  src/main/java/org/example/trademodel/dto/req/CreateUserPositionReq.java \
-  src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java \
-  src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java \
-  src/main/java/org/example/trademodel/telegram/TelegramBotApiClient.java \
-  src/main/java/org/example/trademodel/telegram/TelegramClient.java \
-  src/main/java/org/example/trademodel/telegram/TelegramClientResult.java \
-  src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java \
-  src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java \
-  src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java \
-  src/main/java/org/example/trademodel/telegram/TelegramProperties.java \
-  src/main/java/org/example/trademodel/telegram/TelegramReadinessService.java \
-  src/main/java/org/example/trademodel/telegram/TelegramSecretSanitizer.java \
-  src/main/resources/templates/home.html \
-  src/main/resources/templates/workspace.html \
-  src/main/resources/static/js/home-runtime.js \
-  src/main/resources/static/js/workspace.js \
-  src/main/resources/static/js/frontend-contract.js \
-  src/main/resources/static/css/home.css \
-  src/main/resources/static/css/workspace.css \
-  src/main/resources/schema.sql \
-  src/main/resources/db/migration/V20__telegram_channel_test_audit.sql \
-  docs/AUDIT_REMEDIATION_REPORT.md \
-  src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramBotApiClientTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramReadinessServiceTest.java \
-  src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java \
-  src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramSecurityArchitectureContractTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramChannelTestServiceTest.java \
-  src/test/java/org/example/trademodel/postgresql/V20TelegramChannelTestAuditMigrationContractTest.java \
-  src/test/java/org/example/trademodel/controller/TelegramNotificationControllerTest.java \
-  src/test/java/org/example/trademodel/controller/SystemControllerTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisDetailControllerTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisDetailFrontendContractTest.java \
-  src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java \
-  src/test/java/org/example/trademodel/service/impl/DecisionChainAuditQueryServiceImplTest.java \
-  src/test/java/org/example/trademodel/service/MessageFactServiceTest.java \
-  src/test/java/org/example/trademodel/controller/UserPositionControllerTest.java \
-  src/test/java/org/example/trademodel/service/impl/UserPositionServiceImplTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspacePositionCloseEntryRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspacePositionMonitoringControllerTest.java \
-  src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java \
-  src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java \
-  src/test/java/org/example/trademodel/controller/AssetPoolControllerTaskSemanticsTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
-  src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41FrontendRuntimeAlignmentContractTest.java \
-  src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java \
-  src/test/java/org/example/trademodel/controller/FrontendContractNodeMatrixTest.java \
-  src/test/java/org/example/trademodel/controller/B123OwnerCopyAndPositionDetailContractTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspaceUiReviewPositionRuntimeTest.java \
-  src/test/java/org/example/trademodel/controller/FullInteractionUsabilityContractTest.java \
-  src/test/java/org/example/trademodel/controller/InteractionAuditConsolidatedRemediationContractTest.java)"
+  target_paths="$(awk '
+    $0 ~ "^authorized_next_package_allowed_paths:[[:space:]]*$" { capture=1; next }
+    capture && $0 ~ "^[^[:space:]]" { exit }
+    capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
+      value=$0
+      sub("^[[:space:]]+-[[:space:]]+", "", value)
+      gsub(/^\"/, "", value)
+      gsub(/\"$/, "", value)
+      print value
+    }
+  ' "$TASK_FILE")"
 
   assert_machine_pass() {
     local name="$1"
@@ -2349,8 +2280,8 @@ load_task_package_contract() {
   gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
   official_domain_session_runtime_visibility_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_official_domain_session_runtime_visibility_closure_authorization_status)"
   official_domain_session_runtime_visibility_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_official_domain_session_runtime_visibility_closure_implementation_status)"
-  interaction_audit_consolidated_remediation_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_interaction_audit_consolidated_remediation_authorization_status)"
-  interaction_audit_consolidated_remediation_implementation_status="$(yaml_value "$TASK_FILE" v4_1_interaction_audit_consolidated_remediation_implementation_status)"
+  real_logic_chain_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_authorization_status)"
+  real_logic_chain_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_implementation_status)"
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2410,9 +2341,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
-        interaction_audit_consolidated_remediation_authorization_declared_status="BLOCKED_PENDING_REVIEW"
-        blockers_text="INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
+        real_logic_chain_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="REAL_LOGIC_CHAIN_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
         gpt_background_three_ai_timeout_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_NOT_AUTHORIZED"
@@ -2520,9 +2451,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
-      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
-        interaction_audit_consolidated_remediation_authorization_declared_status="BLOCKED_PENDING_REVIEW"
-        blockers_text="INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
+        real_logic_chain_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="REAL_LOGIC_CHAIN_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_AUTHORIZATION" ]]; then
         gpt_background_three_ai_timeout_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_NOT_AUTHORIZED"
@@ -2835,8 +2766,8 @@ gpt_background_three_ai_timeout_closure_authorization_declared_status="$(yaml_va
 gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
 official_domain_session_runtime_visibility_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_official_domain_session_runtime_visibility_closure_authorization_status)"
 official_domain_session_runtime_visibility_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_official_domain_session_runtime_visibility_closure_implementation_status)"
-interaction_audit_consolidated_remediation_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_interaction_audit_consolidated_remediation_authorization_status)"
-interaction_audit_consolidated_remediation_implementation_status="$(yaml_value "$TASK_FILE" v4_1_interaction_audit_consolidated_remediation_implementation_status)"
+real_logic_chain_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_authorization_status)"
+real_logic_chain_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_implementation_status)"
 local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -3080,15 +3011,15 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
   if [[ "$current_package_status" != "COMPLETED" \
     || "$current_package_mode" != "DOCS_GATE_BASELINE_RECONCILIATION" \
-    || "$current_package_branch" != "codex/v4-1-interaction-audit-consolidated-remediation-authorization" \
-    || "$current_package_starting_full_sha" != "782fb97987da1a09671c3450298f000abc341942" \
-    || "$authorized_next_package_phase" != "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" \
+    || "$current_package_branch" != "codex/v4-1-real-logic-chain-closure-authorization" \
+    || "$current_package_starting_full_sha" != "b6904ba7c12759ab8a89da40991f9809cdc73e24" \
+    || "$authorized_next_package_phase" != "V41_REAL_LOGIC_CHAIN_CLOSURE" \
     || "$authorized_next_package_mode" != "IMPLEMENTATION" \
-    || "$authorized_next_package_branch" != "codex/v4-1-interaction-audit-consolidated-remediation" \
-    || "$authorized_next_package_starting_full_sha" != "782fb97987da1a09671c3450298f000abc341942" \
+    || "$authorized_next_package_branch" != "codex/v4-1-real-logic-chain-closure" \
+    || "$authorized_next_package_starting_full_sha" != "b6904ba7c12759ab8a89da40991f9809cdc73e24" \
     || "$analysis_run_idempotency_tx_fix_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$analysis_run_idempotency_tx_fix_implementation_status" != "COMPLETE" \
     || "$final_runtime_home_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
@@ -3099,11 +3030,11 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDAT
     || "$gpt_background_three_ai_timeout_closure_implementation_status" != "COMPLETE" \
     || "$official_domain_session_runtime_visibility_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$official_domain_session_runtime_visibility_closure_implementation_status" != "COMPLETE" \
-    || "$interaction_audit_consolidated_remediation_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
-    || "$interaction_audit_consolidated_remediation_implementation_status" != "NOT_STARTED" \
+    || "$real_logic_chain_closure_authorization_declared_status" != "AUTHORIZED_PENDING_MERGED_MAIN" \
+    || "$real_logic_chain_closure_implementation_status" != "NOT_STARTED" \
     || "$real_data_home_blocker_closure_authorization_declared_status" != "EFFECTIVE_MERGED_MAIN" \
     || "$real_data_home_blocker_closure_implementation_status" != "COMPLETE" \
-    || "$p1b_scope" != "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_ONLY" ]]; then
+    || "$p1b_scope" != "V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   elif ! is_true_flag "$current_package_repository_edits_allowed" \
     || ! is_false_flag "$current_package_implementation_allowed" \
@@ -3124,7 +3055,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDAT
     || [[ "$authorized_next_canonical_figma_file_key" != "NONE" ]] \
     || ! is_full_git_sha "$current_package_starting_full_sha" \
     || ! is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "79" ]]; then
+    || [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {count++} END {print count+0}')" != "93" ]]; then
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi

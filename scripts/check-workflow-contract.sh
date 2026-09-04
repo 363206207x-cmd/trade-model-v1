@@ -464,8 +464,8 @@ gpt_background_three_ai_timeout_closure_authorization_status="$(yaml_value docs/
 gpt_background_three_ai_timeout_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_gpt_background_three_ai_timeout_closure_implementation_status)"
 official_domain_session_runtime_visibility_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_official_domain_session_runtime_visibility_closure_authorization_status)"
 official_domain_session_runtime_visibility_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_official_domain_session_runtime_visibility_closure_implementation_status)"
-interaction_audit_consolidated_remediation_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_interaction_audit_consolidated_remediation_authorization_status)"
-interaction_audit_consolidated_remediation_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_interaction_audit_consolidated_remediation_implementation_status)"
+real_logic_chain_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_logic_chain_closure_authorization_status)"
+real_logic_chain_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_logic_chain_closure_implementation_status)"
 local_real_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_implementation_status)"
 frontend_interaction_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml frontend_interaction_authorization_status)"
@@ -560,8 +560,8 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$gpt_background_three_ai_timeout_closure_implementation_status" == "COMPLETE" ]] || fail "GPT background/Three-AI timeout closure must remain complete"
 [[ "$official_domain_session_runtime_visibility_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "official-domain session and runtime visibility authorization must remain effective on merged main"
 [[ "$official_domain_session_runtime_visibility_closure_implementation_status" == "COMPLETE" ]] || fail "official-domain session and runtime visibility implementation must remain complete"
-[[ "$interaction_audit_consolidated_remediation_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Interaction audit consolidated remediation authorization must remain pending merged-main effectivity"
-[[ "$interaction_audit_consolidated_remediation_implementation_status" == "NOT_STARTED" ]] || fail "Interaction audit consolidated remediation implementation must remain not started in the gate package"
+[[ "$real_logic_chain_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Real logic chain closure authorization must remain pending merged-main effectivity"
+[[ "$real_logic_chain_closure_implementation_status" == "NOT_STARTED" ]] || fail "Real logic chain closure implementation must remain not started in the gate package"
 [[ "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "local-real authorization must remain effective on merged main"
 [[ "$local_real_implementation_status" == "COMPLETE" ]] || fail "local-real implementation must remain complete"
 [[ "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "frontend interaction authorization must be effective on merged main"
@@ -569,28 +569,28 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Interaction audit consolidated remediation authorization declaration mismatch"
-[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Interaction audit consolidated remediation authorization mode mismatch"
-[[ "$current_package_branch" == "codex/v4-1-interaction-audit-consolidated-remediation-authorization" ]] || fail "Interaction audit consolidated remediation authorization branch mismatch"
-[[ "$current_package_starting_full_sha" == "782fb97987da1a09671c3450298f000abc341942" ]] || fail "Interaction audit consolidated remediation authorization starting SHA mismatch"
-[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Interaction audit consolidated remediation authorization SHA must be full length"
-[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Interaction audit consolidated remediation authorization permissions mismatch"
+[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Real logic chain closure authorization declaration mismatch"
+[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Real logic chain closure authorization mode mismatch"
+[[ "$current_package_branch" == "codex/v4-1-real-logic-chain-closure-authorization" ]] || fail "Real logic chain closure authorization branch mismatch"
+[[ "$current_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "Real logic chain closure authorization starting SHA mismatch"
+[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Real logic chain closure authorization SHA must be full length"
+[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Real logic chain closure authorization permissions mismatch"
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION" ]] || fail "authorized next package phase mismatch"
-[[ "$authorized_next_package_branch" == "codex/v4-1-interaction-audit-consolidated-remediation" ]] || fail "authorized next package branch mismatch"
-[[ "$authorized_next_package_starting_full_sha" == "782fb97987da1a09671c3450298f000abc341942" ]] || fail "authorized next package starting SHA mismatch"
+[[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] || fail "authorized next package phase mismatch"
+[[ "$authorized_next_package_branch" == "codex/v4-1-real-logic-chain-closure" ]] || fail "authorized next package branch mismatch"
+[[ "$authorized_next_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "authorized next package starting SHA mismatch"
 [[ "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized next package SHA must be full length"
 [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
 [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
 [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
 [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
-[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized Interaction audit consolidated remediation PR creation must be true for the one-pass task"
-[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Interaction audit consolidated remediation push/merge/staging-only deployment permissions mismatch"
+[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized Real logic chain closure PR creation must be true for the one-pass task"
+[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Real logic chain closure push/merge/staging-only deployment permissions mismatch"
 [[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "frontend interaction Canonical Figma Desktop permission must remain false"
 [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
 [[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_ONLY" ]] || fail "scope must remain V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_ONLY"
+[[ "$p1b_scope" == "V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY" ]] || fail "scope must remain V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package authorization scope must be explicit"
 expected_owner_paths="$(printf '%s\n' \
   docs/CODEX_NEXT_TASK.yml \
@@ -602,94 +602,17 @@ expected_owner_paths="$(printf '%s\n' \
   scripts/codex-next-task.sh \
   scripts/check-workflow-contract.sh)"
 [[ "$(printf '%s\n' "$current_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_owner_paths" | sort)" ]] \
-  || fail "Interaction audit consolidated remediation authorization allowlist must contain exactly the eight gate-owner paths"
+  || fail "Real logic chain closure authorization allowlist must contain exactly the eight gate-owner paths"
 if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "Interaction audit consolidated remediation authorization allowlist must not contain wildcards or directory-level grants"
+  fail "Real logic chain closure authorization allowlist must not contain wildcards or directory-level grants"
 fi
-expected_implementation_paths="$(printf '%s\n' \
-  src/main/java/org/example/trademodel/entity/TelegramChannelTestAuditDO.java \
-  src/main/java/org/example/trademodel/mapper/TelegramChannelTestAuditMapper.java \
-  src/main/java/org/example/trademodel/service/TelegramChannelTestService.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41CanonicalDesktopInteractionContractTest.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java \
-  src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
-  src/main/java/org/example/trademodel/controller/TelegramNotificationController.java \
-  src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java \
-  src/main/java/org/example/trademodel/controller/AiDecisionAuditController.java \
-  src/main/java/org/example/trademodel/controller/AnalysisDetailController.java \
-  src/main/java/org/example/trademodel/controller/UserConfigController.java \
-  src/main/java/org/example/trademodel/controller/DesktopWorkspaceController.java \
-  src/main/java/org/example/trademodel/controller/UserPositionController.java \
-  src/main/java/org/example/trademodel/controller/WorkspaceRuntimeController.java \
-  src/main/java/org/example/trademodel/controller/WorkspacePositionMonitoringController.java \
-  src/main/java/org/example/trademodel/controller/AssetPoolController.java \
-  src/main/java/org/example/trademodel/service/impl/UserPositionServiceImpl.java \
-  src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java \
-  src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java \
-  src/main/java/org/example/trademodel/service/DecisionChainAuditQueryService.java \
-  src/main/java/org/example/trademodel/service/impl/DecisionChainAuditQueryServiceImpl.java \
-  src/main/java/org/example/trademodel/vo/DecisionChainAuditVO.java \
-  src/main/java/org/example/trademodel/dto/req/CreateUserPositionReq.java \
-  src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java \
-  src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java \
-  src/main/java/org/example/trademodel/telegram/TelegramBotApiClient.java \
-  src/main/java/org/example/trademodel/telegram/TelegramClient.java \
-  src/main/java/org/example/trademodel/telegram/TelegramClientResult.java \
-  src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java \
-  src/main/java/org/example/trademodel/telegram/TelegramMessageCommitListener.java \
-  src/main/java/org/example/trademodel/telegram/TelegramMessageFormatter.java \
-  src/main/java/org/example/trademodel/telegram/TelegramProperties.java \
-  src/main/java/org/example/trademodel/telegram/TelegramReadinessService.java \
-  src/main/java/org/example/trademodel/telegram/TelegramSecretSanitizer.java \
-  src/main/resources/templates/home.html \
-  src/main/resources/templates/workspace.html \
-  src/main/resources/static/js/home-runtime.js \
-  src/main/resources/static/js/workspace.js \
-  src/main/resources/static/js/frontend-contract.js \
-  src/main/resources/static/css/home.css \
-  src/main/resources/static/css/workspace.css \
-  src/main/resources/schema.sql \
-  src/main/resources/db/migration/V20__telegram_channel_test_audit.sql \
-  docs/AUDIT_REMEDIATION_REPORT.md \
-  src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramBotApiClientTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramReadinessServiceTest.java \
-  src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java \
-  src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramMessageFormatterTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramSecurityArchitectureContractTest.java \
-  src/test/java/org/example/trademodel/telegram/TelegramChannelTestServiceTest.java \
-  src/test/java/org/example/trademodel/postgresql/V20TelegramChannelTestAuditMigrationContractTest.java \
-  src/test/java/org/example/trademodel/controller/TelegramNotificationControllerTest.java \
-  src/test/java/org/example/trademodel/controller/SystemControllerTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisDetailControllerTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisDetailFrontendContractTest.java \
-  src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java \
-  src/test/java/org/example/trademodel/service/impl/DecisionChainAuditQueryServiceImplTest.java \
-  src/test/java/org/example/trademodel/service/MessageFactServiceTest.java \
-  src/test/java/org/example/trademodel/controller/UserPositionControllerTest.java \
-  src/test/java/org/example/trademodel/service/impl/UserPositionServiceImplTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspacePositionCloseEntryRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspacePositionMonitoringControllerTest.java \
-  src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java \
-  src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java \
-  src/test/java/org/example/trademodel/controller/AssetPoolControllerTaskSemanticsTest.java \
-  src/test/java/org/example/trademodel/controller/AnalysisRunControllerTest.java \
-  src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java \
-  src/test/java/org/example/trademodel/controller/FundamentalAiV41FrontendRuntimeAlignmentContractTest.java \
-  src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java \
-  src/test/java/org/example/trademodel/controller/FrontendContractNodeMatrixTest.java \
-  src/test/java/org/example/trademodel/controller/B123OwnerCopyAndPositionDetailContractTest.java \
-  src/test/java/org/example/trademodel/controller/WorkspaceUiReviewPositionRuntimeTest.java \
-  src/test/java/org/example/trademodel/controller/FullInteractionUsabilityContractTest.java \
-  src/test/java/org/example/trademodel/controller/InteractionAuditConsolidatedRemediationContractTest.java)"
+expected_implementation_paths="$authorized_next_package_allowed_paths"
+[[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort | git hash-object --stdin)" == "c539dddebc507ecceea0d80d68447244e914c623" ]] \
+  || fail "Real logic chain closure implementation allowlist fingerprint mismatch"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "Interaction audit consolidated remediation implementation allowlist must contain exactly the seventy-nine authorized paths"
+  || fail "Real logic chain closure implementation allowlist must contain exactly the ninety-three authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "Interaction audit consolidated remediation implementation allowlist must not contain wildcards or directory-level grants"
+  fail "Real logic chain closure implementation allowlist must not contain wildcards or directory-level grants"
 fi
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
@@ -699,7 +622,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_SEVENTY_NINE_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_NINETY_THREE_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
@@ -749,8 +672,8 @@ assert_handoff_blocked() {
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_REVIEW" \
-  || fail "Interaction audit consolidated remediation authorization review stage mismatch"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW" \
+  || fail "Real logic chain closure authorization review stage mismatch"
 for machine_identity_field in \
   "MACHINE_AUTHORIZED_PACKAGE: $authorized_next_package_phase" \
   "MACHINE_AUTHORIZED_BRANCH: $authorized_next_package_branch" \
@@ -765,11 +688,11 @@ printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "ready Interaction audit consolidated remediation authorization did not resolve final merge path"
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
+  || fail "ready Real logic chain closure authorization did not resolve final merge path"
 
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_MERGED_MAIN
-assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
@@ -802,8 +725,8 @@ for v4_1_expected in \
   "V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
   "V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
-  "V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
-  "V4_1_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_IMPLEMENTATION_STATUS: NOT_STARTED" \
+  "V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+  "V4_1_REAL_LOGIC_CHAIN_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "LOCAL_REAL_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "LOCAL_REAL_IMPLEMENTATION_STATUS: COMPLETE" \
   "FRONTEND_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -822,8 +745,8 @@ for v4_1_expected in \
     || fail "v4.1 handoff omitted: $v4_1_expected"
 done
 
-assert_handoff_blocked v4_1_unauthorized BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked v4_1_permission_missing BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED
+assert_handoff_blocked v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSUR
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -913,8 +836,8 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "Interaction audit consolidated remediation authorization final gate stage mismatch"
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
+  || fail "Real logic chain closure authorization final gate stage mismatch"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
   AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION_WITH_PR GH_QUERY --request-package "$authorized_next_package_phase"
 assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
@@ -930,11 +853,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -972,11 +895,11 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \

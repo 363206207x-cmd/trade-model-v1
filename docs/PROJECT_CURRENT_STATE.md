@@ -8,32 +8,38 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation Authorization
-Product Phase Status: INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact frozen 26-step interaction-audit remediation; no implementation, Telegram send or deployment is included in this gate package
-Next Business Phase: V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION
+Product Phase: TRINE LOGIC v4.1 Real Logic Chain Closure Authorization
+Product Phase Status: REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact real direction, plan, three-AI and manual-position-monitoring logic closure; no implementation, Telegram send or deployment is included in this gate package
+Next Business Phase: V41_REAL_LOGIC_CHAIN_CLOSURE
 Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Frozen Interaction Audit Consolidated Remediation Authorization
+## TRINE LOGIC v4.1 Real Logic Chain Closure Authorization
 
 The Owner-authorized successor is
-`V41_INTERACTION_AUDIT_CONSOLIDATED_REMEDIATION` on
-`codex/v4-1-interaction-audit-consolidated-remediation`, anchored to frozen
-audit baseline `782fb97987da1a09671c3450298f000abc341942`. The existing
-26-step report (15 PASS, 7 PARTIAL, 4 FAIL) is the sole finding input; no
-rediscovery audit is authorized.
+`V41_REAL_LOGIC_CHAIN_CLOSURE` on
+`codex/v4-1-real-logic-chain-closure`, anchored to deployed baseline
+`b6904ba7c12759ab8a89da40991f9809cdc73e24`. The read-only root-cause audit
+in `docs/evidence/v4_1_real_logic_chain/ROOT_CAUSE_AUDIT.md` is frozen before
+business-code changes.
 
 This gate package changes no business capability. After merged-main
 effectivity, the successor may change only the literal allowlisted paths in
-`docs/CODEX_NEXT_TASK.yml`, then deploy its exact merged-main SHA to private
-Staging and repeat the same 26 formal-domain steps. Production, direction or
-score algorithms, automatic trading, real Telegram sends by this task, and
-all changes to the existing three groups / twenty-five suspected duplicate
-positions remain blocked.
+`docs/CODEX_NEXT_TASK.yml`. It adds failing tests first, repairs direction time
+identity, visible six-direction plan results, recoverable three-AI analysis
+and independent manual-position base monitoring, then deploys its exact
+merged-main SHA to private Staging and repeats the real-provider and 26-step
+formal-domain acceptance. Production, automatic trading, Telegram sends,
+secret access, and all changes to the existing three groups / twenty-five
+suspected duplicate positions remain blocked.
+
+The predecessor frozen-interaction implementation is complete on merged main
+`b6904ba7c12759ab8a89da40991f9809cdc73e24` through PR #1239. Its fixes must
+be preserved and re-verified; this successor does not redo that package.
 
 ---
 

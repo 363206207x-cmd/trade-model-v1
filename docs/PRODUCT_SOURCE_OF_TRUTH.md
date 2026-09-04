@@ -652,6 +652,28 @@ implementation are complete on merged main
 `b5e52d501becf675f4299fc7c5d389707de81af0`; they are predecessor evidence
 and do not independently authorize this successor.
 
+### PS-TRINE-LOGIC-V4-1-REAL-LOGIC-CHAIN-CLOSURE
+
+| Attribute | Registration |
+|---|---|
+| Document name | TRINE LOGIC v4.1 Real Direction, Plan, Three-AI and Position Monitoring Logic Closure Authorization |
+| Version/date | Owner authorization `2026-09-04`; effective only after merged-main validation |
+| Package / branch | `V41_REAL_LOGIC_CHAIN_CLOSURE` / `codex/v4-1-real-logic-chain-closure` |
+| Exact audit baseline | `b6904ba7c12759ab8a89da40991f9809cdc73e24` |
+| Frozen root-cause input | `docs/evidence/v4_1_real_logic_chain/ROOT_CAUSE_AUDIT.md`; read-only source and Staging PostgreSQL evidence frozen before business changes |
+| Exact implementation paths | The ninety-three literal paths in `docs/CODEX_NEXT_TASK.yml`; no wildcard, directory or prefix grant |
+| Required order | failing tests first; root-cause repair; focused, integration, frontend, PostgreSQL and full Maven validation; exact-head CI; squash merge; exact merged-main Staging deployment; real-provider and 26-step formal-domain acceptance |
+| Business output | fresh same-decision direction provenance; visible result for six directional plan states; one idempotent recoverable analysis task; explicit three-AI/resolver/validation states; independent Binance-backed manual-position base monitoring |
+| Safety boundary | no Production, automatic trade, extra Telegram send, fake provider output, secret access, or mutation of the protected three groups / twenty-five suspected duplicate positions |
+
+The frozen v4.1 responsibility split remains authoritative: 4h is the primary
+trend, 1h is current structure and opportunity maturity, 15m is the entry
+trigger, and 5m is the wick/liquidity/reversal-risk filter. Short-timeframe
+noise may block or reduce a plan but cannot manufacture a 4h/1h reversal.
+Every blocked or partial result remains non-executable and must show truthful
+causes rather than fabricated entry, stop, target, confidence, AI or provider
+state.
+
 ### PS-TRINE-LOGIC-V4-1-INTERACTION-AUDIT-CONSOLIDATED-REMEDIATION
 
 | Attribute | Registration |
@@ -674,6 +696,11 @@ under ChannelDelivery, but cannot create a second business-message owner or
 expand the three frozen business-notification categories. Existing three
 groups / twenty-five suspected duplicate positions remain immutable pending a
 separate Owner decision.
+
+This predecessor package is complete on merged main
+`b6904ba7c12759ab8a89da40991f9809cdc73e24` through PR #1239. It is preserved
+acceptance evidence and does not independently authorize the current real
+logic chain closure.
 
 ### PS-FIGMA-BASELINE
 
