@@ -469,6 +469,10 @@
 
     function schedulerObservationText(readiness, header) {
         const status = readiness?.schedulerObservationStatus || header?.systemRuntimeState;
+        const normalized = String(status || "").trim().toUpperCase();
+        if (["-", "—", "N/A", "NA", "NULL"].includes(normalized)) {
+            return "调度状态当前不可查看";
+        }
         return hasValue(status) ? label(status, "调度状态当前不可查看") : "调度状态当前不可查看";
     }
 
@@ -967,6 +971,7 @@
                 document.getElementById("poolScanStatus").textContent = error.message;
             } finally { scanButton.disabled = false; }
         });
+        updatePoolScanCta();
         Promise.all([loadAssetPool(), loadTasks()]).then(function () { updatePoolScanCta(); });
         updateBatchActions();
     }
