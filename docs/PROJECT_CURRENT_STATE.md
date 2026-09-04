@@ -28,7 +28,7 @@ in `docs/evidence/v4_1_real_logic_chain/ROOT_CAUSE_AUDIT.md` is frozen before
 business-code changes.
 
 This gate package changes no business capability. After merged-main
-effectivity, the successor may change only the ninety-six literal allowlisted
+effectivity, the successor may change only the ninety-seven literal allowlisted
 paths in `docs/CODEX_NEXT_TASK.yml`, including the three Owner-authorized AI
 evidence-canonicalization paths without changing package, implementation branch
 or starting SHA. It adds failing tests first, repairs direction time

@@ -11,6 +11,7 @@ class InteractionAuditConsolidatedRemediationContractTest {
     private static final Path HOME = Path.of("src/main/resources/templates/home.html");
     private static final Path HOME_SCRIPT = Path.of("src/main/resources/static/js/home-runtime.js");
     private static final Path HOME_CSS = Path.of("src/main/resources/static/css/home.css");
+    private static final Path MOBILE_HOME_SCRIPT = Path.of("src/main/resources/static/js/dashboard-mobile.js");
     private static final Path HTML = Path.of("src/main/resources/templates/workspace.html");
     private static final Path SCRIPT = Path.of("src/main/resources/static/js/workspace.js");
     private static final Path CSS = Path.of("src/main/resources/static/css/workspace.css");
@@ -138,9 +139,20 @@ class InteractionAuditConsolidatedRemediationContractTest {
                 "aria-label=\"持仓\" title=\"持仓\"",
                 "aria-label=\"系统状态与恢复\"");
         assertThat(script).contains(
+                "OPEN: \"持仓中\"", "PARTIALLY_CLOSED: \"部分平仓\"",
                 "[\"持仓状态\", label(position.status)]",
                 "[\"用户止损\", formatNumber(position.stopLoss)]",
                 "[\"当前价格\"", "[\"反转提示\"", "[\"上次评估\"",
                 "data-direct-close-position", "持仓录入成功", "平仓记录成功");
+    }
+
+    @Test
+    void browserMobileRouteBootstrapsTheVisibleFocusFromItsServerRenderedSelectedCard() throws Exception {
+        String script = Files.readString(MOBILE_HOME_SCRIPT);
+
+        assertThat(script).contains(
+                "function serverRenderedAsset(card)",
+                "updateMobileFocus(serverRenderedAsset(initialAsset)",
+                "PENDING_FIRST_RUN: \"等待首次监控\"");
     }
 }

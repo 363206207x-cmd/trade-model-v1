@@ -189,7 +189,7 @@ public class PositionMonitoringProjectionService implements PositionMonitoringRe
     }
 
     private String trustState(PositionMonitorLogDTO log, LocalDateTime asOf) {
-        if (log == null) return "SOURCE_UNAVAILABLE";
+        if (log == null) return "PENDING_FIRST_RUN";
         String status = upper(log.getMonitorSourceStatus());
         if ("PENDING_VERIFICATION".equals(status)) return "PENDING";
         if ("INVALID".equals(status)) return "INVALID";

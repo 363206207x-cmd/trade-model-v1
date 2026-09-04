@@ -24,7 +24,7 @@ active_block_cn: "Owner 授权的真实方向、计划、三 AI 与持仓监控�
 next_required_action: "Validate, push and merge this exact docs/gate authorization, then continue the frozen root-cause test-first repair without rediscovery."
 next_business_phase: "V41_REAL_LOGIC_CHAIN_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character audit baseline SHA and ninety-six literal implementation paths are required after this authorization amendment is effective on merged main."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character audit baseline SHA and ninety-seven literal implementation paths are required after this authorization amendment is effective on merged main; dashboard-mobile.js is scoped only to the responsive trinelogic.com browser route and does not authorize APP clients."
 
 production_deployment_readiness: "BLOCKED"
 

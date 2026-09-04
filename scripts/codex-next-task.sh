@@ -224,7 +224,7 @@ validate_contract_task() {
   [[ "$authorized_next_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "TASK_VALIDATION_FAILED authorized starting SHA must be full length" >&2; failed=1; }
   [[ "$authorized_next_mode" != "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current and authorized next modes must be distinct" >&2; failed=1; }
   [[ "$authorized_next_edits" == "true" && "$authorized_next_implementation" == "true" && "$authorized_next_pr" == "true" && "$authorized_next_push" == "true" && "$authorized_next_merge" == "true" && "$authorized_next_deployment" == "false" && "$authorized_next_staging_deployment" == "true" && "$authorized_next_production_deployment" == "false" && "$authorized_next_canonical_figma" == "false" && "$authorized_next_mobile" == "false" && "$authorized_next_canonical_figma_key" == "NONE" ]] || { echo "TASK_VALIDATION_FAILED bounded Real logic chain closure permissions are incomplete" >&2; failed=1; }
-  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "96" ]] || { echo "TASK_VALIDATION_FAILED Real logic chain closure closure must contain exactly ninety-six implementation paths" >&2; failed=1; }
+  [[ "$(printf '%s\n' "$authorized_next_allowed_paths" | sed '/^$/d' | wc -l | tr -d ' ')" == "97" ]] || { echo "TASK_VALIDATION_FAILED Real logic chain closure closure must contain exactly ninety-seven implementation paths" >&2; failed=1; }
   if printf '%s\n' "$authorized_next_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     echo "TASK_VALIDATION_FAILED Real logic chain closure allowlist must not contain wildcards or directory grants" >&2
     failed=1

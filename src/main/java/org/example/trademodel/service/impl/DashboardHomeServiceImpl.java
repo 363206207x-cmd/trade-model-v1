@@ -1026,7 +1026,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             } else {
                 clearCardFinalProjection(asset);
             }
-            if (Boolean.TRUE.equals(asset.getHasFinal()) && projection.sourceDecision() != null) {
+            if (Boolean.TRUE.equals(asset.getHasFinal()) && projection.sourceDecision() != null
+                    && projection.sourceDecision().getFinalConfidence() != null) {
                 DecisionResultVO decision = projection.sourceDecision();
                 asset.setMarketBias(asset.getFinalMarketBias());
                 asset.setMarketBiasLabel(biasLabel(asset.getFinalMarketBias()));
@@ -1405,10 +1406,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (decision == null || !"READY".equals(upper(decision.getDirectionDataState()))) {
             return null;
         }
-        String validated = trimToNull(decision.getValidatedMarketBias());
-        if (isStrongBias(validated) && decision.getFinalConfidence() == null) {
+        if (decision.getFinalConfidence() == null) {
             return null;
         }
+        String validated = trimToNull(decision.getValidatedMarketBias());
         if (validated != null) return upper(validated);
         String neutral = upper(decision.getMarketBiasHierarchy());
         return "RANGE".equals(neutral) || "WAIT".equals(neutral) ? neutral : null;
@@ -1421,7 +1422,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private String analysisFieldState(DecisionResultVO decision) {
         if (decision != null && "READY".equals(upper(decision.getDirectionDataState()))
-                && isStrongBias(decision.getValidatedMarketBias())
+                && (trimToNull(decision.getValidatedMarketBias()) != null
+                    || "RANGE".equals(upper(decision.getMarketBiasHierarchy()))
+                    || "WAIT".equals(upper(decision.getMarketBiasHierarchy())))
                 && decision.getFinalConfidence() == null) {
             return "INVALID";
         }
@@ -2010,6 +2013,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             MonitorReadResult monitorRead = latestPositionMonitorLog(userId, position.getId());
             PositionMonitorLogDTO latestMonitorLog = monitorRead.log();
             boolean trustedMonitor = trustedMonitor(latestMonitorLog, asOf);
+            boolean basePricePartial = basePricePartial(position, latestMonitorLog, asOf);
             DashboardHomeVO.PositionVO row = new DashboardHomeVO.PositionVO();
             row.setPositionId(position.getId());
             row.setSymbol(toDisplaySymbol(position.getAssetSymbol()));
@@ -2033,6 +2037,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if (trustedMonitor) {
                 applyTrustedMonitor(row, position, latestMonitorLog);
                 row.setMonitorTrustState("VERIFIED_FRESH");
+            } else if (basePricePartial) {
+                applyBasePricePartial(row, position, latestMonitorLog);
             } else {
                 applyWaitingMonitor(row, latestMonitorLog, asOf);
             }
@@ -2071,6 +2077,40 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && recognizedPositionRisk(monitor.getRiskLevel())
                 && recognizedRiskTrend(monitor.getRiskTrend())
                 && recognizedMonitorOutcome(monitor);
+    }
+
+    private boolean basePricePartial(UserPositionVO position,
+                                     PositionMonitorLogDTO monitor,
+                                     LocalDateTime asOf) {
+        return position != null && "MANUAL_INDEPENDENT".equals(normalizedPositionSource(position))
+                && monitor != null
+                && "PENDING_VERIFICATION".equals(upper(monitor.getMonitorSourceStatus()))
+                && positive(monitor.getCurrentPrice())
+                && hasText(monitor.getMarkPriceSource())
+                && monitor.getObservedAt() != null
+                && monitor.getFreshUntil() != null
+                && asOf != null
+                && !asOf.isBefore(monitor.getObservedAt())
+                && asOf.isBefore(monitor.getFreshUntil());
+    }
+
+    private void applyBasePricePartial(DashboardHomeVO.PositionVO row,
+                                       UserPositionVO position,
+                                       PositionMonitorLogDTO monitor) {
+        row.setMarkPrice(monitor.getCurrentPrice());
+        row.setCurrentPrice(monitor.getCurrentPrice());
+        row.setMarkPriceSource(trimToNull(monitor.getMarkPriceSource()));
+        row.setMarkPriceObservedAt(monitor.getObservedAt());
+        row.setMarkPriceFresh(true);
+        applyPositionPnl(row, position, monitor.getCurrentPrice());
+        row.setEntryLogicStatus("NOT_APPLICABLE");
+        row.setEntryLogicStatusLabel(entryLogicStatusLabel("NOT_APPLICABLE"));
+        row.setDirectionSupportStatus("NOT_APPLICABLE");
+        row.setDirectionSupportStatusLabel(directionSupportStatusLabel("NOT_APPLICABLE"));
+        row.setLastMonitorAt(monitor.getCreatedAt());
+        row.setLastMonitorTime(monitor.getCreatedAt());
+        row.setMonitorTrustState("BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING");
+        row.setDataState("PARTIAL");
     }
 
     private void applyTrustedMonitor(DashboardHomeVO.PositionVO row,
@@ -2140,7 +2180,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String monitorTrustState(PositionMonitorLogDTO monitor, LocalDateTime asOf) {
-        if (monitor == null) return "SOURCE_UNAVAILABLE";
+        if (monitor == null) return "PENDING_FIRST_RUN";
         String sourceStatus = upper(monitor.getMonitorSourceStatus());
         if ("PENDING_VERIFICATION".equals(sourceStatus)) return "PENDING";
         if ("INVALID".equals(sourceStatus)) return "INVALID";
@@ -2402,6 +2442,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         if (rows.stream().anyMatch(row -> "WAITING_MONITOR_DATA".equals(row.getDataState()))) {
             return "WAITING_MONITOR_DATA";
+        }
+        if (rows.stream().anyMatch(row -> "PARTIAL".equals(row.getDataState()))) {
+            return "PARTIAL_COVERAGE";
         }
         return "OPEN_MONITORING";
     }

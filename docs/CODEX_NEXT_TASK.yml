@@ -125,6 +125,7 @@ authorized_next_package_allowed_paths:
   - "src/main/resources/templates/home.html"
   - "src/main/resources/templates/workspace.html"
   - "src/main/resources/static/js/home-runtime.js"
+  - "src/main/resources/static/js/dashboard-mobile.js"
   - "src/main/resources/static/js/workspace.js"
   - "src/main/resources/static/css/home.css"
   - "src/main/resources/static/css/workspace.css"
@@ -173,7 +174,7 @@ next_task_authorization_conditions:
   - "EXACT_PACKAGE_MATCH"
   - "EXACT_BRANCH_MATCH"
   - "EXACT_40_CHARACTER_STARTING_SHA_MATCH"
-  - "EXACT_NINETY_SIX_PATH_IMPLEMENTATION_ALLOWLIST"
+  - "EXACT_NINETY_SEVEN_PATH_IMPLEMENTATION_ALLOWLIST"
   - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN"
   - "PRODUCT_SOURCE_GATE_PASS"
   - "WORKFLOW_CONTRACT_PASS"
@@ -360,7 +361,7 @@ hard_boundaries:
 
 checks:
   - "Authorization exact package, branch, full starting SHA and eight-file gate scope pass"
-  - "Successor exact package, branch, ancestor starting SHA and ninety-six-file implementation scope pass"
+  - "Successor exact package, branch, ancestor starting SHA and ninety-seven-file implementation scope pass; dashboard-mobile.js is the responsive browser route, not an APP client"
   - "Missing, short or wrong SHA; wrong package/branch; wildcard or out-of-scope file fails closed"
   - "Ordinary implementation packages cannot modify canonical gate owners"
   - "Application/API/Schema/frontend/business-test changed-file count is zero in this gate package"

@@ -289,6 +289,33 @@
     });
   }
 
+  function serverRenderedAsset(card) {
+    if (!card) return null;
+    return {
+      symbol: card.dataset.symbol,
+      assetState: card.dataset.assetState,
+      moduleState: card.dataset.moduleState,
+      marketBiasLabel: card.dataset.directionLabel,
+      confidenceLabel: card.dataset.confidenceLabel,
+      riskLabel: card.dataset.riskLabel,
+      dataQuality: card.dataset.qualityLabel
+    };
+  }
+
+  function positionObservationStateText(position) {
+    var state = String(position && position.monitorTrustState || "PENDING_FIRST_RUN").toUpperCase();
+    return {
+      VERIFIED_FRESH: "可信监控可用",
+      PENDING_FIRST_RUN: "等待首次监控",
+      PENDING: "等待监控数据",
+      PENDING_VERIFICATION: "等待监控数据",
+      BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING: "行情已更新，完整监控待验证",
+      STALE: "监控数据已过期",
+      INVALID: "监控数据当前不可用",
+      SOURCE_UNAVAILABLE: "监控来源不可用"
+    }[state] || "等待监控数据";
+  }
+
   function renderMobileSignalList(kind, items) {
     var isAlert = kind === "alert";
     var empty = document.querySelector(isAlert ? "[data-mobile-alert-empty]" : "[data-mobile-event-empty]");
@@ -380,6 +407,7 @@
       card.appendChild(heading);
 
       var core = element("dl", "position-core position-summary");
+      appendDefinition(core, "监控状态", positionObservationStateText(position), false);
       appendDefinition(core, "当前风险", position.riskLevelLabel || position.riskLevel, false);
       appendDefinition(core, "入场逻辑", position.entryLogicStatusLabel || position.entryLogicStatus, false);
       appendDefinition(core, "方向支持", position.directionSupportStatusLabel || position.directionSupportStatus, false);
@@ -1332,6 +1360,7 @@
     var initialAsset = selectedAssetCard();
     keepAssetCardVisible(initialAsset, "auto");
     if (initialAsset && initialAsset.dataset.symbol) {
+      updateMobileFocus(serverRenderedAsset(initialAsset), initialAsset.dataset.moduleState, initialAsset.dataset.symbol);
       updateSelectedSymbolUrl(initialAsset.dataset.symbol);
       updateAssetDetailLink(initialAsset);
       setText(

@@ -420,6 +420,12 @@
         return position && trust === "VERIFIED_FRESH" && position.markPriceFresh === true
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].indexOf(String(position.dataState || "").toUpperCase()) >= 0;
     }
+    function monitorPriceAvailable(position) {
+        var trust = String(position && position.monitorTrustState || "").toUpperCase();
+        return position && position.markPriceFresh === true
+            && ["VERIFIED_FRESH", "BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING"].indexOf(trust) >= 0
+            && has(position.markPrice || position.currentPrice);
+    }
     function validPosition(position) {
         return position && symbolOf(position) && has(position.direction)
             && has(position.entryPrice) && has(position.openedAt);
@@ -438,8 +444,10 @@
     function trustStateText(position) {
         var state = String(position && position.monitorTrustState || "SOURCE_UNAVAILABLE").toUpperCase();
         return {
+            PENDING_FIRST_RUN: "等待首次监控",
             PENDING: "等待监控数据",
             PENDING_VERIFICATION: "等待监控数据",
+            BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING: "行情已更新，完整监控待验证",
             STALE: "监控数据已过期",
             INVALID: "当前不可查看",
             SOURCE_UNAVAILABLE: "监控来源不可用"
@@ -451,6 +459,7 @@
     }
     function positionRow(position) {
         var trusted = trustedMonitor(position);
+        var priceAvailable = monitorPriceAvailable(position);
         var unavailable = trustStateText(position);
         var risk = text(position.riskLevelLabel, label(position.riskLevel));
         var logic = text(position.entryLogicStatusLabel, label(position.entryLogicStatus));
@@ -470,7 +479,7 @@
             : "";
         var openingFacts = '<div class="position-facts">' + positionFact("开仓价", number(position.entryPrice), "UNKNOWN", "numeric")
             + positionFact("开仓时间", time(position.openedAt), "UNKNOWN", "numeric");
-        if (trusted) {
+        if (priceAvailable) {
             openingFacts += positionFact("标记价格", number(position.markPrice), "STABLE", "numeric")
                 + positionFact("盈亏", percent(position.pnlPercent), Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID", "numeric");
         }
