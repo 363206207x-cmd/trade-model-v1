@@ -58,10 +58,15 @@ public final class MarketBiasPolicy {
                     fourHour, oneHour, fifteenMinute, fiveMinute,
                     normalization.getVersion());
         }
-        boolean criticalConflict = fourHour.signum() != 0 && oneHour.signum() != 0
-                && fourHour.signum() != oneHour.signum()
+        boolean opposingCoreDirections = fourHour.signum() != 0 && oneHour.signum() != 0
+                && fourHour.signum() != oneHour.signum();
+        boolean configuredOppositionConflict = opposingCoreDirections
+                && fourHour.subtract(oneHour).abs()
+                .compareTo(config.getMaximumTrendScoreDifference()) > 0;
+        boolean highMagnitudeOppositionConflict = opposingCoreDirections
                 && fourHour.abs().compareTo(BigDecimal.valueOf(35)) >= 0
                 && oneHour.abs().compareTo(BigDecimal.valueOf(35)) >= 0;
+        boolean criticalConflict = configuredOppositionConflict || highMagnitudeOppositionConflict;
         BigDecimal structural = fourHour.multiply(config.getFourHourWeight())
                 .add(oneHour.multiply(config.getOneHourWeight()))
                 .setScale(4, RoundingMode.HALF_UP);
