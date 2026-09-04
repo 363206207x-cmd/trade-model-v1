@@ -2046,7 +2046,7 @@ run_exact_machine_gate_self_test() {
   src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java \
   src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java \
   src/main/java/org/example/trademodel/controller/TelegramNotificationController.java \
-  src/main/java/org/example/trademodel/controller/SystemController.java \
+  src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java \
   src/main/java/org/example/trademodel/controller/AiDecisionAuditController.java \
   src/main/java/org/example/trademodel/controller/AnalysisDetailController.java \
   src/main/java/org/example/trademodel/controller/UserConfigController.java \
