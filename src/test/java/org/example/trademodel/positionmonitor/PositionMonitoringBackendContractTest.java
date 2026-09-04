@@ -38,7 +38,7 @@ class PositionMonitoringBackendContractTest {
         assertThat(names(PositionRiskTrendEnum.values()))
                 .containsExactly("STABLE", "INCREASED", "SHARPLY_INCREASED");
         assertThat(names(PositionMonitorDataStateEnum.values())).containsExactly(
-                "NO_POSITION", "OPEN_MONITORING", "WAITING_MONITOR_DATA", "RISK_ESCALATED",
+                "NO_POSITION", "OPEN_MONITORING", "PARTIAL", "WAITING_MONITOR_DATA", "RISK_ESCALATED",
                 "PLAN_INVALIDATED", "CLOSED");
     }
 

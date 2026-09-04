@@ -825,6 +825,47 @@
             : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
         return prefix + ":" + value;
     }
+    function analysisPreviewKey(symbol) {
+        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":5m";
+    }
+    function analysisPreviewSubmission(symbol) {
+        var key = analysisPreviewKey(symbol);
+        var saved = readDraft(key) || {};
+        if (!saved.submissionId) saved.submissionId = stableSubmissionId("analysis-preview");
+        saved.symbol = String(symbol || "").trim().toUpperCase();
+        saved.timeframe = "5m";
+        writeDraft(key, saved);
+        return saved;
+    }
+    function rememberAnalysisPreview(symbol, current, result) {
+        var saved = Object.assign({}, current || {}, {
+            taskId: result && result.taskId,
+            taskState: result && result.taskState,
+            taskStage: result && result.taskStage,
+            analysisId: result && result.analysisId,
+            traceId: result && result.traceId
+        });
+        writeDraft(analysisPreviewKey(symbol), saved);
+        return saved;
+    }
+    function clearAnalysisPreview(symbol) {
+        removeDraft(analysisPreviewKey(symbol));
+    }
+    async function recoverAnalysisPreviewTask(taskId) {
+        if (!taskId) return null;
+        for (var attempt = 0; attempt < 20; attempt++) {
+            var tasks = await api("/api/workspace/tasks?limit=30");
+            var task = (Array.isArray(tasks) ? tasks : []).find(function (item) {
+                return item && item.taskId === taskId;
+            });
+            if (task && task.resultResourceId) return task;
+            if (task && ["FAILED", "CANCELLED"].indexOf(String(task.state || "").toUpperCase()) >= 0) {
+                throw new Error(text(task.errorMessage, "分析任务未完成"));
+            }
+            await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+        return null;
+    }
     function readDraft(key) {
         try { return JSON.parse(window.sessionStorage.getItem(key) || "null"); }
         catch (_) { return null; }
@@ -1086,8 +1127,22 @@
             searchActionBusy = true;
             renderSearchSelection("分析中");
             try {
-                var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbolOf(selectedSearchAsset)) + "/analysis-preview?timeframe=5m", { method: "POST" });
+                var previewSymbol = symbolOf(selectedSearchAsset);
+                var previewState = analysisPreviewSubmission(previewSymbol);
+                var result = await api("/api/asset-pool/search/" + encodeURIComponent(previewSymbol)
+                    + "/analysis-preview?timeframe=5m&submissionId="
+                    + encodeURIComponent(previewState.submissionId), { method: "POST" });
+                previewState = rememberAnalysisPreview(previewSymbol, previewState, result);
+                if ((!result || !result.analysisId) && result && result.taskId) {
+                    var recovered = await recoverAnalysisPreviewTask(result.taskId);
+                    if (recovered && recovered.resultResourceId) {
+                        result.analysisId = recovered.resultResourceId;
+                        result.traceId = recovered.traceId;
+                        rememberAnalysisPreview(previewSymbol, previewState, result);
+                    }
+                }
                 if (!result || !result.analysisId) throw new Error("预览未返回分析标识");
+                clearAnalysisPreview(previewSymbol);
                 window.location.assign("/analysis/" + encodeURIComponent(result.analysisId) + "?returnTo="
                     + encodeURIComponent("/dashboard" + (selectedSymbol ? "?asset=" + selectedSymbol : "")));
             } catch (error) {

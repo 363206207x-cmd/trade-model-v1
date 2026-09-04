@@ -274,6 +274,7 @@ CREATE INDEX IF NOT EXISTS idx_tm_decision_home_contract
 CREATE TABLE IF NOT EXISTS tm_execution_plan (
     plan_id VARCHAR(64) PRIMARY KEY,
     analysis_id VARCHAR(64) NOT NULL,
+    decision_id VARCHAR(64),
     plan_mode VARCHAR(32) NOT NULL DEFAULT 'ADVISORY',
     execution_plan_status VARCHAR(32) NOT NULL DEFAULT 'INCOMPLETE',
     source_gate_status VARCHAR(32) NOT NULL DEFAULT 'INCOMPLETE',
@@ -521,6 +522,9 @@ CREATE TABLE IF NOT EXISTS tm_execution_plan (
     )
 );
 
+CREATE INDEX IF NOT EXISTS idx_tm_execution_plan_decision_identity
+    ON tm_execution_plan(analysis_id, decision_id, create_time DESC);
+
 CREATE TABLE IF NOT EXISTS tm_market_environment_snapshot (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     analysis_id VARCHAR(64) NOT NULL UNIQUE,
@@ -703,6 +707,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_close_submission
     ON tm_user_position(user_id, close_submission_id);
 CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    monitor_run_key VARCHAR(180),
     position_id BIGINT NOT NULL,
     analysis_id VARCHAR(64) NOT NULL,
     execution_plan_id VARCHAR(64),
@@ -809,6 +814,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_analysis_created
     ON tm_position_monitor_log(analysis_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tm_position_monitor_log_trust_freshness
     ON tm_position_monitor_log(position_id, source_status, fresh_until DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_position_monitor_log_run_key
+    ON tm_position_monitor_log(monitor_run_key);
 
 -- Push 快照 / 二次校验（与 tm_analysis_run.analysis_id 类型一致：VARCHAR(64)）
 -- 下列 CLOB JSON 列由 /api/review/aggregate 原样透出至复盘页文本展示，应用层不对其做解析或折叠 UI。
@@ -1926,6 +1933,8 @@ CREATE TABLE IF NOT EXISTS tm_async_task (
     stage VARCHAR(64),
     resource_type VARCHAR(32),
     resource_id VARCHAR(64),
+    idempotency_key VARCHAR(180),
+    result_resource_id VARCHAR(128),
     trace_id VARCHAR(128),
     retry_count INT NOT NULL DEFAULT 0,
     max_retries INT NOT NULL DEFAULT 0,
@@ -1948,6 +1957,8 @@ CREATE INDEX IF NOT EXISTS idx_tm_async_task_owner_time
     ON tm_async_task(owner_type, owner_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tm_async_task_trace
     ON tm_async_task(trace_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_async_task_idempotency_key
+    ON tm_async_task(owner_type, owner_id, idempotency_key);
 
 CREATE TABLE IF NOT EXISTS tm_event_asset_relation (
     relation_id VARCHAR(64) PRIMARY KEY,

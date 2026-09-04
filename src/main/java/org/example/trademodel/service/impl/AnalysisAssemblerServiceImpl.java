@@ -983,6 +983,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 ExecutionPlanDO pdo = new ExecutionPlanDO();
                 pdo.setPlanId(plan.getPlanId());
                 pdo.setAnalysisId(analysis.getAnalysisId());
+                pdo.setDecisionId(decision == null ? null : decision.getDecisionId());
                 pdo.setPlanMode(plan.getPlanMode());
                 pdo.setExecutionPlanStatus(plan.getExecutionPlanStatus());
                 pdo.setSourceGateStatus(plan.getSourceGateStatus());
@@ -1832,8 +1833,40 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         ObjectNode root = EXPLAIN_JSON.createObjectNode();
         root.put("version", "1");
         root.put("analysisId", analysis.getAnalysisId());
+        root.put("decisionId", decision.getDecisionId());
         root.put("symbol", analysis.getSymbol());
         root.put("timeframe", analysis.getTimeframe() != null ? analysis.getTimeframe() : "");
+        if (decision.getPushTriggerPrice() == null) {
+            root.putNull("priceAtDecision");
+        } else {
+            root.put("priceAtDecision", decision.getPushTriggerPrice());
+        }
+        root.put("directionCalculatedAt", analysis.getAnalysisTime());
+        LocalDateTime marketDataAsOf = evidences == null ? null : evidences.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(EvidenceItemVO::getObservedAt)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+        if (marketDataAsOf == null) {
+            root.putNull("marketDataAsOf");
+        } else {
+            root.put("marketDataAsOf", marketDataAsOf.toString());
+        }
+        String direction = java.util.stream.Stream.of(decision.getFinalMarketBias(),
+                        decision.getValidatedMarketBias(), decision.getRuleMarketBias(),
+                        decision.getMarketBiasHierarchy())
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
+        root.put("direction", direction);
+        if (decision.getFinalConfidence() == null) {
+            root.putNull("confidence");
+        } else {
+            root.put("confidence", decision.getFinalConfidence());
+        }
+        root.put("riskLevel", decision.getRiskLevel());
+        root.set("multiTimeframeDetails", EXPLAIN_JSON.valueToTree(decision.getMultiTimeframeDetails()));
         String summary = decision.getConclusionSummary();
         if (summary != null && summary.length() > 480) {
             summary = summary.substring(0, 477) + "...";

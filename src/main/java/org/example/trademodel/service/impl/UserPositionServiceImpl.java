@@ -10,6 +10,7 @@ import org.example.trademodel.enums.UserPositionStatusEnum;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
 import org.example.trademodel.mapper.UserPositionMapper;
 import org.example.trademodel.service.UserPositionService;
+import org.example.trademodel.service.PositionMonitorScheduler;
 import org.example.trademodel.service.support.UtcLocalTimePolicy;
 import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
@@ -17,6 +18,8 @@ import org.example.trademodel.vo.UserPositionVO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,23 +33,32 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserPositionServiceImpl implements UserPositionService {
+    private static final Logger log = LoggerFactory.getLogger(UserPositionServiceImpl.class);
     private static final String STATUS_OPEN = UserPositionStatusEnum.OPEN.name();
     private static final Set<String> FORBIDDEN_OWNER_FIELDS = Set.of(
             "userid", "ownerid", "accountid", "principalid", "tenantid");
 
     private final UserPositionMapper userPositionMapper;
     private final ExecutionPlanMapper executionPlanMapper;
+    private final PositionMonitorScheduler positionMonitorScheduler;
     private Clock clock = Clock.systemUTC();
 
     public UserPositionServiceImpl(UserPositionMapper userPositionMapper) {
-        this(userPositionMapper, null);
+        this(userPositionMapper, null, null);
+    }
+
+    public UserPositionServiceImpl(UserPositionMapper userPositionMapper,
+                                   ExecutionPlanMapper executionPlanMapper) {
+        this(userPositionMapper, executionPlanMapper, null);
     }
 
     @Autowired
     public UserPositionServiceImpl(UserPositionMapper userPositionMapper,
-                                   ExecutionPlanMapper executionPlanMapper) {
+                                   ExecutionPlanMapper executionPlanMapper,
+                                   PositionMonitorScheduler positionMonitorScheduler) {
         this.userPositionMapper = userPositionMapper;
         this.executionPlanMapper = executionPlanMapper;
+        this.positionMonitorScheduler = positionMonitorScheduler;
     }
 
     @Override
@@ -98,19 +110,34 @@ public class UserPositionServiceImpl implements UserPositionService {
         row.setUpdatedAt(now);
         UserPositionDO existing = userPositionMapper.selectBySubmissionIdAndUserId(submissionId, userId);
         if (existing != null) {
-            return toVo(requireSameOpenPayload(existing, row));
+            UserPositionDO canonical = requireSameOpenPayload(existing, row);
+            requestInitialMonitor(canonical);
+            return toVo(canonical);
         }
         try {
             if (userPositionMapper.insert(row) != 1) {
                 throw new IllegalStateException("UserPosition insert failed");
             }
+            requestInitialMonitor(row);
             return toVo(row);
         } catch (DuplicateKeyException duplicate) {
             UserPositionDO canonical = userPositionMapper.selectBySubmissionIdAndUserId(submissionId, userId);
             if (canonical == null) {
                 throw duplicate;
             }
-            return toVo(requireSameOpenPayload(canonical, row));
+            canonical = requireSameOpenPayload(canonical, row);
+            requestInitialMonitor(canonical);
+            return toVo(canonical);
+        }
+    }
+
+    private void requestInitialMonitor(UserPositionDO position) {
+        if (positionMonitorScheduler == null || position == null || position.getId() == null) return;
+        try {
+            positionMonitorScheduler.requestInitialMonitor(position.getId(), position.getUserId());
+        } catch (RuntimeException failure) {
+            log.warn("[user-position] initial monitoring request could not be queued for positionId={}",
+                    position.getId());
         }
     }
 

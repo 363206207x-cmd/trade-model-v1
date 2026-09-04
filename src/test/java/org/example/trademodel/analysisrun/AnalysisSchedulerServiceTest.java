@@ -98,7 +98,8 @@ class AnalysisSchedulerServiceTest {
     void schedulerPreservesPoolOwnerAndUsesConfiguredStateCadence() {
         SchedulerFixture fixture = schedulerFixture(
                 AssetStateEnum.WAITING_TRIGGER,
-                scanAudit("5m=FLAT;15m=FLAT;1h=FLAT;4h=FLAT", 2_000L), true);
+                scanAuditWithCoreCloses(
+                        "5m=FLAT;15m=FLAT;1h=FLAT;4h=FLAT", 2_000L, 2_000L, 2_000L), true);
         fixture.stubFreshTrends("FLAT", "FLAT", "FLAT", "FLAT", 2_000L);
 
         List<AnalysisRunResult> results = fixture.service.runScheduledCycle();
@@ -176,7 +177,8 @@ class AnalysisSchedulerServiceTest {
     void triggeredMinutePollWithUnchangedEvidenceCallsNoFullAnalysis() {
         SchedulerFixture fixture = schedulerFixture(
                 AssetStateEnum.TRIGGERED,
-                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 3_500L, "FINAL_MISSING"), true);
+                scanAuditWithCoreCloses("5m=UP;15m=UP;1h=UP;4h=UP", 3_500L,
+                        4_000L, 4_000L, "FINAL_MISSING"), true);
         fixture.stubFreshTrends("UP", "UP", "UP", "UP", 4_000L);
 
         assertThat(fixture.service.runScheduledCycle()).isEmpty();
@@ -203,7 +205,8 @@ class AnalysisSchedulerServiceTest {
     void triggeredPlanLifecycleChangeRequestsRuleOwnedReanalysis() {
         SchedulerFixture fixture = schedulerFixture(
                 AssetStateEnum.TRIGGERED,
-                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 5_000L, "READY"), true);
+                scanAuditWithCoreCloses(
+                        "5m=UP;15m=UP;1h=UP;4h=UP", 5_000L, 5_000L, 5_000L, "READY"), true);
         fixture.stubFreshTrends("UP", "UP", "UP", "UP", 5_000L);
         ExecutionPlanDO needsRevalidation = new ExecutionPlanDO();
         needsRevalidation.setPlanLifecycleState("NEEDS_REVALIDATION");
@@ -272,6 +275,34 @@ class AnalysisSchedulerServiceTest {
     }
 
     @Test
+    void newOneHourCloseTriggersRecalculationWhenFiveMinuteCloseIsUnchanged() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.CANDIDATE,
+                scanAuditWithCoreCloses("5m=UP;15m=UP;1h=UP;4h=UP", 6_000L, 5_000L, 4_000L), true);
+        fixture.stubFreshTrendCloses("UP", "UP", "UP", "UP",
+                6_000L, 6_000L, 6_000L, 4_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+        assertThat(fixture.orchestrator.commands).singleElement().satisfies(command ->
+                assertThat(command.getTriggerReference())
+                        .contains("NEW_CORE_CLOSED_CANDLE_RECALCULATION"));
+    }
+
+    @Test
+    void legacySuccessfulScanWithoutCoreCloseIdentityTriggersOneCatchUpRecalculation() {
+        SchedulerFixture fixture = schedulerFixture(
+                AssetStateEnum.CANDIDATE,
+                scanAudit("5m=UP;15m=UP;1h=UP;4h=UP", 6_000L), true);
+        fixture.stubFreshTrendCloses("UP", "UP", "UP", "UP",
+                6_000L, 6_000L, 5_000L, 4_000L);
+
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
+        assertThat(fixture.orchestrator.commands).singleElement().satisfies(command ->
+                assertThat(command.getTriggerReference())
+                        .contains("NEW_CORE_CLOSED_CANDLE_RECALCULATION"));
+    }
+
+    @Test
     void staleSourceFailsClosedBeforeFullAnalysis() {
         SchedulerFixture fixture = schedulerFixture(AssetStateEnum.CANDIDATE, null, true);
         PersistedOhlcvReadinessResult stale = new PersistedOhlcvReadinessResult();
@@ -290,17 +321,17 @@ class AnalysisSchedulerServiceTest {
     }
 
     @Test
-    void missingCoinGlassBlocksFullAutomaticOpportunityChain() {
+    void missingCoinGlassDoesNotBlockCoreStructuralRecalculation() {
         SchedulerFixture fixture = schedulerFixture(AssetStateEnum.OBSERVING, null, false);
         fixture.stubFreshTrends("UP", "UP", "UP", "UP", 7_000L);
 
-        assertThat(fixture.service.runScheduledCycle()).isEmpty();
+        assertThat(fixture.service.runScheduledCycle()).hasSize(1);
 
-        assertThat(fixture.orchestrator.commands).isEmpty();
+        assertThat(fixture.orchestrator.commands).hasSize(1);
         verify(fixture.assetStateService).completeScheduledScan(
-                any(), any(), eq("BLOCKED_EXTERNAL_CREDENTIAL"), eq("COINGLASS_NOT_CONFIGURED"),
-                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(7_000L), eq(null),
-                eq(false), eq(false));
+                any(), any(), eq("PROMOTION_SIGNAL:EXECUTED"), eq(null),
+                eq("FRESH:BINANCE_PUBLIC:SPOT"), anyString(), eq(7_000L), anyString(),
+                eq(true), eq(true));
     }
 
     @Test
@@ -449,6 +480,23 @@ class AnalysisSchedulerServiceTest {
                 + "\",\"latestFullAnalysisCloseTimeMs\":" + latestFullClose + hotReset + "}}";
     }
 
+    private static String scanAuditWithCoreCloses(String signature, long latestFiveMinuteClose,
+                                                   long latestOneHourClose, long latestFourHourClose) {
+        return scanAuditWithCoreCloses(signature, latestFiveMinuteClose,
+                latestOneHourClose, latestFourHourClose, "NOT_REQUIRED");
+    }
+
+    private static String scanAuditWithCoreCloses(String signature, long latestFiveMinuteClose,
+                                                   long latestOneHourClose, long latestFourHourClose,
+                                                   String planStatus) {
+        String fullSignature = signature + ";RISK=HIGH;PLAN=" + planStatus;
+        return "{\"schedulerScan\":{\"structureSignature\":\"" + fullSignature
+                + "\",\"latestFullStructureSignature\":\"" + fullSignature
+                + "\",\"latestFullAnalysisCloseTimeMs\":" + latestFiveMinuteClose
+                + ",\"latestFull1hCloseTimeMs\":" + latestOneHourClose
+                + ",\"latestFull4hCloseTimeMs\":" + latestFourHourClose + "}}";
+    }
+
     private record SchedulerFixture(AnalysisSchedulerService service,
                                     CapturingOrchestrator orchestrator,
                                     AssetStateService assetStateService,
@@ -456,6 +504,14 @@ class AnalysisSchedulerServiceTest {
                                     ExecutionPlanMapper executionPlanMapper) {
         void stubFreshTrends(String fiveMinute, String fifteenMinute,
                              String oneHour, String fourHour, long latestClose) {
+            stubFreshTrendCloses(fiveMinute, fifteenMinute, oneHour, fourHour,
+                    latestClose, latestClose, latestClose, latestClose);
+        }
+
+        void stubFreshTrendCloses(String fiveMinute, String fifteenMinute,
+                                  String oneHour, String fourHour,
+                                  long fiveMinuteClose, long fifteenMinuteClose,
+                                  long oneHourClose, long fourHourClose) {
             when(query.evaluateReadinessForSource(
                     anyString(), anyString(), eq(100), anyLong(),
                     eq("BINANCE_PUBLIC"), eq("SPOT")))
@@ -467,6 +523,13 @@ class AnalysisSchedulerServiceTest {
                             case "1h" -> oneHour;
                             case "4h" -> fourHour;
                             default -> "FLAT";
+                        };
+                        long latestClose = switch (timeframe) {
+                            case "5m" -> fiveMinuteClose;
+                            case "15m" -> fifteenMinuteClose;
+                            case "1h" -> oneHourClose;
+                            case "4h" -> fourHourClose;
+                            default -> fiveMinuteClose;
                         };
                         return freshReadiness(timeframe, trend, latestClose);
                     });

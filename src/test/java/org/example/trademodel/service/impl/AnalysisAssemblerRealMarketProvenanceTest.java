@@ -8,15 +8,20 @@ import org.example.trademodel.market.PersistedRealMarketEnvironmentAssessment;
 import org.example.trademodel.market.PersistedRealMarketEnvironmentService;
 import org.example.trademodel.market.RealMarketEnvironmentService;
 import org.example.trademodel.service.*;
+import org.example.trademodel.vo.AssetAnalysisVO;
+import org.example.trademodel.vo.DecisionBundleVO;
+import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,6 +29,47 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AnalysisAssemblerRealMarketProvenanceTest {
+
+    @Test
+    void explanationPersistsOneDecisionTimeAndPriceIdentityWithCoreTimeframeEvidence() {
+        AnalysisAssemblerServiceImpl assembler = assembler(
+                mock(EvidenceService.class), mock(RealMarketEnvironmentService.class),
+                mock(PersistedRealMarketEnvironmentService.class));
+        AssetAnalysisVO analysis = new AssetAnalysisVO();
+        analysis.setAnalysisId("analysis-identity-1");
+        analysis.setSymbol("ETHUSDT");
+        analysis.setTimeframe("5m");
+        analysis.setAnalysisTime("2026-07-13T02:05:00");
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setDecisionId("decision-identity-1");
+        decision.setPushTriggerPrice(new BigDecimal("2391.25"));
+        decision.setFinalMarketBias("STRONG_BEARISH");
+        decision.setFinalConfidence(81);
+        decision.setRiskLevel("HIGH");
+        decision.setMultiTimeframeDetails(Map.of(
+                "1h", Map.of("closedAt", "2026-07-13T02:00:00", "score", -0.82),
+                "4h", Map.of("closedAt", "2026-07-13T00:00:00", "score", -0.76)));
+        EvidenceItemVO older = new EvidenceItemVO();
+        older.setObservedAt(LocalDateTime.of(2026, 7, 13, 2, 0));
+        EvidenceItemVO newest = new EvidenceItemVO();
+        newest.setObservedAt(LocalDateTime.of(2026, 7, 13, 2, 4, 30));
+
+        String json = ReflectionTestUtils.invokeMethod(assembler, "buildExplanationJson",
+                analysis, decision, List.of(older, newest), List.of());
+
+        assertThat(json)
+                .contains("\"analysisId\":\"analysis-identity-1\"")
+                .contains("\"decisionId\":\"decision-identity-1\"")
+                .contains("\"priceAtDecision\":2391.25")
+                .contains("\"directionCalculatedAt\":\"2026-07-13T02:05:00\"")
+                .contains("\"marketDataAsOf\":\"2026-07-13T02:04:30\"")
+                .contains("\"direction\":\"STRONG_BEARISH\"")
+                .contains("\"confidence\":81")
+                .contains("\"riskLevel\":\"HIGH\"")
+                .contains("\"multiTimeframeDetails\"")
+                .contains("\"1h\"")
+                .contains("\"4h\"");
+    }
 
     @Test
     void analysisAssemblerAcceptsValidKrakenRuntimeContext() {

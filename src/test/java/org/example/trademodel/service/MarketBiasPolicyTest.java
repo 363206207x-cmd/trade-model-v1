@@ -55,6 +55,19 @@ class MarketBiasPolicyTest {
                 .isEqualTo(MarketBiasPolicy.WindowDirection.BULLISH);
     }
 
+    @Test
+    void strongLabelDowngradesWhenCoreScoreDispersionExceedsContract() {
+        FundamentalAiV41Properties properties = FundamentalAiV41Properties.contractFixture();
+        MarketBiasPolicy.DirectionAssessment assessment = MarketBiasPolicy.assessDirection(
+                flat(), flat(), rankedWindow(50), rankedWindow(58),
+                properties.getMultiTimeframe(), properties.getNormalization());
+
+        assertThat(assessment.normalized4hDirectionScore()
+                .subtract(assessment.normalized1hDirectionScore()).abs())
+                .isGreaterThan(properties.getMultiTimeframe().getMaximumTrendScoreDifference());
+        assertThat(assessment.ruleMarketBias()).isEqualTo("BULLISH");
+    }
+
     private static String classify(List<String[]> five, List<String[]> fifteen,
                                    List<String[]> oneHour, List<String[]> fourHour) {
         return MarketBiasPolicy.classify(five, fifteen, oneHour, fourHour);
@@ -82,6 +95,15 @@ class MarketBiasPolicyTest {
                     : BigDecimal.valueOf(100).subtract(BigDecimal.valueOf(index + 1L, 1));
             bars.add(bar("100", price.toPlainString()));
         }
+        return bars;
+    }
+
+    private static List<String[]> rankedWindow(int finalCloseRank) {
+        List<String[]> bars = new ArrayList<>();
+        for (int index = 0; index < 59; index++) {
+            bars.add(bar("100", String.valueOf(101 + index)));
+        }
+        bars.add(bar("100", String.valueOf(101 + finalCloseRank)));
         return bars;
     }
 

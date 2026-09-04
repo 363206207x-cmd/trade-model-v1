@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public class PositionMonitorLogDO {
     private Long logId;
+    private String monitorRunKey;
     private Long positionId;
     private String analysisId;
     private String executionPlanId;
@@ -36,6 +37,9 @@ public class PositionMonitorLogDO {
     public void setLogId(Long logId) {
         this.logId = logId;
     }
+
+    public String getMonitorRunKey() { return monitorRunKey; }
+    public void setMonitorRunKey(String monitorRunKey) { this.monitorRunKey = monitorRunKey; }
 
     public Long getPositionId() {
         return positionId;

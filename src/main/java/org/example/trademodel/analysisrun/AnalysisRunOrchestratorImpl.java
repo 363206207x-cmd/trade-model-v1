@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.AnalysisRunDO;
 import org.example.trademodel.requestcontext.RequestIdSupport;
 import org.example.trademodel.service.AnalysisAssemblerService;
+import org.example.trademodel.service.AsyncTaskService;
 import org.example.trademodel.service.RuleConfigService;
 import org.example.trademodel.mapper.AnalysisRunMapper;
 import org.example.trademodel.vo.AssetAnalysisVO;
@@ -54,6 +55,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
     private final Clock clock;
     private final AnalysisRunMapper analysisRunMapper;
     private final AnalysisRunBackgroundWorker backgroundWorker;
+    private final AsyncTaskService asyncTaskService;
 
     public AnalysisRunOrchestratorImpl(AnalysisIdempotencyGuard idempotencyGuard,
                                        AnalysisAssemblerService assemblerService,
@@ -61,7 +63,18 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                                        AnalysisRunProperties properties,
                                        Clock analysisRunClock) {
         this(idempotencyGuard, assemblerService, ruleConfigService, properties,
-                analysisRunClock, null, null);
+                analysisRunClock, null, null, null);
+    }
+
+    public AnalysisRunOrchestratorImpl(AnalysisIdempotencyGuard idempotencyGuard,
+                                       AnalysisAssemblerService assemblerService,
+                                       RuleConfigService ruleConfigService,
+                                       AnalysisRunProperties properties,
+                                       Clock analysisRunClock,
+                                       AnalysisRunMapper analysisRunMapper,
+                                       AnalysisRunBackgroundWorker backgroundWorker) {
+        this(idempotencyGuard, assemblerService, ruleConfigService, properties,
+                analysisRunClock, analysisRunMapper, backgroundWorker, null);
     }
 
     @Autowired
@@ -71,7 +84,8 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                                        AnalysisRunProperties properties,
                                        Clock analysisRunClock,
                                        AnalysisRunMapper analysisRunMapper,
-                                       AnalysisRunBackgroundWorker backgroundWorker) {
+                                       AnalysisRunBackgroundWorker backgroundWorker,
+                                       AsyncTaskService asyncTaskService) {
         this.idempotencyGuard = idempotencyGuard;
         this.assemblerService = assemblerService;
         this.ruleConfigService = ruleConfigService;
@@ -79,6 +93,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
         this.clock = analysisRunClock != null ? analysisRunClock : Clock.systemUTC();
         this.analysisRunMapper = analysisRunMapper;
         this.backgroundWorker = backgroundWorker;
+        this.asyncTaskService = asyncTaskService;
     }
 
     @Override
@@ -163,6 +178,7 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
                     : backgroundWorker.withLease(run, () -> assemblerService.assemble(context));
             boolean failedRecovery = claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_FAILED;
             boolean expiredLeaseRecovery = claim.getStatus() == AnalysisIdempotencyClaimStatus.RECOVERED_EXPIRED_LEASE;
+            completeLinkedTask(run, true, null, null);
             return AnalysisRunResult.executed(run, analysis, failedRecovery, expiredLeaseRecovery);
         } catch (Exception e) {
             String redactedMessage = redact(e.getMessage());
@@ -180,7 +196,20 @@ public class AnalysisRunOrchestratorImpl implements AnalysisRunOrchestrator {
             if (run != null) {
                 idempotencyGuard.markFailed(context, failureCode, redactedMessage);
             }
+            completeLinkedTask(run, false, failureCode, redactedMessage);
             return AnalysisRunResult.failed(run, redactedMessage);
+        }
+    }
+
+    private void completeLinkedTask(AnalysisRunDO run, boolean succeeded,
+                                    String errorCode, String errorMessage) {
+        if (asyncTaskService == null || run == null || run.getAnalysisId() == null) return;
+        try {
+            asyncTaskService.completeForAnalysisResult(
+                    run.getAnalysisId(), succeeded, errorCode, errorMessage);
+        } catch (RuntimeException taskCompletionFailure) {
+            log.warn("analysis async task completion failed analysisId={} traceId={}",
+                    run.getAnalysisId(), run.getTraceId());
         }
     }
 
