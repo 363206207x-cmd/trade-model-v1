@@ -607,10 +607,10 @@ if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|doc
   fail "Real logic chain closure authorization allowlist must not contain wildcards or directory-level grants"
 fi
 expected_implementation_paths="$authorized_next_package_allowed_paths"
-[[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort | git hash-object --stdin)" == "ccf8d2e80eeb32428ceb2d3e774dc4778dfb06b8" ]] \
+[[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort | git hash-object --stdin)" == "76c96fd1771121df294ae3a4b60717249f2aae09" ]] \
   || fail "Real logic chain closure implementation allowlist fingerprint mismatch"
 [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "Real logic chain closure implementation allowlist must contain exactly the ninety-seven authorized paths"
+  || fail "Real logic chain closure implementation allowlist must contain exactly the ninety-eight authorized paths"
 if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
   fail "Real logic chain closure implementation allowlist must not contain wildcards or directory-level grants"
 fi
@@ -622,7 +622,7 @@ for transition_condition in \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_NINETY_SEVEN_PATH_IMPLEMENTATION_ALLOWLIST \
+  EXACT_NINETY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \

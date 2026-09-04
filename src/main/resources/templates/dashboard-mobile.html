@@ -312,6 +312,8 @@
             <span th:text="${position.directionLabel != null ? position.directionLabel : '--'}">--</span>
           </div>
           <dl class="position-core position-summary" aria-label="持仓核心摘要">
+            <div class="full-row"><dt>监控状态</dt><dd
+                th:text="${position.monitorTrustState == 'VERIFIED_FRESH' ? '可信监控可用' : (position.monitorTrustState == 'BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING' ? '行情已更新，完整监控待验证' : (position.monitorTrustState == 'PENDING_FIRST_RUN' ? '等待首次监控' : (position.monitorTrustState == 'STALE' ? '监控数据已过期' : (position.monitorTrustState == 'INVALID' ? '监控数据当前不可用' : (position.monitorTrustState == 'SOURCE_UNAVAILABLE' ? '监控来源不可用' : '等待监控数据')))))}">等待首次监控</dd></div>
             <div><dt>当前风险</dt><dd th:text="${position.riskLevelLabel != null ? position.riskLevelLabel : (position.riskLevel != null ? position.riskLevel : '--')}">--</dd></div>
             <div><dt>入场逻辑</dt><dd th:text="${position.entryLogicStatusLabel != null ? position.entryLogicStatusLabel : (position.entryLogicStatus != null ? position.entryLogicStatus : '--')}">--</dd></div>
             <div><dt>方向支持</dt><dd th:text="${position.directionSupportStatusLabel != null ? position.directionSupportStatusLabel : (position.directionSupportStatus != null ? position.directionSupportStatus : '--')}">--</dd></div>

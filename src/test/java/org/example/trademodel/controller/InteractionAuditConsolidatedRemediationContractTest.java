@@ -11,6 +11,7 @@ class InteractionAuditConsolidatedRemediationContractTest {
     private static final Path HOME = Path.of("src/main/resources/templates/home.html");
     private static final Path HOME_SCRIPT = Path.of("src/main/resources/static/js/home-runtime.js");
     private static final Path HOME_CSS = Path.of("src/main/resources/static/css/home.css");
+    private static final Path MOBILE_HOME = Path.of("src/main/resources/templates/dashboard-mobile.html");
     private static final Path MOBILE_HOME_SCRIPT = Path.of("src/main/resources/static/js/dashboard-mobile.js");
     private static final Path HTML = Path.of("src/main/resources/templates/workspace.html");
     private static final Path SCRIPT = Path.of("src/main/resources/static/js/workspace.js");
@@ -148,8 +149,13 @@ class InteractionAuditConsolidatedRemediationContractTest {
 
     @Test
     void browserMobileRouteBootstrapsTheVisibleFocusFromItsServerRenderedSelectedCard() throws Exception {
+        String html = Files.readString(MOBILE_HOME);
         String script = Files.readString(MOBILE_HOME_SCRIPT);
 
+        assertThat(html).contains(
+                "<dt>监控状态</dt>",
+                "position.monitorTrustState",
+                "等待首次监控");
         assertThat(script).contains(
                 "function serverRenderedAsset(card)",
                 "updateMobileFocus(serverRenderedAsset(initialAsset)",
