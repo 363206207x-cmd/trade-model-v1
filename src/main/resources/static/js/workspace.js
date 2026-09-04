@@ -53,6 +53,7 @@
         MOVE_STOP: "移动止损", PARTIAL_TAKE_PROFIT: "分批止盈",
         WAIT_CONFIRMATION: "等待人工确认", RECORD_CLOSE_REVIEW: "记录平仓并进入复盘",
         SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
+        OPEN: "持仓中", PARTIALLY_CLOSED: "部分平仓",
         OPEN_MONITORING: "持续监控", WAITING_MONITOR_DATA: "等待监控数据",
         RISK_ESCALATED: "风险升级", CLOSED: "已平仓", NO_POSITION: "暂无持仓",
         CONFIRMATION: "确认型", PREPARATION: "预备型", REDUCED: "缩减型",
@@ -987,10 +988,19 @@
             && ["OPEN_MONITORING", "RISK_ESCALATED", "PLAN_INVALIDATED"].includes(monitor.dataState);
     }
 
+    function monitorPriceAvailable(monitor) {
+        const state = String(monitor?.monitorTrustState || "").toUpperCase();
+        return monitor?.markPriceFresh === true
+            && ["VERIFIED_FRESH", "BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING"].includes(state)
+            && hasValue(monitor.currentPrice || monitor.markPrice);
+    }
+
     function monitorUnavailableText(monitor) {
         return {
+            PENDING_FIRST_RUN: "等待首次监控",
             PENDING: "等待监控数据",
             PENDING_VERIFICATION: "等待监控数据",
+            BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING: "行情已更新，完整监控待验证",
             STALE: "监控数据已过期",
             INVALID: "当前不可查看",
             SOURCE_UNAVAILABLE: "监控来源不可用"
@@ -1012,11 +1022,12 @@
     function renderPosition(userPosition, monitor, options) {
         const showDetailLink = options?.showDetailLink !== false;
         const trusted = trustedMonitor(monitor);
+        const priceAvailable = monitorPriceAvailable(monitor);
         const positionId = userPosition.id || monitor?.positionId;
         const symbol = userPosition.assetSymbol || monitor?.symbol;
         const direction = userPosition.side || monitor?.direction;
         const facts = [["开仓价", formatNumber(userPosition.entryPrice)], ["开仓时间", formatTime(userPosition.openedAt)]];
-        if (trusted) facts.splice(1, 0, ["标记价格", formatNumber(monitor.markPrice)], ["盈亏", formatPercent(monitor.pnlPercent)]);
+        if (priceAvailable) facts.splice(1, 0, ["标记价格", formatNumber(monitor.markPrice)], ["盈亏", formatPercent(monitor.pnlPercent)]);
         const judgment = trusted ? [
             ["入场逻辑状态", text(monitor.entryLogicStatusLabel, label(monitor.entryLogicStatus))],
             ["反转状态", text(monitor.reversalStatusLabel, label(monitor.reversalStatus))],

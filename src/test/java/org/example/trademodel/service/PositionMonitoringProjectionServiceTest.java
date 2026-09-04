@@ -64,7 +64,7 @@ class PositionMonitoringProjectionServiceTest {
 
         assertThat(result.position().getEntryPrice()).isEqualByComparingTo("100");
         assertThat(result.monitorAvailable()).isFalse();
-        assertThat(result.monitor().getMonitorTrustState()).isEqualTo("SOURCE_UNAVAILABLE");
+        assertThat(result.monitor().getMonitorTrustState()).isEqualTo("PENDING_FIRST_RUN");
         assertThat(result.monitor().getMarkPrice()).isNull();
         assertThat(result.monitor().getRiskLevel()).isNull();
         assertThat(result.monitor().getMonitorConclusion()).isNull();

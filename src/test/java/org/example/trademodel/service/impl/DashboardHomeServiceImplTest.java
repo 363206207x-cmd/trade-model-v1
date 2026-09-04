@@ -886,6 +886,33 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void anyDirectionalBiasWithoutVisibleConfidenceFailsClosedAcrossWebSurfaces() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        DecisionResultVO decision = decision("ADAUSDT", "BULLISH", "HIGH", "HIGH", 91, 18,
+                "LEVEL_1_CONSISTENT", false, "{\"state\":\"OBSERVING\"}");
+        decision.setValidatedMarketBias("BULLISH");
+        decision.setDirectionDataState("READY");
+        decision.setFinalConfidence(null);
+        decision.setOneHourOpportunityQuality(72);
+        decision.setFourHourTrendAlignment(75);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(202L, decision, null, null, "OBSERVING")));
+
+        DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, null, 6, null)
+                .getAssets().get(0);
+
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getConfidenceLevel()).isNull();
+        assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "INVALID")
+                .containsEntry("confidence", "MISSING");
+    }
+
+    @Test
     void insufficientDirectionDataCannotFallBackToWaitOrRiskValues() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
@@ -1387,7 +1414,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void pendingMonitorSourceFailsClosedWithoutLeakingMonitorResults() {
+    void pendingManualMonitorProjectsOnlyFreshBasePriceWithoutLeakingUnverifiedJudgment() {
         UserPositionVO position = activeManualPosition(901L, "BTCUSDT", null);
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(new BigDecimal("2"));
@@ -1403,7 +1430,17 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO home = service.getHomeForUser(USER_ID, null, 6);
         DashboardHomeVO.PositionVO row = home.getPositions().get(0);
 
-        assertWaitingMonitorData(row);
+        assertThat(row.getMarkPrice()).isEqualByComparingTo("110");
+        assertThat(row.getCurrentPrice()).isEqualByComparingTo("110");
+        assertThat(row.getPnlAmount()).isEqualByComparingTo("20");
+        assertThat(row.getPnlPercent()).isEqualByComparingTo("10");
+        assertThat(row.getMarkPriceFresh()).isTrue();
+        assertThat(row.getMonitorTrustState()).isEqualTo("BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING");
+        assertThat(row.getDataState()).isEqualTo("PARTIAL");
+        assertThat(row.getRiskLevel()).isNull();
+        assertThat(row.getMonitorConclusion()).isNull();
+        assertThat(row.getSuggestedAction()).isNull();
+        assertThat(home.getPositionMonitoringState()).isEqualTo("PARTIAL_COVERAGE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
                 .isEqualTo("1 笔 · 待评估");
         assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("UNKNOWN");
