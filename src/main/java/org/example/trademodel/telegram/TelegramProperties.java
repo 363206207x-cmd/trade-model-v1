@@ -23,6 +23,8 @@ public class TelegramProperties {
     private int claimLeaseSeconds = 60;
     private int cooldownMinutes = 15;
     private boolean allowHighQualityReduced;
+    /** Separate operator gate for an explicit Owner-initiated channel test. Defaults fail-closed. */
+    private boolean channelTestSendEnabled;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean value) { this.enabled = value; }
@@ -58,6 +60,8 @@ public class TelegramProperties {
     public void setCooldownMinutes(int value) { this.cooldownMinutes = positive(value, 15); }
     public boolean isAllowHighQualityReduced() { return allowHighQualityReduced; }
     public void setAllowHighQualityReduced(boolean value) { this.allowHighQualityReduced = value; }
+    public boolean isChannelTestSendEnabled() { return channelTestSendEnabled; }
+    public void setChannelTestSendEnabled(boolean value) { this.channelTestSendEnabled = value; }
 
     public boolean hasToken() { return hasText(botToken); }
     public boolean hasChatId() { return hasText(chatId); }

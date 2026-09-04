@@ -231,7 +231,10 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 ">最终裁决<", ">冲突复核<", ">反方挑战<",
                 "Preview 不创建机会", "计划不会自动变成持仓",
                 "仅展示通过 Rule Validation", "复核不会产生交易授权",
-                "资产池是机会发现的唯一入口", "Telegram", "telegram");
+                "资产池是机会发现的唯一入口");
+        assertThat(html).contains(
+                "Telegram 通知", "发送通道测试", "通道测试、非交易指令")
+                .doesNotContain("botToken", "chatId");
     }
 
     private static String slice(String value, String start, String end) {

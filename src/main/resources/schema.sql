@@ -1890,6 +1890,33 @@ CREATE INDEX IF NOT EXISTS idx_tm_channel_delivery_due
 CREATE INDEX IF NOT EXISTS idx_tm_channel_delivery_cooldown
     ON tm_channel_delivery(user_id, cooldown_key, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS tm_telegram_channel_test_audit (
+    test_id VARCHAR(64) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(128) NOT NULL,
+    status VARCHAR(24) NOT NULL,
+    provider_reference VARCHAR(256),
+    bot_username VARCHAR(128),
+    recipient_fingerprint VARCHAR(32),
+    response_code INT,
+    error_code VARCHAR(128),
+    error_message VARCHAR(512),
+    requested_at TIMESTAMP NOT NULL,
+    attempted_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    not_trade_instruction BOOLEAN NOT NULL DEFAULT TRUE,
+    not_order_execution BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uk_tm_telegram_channel_test_owner_key UNIQUE (user_id, idempotency_key),
+    CONSTRAINT ck_tm_telegram_channel_test_status CHECK (
+        status IN ('PENDING', 'PASSED', 'FAILED', 'RATE_LIMITED', 'NOT_CONFIGURED', 'BLOCKED')
+    ),
+    CONSTRAINT ck_tm_telegram_channel_test_safety CHECK (
+        not_trade_instruction = TRUE AND not_order_execution = TRUE
+    )
+);
+CREATE INDEX IF NOT EXISTS idx_tm_telegram_channel_test_owner_time
+    ON tm_telegram_channel_test_audit(user_id, requested_at DESC);
+
 CREATE TABLE IF NOT EXISTS tm_async_task (
     task_id VARCHAR(64) PRIMARY KEY,
     owner_type VARCHAR(16) NOT NULL,

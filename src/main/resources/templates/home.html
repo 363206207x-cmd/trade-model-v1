@@ -14,23 +14,23 @@
 <aside class="home-rail" aria-label="主要导航" data-component-family="SideNav">
     <a class="rail-brand" href="/dashboard" aria-label="TRINE LOGIC 首页"><span class="rail-brand-mark">T</span><span class="rail-label"><strong>TRINE LOGIC</strong></span></a>
     <nav class="rail-nav" aria-label="产品页面">
-        <a class="is-active" href="/dashboard" aria-label="首页"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="rail-label">首页</span></a>
-        <a href="/positions" aria-label="持仓"><svg aria-hidden="true"><use href="/icons/app-shell.svg#positions"/></svg><span class="rail-label">持仓</span></a>
-        <a href="/analysis" aria-label="分析"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="rail-label">分析</span></a>
-        <a href="/messages" aria-label="消息"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="rail-label">消息</span></a>
-        <a href="/me" aria-label="我的"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="rail-label">我的</span></a>
+        <a class="is-active" href="/dashboard" aria-label="首页" title="首页"><svg aria-hidden="true"><use href="/icons/app-shell.svg#home"/></svg><span class="rail-label">首页</span></a>
+        <a href="/positions" aria-label="持仓" title="持仓"><svg aria-hidden="true"><use href="/icons/app-shell.svg#positions"/></svg><span class="rail-label">持仓</span></a>
+        <a href="/analysis" aria-label="分析" title="分析"><svg aria-hidden="true"><use href="/icons/app-shell.svg#analysis"/></svg><span class="rail-label">分析</span></a>
+        <a href="/messages" aria-label="消息" title="消息"><svg aria-hidden="true"><use href="/icons/app-shell.svg#messages"/></svg><span class="rail-label">消息</span></a>
+        <a href="/me" aria-label="我的" title="我的"><svg aria-hidden="true"><use href="/icons/app-shell.svg#me"/></svg><span class="rail-label">我的</span></a>
     </nav>
     <nav class="rail-footer" aria-label="次级工具">
         <a href="/asset-pool" aria-label="资产池" title="资产池"><svg aria-hidden="true"><use href="/icons/app-shell.svg#pool"/></svg><span class="rail-label">资产池</span></a>
         <a href="/calendar" aria-label="事件日历" title="事件日历"><svg aria-hidden="true"><use href="/icons/app-shell.svg#calendar"/></svg><span class="rail-label">事件日历</span></a>
-        <a href="#systemStatusStrip" aria-label="系统状态" title="系统状态"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></a>
+        <button type="button" data-open-home-status aria-label="系统状态与恢复" aria-haspopup="dialog" aria-controls="homeStatusDialog" title="系统状态"><svg aria-hidden="true"><use href="/icons/app-shell.svg#status"/></svg><span class="rail-label">系统状态</span></button>
         <form th:action="@{/logout}" method="post"><button type="submit" aria-label="退出登录" title="退出登录"><svg aria-hidden="true"><use href="/icons/app-shell.svg#logout"/></svg><span class="rail-label">退出登录</span></button></form>
     </nav>
 </aside>
 <div class="home-stage">
     <header class="home-page-header" data-component-family="PageHeader">
         <div class="home-title-block"><h1>TRINE LOGIC</h1><span class="selected-context" id="selectedAssetContext">尚未选择机会资产</span></div>
-        <div class="header-context" aria-live="polite"><time id="headerUpdatedAt">—</time></div>
+        <div class="header-context" aria-live="polite"><time id="headerUpdatedAt">等待同步</time></div>
     </header>
     <main class="home-main" id="homeMain" tabindex="-1">
         <div class="sr-only" id="homeLiveRegion" aria-live="polite"></div>
@@ -115,6 +115,12 @@
         <p class="home-form-status" id="homePositionCloseStatus" role="status"></p>
         <footer class="home-dialog-actions"><button class="home-button secondary" type="button" data-close-position-dialog>取消</button><button class="home-button primary" type="submit">确认记录</button></footer>
     </form>
+</dialog>
+<dialog class="home-dialog compact" id="homeStatusDialog" aria-labelledby="homeStatusHeading" data-overlay-code="O01">
+    <div class="home-dialog-content">
+        <header class="home-dialog-header"><div><h2 id="homeStatusHeading">状态与恢复</h2><p>只读显示真实运行状态，不会自动重启、刷新外部数据或触发调度。</p></div><button type="button" data-close-home-status aria-label="关闭状态与恢复">关闭</button></header>
+        <div id="homeStatusDetail" class="status-detail"><p>等待可信系统状态</p></div>
+    </div>
 </dialog>
 <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js"></script>
 <script th:src="@{/js/home-runtime.js}" src="/js/home-runtime.js" defer></script>

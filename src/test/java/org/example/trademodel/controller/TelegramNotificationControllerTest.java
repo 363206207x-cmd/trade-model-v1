@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.trademodel.entity.ChannelDeliveryDO;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.service.ChannelDeliveryService;
+import org.example.trademodel.service.TelegramChannelTestService;
 import org.example.trademodel.telegram.TelegramProperties;
 import org.example.trademodel.telegram.TelegramReadinessService;
 import org.example.trademodel.telegram.TelegramReadinessState;
@@ -24,6 +25,7 @@ class TelegramNotificationControllerTest {
         AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
         ChannelDeliveryService deliveryService = mock(ChannelDeliveryService.class);
         TelegramReadinessService readiness = mock(TelegramReadinessService.class);
+        TelegramChannelTestService channelTestService = mock(TelegramChannelTestService.class);
         TelegramProperties properties = new TelegramProperties();
         properties.setEnabled(true);
         properties.setExternalCallsEnabled(true);
@@ -37,18 +39,20 @@ class TelegramNotificationControllerTest {
         when(readiness.state()).thenReturn(TelegramReadinessState.RATE_LIMITED);
         when(readiness.botUsername()).thenReturn(null);
         when(readiness.recipientConfigured()).thenReturn(true);
+        when(readiness.reasonCode()).thenReturn("RATE_LIMITED");
         when(deliveryService.latestTelegramForUser(41L)).thenReturn(latest);
         when(deliveryService.retryingCountForUser(41L)).thenReturn(1);
 
         TelegramNotificationController controller =
-                new TelegramNotificationController(resolver, properties, readiness, deliveryService);
+                new TelegramNotificationController(resolver, properties, readiness, deliveryService, channelTestService);
         String json = new ObjectMapper().findAndRegisterModules().writeValueAsString(controller.status());
 
         assertThat(json).contains(
                 "\"enabled\":true", "\"configured\":true", "\"externalCallsEnabled\":true",
                 "\"state\":\"RATE_LIMITED\"", "\"recipientConfigured\":true",
                 "\"lastDeliveryState\":\"RETRYING\"", "\"lastErrorCode\":\"RATE_LIMITED\"",
-                "\"retryingCount\":1");
+                "\"retryingCount\":1", "\"maskedChatIdentity\":\"sha256:",
+                "\"testSendEnabled\":false");
         assertThat(json).doesNotContain("TEST_TOKEN", "TEST_CHAT_ID", "botToken", "chatId",
                 "apiBaseUrl", "publicBaseUrl", "telegram.env");
     }
@@ -58,10 +62,11 @@ class TelegramNotificationControllerTest {
         AuthenticatedUserIdResolver resolver = mock(AuthenticatedUserIdResolver.class);
         ChannelDeliveryService deliveryService = mock(ChannelDeliveryService.class);
         TelegramReadinessService readiness = mock(TelegramReadinessService.class);
+        TelegramChannelTestService channelTestService = mock(TelegramChannelTestService.class);
         when(resolver.requireCurrentUserId()).thenReturn(41L);
         when(deliveryService.requeueTelegramForMessage(41L, "message-9")).thenReturn(true);
         TelegramNotificationController controller = new TelegramNotificationController(
-                resolver, new TelegramProperties(), readiness, deliveryService);
+                resolver, new TelegramProperties(), readiness, deliveryService, channelTestService);
 
         String json = new ObjectMapper().findAndRegisterModules()
                 .writeValueAsString(controller.retry("message-9"));
@@ -72,13 +77,16 @@ class TelegramNotificationControllerTest {
     }
 
     @Test
-    void currentProductUiDoesNotExposeTheDormantTelegramChannel() throws Exception {
+    void currentProductUiExposesOwnerOnlyChannelStatusWithoutSecretsOrAutomaticSend() throws Exception {
         String currentUi = Files.readString(Path.of("src/main/resources/templates/home.html"))
                 + Files.readString(Path.of("src/main/resources/templates/workspace.html"))
                 + Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"))
                 + Files.readString(Path.of("src/main/resources/static/js/workspace.js"));
 
-        assertThat(currentUi).doesNotContain(
-                "Telegram", "telegram", "data-retry-telegram", "ChannelDeliveryStatus", "O10");
+        assertThat(currentUi).contains(
+                "Telegram 通知", "telegramChannelStatus", "overlay-telegram-channel-test", "O10",
+                "真实测试发送门禁未开启", "通道测试、非交易指令")
+                .doesNotContain("botToken", "chatId", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID",
+                        "data-retry-telegram");
     }
 }

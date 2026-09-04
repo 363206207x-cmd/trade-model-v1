@@ -66,7 +66,7 @@
             var shared = contract.userFacingValue(raw);
             if (shared && shared !== raw) return shared;
         }
-        return /^[A-Z][A-Z0-9_]*$/.test(raw) ? "—" : raw;
+        return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || "当前不可查看") : raw;
     }
     var alertTokenLabels = Object.freeze({
         HIGH: "高优先级", WARN: "需关注", ERROR: "读取失败", WAITING_SYNC: "等待同步",
@@ -238,7 +238,7 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "—");
+        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "等待同步");
     }
 
     function renderStatus(home) {
@@ -250,11 +250,11 @@
         setText("statusSystem", runtimeLabel
             + (has(completedScan) ? " · 上次扫描 " + clockTime(completedScan) : ""));
         applySemanticClass("statusSystem", header.systemRuntimeStatus || runtimeLabel);
-        setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "—");
+        setText("statusData", has(state.dataQuality?.value) ? "更新于 " + clockTime(state.dataQuality.value) : "等待同步");
         applySemanticClass("statusData", has(state.dataQuality?.value) ? "READY" : "UNKNOWN");
-        setText("statusService", statusValue(state.serviceAvailability, "—"));
-        setText("statusAccount", statusValue(state.accountStatus, "—"));
-        setText("statusReset", statusValue(state.hotReset, "—"));
+        setText("statusService", statusValue(state.serviceAvailability, "等待同步"));
+        setText("statusAccount", statusValue(state.accountStatus, "等待同步"));
+        setText("statusReset", statusValue(state.hotReset, "等待同步"));
     }
 
     function eventTime(value) {
@@ -292,6 +292,11 @@
         var visible = revalidating ? "正在重验" : view.label;
         var tone = revalidating ? " warning" : view.tone === "danger" ? " danger" : view.tone === "warning" ? " warning" : view.tone === "muted" ? " muted" : "";
         return '<span class="state-badge' + tone + semanticClass(asset.opportunityState || asset.assetState) + '">' + escapeHtml(visible) + "</span>";
+    }
+    function shortId(value) {
+        var raw = text(value, "");
+        if (!raw) return "未形成";
+        return raw.length <= 14 ? raw : raw.slice(0, 8) + "…" + raw.slice(-4);
     }
     function assetProvenance(asset) {
         return {
@@ -347,16 +352,26 @@
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
         var ticker = assetTicker(asset);
-        var direction = text(asset.marketBiasLabel, "—");
-        var confidence = text(asset.confidenceLabel, "—");
-        var risk = text(asset.riskLabel, "—");
+        var finalDirection = asset.hasFinal === true ? asset.finalMarketBias : asset.marketBias;
+        var direction = has(finalDirection) ? label(finalDirection, text(asset.marketBiasLabel, "待重新分析"))
+            : text(asset.marketBiasLabel, "待重新分析");
+        var confidenceLabel = text(asset.confidenceLabel, "");
+        var confidence = confidenceLabel && confidenceLabel !== "—" ? confidenceLabel
+            : has(asset.confidenceLevel) ? label(asset.confidenceLevel, "当前不可查看")
+                : has(finalDirection) ? "待重新分析" : "—";
+        if (has(finalDirection) && confidence === "待重新分析") direction = "待重新分析";
+        var riskLabel = text(asset.riskLabel, "");
+        var risk = riskLabel && riskLabel !== "—" ? riskLabel : label(asset.riskLevel, "当前不可查看");
         var oneHour = text(asset.oneHourOpportunityLabel, "1小时数据不足");
         var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
-        var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "—";
+        var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "价格待同步";
+        var provenance = assetProvenance(asset);
+        var provenanceSummary = "Analysis " + shortId(provenance.analysisId) + " · Decision " + shortId(provenance.decisionId)
+            + " · Trace " + shortId(provenance.traceId) + " · 方向计算 " + text(provenance.directionCalculatedAt, "当前不可查看");
         return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
             + String(isSelected) + '" data-symbol="'
-            + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
-            + escapeHtml(symbol + " 首页资产上下文") + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' title="' + escapeHtml(provenanceSummary) + '" aria-label="查看 '
+            + escapeHtml(symbol + " 首页资产上下文；" + direction + "；置信度 " + confidence + "；" + provenanceSummary) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
             + escapeHtml(text(asset.name, "名称不可用"))
             + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
@@ -487,11 +502,11 @@
         empty.hidden = shown.length !== 0;
         var aggregate = home.positionAggregate && typeof home.positionAggregate === "object"
             ? home.positionAggregate : {};
-        var activeCount = Number.isInteger(aggregate.activeCount) ? aggregate.activeCount : "—";
+        var activeCount = Number.isInteger(aggregate.activeCount) ? aggregate.activeCount : "等待同步";
         var highestTrustedRisk = has(aggregate.highestTrustedRisk)
-            ? label(aggregate.highestTrustedRisk, "—") : "—";
+            ? label(aggregate.highestTrustedRisk, "等待评估") : "等待评估";
         var coverage = has(aggregate.coverageState)
-            ? label(aggregate.coverageState, "—") : "—";
+            ? label(aggregate.coverageState, "等待评估") : "等待评估";
         setText("positionAggregate", "活动 " + activeCount + " · 最高风险 " + highestTrustedRisk + " · " + coverage);
     }
 
@@ -555,6 +570,68 @@
     }
     function dl(items) {
         return "<dl>" + items.map(function (item) { return "<div><dt>" + escapeHtml(item[0]) + "</dt><dd>" + escapeHtml(text(item[1], "当前不可查看")) + "</dd></div>"; }).join("") + "</dl>";
+    }
+
+    async function openHomeStatus(trigger) {
+        var dialog = document.getElementById("homeStatusDialog");
+        var target = document.getElementById("homeStatusDetail");
+        if (!dialog || !target) return;
+        dialog.dataset.restoreFocusId = trigger && trigger.id || "";
+        if (!dialog.open) dialog.showModal();
+        var header = currentHome.header || {};
+        target.innerHTML = dl([
+            ["应用状态", "正在读取"],
+            ["调度状态", text(header.systemRuntimeLabel, label(header.systemRuntimeState, "当前不可查看"))],
+            ["调度心跳", time(header.schedulerHeartbeatAt)],
+            ["本轮开始", time(header.scanStartedAt)],
+            ["上次成功完成", time(header.lastCompletedScanAt)],
+            ["下次计划扫描", time(header.nextScheduledScanAt)],
+            ["上次扫描结果", label(header.lastScanResult, "尚无完成记录")],
+            ["上次失败原因", label(header.lastScanFailureReason, "无失败记录")],
+            ["数据来源", label(header.dataSourceText, "当前不可查看")]
+        ]);
+        try {
+            var response = await fetch("/api/system/runtime-readiness-guardrail-status", {
+                credentials: "same-origin", headers: { Accept: "application/json" }
+            });
+            var readiness = await response.json();
+            if (!response.ok) throw new Error("STATUS_UNAVAILABLE");
+            target.innerHTML = dl([
+                ["应用状态", label(readiness.status, "当前不可查看")],
+                ["数据库", label(readiness.databaseStatus, "当前不可查看")],
+                ["调度器", label(readiness.schedulerObservationStatus || header.systemRuntimeState, "当前不可查看")],
+                ["扫描状态", text(header.systemRuntimeLabel, label(header.systemRuntimeState, "当前不可查看"))],
+                ["调度心跳", time(header.schedulerHeartbeatAt)],
+                ["本轮开始", time(header.scanStartedAt)],
+                ["上次成功完成", time(header.lastCompletedScanAt)],
+                ["下次计划扫描", time(header.nextScheduledScanAt)],
+                ["上次扫描结果", label(header.lastScanResult, "尚无完成记录")],
+                ["上次失败原因", label(header.lastScanFailureReason, "无失败记录")],
+                ["数据来源", label(header.dataSourceText, "当前不可查看")]
+            ]) + '<div class="status-recovery-copy"><strong>恢复条件</strong><p>请先确认数据库、调度心跳和数据源恢复，再由 Owner 手动重试。此面板不执行恢复动作。</p></div>';
+        } catch (_) {
+            target.innerHTML = '<div class="status-recovery-copy"><strong>系统状态当前不可查看</strong><p>未返回可信运行状态；不会自动触发任何恢复动作。</p></div>';
+        }
+    }
+
+    function bindHomeStatus() {
+        document.addEventListener("click", function (event) {
+            var open = event.target.closest("[data-open-home-status]");
+            if (open) {
+                event.preventDefault();
+                openHomeStatus(open);
+                return;
+            }
+            var close = event.target.closest("[data-close-home-status]");
+            if (close) {
+                event.preventDefault();
+                close.closest("dialog")?.close();
+            }
+        });
+        document.getElementById("homeStatusDialog")?.addEventListener("cancel", function (event) {
+            event.preventDefault();
+            event.currentTarget.close();
+        });
     }
     function roleUnavailable(role) {
         return '<div class="ai-unavailable"><strong>' + escapeHtml({ GPT_FINAL: "GPT 综合判断", GEMINI_REVIEW: "Gemini 冲突复核", GROK_CHALLENGE: "Grok 反方挑战" }[activeRole])
@@ -687,7 +764,14 @@
         else if (activeRole === "GEMINI_REVIEW") roleContent = renderGemini(role);
         else roleContent = renderGrok(role);
         panel.innerHTML = roleContent;
-        setText("aiMetadata", role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 生成时间 " + time(role.generatedAt) + " · 来源 " + text(role.provider, "当前不可查看") : "角色状态待同步");
+        var selectedAsset = (Array.isArray(home.assets) ? home.assets : []).find(function (item) {
+            return symbolOf(item) === symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
+        }) || {};
+        var provenance = assetProvenance(selectedAsset);
+        var provenanceCopy = "Analysis " + shortId(provenance.analysisId) + " · Decision " + shortId(provenance.decisionId)
+            + " · Trace " + shortId(provenance.traceId) + " · 方向计算 " + time(provenance.directionCalculatedAt)
+            + " · 行情截止 " + time(provenance.marketDataAsOf);
+        setText("aiMetadata", (role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 模型来源 " + text(role.provider, "当前不可查看") + " · " : "") + provenanceCopy);
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
         var audit = document.getElementById("auditChainLink");
@@ -1070,6 +1154,7 @@
     bindSearch();
     bindTabs();
     bindPositionActions();
+    bindHomeStatus();
     var requested = typeof contract.readUrlParam === "function" ? contract.readUrlParam("asset") : new URLSearchParams(window.location.search).get("asset");
     loadHome(requested || "");
 })();

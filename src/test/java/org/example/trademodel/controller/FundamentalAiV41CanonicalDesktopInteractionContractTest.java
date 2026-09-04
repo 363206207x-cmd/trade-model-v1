@@ -61,8 +61,8 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
 
         assertThat(overlayCodes).containsExactlyInAnyOrder(
                 "O01", "O02", "O03", "O04", "O05", "O06",
-                "O07", "O08", "O09", "O11");
-        assertThat(count(html, "<dialog class=\"overlay")).isEqualTo(10);
+                "O07", "O08", "O09", "O10", "O11");
+        assertThat(count(html, "<dialog class=\"overlay")).isEqualTo(11);
         assertThat(Files.readString(WORKSPACE_JS)).contains(
                 "dialog.showModal()", "dialog.close()", "restoreFocus",
                 "dialog.addEventListener(\"cancel\"", "focus()");
@@ -73,7 +73,7 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
         String html = Files.readString(WORKSPACE);
         Set<String> families = captures(html, "data-component-family=\"([^\"]+)\"");
 
-        assertThat(families).hasSize(51).contains(
+        assertThat(families).hasSize(52).contains(
                 "AppShell", "SideNav", "PageHeader", "StateBadge",
                 "EmptyState", "AsyncTaskIndicator", "Drawer", "Modal", "AuditMetaDisclosure",
                 "AssetSearch", "SearchResultItem", "AssetPoolToolbar", "AssetPoolTable",
@@ -87,9 +87,10 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 "AtTimeLaterCompare", "ResponsibilityChain", "MessageListItem",
                 "OriginalSnapshotCard", "RecheckResultHero",
                 "RecheckActionBar", "EventCalendar", "EventWindowBadge", "FocusedDetailShell",
-                "RiskPreferenceForm", "ProviderStatusPanel", "AuditChainStepper");
+                "RiskPreferenceForm", "ProviderStatusPanel", "TelegramBindingPanel",
+                "AuditChainStepper");
         assertThat(html).doesNotContain("SystemStatusBar", "workspace-system-status",
-                "ChannelDeliveryStatus", "TelegramBindingPanel", "analysisFailurePanel", "analysisFailures");
+                "ChannelDeliveryStatus", "analysisFailurePanel", "analysisFailures");
         assertThat(html).doesNotContain("data-detached-instance=\"true\"");
     }
 
@@ -135,11 +136,17 @@ class FundamentalAiV41CanonicalDesktopInteractionContractTest {
                 .doesNotContain("/api/dashboard/home?limit=6", "/api/user-positions/open")
                 .doesNotContain("AUTO_OPEN", "AUTO_CLOSE", "AUTO_REVERSE", "AUTO_ORDER");
         assertThat(html).contains(
-                "录入持仓", "记录平仓", "开始预览", "加入资产池持续跟踪")
+                "录入持仓", "记录平仓", "开始预览", "加入资产池持续跟踪",
+                "data-component-family=\"TelegramBindingPanel\"",
+                "id=\"openTelegramTest\"", "data-overlay-code=\"O10\"",
+                "通道测试、非交易指令")
                 .doesNotContain("Preview 不创建机会")
                 .doesNotContain("自动开仓", "自动平仓", "自动反手", "自动下单");
         assertThat(css).contains("overflow-x: hidden", ":focus-visible");
-        assertThat(html + script).doesNotContain("Telegram", "telegram", "pageKey == 'home'", "60:40");
+        assertThat(script).contains(
+                "/api/settings/notifications/telegram/status",
+                "telegramStatus?.testSendEnabled === true");
+        assertThat(html + script).doesNotContain("pageKey == 'home'", "60:40");
     }
 
     private static Set<String> captures(String source, String regex) {
