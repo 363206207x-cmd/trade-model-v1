@@ -140,6 +140,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         requireInput(input);
         DecisionBundleVO decision = input.decision();
         materializeRuleResult(input);
+        applyDirectionConfidence(input, decision, 0);
         boolean assetPoolSource = assetPoolService.isOpportunitySource(
                 input.ownerType(), input.ownerId(), input.assetId(), input.symbol());
         if (!assetPoolSource && !input.preview()) {
@@ -210,6 +211,10 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 input.analysisId(), input.traceId(), input.ruleVersion(),
                 "VALIDATED_DIRECTION_PLAN_CHAIN_STARTED",
                 triggerSource(input.triggerType(), AssetStateEnum.CANDIDATE));
+
+        if (!aiInvocationTriggered(input, decision, opportunity)) {
+            return blockedWithoutAiTrigger(input, opportunity);
+        }
 
         String candidateId = stableCandidateId(input, false);
         Map<String, Object> facts = commonFacts(input, opportunity);
@@ -386,6 +391,24 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 blockedPlan(input.rulePlan(), opportunity, null, null, blocked));
     }
 
+    private DecisionChainBuildResult blockedWithoutAiTrigger(DecisionChainBuildInput input,
+                                                              OpportunityTransitionResult opportunity) {
+        RuleValidationResult blocked = RuleValidationResult.blocked(List.of("AI_TRIGGER_NOT_MET"));
+        DecisionBundleVO decision = input.decision();
+        decision.setFinalMarketBias(null);
+        decision.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
+        decision.setMarketBiasHierarchy("WAIT");
+        decision.setIsWorthOpening(false);
+        applyOpportunityState(decision, input, opportunity, blocked);
+        applyIncompleteAiRoleResults(decision, input,
+                aiNotTriggered(AiDecisionChainRole.GPT_FINAL),
+                aiNotTriggered(AiDecisionChainRole.GEMINI_REVIEW),
+                aiNotTriggered(AiDecisionChainRole.GROK_CHALLENGE));
+        persistOpportunityProjection(input, opportunity, null, blocked);
+        return new DecisionChainBuildResult(opportunity, null, null, blocked,
+                blockedPlan(input.rulePlan(), opportunity, null, null, blocked));
+    }
+
     private DecisionChainBuildResult blockedAfterChainDeadline(DecisionChainBuildInput input,
                                                                OpportunityTransitionResult opportunity,
                                                                ExecutionPlanCandidateDO candidate,
@@ -425,6 +448,16 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         result.setRoleState(AiRoleState.UNAVAILABLE);
         result.setDataState(AiRoleDataState.SOURCE_UNAVAILABLE);
         result.setFailureClassification("NOT_STARTED_DEPENDENCY_FAILED");
+        return result;
+    }
+
+    private static AiDecisionChainResult aiNotTriggered(AiDecisionChainRole role) {
+        AiDecisionChainResult result = AiDecisionChainResult.failed(null, role,
+                AiProviderCallStatus.DISABLED, "AI_TRIGGER_NOT_MET");
+        result.setTaskState(AiBackgroundTaskState.CANCELLED);
+        result.setRoleState(AiRoleState.UNAVAILABLE);
+        result.setDataState(AiRoleDataState.FALLBACK_RULE_ONLY);
+        result.setFailureClassification("NOT_CALLED_TRIGGER_POLICY");
         return result;
     }
 
@@ -547,11 +580,6 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 !V41DecisionContractPolicy.evidenceItemContractComplete(item, input.analysisId()))) {
             failures.add("EVIDENCE_CONTRACT_INCOMPLETE");
         }
-        if (input.evidence() == null || input.evidence().stream()
-                .noneMatch(item -> isSignificantAiTriggerEvidence(item,
-                        v41Properties.getAiGate().getMinimumSignificantEvidenceStrength()))) {
-            failures.add("SIGNIFICANT_EVIDENCE_CHANGE_MISSING");
-        }
         Set<String> scoreTypes = input.scores() == null ? Set.of() : input.scores().stream()
                 .filter(item -> item != null && hasText(item.getScoreType()))
                 .map(item -> item.getScoreType().trim())
@@ -593,9 +621,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
             return false;
         }
         String type = upper(item.getEvidenceType());
-        if (type.equals(upper(EvidenceTypeConstants.PRICE_STRUCTURE))
-                || type.equals(upper(EvidenceTypeConstants.FUNDING))
-                || type.equals(upper(EvidenceTypeConstants.EVENT))
+        if (type.equals(upper(EvidenceTypeConstants.EVENT))
                 || type.equals(upper(EvidenceTypeConstants.MACRO))
                 || type.equals(upper(EvidenceTypeConstants.NEWS))) {
             return true;
@@ -609,8 +635,27 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 upper(item.getDescription()),
                 upper(item.getSourceReference()));
         return containsAny(signal,
-                "PRICE", "VOLUME", "HIGH_LOW_RANGE", "VOLATILITY",
-                "OPEN_INTEREST", "OI_", "FUNDING", "EVENT", "LIQUIDATION");
+                "SIGNIFICANT", "MAJOR_CHANGE", "BREAKOUT", "BREAKDOWN",
+                "STRUCTURE_BREAK", "REGIME_CHANGE", "INVALIDATION",
+                "REVERSAL_CONFIRMED", "VOLUME_SPIKE", "VOLATILITY_SPIKE",
+                "OI_EXPANSION_STRONG", "FUNDING_EXTREME", "LIQUIDATION_SPIKE");
+    }
+
+    private boolean aiInvocationTriggered(DecisionChainBuildInput input,
+                                          DecisionBundleVO decision,
+                                          OpportunityTransitionResult opportunity) {
+        if (input.preview()
+                || input.triggerType() == AnalysisRunTriggerType.ANALYSIS_PREVIEW
+                || input.triggerType() == AnalysisRunTriggerType.MANUAL_API) {
+            return true;
+        }
+        boolean significantEvidence = input.evidence() != null && input.evidence().stream()
+                .anyMatch(item -> isSignificantAiTriggerEvidence(item,
+                        v41Properties.getAiGate().getMinimumSignificantEvidenceStrength()));
+        String bias = upper(decision.getValidatedMarketBias());
+        boolean newStrongOpportunity = opportunity != null && opportunity.changed()
+                && ("STRONG_BULLISH".equals(bias) || "STRONG_BEARISH".equals(bias));
+        return significantEvidence || newStrongOpportunity;
     }
 
     private static boolean containsAny(String value, String... needles) {
@@ -1340,18 +1385,39 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         decision.setMarketBiasHierarchy(validation.passed() ? conflict.getBiasAfter() : "WAIT");
         decision.setAiConflictLevel(conflict.getConflictLevel());
         decision.setAiConflictScore(conflict.getConflictScore());
+        applyDirectionConfidence(null, decision, conflict.getConflictScore());
         if (!validation.passed()) {
             decision.setIsWorthOpening(false);
-            decision.setFinalConfidence(null);
-        } else {
-            int multiTf = decision.isMultiTimeframeAligned() ? 100 : 50;
-            int evidenceCoverage = decision.getEvidenceReliability() == null ? 0 : decision.getEvidenceReliability();
-            org.example.trademodel.service.support.V41DecisionContractPolicy.Metric confidence =
-                    org.example.trademodel.service.support.V41DecisionContractPolicy.finalConfidence(
-                            decision.getDataQualityScore(), multiTf, evidenceCoverage,
-                            evidenceCoverage, conflict.getConflictScore());
-            decision.setFinalConfidence(confidence.value());
         }
+    }
+
+    private void applyDirectionConfidence(DecisionChainBuildInput input,
+                                          DecisionBundleVO decision,
+                                          Integer conflictPenalty) {
+        if (decision == null
+                || !directionalBias(decision.getValidatedMarketBias())
+                || !"READY".equals(upper(decision.getDirectionDataState()))) {
+            return;
+        }
+        int multiTf = decision.isMultiTimeframeAligned() ? 100 : 50;
+        Integer dataQuality = decision.getDataQualityScore();
+        if (dataQuality == null && input != null) {
+            dataQuality = input.dataQualityScore();
+            decision.setDataQualityScore(dataQuality);
+        }
+        Integer evidenceCoverage = decision.getEvidenceReliability();
+        if (evidenceCoverage == null && input != null) {
+            Double scoredReliability = V41DecisionContractPolicy.scoreMap(input.scores())
+                    .get(V41DecisionContractPolicy.EVIDENCE_RELIABILITY);
+            evidenceCoverage = scoredReliability == null
+                    ? V41DecisionContractPolicy.evidenceCoverage(input.evidence())
+                    : (int) Math.round(scoredReliability);
+            decision.setEvidenceReliability(evidenceCoverage);
+        }
+        V41DecisionContractPolicy.Metric confidence = V41DecisionContractPolicy.finalConfidence(
+                dataQuality, multiTf, evidenceCoverage,
+                evidenceCoverage, conflictPenalty == null ? 0 : conflictPenalty);
+        decision.setFinalConfidence(confidence.value());
     }
 
     private void applyOpportunityState(DecisionBundleVO decision,
@@ -1436,8 +1502,7 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 input.ruleVersion(),
                 input.decision().getOpportunityScore() == null
                         ? opportunityScore(input.scores()) : input.decision().getOpportunityScore(),
-                input.decision().getFinalConfidence() == null
-                        ? input.decision().getConfidenceLevel() : String.valueOf(input.decision().getFinalConfidence()),
+                input.decision().getConfidenceLevel(),
                 input.decision().getRiskLevel(),
                 json(ext));
     }

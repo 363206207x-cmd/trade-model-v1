@@ -780,7 +780,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void highRiskRankingProjectionNeverExposesFinalOrExecutablePlanFields() {
+    void highRiskRankingProjectionShowsItsBlockedPlanResultWithoutExecutableFields() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setAssetPoolService(assetPoolService);
@@ -793,6 +793,18 @@ class DashboardHomeServiceImplTest {
         decision.setFinalConfidence(84);
         decision.setOneHourOpportunityQuality(78);
         decision.setFourHourTrendAlignment(81);
+        decision.setAssetStateSnapshot("{\"state\":\"HIGH_RISK\",\"directionalPushBlocked\":true}");
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("BLOCKED");
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setChainStatus("RULE_VALIDATION_BLOCKED");
+        plan.setFinalPlan(false);
+        plan.setPlanLifecycleState("INVALIDATED");
+        plan.setValidationReasons("HIGH_RISK_REVIEW_REQUIRED");
+        plan.setRevalidationRule("风险降级且完成重新分析后恢复");
+        plan.setEntryZone(null);
+        plan.setStopLoss(null);
+        plan.setTakeProfitRules(null);
         when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
                 projection(101L, decision, 92, "opportunity-high-risk", "HIGH_RISK")));
 
@@ -814,7 +826,11 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时机会较强");
             assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时趋势偏多");
         });
-        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("NO_COMPLETE_PLAN");
+        assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DIRECTION_BLOCKED");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).contains("HIGH_RISK_REVIEW_REQUIRED");
+        assertThat(home.getExecutionSuggestion().getRevalidationRule()).isEqualTo("风险降级且完成重新分析后恢复");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
+        assertThat(home.getExecutionSuggestion().getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
         assertThat(home.getExecutionSuggestion().getDirection()).isNull();
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getStopLoss()).isNull();
@@ -2909,6 +2925,26 @@ class DashboardHomeServiceImplTest {
     @Test
     void budgetBlockedAiRoleHasNoBusinessResult() {
         assertNonSuccessfulAiRole(AiProviderCallStatus.BUDGET_BLOCKED, "AI 预算门控阻断");
+    }
+
+    @Test
+    void exhaustedDailyAiBudgetExplainsTheUserVisibleReason() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 80, 72,
+                "LEVEL_3_DIVERGENCE", true, "{\"state\":\"CANDIDATE\"}");
+        AiProviderReviewResult budgetBlocked = role(
+                AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                AiReviewStance.SUPPORT, "DAILY_BUDGET_EXCEEDED", "");
+        budgetBlocked.setCallStatus(AiProviderCallStatus.BUDGET_BLOCKED);
+        budgetBlocked.setFallback(true);
+        budgetBlocked.setFallbackReason("DAILY_BUDGET_EXCEEDED");
+        decision.setAiRoleResults(structuredAiRoleResults(List.of(
+                budgetBlocked), null));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO.AiTabVO tab = aiTab(service.getHomeForUser(USER_ID, "BTCUSDT", 6), "GPT_FINAL");
+
+        assertThat(tab.getResultAvailable()).isFalse();
+        assertThat(tab.getStatusMessage()).isEqualTo("今日AI额度已用完");
     }
 
     @Test

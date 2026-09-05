@@ -653,7 +653,13 @@ class PositionMonitorServiceImplTest {
         assertThat(batch.getFailureCount()).isEqualTo(1);
         assertThat(batch.getResults()).extracting(PositionMonitorResultDTO::getPositionId).containsExactly(21L);
         assertThat(batch.getFailures()).hasSize(1);
-        verify(positionMonitorLogService).recordMonitorRunForSystem(any());
+        ArgumentCaptor<RecordPositionMonitorLogCommand> command =
+                ArgumentCaptor.forClass(RecordPositionMonitorLogCommand.class);
+        verify(positionMonitorLogService).recordMonitorRunForSystem(command.capture());
+        String runKey = command.getValue().getMonitorRunKey();
+        LocalDateTime bucket = LocalDateTime.parse(runKey.split(":", 3)[2]);
+        assertThat(bucket.getMinute() % 5).isZero();
+        assertThat(bucket.getSecond()).isZero();
     }
 
     @Test

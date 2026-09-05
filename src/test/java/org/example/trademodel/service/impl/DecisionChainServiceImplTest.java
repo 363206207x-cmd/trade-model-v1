@@ -162,7 +162,8 @@ class DecisionChainServiceImplTest {
     void threeRoleChainProducesSeparateCandidateAndRuleValidatedFinalPlan() {
         stubHappyPath();
 
-        DecisionChainBuildResult result = service.build(input());
+        DecisionChainBuildInput input = input();
+        DecisionChainBuildResult result = service.build(input);
 
         assertThat(result.candidate()).isNotNull();
         assertThat(result.candidate().getNotFinalPlan()).isTrue();
@@ -189,10 +190,10 @@ class DecisionChainServiceImplTest {
             assertThat(call.isInputContractSatisfied()).isTrue();
             assertThat(call.getInputContractFailures()).isEmpty();
         });
-        assertThat(calls.getAllValues().get(0).getInput()).satisfies(input -> {
-            assertThat((List<?>) input.get("evidence")).hasSize(1);
-            assertThat((List<?>) input.get("scores")).hasSize(8);
-            assertThat(((Map<?, ?>) ((Map<?, ?>) input.get("decisionBundle")).get("multiTimeframe"))
+        assertThat(calls.getAllValues().get(0).getInput()).satisfies(facts -> {
+            assertThat((List<?>) facts.get("evidence")).hasSize(1);
+            assertThat((List<?>) facts.get("scores")).hasSize(8);
+            assertThat(((Map<?, ?>) ((Map<?, ?>) facts.get("decisionBundle")).get("multiTimeframe"))
                     .keySet().stream().map(String::valueOf).toList())
                     .containsExactlyInAnyOrder("4h", "1h", "15m", "5m");
         });
@@ -317,7 +318,8 @@ class DecisionChainServiceImplTest {
             return success(request.getRole());
         });
 
-        DecisionChainBuildResult result = service.build(input());
+        DecisionChainBuildInput input = input();
+        DecisionChainBuildResult result = service.build(input);
         assertThat(reviewsStarted.await(1, TimeUnit.SECONDS)).isTrue();
 
         assertThat(result.candidate()).isNotNull();
@@ -420,6 +422,12 @@ class DecisionChainServiceImplTest {
     @Test
     void searchPreviewRunsAllThreeRolesWithoutOpportunityCandidateOrFinalPersistence() {
         DecisionChainBuildInput base = input();
+        EvidenceItemVO userRequestedEvidence = base.evidence().get(0);
+        userRequestedEvidence.setEvidenceType("杠杆");
+        userRequestedEvidence.setDescription("LEVERAGE_SUGGESTION_ONLY");
+        userRequestedEvidence.setChangeFromBaseline("VOLATILITY_ADJUSTED_LEVERAGE");
+        userRequestedEvidence.setSourceReference("market.leverageSuggestion");
+        userRequestedEvidence.setStrength(100.0);
         DecisionChainBuildInput preview = new DecisionChainBuildInput(
                 base.analysisId(), base.traceId(), "AAVEUSDT", base.timeframe(), base.dataQualityScore(),
                 base.decision(), base.rulePlan(), base.evidence(), base.scores(),
@@ -603,17 +611,19 @@ class DecisionChainServiceImplTest {
         leverage.setChangeFromBaseline("VOLATILITY_ADJUSTED_LEVERAGE");
         leverage.setSourceReference("market.leverageSuggestion");
         leverage.setStrength(100.0);
-        stubInputGateFallback();
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(), anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
 
-        service.build(complete);
+        DecisionChainBuildResult result = service.build(complete);
 
-        ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
-        verify(aiOrchestratorService).invoke(requests.capture());
-        assertThat(requests.getAllValues()).allSatisfy(request -> {
-            assertThat(request.isInputContractSatisfied()).isFalse();
-            assertThat(request.getInputContractFailures())
-                    .contains("SIGNIFICANT_EVIDENCE_CHANGE_MISSING");
-        });
+        verify(aiOrchestratorService, never()).invoke(any());
+        assertThat(result.validation().reasons()).containsExactly("AI_TRIGGER_NOT_MET");
+        assertThat(result.finalPlan().getRuleValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(complete.decision().getValidatedMarketBias()).isEqualTo("BULLISH");
+        assertThat(complete.decision().getFinalConfidence()).isNotNull();
     }
 
     @Test
@@ -623,17 +633,34 @@ class DecisionChainServiceImplTest {
         price.setEvidenceType("价格结构");
         price.setStrength(100.0);
         price.setFreshness("STALE");
-        stubInputGateFallback();
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(), anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.CANDIDATE, "ADVISORY_ALLOWED"));
+        when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
 
-        service.build(complete);
+        DecisionChainBuildResult result = service.build(complete);
 
-        ArgumentCaptor<AiDecisionChainRequest> requests = ArgumentCaptor.forClass(AiDecisionChainRequest.class);
-        verify(aiOrchestratorService).invoke(requests.capture());
-        assertThat(requests.getAllValues()).allSatisfy(request -> {
-            assertThat(request.isInputContractSatisfied()).isFalse();
-            assertThat(request.getInputContractFailures())
-                    .contains("SIGNIFICANT_EVIDENCE_CHANGE_MISSING");
-        });
+        verify(aiOrchestratorService, never()).invoke(any());
+        assertThat(result.validation().reasons()).containsExactly("AI_TRIGGER_NOT_MET");
+        assertThat(result.finalPlan().getRuleValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(complete.decision().getValidatedMarketBias()).isEqualTo("BULLISH");
+        assertThat(complete.decision().getFinalConfidence()).isNotNull();
+    }
+
+    @Test
+    void newStrongDirectionTriggersThreeAiEvenWithoutMaterialChangeEvidence() {
+        stubHappyPath();
+        DecisionChainBuildInput complete = input();
+        complete.decision().setValidatedMarketBias("STRONG_BULLISH");
+        complete.evidence().get(0).setEvidenceType("杠杆");
+        complete.evidence().get(0).setDescription("LEVERAGE_SUGGESTION_ONLY");
+        complete.evidence().get(0).setChangeFromBaseline("VOLATILITY_ADJUSTED_LEVERAGE");
+
+        DecisionChainBuildResult result = service.build(complete);
+
+        verify(aiOrchestratorService, org.mockito.Mockito.times(3)).invoke(any());
+        assertThat(result.candidate()).isNotNull();
     }
 
     @Test
@@ -655,11 +682,22 @@ class DecisionChainServiceImplTest {
                 .thenReturn(RuleValidationResult.blocked(List.of("PLAN_MODE_BLOCKED")));
         when(aiRoleResultsCodec.serializeDecisionChain(any(), any(), any(), any(), any())).thenReturn("{}");
 
-        DecisionChainBuildResult result = service.build(input());
+        DecisionChainBuildInput input = input();
+        DecisionChainBuildResult result = service.build(input);
 
         assertThat(result.opportunity().state()).isEqualTo(AssetStateEnum.CONFUSED);
         assertThat(result.finalPlan().getFinalPlan()).isFalse();
         assertThat(result.finalPlan().getRuleValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(result.finalPlan().getFinalMarketBias()).isNull();
+        assertThat(result.finalPlan().getEntryZone()).isNull();
+        assertThat(result.finalPlan().getStopLoss()).isNull();
+        assertThat(result.finalPlan().getTakeProfitRules()).isNull();
+        assertThat(result.finalPlan().getNotTradeInstruction()).isTrue();
+        assertThat(result.finalPlan().getNotAutoTrading()).isTrue();
+        assertThat(result.finalPlan().getNotOrderExecution()).isTrue();
+        assertThat(input.decision().getValidatedMarketBias()).isEqualTo("BULLISH");
+        assertThat(input.decision().getFinalConfidence()).isNotNull();
+        assertThat(result.candidate()).isNotNull();
         ArgumentCaptor<AssetStateEnum> states = ArgumentCaptor.forClass(AssetStateEnum.class);
         verify(assetStateService, org.mockito.Mockito.times(2)).transition(
                 any(OpportunityStateIdentity.class), states.capture(), anyInt(), anyInt(), any(), any(),
@@ -802,7 +840,7 @@ class DecisionChainServiceImplTest {
         item.setSourceReference("test://market/BTCUSDT/5m");
         item.setSourceTraceId("source-trace-1");
         item.setCurrentValue("101");
-        item.setChangeFromBaseline("+1%");
+        item.setChangeFromBaseline("SIGNIFICANT_PRICE_BREAKOUT:+1%");
         item.setObservedAt(LocalDateTime.of(2026, 8, 12, 0, 0));
         item.setFreshness("FRESH");
         return item;

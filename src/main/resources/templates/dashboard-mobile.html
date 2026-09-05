@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
+  <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}">
+  <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}">
   <title th:text="${home.header.pageTitle != null ? home.header.pageTitle : 'Trade Model'}">Trade Model</title>
   <link rel="stylesheet" th:href="@{/css/dashboard-mobile.css}" href="/css/dashboard-mobile.css">
   <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js" defer></script>
@@ -233,7 +235,7 @@
           </span>
         </button>
       </div>
-      <p class="asset-interaction-note">点击卡片切换当前资产；分析详情仅在权威分析身份可用时开放。</p>
+      <p class="asset-interaction-note">点击卡片启动或恢复该资产唯一分析任务，完成后查看三 AI 结果。</p>
     </section>
 
     <section class="execution-section" id="execution-advice" aria-labelledby="mobile-execution-title"

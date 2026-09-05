@@ -12,6 +12,7 @@
     var assetPoolSymbols = new Set();
     var assetPoolCount = 0;
     var searchActionBusy = false;
+    var assetAnalysisBusy = new Set();
     var activeClosePositionId = "";
     var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
@@ -405,7 +406,11 @@
             function select() {
                 selectedSymbol = card.dataset.symbol;
                 if (typeof contract.replaceUrlParam === "function") contract.replaceUrlParam("asset", selectedSymbol);
-                loadHome(selectedSymbol);
+                var asset = assets.find(function (item) { return symbolOf(item) === selectedSymbol; });
+                card.setAttribute("aria-busy", "true");
+                openOrResumeAssetAnalysis(asset).finally(function () {
+                    card.removeAttribute("aria-busy");
+                });
             }
             card.addEventListener("click", select);
             card.addEventListener("keydown", function (event) {
@@ -842,15 +847,17 @@
             : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
         return prefix + ":" + value;
     }
-    function analysisPreviewKey(symbol) {
-        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":5m";
+    function analysisPreviewKey(symbol, analysisId) {
+        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":5m:"
+            + String(analysisId || "search").trim();
     }
-    function analysisPreviewSubmission(symbol) {
-        var key = analysisPreviewKey(symbol);
+    function analysisPreviewSubmission(symbol, analysisId) {
+        var key = analysisPreviewKey(symbol, analysisId);
         var saved = readDraft(key) || {};
         if (!saved.submissionId) saved.submissionId = stableSubmissionId("analysis-preview");
         saved.symbol = String(symbol || "").trim().toUpperCase();
         saved.timeframe = "5m";
+        saved.sourceAnalysisId = analysisId || null;
         writeDraft(key, saved);
         return saved;
     }
@@ -862,11 +869,11 @@
             analysisId: result && result.analysisId,
             traceId: result && result.traceId
         });
-        writeDraft(analysisPreviewKey(symbol), saved);
+        writeDraft(analysisPreviewKey(symbol, saved.sourceAnalysisId), saved);
         return saved;
     }
-    function clearAnalysisPreview(symbol) {
-        removeDraft(analysisPreviewKey(symbol));
+    function clearAnalysisPreview(symbol, analysisId) {
+        removeDraft(analysisPreviewKey(symbol, analysisId));
     }
     async function recoverAnalysisPreviewTask(taskId) {
         if (!taskId) return null;
@@ -882,6 +889,44 @@
             await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
         }
         return null;
+    }
+    function openOrResumeAssetAnalysis(asset) {
+        return (async function () {
+            var symbol = symbolOf(asset);
+            var analysisId = asset && asset.analysisId;
+            if (!symbol || !analysisId) {
+                announce("当前资产缺少可追溯分析，正在刷新");
+                await loadHome(symbol || selectedSymbol);
+                return;
+            }
+            var busyKey = symbol + ":" + analysisId;
+            if (assetAnalysisBusy.has(busyKey)) return;
+            assetAnalysisBusy.add(busyKey);
+            announce(symbol + " 三 AI 分析启动中");
+            try {
+                var previewState = analysisPreviewSubmission(symbol, analysisId);
+                var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol)
+                    + "/analysis-preview?timeframe=5m&submissionId="
+                    + encodeURIComponent(previewState.submissionId), { method: "POST" });
+                previewState = rememberAnalysisPreview(symbol, previewState, result);
+                if ((!result || !result.analysisId) && result && result.taskId) {
+                    var recovered = await recoverAnalysisPreviewTask(result.taskId);
+                    if (recovered && recovered.resultResourceId) {
+                        result.analysisId = recovered.resultResourceId;
+                        result.traceId = recovered.traceId;
+                        rememberAnalysisPreview(symbol, previewState, result);
+                    }
+                }
+                if (!result || !result.analysisId) throw new Error("分析任务尚未返回结果标识");
+                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId) + "?returnTo="
+                    + encodeURIComponent("/dashboard?asset=" + symbol));
+            } catch (error) {
+                announce(error.message);
+                await loadHome(symbol);
+            } finally {
+                assetAnalysisBusy.delete(busyKey);
+            }
+        })();
     }
     function readDraft(key) {
         try { return JSON.parse(window.sessionStorage.getItem(key) || "null"); }

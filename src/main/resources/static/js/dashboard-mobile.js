@@ -10,6 +10,8 @@
   var activeRequest = null;
   var activeAiRole = "GPT_FINAL";
   var manualMobileTheme = null;
+  var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
+  var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
 
   function bindPreferredColorScheme() {
     var preference = window.matchMedia
@@ -87,6 +89,75 @@
   function setWatchActionStatus(message) {
     var status = document.querySelector("[data-watch-action-status]");
     if (status) status.textContent = message || "";
+  }
+
+  function stableSubmissionId(prefix) {
+    var value = window.crypto && typeof window.crypto.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    return prefix + ":" + value;
+  }
+
+  function mobileAnalysisSubmission(symbol, sourceAnalysisId) {
+    var key = "mobile-analysis-preview:" + normalizeSymbol(symbol) + ":5m:"
+      + String(sourceAnalysisId || "missing");
+    var saved = {};
+    try { saved = JSON.parse(window.sessionStorage.getItem(key) || "{}"); } catch (ignored) { saved = {}; }
+    if (!saved.submissionId) saved.submissionId = stableSubmissionId("analysis-preview");
+    saved.sourceAnalysisId = sourceAnalysisId;
+    window.sessionStorage.setItem(key, JSON.stringify(saved));
+    return { key: key, value: saved };
+  }
+
+  async function mobileApi(url, options) {
+    var request = Object.assign({ credentials: "same-origin", headers: { Accept: "application/json" } }, options || {});
+    request.headers = Object.assign({}, request.headers || {});
+    if (request.body) request.headers["Content-Type"] = "application/json";
+    if (csrfToken && csrfHeader && request.method && request.method !== "GET") request.headers[csrfHeader] = csrfToken;
+    var response = await fetch(url, request);
+    var envelope = await response.json().catch(function () { return null; });
+    if (!response.ok) throw new Error(text(envelope && envelope.msg, "分析请求失败"));
+    var parsed = frontendContract.parseApiEnvelope(envelope);
+    if (!parsed.ok) throw new Error(parsed.message);
+    return parsed.data;
+  }
+
+  async function recoverMobileAnalysisTask(taskId) {
+    if (!taskId) return null;
+    for (var attempt = 0; attempt < 20; attempt++) {
+      var tasks = await mobileApi("/api/workspace/tasks?limit=30");
+      var task = (Array.isArray(tasks) ? tasks : []).find(function (item) {
+        return item && item.taskId === taskId;
+      });
+      if (task && task.resultResourceId) return task;
+      if (task && ["FAILED", "CANCELLED"].indexOf(String(task.state || "").toUpperCase()) >= 0) {
+        throw new Error(text(task.errorMessage, "分析任务未完成"));
+      }
+      await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+    }
+    return null;
+  }
+
+  async function openOrResumeMobileAssetAnalysis(card) {
+    var symbol = card && card.dataset.symbol;
+    var sourceAnalysisId = card && card.dataset.analysisId;
+    if (!symbol || !sourceAnalysisId) throw new Error("当前资产缺少可追溯分析");
+    var submission = mobileAnalysisSubmission(symbol, sourceAnalysisId);
+    setWatchActionStatus("三 AI 分析启动中");
+    var result = await mobileApi("/api/asset-pool/search/" + encodeURIComponent(symbol)
+      + "/analysis-preview?timeframe=5m&submissionId="
+      + encodeURIComponent(submission.value.submissionId), { method: "POST" });
+    submission.value.taskId = result && result.taskId;
+    submission.value.analysisId = result && result.analysisId;
+    window.sessionStorage.setItem(submission.key, JSON.stringify(submission.value));
+    if ((!result || !result.analysisId) && result && result.taskId) {
+      var recovered = await recoverMobileAnalysisTask(result.taskId);
+      if (recovered && recovered.resultResourceId) result.analysisId = recovered.resultResourceId;
+    }
+    if (!result || !result.analysisId) throw new Error("分析任务尚未返回结果标识");
+    window.location.assign("/dashboard/analysis-detail?analysisId="
+      + encodeURIComponent(result.analysisId) + "&selectedSymbol="
+      + encodeURIComponent(symbol) + "&view=mobile");
   }
 
   function updateSelectedSymbolUrl(symbol) {
@@ -1062,6 +1133,7 @@
   }
 
   async function selectAsset(symbol, sourceCard) {
+    var launchAnalysis = arguments.length < 3 || arguments[2] !== false;
     if (!symbol) return;
     window.__lastRequestedMobileSymbol = symbol;
     requestSequence += 1;
@@ -1117,6 +1189,9 @@
       setWatchActionStatus("");
       updateExecution(parsed.data.executionSuggestion, selectedAsset, selectedCard);
       updateAi(parsed.data.aiDecision);
+      if (launchAnalysis === true) {
+        await openOrResumeMobileAssetAnalysis(selectedCard || sourceCard);
+      }
     } catch (error) {
       if (error.name !== "AbortError" && sequence === requestSequence) {
         failClosedAfterLoadError(symbol, "error");
@@ -1135,7 +1210,7 @@
     if (!pager) return;
     pager.addEventListener("click", function (event) {
       var card = event.target.closest(".asset-select");
-      if (card && pager.contains(card)) selectAsset(card.dataset.symbol, card);
+      if (card && pager.contains(card)) selectAsset(card.dataset.symbol, card, true);
     });
     pager.addEventListener("keydown", function (event) {
       if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
@@ -1148,7 +1223,7 @@
       var next = cards[(index + offset + cards.length) % cards.length];
       next.focus({ preventScroll: true });
       keepAssetCardVisible(next, "smooth");
-      selectAsset(next.dataset.symbol, next);
+      selectAsset(next.dataset.symbol, next, true);
     });
   }
 
@@ -1159,7 +1234,7 @@
       var selected = selectedAssetCard();
       button.disabled = true;
       var retry = selected && selected.dataset.symbol
-        ? selectAsset(selected.dataset.symbol, selected)
+        ? selectAsset(selected.dataset.symbol, selected, false)
         : loadInitialMobileHome();
       Promise.resolve(retry).finally(function () {
         button.disabled = false;
@@ -1205,7 +1280,7 @@
         resultButton.type = "button";
         resultButton.dataset.searchSymbol = symbol;
         resultButton.addEventListener("click", function () {
-          selectAsset(symbol, card);
+          selectAsset(symbol, card, true);
           closeAssetSearch(panel, toggle);
           setWatchActionStatus("已选择 " + symbol);
           keepAssetCardVisible(card, "smooth");
