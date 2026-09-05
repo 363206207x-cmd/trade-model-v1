@@ -206,4 +206,19 @@ class PositionMonitoringFrontendContractTest {
                         "url(http",
                         "cdn");
     }
+
+    @Test
+    void dashboardShowsBlockedPlanReasonsAndPartialManualMonitorJudgmentInPlace() throws Exception {
+        String script = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+
+        assertThat(script)
+                .contains(
+                        "function monitorJudgmentAvailable(position)",
+                        "基础价格监控",
+                        "监控时间",
+                        "已阻断",
+                        "阻断原因 · ",
+                        "恢复条件 · ")
+                .doesNotContain("window.location.href = \"/analysis");
+    }
 }

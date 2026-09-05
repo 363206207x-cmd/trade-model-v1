@@ -197,6 +197,20 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
                 if (canonical == null || !positionId.equals(canonical.getPositionId())) {
                     throw new IllegalStateException("PositionMonitorLog idempotency claim mismatch");
                 }
+                int refreshed = positionMonitorLogMapper.refreshByMonitorRunKey(row);
+                if (refreshed == 1) {
+                    row.setLogId(canonical.getLogId());
+                    row.setCreatedAt(canonical.getCreatedAt());
+                    purgeExpiredMonitorLogs(recordedAt);
+                    return toDto(row);
+                }
+                if (refreshed != 0) {
+                    throw new IllegalStateException("PositionMonitorLog refresh failed");
+                }
+                canonical = positionMonitorLogMapper.selectByMonitorRunKey(monitorRunKey);
+                if (canonical == null || !positionId.equals(canonical.getPositionId())) {
+                    throw new IllegalStateException("PositionMonitorLog idempotency refresh mismatch");
+                }
                 purgeExpiredMonitorLogs(recordedAt);
                 return toDto(canonical);
             }

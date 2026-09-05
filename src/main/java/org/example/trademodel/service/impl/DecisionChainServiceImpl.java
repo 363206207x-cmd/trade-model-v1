@@ -167,7 +167,8 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                     "VALIDATED_MARKET_BIAS_REQUIRED"));
             decision.setFinalMarketBias(null);
             decision.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
-            decision.setMarketBiasHierarchy("WAIT");
+            decision.setMarketBiasHierarchy("RANGE".equals(upper(decision.getRuleMarketBias()))
+                    ? "RANGE" : "WAIT");
             decision.setIsWorthOpening(false);
             applyOpportunityState(decision, input, observing, blocked);
             persistOpportunityProjection(input, observing, null, blocked);
@@ -1394,8 +1395,12 @@ public class DecisionChainServiceImpl implements DecisionChainService {
     private void applyDirectionConfidence(DecisionChainBuildInput input,
                                           DecisionBundleVO decision,
                                           Integer conflictPenalty) {
+        String confidenceBias = decision == null ? null : upper(decision.getValidatedMarketBias());
+        if ((confidenceBias == null || confidenceBias.isEmpty()) && decision != null) {
+            confidenceBias = upper(decision.getRuleMarketBias());
+        }
         if (decision == null
-                || !directionalBias(decision.getValidatedMarketBias())
+                || !(directionalBias(confidenceBias) || "RANGE".equals(confidenceBias))
                 || !"READY".equals(upper(decision.getDirectionDataState()))) {
             return;
         }

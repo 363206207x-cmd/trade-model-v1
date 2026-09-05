@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.example.trademodel.entity.PositionMonitorLogDO;
 
 import java.util.List;
@@ -78,6 +79,19 @@ public interface PositionMonitorLogMapper {
 
     @Select(BASE_SELECT + "WHERE monitor_run_key = #{monitorRunKey}")
     PositionMonitorLogDO selectByMonitorRunKey(@Param("monitorRunKey") String monitorRunKey);
+
+    @Update("UPDATE tm_position_monitor_log SET analysis_id = #{analysisId}, "
+            + "execution_plan_id = #{executionPlanId}, current_price = #{currentPrice}, "
+            + "mark_price_source = #{markPriceSource}, entry_logic_status = #{entryLogicStatus}, "
+            + "monitor_conclusion = #{monitorConclusion}, reversal_status = #{reversalStatus}, "
+            + "risk_change_reason = #{riskChangeReason}, risk_level = #{riskLevel}, risk_trend = #{riskTrend}, "
+            + "suggested_action = #{suggestedAction}, source_status = #{monitorSourceStatus}, "
+            + "observed_at = #{observedAt}, fresh_until = #{freshUntil}, reason = #{reason}, "
+            + "evidence_snapshot = #{evidenceSnapshot}, score_snapshot = #{scoreSnapshot}, "
+            + "decision_snapshot = #{decisionSnapshot}, risk_snapshot = #{riskSnapshot}, trace_id = #{traceId} "
+            + "WHERE monitor_run_key = #{monitorRunKey} AND position_id = #{positionId} "
+            + "AND observed_at < #{observedAt}")
+    int refreshByMonitorRunKey(PositionMonitorLogDO row);
 
     @Delete("DELETE FROM tm_position_monitor_log WHERE created_at < #{cutoff}")
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);

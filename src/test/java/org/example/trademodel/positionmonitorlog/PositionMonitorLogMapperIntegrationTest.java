@@ -100,6 +100,29 @@ class PositionMonitorLogMapperIntegrationTest {
                 .hasMessageContaining("CK_TM_POSITION_MONITOR_LOG_TRUSTED_PAYLOAD");
     }
 
+    @Test
+    void refreshByMonitorRunKeyUpdatesLatestObservationWithoutAddingAnotherRow() {
+        UserPositionDO position = userPosition("OPEN", LocalDateTime.of(2026, 6, 22, 10, 0));
+        userPositionMapper.insert(position);
+        LocalDateTime firstObservedAt = LocalDateTime.of(2026, 6, 22, 10, 1);
+        PositionMonitorLogDO first = log(position.getId(), "ana-p0-4", "LOGIC_VALID", "LOW",
+                "CONTINUE_HOLD", firstObservedAt);
+        first.setMonitorRunKey("position-monitor:" + position.getId() + ":2026-06-22T10:00");
+        assertThat(positionMonitorLogMapper.insertIfAbsent(first)).isEqualTo(1);
+
+        PositionMonitorLogDO refreshed = log(position.getId(), "ana-p0-4", "HIGH_RISK_OBSERVATION", "HIGH",
+                "REDUCE_POSITION", firstObservedAt.plusSeconds(30));
+        refreshed.setMonitorRunKey(first.getMonitorRunKey());
+        refreshed.setCurrentPrice(new BigDecimal("112.50"));
+        assertThat(positionMonitorLogMapper.refreshByMonitorRunKey(refreshed)).isEqualTo(1);
+
+        PositionMonitorLogDO persisted = positionMonitorLogMapper.selectByMonitorRunKey(first.getMonitorRunKey());
+        assertThat(persisted.getLogId()).isEqualTo(first.getLogId());
+        assertThat(persisted.getCurrentPrice()).isEqualByComparingTo("112.50");
+        assertThat(persisted.getObservedAt()).isEqualTo(refreshed.getObservedAt());
+        assertThat(positionMonitorLogMapper.listByPositionId(position.getId(), 10)).hasSize(1);
+    }
+
     private static PositionMonitorLogDO log(Long positionId, String analysisId, String monitorConclusion,
                                             String riskLevel, String suggestedAction, LocalDateTime createdAt) {
         PositionMonitorLogDO row = new PositionMonitorLogDO();

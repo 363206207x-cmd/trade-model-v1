@@ -431,6 +431,12 @@
             && ["VERIFIED_FRESH", "BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING"].indexOf(trust) >= 0
             && has(position.markPrice || position.currentPrice);
     }
+    function monitorJudgmentAvailable(position) {
+        var trust = String(position && position.monitorTrustState || "").toUpperCase();
+        return position && position.markPriceFresh === true
+            && ["VERIFIED_FRESH", "BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING"].indexOf(trust) >= 0
+            && has(position.riskLevel) && has(position.monitorConclusion) && has(position.suggestedAction);
+    }
     function validPosition(position) {
         return position && symbolOf(position) && has(position.direction)
             && has(position.entryPrice) && has(position.openedAt);
@@ -443,7 +449,7 @@
     }
     function riskRank(value) { return { LOW: 1, MEDIUM: 2, HIGH: 3, EXTREME: 4 }[String(value || "").toUpperCase()] || 0; }
     function highestRisk(positions) {
-        var trusted = positions.filter(trustedMonitor).sort(function (a, b) { return riskRank(b.riskLevel) - riskRank(a.riskLevel); });
+        var trusted = positions.filter(monitorJudgmentAvailable).sort(function (a, b) { return riskRank(b.riskLevel) - riskRank(a.riskLevel); });
         return trusted.length ? text(trusted[0].riskLevelLabel, label(trusted[0].riskLevel, "暂无评估")) : "暂无评估";
     }
     function trustStateText(position) {
@@ -464,6 +470,7 @@
     }
     function positionRow(position) {
         var trusted = trustedMonitor(position);
+        var judgmentAvailable = monitorJudgmentAvailable(position);
         var priceAvailable = monitorPriceAvailable(position);
         var unavailable = trustStateText(position);
         var risk = text(position.riskLevelLabel, label(position.riskLevel));
@@ -489,19 +496,21 @@
                 + positionFact("盈亏", percent(position.pnlPercent), Number(position.pnlPercent) >= 0 ? "STABLE" : "INVALID", "numeric");
         }
         openingFacts += "</div>";
-        var monitorColumns = trusted
-            ? '<div class="position-judgment">' + positionFact("入场逻辑", logic, position.entryLogicStatus, "center")
-                + positionFact("反转状态", reversal, position.reversalStatus, "center")
+        var monitorColumns = judgmentAvailable
+            ? '<div class="position-judgment">' + positionFact("监控覆盖", trusted ? "完整监控" : "基础价格监控", trusted ? "VERIFIED" : "PARTIAL", "center")
+                + positionFact("监控时间", time(position.lastMonitorAt || position.markPriceObservedAt), "STABLE", "center")
+                + positionFact("入场逻辑", trusted ? logic : "不适用", trusted ? position.entryLogicStatus : "NOT_APPLICABLE", "center")
+                + positionFact("反转状态", trusted ? reversal : "上下文待验证", trusted ? position.reversalStatus : "PENDING", "center")
                 + positionFact("持仓风险", risk, position.riskLevel, "center")
                 + positionFact("风险趋势", trend, position.riskTrend, "center") + "</div>"
                 + '<div class="position-conclusion">' + positionFact("监控结论", conclusion, position.monitorConclusion, "narrative")
                 + positionFact("建议动作", action, position.suggestedAction, "narrative")
                 + positionActions + '</div>'
             : '<div class="position-trust-state" role="status"><strong>' + escapeHtml(unavailable) + '</strong>' + positionActions + '</div>';
-        return '<article class="position-row' + (trusted ? " is-trusted" : " is-untrusted")
+        return '<article class="position-row' + (trusted ? " is-trusted" : judgmentAvailable ? " is-partial" : " is-untrusted")
             + '"' + (pnlCoverage ? ' title="' + escapeHtml(pnlCoverage) + '"' : '')
             + ' aria-label="' + escapeHtml(symbolOf(position) + " " + text(position.directionLabel, label(position.direction)) + " "
-                + (trusted ? conclusion : unavailable) + (pnlCoverage ? " " + pnlCoverage : "")) + '">'
+                + (judgmentAvailable ? conclusion : unavailable) + (pnlCoverage ? " " + pnlCoverage : "")) + '">'
             + '<div class="position-identity"><strong>' + escapeHtml(symbolOf(position)) + "</strong>"
             + '<span class="direction-label">' + escapeHtml(text(position.directionLabel, label(position.direction))) + "</span><small>" + escapeHtml(source) + "</small></div>"
             + openingFacts + monitorColumns + "</article>";
@@ -539,9 +548,18 @@
         setText("planAsset", selected || "未选择资产");
         if (!access.visible) {
             var revalidating = String(plan.status || "").toUpperCase() === "REVALIDATION_REQUIRED";
-            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : "尚未形成") + '</strong><span>机会状态 · '
-                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + escapeHtml(text(plan.revalidationReason || access.reason, "尚未形成有效计划")) + "</span>"
-                + (revalidating ? '<span>恢复条件 · ' + escapeHtml(text(plan.revalidationRule, "当前无可验证恢复条件")) + "</span>" : "")
+            var status = String(plan.status || "").toUpperCase();
+            var blocked = status.indexOf("BLOCKED") >= 0
+                || String(plan.validationStatus || "").toUpperCase() === "BLOCKED"
+                || String(plan.chainStatus || "").toUpperCase().indexOf("BLOCKED") >= 0
+                || String(plan.finalPlanMode || "").toUpperCase() === "BLOCKED";
+            var reason = plan.blockedReason || plan.validationReasons || plan.ruleVetoReason
+                || plan.revalidationReason || access.reason;
+            var recovery = plan.revalidationRule || plan.executionFeasibilityReason
+                || "等待新数据并重新分析通过规则校验";
+            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : blocked ? "已阻断" : "尚未形成") + '</strong><span>机会状态 · '
+                + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + (blocked ? "阻断原因 · " : "") + escapeHtml(text(reason, blocked ? "当前计划未通过规则校验" : "尚未形成有效计划")) + "</span>"
+                + (revalidating || blocked ? '<span>恢复条件 · ' + escapeHtml(text(recovery, "当前无可验证恢复条件")) + "</span>" : "")
                 + (revalidating ? '<span>最新重验状态 · ' + escapeHtml(label(plan.planLifecycleState, "等待重验")) + "</span>" : "") + "</div>";
             link.hidden = true;
             return;

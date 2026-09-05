@@ -63,6 +63,8 @@ import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.PositionMonitorConclusionEnum;
 import org.example.trademodel.positionmonitorlog.PositionMonitorSuggestedActionEnum;
 import org.example.trademodel.positionmonitor.PositionPlanSourceResolver;
+import org.example.trademodel.positionmonitor.PositionMonitorPolicy;
+import org.example.trademodel.positionmonitor.SinglePositionRiskCalculator;
 import org.example.trademodel.service.support.DataQualityCircuitBreakerPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy;
 import org.example.trademodel.service.support.ExecutionPlanReviewPolicy.PersistedPlanState;
@@ -77,6 +79,7 @@ import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
+import org.example.trademodel.entity.UserPositionDO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.example.trademodel.service.watchlistsource.AssetPoolService;
@@ -105,6 +108,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class DashboardHomeServiceImpl implements DashboardHomeService {
+    private static final SinglePositionRiskCalculator POSITION_RISK_CALCULATOR =
+            new SinglePositionRiskCalculator();
     private static final int DEFAULT_LIMIT = 6;
     private static final int MAX_LIMIT = 12;
     private static final List<String> AI_ROLES = List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE");
@@ -852,7 +857,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "活动持仓 0", "EMPTY", 0);
         }
         String highestRisk = positions.stream()
-                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .filter(this::hasReadablePositionRisk)
                 .map(DashboardHomeVO.PositionVO::getRiskLevel)
                 .filter(this::recognizedPositionRisk)
                 .max(Comparator.comparingInt(this::positionRiskRank))
@@ -2105,10 +2110,50 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setEntryLogicStatusLabel(entryLogicStatusLabel("NOT_APPLICABLE"));
         row.setDirectionSupportStatus("NOT_APPLICABLE");
         row.setDirectionSupportStatusLabel(directionSupportStatusLabel("NOT_APPLICABLE"));
-        row.setLastMonitorAt(monitor.getCreatedAt());
-        row.setLastMonitorTime(monitor.getCreatedAt());
+        applyManualBasePriceRisk(row, position, monitor.getCurrentPrice());
+        row.setLastMonitorAt(monitor.getObservedAt());
+        row.setLastMonitorTime(monitor.getObservedAt());
         row.setMonitorTrustState("BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING");
         row.setDataState("PARTIAL");
+    }
+
+    private void applyManualBasePriceRisk(DashboardHomeVO.PositionVO row,
+                                          UserPositionVO position,
+                                          BigDecimal markPrice) {
+        java.util.function.Supplier<UserPositionDO> riskInputFactory = UserPositionDO::new;
+        UserPositionDO riskInput = riskInputFactory.get();
+        riskInput.setSide(position.getSide());
+        riskInput.setEntryPrice(position.getEntryPrice());
+        riskInput.setQuantity(position.getQuantity());
+        riskInput.setLeverage(position.getLeverage());
+        riskInput.setStopLoss(position.getStopLoss());
+        riskInput.setTakeProfit(position.getTakeProfit());
+        try {
+            SinglePositionRiskCalculator.Assessment assessment = POSITION_RISK_CALCULATOR.calculate(
+                    riskInput, markPrice, false, false);
+            String riskLevel = assessment.level().name();
+            row.setRiskLevel(riskLevel);
+            row.setRiskLevelLabel(positionRiskLevelLabel(riskLevel));
+            row.setRiskTrend("STABLE");
+            row.setRiskReason("BASE_PRICE_POSITION_RISK");
+            row.setRiskReasonLabel("基于杠杆、名义仓位、价格偏移及手工止损止盈");
+            boolean boundaryReached = PositionMonitorPolicy.stopLossBreached(
+                    position.getSide(), markPrice, position.getStopLoss())
+                    || PositionMonitorPolicy.takeProfitReached(
+                    position.getSide(), markPrice, position.getTakeProfit());
+            boolean highRisk = "HIGH".equals(riskLevel) || "EXTREME".equals(riskLevel);
+            row.setMonitorConclusion(boundaryReached
+                    ? "WAIT_USER_CONFIRM_CLOSE"
+                    : highRisk ? "HIGH_RISK_OBSERVATION" : "BASE_PRICE_MONITORING_ACTIVE");
+            row.setMonitorConclusionLabel(boundaryReached
+                    ? "价格已触及手工边界，等待人工确认"
+                    : highRisk ? "基础价格显示当前持仓风险偏高" : "基础价格监控正常运行");
+            row.setSuggestedAction("WAIT_CONFIRMATION");
+            row.setSuggestedManualAction("WAIT_CONFIRMATION");
+            row.setSuggestedManualActionText("请人工复核持仓；系统不会自动交易");
+        } catch (IllegalArgumentException ignored) {
+            // Incomplete position fields remain explicit PARTIAL data without an invented risk result.
+        }
     }
 
     private void applyTrustedMonitor(DashboardHomeVO.PositionVO row,
@@ -2137,8 +2182,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         row.setSuggestedAction(trimToNull(monitor.getSuggestedAction()));
         row.setSuggestedManualAction(row.getSuggestedAction());
         row.setSuggestedManualActionText(suggestedActionText(row.getSuggestedAction()));
-        row.setLastMonitorAt(monitor.getCreatedAt());
-        row.setLastMonitorTime(monitor.getCreatedAt());
+        row.setLastMonitorAt(monitor.getObservedAt());
+        row.setLastMonitorTime(monitor.getObservedAt());
         row.setDataState(positionDataState(row));
     }
 
@@ -3261,7 +3306,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
                 .count();
         if (trusted == positions.size()) return "COMPLETE";
-        return trusted > 0 ? "PARTIAL_COVERAGE" : "UNKNOWN";
+        return positions.stream().anyMatch(this::hasReadablePositionRisk)
+                ? "PARTIAL_COVERAGE" : "UNKNOWN";
+    }
+
+    private boolean hasReadablePositionRisk(DashboardHomeVO.PositionVO row) {
+        String trust = upper(row == null ? null : row.getMonitorTrustState());
+        return ("VERIFIED_FRESH".equals(trust)
+                || "BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING".equals(trust))
+                && Boolean.TRUE.equals(row.getMarkPriceFresh())
+                && recognizedPositionRisk(row.getRiskLevel());
     }
 
     private DashboardHomeVO.PositionAggregateVO buildPositionAggregate(PositionRowsResult positionRows) {
@@ -3270,7 +3324,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.PositionAggregateVO aggregate = new DashboardHomeVO.PositionAggregateVO();
         aggregate.setActiveCount(positions.size());
         aggregate.setHighestTrustedRisk(positions.stream()
-                .filter(row -> "VERIFIED_FRESH".equalsIgnoreCase(trimToNull(row.getMonitorTrustState())))
+                .filter(this::hasReadablePositionRisk)
                 .map(DashboardHomeVO.PositionVO::getRiskLevel)
                 .filter(this::recognizedPositionRisk)
                 .max(Comparator.comparingInt(this::positionRiskRank))
