@@ -215,6 +215,7 @@ class PositionMonitoringFrontendContractTest {
                 .contains(
                         "function monitorJudgmentAvailable(position)",
                         "基础价格监控",
+                        "positionFact(\"行情来源\", label(position.markPriceSource",
                         "监控时间",
                         "已阻断",
                         "阻断原因 · ",

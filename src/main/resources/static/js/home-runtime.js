@@ -47,6 +47,7 @@
         SOURCE_UNAVAILABLE: "来源不可用", STALE: "数据已过期",
         COMPLETE: "覆盖完整", PARTIAL_COVERAGE: "覆盖部分", UNKNOWN: "等待评估",
         SYSTEM_PLAN_POSITION: "系统计划", MANUAL_POSITION: "独立录入", MANUAL_INDEPENDENT: "独立录入",
+        BINANCE: "Binance",
         VERIFIED_FRESH: "已验证且新鲜", PENDING: "等待验证", INVALID: "来源无效",
         SOURCE_UNAVAILABLE: "来源不可用", CURRENT: "当前有效", NEEDS_REVALIDATION: "正在重验"
     });
@@ -498,6 +499,7 @@
         openingFacts += "</div>";
         var monitorColumns = judgmentAvailable
             ? '<div class="position-judgment">' + positionFact("监控覆盖", trusted ? "完整监控" : "基础价格监控", trusted ? "VERIFIED" : "PARTIAL", "center")
+                + positionFact("行情来源", label(position.markPriceSource, "当前不可查看"), position.markPriceSource, "center")
                 + positionFact("监控时间", time(position.lastMonitorAt || position.markPriceObservedAt), "STABLE", "center")
                 + positionFact("入场逻辑", trusted ? logic : "不适用", trusted ? position.entryLogicStatus : "NOT_APPLICABLE", "center")
                 + positionFact("反转状态", trusted ? reversal : "上下文待验证", trusted ? position.reversalStatus : "PENDING", "center")
