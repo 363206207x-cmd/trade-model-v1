@@ -538,7 +538,8 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     private MarkPriceContext readMarkPrice(String assetSymbol) {
         ProviderCallResult<MarketPriceSnapshot> result;
         try {
-            result = marketPriceSnapshotService.get(assetSymbol, AssetPriority.P0_POSITION,
+            String marketSymbol = BinanceUsdtSymbol.toUsdtPair(assetSymbol);
+            result = marketPriceSnapshotService.get(marketSymbol, AssetPriority.P0_POSITION,
                     Duration.ofSeconds(15), "position-monitor-" + UUID.randomUUID());
         } catch (RuntimeException ex) {
             throw new PositionMonitorDataUnavailableException("QUOTE_UNAVAILABLE", ex);
