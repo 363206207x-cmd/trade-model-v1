@@ -272,8 +272,11 @@ trade-model:
       advertised-rpm: ${COINGLASS_ADVERTISED_RPM:}
       internal-budget-ratio: 0.80
       request-timeout-ms: 5000
-      fresh-ttl-seconds: 60
-      stale-ttl-seconds: 180
+      # Keep the composite snapshot fresh for the slowest authorized LOW-profile
+      # derivatives cadence. A shorter TTL creates a false stale window between
+      # the 60s component TTL and the 120s watchlist refresh interval.
+      fresh-ttl-seconds: ${TRADE_MODEL_COINGLASS_FRESH_TTL_SECONDS:120}
+      stale-ttl-seconds: ${TRADE_MODEL_COINGLASS_STALE_TTL_SECONDS:360}
       emergency-min-refresh-gap-seconds: 40
       max-retry-5xx: 2
       max-retry-timeout: 1

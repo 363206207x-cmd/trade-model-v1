@@ -9,6 +9,7 @@ import org.example.trademodel.vo.ScoreItemVO;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +27,12 @@ class AnalysisAssemblerServiceImplTest {
     private static final String USDM_OI_MIN = "BINANCE_USDM_OI_MIN_HEURISTIC";
     private static final String SPOT_PERP_OI_MIN = "BINANCE_SPOT_PERP_OI_MIN_HEURISTIC";
     private static final String FALLBACK = "PLACEHOLDER_FALLBACK";
+
+    @Test
+    void derivativesSnapshotReadUsesConfiguredCompositeFreshnessWindow() {
+        assertEquals(Duration.ofSeconds(120), AnalysisAssemblerServiceImpl.derivativesFreshTtl(120));
+        assertEquals(Duration.ofSeconds(1), AnalysisAssemblerServiceImpl.derivativesFreshTtl(0));
+    }
 
     /** 原条数逻辑会得到 85：有效 ev &gt;= 2；空 VO 不视为第二维排外条。 */
     private static List<EvidenceItemVO> twoEvidences() {
