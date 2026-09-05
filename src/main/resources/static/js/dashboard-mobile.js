@@ -155,9 +155,7 @@
       if (recovered && recovered.resultResourceId) result.analysisId = recovered.resultResourceId;
     }
     if (!result || !result.analysisId) throw new Error("分析任务尚未返回结果标识");
-    window.location.assign("/dashboard/analysis-detail?analysisId="
-      + encodeURIComponent(result.analysisId) + "&selectedSymbol="
-      + encodeURIComponent(symbol) + "&view=mobile");
+    return result;
   }
 
   function updateSelectedSymbolUrl(symbol) {
@@ -1191,6 +1189,8 @@
       updateAi(parsed.data.aiDecision);
       if (launchAnalysis === true) {
         await openOrResumeMobileAssetAnalysis(selectedCard || sourceCard);
+        await selectAsset(selectedSymbol, selectedCard || sourceCard, false);
+        setWatchActionStatus(selectedSymbol + " 三 AI 分析已在首页更新");
       }
     } catch (error) {
       if (error.name !== "AbortError" && sequence === requestSequence) {

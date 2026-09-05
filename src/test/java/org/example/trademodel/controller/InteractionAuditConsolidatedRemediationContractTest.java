@@ -112,12 +112,21 @@ class InteractionAuditConsolidatedRemediationContractTest {
     void onDemandAnalysisUsesStableSubmissionAndRecoversCanonicalTaskIdentity() throws Exception {
         String homeScript = Files.readString(HOME_SCRIPT);
         String workspaceScript = Files.readString(SCRIPT);
+        String homeCardAnalysis = homeScript.substring(
+                homeScript.indexOf("function openOrResumeAssetAnalysis(asset)"),
+                homeScript.indexOf("function readDraft(key)"));
+        String mobileCardAnalysis = Files.readString(MOBILE_HOME_SCRIPT).substring(
+                Files.readString(MOBILE_HOME_SCRIPT).indexOf("async function openOrResumeMobileAssetAnalysis(card)"),
+                Files.readString(MOBILE_HOME_SCRIPT).indexOf("function updateSelectedSymbolUrl(symbol)"));
 
         assertThat(homeScript).contains(
                 "sessionStorage", "analysis-preview:", "submissionId", "taskId",
                 "function openOrResumeAssetAnalysis(asset)",
                 "analysisPreviewSubmission(symbol, analysisId)",
                 "recoverAnalysisPreviewTask(result.taskId)");
+        assertThat(homeCardAnalysis)
+                .contains("await loadHome(symbol)")
+                .doesNotContain("window.location.assign", "window.location.href");
         assertThat(workspaceScript).contains("sessionStorage", "analysis-preview:", "submissionId",
                 "taskId", "/api/workspace/tasks?limit=30");
         assertThat(Files.readString(MOBILE_HOME)).contains(
@@ -127,7 +136,11 @@ class InteractionAuditConsolidatedRemediationContractTest {
                 "openOrResumeMobileAssetAnalysis(card)",
                 "recoverMobileAnalysisTask(result.taskId)",
                 "/analysis-preview?timeframe=5m&submissionId=",
-                "launchAnalysis === true");
+                "launchAnalysis === true",
+                "await selectAsset(selectedSymbol, selectedCard || sourceCard, false)");
+        assertThat(mobileCardAnalysis)
+                .contains("return result")
+                .doesNotContain("window.location.assign", "window.location.href");
         assertThat(homeScript).contains("clearAnalysisPreview(previewSymbol)");
         assertThat(workspaceScript).contains("clearAnalysisPreview(snapshot?.symbol || analysisSelectedAsset?.symbol)");
     }

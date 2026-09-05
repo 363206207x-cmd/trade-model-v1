@@ -922,6 +922,7 @@
             assetAnalysisBusy.add(busyKey);
             announce(symbol + " 三 AI 分析启动中");
             try {
+                await loadHome(symbol);
                 var previewState = analysisPreviewSubmission(symbol, analysisId);
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol)
                     + "/analysis-preview?timeframe=5m&submissionId="
@@ -936,8 +937,8 @@
                     }
                 }
                 if (!result || !result.analysisId) throw new Error("分析任务尚未返回结果标识");
-                window.location.assign("/analysis/" + encodeURIComponent(result.analysisId) + "?returnTo="
-                    + encodeURIComponent("/dashboard?asset=" + symbol));
+                await loadHome(symbol);
+                announce(symbol + " 三 AI 分析已在首页更新");
             } catch (error) {
                 announce(error.message);
                 await loadHome(symbol);
