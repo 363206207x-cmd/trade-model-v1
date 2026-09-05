@@ -42,6 +42,7 @@
         LEVEL_1_CONSISTENT: "一致", LEVEL_2_MINOR_DISAGREEMENT: "轻微分歧",
         LEVEL_3_SIGNIFICANT_DISAGREEMENT: "显著分歧", LEVEL_4_EXTREME_CONFLICT: "极端冲突",
         READY: "就绪", PARTIAL: "部分可用", FALLBACK: "规则路径降级", UNAVAILABLE: "当前不可用",
+        CONNECTED: "已连接", CONFIGURED: "已配置", NOT_CONFIGURED: "未配置", FAIL_CLOSED: "已阻断",
         DISABLED: "数据源未启用", WAITING_SYNC: "等待同步", OK: "正常", UP: "正常", DEGRADED: "降级",
         FOUND: "已发现", NONE_FOUND: "未发现", INSUFFICIENT_DATA: "数据不足",
         SOURCE_UNAVAILABLE: "来源不可用", STALE: "数据已过期",
