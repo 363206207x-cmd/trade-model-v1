@@ -76,6 +76,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class PositionMonitorServiceImpl implements PositionMonitorService {
+    private static final Duration POSITION_MARK_PRICE_FRESHNESS = Duration.ofSeconds(90);
+
     private final UserPositionMapper userPositionMapper;
     private final MarketPriceSnapshotService marketPriceSnapshotService;
     private final SinglePositionRiskCalculator singlePositionRiskCalculator;
@@ -540,7 +542,7 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
         try {
             String marketSymbol = BinanceUsdtSymbol.toUsdtPair(assetSymbol);
             result = marketPriceSnapshotService.get(marketSymbol, AssetPriority.P0_POSITION,
-                    Duration.ofSeconds(45), "position-monitor-" + UUID.randomUUID());
+                    POSITION_MARK_PRICE_FRESHNESS, "position-monitor-" + UUID.randomUUID());
         } catch (RuntimeException ex) {
             throw new PositionMonitorDataUnavailableException("QUOTE_UNAVAILABLE", ex);
         }

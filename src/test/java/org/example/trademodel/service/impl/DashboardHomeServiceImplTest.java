@@ -3698,12 +3698,14 @@ class DashboardHomeServiceImplTest {
     void mismatchedAssetStateTraceBlocksPlan() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
+        allowMatchingSnapshot(decision);
         AssetStateDO state = new AssetStateDO();
         state.setSymbol("BTCUSDT");
         state.setState(AssetStateEnum.CANDIDATE);
         state.setTraceId("trace-current-state");
         AnalysisRunDO run = new AnalysisRunDO();
         run.setAnalysisId(decision.getAnalysisId());
+        run.setSymbol("BTCUSDT");
         run.setTraceId("trace-original-plan");
         when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(state);
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
@@ -3717,6 +3719,43 @@ class DashboardHomeServiceImplTest {
                 .isEqualTo("状态已更新，原计划需重新分析");
         assertThat(home.getExecutionSuggestion().getEntryZone()).isNull();
         assertThat(home.getExecutionSuggestion().getInvalidCondition()).isNull();
+    }
+
+    @Test
+    void exactPersistedBlockedPlanRemainsVisibleWhenAssetStateTraceHasAdvanced() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setExecutionPlanStatus("INCOMPLETE");
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setChainStatus("RULE_VALIDATION_BLOCKED");
+        plan.setFinalPlan(false);
+        plan.setValidationReasons("AI_TRIGGER_NOT_MET");
+        plan.setRuleVetoReason("AI_TRIGGER_NOT_MET");
+        plan.setRevalidationRule("等待新数据并重新分析通过规则校验");
+
+        AssetStateDO currentState = new AssetStateDO();
+        currentState.setSymbol("BTCUSDT");
+        currentState.setState(AssetStateEnum.OBSERVING);
+        currentState.setTraceId("trace-current-state");
+        when(assetStateMapper.selectBySymbol("BTCUSDT")).thenReturn(currentState);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(decision));
+
+        DashboardHomeVO.ExecutionSuggestionVO suggestion = service
+                .getHomeForUser(USER_ID, "BTCUSDT", 6)
+                .getExecutionSuggestion();
+
+        assertThat(suggestion.getStatus()).isEqualTo("PLAN_BLOCKED");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
+        assertThat(suggestion.getValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(suggestion.getBlockedReason()).contains("AI_TRIGGER_NOT_MET");
+        assertThat(suggestion.getRevalidationRule())
+                .isEqualTo("等待新数据并重新分析通过规则校验");
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
     }
 
     @Test

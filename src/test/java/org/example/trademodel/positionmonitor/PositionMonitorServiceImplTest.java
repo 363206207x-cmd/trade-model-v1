@@ -19,6 +19,7 @@ import org.example.trademodel.market.client.MarketQuoteClient;
 import org.example.trademodel.market.dto.MarketQuoteSnapshot;
 import org.example.trademodel.positionmonitorlog.PositionMonitorLogDTO;
 import org.example.trademodel.positionmonitorlog.RecordPositionMonitorLogCommand;
+import org.example.trademodel.providercall.snapshot.MarketPriceSnapshotService;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
 import org.example.trademodel.service.MacroEventService;
@@ -186,6 +187,36 @@ class PositionMonitorServiceImplTest {
         assertThat(result.getSide()).isEqualTo("SHORT");
         assertThat(result.isStopLossBreached()).isFalse();
         assertThat(result.isTakeProfitReached()).isFalse();
+    }
+
+    @Test
+    void markPriceFreshnessCoversTwoSchedulerIntervals() {
+        MarketPriceSnapshotService snapshotService = org.mockito.Mockito.mock(MarketPriceSnapshotService.class);
+        PositionMonitorServiceImpl freshnessService = new PositionMonitorServiceImpl(
+                userPositionMapper,
+                snapshotService,
+                userPositionRiskAdapter,
+                executionPlanMapper,
+                positionMonitorLogService,
+                evidenceItemMapper,
+                scoreItemMapper,
+                decisionResultMapper,
+                new ObjectMapper(),
+                analysisRunMapper,
+                null);
+        UserPositionDO position = position(202L, "LONG", "OPEN", null, "90", "120");
+        position.setSourceType("MANUAL_INDEPENDENT");
+        when(userPositionMapper.selectByIdAndUserId(202L, USER_ID)).thenReturn(position);
+        when(snapshotService.get(eq("BTCUSDT"), any(), any(), anyString()))
+                .thenThrow(new IllegalStateException("stop after freshness capture"));
+
+        assertThatThrownBy(() -> freshnessService.monitorUserPositionForUser(202L, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("QUOTE_UNAVAILABLE");
+
+        ArgumentCaptor<java.time.Duration> freshness = ArgumentCaptor.forClass(java.time.Duration.class);
+        verify(snapshotService).get(eq("BTCUSDT"), any(), freshness.capture(), anyString());
+        assertThat(freshness.getValue()).isEqualTo(java.time.Duration.ofSeconds(90));
     }
 
     @Test
