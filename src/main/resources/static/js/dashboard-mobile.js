@@ -969,9 +969,11 @@
     var root = document.querySelector("[data-ai-analysis-root]");
     if (!root) return;
     var safeAi = aiDecision || {};
-    var analysisId = card ? String(card.dataset.analysisId || "").trim() : "";
-    var symbol = card ? String(card.dataset.symbol || "").trim() : "";
-    var identityReady = !!analysisId && !!symbol;
+    var selectedSymbol = card ? String(card.dataset.symbol || "").trim() : "";
+    var symbol = String(safeAi.symbol || selectedSymbol).trim();
+    var analysisId = String(safeAi.analysisId || "").trim();
+    var decisionId = String(safeAi.decisionId || "").trim();
+    var identityReady = !!analysisId && !!decisionId && !!symbol && symbol === selectedSymbol;
     var runStatus = String(safeAi.runStatus || "").trim().toUpperCase();
     var failed = runStatus.indexOf("FAIL") >= 0 || runStatus.indexOf("ERROR") >= 0;
     var loading = runStatus === "LOADING" || runStatus === "PENDING";
@@ -984,6 +986,21 @@
     );
     var stateView = frontendContract.aiAnalysisStateView(analysisState);
     root.dataset.analysisState = analysisState;
+    setText("[data-ai-analysis-symbol]", symbol, "--");
+    setText("[data-ai-analysis-id]", analysisId, "待同步");
+    setText("[data-ai-decision-id]", decisionId, "待同步");
+    var detailLink = document.querySelector("[data-ai-analysis-detail-link]");
+    if (detailLink) {
+      if (identityReady) {
+        detailLink.href = "/dashboard/analysis-detail?analysisId="
+          + encodeURIComponent(analysisId)
+          + "&selectedSymbol=" + encodeURIComponent(symbol);
+        detailLink.removeAttribute("aria-disabled");
+      } else {
+        detailLink.removeAttribute("href");
+        detailLink.setAttribute("aria-disabled", "true");
+      }
+    }
     setText(
       "[data-ai-analysis-state-status]",
       analysisState === "partial" ? safeAi.runStatusLabel : stateView.statusLabel,

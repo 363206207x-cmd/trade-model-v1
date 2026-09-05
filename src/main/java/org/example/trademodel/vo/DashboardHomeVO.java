@@ -1427,6 +1427,9 @@ public class DashboardHomeVO {
     }
 
     public static class AiDecisionVO {
+        private String analysisId;
+        private String decisionId;
+        private String symbol;
         private String schemaVersion;
         private String runStatus;
         private String runStatusLabel;
@@ -1435,6 +1438,13 @@ public class DashboardHomeVO {
         private String activeTab = "GPT_FINAL";
         private List<AiTabVO> tabs = new ArrayList<>();
         private ConsistencyVO consistency = new ConsistencyVO();
+
+        public String getAnalysisId() { return analysisId; }
+        public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
+        public String getDecisionId() { return decisionId; }
+        public void setDecisionId(String decisionId) { this.decisionId = decisionId; }
+        public String getSymbol() { return symbol; }
+        public void setSymbol(String symbol) { this.symbol = symbol; }
 
         public String getRunStatus() { return runStatus; }
         public void setRunStatus(String runStatus) { this.runStatus = runStatus; }
@@ -1482,6 +1492,7 @@ public class DashboardHomeVO {
         private String role;
         private String roleLabel;
         private String analysisId;
+        private String decisionId;
         private String traceId;
         private String roleState;
         private String dataState;
@@ -1611,6 +1622,8 @@ public class DashboardHomeVO {
 
         public String getAnalysisId() { return analysisId; }
         public void setAnalysisId(String value) { this.analysisId = value; }
+        public String getDecisionId() { return decisionId; }
+        public void setDecisionId(String value) { this.decisionId = value; }
         public String getTraceId() { return traceId; }
         public void setTraceId(String value) { this.traceId = value; }
         public String getRoleState() { return roleState; }

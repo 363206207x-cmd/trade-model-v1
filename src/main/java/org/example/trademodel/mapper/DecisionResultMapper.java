@@ -112,6 +112,31 @@ public interface DecisionResultMapper {
             """)
     DecisionResultVO findLatestDecisionResultBySymbolJoined(@Param("normalizedSymbol") String normalizedSymbol);
 
+    @Select("""
+            SELECT d.decision_id AS decisionId,
+                   d.analysis_id AS analysisId,
+                   d.symbol AS symbol,
+                   d.ai_role_results AS aiRoleResults,
+                   d.create_time AS createTime
+            FROM tm_decision_result d
+            INNER JOIN tm_analysis_run ar ON ar.analysis_id = d.analysis_id
+            WHERE ar.status = 'SUCCESS'
+              AND ar.preview = TRUE
+              AND ar.analysis_mode = 'ANALYSIS_PREVIEW'
+              AND ar.owner_type = 'USER'
+              AND ar.owner_id = #{userId}
+              AND UPPER(TRIM(ar.symbol)) = #{normalizedSymbol}
+              AND UPPER(TRIM(d.symbol)) = #{normalizedSymbol}
+              AND d.ai_role_results IS NOT NULL
+            ORDER BY COALESCE(ar.completed_at, ar.updated_at, ar.created_at) DESC,
+                     d.create_time DESC,
+                     d.decision_id DESC
+            LIMIT 1
+            """)
+    DecisionResultVO findLatestSuccessfulPreviewForUserAndSymbol(
+            @Param("userId") Long userId,
+            @Param("normalizedSymbol") String normalizedSymbol);
+
     @Select({
             "<script>",
             "SELECT d.decision_id AS decisionId, d.analysis_id AS analysisId, d.symbol AS symbol,",
