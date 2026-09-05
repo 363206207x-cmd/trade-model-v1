@@ -614,6 +614,20 @@
         return "尚无完成记录";
     }
 
+    function providerReadinessText(home) {
+        var providers = home && home.diagnostics && home.diagnostics.providerReadiness?.providers;
+        var active = (Array.isArray(providers) ? providers : []).filter(function (provider) {
+            return provider && (provider.enabled === true || provider.connected === true);
+        });
+        if (!active.length) return "当前不可查看";
+        return active.map(function (provider) {
+            var name = text(provider.name, "未知 Provider");
+            var status = label(provider.status, text(provider.status, "状态未知"));
+            var reason = text(provider.reason, "未提供原因");
+            return name + " · " + status + " · " + reason;
+        }).join("；");
+    }
+
     async function openHomeStatus(trigger) {
         var dialog = document.getElementById("homeStatusDialog");
         var target = document.getElementById("homeStatusDetail");
@@ -630,7 +644,8 @@
             ["下次计划扫描", time(header.nextScheduledScanAt)],
             ["上次扫描结果", label(header.lastScanResult, "尚无完成记录")],
             ["上次失败原因", label(header.lastScanFailureReason, "无失败记录")],
-            ["数据来源", label(header.dataSourceText, "当前不可查看")]
+            ["数据来源", label(header.dataSourceText, "当前不可查看")],
+            ["服务明细", providerReadinessText(currentHome)]
         ]);
         try {
             var response = await fetch("/api/system/runtime-readiness-guardrail-status", {
@@ -649,7 +664,8 @@
                 ["下次计划扫描", time(header.nextScheduledScanAt)],
                 ["上次扫描结果", label(header.lastScanResult, "尚无完成记录")],
                 ["上次失败原因", label(header.lastScanFailureReason, "无失败记录")],
-                ["数据来源", label(header.dataSourceText, "当前不可查看")]
+                ["数据来源", label(header.dataSourceText, "当前不可查看")],
+                ["服务明细", providerReadinessText(currentHome)]
             ]) + '<div class="status-recovery-copy"><strong>恢复条件</strong><p>请先确认数据库、调度心跳和数据源恢复，再由 Owner 手动重试。此面板不执行恢复动作。</p></div>';
         } catch (_) {
             target.innerHTML = '<div class="status-recovery-copy"><strong>系统状态当前不可查看</strong><p>未返回可信运行状态；不会自动触发任何恢复动作。</p></div>';
