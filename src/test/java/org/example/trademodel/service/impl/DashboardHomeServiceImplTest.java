@@ -3011,6 +3011,41 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void downstreamAiRolesExplainWhenTheGptDependencyWasNotStarted() {
+        DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 80, 72,
+                "LEVEL_3_DIVERGENCE", true, "{\"state\":\"CANDIDATE\"}");
+        AiProviderReviewResult budgetBlocked = role(
+                AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW,
+                AiReviewStance.SUPPORT, "DAILY_BUDGET_EXCEEDED", "");
+        budgetBlocked.setCallStatus(AiProviderCallStatus.BUDGET_BLOCKED);
+        budgetBlocked.setFallback(true);
+        budgetBlocked.setFallbackReason("DAILY_BUDGET_EXCEEDED");
+        AiProviderReviewResult geminiNotStarted = role(
+                AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW,
+                AiReviewStance.ABSTAIN, "GPT_DEPENDENCY_FAILED", "");
+        geminiNotStarted.setCallStatus(AiProviderCallStatus.FAILED);
+        geminiNotStarted.setFallback(true);
+        geminiNotStarted.setFallbackReason("GPT_DEPENDENCY_FAILED");
+        AiProviderReviewResult grokNotStarted = role(
+                AiProviderName.XAI, AiProviderRole.GROK_ADVERSARIAL_CHALLENGE,
+                AiReviewStance.ABSTAIN, "GPT_DEPENDENCY_FAILED", "");
+        grokNotStarted.setCallStatus(AiProviderCallStatus.FAILED);
+        grokNotStarted.setFallback(true);
+        grokNotStarted.setFallbackReason("GPT_DEPENDENCY_FAILED");
+        decision.setAiRoleResults(structuredAiRoleResults(List.of(
+                budgetBlocked, geminiNotStarted, grokNotStarted), null));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6);
+
+        assertThat(aiTab(home, "GPT_FINAL").getStatusMessage()).isEqualTo("今日AI额度已用完");
+        assertThat(aiTab(home, "GEMINI_REVIEW").getStatusMessage())
+                .isEqualTo("上游 GPT 分析未完成，当前角色未运行");
+        assertThat(aiTab(home, "GROK_CHALLENGE").getStatusMessage())
+                .isEqualTo("上游 GPT 分析未完成，当前角色未运行");
+    }
+
+    @Test
     void successfulAbstainDoesNotExposeFinalDirection() {
         DecisionResultVO decision = decision("BTCUSDT", "BULLISH", "HIGH", "HIGH", 88, 25,
                 "LEVEL_2_REVIEW", true, "{\"state\":\"CANDIDATE\"}");

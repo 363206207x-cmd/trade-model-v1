@@ -4127,6 +4127,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && "DAILY_BUDGET_EXCEEDED".equals(upper(reason))) {
             return "今日AI额度已用完";
         }
+        if ("FAILED".equals(upper(status))
+                && "GPT_DEPENDENCY_FAILED".equals(upper(reason))) {
+            return "上游 GPT 分析未完成，当前角色未运行";
+        }
         return switch (upper(status)) {
             case "SUCCESS" -> "根据角色结果展示";
             case "DISABLED" -> "AI 复核未启用";
