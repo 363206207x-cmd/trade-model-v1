@@ -780,6 +780,64 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void latestOwnerAssetPreviewPopulatesOnlyAiPanelWithOneCoherentRunIdentity() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        DecisionResultVO naturalDecision = decision("BTCUSDT", "BULLISH", "HIGH", "MEDIUM", 93, 0,
+                "LEVEL_1_CONSISTENT", false, "{\"state\":\"HIGH_RISK\"}");
+        naturalDecision.setAnalysisId("analysis-natural-btc");
+        naturalDecision.setDecisionId("decision-natural-btc");
+        HomeTopAssetProjection projection = projection(101L, naturalDecision, 80,
+                "opportunity-natural-btc", "CANDIDATE");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(projection));
+        AnalysisRunDO naturalRun = formalSchedulerRun(naturalDecision.getAnalysisId(), "BTCUSDT", 101L);
+        when(analysisRunMapper.selectById(naturalDecision.getAnalysisId())).thenReturn(naturalRun);
+        when(analysisRunMapper.selectReadableByUser(naturalDecision.getAnalysisId(), USER_ID))
+                .thenReturn(naturalRun);
+
+        DecisionResultVO previewDecision = decisionWithStructuredAiRoles();
+        previewDecision.setAnalysisId("analysis-dashboard-ai");
+        previewDecision.setDecisionId("decision-preview-btc");
+        previewDecision.setSymbol("BTCUSDT");
+        when(decisionResultMapper.findLatestSuccessfulPreviewForUserAndSymbol(USER_ID, "BTCUSDT"))
+                .thenReturn(previewDecision);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getSelectedAssetContext().getAnalysisId()).isEqualTo("analysis-natural-btc");
+        assertThat(home.getSelectedAssetContext().getDecisionId()).isEqualTo("decision-natural-btc");
+        assertThat(home.getAiDecision().getAnalysisId()).isEqualTo("analysis-dashboard-ai");
+        assertThat(home.getAiDecision().getDecisionId()).isEqualTo("decision-preview-btc");
+        assertThat(home.getAiDecision().getSymbol()).isEqualTo("BTCUSDT");
+        assertThat(home.getAiDecision().getTabs())
+                .extracting(DashboardHomeVO.AiTabVO::getAnalysisId)
+                .containsExactly("analysis-dashboard-ai", "analysis-dashboard-ai", "analysis-dashboard-ai");
+        assertThat(home.getAiDecision().getTabs())
+                .extracting(DashboardHomeVO.AiTabVO::getDecisionId)
+                .containsExactly("decision-preview-btc", "decision-preview-btc", "decision-preview-btc");
+    }
+
+    @Test
+    void crossRunPreviewPayloadCannotReplaceSelectedAssetsNaturalAiContext() {
+        DecisionResultVO naturalDecision = decisionWithStructuredAiRoles();
+        naturalDecision.setAnalysisId("analysis-natural-btc");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt()))
+                .thenReturn(List.of(naturalDecision));
+
+        DecisionResultVO mismatchedPreview = decisionWithStructuredAiRoles();
+        mismatchedPreview.setAnalysisId("analysis-other-run");
+        mismatchedPreview.setDecisionId("decision-other-run");
+        when(decisionResultMapper.findLatestSuccessfulPreviewForUserAndSymbol(USER_ID, "BTCUSDT"))
+                .thenReturn(mismatchedPreview);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getAiDecision().getAnalysisId()).isEqualTo("analysis-natural-btc");
+        assertThat(home.getAiDecision().getDecisionId()).isEqualTo(naturalDecision.getDecisionId());
+    }
+
+    @Test
     void highRiskRankingProjectionShowsItsBlockedPlanResultWithoutExecutableFields() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);

@@ -354,7 +354,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
-        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(selectedDecision);
+        DecisionResultVO aiDecisionSource = latestCoherentAiPreview(userId, normalizedSelected, selectedDecision);
+        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(aiDecisionSource);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         Instant globalDataUpdatedAt = latestPersistedClosedBarAt();
         DashboardHomeVO home = new DashboardHomeVO();
@@ -2996,6 +2997,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private DashboardHomeVO.AiDecisionVO buildAiDecision(DecisionResultVO decision) {
         DashboardHomeVO.AiDecisionVO ai = new DashboardHomeVO.AiDecisionVO();
+        ai.setAnalysisId(decision != null ? trimToNull(decision.getAnalysisId()) : null);
+        ai.setDecisionId(decision != null ? trimToNull(decision.getDecisionId()) : null);
+        ai.setSymbol(decision != null ? normalizeSymbol(decision.getSymbol()) : null);
         ai.setActiveTab("GPT_FINAL");
         AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(
                 decision != null ? decision.getAiRoleResults() : null);
@@ -3014,7 +3018,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.AiTabVO> tabs = new ArrayList<>();
         for (String role : AI_ROLES) {
             AiRoleResultsPayload.RolePayload rolePayload = payload != null ? payload.roles().get(role) : null;
-            tabs.add(buildAiTab(role, rolePayload, synthesis));
+            DashboardHomeVO.AiTabVO tab = buildAiTab(role, rolePayload, synthesis);
+            tab.setDecisionId(decision != null ? trimToNull(decision.getDecisionId()) : null);
+            tabs.add(tab);
         }
         ai.setTabs(tabs);
         DashboardHomeVO.ConsistencyVO consistency = new DashboardHomeVO.ConsistencyVO();
@@ -3044,6 +3050,40 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 ? trimToNull(synthesis.recoveryCondition()) : null);
         ai.setConsistency(consistency);
         return ai;
+    }
+
+    private DecisionResultVO latestCoherentAiPreview(Long userId,
+                                                     String normalizedSymbol,
+                                                     DecisionResultVO fallback) {
+        if (userId == null || userId <= 0 || !hasText(normalizedSymbol) || decisionResultMapper == null) {
+            return fallback;
+        }
+        try {
+            DecisionResultVO preview = decisionResultMapper
+                    .findLatestSuccessfulPreviewForUserAndSymbol(userId, normalizedSymbol);
+            return coherentAiPreview(preview, normalizedSymbol) ? preview : fallback;
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private boolean coherentAiPreview(DecisionResultVO preview, String normalizedSymbol) {
+        if (preview == null
+                || !hasText(preview.getAnalysisId())
+                || !hasText(preview.getDecisionId())
+                || !normalizedSymbol.equals(normalizeSymbol(preview.getSymbol()))) {
+            return false;
+        }
+        AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(preview.getAiRoleResults());
+        if (!parsed.current() || parsed.payload() == null
+                || !preview.getAnalysisId().equals(trimToNull(parsed.payload().analysisId()))) {
+            return false;
+        }
+        return AI_ROLES.stream().allMatch(role -> {
+            AiRoleResultsPayload.RolePayload rolePayload = parsed.payload().roles().get(role);
+            return rolePayload != null
+                    && preview.getAnalysisId().equals(trimToNull(rolePayload.analysisId()));
+        });
     }
 
     private DashboardHomeVO.AiTabVO buildAiTab(String role,

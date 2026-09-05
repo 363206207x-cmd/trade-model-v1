@@ -804,13 +804,10 @@
         else if (activeRole === "GEMINI_REVIEW") roleContent = renderGemini(role);
         else roleContent = renderGrok(role);
         panel.innerHTML = roleContent;
-        var selectedAsset = (Array.isArray(home.assets) ? home.assets : []).find(function (item) {
-            return symbolOf(item) === symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
-        }) || {};
-        var provenance = assetProvenance(selectedAsset);
-        var provenanceCopy = "Analysis " + shortId(provenance.analysisId) + " · Decision " + shortId(provenance.decisionId)
-            + " · Trace " + shortId(provenance.traceId) + " · 方向计算 " + time(provenance.directionCalculatedAt)
-            + " · 行情截止 " + time(provenance.marketDataAsOf);
+        var provenanceCopy = "AI Analysis " + shortId((role && role.analysisId) || ai.analysisId)
+            + " · Decision " + shortId((role && role.decisionId) || ai.decisionId)
+            + " · Trace " + shortId(role && role.traceId)
+            + " · 生成时间 " + time(role && role.generatedAt);
         setText("aiMetadata", (role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 模型来源 " + text(role.provider, "当前不可查看") + " · " : "") + provenanceCopy);
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
