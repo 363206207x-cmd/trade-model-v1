@@ -378,10 +378,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        DecisionResultVO executionDecision = (selectedProjection != null
-                && selectedProjection.sourceDecision() == null)
-                || (selectedProjection != null
-                && "HIGH_RISK".equalsIgnoreCase(selectedProjection.opportunityState()))
+        DecisionResultVO executionDecision = selectedProjection != null
+                && selectedProjection.sourceDecision() == null
                 ? null : selectedDecision;
         DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(executionDecision);
         home.setExecutionSuggestion(executionSuggestion);
@@ -2554,11 +2552,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "已进入冲突状态，等待人工复核");
             return suggestion;
         }
-        if (directionalPushBlocked(decision)) {
-            blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前暂无完整执行计划",
-                    "方向结论已阻断，等待重新分析");
-            return suggestion;
-        }
         if (!hasText(decision.getDecisionId())) {
             blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
                     "决策缺少精确身份，不能关联执行计划");
@@ -2580,7 +2573,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 executionPlan,
                 LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
         if (planState != PersistedPlanState.ACTIVE) {
-            blockPersistedAssetPlan(suggestion, executionPlan, planState);
+            if (planState == PersistedPlanState.BLOCKED && directionalPushBlocked(decision)) {
+                String persistedReason = firstPlanReason(executionPlan);
+                blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前执行计划已阻断",
+                        persistedReason == null ? "方向结论已阻断，等待重新分析" : persistedReason);
+            } else {
+                blockPersistedAssetPlan(suggestion, executionPlan, planState);
+            }
+            applyPersistedPlanAudit(suggestion, assetPlan, executionPlan);
+            return suggestion;
+        }
+        if (directionalPushBlocked(decision)) {
+            blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前执行计划已阻断",
+                    "方向结论已阻断，等待重新分析");
             applyPersistedPlanAudit(suggestion, assetPlan, executionPlan);
             return suggestion;
         }
@@ -3018,7 +3023,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 || "PARTIAL".equalsIgnoreCase(rolePayload.roleState()))
                 && "SUCCESS".equalsIgnoreCase(callStatus);
         tab.setResultAvailable(resultAvailable);
-        tab.setStatusMessage(aiRoleStatusMessage(callStatus));
+        tab.setStatusMessage(aiRoleStatusMessage(callStatus, rolePayload.fallbackReason()));
         tab.setStance(trimToNull(rolePayload.stance()));
         if (resultAvailable) {
             populateLegacyJavaProjection(tab, role, rolePayload);
@@ -4012,6 +4017,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String aiRoleStatusMessage(String status) {
+        return aiRoleStatusMessage(status, null);
+    }
+
+    private String aiRoleStatusMessage(String status, String reason) {
+        if ("BUDGET_BLOCKED".equals(upper(status))
+                && "DAILY_BUDGET_EXCEEDED".equals(upper(reason))) {
+            return "今日AI额度已用完";
+        }
         return switch (upper(status)) {
             case "SUCCESS" -> "根据角色结果展示";
             case "DISABLED" -> "AI 复核未启用";

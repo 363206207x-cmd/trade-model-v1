@@ -1,6 +1,7 @@
 package org.example.trademodel.mapper;
 
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -8,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.example.trademodel.entity.PositionMonitorLogDO;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface PositionMonitorLogMapper {
@@ -76,6 +78,9 @@ public interface PositionMonitorLogMapper {
 
     @Select(BASE_SELECT + "WHERE monitor_run_key = #{monitorRunKey}")
     PositionMonitorLogDO selectByMonitorRunKey(@Param("monitorRunKey") String monitorRunKey);
+
+    @Delete("DELETE FROM tm_position_monitor_log WHERE created_at < #{cutoff}")
+    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 
     @Select(BASE_SELECT + "WHERE log_id = #{logId}")
     PositionMonitorLogDO selectById(@Param("logId") Long logId);

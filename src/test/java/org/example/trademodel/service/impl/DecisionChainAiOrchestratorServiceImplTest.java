@@ -1,5 +1,8 @@
 package org.example.trademodel.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.trademodel.ai.AiDecisionChainPromptBuilder;
 import org.example.trademodel.ai.AiDecisionChainRequest;
 import org.example.trademodel.ai.AiDecisionChainResult;
 import org.example.trademodel.ai.AiDecisionChainRole;
@@ -35,6 +38,28 @@ import static org.mockito.Mockito.when;
 
 @Tag("core-regression")
 class DecisionChainAiOrchestratorServiceImplTest {
+
+    @Test
+    void promptPublishesExactEvidenceReferencesAndDeterministicCollectionRules() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AiDecisionChainPromptBuilder builder = new AiDecisionChainPromptBuilder(
+                objectMapper, new AiOrchestratorProperties());
+        AiDecisionChainRequest request = request(AiDecisionChainRole.GEMINI_REVIEW);
+        request.setInput(Map.of("evidence", List.of(Map.of(
+                "evidenceId", "evidence-1",
+                "source", "BINANCE",
+                "sourceReference", "market://BTCUSDT/5m",
+                "sourceTraceId", "trace-market-1"))));
+
+        JsonNode root = objectMapper.readTree(builder.build(request).dataJson());
+
+        assertThat(root.path("allowedEvidenceReferences").toString())
+                .contains("evidence-1", "BINANCE", "market://BTCUSDT/5m", "trace-market-1");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GEMINI_REVIEW))
+                .contains("allowedEvidenceReferences", "FOUND only when");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GROK_CHALLENGE))
+                .contains("allowedEvidenceReferences", "FOUND only when", "at most one item");
+    }
 
     @Test
     void eachDecisionRoleIsRoutedOnlyToItsAuthorizedProviderRoleAndAudited() {

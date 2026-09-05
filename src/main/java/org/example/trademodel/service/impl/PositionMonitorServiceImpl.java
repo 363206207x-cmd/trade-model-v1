@@ -468,7 +468,10 @@ public class PositionMonitorServiceImpl implements PositionMonitorService {
     }
 
     private static String monitorRunKey(Long positionId, LocalDateTime observedAt) {
-        LocalDateTime bucket = observedAt == null ? null : observedAt.truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        LocalDateTime bucket = observedAt == null ? null : observedAt
+                .withMinute(observedAt.getMinute() - Math.floorMod(observedAt.getMinute(), 5))
+                .withSecond(0)
+                .withNano(0);
         return "position-monitor:" + positionId + ":" + bucket;
     }
 

@@ -19,21 +19,27 @@ import org.example.trademodel.userposition.UserPositionConflictException;
 import org.example.trademodel.userposition.UserPositionNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class PositionMonitorLogServiceImpl implements org.example.trademodel.service.PositionMonitorLogService {
+    private static final Logger log = LoggerFactory.getLogger(PositionMonitorLogServiceImpl.class);
     static final int DEFAULT_LIMIT = 20;
     static final int MAX_LIMIT = 100;
     static final int MAX_SNAPSHOT_LENGTH = 8000;
+    static final int MONITOR_LOG_RETENTION_DAYS = 30;
 
     private final PositionMonitorLogMapper positionMonitorLogMapper;
     private final UserPositionMapper userPositionMapper;
+    private final AtomicReference<LocalDateTime> nextRetentionSweep = new AtomicReference<>();
 
     public PositionMonitorLogServiceImpl(PositionMonitorLogMapper positionMonitorLogMapper,
                                          UserPositionMapper userPositionMapper) {
@@ -191,13 +197,33 @@ public class PositionMonitorLogServiceImpl implements org.example.trademodel.ser
                 if (canonical == null || !positionId.equals(canonical.getPositionId())) {
                     throw new IllegalStateException("PositionMonitorLog idempotency claim mismatch");
                 }
+                purgeExpiredMonitorLogs(recordedAt);
                 return toDto(canonical);
             }
         }
         if (inserted != 1) {
             throw new IllegalStateException("PositionMonitorLog insert failed");
         }
+        purgeExpiredMonitorLogs(recordedAt);
         return toDto(row);
+    }
+
+    private void purgeExpiredMonitorLogs(LocalDateTime now) {
+        LocalDateTime next = nextRetentionSweep.get();
+        if (next != null && now.isBefore(next)) {
+            return;
+        }
+        LocalDateTime scheduledNext = now.plusHours(1);
+        if (!nextRetentionSweep.compareAndSet(next, scheduledNext)) {
+            return;
+        }
+        try {
+            positionMonitorLogMapper.deleteOlderThan(now.minusDays(MONITOR_LOG_RETENTION_DAYS));
+        } catch (RuntimeException failure) {
+            nextRetentionSweep.set(now.plusMinutes(5));
+            log.warn("[position-monitor-retention] cleanup deferred: {}",
+                    failure.getClass().getSimpleName());
+        }
     }
 
     @Override

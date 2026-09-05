@@ -86,6 +86,9 @@ class PositionMonitorLogServiceImplTest {
         assertThat(dto.getLogId()).isEqualTo(101L);
         assertSafetyFields(dto);
         assertForbiddenActionFieldsAbsent();
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(positionMonitorLogMapper).deleteOlderThan(cutoff.capture());
+        assertThat(cutoff.getValue()).isBefore(LocalDateTime.now().minusDays(29));
     }
 
     @Test

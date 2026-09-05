@@ -113,9 +113,21 @@ class InteractionAuditConsolidatedRemediationContractTest {
         String homeScript = Files.readString(HOME_SCRIPT);
         String workspaceScript = Files.readString(SCRIPT);
 
-        assertThat(homeScript).contains("sessionStorage", "analysis-preview:", "submissionId", "taskId");
+        assertThat(homeScript).contains(
+                "sessionStorage", "analysis-preview:", "submissionId", "taskId",
+                "function openOrResumeAssetAnalysis(asset)",
+                "analysisPreviewSubmission(symbol, analysisId)",
+                "recoverAnalysisPreviewTask(result.taskId)");
         assertThat(workspaceScript).contains("sessionStorage", "analysis-preview:", "submissionId",
                 "taskId", "/api/workspace/tasks?limit=30");
+        assertThat(Files.readString(MOBILE_HOME)).contains(
+                "meta name=\"_csrf\"", "启动或恢复该资产唯一分析任务", "三 AI 结果");
+        assertThat(Files.readString(MOBILE_HOME_SCRIPT)).contains(
+                "mobileAnalysisSubmission(symbol, sourceAnalysisId)",
+                "openOrResumeMobileAssetAnalysis(card)",
+                "recoverMobileAnalysisTask(result.taskId)",
+                "/analysis-preview?timeframe=5m&submissionId=",
+                "launchAnalysis === true");
         assertThat(homeScript).contains("clearAnalysisPreview(previewSymbol)");
         assertThat(workspaceScript).contains("clearAnalysisPreview(snapshot?.symbol || analysisSelectedAsset?.symbol)");
     }
