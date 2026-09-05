@@ -235,6 +235,29 @@ class DecisionChainServiceImplTest {
     }
 
     @Test
+    void readyRangeRuleResultKeepsNeutralDirectionAndCalculatedConfidenceWithoutCallingAi() {
+        DecisionChainBuildInput input = input();
+        input.decision().setMarketBiasHierarchy("RANGE");
+        input.decision().setRuleMarketBias("RANGE");
+        input.decision().setValidatedMarketBias(null);
+        input.decision().setIsWorthOpening(false);
+        when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);
+        when(assetStateService.transition(
+                any(OpportunityStateIdentity.class), any(), anyInt(), anyInt(), any(), any(),
+                anyString(), anyString(), any()))
+                .thenReturn(opportunity(AssetStateEnum.OBSERVING, "BLOCKED"));
+
+        DecisionChainBuildResult result = service.build(input);
+
+        assertThat(input.decision().getMarketBiasHierarchy()).isEqualTo("RANGE");
+        assertThat(input.decision().getFinalConfidence()).isNotNull();
+        assertThat(input.decision().getFinalMarketBias()).isNull();
+        assertThat(input.decision().getFinalPlanMode()).isEqualTo("BLOCKED");
+        assertThat(result.finalPlan().getRuleValidationStatus()).isEqualTo("BLOCKED");
+        verify(aiOrchestratorService, never()).invoke(any());
+    }
+
+    @Test
     void geminiAndGrokStartOnlyAfterGptAndConsumeSameImmutableCandidateSnapshotInParallel()
             throws Exception {
         when(assetPoolService.isOpportunitySource("SYSTEM", 0L, 1L, "BTCUSDT")).thenReturn(true);

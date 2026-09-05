@@ -1430,10 +1430,12 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void pendingManualMonitorProjectsOnlyFreshBasePriceWithoutLeakingUnverifiedJudgment() {
+    void pendingManualMonitorProjectsFreshBasePriceWithConservativePriceOnlyRiskJudgment() {
         UserPositionVO position = activeManualPosition(901L, "BTCUSDT", null);
         position.setEntryPrice(new BigDecimal("100"));
         position.setQuantity(new BigDecimal("2"));
+        position.setLeverage(new BigDecimal("10"));
+        position.setStopLoss(null);
         PositionMonitorLogDTO monitor = new PositionMonitorLogDTO();
         monitor.setPositionId(position.getId());
         monitor.setCurrentPrice(new BigDecimal("110"));
@@ -1453,13 +1455,16 @@ class DashboardHomeServiceImplTest {
         assertThat(row.getMarkPriceFresh()).isTrue();
         assertThat(row.getMonitorTrustState()).isEqualTo("BASE_PRICE_VERIFIED_OPTIONAL_CONTEXT_PENDING");
         assertThat(row.getDataState()).isEqualTo("PARTIAL");
-        assertThat(row.getRiskLevel()).isNull();
-        assertThat(row.getMonitorConclusion()).isNull();
-        assertThat(row.getSuggestedAction()).isNull();
+        assertThat(row.getRiskLevel()).isEqualTo("HIGH");
+        assertThat(row.getMonitorConclusion()).isEqualTo("HIGH_RISK_OBSERVATION");
+        assertThat(row.getMonitorConclusionLabel()).isEqualTo("基础价格显示当前持仓风险偏高");
+        assertThat(row.getSuggestedAction()).isEqualTo("WAIT_CONFIRMATION");
+        assertThat(row.getSuggestedManualActionText()).isEqualTo("请人工复核持仓；系统不会自动交易");
+        assertThat(row.getLastMonitorAt()).isEqualTo(monitor.getObservedAt());
         assertThat(home.getPositionMonitoringState()).isEqualTo("PARTIAL_COVERAGE");
         assertThat(home.getSystemState().getAccountStatus().getValueLabel())
-                .isEqualTo("1 笔 · 待评估");
-        assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("UNKNOWN");
+                .isEqualTo("1 笔 · 高风险");
+        assertThat(home.getDiagnostics().getAccountRiskCoverageState()).isEqualTo("PARTIAL_COVERAGE");
     }
 
     @Test
@@ -1621,7 +1626,7 @@ class DashboardHomeServiceImplTest {
         assertThat(row.getSystemSuggestedStopLoss()).isNull();
         assertThat(row.getSystemSuggestedTakeProfit()).isNull();
         assertThat(row.getOpenedAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 0));
-        assertThat(row.getLastMonitorAt()).isEqualTo(LocalDateTime.of(2026, 7, 13, 10, 5));
+        assertThat(row.getLastMonitorAt()).isEqualTo(monitorLog.getObservedAt());
         assertThat(row.getNextMonitorAt()).isNull();
     }
 
