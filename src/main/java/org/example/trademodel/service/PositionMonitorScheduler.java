@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Component
 public class PositionMonitorScheduler {
@@ -44,6 +47,9 @@ public class PositionMonitorScheduler {
             log.info("[position-monitor-scheduler] batch completed total={} success={} failure={} blocked={}",
                     batch.getTotalCount(), batch.getSuccessCount(),
                     batch.getFailureCount(), batch.getBlockedCount());
+            if (batch.getFailureCount() > 0) {
+                log.warn("[position-monitor-scheduler] failure summary={}", failureReasonSummary(batch));
+            }
         } catch (RuntimeException ex) {
             log.warn("[position-monitor-scheduler] batch skipped: {}", ex.getMessage());
         }
@@ -83,5 +89,28 @@ public class PositionMonitorScheduler {
 
     boolean scheduledExecutionEnabled() {
         return schedulersEnabled && positionMonitorSchedulerEnabled;
+    }
+
+    static String failureReasonSummary(PositionMonitorBatchResultDTO batch) {
+        if (batch == null || batch.getFailures().isEmpty()) {
+            return "NONE";
+        }
+        Map<String, Long> counts = batch.getFailures().stream()
+                .collect(Collectors.groupingBy(
+                        failure -> sanitizedReason(failure == null ? null : failure.getReason()),
+                        TreeMap::new,
+                        Collectors.counting()));
+        return counts.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining(","));
+    }
+
+    private static String sanitizedReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "UNKNOWN";
+        }
+        String token = reason.trim().toUpperCase(java.util.Locale.ROOT)
+                .replaceAll("[^A-Z0-9:_-]", "_");
+        return token.length() <= 120 ? token : token.substring(0, 120);
     }
 }

@@ -43,14 +43,21 @@ class PositionMonitorSchedulerTest {
         batch.setSuccessCount(0);
         batch.setFailureCount(28);
         batch.setBlockedCount(0);
+        batch.setFailures(java.util.List.of(
+                new PositionMonitorBatchResultDTO.FailureItem(31L, "ETH", "QUOTE_UNAVAILABLE"),
+                new PositionMonitorBatchResultDTO.FailureItem(32L, "ETH", "QUOTE_UNAVAILABLE"),
+                new PositionMonitorBatchResultDTO.FailureItem(33L, "BTC", "POSITION_MONITOR_FAILED:IllegalStateException")));
         when(service.monitorClaimedOpenPositionsForSystem()).thenReturn(batch);
         PositionMonitorScheduler scheduler = new PositionMonitorScheduler(service, true, true);
 
         scheduler.monitorOpenUserPositionsScheduled();
 
         assertThat(output).contains("batch completed total=28 success=0 failure=28 blocked=0")
+                .contains("failure summary=POSITION_MONITOR_FAILED:ILLEGALSTATEEXCEPTION=1,QUOTE_UNAVAILABLE=2")
                 .doesNotContain("positionId=")
-                .doesNotContain("assetSymbol=");
+                .doesNotContain("assetSymbol=")
+                .doesNotContain("ETH")
+                .doesNotContain("BTC");
     }
 
     @Test
