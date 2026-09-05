@@ -68,6 +68,7 @@ class InteractionAuditConsolidatedRemediationContractTest {
                 "openHomeStatus", "/api/system/runtime-readiness-guardrail-status",
                 "调度心跳", "上次成功完成", "下次计划扫描", "恢复条件",
                 "providerReadinessText", "服务明细", ".providerReadiness?.providers",
+                "CONNECTED: \"已连接\"", "FAIL_CLOSED: \"已阻断\"",
                 "此面板不执行恢复动作")
                 .doesNotContain("hot-reset", "restart", "triggerScan");
     }
