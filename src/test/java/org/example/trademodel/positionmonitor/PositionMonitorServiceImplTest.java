@@ -620,14 +620,14 @@ class PositionMonitorServiceImplTest {
 
         UserPositionDO invalidQuote = position(19L, "LONG", "OPEN", "plan-invalid-price", "90", "120");
         when(userPositionMapper.selectByIdAndUserId(19L, USER_ID)).thenReturn(invalidQuote);
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("0")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("0")));
         assertThatThrownBy(() -> service.monitorUserPositionForUser(19L, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("INVALID_MARKET_PRICE");
 
         UserPositionDO unavailableQuote = position(20L, "LONG", "OPEN", "plan-no-quote", "90", "120");
         when(userPositionMapper.selectByIdAndUserId(20L, USER_ID)).thenReturn(unavailableQuote);
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.empty());
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.monitorUserPositionForUser(20L, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("QUOTE_UNAVAILABLE");
@@ -640,11 +640,11 @@ class PositionMonitorServiceImplTest {
         UserPositionDO open = position(21L, "LONG", "OPEN", "plan-batch-open", "90", "120");
         UserPositionDO partial = position(22L, "SHORT", "PARTIALLY_CLOSED", "plan-batch-partial", "110", "80");
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(open, partial));
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk("LOW", false));
         when(executionPlanMapper.selectByPlanId("plan-batch-open"))
                 .thenReturn(plan("plan-batch-open", "ana-21", "VALID", true));
-        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.empty());
+        when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.empty());
 
         PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
 
@@ -672,8 +672,8 @@ class PositionMonitorServiceImplTest {
         ownerB.setLeverage(new BigDecimal("25"));
 
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(ownerA, ownerB));
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
-        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.of(quote("100")));
         when(executionPlanMapper.selectByPlanId("plan-owner-a"))
                 .thenReturn(plan("plan-owner-a", "ana-owner-a", "VALID", true));
         when(executionPlanMapper.selectByPlanId("plan-owner-b"))
@@ -707,8 +707,8 @@ class PositionMonitorServiceImplTest {
         next.setUserId(202L);
         next.setAssetSymbol("ETH");
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(staleClosed, next));
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
-        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.of(quote("100")));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(risk("LOW", false));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(202L)).thenReturn(risk("LOW", false));
         doThrow(new UserPositionConflictException("CLOSED UserPosition cannot record new monitor run logs"))
@@ -737,8 +737,8 @@ class PositionMonitorServiceImplTest {
         next.setUserId(202L);
         next.setAssetSymbol("ETH");
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(failed, next));
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("100")));
-        when(marketQuoteClient.fetch24hTicker("ETH")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("100")));
+        when(marketQuoteClient.fetch24hTicker("ETHUSDT")).thenReturn(Optional.of(quote("100")));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(101L)).thenReturn(risk("LOW", false));
         when(executionPlanMapper.selectByPlanId("plan-runtime-failure"))
                 .thenReturn(plan("plan-runtime-failure", "ana-27", "VALID", true));
@@ -786,7 +786,7 @@ class PositionMonitorServiceImplTest {
     void systemBatchKeepsManualIndependentBaseMonitoringWhenOptionalWindowsAreStale() {
         UserPositionDO position = position(30L, "LONG", "OPEN", null, "90", "120");
         when(userPositionMapper.listClaimedOpenForSystemMonitoring()).thenReturn(List.of(position));
-        when(marketQuoteClient.fetch24hTicker("BTC")).thenReturn(Optional.of(quote("102.5")));
+        when(marketQuoteClient.fetch24hTicker("BTCUSDT")).thenReturn(Optional.of(quote("102.5")));
 
         PositionMonitorBatchResultDTO batch = service.monitorClaimedOpenPositionsForSystem();
 
@@ -800,6 +800,7 @@ class PositionMonitorServiceImplTest {
         verify(persistedOhlcvQueryService, never()).evaluateReadinessForSource(
                 eq("BTCUSDT"), anyString(), anyInt(), anyLong(),
                 eq("BINANCE_PUBLIC"), eq("SPOT"));
+        verify(marketQuoteClient).fetch24hTicker("BTCUSDT");
         verify(positionMonitorLogService).recordMonitorRunForSystem(any());
     }
 
@@ -915,7 +916,9 @@ class PositionMonitorServiceImplTest {
                          UserPositionRiskResult risk,
                          ExecutionPlanDO plan) {
         when(userPositionMapper.selectByIdAndUserId(position.getId(), USER_ID)).thenReturn(position);
-        when(marketQuoteClient.fetch24hTicker(position.getAssetSymbol())).thenReturn(Optional.of(quote(currentPrice)));
+        when(marketQuoteClient.fetch24hTicker(
+                org.example.trademodel.market.util.BinanceUsdtSymbol.toUsdtPair(position.getAssetSymbol())))
+                .thenReturn(Optional.of(quote(currentPrice)));
         lenient().when(userPositionRiskAdapter.currentRiskForUser(USER_ID)).thenReturn(risk);
         if (plan != null) {
             when(executionPlanMapper.selectByPlanId(plan.getPlanId())).thenReturn(plan);
