@@ -2573,6 +2573,45 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     "数据质量不足，暂不交易 / 事件观望");
             return suggestion;
         }
+        if (!hasText(decision.getDecisionId())) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
+                    "决策缺少精确身份，不能关联执行计划");
+            return suggestion;
+        }
+        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
+        if (assetPlan.state() == ExactPlanIdentityState.MISSING) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
+                    assetPlan.reason());
+            return suggestion;
+        }
+        if (assetPlan.state() == ExactPlanIdentityState.ERROR || !assetPlan.verified()) {
+            blockSuggestion(suggestion, "PLAN_IDENTITY_ERROR", "当前执行计划不可用",
+                    assetPlan.reason());
+            return suggestion;
+        }
+        ExecutionPlanDO executionPlan = assetPlan.executionPlan();
+        PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
+                executionPlan,
+                LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
+        boolean persistedRuleBlocked = "BLOCKED".equalsIgnoreCase(
+                trimToNull(executionPlan.getRuleValidationStatus()))
+                || upper(executionPlan.getChainStatus()).contains("BLOCKED");
+        if (planState != PersistedPlanState.ACTIVE || persistedRuleBlocked) {
+            if ((planState == PersistedPlanState.BLOCKED || persistedRuleBlocked)
+                    && directionalPushBlocked(decision)) {
+                String persistedReason = firstPlanReason(executionPlan);
+                blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前执行计划已阻断",
+                        persistedReason == null ? "方向结论已阻断，等待重新分析" : persistedReason);
+            } else if (persistedRuleBlocked) {
+                String persistedReason = firstPlanReason(executionPlan);
+                blockSuggestion(suggestion, "PLAN_BLOCKED", "当前执行计划已阻断",
+                        persistedReason == null ? "执行计划未通过规则校验" : persistedReason);
+            } else {
+                blockPersistedAssetPlan(suggestion, executionPlan, planState);
+            }
+            applyPersistedPlanAudit(suggestion, assetPlan, executionPlan);
+            return suggestion;
+        }
         String assetState = authoritativeAssetState(normalizeSymbol(decision.getSymbol()),
                 decision.getAssetStateSnapshot());
         if (!planAllowedAssetState(assetState)) {
@@ -2596,37 +2635,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && decision.getConfusedScore() >= ConfusedStatePolicy.CONFUSED_ENTER_THRESHOLD) {
             blockSuggestion(suggestion, "CONFLICT_BLOCKED", "当前暂无完整执行计划",
                     "已进入冲突状态，等待人工复核");
-            return suggestion;
-        }
-        if (!hasText(decision.getDecisionId())) {
-            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
-                    "决策缺少精确身份，不能关联执行计划");
-            return suggestion;
-        }
-        AssetExecutionPlanResolution assetPlan = resolveAssetExecutionPlan(decision);
-        if (assetPlan.state() == ExactPlanIdentityState.MISSING) {
-            blockSuggestion(suggestion, "PLAN_IDENTITY_MISSING", "当前暂无完整执行计划",
-                    assetPlan.reason());
-            return suggestion;
-        }
-        if (assetPlan.state() == ExactPlanIdentityState.ERROR || !assetPlan.verified()) {
-            blockSuggestion(suggestion, "PLAN_IDENTITY_ERROR", "当前执行计划不可用",
-                    assetPlan.reason());
-            return suggestion;
-        }
-        ExecutionPlanDO executionPlan = assetPlan.executionPlan();
-        PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
-                executionPlan,
-                LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
-        if (planState != PersistedPlanState.ACTIVE) {
-            if (planState == PersistedPlanState.BLOCKED && directionalPushBlocked(decision)) {
-                String persistedReason = firstPlanReason(executionPlan);
-                blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前执行计划已阻断",
-                        persistedReason == null ? "方向结论已阻断，等待重新分析" : persistedReason);
-            } else {
-                blockPersistedAssetPlan(suggestion, executionPlan, planState);
-            }
-            applyPersistedPlanAudit(suggestion, assetPlan, executionPlan);
             return suggestion;
         }
         if (directionalPushBlocked(decision)) {
