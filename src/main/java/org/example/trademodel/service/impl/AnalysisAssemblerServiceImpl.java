@@ -108,6 +108,8 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private UserPositionRiskAdapter userPositionRiskAdapter;
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
     private boolean requireRealMarketEnvironment;
+    @Value("${trade-model.providers.coinglass.fresh-ttl-seconds:120}")
+    private long derivativesFreshTtlSeconds = 120L;
     private Clock assemblerClock = Clock.systemUTC();
     private HighValueAlertMessageService highValueAlertMessageService;
     private FundamentalAiV41Properties v41Properties = FundamentalAiV41Properties.contractFixture();
@@ -514,7 +516,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
         ProviderCallResult<DerivativesRiskSnapshot> snapshotResult;
         try {
             snapshotResult = derivativesSnapshotReadPort.readCached(context.getSymbol(), AssetPriority.P1_WATCHLIST,
-                    Duration.ofSeconds(60), context.getTraceId());
+                    derivativesFreshTtl(derivativesFreshTtlSeconds), context.getTraceId());
         } catch (RuntimeException failure) {
             snapshotResult = null;
         }
@@ -553,6 +555,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 planBoundaryComplete, false,
                 null, snapshotResult == null ? null : snapshotResult.payload(), context.getTraceId(),
                 context.getAnalysisId(), context.getRuleVersion());
+    }
+
+    static Duration derivativesFreshTtl(long configuredSeconds) {
+        return Duration.ofSeconds(Math.max(1L, configuredSeconds));
     }
 
     private boolean accountRiskAllowed() {
