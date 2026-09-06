@@ -58,7 +58,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|103b77453d0efaebe8d913b59281591b31e01f3894fb74453f3e74b5230f0c4d|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|84e3eeab3ee9197c9484d0a0e79e10afba5ca265acfd6c3665898add7d419472|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
@@ -185,12 +185,25 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `103b77453d0efaebe8d913b59281591b31e01f3894fb74453f3e74b5230f0c4d` |
-| Version/date | v4.1 unified final freeze; registered `2026-08-14` |
+| Repository SHA-256 | `84e3eeab3ee9197c9484d0a0e79e10afba5ca265acfd6c3665898add7d419472` |
+| Version/date | v4.1 unified final freeze plus Owner-final Web Live Direction and Risk Amendment; updated `2026-09-06` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
 | Required concepts | all original decision-chain concepts plus 18 final disambiguation contracts, dual analysis modes, plan lifecycle/revalidation, Message/Telegram ownership, selected context, complete routed interaction and the frozen Canonical Figma visual-density/proportion contract |
 | Forbidden reinterpretations | no competing v4.1 source; no fake data/progress; no automatic trading; no AI rule bypass; no Preview persistence; no Candidate as Final; no plan as position; no duplicate owner; no second/non-canonical Figma or Design System; no Mobile implementation in current package |
+
+The Owner-final Appendix G amendment authorizes one bounded implementation
+package, `V41_WEB_LIVE_DIRECTION_RISK_CLOSURE`, on
+`codex/v4-1-web-live-direction-risk-closure` from exact merged-main SHA
+`b87cb1878405a6fe8693add1036251d6631e2520`. Its capability movement is from
+closed-bar-only static Home projection to a version-coherent closed-bar
+direction, calibrated confidence, concrete risk vector, structural conditional
+plan, authenticated live Home transport and read-only position-risk update
+chain. The current correction accepts only the 1440 x 900 Desktop
+official-domain web route; the 390 x 844 mobile-web route and every native APP
+are outside the package. Production, automatic trade actions, Owner-position
+mutation during automated acceptance, secret access, and fabricated Provider,
+AI, plan or position data remain hard blocked.
 
 Normative annex registration:
 

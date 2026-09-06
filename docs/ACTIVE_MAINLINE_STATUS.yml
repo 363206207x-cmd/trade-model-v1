@@ -13,23 +13,23 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "TRINE LOGIC v4.1 Real Logic Chain Closure Authorization"
-product_phase_status: "REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
+product_phase: "TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization"
+product_phase_status: "WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "Owner-authorized exact machine gate for real direction, plan, three-AI and position-monitoring logic closure"
-active_block_cn: "Owner 授权的真实方向、计划、三 AI 与持仓监控逻辑闭环精确机器门禁"
+active_block: "Owner-authorized exact machine gate for the desktop-web live direction, risk, plan, SSE and read-only position-monitor closure"
+active_block_cn: "Owner 授权的桌面网页版实时方向、风险、计划、SSE 与只读持仓监控闭环精确机器门禁"
 
-next_required_action: "Validate, push and merge this exact docs/gate authorization, then continue the frozen root-cause test-first repair without rediscovery."
-next_business_phase: "V41_REAL_LOGIC_CHAIN_CLOSURE"
+next_required_action: "Validate, push and merge this exact gate-only authorization, then continue the preserved implementation branch."
+next_business_phase: "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character audit baseline SHA and ninety-eight literal implementation paths are required after this authorization amendment is effective on merged main; dashboard-mobile.html and dashboard-mobile.js are scoped only to the responsive trinelogic.com browser route and do not authorize APP clients."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character baseline SHA and forty-one literal implementation paths become effective only after this gate is merged; native APP and mobile-web paths are absent."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "NONE; one docs/gate-only real logic chain closure authorization PR is authorized after local validation"
-current_branch: "codex/v4-1-real-logic-chain-closure-authorization"
+current_pr: "NONE; one docs/gate-only web live direction and risk closure authorization PR is authorized after local validation"
+current_branch: "codex/v4-1-web-live-direction-risk-closure-authorization"
 current_package_pr: "NONE; Owner one-pass authorization permits exact-head push/PR/merge"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
@@ -41,11 +41,11 @@ v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_C
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_authorized_package: "V41_REAL_LOGIC_CHAIN_CLOSURE"
+v4_1_authorized_package: "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-real-logic-chain-closure"
+v4_1_authorized_successor_branch: "codex/v4-1-web-live-direction-risk-closure"
 v4_1_authorized_successor_starting_full_sha: "b6904ba7c12759ab8a89da40991f9809cdc73e24"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
@@ -85,6 +85,8 @@ v4_1_interaction_audit_consolidated_remediation_authorization_status: "EFFECTIVE
 v4_1_interaction_audit_consolidated_remediation_implementation_status: "COMPLETE"
 v4_1_real_logic_chain_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_real_logic_chain_closure_implementation_status: "NOT_STARTED"
+v4_1_web_live_direction_risk_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_web_live_direction_risk_closure_implementation_status: "NOT_STARTED"
 local_real_authorization_status: "EFFECTIVE_MERGED_MAIN"
 local_real_implementation_status: "COMPLETE"
 frontend_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"

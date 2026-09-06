@@ -8,17 +8,41 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Real Logic Chain Closure Authorization
-Product Phase Status: REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact real direction, plan, three-AI and manual-position-monitoring logic closure; no implementation, Telegram send or deployment is included in this gate package
-Next Business Phase: V41_REAL_LOGIC_CHAIN_CLOSURE
-Next Business Phase Allowed: NO on this docs/gate branch; the exact successor is allowed only after this authorization is effective on merged main
+Product Phase: TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization
+Product Phase Status: WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: Register the exact desktop-web live direction, risk, plan, SSE and read-only position-monitor package; this gate PR contains no business code or deployment
+Next Business Phase: V41_WEB_LIVE_DIRECTION_RISK_CLOSURE
+Next Business Phase Allowed: NO on this gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Real Logic Chain Closure Authorization
+## TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization
+
+The Owner-authorized successor is
+`V41_WEB_LIVE_DIRECTION_RISK_CLOSURE` on
+`codex/v4-1-web-live-direction-risk-closure`, anchored to exact merged-main
+baseline `b87cb1878405a6fe8693add1036251d6631e2520`. It is limited to the forty-one
+literal implementation paths in `docs/CODEX_NEXT_TASK.yml`: the Desktop
+`trinelogic.com` browser, its necessary shared backend and exact-path tests.
+
+The successor may add closed-1h/4h structural direction, an independent
+real-time shock safety layer, calibrated confidence, concrete risk vectors,
+structural plans, authenticated Home SSE, Binance public live data and
+read-only position-monitor refresh. Native APP and mobile-web files are not in
+its allowlist. Production, automatic trading, Owner-position mutation, secret
+output and extra Telegram messages remain blocked.
+
+The predecessor real-logic implementation is effective through PR #1243 and
+the subsequent Desktop runtime corrections through PR #1264 on this exact
+baseline. Those effective fixes are preserved; this package does not recreate
+them. This authorization package changes no business capability and must be
+merged before its implementation PR may merge.
+
+---
+
+## TRINE LOGIC v4.1 Real Logic Chain Closure Authorization (historical compatibility evidence)
 
 The Owner-authorized successor is
 `V41_REAL_LOGIC_CHAIN_CLOSURE` on
