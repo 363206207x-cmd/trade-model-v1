@@ -45,4 +45,17 @@ class WebLiveDashboardContractTest {
                 "[\"OBSERVATION\", \"BLOCKED\"].indexOf(finalMode) >= 0"
         );
     }
+
+    @Test
+    void desktopPreservesLastGoodSnapshotAndClearsRecoveredRequestError() throws Exception {
+        String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+
+        assertThat(desktop).contains(
+                "var homeRequestFailed = false",
+                "function reportHomeRequestFailure(error)",
+                "function clearHomeRequestFailure()",
+                "if (!Array.isArray(currentHome.assets) || !currentHome.assets.length)",
+                "clearHomeRequestFailure();"
+        );
+    }
 }
