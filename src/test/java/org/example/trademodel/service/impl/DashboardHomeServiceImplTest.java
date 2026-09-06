@@ -780,6 +780,64 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void alignedPreviewKeepsSelectedRankedCardIdentityAndRemainsRenderable() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        DecisionResultVO naturalDecision = decision("BTCUSDT", "RANGE", "MEDIUM", "HIGH", 82, 0,
+                "LEVEL_1_CONSISTENT", false, "{\"state\":\"HIGH_RISK\"}");
+        naturalDecision.setAnalysisId("analysis-natural-btc");
+        naturalDecision.setDecisionId("decision-natural-btc");
+        naturalDecision.setCreateTime(LocalDateTime.of(2026, 8, 11, 12, 10));
+        HomeTopAssetProjection projection = projection(101L, naturalDecision, 61,
+                "opportunity-natural-btc", "HIGH_RISK");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(projection));
+
+        AnalysisRunDO naturalRun = formalSchedulerRun("analysis-natural-btc", "BTCUSDT", 101L);
+        naturalRun.setTraceId("trace-natural-btc");
+        when(analysisRunMapper.selectById("analysis-natural-btc")).thenReturn(naturalRun);
+        when(analysisRunMapper.selectReadableByUser("analysis-natural-btc", USER_ID)).thenReturn(naturalRun);
+
+        DecisionResultVO previewDecision = decisionWithStructuredAiRoles();
+        previewDecision.setAnalysisId("analysis-dashboard-ai");
+        previewDecision.setDecisionId("decision-preview-btc");
+        previewDecision.setSymbol("BTCUSDT");
+        previewDecision.setCreateTime(LocalDateTime.of(2026, 8, 11, 12, 20));
+        when(decisionResultMapper.findLatestSuccessfulPreviewForUserAndSymbol(USER_ID, "BTCUSDT"))
+                .thenReturn(previewDecision);
+
+        ExecutionPlanDO previewPlan = new ExecutionPlanDO();
+        previewPlan.setPlanId("plan-dashboard-ai");
+        previewPlan.setAnalysisId("analysis-dashboard-ai");
+        previewPlan.setDecisionId("decision-preview-btc");
+        when(executionPlanMapper.selectLatestByDecisionIdentity(
+                "analysis-dashboard-ai", "decision-preview-btc")).thenReturn(previewPlan);
+        when(decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
+                "analysis-dashboard-ai", "plan-dashboard-ai")).thenReturn(previewDecision);
+
+        AnalysisRunDO previewRun = formalSchedulerRun("analysis-dashboard-ai", "BTCUSDT", 101L);
+        previewRun.setPreview(true);
+        previewRun.setTriggerType("ANALYSIS_PREVIEW");
+        previewRun.setAnalysisMode("ANALYSIS_PREVIEW");
+        previewRun.setTraceId("trace-dashboard-ai");
+        when(analysisRunMapper.selectById("analysis-dashboard-ai")).thenReturn(previewRun);
+
+        DashboardHomeVO home = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null);
+
+        assertThat(home.getAssets()).singleElement().satisfies(asset -> {
+            assertThat(asset.getAssetId()).isEqualTo(101L);
+            assertThat(asset.getName()).isEqualTo("Bitcoin");
+            assertThat(asset.getSlotType()).isEqualTo("DECISION");
+            assertThat(asset.getOpportunityId()).isEqualTo("opportunity-natural-btc");
+            assertThat(asset.getOpportunityState()).isEqualTo("HIGH_RISK");
+            assertThat(asset.getAnalysisId()).isEqualTo("analysis-dashboard-ai");
+            assertThat(asset.getDecisionId()).isEqualTo("decision-preview-btc");
+            assertThat(asset.getTraceId()).isEqualTo("trace-dashboard-ai");
+        });
+        assertThat(home.getSelectedAssetContext()).isSameAs(home.getAssets().get(0));
+    }
+
+    @Test
     void latestOwnerAssetPreviewPopulatesOnlyAiPanelWithOneCoherentRunIdentity() {
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setOpportunityPriorityRankingService(rankingService);

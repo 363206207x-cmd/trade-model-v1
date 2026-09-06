@@ -364,7 +364,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DecisionResultVO displayDecision = latestAlignedAiPreview(
                 userId, normalizedSelected, selectedDecision, aiPreviewMarker);
         if (displayDecision != null && displayDecision != selectedDecision) {
-            assets = replaceSelectedAssetDecision(assets, normalizedSelected, displayDecision);
+            assets = replaceSelectedAssetDecision(assets, normalizedSelected, displayDecision, userId);
         }
 
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, displayDecision);
@@ -431,7 +431,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private List<DashboardHomeVO.AssetVO> replaceSelectedAssetDecision(
             List<DashboardHomeVO.AssetVO> assets,
             String selectedSymbol,
-            DecisionResultVO decision) {
+            DecisionResultVO decision,
+            Long userId) {
         if (assets == null || assets.isEmpty() || decision == null || !hasText(selectedSymbol)) {
             return assets == null ? List.of() : assets;
         }
@@ -440,7 +441,35 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         for (int index = 0; index < aligned.size(); index++) {
             DashboardHomeVO.AssetVO asset = aligned.get(index);
             if (asset != null && Objects.equals(normalized, normalizeSymbol(asset.getRawSymbol()))) {
-                aligned.set(index, assetFromDecision(index + 1, decision));
+                DashboardHomeVO.AssetVO replacement = assetFromDecision(index + 1, decision);
+                replacement.setAssetId(asset.getAssetId());
+                replacement.setName(asset.getName());
+                replacement.setOpportunityId(asset.getOpportunityId());
+                replacement.setOpportunityState(asset.getOpportunityState());
+                replacement.setPrimaryOpportunityId(asset.getPrimaryOpportunityId());
+                replacement.setPrimaryTimeframe(asset.getPrimaryTimeframe());
+                replacement.setPrimaryPlanMode(asset.getPrimaryPlanMode());
+                replacement.setSecondaryOpportunityCount(asset.getSecondaryOpportunityCount());
+                replacement.setTimeframeConflictState(asset.getTimeframeConflictState());
+                replacement.setOpportunityScore(asset.getOpportunityScore());
+                replacement.setRankingReason(asset.getRankingReason());
+                replacement.setPlanMode(firstNonBlank(trimToNull(decision.getPlanMode()), asset.getPlanMode()));
+                replacement.setAiDecisionResult(firstNonBlank(
+                        trimToNull(decision.getAiConflictLevel()), asset.getAiDecisionResult()));
+                applyCardFinalProjection(replacement, decision);
+                HomeTopAssetProjection previewProjection = new HomeTopAssetProjection(
+                        replacement.getAssetId(), replacement.getRawSymbol(), replacement.getName(),
+                        replacement.getOpportunityScore(), trimToNull(decision.getFinalMarketBias()),
+                        trimToNull(decision.getConfidenceLevel()), trimToNull(decision.getRiskLevel()),
+                        trimToNull(decision.getPlanMode()), trimToNull(decision.getAiConflictLevel()),
+                        decision.getDataQualityScore(), asset.getFreshnessStatus(), null, null,
+                        0, replacement.getRankingReason(), decision.getAnalysisId(),
+                        replacement.getOpportunityId(), replacement.getOpportunityState(),
+                        replacement.getPrimaryOpportunityId(), replacement.getPrimaryTimeframe(),
+                        replacement.getPrimaryPlanMode(), replacement.getSecondaryOpportunityCount(),
+                        replacement.getTimeframeConflictState(), decision.getCreateTime(), decision);
+                applyAnalysisProvenance(replacement, previewProjection, userId);
+                aligned.set(index, replacement);
                 return List.copyOf(aligned);
             }
         }
