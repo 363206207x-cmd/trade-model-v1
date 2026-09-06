@@ -333,7 +333,22 @@ class DecisionEngineServiceTest {
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-mtf-conflict", 85, 65);
 
         assertThat(decision.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(decision.getValidatedMarketBias()).isNull();
+        assertThat(decision.getDirectionDataState()).isEqualTo("MULTI_TIMEFRAME_CONFLICT");
         assertThat(decision.getMultiTfConvergence()).isEqualTo("WEAK");
+        assertThat(decision.getIsWorthOpening()).isFalse();
+    }
+
+    @Test
+    void makeDecision_rangeObservationIsNotPersistedAsValidatedDirectionalBias() {
+        when(ohlcvSnapshotSource.readClosedBars(anyString(), anyString(), anyInt(), anyString()))
+                .thenReturn(rangeKlines());
+
+        DecisionBundleVO decision = service.makeDecision("BTCUSDT", "5m", "analysis-range", 85, 65);
+
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("RANGE");
+        assertThat(decision.getValidatedMarketBias()).isNull();
+        assertThat(decision.getDirectionDataState()).isEqualTo("READY");
         assertThat(decision.getIsWorthOpening()).isFalse();
     }
 
@@ -649,6 +664,19 @@ class DecisionEngineServiceTest {
 
     private static List<String[]> bearishKlines() {
         return directionalKlines(false);
+    }
+
+    private static List<String[]> rangeKlines() {
+        List<String[]> bars = new ArrayList<>();
+        java.math.BigDecimal center = new java.math.BigDecimal("100");
+        for (int index = 0; index < 60; index++) {
+            java.math.BigDecimal close = center.add(index % 2 == 0
+                    ? new java.math.BigDecimal("0.10")
+                    : new java.math.BigDecimal("-0.10"));
+            bars.add(new String[]{String.valueOf(index), center.toPlainString(), "101", "99",
+                    close.toPlainString()});
+        }
+        return bars;
     }
 
     private static List<String[]> directionalKlines(boolean bullish) {
