@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class BinanceLiveMarketService implements WebSocket.Listener {
     private static final Logger log = LoggerFactory.getLogger(BinanceLiveMarketService.class);
-    private static final List<String> SYMBOLS = List.of("btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "dogeusdt");
+    private static final List<String> SYMBOLS = List.of("btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "adausdt");
     private final ObjectMapper objectMapper;
     private final DashboardLiveEventService eventService;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();

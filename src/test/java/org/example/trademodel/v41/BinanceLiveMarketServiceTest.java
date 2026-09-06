@@ -38,8 +38,8 @@ class BinanceLiveMarketServiceTest {
         String uri = invokeStreamUri();
         assertThat(uri).contains("btcusdt@markPrice@1s", "btcusdt@bookTicker",
                 "btcusdt@depth@500ms", "btcusdt@kline_1m", "btcusdt@kline_5m",
-                "dogeusdt@markPrice@1s", "dogeusdt@bookTicker", "dogeusdt@depth@500ms")
-                .doesNotContain("adausdt");
+                "adausdt@markPrice@1s", "adausdt@bookTicker", "adausdt@depth@500ms")
+                .doesNotContain("dogeusdt");
     }
 
     @Test
