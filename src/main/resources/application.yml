@@ -63,6 +63,8 @@ management:
       show-components: never
 
 trade-model:
+  home-live:
+    enabled: ${TRADE_MODEL_HOME_LIVE_ENABLED:false}
   telegram:
     enabled: ${TRADE_MODEL_TELEGRAM_ENABLED:false}
     external-calls-enabled: ${TRADE_MODEL_TELEGRAM_EXTERNAL_CALLS_ENABLED:false}
@@ -203,15 +205,15 @@ trade-model:
       concurrency-limit: 3
       max-retry-per-role: 1
     multi-timeframe:
-      four-hour-weight: 0.57
-      one-hour-weight: 0.43
+      four-hour-weight: 0.55
+      one-hour-weight: 0.45
       fifteen-minute-weight: 0.00
       five-minute-weight: 0.00
       minimum-aligned-count: 2
       minimum-aligned-weight: 1.00
       maximum-trend-score-difference: 15
     normalization:
-      version: V41-NORM-WREP-1
+      version: V41-DIRECTION-4H1H-2
       lookback: 200
       minimum-sample-count: 60
       winsorize-lower-percentile: 2.5

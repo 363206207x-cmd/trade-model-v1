@@ -6,9 +6,15 @@ import org.example.trademodel.positionmonitor.PositionMonitorBatchResultDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.example.trademodel.v41.DashboardLiveEvent;
+import org.example.trademodel.v41.DashboardLiveEventService;
+
+import java.time.Instant;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -22,6 +28,8 @@ public class PositionMonitorScheduler {
     private final boolean schedulersEnabled;
     private final boolean positionMonitorSchedulerEnabled;
     private final ConcurrentMap<Long, Long> pendingInitialMonitors = new ConcurrentHashMap<>();
+    private final AtomicBoolean immediateMonitorRequested = new AtomicBoolean();
+    private DashboardLiveEventService dashboardLiveEventService;
 
     public PositionMonitorScheduler(
             PositionMonitorService positionMonitorService,
@@ -32,9 +40,33 @@ public class PositionMonitorScheduler {
         this.positionMonitorSchedulerEnabled = positionMonitorSchedulerEnabled;
     }
 
+    @Autowired
+    void setDashboardLiveEventService(DashboardLiveEventService value) {
+        this.dashboardLiveEventService = value;
+    }
+
     @Scheduled(initialDelayString = "${trade-model.schedulers.position-monitor.initial-delay-ms:15000}",
             fixedRateString = "${trade-model.schedulers.position-monitor.fixed-rate-ms:30000}")
     public void monitorOpenUserPositionsScheduled() {
+        monitorOpenPositions("PERIODIC_30S");
+    }
+
+    @Scheduled(initialDelayString = "${trade-model.schedulers.position-monitor.immediate-delay-ms:1000}",
+            fixedDelayString = "${trade-model.schedulers.position-monitor.immediate-rate-ms:1000}")
+    public void monitorImmediateRiskRequestsScheduled() {
+        if (immediateMonitorRequested.compareAndSet(true, false)) {
+            monitorOpenPositions("REALTIME_SHOCK");
+        }
+    }
+
+    public void requestImmediateRiskMonitor(String reasonCode) {
+        if (!scheduledExecutionEnabled()) return;
+        immediateMonitorRequested.set(true);
+        log.info("[position-monitor-scheduler] immediate read-only monitor requested reason={}",
+                sanitizedReason(reasonCode));
+    }
+
+    private synchronized void monitorOpenPositions(String trigger) {
         if (!scheduledExecutionEnabled()) {
             return;
         }
@@ -44,15 +76,27 @@ public class PositionMonitorScheduler {
                 log.warn("[position-monitor-scheduler] batch completed without a result summary");
                 return;
             }
-            log.info("[position-monitor-scheduler] batch completed total={} success={} failure={} blocked={}",
+            log.info("[position-monitor-scheduler] batch completed trigger={} total={} success={} failure={} blocked={}",
+                    trigger,
                     batch.getTotalCount(), batch.getSuccessCount(),
                     batch.getFailureCount(), batch.getBlockedCount());
+            publishRefreshEvent(batch);
             if (batch.getFailureCount() > 0) {
                 log.warn("[position-monitor-scheduler] failure summary={}", failureReasonSummary(batch));
             }
         } catch (RuntimeException ex) {
             log.warn("[position-monitor-scheduler] batch skipped: {}", ex.getMessage());
         }
+    }
+
+    private void publishRefreshEvent(PositionMonitorBatchResultDTO batch) {
+        if (dashboardLiveEventService == null) return;
+        long version = System.currentTimeMillis();
+        dashboardLiveEventService.publish(new DashboardLiveEvent(
+                "position-monitor-" + version, "POSITION_MONITOR_UPDATED", "SYSTEM", version,
+                Instant.now(), Instant.now(), Map.of("refreshRequired", true,
+                "successCount", batch.getSuccessCount(), "failureCount", batch.getFailureCount(),
+                "version", "V41-POSITION-RISK-VECTOR-1")));
     }
 
     public void requestInitialMonitor(Long positionId, Long userId) {

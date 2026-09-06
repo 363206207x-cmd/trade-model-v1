@@ -272,7 +272,7 @@ class DecisionEngineServiceTest {
         assertThat(gated.getMarketBiasHierarchy()).isEqualTo("WAIT");
         assertThat(gated.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
         assertThat(gated.getAiPlanMode()).isNull();
-        assertThat(normal.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(normal.getMarketBiasHierarchy()).isEqualTo("BULLISH");
     }
 
     @Test
@@ -351,7 +351,7 @@ class DecisionEngineServiceTest {
                 85, 65, null, null, 100);
 
         assertThat(decision.getConclusionSummary()).contains("八项评分修正 +1");
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
     }
 
     @Test
@@ -366,7 +366,7 @@ class DecisionEngineServiceTest {
                 85, 65, null, null, 50);
 
         assertThat(decision.getIsWorthOpening()).isFalse();
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
     }
 
     @Test
@@ -391,9 +391,9 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-11", 85, 65);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BEARISH");
-        assertThat(decision.getRuleMarketBias()).isEqualTo("STRONG_BEARISH");
-        assertThat(decision.getValidatedMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BEARISH");
+        assertThat(decision.getRuleMarketBias()).isEqualTo("BEARISH");
+        assertThat(decision.getValidatedMarketBias()).isEqualTo("BEARISH");
         assertThat(decision.getFinalMarketBias()).isNull();
         assertThat(decision.getAiRoleResults())
                 .contains("\"schemaVersion\":\"v1\"")
@@ -473,7 +473,7 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-high", 85, 65, external);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
         assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
         assertThat(decision.getConfidenceLevel()).isEqualTo("MEDIUM");
         assertThat(decision.getIsWorthOpening()).isTrue();
@@ -487,7 +487,7 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = service.makeDecision("BTCUSDT", "1m", "analysis-ext-block", 85, 65, external);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
         assertThat(decision.getRiskLevel()).isEqualTo("HIGH");
         assertThat(decision.getIsWorthOpening()).isFalse();
         assertThat(decision.getAssetState()).isEqualTo(AssetStateEnum.HIGH_RISK);
@@ -557,9 +557,9 @@ class DecisionEngineServiceTest {
         assertThat(context.isGptConsistentWithRule()).isFalse();
         assertThat(context.getAiProviderConflictContribution()).isEqualTo(18);
         assertThat(context.getAiOrchestrationMode()).isEqualTo("AI_ASSISTED");
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
-        assertThat(decision.getRuleMarketBias()).isEqualTo("STRONG_BULLISH");
-        assertThat(decision.getValidatedMarketBias()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(decision.getRuleMarketBias()).isEqualTo("BULLISH");
+        assertThat(decision.getValidatedMarketBias()).isEqualTo("BULLISH");
         assertThat(decision.getFinalMarketBias()).isNull();
         assertThat(decision.getAiRoleResults())
                 .contains("\"ruleDirectionPreserved\":true");
@@ -582,7 +582,7 @@ class DecisionEngineServiceTest {
 
         DecisionBundleVO decision = serviceWithAi.makeDecision("BTCUSDT", "1m", "analysis-ai-fallback", 85, 65);
 
-        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
+        assertThat(decision.getMarketBiasHierarchy()).isEqualTo("BULLISH");
         assertThat(decision.getAiRoleResults()).contains("RULE_ONLY_FALLBACK");
         assertThat(decision.getAiRoleResults()).contains("AI_ORCHESTRATOR_FAILED");
         assertThat(decision.getAiPlanMode()).isNull();
@@ -626,8 +626,8 @@ class DecisionEngineServiceTest {
         DecisionBundleVO btc = service.makeDecision("BTCUSDT", "5m", "analysis-btc", 85, 65);
         DecisionBundleVO eth = service.makeDecision("ETHUSDT", "5m", "analysis-eth", 85, 65);
 
-        assertThat(btc.getMarketBiasHierarchy()).isEqualTo("STRONG_BULLISH");
-        assertThat(eth.getMarketBiasHierarchy()).isEqualTo("STRONG_BEARISH");
+        assertThat(btc.getMarketBiasHierarchy()).isEqualTo("BULLISH");
+        assertThat(eth.getMarketBiasHierarchy()).isEqualTo("BEARISH");
     }
 
     @Test

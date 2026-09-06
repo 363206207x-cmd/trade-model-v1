@@ -48,6 +48,8 @@ import org.example.trademodel.providercall.ProviderCallResult;
 import org.example.trademodel.providercall.snapshot.DerivativesRiskSnapshot;
 import org.example.trademodel.risk.UserPositionRiskAdapter;
 import org.example.trademodel.risk.UserPositionRiskResult;
+import org.example.trademodel.v41.DashboardLiveEvent;
+import org.example.trademodel.v41.DashboardLiveEventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,6 +114,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     private long derivativesFreshTtlSeconds = 120L;
     private Clock assemblerClock = Clock.systemUTC();
     private HighValueAlertMessageService highValueAlertMessageService;
+    private DashboardLiveEventService dashboardLiveEventService;
     private FundamentalAiV41Properties v41Properties = FundamentalAiV41Properties.contractFixture();
 
     @Autowired(required = false)
@@ -165,6 +168,11 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
     @Autowired(required = false)
     void setHighValueAlertMessageService(HighValueAlertMessageService value) {
         this.highValueAlertMessageService = value;
+    }
+
+    @Autowired(required = false)
+    void setDashboardLiveEventService(DashboardLiveEventService value) {
+        this.dashboardLiveEventService = value;
     }
 
     public AnalysisAssemblerServiceImpl(EvidenceService evidenceService, ScoreService scoreService,
@@ -408,6 +416,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                     decision,
                     marketEnv,
                     effectiveContext);
+            ExecutionPlanVO ruleAssessmentPlan = plan;
             plan.setAnalysisTimeframesJson(serializeRequired(
                     decision.getMultiTimeframeDetails(), "MULTI_TIMEFRAME_SERIALIZATION_FAILED"));
             if (derivativesInput != null && derivativesAssessment != null) {
@@ -456,6 +465,10 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                         !effectiveContext.isPreview());
             }
             plan = decisionChain.finalPlan();
+            if (effectiveContext.isPreview() && plan == null) {
+                plan = previewRuleAssessmentForPersistence(
+                        ruleAssessmentPlan, effectiveContext.getTraceId(), analysisId);
+            }
             if (plan != null) {
                 plan.setAccountRiskSnapshotId(accountRiskSnapshot == null ? null : accountRiskSnapshot.getId());
                 plan.setAccountRiskJson(pushSnapshotService.accountRiskJson(accountRiskSnapshot));
@@ -481,6 +494,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             saveToDatabase(effectiveContext, analysis, evidences, scores, decision, plan,
                     marketEnvSourceType, decisionChain);
             System.out.println("=== 落库执行完成 === analysisId=" + analysisId);
+            publishDirectionUpdate(effectiveContext, decision, plan);
 
             return analysis;
         } catch (Exception e) {
@@ -492,6 +506,69 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             if (FIRST_ANALYSIS_RUN_LOGGED.compareAndSet(false, true)) {
                 System.out.println("[PERF] first_analysis_run=" + assembleCostMs + " ms");
             }
+        }
+    }
+
+    private void publishDirectionUpdate(AnalysisExecutionContext context,
+                                        DecisionBundleVO decision,
+                                        ExecutionPlanVO plan) {
+        if (dashboardLiveEventService == null || context == null || context.getOwnerId() == null
+                || decision == null || context.getSymbol() == null) return;
+        long version = Math.max(1L, assemblerClock.instant().toEpochMilli());
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("analysisId", context.getAnalysisId());
+        payload.put("decisionId", decision.getDecisionId());
+        payload.put("traceId", context.getTraceId());
+        payload.put("structuralDirection", decision.getValidatedMarketBias() != null
+                ? decision.getValidatedMarketBias() : decision.getRuleMarketBias());
+        payload.put("structuralDirectionScore", decision.getStructuralDirectionScore());
+        payload.put("confidence", decision.getFinalConfidence());
+        payload.put("directionCalculatedAt", context.getAnalysisTime());
+        payload.put("directionVersion", decision.getNormalizationVersion());
+        payload.put("priceAtDecision", decision.getPushTriggerPrice());
+        payload.put("marketDataAsOf", context.getAnalysisTime());
+        payload.put("structuralInvalidationLevel", decision.getStructuralInvalidationLevel());
+        payload.put("planState", plan == null ? null : plan.getPlanLifecycleState());
+        payload.values().removeIf(java.util.Objects::isNull);
+        if (decision.getValidatedMarketBias() != null && decision.getStructuralAtr1h() != null
+                && decision.getStructuralAtr1h().signum() > 0) {
+            dashboardLiveEventService.recordStructuralContext(context.getOwnerId(),
+                    new DashboardLiveEventService.StructuralContext(context.getSymbol(),
+                            decision.getValidatedMarketBias(), decision.getStructuralAtr1h(),
+                            decision.getStructuralInvalidationLevel(), decision.getFinalConfidence(),
+                            context.getAnalysisId(), decision.getDecisionId(), context.getTraceId(),
+                            context.getAnalysisTime().toInstant(ZoneOffset.UTC),
+                            decision.getExpiresAt() == null ? null : decision.getExpiresAt().toInstant(),
+                            "FRESH".equalsIgnoreCase(decision.getDerivativesFreshness())));
+        }
+        DashboardLiveEvent event = new DashboardLiveEvent(
+                context.getSymbol() + "-direction-" + version,
+                "ASSET_DIRECTION_UPDATED", context.getSymbol(), version,
+                assemblerClock.instant(), assemblerClock.instant(), Map.copyOf(payload));
+        dashboardLiveEventService.publishToUser(context.getOwnerId(), event);
+        if (plan != null) {
+            Map<String, Object> planPayload = new java.util.LinkedHashMap<>();
+            planPayload.put("sourceAnalysisId", context.getAnalysisId());
+            planPayload.put("sourceDecisionId", decision.getDecisionId());
+            planPayload.put("sourceTraceId", context.getTraceId());
+            planPayload.put("direction", decision.getValidatedMarketBias() != null
+                    ? decision.getValidatedMarketBias() : decision.getRuleMarketBias());
+            planPayload.put("entryZone", plan.getEntryZone());
+            planPayload.put("triggerCondition", plan.getTriggerCondition());
+            planPayload.put("stopLoss", plan.getStopLoss());
+            planPayload.put("takeProfitRules", plan.getTakeProfitRules());
+            planPayload.put("invalidCondition", plan.getInvalidCondition());
+            planPayload.put("expectedRiskReward", plan.getExpectedRiskReward());
+            planPayload.put("planState", plan.getPlanLifecycleState());
+            planPayload.put("validationStatus", plan.getRuleValidationStatus());
+            planPayload.put("blockedReason", plan.getRuleVetoReason());
+            planPayload.put("recoveryCondition", plan.getRevalidationRule());
+            planPayload.put("planVersion", plan.getPlanVersion());
+            planPayload.values().removeIf(java.util.Objects::isNull);
+            dashboardLiveEventService.publishToUser(context.getOwnerId(), new DashboardLiveEvent(
+                    context.getSymbol() + "-plan-" + (version + 1),
+                    "PLAN_STATE_CHANGED", context.getSymbol(), version + 1,
+                    assemblerClock.instant(), assemblerClock.instant(), Map.copyOf(planPayload)));
         }
     }
 
@@ -719,6 +796,33 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
 
     private static Boolean booleanOrTrue(Boolean value) {
         return value != null ? value : Boolean.TRUE;
+    }
+
+    private ExecutionPlanVO previewRuleAssessmentForPersistence(ExecutionPlanVO plan,
+                                                                String traceId,
+                                                                String analysisId) {
+        if (plan == null) return null;
+        if (Boolean.TRUE.equals(plan.getSourceGateComplete())) {
+            plan.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_BLOCKED);
+            plan.setReadinessStatus(ExecutionPlanVO.READINESS_WATCH_ONLY);
+        }
+        plan.setCandidateId(null);
+        plan.setOpportunityId(null);
+        plan.setResolverResultId(null);
+        plan.setTraceId(traceId);
+        plan.setChainStatus("RULE_VALIDATION_BLOCKED");
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setRuleVetoReason("ANALYSIS_PREVIEW_NON_FINAL");
+        plan.setValidationResultId("preview-validation-" + analysisId);
+        plan.setValidationReasons(List.of("ANALYSIS_PREVIEW_NON_FINAL"));
+        plan.setFinalPlan(false);
+        plan.setPlanMode("BLOCKED");
+        plan.setFinalPlanMode("BLOCKED");
+        plan.setFinalizedAt(null);
+        plan.setPlanLifecycleState(hasText(plan.getEntryZone())
+                && hasText(plan.getStopLoss()) && hasText(plan.getTakeProfitRules())
+                ? "CURRENT" : "INVALIDATED");
+        return plan;
     }
 
     private AnalysisExecutionContext normalizeExecutionContext(AnalysisExecutionContext context) {
@@ -1866,11 +1970,26 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 .findFirst()
                 .orElse(null);
         root.put("direction", direction);
+        root.put("directionVersion", decision.getNormalizationVersion());
+        putDecimalOrNull(root, "structuralDirectionScore", decision.getStructuralDirectionScore());
+        putDecimalOrNull(root, "trend4hScore", decision.getStructuralTrend4hScore());
+        putDecimalOrNull(root, "state1hScore", decision.getStructuralState1hScore());
+        putDecimalOrNull(root, "atr1h", decision.getStructuralAtr1h());
+        putDecimalOrNull(root, "structuralInvalidationLevel", decision.getStructuralInvalidationLevel());
+        root.put("directionSnapshotFingerprint", decision.getDirectionSnapshotFingerprint());
         if (decision.getFinalConfidence() == null) {
             root.putNull("confidence");
         } else {
             root.put("confidence", decision.getFinalConfidence());
         }
+        root.put("confidenceVersion", decision.getConfidenceVersion());
+        if (decision.getConfidenceCalibrationSampleCount() == null) {
+            root.putNull("confidenceSampleCount");
+        } else {
+            root.put("confidenceSampleCount", decision.getConfidenceCalibrationSampleCount());
+        }
+        putDoubleOrNull(root, "confidenceBrierScore", decision.getConfidenceBrierScore());
+        putDoubleOrNull(root, "confidenceCalibrationError", decision.getConfidenceCalibrationError());
         root.put("riskLevel", decision.getRiskLevel());
         root.set("multiTimeframeDetails", EXPLAIN_JSON.valueToTree(decision.getMultiTimeframeDetails()));
         String summary = decision.getConclusionSummary();
@@ -1955,6 +2074,16 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
             return "{\"version\":\"1\",\"summary\":\"serialization_failed\",\"primaryDrivers\":[],\"reviewReasons\":[],"
                     + "\"conflict\":{\"level\":\"\",\"score\":0,\"planMode\":\"\"},\"confused\":{\"score\":0}}";
         }
+    }
+
+    private static void putDecimalOrNull(ObjectNode root, String name, BigDecimal value) {
+        if (value == null) root.putNull(name);
+        else root.put(name, value);
+    }
+
+    private static void putDoubleOrNull(ObjectNode root, String name, Double value) {
+        if (value == null) root.putNull(name);
+        else root.put(name, value);
     }
 
     private LocalDateTime utcLocalNow() {

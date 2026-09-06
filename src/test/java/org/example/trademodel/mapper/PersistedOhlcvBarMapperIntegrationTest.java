@@ -86,6 +86,9 @@ class PersistedOhlcvBarMapperIntegrationTest {
         insertBar("MARKETUSDT", "5m", 2_000L, 2_999L, "101.00", true, 0,
                 "perp-batch", "perp-trace", LocalDateTime.of(2026, 5, 17, 10, 1),
                 "BINANCE_PUBLIC", "USDT_PERP");
+        insertBar("MARKETUSDT", "5m", 3_000L, 3_999L, "999.00", false, 0,
+                "open-batch", "open-candle-trace", LocalDateTime.of(2026, 5, 17, 10, 2),
+                "BINANCE_PUBLIC", "SPOT");
 
         List<PersistedOhlcvBarDO> spot = persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
                 "MARKETUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 1);
@@ -95,6 +98,7 @@ class PersistedOhlcvBarMapperIntegrationTest {
         assertThat(spot).singleElement().satisfies(row -> {
             assertThat(row.getSourceTraceId()).isEqualTo("spot-trace");
             assertThat(row.getProviderMarketType()).isEqualTo("SPOT");
+            assertThat(row.getClosed()).isTrue();
         });
         assertThat(perpetual).singleElement().satisfies(row -> {
             assertThat(row.getSourceTraceId()).isEqualTo("perp-trace");

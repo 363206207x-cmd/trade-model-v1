@@ -587,6 +587,14 @@ public class DashboardHomeVO {
         private String confidenceLabel;
         private String riskLevel;
         private String riskLabel;
+        private String riskVersion;
+        private List<AssetRiskItemVO> riskItems = new ArrayList<>();
+        private Long snapshotVersion;
+        private String structuralDirection;
+        private BigDecimal structuralDirectionScore;
+        private BigDecimal structuralAtr1h;
+        private String realtimeState = "NORMAL";
+        private String effectiveExecutionState = "ACTIVE";
         private String oneHourOpportunityLabel;
         private String fourHourTrendLabel;
         private String assetState;
@@ -818,6 +826,24 @@ public class DashboardHomeVO {
         public void setRiskLabel(String riskLabel) {
             this.riskLabel = riskLabel;
         }
+        public String getRiskVersion() { return riskVersion; }
+        public void setRiskVersion(String value) { this.riskVersion = value; }
+        public List<AssetRiskItemVO> getRiskItems() { return List.copyOf(riskItems); }
+        public void setRiskItems(List<AssetRiskItemVO> value) {
+            this.riskItems = value == null ? new ArrayList<>() : new ArrayList<>(value);
+        }
+        public Long getSnapshotVersion() { return snapshotVersion; }
+        public void setSnapshotVersion(Long value) { this.snapshotVersion = value; }
+        public String getStructuralDirection() { return structuralDirection; }
+        public void setStructuralDirection(String value) { this.structuralDirection = value; }
+        public BigDecimal getStructuralDirectionScore() { return structuralDirectionScore; }
+        public void setStructuralDirectionScore(BigDecimal value) { this.structuralDirectionScore = value; }
+        public BigDecimal getStructuralAtr1h() { return structuralAtr1h; }
+        public void setStructuralAtr1h(BigDecimal value) { this.structuralAtr1h = value; }
+        public String getRealtimeState() { return realtimeState; }
+        public void setRealtimeState(String value) { this.realtimeState = value; }
+        public String getEffectiveExecutionState() { return effectiveExecutionState; }
+        public void setEffectiveExecutionState(String value) { this.effectiveExecutionState = value; }
 
         public String getOneHourOpportunityLabel() { return oneHourOpportunityLabel; }
         public void setOneHourOpportunityLabel(String value) { this.oneHourOpportunityLabel = value; }
@@ -878,6 +904,34 @@ public class DashboardHomeVO {
         public void setConfused(Boolean confused) { this.confused = confused; }
         public LocalDateTime getUpdatedAt() { return updatedAt; }
         public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    }
+
+    public static class AssetRiskItemVO {
+        private String riskType;
+        private String riskTypeLabel;
+        private Integer score;
+        private String severity;
+        private String primaryEvidence;
+        private String source;
+        private Instant observedAt;
+        private String recoveryCondition;
+
+        public String getRiskType() { return riskType; }
+        public void setRiskType(String value) { this.riskType = value; }
+        public String getRiskTypeLabel() { return riskTypeLabel; }
+        public void setRiskTypeLabel(String value) { this.riskTypeLabel = value; }
+        public Integer getScore() { return score; }
+        public void setScore(Integer value) { this.score = value; }
+        public String getSeverity() { return severity; }
+        public void setSeverity(String value) { this.severity = value; }
+        public String getPrimaryEvidence() { return primaryEvidence; }
+        public void setPrimaryEvidence(String value) { this.primaryEvidence = value; }
+        public String getSource() { return source; }
+        public void setSource(String value) { this.source = value; }
+        public Instant getObservedAt() { return observedAt; }
+        public void setObservedAt(Instant value) { this.observedAt = value; }
+        public String getRecoveryCondition() { return recoveryCondition; }
+        public void setRecoveryCondition(String value) { this.recoveryCondition = value; }
     }
 
     public static class PositionVO {
@@ -1193,6 +1247,7 @@ public class DashboardHomeVO {
         private String statusLabel;
         private String blockedReason;
         private String sourceAnalysisId;
+        private String sourceDecisionId;
         private String sourceExecutionPlanId;
         private String sourceTraceId;
         private Boolean positionMode = false;
@@ -1256,6 +1311,8 @@ public class DashboardHomeVO {
         public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
         public String getSourceAnalysisId() { return sourceAnalysisId; }
         public void setSourceAnalysisId(String sourceAnalysisId) { this.sourceAnalysisId = sourceAnalysisId; }
+        public String getSourceDecisionId() { return sourceDecisionId; }
+        public void setSourceDecisionId(String value) { this.sourceDecisionId = value; }
         public String getSourceExecutionPlanId() { return sourceExecutionPlanId; }
         public void setSourceExecutionPlanId(String sourceExecutionPlanId) { this.sourceExecutionPlanId = sourceExecutionPlanId; }
         public String getSourceTraceId() { return sourceTraceId; }
@@ -1429,6 +1486,7 @@ public class DashboardHomeVO {
     public static class AiDecisionVO {
         private String analysisId;
         private String decisionId;
+        private String traceId;
         private String symbol;
         private String schemaVersion;
         private String runStatus;
@@ -1443,6 +1501,8 @@ public class DashboardHomeVO {
         public void setAnalysisId(String analysisId) { this.analysisId = analysisId; }
         public String getDecisionId() { return decisionId; }
         public void setDecisionId(String decisionId) { this.decisionId = decisionId; }
+        public String getTraceId() { return traceId; }
+        public void setTraceId(String value) { this.traceId = value; }
         public String getSymbol() { return symbol; }
         public void setSymbol(String symbol) { this.symbol = symbol; }
 

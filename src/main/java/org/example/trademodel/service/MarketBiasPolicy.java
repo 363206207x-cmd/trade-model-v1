@@ -1,6 +1,7 @@
 package org.example.trademodel.service;
 
 import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.v41.V41StructuralDirectionEngine;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -49,39 +50,32 @@ public final class MarketBiasPolicy {
             FundamentalAiV41Properties.Normalization normalization) {
         requireConfig(config);
         requireNormalization(normalization);
-        BigDecimal fourHour = normalizedDirectionScore(bars4h, normalization);
-        BigDecimal oneHour = normalizedDirectionScore(bars1h, normalization);
+        V41StructuralDirectionEngine.Assessment structuralAssessment =
+                V41StructuralDirectionEngine.assess(bars1h, bars4h);
+        BigDecimal fourHour = structuralAssessment.trend4h();
+        BigDecimal oneHour = structuralAssessment.state1h();
         BigDecimal fifteenMinute = normalizedDirectionScore(bars15m, normalization);
         BigDecimal fiveMinute = normalizedDirectionScore(bars5m, normalization);
         if (fourHour == null || oneHour == null) {
             return new DirectionAssessment("WAIT", "INSUFFICIENT_DATA", null,
                     fourHour, oneHour, fifteenMinute, fiveMinute,
-                    normalization.getVersion());
+                    V41StructuralDirectionEngine.VERSION,
+                    structuralAssessment.atr1h(),
+                    structuralAssessment.invalidationLevel(),
+                    structuralAssessment.snapshotFingerprint(),
+                    structuralAssessment.calibration());
         }
-        boolean opposingCoreDirections = fourHour.signum() != 0 && oneHour.signum() != 0
-                && fourHour.signum() != oneHour.signum();
-        boolean configuredOppositionConflict = opposingCoreDirections
-                && fourHour.subtract(oneHour).abs()
-                .compareTo(config.getMaximumTrendScoreDifference()) > 0;
-        boolean highMagnitudeOppositionConflict = opposingCoreDirections
-                && fourHour.abs().compareTo(BigDecimal.valueOf(35)) >= 0
-                && oneHour.abs().compareTo(BigDecimal.valueOf(35)) >= 0;
-        boolean criticalConflict = configuredOppositionConflict || highMagnitudeOppositionConflict;
-        BigDecimal structural = fourHour.multiply(config.getFourHourWeight())
-                .add(oneHour.multiply(config.getOneHourWeight()))
-                .setScale(4, RoundingMode.HALF_UP);
-        String bias = criticalConflict ? "WAIT" : classifyStructuralBias(structural);
-        boolean strongDispersion = ("STRONG_BULLISH".equals(bias) || "STRONG_BEARISH".equals(bias))
-                && fourHour.signum() == oneHour.signum()
-                && fourHour.subtract(oneHour).abs()
-                .compareTo(config.getMaximumTrendScoreDifference()) > 0;
-        if (strongDispersion) {
-            bias = "STRONG_BULLISH".equals(bias) ? "BULLISH" : "BEARISH";
-        }
+        boolean criticalConflict = "MULTI_TIMEFRAME_CONFLICT".equals(structuralAssessment.state());
+        BigDecimal structural = structuralAssessment.directionScore();
+        String bias = structuralAssessment.direction();
         return new DirectionAssessment(bias,
                 criticalConflict ? "MULTI_TIMEFRAME_CONFLICT" : "READY",
                 structural, fourHour, oneHour, fifteenMinute, fiveMinute,
-                normalization.getVersion());
+                V41StructuralDirectionEngine.VERSION,
+                structuralAssessment.atr1h(),
+                structuralAssessment.invalidationLevel(),
+                structuralAssessment.snapshotFingerprint(),
+                structuralAssessment.calibration());
     }
 
     public static Map<String, Map<String, Object>> describeTimeframes(
@@ -341,7 +335,11 @@ public final class MarketBiasPolicy {
             BigDecimal normalized1hDirectionScore,
             BigDecimal normalized15mDirectionScore,
             BigDecimal normalized5mDirectionScore,
-            String normalizationVersion) {
+            String normalizationVersion,
+            BigDecimal atr1h,
+            BigDecimal invalidationLevel,
+            String snapshotFingerprint,
+            V41StructuralDirectionEngine.Calibration calibration) {
         public boolean structurallyReady() {
             return "READY".equals(directionDataState);
         }

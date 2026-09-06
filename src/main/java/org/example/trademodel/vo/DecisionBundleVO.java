@@ -29,6 +29,16 @@ public class DecisionBundleVO {
     private String scoreVersion;
     private String dataQualityVersion;
     private String providerMatrixVersion;
+    private BigDecimal structuralDirectionScore;
+    private BigDecimal structuralTrend4hScore;
+    private BigDecimal structuralState1hScore;
+    private BigDecimal structuralAtr1h;
+    private BigDecimal structuralInvalidationLevel;
+    private String directionSnapshotFingerprint;
+    private String confidenceVersion;
+    private Integer confidenceCalibrationSampleCount;
+    private Double confidenceBrierScore;
+    private Double confidenceCalibrationError;
     private String ruleConfidence;
     private String ruleRisk;
     private String rulePlanMode;
@@ -143,6 +153,26 @@ public class DecisionBundleVO {
     public void setDataQualityVersion(String value) { this.dataQualityVersion = value; }
     public String getProviderMatrixVersion() { return providerMatrixVersion; }
     public void setProviderMatrixVersion(String value) { this.providerMatrixVersion = value; }
+    public BigDecimal getStructuralDirectionScore() { return structuralDirectionScore; }
+    public void setStructuralDirectionScore(BigDecimal value) { this.structuralDirectionScore = value; }
+    public BigDecimal getStructuralTrend4hScore() { return structuralTrend4hScore; }
+    public void setStructuralTrend4hScore(BigDecimal value) { this.structuralTrend4hScore = value; }
+    public BigDecimal getStructuralState1hScore() { return structuralState1hScore; }
+    public void setStructuralState1hScore(BigDecimal value) { this.structuralState1hScore = value; }
+    public BigDecimal getStructuralAtr1h() { return structuralAtr1h; }
+    public void setStructuralAtr1h(BigDecimal value) { this.structuralAtr1h = value; }
+    public BigDecimal getStructuralInvalidationLevel() { return structuralInvalidationLevel; }
+    public void setStructuralInvalidationLevel(BigDecimal value) { this.structuralInvalidationLevel = value; }
+    public String getDirectionSnapshotFingerprint() { return directionSnapshotFingerprint; }
+    public void setDirectionSnapshotFingerprint(String value) { this.directionSnapshotFingerprint = value; }
+    public String getConfidenceVersion() { return confidenceVersion; }
+    public void setConfidenceVersion(String value) { this.confidenceVersion = value; }
+    public Integer getConfidenceCalibrationSampleCount() { return confidenceCalibrationSampleCount; }
+    public void setConfidenceCalibrationSampleCount(Integer value) { this.confidenceCalibrationSampleCount = value; }
+    public Double getConfidenceBrierScore() { return confidenceBrierScore; }
+    public void setConfidenceBrierScore(Double value) { this.confidenceBrierScore = value; }
+    public Double getConfidenceCalibrationError() { return confidenceCalibrationError; }
+    public void setConfidenceCalibrationError(Double value) { this.confidenceCalibrationError = value; }
     public String getRuleConfidence() { return ruleConfidence; }
     public void setRuleConfidence(String value) { this.ruleConfidence = value; }
     public String getRuleRisk() { return ruleRisk; }

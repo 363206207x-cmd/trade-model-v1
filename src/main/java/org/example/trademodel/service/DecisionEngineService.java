@@ -21,6 +21,8 @@ import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EventImpactInputVO;
 import org.example.trademodel.vo.ScoreItemVO;
+import org.example.trademodel.v41.V41ConfidenceCalibrationPolicy;
+import org.example.trademodel.v41.V41StructuralDirectionEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -275,8 +277,11 @@ public class DecisionEngineService {
             boolean aiQualityEligible = dataQualityScore != null
                     && dataQualityScore >= v41Properties.getAiGate().getMinimumDataQuality();
             if (!aiQualityEligible) confidenceLevel = downgradeConfidenceLevel(confidenceLevel);
-            boolean hasUsableMarketStructure = directional(ruleMarketBias)
-                    && directionAssessment.structurallyReady();
+            // A complete, genuinely range-bound 4h/1h structure is a valid market observation.
+            // Directionality is required for an executable opportunity, but must not be used as
+            // a proxy for missing inputs; otherwise every legitimate WAIT/RANGE snapshot is
+            // mislabeled HIGH_RISK and the dashboard reports a source failure that did not occur.
+            boolean hasUsableMarketStructure = directionAssessment.structurallyReady();
             boolean dataQualitySufficient = DataQualityCircuitBreakerPolicy.passes(dataQualityScore);
             boolean decisionInputsSufficient = dataQualitySufficient && hasUsableMarketStructure;
             boolean worthOpening = finalScore >= worthOpeningMinScore && multiTfConvergence
@@ -466,7 +471,31 @@ public class DecisionEngineService {
             decision.setOneHourOpportunityQuality(directionQuality(
                     directionAssessment.normalized1hDirectionScore()));
             decision.setFourHourTrendAlignment(fourHourAlignment(directionAssessment));
-            decision.setNormalizationVersion(v41Properties.getNormalization().getVersion());
+            V41StructuralDirectionEngine.Calibration directionCalibration = directionAssessment.calibration();
+            V41ConfidenceCalibrationPolicy.Result calibratedConfidence =
+                    V41ConfidenceCalibrationPolicy.calibrate(new V41ConfidenceCalibrationPolicy.Input(
+                            dataQualityScore == null ? 0 : dataQualityScore,
+                            directionCalibration.walkForwardHitRate() == null ? 0.0
+                                    : directionCalibration.walkForwardHitRate(),
+                            decision.getFourHourTrendAlignment() == null ? 0.0
+                                    : decision.getFourHourTrendAlignment(),
+                            derivativesAssessment == null ? 65.0
+                                    : derivativesAssessment.confirmEligible() ? 90.0 : 70.0,
+                            directionCalibration.sampleCount(), directionCalibration.brierScore(),
+                            directionCalibration.calibrationError()));
+            decision.setFinalConfidence(calibratedConfidence.available()
+                    ? calibratedConfidence.confidence() : null);
+            decision.setNormalizationVersion(directionAssessment.normalizationVersion());
+            decision.setStructuralDirectionScore(directionAssessment.structuralBias());
+            decision.setStructuralTrend4hScore(directionAssessment.normalized4hDirectionScore());
+            decision.setStructuralState1hScore(directionAssessment.normalized1hDirectionScore());
+            decision.setStructuralAtr1h(directionAssessment.atr1h());
+            decision.setStructuralInvalidationLevel(directionAssessment.invalidationLevel());
+            decision.setDirectionSnapshotFingerprint(directionAssessment.snapshotFingerprint());
+            decision.setConfidenceVersion(calibratedConfidence.version());
+            decision.setConfidenceCalibrationSampleCount(calibratedConfidence.sampleCount());
+            decision.setConfidenceBrierScore(calibratedConfidence.brierScore());
+            decision.setConfidenceCalibrationError(calibratedConfidence.calibrationError());
             decision.setScoreVersion(V41DecisionContractPolicy.SCORE_VERSION);
             decision.setDataQualityVersion(V41DecisionContractPolicy.DATA_QUALITY_VERSION);
             decision.setProviderMatrixVersion(v41Properties.getProviderMatrix().getVersion());
@@ -519,9 +548,21 @@ public class DecisionEngineService {
             decision.setPushExpiresAt(pushExpiresAt);
             decision.setValidFrom(validFrom);
             decision.setExpiresAt(expiresAt);
-            decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
-            decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
-            decision.setPushInvalidationSummary(pushInvalidationSummary);
+            if (MarketBiasPolicy.bullishFamily(ruleMarketBias)
+                    && directionAssessment.invalidationLevel() != null) {
+                decision.setPushInvalidPriceBelow(directionAssessment.invalidationLevel());
+                decision.setPushInvalidPriceAbove(null);
+                decision.setPushInvalidationSummary("结构失效：当前价低于闭合1小时结构失效位");
+            } else if (MarketBiasPolicy.bearishFamily(ruleMarketBias)
+                    && directionAssessment.invalidationLevel() != null) {
+                decision.setPushInvalidPriceBelow(null);
+                decision.setPushInvalidPriceAbove(directionAssessment.invalidationLevel());
+                decision.setPushInvalidationSummary("结构失效：当前价高于闭合1小时结构失效位");
+            } else {
+                decision.setPushInvalidPriceBelow(pushInvalidPriceBelow);
+                decision.setPushInvalidPriceAbove(pushInvalidPriceAbove);
+                decision.setPushInvalidationSummary(pushInvalidationSummary);
+            }
             if (derivativesAssessment != null) {
                 decision.setDerivativesStatus(derivativesAssessment.sourceStatus() == null
                         ? null : derivativesAssessment.sourceStatus().name());

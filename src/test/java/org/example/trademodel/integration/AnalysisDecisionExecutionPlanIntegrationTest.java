@@ -220,7 +220,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         String symbol = "BNBUSDT";
         AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
-        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(persisted.getMarketBiasHierarchy()).contains("BULLISH");
 
         clearInvocations(aiDecisionOrchestratorService, decisionChainAiOrchestratorService);
         DashboardHomeVO home = dashboardHomeService.getHome(symbol, 6);
@@ -233,7 +233,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(home.getSelectedAssetContext()).isNotNull();
         assertThat(home.getSelectedAssetContext().getRawSymbol()).isEqualTo(symbol);
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DIRECTION_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getDirection()).isNull();
+        assertThat(home.getExecutionSuggestion().getDirection()).contains("BULLISH");
         assertThat(home.getAiDecision().getSchemaVersion()).isEqualTo("v2");
         assertThat(home.getAiDecision().getTabs()).allSatisfy(tab ->
                 assertThat(tab.getResultAvailable()).isTrue());
@@ -248,7 +248,7 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         DecisionResult persisted = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
         AiRoleResultsPayload payload = aiRoleResultsCodec.parse(persisted.getAiRoleResults()).payload();
 
-        assertThat(persisted.getMarketBiasHierarchy()).isEqualTo("WAIT");
+        assertThat(persisted.getMarketBiasHierarchy()).contains("BULLISH");
         assertThat(persisted.getRuleMarketBias()).contains("BULLISH");
         assertThat(persisted.getValidatedMarketBias()).contains("BULLISH");
         assertThat(persisted.getFinalMarketBias()).isNull();
@@ -455,6 +455,70 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         assertThat(plan.getNotAutoTrading()).isTrue();
         assertThat(plan.getNotOrderExecution()).isTrue();
         assertThat(plan.getNotUserPositionCreation()).isTrue();
+    }
+
+    @Test
+    void readyValidatedDirectionBuildsTraceableConditionalRulePlanWithoutBecomingExecutable() {
+        DecisionBundleVO decision = new DecisionBundleVO();
+        decision.setDecisionId("decision-structural-plan");
+        decision.setDirectionDataState("READY");
+        decision.setValidatedMarketBias("BULLISH");
+        decision.setPushTriggerPrice(new BigDecimal("100"));
+        decision.setStructuralAtr1h(new BigDecimal("2"));
+        decision.setStructuralInvalidationLevel(new BigDecimal("96"));
+        decision.setValidFrom(OffsetDateTime.parse("2026-07-20T10:00:00Z"));
+
+        ExecutionPlanVO plan = new PlanServiceImpl().buildRuleExecutionAssessment(decision, null);
+
+        assertThat(plan.getEntryZone()).isEqualTo("99.3 – 99.8");
+        assertThat(plan.getStopLoss()).isEqualTo("96");
+        assertThat(plan.getTakeProfitRules()).contains("TP1 106", "TP2 108.8");
+        assertThat(plan.getInvalidCondition()).contains("价格跌破 96");
+        assertThat(plan.getExecutionPlanStatus()).isEqualTo("INCOMPLETE");
+        assertThat(plan.getManualReviewRequired()).isTrue();
+        assertThat(plan.getNotExecutable()).isTrue();
+        assertThat(plan.getNotAutoTrading()).isTrue();
+        assertThat(plan.getNotOrderExecution()).isTrue();
+    }
+
+    @Test
+    void onDemandThreeAiPreviewKeepsCardPlanAndAiOnOneRun() {
+        String symbol = "SOLUSDT";
+        Long userId = 77L;
+        when(realMarketEnvironmentService.tryBuildFromRealQuote(eq(symbol), eq("1h")))
+                .thenReturn(Optional.of(authoritativeMarketEnvironment(symbol)));
+        persistDecisionTimeframes(symbol, true, 100);
+
+        AnalysisRunResult result = analysisRunOrchestrator.run(
+                AnalysisRunCommand.preview(userId, symbol, "1h", "req-preview-aligned", null));
+
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        AnalysisRunDO run = analysisRunMapper.selectById(result.getAnalysisId());
+        DecisionResult decision = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(run.getPreview()).isTrue();
+        assertThat(plan).isNotNull();
+        assertThat(plan.getFinalPlan()).isFalse();
+        assertThat(plan.getEntryZone()).isNotBlank();
+        assertThat(plan.getStopLoss()).isNotBlank();
+        assertThat(plan.getTakeProfitRules()).isNotBlank();
+
+        DashboardHomeVO home = dashboardHomeService.getHomeForUser(userId, symbol, 6);
+        assertThat(home.getSelectedAssetContext().getAnalysisId()).isEqualTo(result.getAnalysisId());
+        assertThat(home.getSelectedAssetContext().getDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(home.getSelectedAssetContext().getTraceId()).isEqualTo(run.getTraceId());
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo(result.getAnalysisId());
+        assertThat(home.getExecutionSuggestion().getSourceDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(home.getExecutionSuggestion().getSourceTraceId()).isEqualTo(run.getTraceId());
+        assertThat(home.getAiDecision().getAnalysisId()).isEqualTo(result.getAnalysisId());
+        assertThat(home.getAiDecision().getDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(home.getAiDecision().getTraceId()).isEqualTo(run.getTraceId());
+        assertThat(home.getAiDecision().getTabs()).allSatisfy(tab -> {
+            assertThat(tab.getAnalysisId()).isEqualTo(result.getAnalysisId());
+            assertThat(tab.getDecisionId()).isEqualTo(decision.getDecisionId());
+            assertThat(tab.getTraceId()).isEqualTo(run.getTraceId());
+        });
+        assertThat(count("tm_user_position")).isZero();
     }
 
     @Test

@@ -102,14 +102,14 @@ public class FundamentalAiV41Properties {
         value.aiGate.dailyCostMicrosLimit = 100000000L;
         value.aiGate.concurrencyLimit = 3;
         value.aiGate.maxRetryPerRole = 1;
-        value.multiTimeframe.fourHourWeight = new BigDecimal("0.57");
-        value.multiTimeframe.oneHourWeight = new BigDecimal("0.43");
+        value.multiTimeframe.fourHourWeight = new BigDecimal("0.55");
+        value.multiTimeframe.oneHourWeight = new BigDecimal("0.45");
         value.multiTimeframe.fifteenMinuteWeight = BigDecimal.ZERO;
         value.multiTimeframe.fiveMinuteWeight = BigDecimal.ZERO;
         value.multiTimeframe.minimumAlignedCount = 2;
         value.multiTimeframe.minimumAlignedWeight = BigDecimal.ONE;
         value.multiTimeframe.maximumTrendScoreDifference = new BigDecimal("15");
-        value.normalization.version = "V41-NORM-WREP-1";
+        value.normalization.version = "V41-DIRECTION-4H1H-2";
         value.normalization.lookback = 200;
         value.normalization.minimumSampleCount = 60;
         value.normalization.winsorizeLowerPercentile = new BigDecimal("2.5");
