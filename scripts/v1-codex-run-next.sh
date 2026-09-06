@@ -32,8 +32,18 @@ EOF
 state_value() {
   local state_text="$1"
   local key="$2"
-  printf '%s\n' "$state_text" | awk -F': ' -v key="$key" '$1 == key {print substr($0, length(key) + 3); exit}'
+  printf '%s\n' "$state_text" | awk -F': ' -v key="$key" '
+    $1 == key && !found {
+      print substr($0, length(key) + 3)
+      found=1
+    }
+  '
 }
+
+if [[ "${V1_STATE_VALUE_SELF_TEST:-0}" == "1" ]]; then
+  state_value "$(cat)" "${V1_STATE_VALUE_KEY:-}"
+  exit 0
+fi
 
 yaml_value() {
   local file="$1"

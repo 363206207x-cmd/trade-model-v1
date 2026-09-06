@@ -593,8 +593,8 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOS
   [[ "$authorized_next_package_edits" == "true" && "$authorized_next_package_implementation" == "true" && "$authorized_next_package_pr" == "true" && "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Web live direction and risk closure permissions mismatch"
   [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
   [[ "$p1b_scope" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY"
-  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "9de0b85f8d733df34d4e8323b88d71a113192a3d" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
-  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "ca8723808584839cb9e8af3c689ca2a10ea72a2e" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "7b5cf25f5dc0632643a09b5086322bf860c1fea3" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "f6f6d0ab58885d14fd962f17c9b7ef305823439a" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
   if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
   fi
@@ -634,8 +634,8 @@ fi
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
 if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   for transition_condition in \
-    EXACT_NINE_PATH_GATE_ALLOWLIST \
-    EXACT_FORTY_ONE_PATH_IMPLEMENTATION_ALLOWLIST; do
+    EXACT_TEN_PATH_GATE_ALLOWLIST \
+    EXACT_SIXTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST; do
     printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
       || fail "missing v4.1 authorization transition condition: $transition_condition"
   done
@@ -964,6 +964,18 @@ assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLIC
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked PRODUCT_SOURCE_FAILURE product_source_failure BLOCKED_PRODUCT_SOURCE_GATE \
   --request-package "$authorized_next_package_phase"
+
+state_value_fixture='TARGET_KEY: first-value'
+for state_value_index in $(seq 1 200); do
+  state_value_fixture="${state_value_fixture}"$'\n'"TRAILING_KEY_${state_value_index}: value-${state_value_index}"
+done
+state_value_fixture="${state_value_fixture}"$'\n'"TARGET_KEY: duplicate-must-not-win"
+state_value_output="$(printf '%s\n' "$state_value_fixture" | \
+  V1_STATE_VALUE_SELF_TEST=1 V1_STATE_VALUE_KEY=TARGET_KEY bash scripts/v1-codex-run-next.sh)" \
+  || fail "outer launcher state parser failed under set -euo pipefail"
+[[ "$state_value_output" == "first-value" ]] \
+  || fail "outer launcher state parser must return the first duplicate exactly once"
+echo "OUTER_LAUNCHER_STATE_VALUE_PIPEFAIL: PASS"
 
 set +e
 invalid_evidence_output="$(V1_OPEN_PR_NONE_CONFIRMED=INVALID V1_WORKFLOW_SELF_TEST=1 \
