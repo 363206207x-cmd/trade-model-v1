@@ -222,7 +222,8 @@
             && eligibleOpportunity(asset)
             && asset.hasFinal === true
             && has(asset.finalMarketBias)
-            && ["CONFIRMATION", "REDUCED", "PREPARATION"].indexOf(finalMode) >= 0
+            && (["CONFIRMATION", "REDUCED", "PREPARATION"].indexOf(finalMode) >= 0
+                || ["OBSERVATION", "BLOCKED"].indexOf(finalMode) >= 0)
             && has(asset.confidenceLevel)
             && has(asset.riskLevel);
     }

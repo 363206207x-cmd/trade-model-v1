@@ -35,4 +35,14 @@ class WebLiveDashboardContractTest {
                         desktop.indexOf("function stableSubmissionId")))
                 .doesNotContain("analysis-preview", "method: \"POST\"", "/api/user-positions");
     }
+
+    @Test
+    void desktopKeepsDirectionalBlockedAndObservationPlansInSixCardGrid() throws Exception {
+        String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+
+        assertThat(desktop).contains(
+                "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"].indexOf(finalMode) >= 0",
+                "[\"OBSERVATION\", \"BLOCKED\"].indexOf(finalMode) >= 0"
+        );
+    }
 }
