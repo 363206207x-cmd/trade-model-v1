@@ -1244,8 +1244,13 @@
         form.elements.sourceType.value = "MANUAL_INDEPENDENT";
         form.elements.submissionId.value = stableSubmissionId("position-open");
         form.elements.openedAt.value = localDateTimeValue(new Date());
+        var freshSubmissionId = form.elements.submissionId.value;
+        var freshOpenedAt = form.elements.openedAt.value;
         if (selectedSymbol) form.elements.assetSymbol.value = selectedSymbol;
         if (draft) restoreForm(form, draft);
+        form.elements.sourceType.value = "MANUAL_INDEPENDENT";
+        if (!has(form.elements.submissionId.value)) form.elements.submissionId.value = freshSubmissionId;
+        if (!has(form.elements.openedAt.value)) form.elements.openedAt.value = freshOpenedAt;
         writeDraft(key, formSnapshot(form));
         dialog.dataset.restoreFocusId = trigger && trigger.id || "";
         setFormStatus("homePositionEntryStatus", draft ? "已恢复未提交内容" : "", "");
@@ -1261,7 +1266,11 @@
         form.reset();
         form.elements.submissionId.value = stableSubmissionId("position-close");
         form.elements.closedAt.value = localDateTimeValue(new Date());
+        var freshSubmissionId = form.elements.submissionId.value;
+        var freshClosedAt = form.elements.closedAt.value;
         if (draft) restoreForm(form, draft);
+        if (!has(form.elements.submissionId.value)) form.elements.submissionId.value = freshSubmissionId;
+        if (!has(form.elements.closedAt.value)) form.elements.closedAt.value = freshClosedAt;
         writeDraft(key, formSnapshot(form));
         document.getElementById("homePositionCloseHeading").textContent = "记录平仓 · " + symbol;
         dialog.dataset.restoreFocusId = trigger && trigger.id || "";

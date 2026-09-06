@@ -58,4 +58,16 @@ class WebLiveDashboardContractTest {
                 "clearHomeRequestFailure();"
         );
     }
+
+    @Test
+    void restoredPositionDraftCannotEraseIdempotencyOrManualSourceFields() throws Exception {
+        String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+
+        assertThat(desktop).contains(
+                "form.elements.submissionId.value = stableSubmissionId(\"position-open\")",
+                "form.elements.sourceType.value = \"MANUAL_INDEPENDENT\";\n        if (!has(form.elements.submissionId.value))",
+                "form.elements.submissionId.value = stableSubmissionId(\"position-close\")",
+                "if (!has(form.elements.closedAt.value)) form.elements.closedAt.value = freshClosedAt"
+        );
+    }
 }
