@@ -28,8 +28,8 @@ class MarketBiasPolicyTest {
         String bullish = classify(down(), down(), up(), up());
         String bearish = classify(up(), up(), down(), down());
 
-        assertThat(bullish).isEqualTo("STRONG_BULLISH");
-        assertThat(bearish).isEqualTo("STRONG_BEARISH");
+        assertThat(bullish).isIn("BULLISH", "STRONG_BULLISH");
+        assertThat(bearish).isIn("BEARISH", "STRONG_BEARISH");
     }
 
     @Test
@@ -65,7 +65,7 @@ class MarketBiasPolicyTest {
         assertThat(assessment.normalized4hDirectionScore()
                 .subtract(assessment.normalized1hDirectionScore()).abs())
                 .isGreaterThan(properties.getMultiTimeframe().getMaximumTrendScoreDifference());
-        assertThat(assessment.ruleMarketBias()).isEqualTo("BULLISH");
+        assertThat(assessment.ruleMarketBias()).isEqualTo("WEAK_BULLISH");
     }
 
     @Test

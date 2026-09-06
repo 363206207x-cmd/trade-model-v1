@@ -48,6 +48,8 @@ binance:
     secret: ${BINANCE_API_SECRET}
 
 trade-model:
+  home-live:
+    enabled: ${TRADE_MODEL_HOME_LIVE_ENABLED:true}
   ai:
     background-execution:
       enabled: ${TRADE_MODEL_AI_BACKGROUND_EXECUTION_ENABLED:true}

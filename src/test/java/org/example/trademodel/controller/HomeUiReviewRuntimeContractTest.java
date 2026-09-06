@@ -94,7 +94,7 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
-                assert.equal(eth.includes('<small>风险</small><strong class="semantic-value semantic-bearish">高</strong>'), true);
+                assert.equal(eth.includes('<small>风险</small><strong data-live-field="risk" class="semantic-value semantic-medium-risk">中</strong>'), true);
                 assert.equal(eth.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(eth.includes('<small>状态</small>'), false);
                 assert.equal(eth.includes('<small>数据</small>'), false);
@@ -188,9 +188,9 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(validOpportunityCard({ ...blockedObservation, slotType: 'DECISION', analysisId: null }), false);
                 const observationHtml = opportunityCard(observation, '');
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
-                assert.equal(observationHtml.includes('<small>方向</small><b class="semantic-value semantic-neutral">暂不可判断</b>'), true);
-                assert.equal(observationHtml.includes('<small>置信</small><strong>—</strong>'), true);
-                assert.equal(observationHtml.includes('<small>风险</small><strong class="semantic-value semantic-neutral">暂不可判断</strong>'), true);
+                assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-neutral">暂不可判断</b>'), true);
+                assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
+                assert.equal(observationHtml.includes('<small>风险</small><strong data-live-field="risk" class="semantic-value semantic-neutral">暂不可判断</strong>'), true);
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
                 assert.equal(observationHtml.includes('<small>状态</small>'), false);

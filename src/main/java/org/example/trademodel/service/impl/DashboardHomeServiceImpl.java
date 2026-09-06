@@ -78,6 +78,9 @@ import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
+import org.example.trademodel.v41.V41RiskVectorPolicy;
+import org.example.trademodel.v41.V41StructuralPlanPolicy;
+import org.example.trademodel.v41.DashboardLiveEventService;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -161,6 +164,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private PersistedOhlcvQueryService persistedOhlcvQueryService;
     private MarketDataScheduler marketDataScheduler;
     private PlanRevalidationService planRevalidationService;
+    private DashboardLiveEventService dashboardLiveEventService;
     private Clock planValidityClock = Clock.systemUTC();
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
@@ -206,6 +210,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                            DerivativesBusinessIntegrationService derivativesBusinessIntegrationService) {
         this.derivativesSnapshotReadPort = derivativesSnapshotReadPort;
         this.derivativesBusinessIntegrationService = derivativesBusinessIntegrationService;
+    }
+
+    @Autowired(required = false)
+    void setDashboardLiveEventService(DashboardLiveEventService value) {
+        this.dashboardLiveEventService = value;
     }
 
     @Autowired(required = false)
@@ -351,10 +360,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
         }
 
-        ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, selectedDecision);
+        DecisionResultVO aiPreviewMarker = latestCoherentAiPreviewMarker(userId, normalizedSelected);
+        DecisionResultVO displayDecision = latestAlignedAiPreview(
+                userId, normalizedSelected, selectedDecision, aiPreviewMarker);
+        if (displayDecision != null && displayDecision != selectedDecision) {
+            assets = replaceSelectedAssetDecision(assets, normalizedSelected, displayDecision);
+        }
+
+        ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, displayDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
-        DecisionResultVO aiDecisionSource = latestCoherentAiPreview(userId, normalizedSelected, selectedDecision);
+        DecisionResultVO aiDecisionSource = displayDecision != selectedDecision
+                ? displayDecision : aiPreviewMarker != null ? aiPreviewMarker : selectedDecision;
         DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(aiDecisionSource);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         Instant globalDataUpdatedAt = latestPersistedClosedBarAt();
@@ -373,7 +390,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AssetVO selectedAsset = findHomeAsset(assets, normalizedSelected);
         DashboardHomeVO.AssetVO selectedContext = selectedAsset != null
                 ? selectedAsset
-                : selectedDecision == null ? null : assetFromDecision(0, selectedDecision);
+                : displayDecision == null ? null : assetFromDecision(0, displayDecision);
         home.setSelectedAssetContext(selectedContext);
         home.setSelectedContextState(selectedAsset != null ? "RANKED"
                 : selectedContext != null ? "EXITED_TOP6" : "NO_ACTIVE_CONTEXT");
@@ -384,21 +401,21 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setSelectedPositionId(activePosition != null ? activePosition.getPositionId() : null);
         home.setPositionSelectionStatus(positionSelection.status().name());
         home.setMatchingPositionCount(positionSelection.matchingPositionCount());
-        DecisionResultVO executionDecision = selectedProjection != null
+        DecisionResultVO executionDecision = displayDecision == selectedDecision && selectedProjection != null
                 && selectedProjection.sourceDecision() == null
-                ? null : selectedDecision;
+                ? null : displayDecision;
         DashboardHomeVO.ExecutionSuggestionVO executionSuggestion = buildExecutionSuggestion(executionDecision);
         home.setExecutionSuggestion(executionSuggestion);
         home.setAiDecision(aiDecision);
         home.setPushInbox(pushInboxContext.pushInbox());
         DashboardHomeVO.DerivativesSummaryVO derivativesSummary = buildDerivativesSummary(
-                normalizedSelected, selectedDecision);
+                normalizedSelected, displayDecision);
         home.setDerivatives(derivativesSummary);
         if (selectedContext != null && derivativesSummary != null
                 && upper(derivativesSummary.getSource()).startsWith("COINGLASS")) {
             selectedContext.setCoinGlassDataAt(derivativesSummary.getDataTime());
         }
-        home.setDiagnostics(buildDiagnostics(systemStatus, decisions, selectedDecision, positionSyncStatus,
+        home.setDiagnostics(buildDiagnostics(systemStatus, decisions, displayDecision, positionSyncStatus,
                 pushInboxContext, providerReadiness, positionRowsResult));
         home.setSafety(new DashboardHomeVO.SafetyVO());
         DashboardHomeVO.ModuleStatesVO moduleStates = buildModuleStates(
@@ -407,7 +424,46 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
         home.getHeader().setUpdatedAt(globalDataUpdatedAt);
+        registerLiveStructuralContexts(userId, assets);
         return home;
+    }
+
+    private List<DashboardHomeVO.AssetVO> replaceSelectedAssetDecision(
+            List<DashboardHomeVO.AssetVO> assets,
+            String selectedSymbol,
+            DecisionResultVO decision) {
+        if (assets == null || assets.isEmpty() || decision == null || !hasText(selectedSymbol)) {
+            return assets == null ? List.of() : assets;
+        }
+        List<DashboardHomeVO.AssetVO> aligned = new ArrayList<>(assets);
+        String normalized = normalizeSymbol(selectedSymbol);
+        for (int index = 0; index < aligned.size(); index++) {
+            DashboardHomeVO.AssetVO asset = aligned.get(index);
+            if (asset != null && Objects.equals(normalized, normalizeSymbol(asset.getRawSymbol()))) {
+                aligned.set(index, assetFromDecision(index + 1, decision));
+                return List.copyOf(aligned);
+            }
+        }
+        return assets;
+    }
+
+    private void registerLiveStructuralContexts(Long userId, List<DashboardHomeVO.AssetVO> assets) {
+        if (dashboardLiveEventService == null || userId == null || assets == null) return;
+        for (DashboardHomeVO.AssetVO asset : assets) {
+            if (asset == null || !hasText(asset.getStructuralDirection())
+                    || !positive(asset.getStructuralAtr1h()) || asset.getDirectionCalculatedAt() == null) continue;
+            Instant calculatedAt = asset.getDirectionCalculatedAt().toInstant(ZoneOffset.UTC);
+            dashboardLiveEventService.recordStructuralContext(userId,
+                    new DashboardLiveEventService.StructuralContext(asset.getRawSymbol(),
+                            asset.getStructuralDirection(), asset.getStructuralAtr1h(),
+                            numericInvalidationLevel(asset.getPlanInvalidationLevel()),
+                            exactInteger(asset.getConfidenceLevel()), asset.getAnalysisId(),
+                            asset.getDecisionId(), asset.getTraceId(), calculatedAt,
+                            calculatedAt.plus(Duration.ofMinutes(90)),
+                            asset.getCoinGlassDataAt() != null
+                                    && !asset.getCoinGlassDataAt().isBefore(planValidityClock.instant()
+                                    .minus(Duration.ofMinutes(10)))));
+        }
     }
 
     private DashboardHomeVO.ModuleStatesVO buildModuleStates(
@@ -1050,6 +1106,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 setFieldSource(asset, "score", "DERIVED");
             }
             applyAnalysisProvenance(asset, projection, userId);
+            if (projection.sourceDecision() != null) {
+                applyAssetRiskVector(asset, projection.sourceDecision());
+            }
             assets.add(asset);
         }
         return assets;
@@ -1644,6 +1703,33 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
     }
 
+    private BigDecimal explanationDecimal(String explanationJson, String field) {
+        if (!hasText(explanationJson) || !hasText(field)) return null;
+        try {
+            JsonNode value = objectMapper.readTree(explanationJson).path(field);
+            return value.isNumber() ? value.decimalValue()
+                    : value.isTextual() ? exactDecimal(value.asText()) : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private BigDecimal numericInvalidationLevel(String invalidationLevel) {
+        if (!hasText(invalidationLevel)) return null;
+        String[] pair = invalidationLevel.split("=", 2);
+        return pair.length == 2 ? exactDecimal(pair[1]) : exactDecimal(invalidationLevel);
+    }
+
+    private Integer exactInteger(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null || !normalized.matches("\\d{1,3}")) return null;
+        try {
+            return Math.max(0, Math.min(100, Integer.parseInt(normalized)));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private BigDecimal priceDriftPct(BigDecimal priceAtDecision, BigDecimal latestPrice) {
         if (!positive(priceAtDecision) || !positive(latestPrice)) return null;
         return latestPrice.subtract(priceAtDecision)
@@ -1733,6 +1819,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         DashboardHomeVO.AssetVO asset = assetBase(slot, normalizeSymbol(decision.getSymbol()));
         asset.setSlotType("DECISION");
         asset.setAnalysisId(authoritativeAnalysisId(decision, asset));
+        asset.setDecisionId(trimToNull(decision.getDecisionId()));
+        asset.setTraceId(analysisTraceId(decision));
         asset.setMarketBias(trimToNull(decision.getMarketBiasHierarchy()));
         asset.setMarketBiasLabel(biasLabel(decision.getMarketBiasHierarchy()));
         setFieldSource(asset, "direction", hasText(asset.getMarketBias()) ? "DERIVED" : "MISSING");
@@ -1756,7 +1844,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
         setFieldSource(asset, "confidence", hasText(asset.getConfidenceLevel()) ? "DERIVED" : "MISSING");
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
-        asset.setRiskLabel(riskLabel(decision.getRiskLevel()));
+        asset.setRiskLabel(asset.getRiskLevel() == null ? null : riskLabel(asset.getRiskLevel()));
+        applyAssetRiskVector(asset, decision);
         setFieldSource(asset, "riskLevel", hasText(asset.getRiskLevel()) ? "DERIVED" : "MISSING");
         AssetStateResolution stateResolution = authoritativeAssetStateResolution(
                 normalizeSymbol(decision.getSymbol()), decision.getAssetStateSnapshot());
@@ -1788,6 +1877,68 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setModuleState(assetModuleState(asset));
         return asset;
     }
+
+    private void applyAssetRiskVector(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
+        if (asset == null || decision == null) return;
+        int baseRisk = clamp(decision.getRiskScore() == null ? riskScore(decision.getRiskLevel())
+                : decision.getRiskScore());
+        int dataRisk = clamp(100 - (decision.getDataQualityScore() == null ? 0 : decision.getDataQualityScore()));
+        int reversalRisk = clamp(100 - (decision.getFourHourTrendAlignment() == null
+                ? 50 : decision.getFourHourTrendAlignment()));
+        int chaseRisk = clamp(decision.getOneHourOpportunityQuality() == null ? baseRisk
+                : decision.getOneHourOpportunityQuality());
+        int crowding = baseRisk / 2;
+        int liquidation = baseRisk / 2;
+        int liquidity = baseRisk;
+        V41RiskVectorPolicy.RiskVector vector = V41RiskVectorPolicy.assess(new V41RiskVectorPolicy.Input(
+                chaseRisk, Math.max(0, baseRisk - 10), reversalRisk, crowding, liquidation,
+                liquidity, Math.max(0, baseRisk - 20), dataRisk,
+                asset.getCoinGlassDataAt() == null ? "BINANCE" : "BINANCE+COINGLASS",
+                decision.getCreateTime() == null ? planValidityClock.instant()
+                        : decision.getCreateTime().toInstant(ZoneOffset.UTC)));
+        asset.setRiskVersion(vector.version());
+        asset.setRiskItems(vector.items().stream()
+                .sorted(Comparator.comparingInt(V41RiskVectorPolicy.RiskItem::score).reversed())
+                .map(this::riskItemView).toList());
+        asset.setStructuralDirection(firstNonBlank(decision.getValidatedMarketBias(),
+                decision.getFinalMarketBias(), decision.getMarketBiasHierarchy()));
+        asset.setStructuralDirectionScore(explanationDecimal(decision.getExplanationJson(),
+                "structuralDirectionScore"));
+        asset.setStructuralAtr1h(explanationDecimal(decision.getExplanationJson(), "atr1h"));
+        asset.setSnapshotVersion(decision.getCreateTime() == null ? null
+                : decision.getCreateTime().toInstant(ZoneOffset.UTC).toEpochMilli());
+        asset.setRealtimeState("NORMAL");
+        asset.setEffectiveExecutionState("ACTIVE");
+        setFieldSource(asset, "riskLevel", "DERIVED");
+    }
+
+    private DashboardHomeVO.AssetRiskItemVO riskItemView(V41RiskVectorPolicy.RiskItem item) {
+        DashboardHomeVO.AssetRiskItemVO view = new DashboardHomeVO.AssetRiskItemVO();
+        view.setRiskType(item.riskType());
+        view.setRiskTypeLabel(item.riskTypeLabel());
+        view.setScore(item.score());
+        view.setSeverity(item.severity());
+        view.setPrimaryEvidence(item.primaryEvidence());
+        view.setSource(item.source());
+        view.setObservedAt(item.observedAt());
+        view.setRecoveryCondition(item.recoveryCondition());
+        return view;
+    }
+
+    private int riskScore(String riskLevel) {
+        return switch (upper(riskLevel)) {
+            case "EXTREME" -> 90;
+            case "HIGH" -> 78;
+            case "MEDIUM" -> 52;
+            case "LOW" -> 24;
+            default -> 50;
+        };
+    }
+
+    private static int clamp(int value) {
+        return Math.max(0, Math.min(100, value));
+    }
+
 
     private String authoritativeAnalysisId(DecisionResultVO decision, DashboardHomeVO.AssetVO asset) {
         if (decision == null || asset == null || analysisRunMapper == null
@@ -2557,6 +2708,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         suggestion.setSourceAnalysisId(trimToNull(decision.getAnalysisId()));
+        suggestion.setSourceDecisionId(trimToNull(decision.getDecisionId()));
 
         if (!AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(decision.getTimeframe())) {
             blockSuggestion(suggestion, "UNSUPPORTED_TIMEFRAME", "当前暂无完整执行计划",
@@ -2786,6 +2938,31 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
         suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
+        if (V41StructuralPlanPolicy.VERSION.equals(trimToNull(plan.getRuleVersion()))) {
+            suggestion.setDirection(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
+            suggestion.setFinalMarketBias(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
+            suggestion.setFinalPlanMode(firstNonBlank(plan.getFinalPlanMode(), plan.getPlanMode()));
+            suggestion.setRecommendedAction(trimPlanValue(plan.getRecommendedAction()));
+            suggestion.setEntryLogic(trimPlanValue(plan.getEntryLogic()));
+            suggestion.setEntryZone(trimPlanValue(plan.getEntryZone()));
+            suggestion.setTriggerCondition(trimPlanValue(plan.getTriggerCondition()));
+            suggestion.setStopLogic(trimPlanValue(plan.getStopLogic()));
+            suggestion.setStopZone(trimPlanValue(plan.getStopLoss()));
+            suggestion.setStopLoss(trimPlanValue(plan.getStopLoss()));
+            suggestion.setTargetLogic(trimPlanValue(plan.getTargetLogic()));
+            suggestion.setTargetZones(trimPlanValue(plan.getTakeProfitRules()));
+            suggestion.setTakeProfitRules(trimPlanValue(plan.getTakeProfitRules()));
+            suggestion.setInvalidCondition(trimPlanValue(plan.getInvalidCondition()));
+            suggestion.setAbandonCondition(trimPlanValue(plan.getAbandonCondition()));
+            suggestion.setExpectedRiskReward(plan.getExpectedRiskReward());
+            suggestion.setValidFrom(asUtcOffset(plan.getValidFrom()));
+            suggestion.setExpiresAt(asUtcOffset(plan.getValidUntil()));
+            suggestion.setPlanVersion(plan.getPlanVersion());
+        }
+    }
+
+    private OffsetDateTime asUtcOffset(LocalDateTime value) {
+        return value == null ? null : value.atOffset(ZoneOffset.UTC);
     }
 
     private String firstPlanReason(ExecutionPlanDO plan) {
@@ -3012,6 +3189,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(
                 decision != null ? decision.getAiRoleResults() : null);
         AiRoleResultsPayload payload = parsed.current() ? parsed.payload() : null;
+        ai.setTraceId(payload != null ? trimToNull(payload.traceId()) : analysisTraceId(decision));
         AiRoleResultsPayload.SynthesisPayload synthesis = payload != null ? payload.synthesis() : null;
         ai.setSchemaVersion(payload != null ? payload.schemaVersion() : null);
         AiRoleStats roleStats = aiRoleStats(payload);
@@ -3060,22 +3238,49 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return ai;
     }
 
-    private DecisionResultVO latestCoherentAiPreview(Long userId,
-                                                     String normalizedSymbol,
-                                                     DecisionResultVO fallback) {
+    private DecisionResultVO latestCoherentAiPreviewMarker(Long userId, String normalizedSymbol) {
         if (userId == null || userId <= 0 || !hasText(normalizedSymbol) || decisionResultMapper == null) {
+            return null;
+        }
+        try {
+            DecisionResultVO marker = decisionResultMapper
+                    .findLatestSuccessfulPreviewForUserAndSymbol(userId, normalizedSymbol);
+            return coherentAiPayload(marker, normalizedSymbol) ? marker : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private DecisionResultVO latestAlignedAiPreview(Long userId,
+                                                    String normalizedSymbol,
+                                                    DecisionResultVO fallback,
+                                                    DecisionResultVO marker) {
+        if (marker == null || executionPlanMapper == null || analysisRunMapper == null) {
             return fallback;
         }
         try {
-            DecisionResultVO preview = decisionResultMapper
-                    .findLatestSuccessfulPreviewForUserAndSymbol(userId, normalizedSymbol);
-            return coherentAiPreview(preview, normalizedSymbol) ? preview : fallback;
+            ExecutionPlanDO plan = executionPlanMapper.selectLatestByDecisionIdentity(
+                    marker.getAnalysisId(), marker.getDecisionId());
+            if (plan == null || !Objects.equals(trimToNull(marker.getAnalysisId()), trimToNull(plan.getAnalysisId()))
+                    || !Objects.equals(trimToNull(marker.getDecisionId()), trimToNull(plan.getDecisionId()))
+                    || !hasText(plan.getPlanId())) {
+                return fallback;
+            }
+            DecisionResultVO preview = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
+                    marker.getAnalysisId(), plan.getPlanId());
+            if (!coherentAlignedAiPreview(preview, normalizedSymbol, userId)
+                    || fallback != null && fallback.getCreateTime() != null
+                    && (preview.getCreateTime() == null
+                    || preview.getCreateTime().isBefore(fallback.getCreateTime()))) {
+                return fallback;
+            }
+            return preview;
         } catch (RuntimeException ignored) {
             return fallback;
         }
     }
 
-    private boolean coherentAiPreview(DecisionResultVO preview, String normalizedSymbol) {
+    private boolean coherentAiPayload(DecisionResultVO preview, String normalizedSymbol) {
         if (preview == null
                 || !hasText(preview.getAnalysisId())
                 || !hasText(preview.getDecisionId())
@@ -3092,6 +3297,37 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return rolePayload != null
                     && preview.getAnalysisId().equals(trimToNull(rolePayload.analysisId()));
         });
+    }
+
+    private boolean coherentAlignedAiPreview(DecisionResultVO preview, String normalizedSymbol, Long userId) {
+        if (!coherentAiPayload(preview, normalizedSymbol)) return false;
+        AiRoleResultsCodec.ParseResult parsed = aiRoleResultsCodec.parse(preview.getAiRoleResults());
+        AnalysisRunDO run = analysisRunMapper.selectById(preview.getAnalysisId());
+        String traceId = run == null ? null : trimToNull(run.getTraceId());
+        if (run == null || !Boolean.TRUE.equals(run.getPreview())
+                || !"ANALYSIS_PREVIEW".equalsIgnoreCase(trimToNull(run.getAnalysisMode()))
+                || !"USER".equalsIgnoreCase(trimToNull(run.getOwnerType()))
+                || !Objects.equals(userId, run.getOwnerId())
+                || !normalizedSymbol.equals(normalizeSymbol(run.getSymbol()))
+                || !Objects.equals(traceId, trimToNull(parsed.payload().traceId()))) {
+            return false;
+        }
+        return AI_ROLES.stream().allMatch(role -> {
+            AiRoleResultsPayload.RolePayload rolePayload = parsed.payload().roles().get(role);
+            return rolePayload != null
+                    && preview.getAnalysisId().equals(trimToNull(rolePayload.analysisId()))
+                    && Objects.equals(traceId, trimToNull(rolePayload.traceId()));
+        });
+    }
+
+    private String analysisTraceId(DecisionResultVO decision) {
+        if (decision == null || analysisRunMapper == null || !hasText(decision.getAnalysisId())) return null;
+        try {
+            AnalysisRunDO run = analysisRunMapper.selectById(decision.getAnalysisId());
+            return run == null ? null : trimToNull(run.getTraceId());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private DashboardHomeVO.AiTabVO buildAiTab(String role,

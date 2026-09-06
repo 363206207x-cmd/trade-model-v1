@@ -52,12 +52,25 @@ class PositionMonitorSchedulerTest {
 
         scheduler.monitorOpenUserPositionsScheduled();
 
-        assertThat(output).contains("batch completed total=28 success=0 failure=28 blocked=0")
+        assertThat(output).contains("batch completed trigger=PERIODIC_30S total=28 success=0 failure=28 blocked=0")
                 .contains("failure summary=POSITION_MONITOR_FAILED:ILLEGALSTATEEXCEPTION=1,QUOTE_UNAVAILABLE=2")
                 .doesNotContain("positionId=")
                 .doesNotContain("assetSymbol=")
                 .doesNotContain("ETH")
                 .doesNotContain("BTC");
+    }
+
+    @Test
+    void realtimeShockCoalescesRequestsAndRunsOneImmediateReadOnlyBatch() {
+        PositionMonitorService service = mock(PositionMonitorService.class);
+        PositionMonitorScheduler scheduler = new PositionMonitorScheduler(service, true, true);
+
+        scheduler.requestImmediateRiskMonitor("PRICE_SHOCK_1M");
+        scheduler.requestImmediateRiskMonitor("PRICE_SHOCK_1M");
+        scheduler.monitorImmediateRiskRequestsScheduled();
+        scheduler.monitorImmediateRiskRequestsScheduled();
+
+        verify(service).monitorClaimedOpenPositionsForSystem();
     }
 
     @Test

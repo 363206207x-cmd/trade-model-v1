@@ -42,6 +42,7 @@ import org.example.trademodel.service.support.V41DecisionContractPolicy;
 import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.EvidenceItemVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
+import org.example.trademodel.v41.V41StructuralPlanPolicy;
 import org.example.trademodel.vo.ScoreItemVO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -398,7 +399,6 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         DecisionBundleVO decision = input.decision();
         decision.setFinalMarketBias(null);
         decision.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
-        decision.setMarketBiasHierarchy("WAIT");
         decision.setIsWorthOpening(false);
         applyOpportunityState(decision, input, opportunity, blocked);
         applyIncompleteAiRoleResults(decision, input,
@@ -1181,9 +1181,17 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         plan.setFinalPlan(false);
         plan.setPlanMode(PlanModeEnum.BLOCKED.name());
         plan.setFinalPlanMode(PlanModeEnum.BLOCKED.name());
-        plan.setRecommendedAction(null);
-        clearDirectionalParameters(plan);
-        plan.setPlanLifecycleState("INVALIDATED");
+        boolean structuralRulePlan = V41StructuralPlanPolicy.VERSION.equals(plan.getRuleVersion())
+                && hasText(plan.getRuleMarketBias());
+        if (structuralRulePlan) {
+            plan.setRecommendedAction(hasText(plan.getRecommendedAction())
+                    ? plan.getRecommendedAction() : "等待规则触发并完成人工复核");
+            plan.setPlanLifecycleState("CURRENT");
+        } else {
+            plan.setRecommendedAction(null);
+            clearDirectionalParameters(plan);
+            plan.setPlanLifecycleState("INVALIDATED");
+        }
         plan.setFinalizedAt(null);
         return plan;
     }
@@ -1383,7 +1391,8 @@ public class DecisionChainServiceImpl implements DecisionChainService {
         decision.setFinalMarketBias(validation.passed() ? conflict.getBiasAfter() : null);
         decision.setBiasAdjustmentReason(conflict.getAdjustmentReason());
         decision.setPlanModeAdjustmentReason(conflict.getDowngradeReason());
-        decision.setMarketBiasHierarchy(validation.passed() ? conflict.getBiasAfter() : "WAIT");
+        decision.setMarketBiasHierarchy(validation.passed() ? conflict.getBiasAfter()
+                : firstDirection(decision.getValidatedMarketBias(), decision.getRuleMarketBias()));
         decision.setAiConflictLevel(conflict.getConflictLevel());
         decision.setAiConflictScore(conflict.getConflictScore());
         applyDirectionConfidence(null, decision, conflict.getConflictScore());
@@ -1404,7 +1413,12 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                 || !"READY".equals(upper(decision.getDirectionDataState()))) {
             return;
         }
-        int multiTf = decision.isMultiTimeframeAligned() ? 100 : 50;
+        if (decision.getFinalConfidence() != null) {
+            return;
+        }
+        int multiTf = decision.getFourHourTrendAlignment() == null
+                ? (decision.isMultiTimeframeAligned() ? 85 : 45)
+                : decision.getFourHourTrendAlignment();
         Integer dataQuality = decision.getDataQualityScore();
         if (dataQuality == null && input != null) {
             dataQuality = input.dataQualityScore();
@@ -1419,9 +1433,12 @@ public class DecisionChainServiceImpl implements DecisionChainService {
                     : (int) Math.round(scoredReliability);
             decision.setEvidenceReliability(evidenceCoverage);
         }
+        Double capitalFlow = input == null ? null : V41DecisionContractPolicy.scoreMap(input.scores())
+                .get(V41DecisionContractPolicy.CAPITAL_FLOW);
+        Integer crossSourceConsistency = capitalFlow == null ? null : (int) Math.round(capitalFlow);
         V41DecisionContractPolicy.Metric confidence = V41DecisionContractPolicy.finalConfidence(
                 dataQuality, multiTf, evidenceCoverage,
-                evidenceCoverage, conflictPenalty == null ? 0 : conflictPenalty);
+                crossSourceConsistency, conflictPenalty == null ? 0 : conflictPenalty);
         decision.setFinalConfidence(confidence.value());
     }
 
@@ -1693,6 +1710,10 @@ public class DecisionChainServiceImpl implements DecisionChainService {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static String firstDirection(String primary, String fallback) {
+        return hasText(primary) ? primary : hasText(fallback) ? fallback : "WAIT";
     }
 
     private static int integer(Integer value) {

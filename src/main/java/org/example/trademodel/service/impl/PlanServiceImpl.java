@@ -19,8 +19,11 @@ import org.example.trademodel.vo.DecisionBundleVO;
 import org.example.trademodel.vo.ExecutionPlanVO;
 import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.ScoreItemVO;
+import org.example.trademodel.v41.V41StructuralPlanPolicy;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +54,17 @@ public class PlanServiceImpl implements PlanService {
     ) {
         ExecutionPlanVO assessment = new ExecutionPlanVO();
         assessment.setPlanId("rule-assessment-" + UUID.randomUUID());
+        assessment.setRuleVersion(V41StructuralPlanPolicy.VERSION);
+        if (decisionBundle != null) {
+            assessment.setRuleMarketBias(decisionBundle.getValidatedMarketBias() != null
+                    ? decisionBundle.getValidatedMarketBias() : decisionBundle.getRuleMarketBias());
+            assessment.setPlanMode(decisionBundle.getRulePlanMode());
+            assessment.setValidFrom(decisionBundle.getValidFrom() == null ? null
+                    : decisionBundle.getValidFrom().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+            assessment.setValidUntil(decisionBundle.getExpiresAt() == null ? null
+                    : decisionBundle.getExpiresAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+            assessment.setPlanVersion(1);
+        }
         assessment.setManualReviewRequired(true);
         assessment.setNotTradeInstruction(true);
         assessment.setNotExecutable(true);
@@ -69,6 +83,7 @@ public class PlanServiceImpl implements PlanService {
             appendUnique(assessment.getMissingSourceReasons(), boundaryResult.getMissingFields());
             appendUnique(assessment.getSourceBlockerReasons(), boundaryResult.getBlockingReasons());
         }
+        applyStructuralRulePlan(assessment, decisionBundle);
         if (boundaryResult == null
                 || !boundaryResult.isBoundaryReady()
                 || !boundaryResult.isSourceTraceReady()
@@ -85,11 +100,43 @@ public class PlanServiceImpl implements PlanService {
         } else {
             applyBoundaryProducerResult(assessment, boundaryResult, null);
             applyRuleOwnedBoundaryContract(assessment, boundaryResult, decisionBundle);
+            assessment.setPlanLifecycleState("CURRENT");
         }
         // This object is a non-final rule assessment, never a detailed plan.
         assessment.setExecutionPlanStatus(ExecutionPlanVO.EXECUTION_PLAN_STATUS_INCOMPLETE);
         applyExternalContextReadiness(assessment, decisionBundle);
         return assessment;
+    }
+
+    private static void applyStructuralRulePlan(ExecutionPlanVO plan, DecisionBundleVO decision) {
+        if (plan == null || decision == null) return;
+        if (!"READY".equalsIgnoreCase(decision.getDirectionDataState())) return;
+        String direction = decision.getValidatedMarketBias();
+        if (direction == null || direction.isBlank()) return;
+        Instant generatedAt = decision.getValidFrom() == null
+                ? null : decision.getValidFrom().toInstant();
+        V41StructuralPlanPolicy.Plan structural = V41StructuralPlanPolicy.build(
+                new V41StructuralPlanPolicy.Input(direction, decision.getPushTriggerPrice(),
+                        decision.getStructuralAtr1h(), decision.getStructuralInvalidationLevel(),
+                        null, decision.getDecisionId(), null, generatedAt,
+                        "BINANCE_CLOSED_1H_4H", false, null));
+        if (structural.entryZone() == null || structural.stopLoss() == null
+                || structural.takeProfit1() == null || structural.takeProfit2() == null) {
+            return;
+        }
+        plan.setEntryZone(structural.entryZone());
+        plan.setTriggerCondition(structural.entryTrigger());
+        plan.setStopLoss(structural.stopLoss().stripTrailingZeros().toPlainString());
+        plan.setTakeProfitRules("TP1 " + structural.takeProfit1().stripTrailingZeros().toPlainString()
+                + "；TP2 " + structural.takeProfit2().stripTrailingZeros().toPlainString());
+        plan.setInvalidCondition((direction.contains("BULLISH") ? "价格跌破 " : "价格突破 ")
+                + structural.invalidationLevel().stripTrailingZeros().toPlainString()
+                + " 后由新闭合1小时结构重验");
+        plan.setAbandonCondition(plan.getInvalidCondition());
+        plan.setExpectedRiskReward(structural.riskRewardRatio());
+        plan.setRecommendedAction(structural.blockedOrWaitingReason());
+        plan.setRevalidationRule(structural.recoveryCondition());
+        plan.setPlanLifecycleState(structural.planState());
     }
 
     private static void applyRuleOwnedBoundaryContract(

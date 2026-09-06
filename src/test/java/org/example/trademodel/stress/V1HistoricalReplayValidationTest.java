@@ -91,8 +91,8 @@ class V1HistoricalReplayValidationTest {
         assertThat(results.stream().filter(ReplayResult::missedValidOpportunity).count()).isZero();
         assertResult(results, "HISTORICAL_STYLE_UPTREND_BREAKOUT", "BULLISH", true, AssetStateEnum.CANDIDATE);
         assertResult(results, "HISTORICAL_STYLE_DOWNTREND_BREAKDOWN", "BEARISH", true, AssetStateEnum.CANDIDATE);
-        assertResult(results, "CHOPPY_RANGE_NO_TRADE", "BEARISH", false, AssetStateEnum.OBSERVING);
-        assertResult(results, "WICK_STOP_SWEEP", "BULLISH", false, AssetStateEnum.OBSERVING);
+        assertResult(results, "CHOPPY_RANGE_NO_TRADE", "WAIT", false, AssetStateEnum.OBSERVING);
+        assertResult(results, "WICK_STOP_SWEEP", "WAIT", false, AssetStateEnum.OBSERVING);
         assertResult(results, "FAST_CRASH_REBOUND", "WAIT", false, AssetStateEnum.CONFUSED);
         assertResult(results, "SLOW_TREND_PULLBACK", "BULLISH", true, AssetStateEnum.WAITING_TRIGGER);
         assertResult(results, "HIGH_RISK_EVENT_WINDOW", "BULLISH", false, AssetStateEnum.HIGH_RISK);
@@ -247,6 +247,7 @@ class V1HistoricalReplayValidationTest {
         if (marketBias == null) return "";
         if (marketBias.endsWith("BULLISH")) return "BULLISH";
         if (marketBias.endsWith("BEARISH")) return "BEARISH";
+        if ("WAIT".equals(marketBias) || "RANGE".equals(marketBias)) return "NEUTRAL";
         return marketBias;
     }
 
@@ -258,9 +259,9 @@ class V1HistoricalReplayValidationTest {
                         downtrend(), downtrend(), AssetStateEnum.CANDIDATE),
                 ReplayScenario.valid("FAKE_BREAKOUT_REVERSAL", "SOLUSDT", "BULLISH",
                         fakeBreakout(), fakeBreakout(), AssetStateEnum.CANDIDATE),
-                ReplayScenario.noTrade("CHOPPY_RANGE_NO_TRADE", "BNBUSDT", "BEARISH",
+                ReplayScenario.noTrade("CHOPPY_RANGE_NO_TRADE", "BNBUSDT", "WAIT",
                         choppy1m(), choppy5m(), AssetStateEnum.OBSERVING, "RANGE_NO_TRADE"),
-                ReplayScenario.noTrade("WICK_STOP_SWEEP", "XRPUSDT", "BULLISH",
+                ReplayScenario.noTrade("WICK_STOP_SWEEP", "XRPUSDT", "WAIT",
                         wick1m(), wick5m(), AssetStateEnum.OBSERVING, "WICK_RISK_REVIEW"),
                 ReplayScenario.confused("FAST_CRASH_REBOUND", "DOGEUSDT", crashRebound(), crashRebound()),
                 ReplayScenario.valid("SLOW_TREND_PULLBACK", "ADAUSDT", "BULLISH",

@@ -14,6 +14,11 @@
     var searchActionBusy = false;
     var assetAnalysisBusy = new Set();
     var activeClosePositionId = "";
+    var homeEventSource = null;
+    var homeFallbackTimer = null;
+    var homeReconciliationTimer = null;
+    var homeLiveState = "连接中";
+    var liveSnapshotVersions = new Map();
     var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
 
@@ -160,7 +165,11 @@
         if (csrfToken && csrfHeader && request.method && request.method !== "GET") request.headers[csrfHeader] = csrfToken;
         var response = await fetch(url, request);
         var payload = await response.json().catch(function () { return null; });
-        if (!response.ok) throw new Error(text(payload && payload.msg, "请求失败（" + response.status + "）"));
+        if (!response.ok) {
+            var failure = new Error(text(payload && payload.msg, "请求失败（" + response.status + "）"));
+            failure.status = response.status;
+            throw failure;
+        }
         return apiData(payload);
     }
 
@@ -241,7 +250,8 @@
         var header = home.header || {};
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol });
         setText("selectedAssetContext", selected ? "当前资产 · " + selected : "尚未选择机会资产");
-        setText("headerUpdatedAt", has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "等待同步");
+        var updated = has(header.updatedAt) ? "更新于 " + clockTime(header.updatedAt) : "等待同步";
+        setText("headerUpdatedAt", updated + " · " + homeLiveState);
     }
 
     function renderStatus(home) {
@@ -363,8 +373,11 @@
             : has(asset.confidenceLevel) ? label(asset.confidenceLevel, "当前不可查看")
                 : has(finalDirection) ? "待重新分析" : "—";
         if (has(finalDirection) && confidence === "待重新分析") direction = "待重新分析";
-        var riskLabel = text(asset.riskLabel, "");
-        var risk = riskLabel && riskLabel !== "—" ? riskLabel : label(asset.riskLevel, "当前不可查看");
+        var riskItems = Array.isArray(asset.riskItems) ? asset.riskItems : [];
+        var riskLabel = riskItems.slice(0, 2).map(function (item) {
+            return text(item && item.riskTypeLabel, "具体风险") + "（" + label(item && item.severity, "需关注") + "）";
+        }).join("·");
+        var risk = riskLabel || text(asset.riskLabel, label(asset.riskLevel, "当前不可查看"));
         var oneHour = text(asset.oneHourOpportunityLabel, "1小时数据不足");
         var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
         var price = has(asset.latestPrice) ? "$" + number(asset.latestPrice, Number(asset.latestPrice) >= 100 ? 2 : 4) : "价格待同步";
@@ -377,10 +390,10 @@
             + escapeHtml(symbol + " 首页资产上下文；" + direction + "；置信度 " + confidence + "；" + provenanceSummary) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
             + escapeHtml(text(asset.name, "名称不可用"))
-            + '</small></div><strong class="opportunity-price">' + escapeHtml(price)
-            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b class="semantic-value' + semanticClass(asset.marketBias) + '">' + escapeHtml(direction)
-            + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong>' + escapeHtml(confidence)
-            + '</strong></span><span><small>风险</small><strong class="semantic-value' + semanticClass(asset.riskLevel) + '">' + escapeHtml(risk)
+            + '</small></div><strong class="opportunity-price" data-live-field="price">' + escapeHtml(price)
+            + '</strong></header><div class="opportunity-final"><span><small>方向</small><b data-live-field="direction" class="semantic-value' + semanticClass(asset.marketBias) + '">' + escapeHtml(direction)
+            + '</b></span></div><div class="opportunity-metrics"><span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
+            + '</strong></span><span><small>风险</small><strong data-live-field="risk" class="semantic-value' + semanticClass(asset.riskLevel) + '">' + escapeHtml(risk)
             + '</strong></span></div><div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span></div></article>';
     }
@@ -560,10 +573,17 @@
                 || plan.revalidationReason || access.reason;
             var recovery = plan.revalidationRule || plan.executionFeasibilityReason
                 || "等待新数据并重新分析通过规则校验";
-            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : blocked ? "已阻断" : "尚未形成") + '</strong><span>机会状态 · '
+            var hasConditionalPlan = has(plan.entryZone) && has(plan.stopLoss || plan.stopZone)
+                && has(plan.takeProfitRules || plan.targetZones);
+            target.innerHTML = '<div class="plan-empty"><strong>' + (revalidating ? "正在重验" : blocked ? "已阻断" : hasConditionalPlan ? "条件计划" : "尚未形成") + '</strong><span>机会状态 · '
                 + escapeHtml(selectedOpportunityState(home)) + "</span><span>" + (blocked ? "阻断原因 · " : "") + escapeHtml(text(reason, blocked ? "当前计划未通过规则校验" : "尚未形成有效计划")) + "</span>"
                 + (revalidating || blocked ? '<span>恢复条件 · ' + escapeHtml(text(recovery, "当前无可验证恢复条件")) + "</span>" : "")
-                + (revalidating ? '<span>最新重验状态 · ' + escapeHtml(label(plan.planLifecycleState, "等待重验")) + "</span>" : "") + "</div>";
+                + (revalidating ? '<span>最新重验状态 · ' + escapeHtml(label(plan.planLifecycleState, "等待重验")) + "</span>" : "") + "</div>"
+                + (hasConditionalPlan ? '<div class="plan-key-layer">'
+                    + planField("入场 / 触发", plan.entryZone || plan.triggerCondition)
+                    + planField("止损", plan.stopZone || plan.stopLoss)
+                    + planField("失效条件", plan.invalidCondition || plan.abandonCondition)
+                    + planField("目标", plan.targetZones || plan.takeProfitRules) + "</div>" : "");
             link.hidden = true;
             return;
         }
@@ -870,9 +890,206 @@
             }
             render(await api("/api/dashboard/home?" + query.toString()));
         } catch (error) {
+            if (Number(error.status) === 401 || Number(error.status) === 403) {
+                announce("登录会话已失效，请重新登录后继续。当前页面数据已保留。");
+                return;
+            }
             announce(error.message);
             render({ states: { overall: "ERROR" }, diagnostics: {}, assets: [], positions: [], aiDecision: { tabs: [] } });
         }
+    }
+
+    function liveAsset(symbol) {
+        var normalized = String(symbol || "").toUpperCase();
+        return (Array.isArray(currentHome.assets) ? currentHome.assets : []).find(function (asset) {
+            return symbolOf(asset) === normalized;
+        });
+    }
+    function acceptLiveSnapshot(event) {
+        var symbol = String(event && event.symbol || "SYSTEM").toUpperCase();
+        var identity = symbol + "|" + String(event && event.eventType || "UNKNOWN").toUpperCase();
+        var version = Number(event && event.snapshotVersion);
+        if (!Number.isFinite(version) || version <= 0) return false;
+        var current = Number(liveSnapshotVersions.get(identity) || 0);
+        if (version <= current) return false;
+        liveSnapshotVersions.set(identity, version);
+        return true;
+    }
+    function liveCard(symbol) {
+        var escaped = window.CSS && typeof window.CSS.escape === "function" ? window.CSS.escape(symbol) : symbol;
+        return document.querySelector('.opportunity-card[data-symbol="' + escaped + '"]');
+    }
+    function sameLiveDecision(asset, payload) {
+        if (!asset || !payload) return false;
+        if (has(payload.analysisId) && has(asset.analysisId)
+                && String(payload.analysisId) !== String(asset.analysisId)) return false;
+        if (has(payload.decisionId) && has(asset.decisionId)
+                && String(payload.decisionId) !== String(asset.decisionId)) return false;
+        return true;
+    }
+    function applyHomeLiveEvent(event) {
+        if (!event || !acceptLiveSnapshot(event)) return;
+        var payload = event.payload || {};
+        var symbol = String(event.symbol || "").toUpperCase();
+        var asset = liveAsset(symbol);
+        var card = liveCard(symbol);
+        if (event.eventType === "ASSET_PRICE_UPDATED" && asset) {
+            if (has(payload.latestPrice)) asset.latestPrice = payload.latestPrice;
+            if (has(payload.latestPriceAt)) asset.latestPriceAt = payload.latestPriceAt;
+            asset.snapshotVersion = event.snapshotVersion;
+            if (card) {
+                var priceNode = card.querySelector('[data-live-field="price"]');
+                if (priceNode && has(payload.latestPrice)) {
+                    priceNode.textContent = "$" + number(payload.latestPrice, Number(payload.latestPrice) >= 100 ? 2 : 4);
+                }
+                card.dataset.snapshotVersion = String(event.snapshotVersion);
+                card.dataset.latestPriceAt = text(payload.latestPriceAt, "");
+            }
+        } else if (event.eventType === "ASSET_DIRECTION_UPDATED" && asset) {
+            var structuralDirection = payload.structuralDirection || asset.structuralDirection;
+            asset.analysisId = payload.analysisId || asset.analysisId;
+            asset.decisionId = payload.decisionId || asset.decisionId;
+            asset.traceId = payload.traceId || asset.traceId;
+            asset.structuralDirection = structuralDirection;
+            asset.marketBias = structuralDirection;
+            asset.marketBiasLabel = label(structuralDirection, "待重新分析");
+            asset.confidenceLevel = has(payload.confidence) ? String(payload.confidence) : null;
+            asset.confidenceLabel = has(payload.confidence) ? String(payload.confidence) + "%" : "样本不足";
+            asset.baseConfidenceLevel = asset.confidenceLevel;
+            asset.directionCalculatedAt = payload.directionCalculatedAt || asset.directionCalculatedAt;
+            asset.priceAtDecision = has(payload.priceAtDecision) ? payload.priceAtDecision : asset.priceAtDecision;
+            asset.marketDataAsOf = payload.marketDataAsOf || asset.marketDataAsOf;
+            asset.planInvalidationLevel = has(payload.structuralInvalidationLevel)
+                ? payload.structuralInvalidationLevel : asset.planInvalidationLevel;
+            asset.snapshotVersion = event.snapshotVersion;
+            if (card) {
+                var directionNode = card.querySelector('[data-live-field="direction"]');
+                var confidenceNode = card.querySelector('[data-live-field="confidence"]');
+                if (directionNode) {
+                    directionNode.textContent = label(structuralDirection, "待重新分析");
+                    directionNode.className = "semantic-value" + semanticClass(structuralDirection);
+                }
+                if (confidenceNode) confidenceNode.textContent = asset.confidenceLabel;
+                card.dataset.analysisId = text(asset.analysisId, "");
+                card.dataset.decisionId = text(asset.decisionId, "");
+                card.dataset.traceId = text(asset.traceId, "");
+                card.dataset.directionCalculatedAt = text(asset.directionCalculatedAt, "");
+                card.dataset.priceAtDecision = text(asset.priceAtDecision, "");
+                card.dataset.marketDataAsOf = text(asset.marketDataAsOf, "");
+                card.dataset.planInvalidationLevel = text(asset.planInvalidationLevel, "");
+            }
+        } else if (event.eventType === "ASSET_RISK_UPDATED" && asset) {
+            if (!sameLiveDecision(asset, payload)) return;
+            asset.realtimeState = payload.realtimeState || asset.realtimeState;
+            asset.effectiveExecutionState = payload.effectiveExecutionState || asset.effectiveExecutionState;
+            if (Array.isArray(payload.riskItems) && payload.riskItems.length) asset.riskItems = payload.riskItems;
+            if (!has(asset.baseConfidenceLevel) && Number.isFinite(Number(asset.confidenceLevel))) {
+                asset.baseConfidenceLevel = String(asset.confidenceLevel);
+            }
+            if (Number.isFinite(Number(payload.confidenceCap))
+                    && Number.isFinite(Number(asset.baseConfidenceLevel))) {
+                asset.confidenceLevel = String(Math.min(Number(asset.baseConfidenceLevel), Number(payload.confidenceCap)));
+                asset.confidenceLabel = asset.confidenceLevel + "%";
+            }
+            if (card && Array.isArray(asset.riskItems) && asset.riskItems.length) {
+                var riskNode = card.querySelector('[data-live-field="risk"]');
+                var confidenceNode = card.querySelector('[data-live-field="confidence"]');
+                if (riskNode) riskNode.textContent = asset.riskItems.slice(0, 2).map(function (risk) {
+                    return text(risk.riskTypeLabel, "具体风险") + "（" + label(risk.severity, "需关注") + "）";
+                }).join("·");
+                if (confidenceNode) confidenceNode.textContent = asset.confidenceLabel;
+                card.dataset.realtimeState = text(asset.realtimeState, "");
+                card.dataset.effectiveExecutionState = text(asset.effectiveExecutionState, "");
+            }
+        } else if (event.eventType === "PLAN_STATE_CHANGED" && symbol === selectedSymbol) {
+            var selectedAsset = liveAsset(symbol);
+            if (!sameLiveDecision(selectedAsset, {
+                analysisId: payload.sourceAnalysisId, decisionId: payload.sourceDecisionId
+            })) return;
+            currentHome.executionSuggestion = Object.assign({}, currentHome.executionSuggestion || {}, payload, {
+                status: payload.planState || "SUSPENDED", planLifecycleState: payload.planState || "SUSPENDED"
+            });
+            renderPlan(currentHome);
+        } else if (event.eventType === "POSITION_MONITOR_UPDATED") {
+            if (payload.refreshRequired === true) {
+                lightweightHomeRefresh().catch(function (error) { announce(error.message); });
+                return;
+            }
+            var positions = Array.isArray(currentHome.positions) ? currentHome.positions : [];
+            currentHome.positions = positions.map(function (position) {
+                return String(position.positionId) === String(payload.positionId)
+                    ? Object.assign({}, position, payload) : position;
+            });
+            renderPositions(currentHome);
+        }
+    }
+    async function lightweightHomeRefresh() {
+        var query = new URLSearchParams({ limit: "6" });
+        if (selectedSymbol) query.set("selectedSymbol", selectedSymbol);
+        var fresh = await api("/api/dashboard/home?" + query.toString());
+        (Array.isArray(fresh.assets) ? fresh.assets : []).forEach(function (asset) {
+            var version = Number(asset.snapshotVersion || (new Date(asset.latestPriceAt || asset.updatedAt || 0)).getTime());
+            applyHomeLiveEvent({ eventId: "poll-" + symbolOf(asset) + "-" + version,
+                eventType: "ASSET_PRICE_UPDATED", symbol: symbolOf(asset), snapshotVersion: version,
+                payload: { latestPrice: asset.latestPrice, latestPriceAt: asset.latestPriceAt } });
+        });
+        currentHome.positions = fresh.positions || currentHome.positions;
+        renderPositions(currentHome);
+        if (fresh.executionSuggestion) {
+            currentHome.executionSuggestion = fresh.executionSuggestion;
+            renderPlan(currentHome);
+        }
+    }
+    function scheduleHomeFallbackPoll() {
+        if (homeFallbackTimer) return;
+        homeFallbackTimer = window.setInterval(function () {
+            lightweightHomeRefresh().catch(function (error) { announce(error.message); });
+        }, 15000);
+    }
+    function stopHomeFallbackPoll() {
+        if (!homeFallbackTimer) return;
+        window.clearInterval(homeFallbackTimer);
+        homeFallbackTimer = null;
+    }
+    function connectHomeStream() {
+        if (!window.EventSource) {
+            scheduleHomeFallbackPoll();
+            return;
+        }
+        if (homeEventSource) homeEventSource.close();
+        homeEventSource = new EventSource("/api/dashboard/stream");
+        ["ASSET_PRICE_UPDATED", "ASSET_DIRECTION_UPDATED", "ASSET_RISK_UPDATED", "PLAN_STATE_CHANGED",
+            "POSITION_MONITOR_UPDATED", "SYSTEM_STATUS_UPDATED", "DATA_SOURCE_STATUS_CHANGED"].forEach(function (type) {
+            homeEventSource.addEventListener(type, function (message) {
+                try { applyHomeLiveEvent(JSON.parse(message.data)); }
+                catch (_) { announce("实时更新内容格式异常，等待完整对账"); }
+            });
+        });
+        homeEventSource.onopen = function () {
+            homeLiveState = "实时已连接";
+            stopHomeFallbackPoll();
+            renderHeader(currentHome);
+            announce("首页实时更新已连接");
+        };
+        homeEventSource.onerror = function () {
+            homeLiveState = "重连中·15秒轮询";
+            renderHeader(currentHome);
+            scheduleHomeFallbackPoll();
+        };
+    }
+    function startHomeLiveRuntime() {
+        connectHomeStream();
+        homeReconciliationTimer = window.setInterval(function () {
+            loadHome(selectedSymbol).catch(function (error) { announce(error.message); });
+        }, 60000);
+        document.addEventListener("visibilitychange", function () {
+            if (!document.hidden) loadHome(selectedSymbol);
+        });
+        window.addEventListener("beforeunload", function () {
+            if (homeEventSource) homeEventSource.close();
+            stopHomeFallbackPoll();
+            if (homeReconciliationTimer) window.clearInterval(homeReconciliationTimer);
+        });
     }
 
     function stableSubmissionId(prefix) {
@@ -882,7 +1099,7 @@
         return prefix + ":" + value;
     }
     function analysisPreviewKey(symbol, analysisId) {
-        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":5m:"
+        return "analysis-preview:" + String(symbol || "").trim().toUpperCase() + ":1h:"
             + String(analysisId || "search").trim();
     }
     function analysisPreviewSubmission(symbol, analysisId) {
@@ -890,7 +1107,7 @@
         var saved = readDraft(key) || {};
         if (!saved.submissionId) saved.submissionId = stableSubmissionId("analysis-preview");
         saved.symbol = String(symbol || "").trim().toUpperCase();
-        saved.timeframe = "5m";
+        saved.timeframe = "1h";
         saved.sourceAnalysisId = analysisId || null;
         writeDraft(key, saved);
         return saved;
@@ -939,9 +1156,12 @@
             announce(symbol + " 三 AI 分析启动中");
             try {
                 await loadHome(symbol);
+                var refreshedAsset = liveAsset(symbol);
+                analysisId = refreshedAsset && refreshedAsset.analysisId || analysisId;
+                if (!analysisId) throw new Error("当前资产缺少可追溯分析");
                 var previewState = analysisPreviewSubmission(symbol, analysisId);
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol)
-                    + "/analysis-preview?timeframe=5m&submissionId="
+                    + "/analysis-preview?timeframe=1h&submissionId="
                     + encodeURIComponent(previewState.submissionId), { method: "POST" });
                 previewState = rememberAnalysisPreview(symbol, previewState, result);
                 if ((!result || !result.analysisId) && result && result.taskId) {
@@ -1301,6 +1521,12 @@
         tabs.forEach(function (button) {
             button.addEventListener("click", function () {
                 activate(button, false);
+                var roles = currentHome && currentHome.aiDecision
+                    && Array.isArray(currentHome.aiDecision.tabs) ? currentHome.aiDecision.tabs : [];
+                var role = roles.find(function (item) { return item && item.role === activeRole; });
+                if (!role || role.resultAvailable !== true) {
+                    openOrResumeAssetAnalysis(liveAsset(selectedSymbol));
+                }
             });
             button.addEventListener("keydown", function (event) {
                 var index = tabs.indexOf(button);
@@ -1321,5 +1547,5 @@
     bindPositionActions();
     bindHomeStatus();
     var requested = typeof contract.readUrlParam === "function" ? contract.readUrlParam("asset") : new URLSearchParams(window.location.search).get("asset");
-    loadHome(requested || "");
+    loadHome(requested || "").finally(startHomeLiveRuntime);
 })();
