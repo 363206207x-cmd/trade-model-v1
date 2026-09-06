@@ -83,6 +83,10 @@ yaml_list() {
   ' "$file"
 }
 
+path_list_fingerprint() {
+  printf '%s\n' "${1:-}" | sed '/^$/d' | LC_ALL=C sort | git hash-object --stdin
+}
+
 matrix_field() {
   local phase="$1"
   local field_index="$2"
@@ -466,6 +470,8 @@ official_domain_session_runtime_visibility_closure_authorization_status="$(yaml_
 official_domain_session_runtime_visibility_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_official_domain_session_runtime_visibility_closure_implementation_status)"
 real_logic_chain_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_logic_chain_closure_authorization_status)"
 real_logic_chain_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_real_logic_chain_closure_implementation_status)"
+web_live_direction_risk_closure_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_live_direction_risk_closure_authorization_status)"
+web_live_direction_risk_closure_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_live_direction_risk_closure_implementation_status)"
 local_real_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value docs/CODEX_NEXT_TASK.yml local_real_implementation_status)"
 frontend_interaction_authorization_status="$(yaml_value docs/CODEX_NEXT_TASK.yml frontend_interaction_authorization_status)"
@@ -560,8 +566,13 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$gpt_background_three_ai_timeout_closure_implementation_status" == "COMPLETE" ]] || fail "GPT background/Three-AI timeout closure must remain complete"
 [[ "$official_domain_session_runtime_visibility_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "official-domain session and runtime visibility authorization must remain effective on merged main"
 [[ "$official_domain_session_runtime_visibility_closure_implementation_status" == "COMPLETE" ]] || fail "official-domain session and runtime visibility implementation must remain complete"
-[[ "$real_logic_chain_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Real logic chain closure authorization must remain pending merged-main effectivity"
-[[ "$real_logic_chain_closure_implementation_status" == "NOT_STARTED" ]] || fail "Real logic chain closure implementation must remain not started in the gate package"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$web_live_direction_risk_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Web live direction and risk closure authorization must remain pending merged-main effectivity"
+  [[ "$web_live_direction_risk_closure_implementation_status" == "NOT_STARTED" ]] || fail "Web live direction and risk closure implementation must remain not started in the gate package"
+else
+  [[ "$real_logic_chain_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Real logic chain closure authorization must remain pending merged-main effectivity"
+  [[ "$real_logic_chain_closure_implementation_status" == "NOT_STARTED" ]] || fail "Real logic chain closure implementation must remain not started in the gate package"
+fi
 [[ "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "local-real authorization must remain effective on merged main"
 [[ "$local_real_implementation_status" == "COMPLETE" ]] || fail "local-real implementation must remain complete"
 [[ "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "frontend interaction authorization must be effective on merged main"
@@ -569,60 +580,75 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-[[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Real logic chain closure authorization declaration mismatch"
-[[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Real logic chain closure authorization mode mismatch"
-[[ "$current_package_branch" == "codex/v4-1-real-logic-chain-closure-authorization" ]] || fail "Real logic chain closure authorization branch mismatch"
-[[ "$current_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "Real logic chain closure authorization starting SHA mismatch"
-[[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Real logic chain closure authorization SHA must be full length"
-[[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Real logic chain closure authorization permissions mismatch"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
+  [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
+  [[ "$current_package_branch" == "codex/v4-1-web-live-direction-risk-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
+  [[ "$current_package_starting_full_sha" == "b87cb1878405a6fe8693add1036251d6631e2520" && "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Web live direction and risk closure authorization starting SHA mismatch"
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Web live direction and risk closure authorization permissions mismatch"
+  [[ "$authorized_next_package_phase" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE" ]] || fail "authorized Web live direction and risk closure package mismatch"
+  [[ "$authorized_next_package_branch" == "codex/v4-1-web-live-direction-risk-closure" ]] || fail "authorized Web live direction and risk closure branch mismatch"
+  [[ "$authorized_next_package_starting_full_sha" == "b87cb1878405a6fe8693add1036251d6631e2520" && "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized Web live direction and risk closure starting SHA mismatch"
+  [[ "$authorized_next_package_mode" == "IMPLEMENTATION" && "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "authorized Web live direction and risk closure mode mismatch"
+  [[ "$authorized_next_package_edits" == "true" && "$authorized_next_package_implementation" == "true" && "$authorized_next_package_pr" == "true" && "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Web live direction and risk closure permissions mismatch"
+  [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
+  [[ "$p1b_scope" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY"
+  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "9de0b85f8d733df34d4e8323b88d71a113192a3d" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "ca8723808584839cb9e8af3c689ca2a10ea72a2e" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
+    fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
+  fi
+else
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" && "$current_package_status" == "COMPLETED" ]] || fail "Real logic chain closure authorization declaration mismatch"
+  [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Real logic chain closure authorization mode mismatch"
+  [[ "$current_package_branch" == "codex/v4-1-real-logic-chain-closure-authorization" ]] || fail "Real logic chain closure authorization branch mismatch"
+  [[ "$current_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "Real logic chain closure authorization starting SHA mismatch"
+  [[ "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Real logic chain closure authorization SHA must be full length"
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Real logic chain closure authorization permissions mismatch"
+  [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
+  [[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] || fail "authorized next package phase mismatch"
+  [[ "$authorized_next_package_branch" == "codex/v4-1-real-logic-chain-closure" ]] || fail "authorized next package branch mismatch"
+  [[ "$authorized_next_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "authorized next package starting SHA mismatch"
+  [[ "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized next package SHA must be full length"
+  [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
+  [[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
+  [[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
+  [[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
+  [[ "$authorized_next_package_pr" == "true" ]] || fail "authorized Real logic chain closure PR creation must be true for the one-pass task"
+  [[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Real logic chain closure push/merge/staging-only deployment permissions mismatch"
+  [[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "frontend interaction Canonical Figma Desktop permission must remain false"
+  [[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
+  [[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
+  [[ "$p1b_scope" == "V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY" ]] || fail "scope must remain V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY"
+  expected_owner_paths="$(printf '%s\n' docs/CODEX_NEXT_TASK.yml docs/PRODUCT_SOURCE_OF_TRUTH.md docs/PROJECT_CURRENT_STATE.md docs/DELIVERY_PROGRESS_MATRIX.md docs/ACTIVE_MAINLINE_STATUS.yml scripts/v1-state.sh scripts/codex-next-task.sh scripts/check-workflow-contract.sh)"
+  [[ "$(printf '%s\n' "$current_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_owner_paths" | sort)" ]] || fail "Real logic chain closure authorization allowlist must contain exactly the eight gate-owner paths"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "76c96fd1771121df294ae3a4b60717249f2aae09" ]] || fail "Real logic chain closure implementation allowlist fingerprint mismatch"
+  if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
+    fail "Real logic chain closure allowlists must not contain wildcards or directory-level grants"
+  fi
+fi
 [[ -n "$authorized_next_package_phase" && "$authorized_next_package_phase" != "$current_package_phase" ]] || fail "authorized next package must be distinct"
-[[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] || fail "authorized next package phase mismatch"
-[[ "$authorized_next_package_branch" == "codex/v4-1-real-logic-chain-closure" ]] || fail "authorized next package branch mismatch"
-[[ "$authorized_next_package_starting_full_sha" == "b6904ba7c12759ab8a89da40991f9809cdc73e24" ]] || fail "authorized next package starting SHA mismatch"
-[[ "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized next package SHA must be full length"
-[[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] || fail "authorized next package mode mismatch"
-[[ "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "current and authorized next package modes must be distinct"
-[[ "$authorized_next_package_edits" == "true" ]] || fail "authorized v4.1 repository edits must be true"
-[[ "$authorized_next_package_implementation" == "true" ]] || fail "authorized v4.1 implementation must be true"
-[[ "$authorized_next_package_pr" == "true" ]] || fail "authorized Real logic chain closure PR creation must be true for the one-pass task"
-[[ "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Real logic chain closure push/merge/staging-only deployment permissions mismatch"
-[[ "$authorized_next_package_canonical_figma" == "false" ]] || fail "frontend interaction Canonical Figma Desktop permission must remain false"
-[[ "$authorized_next_package_mobile" == "false" ]] || fail "authorized v4.1 Mobile permission must remain false"
-[[ "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "frontend interaction package must not resolve a Figma key"
 [[ -n "$blocked_package_phase" && "$blocked_package_phase" != "$current_package_phase" && "$blocked_package_phase" != "$authorized_next_package_phase" && "$blocked_package_status" == BLOCKED_* ]] || fail "blocked successor package declaration mismatch"
-[[ "$p1b_scope" == "V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY" ]] || fail "scope must remain V41_REAL_LOGIC_CHAIN_CLOSURE_ONLY"
 [[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package authorization scope must be explicit"
-expected_owner_paths="$(printf '%s\n' \
-  docs/CODEX_NEXT_TASK.yml \
-  docs/PRODUCT_SOURCE_OF_TRUTH.md \
-  docs/PROJECT_CURRENT_STATE.md \
-  docs/DELIVERY_PROGRESS_MATRIX.md \
-  docs/ACTIVE_MAINLINE_STATUS.yml \
-  scripts/v1-state.sh \
-  scripts/codex-next-task.sh \
-  scripts/check-workflow-contract.sh)"
-[[ "$(printf '%s\n' "$current_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_owner_paths" | sort)" ]] \
-  || fail "Real logic chain closure authorization allowlist must contain exactly the eight gate-owner paths"
-if printf '%s\n' "$current_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "Real logic chain closure authorization allowlist must not contain wildcards or directory-level grants"
-fi
-expected_implementation_paths="$authorized_next_package_allowed_paths"
-[[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort | git hash-object --stdin)" == "76c96fd1771121df294ae3a4b60717249f2aae09" ]] \
-  || fail "Real logic chain closure implementation allowlist fingerprint mismatch"
-[[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | sort)" == "$(printf '%s\n' "$expected_implementation_paths" | sort)" ]] \
-  || fail "Real logic chain closure implementation allowlist must contain exactly the ninety-eight authorized paths"
-if printf '%s\n' "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
-  fail "Real logic chain closure implementation allowlist must not contain wildcards or directory-level grants"
-fi
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+  for transition_condition in \
+    EXACT_NINE_PATH_GATE_ALLOWLIST \
+    EXACT_FORTY_ONE_PATH_IMPLEMENTATION_ALLOWLIST; do
+    printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
+      || fail "missing v4.1 authorization transition condition: $transition_condition"
+  done
+else
+  printf '%s\n' "$transition_conditions" | grep -Fxq "EXACT_NINETY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST" \
+    || fail "missing v4.1 authorization transition condition: EXACT_NINETY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST"
+fi
 for transition_condition in \
   OWNER_EXPLICIT_ONE_SHOT_END_TO_END_AUTHORIZATION \
   AUTHORIZATION_STARTED_FROM_CLEAN_CURRENT_ORIGIN_MAIN_WITH_EXACT_STARTING_SHA_ANCESTOR \
   EXACT_PACKAGE_MATCH \
   EXACT_BRANCH_MATCH \
   EXACT_40_CHARACTER_STARTING_SHA_MATCH \
-  EXACT_NINETY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST \
   AUTHORIZATION_EFFECTIVE_MERGED_MAIN \
   PRODUCT_SOURCE_GATE_PASS \
   WORKFLOW_CONTRACT_PASS \
@@ -669,11 +695,24 @@ assert_handoff_blocked() {
     || fail "blocked handoff scenario generated a task: $scenario"
 }
 
+authorization_review_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
+authorization_final_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+authorization_pending_reason="BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+authorization_permission_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE"
+authorization_scope_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+  authorization_review_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_REVIEW"
+  authorization_final_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+  authorization_pending_reason="BLOCKED_PENDING_V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+  authorization_permission_reason="BLOCKED_WEB_LIVE_DIRECTION_RISK_CLOSURE_CONTRACT"
+  authorization_scope_reason="BLOCKED_WEB_LIVE_DIRECTION_RISK_CLOSURE_CONTRACT"
+fi
+
 authorization_handoff="$(run_handoff_scenario authorization_pending)" || fail "authorization handoff failed"
 printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_PACKAGE: $current_package_phase" \
   || fail "authorization handoff did not resolve the current v4.1 authorization package"
-printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW" \
-  || fail "Real logic chain closure authorization review stage mismatch"
+printf '%s\n' "$authorization_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: $authorization_review_stage" \
+  || fail "authorization review stage mismatch"
 for machine_identity_field in \
   "MACHINE_AUTHORIZED_PACKAGE: $authorized_next_package_phase" \
   "MACHINE_AUTHORIZED_BRANCH: $authorized_next_package_branch" \
@@ -688,14 +727,29 @@ printf '%s\n' "$authorization_handoff" | grep -Fq "NEXT_PACKAGE_ALLOWED: NO" \
   || fail "unmerged authorization must keep v4.1 implementation blocked"
 
 authorization_ready_handoff="$(run_handoff_scenario authorization_ready_unmerged)" || fail "ready authorization handoff failed"
-printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "ready Real logic chain closure authorization did not resolve final merge path"
+printf '%s\n' "$authorization_ready_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: $authorization_final_stage" \
+  || fail "ready authorization did not resolve final merge path"
 
-assert_handoff_blocked authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN
-assert_handoff_blocked authorization_merged_unsynced BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN
+assert_handoff_blocked authorization_pending_request_v4_1 "$authorization_pending_reason"
+assert_handoff_blocked authorization_merged_unsynced "$authorization_pending_reason"
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+  for v4_1_status_expected in \
+    "V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_STATUS: AUTHORIZED" \
+    "V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED"; do
+    printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_status_expected" \
+      || fail "v4.1 handoff omitted: $v4_1_status_expected"
+  done
+else
+  for v4_1_status_expected in \
+    "V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+    "V4_1_REAL_LOGIC_CHAIN_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED"; do
+    printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_status_expected" \
+      || fail "v4.1 handoff omitted: $v4_1_status_expected"
+  done
+fi
 for v4_1_expected in \
   "CURRENT_PACKAGE: $current_package_phase" \
   "REQUESTED_PACKAGE: $authorized_next_package_phase" \
@@ -725,8 +779,6 @@ for v4_1_expected in \
   "V4_1_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
   "V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "V4_1_OFFICIAL_DOMAIN_SESSION_RUNTIME_VISIBILITY_CLOSURE_IMPLEMENTATION_STATUS: COMPLETE" \
-  "V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
-  "V4_1_REAL_LOGIC_CHAIN_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED" \
   "LOCAL_REAL_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
   "LOCAL_REAL_IMPLEMENTATION_STATUS: COMPLETE" \
   "FRONTEND_INTERACTION_AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -741,12 +793,18 @@ for v4_1_expected in \
   "MOBILE_IMPLEMENTATION_ALLOWED: false" \
   "CANONICAL_FIGMA_FILE_KEY: NONE" \
   "GENERATED_PACKAGE: $authorized_next_package_phase"; do
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
+    && ( "$v4_1_expected" == *"AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
+      || "$v4_1_expected" == "V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: EFFECTIVE_MERGED_MAIN" \
+      || "$v4_1_expected" == "V4_1_BASELINE_RECONCILIATION_GATE_STATUS: EFFECTIVE_MERGED_MAIN" ) ]]; then
+    continue
+  fi
   printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_expected" \
     || fail "v4.1 handoff omitted: $v4_1_expected"
 done
 
-assert_handoff_blocked v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED
-assert_handoff_blocked v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE
+assert_handoff_blocked v4_1_unauthorized "$authorization_scope_reason"
+assert_handoff_blocked v4_1_permission_missing "$authorization_permission_reason"
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
   --request-package V41_CROSS_DEVICE_SECURE_DOMAIN_ACCESS_CLOSUR
 assert_handoff_blocked authorization_merged_validated BLOCKED_UNKNOWN_RESOLVED_STATE \
@@ -836,8 +894,8 @@ assert_chain_allowed CURRENT_AUTHORIZATION_REMEDIATION current_authorization_rem
 assert_chain_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
 final_gate_handoff="$(run_handoff_scenario current_authorization_final_gate)" || fail "authorization final gate handoff failed"
-printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH" \
-  || fail "Real logic chain closure authorization final gate stage mismatch"
+printf '%s\n' "$final_gate_handoff" | grep -Fq "RESOLVED_HANDOFF_STAGE: $authorization_final_stage" \
+  || fail "authorization final gate stage mismatch"
 assert_chain_allowed MERGED_VALIDATED_WITH_GH merged_gh_no_pr \
   AUTHORIZED_IMPLEMENTATION_PACKAGE IMPLEMENTATION_WITH_PR GH_QUERY --request-package "$authorized_next_package_phase"
 assert_chain_blocked MERGED_WITHOUT_GH_OR_EVIDENCE merged_gh_unavailable_no_evidence \
@@ -853,11 +911,11 @@ assert_chain_blocked SEPARATE_CONFLICTING_PR separate_conflicting_pr_successor \
   BLOCKED_ACTIVE_CONFLICTING_PR --request-package "$authorized_next_package_phase"
 assert_chain_allowed SEPARATE_CONFLICT_CURRENT_AUTHORIZATION separate_conflicting_pr_current \
   CURRENT_PACKAGE_CONTINUATION CURRENT_PACKAGE_CONTINUATION GH_QUERY
-assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE \
+assert_chain_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing "$authorization_permission_reason" \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN \
+assert_chain_blocked V4_1_BEFORE_AUTHORIZATION authorization_pending_request_v4_1 "$authorization_pending_reason" \
   --request-package "$authorized_next_package_phase"
-assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED \
+assert_chain_blocked V4_1_UNAUTHORIZED v4_1_unauthorized "$authorization_scope_reason" \
   --request-package "$authorized_next_package_phase"
 assert_chain_blocked DIRTY_WORKTREE dirty_worktree BLOCKED_WORKTREE_DIRTY \
   --request-package "$authorized_next_package_phase"
@@ -895,11 +953,11 @@ assert_outer_blocked() {
 
 assert_outer_allowed CURRENT_AUTHORIZATION_LAUNCH current_authorization_remediation CURRENT_PACKAGE_CONTINUATION
 assert_outer_allowed CURRENT_AUTHORIZATION_FINAL_GATE current_authorization_final_gate CURRENT_PACKAGE_CONTINUATION
-assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE \
+assert_outer_blocked V4_1_PERMISSION_MISSING v4_1_permission_missing "$authorization_permission_reason" \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN \
+assert_outer_blocked V4_1_PENDING_MERGE authorization_pending_request_v4_1 "$authorization_pending_reason" \
   --request-package "$authorized_next_package_phase"
-assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED \
+assert_outer_blocked V4_1_UNAUTHORIZED v4_1_unauthorized "$authorization_scope_reason" \
   --request-package "$authorized_next_package_phase"
 assert_outer_blocked UNKNOWN_STATE unknown_state BLOCKED_UNKNOWN_RESOLVED_STATE
 assert_outer_blocked ACTIVE_CONFLICTING_PR conflicting_pr BLOCKED_ACTIVE_CONFLICTING_PR \
@@ -941,7 +999,26 @@ for exact_gate_case in \
   EXACT_GATE_11_OWNER_PERMISSION_MISMATCH \
   EXACT_GATE_12_BLOCKED_PACKAGE_REGRESSION \
   EXACT_GATE_13_SCOPE_PROOF_MISSING \
-  EXACT_GATE_14_IMPLEMENTATION_OUT_OF_SCOPE_FILE; do
+  EXACT_GATE_14_IMPLEMENTATION_OUT_OF_SCOPE_FILE \
+  WEB_GATE_01_EXACT_IDENTITY \
+  WEB_GATE_02_WRONG_PACKAGE \
+  WEB_GATE_03_WRONG_BRANCH \
+  WEB_GATE_04_WRONG_SHA \
+  WEB_GATE_05_SHORT_SHA \
+  WEB_GATE_06_NOT_MERGED_MAIN \
+  WEB_GATE_07_OUT_OF_ALLOWLIST \
+  WEB_GATE_08_PRODUCTION_DEPLOYMENT \
+  WEB_GATE_09_OWNER_DATA_MUTATION_PATH \
+  WEB_TRANSITION_01_PENDING_MERGED_MAIN \
+  WEB_TRANSITION_02_AUTHORIZED \
+  WEB_TRANSITION_03_WRONG_PACKAGE \
+  WEB_TRANSITION_04_WRONG_BRANCH \
+  WEB_TRANSITION_05_WRONG_SHA \
+  WEB_TRANSITION_06_SHORT_SHA \
+  WEB_TRANSITION_07_ALLOWLIST_ADDED \
+  WEB_TRANSITION_08_ALLOWLIST_MISSING \
+  WEB_TRANSITION_09_PRODUCTION_FORBIDDEN \
+  WEB_TRANSITION_10_PRODUCT_SOURCE_REQUIRED; do
   printf '%s\n' "$exact_gate_text" | grep -Fq "$exact_gate_case: PASS" \
     || fail "missing exact machine-gate case: $exact_gate_case"
 done

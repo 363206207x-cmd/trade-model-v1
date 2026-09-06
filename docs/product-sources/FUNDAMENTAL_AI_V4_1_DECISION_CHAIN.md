@@ -816,3 +816,60 @@ multi-timeframe conflict, both analysis modes, waiting-trigger Preparation,
 triggered revalidation, all five Plan Modes, Pool removal with continuing
 position monitoring, three high-value message categories with dedupe, seven
 Recheck result classes, Hot Reset/Confused recovery and close-to-review.
+
+## Appendix G. Owner-Final Web Live Direction and Risk Amendment
+
+Status: `ACTIVE / OWNER_AUTHORIZED / 2026-09-06`
+
+This amendment is part of this sole v4.1 Product Source. It supersedes only
+the earlier direction-weight, normalization, rule-plan dependency, live-home,
+risk-display, and Mobile-authorization details that conflict with the exact
+`V41_WEB_LIVE_DIRECTION_RISK_CLOSURE` Owner instruction. It does not create a
+second Analysis, Decision, Plan, Position, Monitor, Message, or frontend stack.
+
+- Package: `V41_WEB_LIVE_DIRECTION_RISK_CLOSURE`
+- Branch: `codex/v4-1-web-live-direction-risk-closure`
+- Starting full SHA: `b87cb1878405a6fe8693add1036251d6631e2520`
+- Official target: `https://trinelogic.com/dashboard`
+- Direction: `V41-DIRECTION-4H1H-2`, using closed 4h and 1h bars only and
+  `DirectionScore = 0.55 * Trend4H + 0.45 * State1H`. Trend and state use
+  ATR/MAD/robust-volatility-normalized slope, structure, center, momentum,
+  pullback, and acceleration features; the prior fixed-start 200-bar return
+  percentile is not a primary direction feature.
+- Shock gate: `V41-REALTIME-SHOCK-1`. Structural direction remains immutable
+  between closed-bar recalculations; mark/index price, trade, 1m/5m, depth,
+  liquidation, OI, funding, and crowding facts may warn, suspend, invalidate,
+  or require revalidation but never manufacture a formal opposite direction.
+- Confidence: `V41-CONFIDENCE-CALIBRATED-1`, the walk-forward probability that
+  the next four hours reaches +1 ATR in the structural direction before -0.75
+  ATR. It is capped at 75% for data quality 85-94 and 95% for quality >=95;
+  quality below 85 or insufficient samples cannot show a valid confidence.
+- Risk: `V41-RISK-VECTOR-1`, with independent asset risk items for chase,
+  rapid move, trend reversal, crowding, liquidation, liquidity, event, and
+  data risk. Each item owns score, severity, evidence, source, observation
+  time, and recovery condition. Home shows the two highest concrete items.
+- Plan: `V41-STRUCTURAL-PLAN-2`. Each of the six non-WAIT direction states owns
+  a traceable conditional rule plan independent of AI availability. WAIT and
+  multi-timeframe conflict expose truthful recovery conditions without fake
+  prices. A suspended or invalidated plan is historical and is never revived;
+  recovery requires a new AnalysisRun, Decision, snapshot, and plan version.
+- Live Home: `V41-HOME-SSE-1`. An authenticated SSE stream carries monotonic,
+  versioned price, direction, risk, plan, position-monitor, provider, and
+  system events. The web client applies only newer events, polls after a
+  disconnect at 15 seconds, reconciles a full snapshot every 60 seconds, and
+  refreshes on focus without changing selected asset, AI tab, or open form.
+- Position Monitor: `V41-POSITION-RISK-VECTOR-1`. Normal read-only monitoring
+  runs every 30 seconds and urgent shock facts trigger immediate monitoring.
+  Manual close remains an idempotent Owner action and is never automatic.
+- This correction accepts only the 1440 x 900 desktop `trinelogic.com` browser
+  route. The 390 x 844 mobile-web route is paused and its files are outside
+  this package. Native iOS, Android, macOS, Windows, Electron, WebView shells,
+  and every automatic trade action remain forbidden.
+- Telegram keeps the existing Message/ChannelDelivery owner. Strong-direction
+  complete-plan opportunities and material position/safety state changes use
+  distinct idempotency keys; weak directions, fabricated facts, and duplicate
+  same-severity messages are rejected.
+
+Acceptance requires real Binance, CoinGlass, database, three-AI, Staging, and
+official-domain browser evidence. Unit tests, fixtures, or a safely empty UI
+cannot by themselves close this package.
