@@ -304,8 +304,11 @@ public class DecisionEngineService {
                     ? finalScore >= riskTierLowMinScore ? "LOW" : "MEDIUM"
                     : "HIGH";
             String validatedMarketBias = dataQualitySufficient && hasUsableMarketStructure
+                    && directional(ruleMarketBias)
                     ? ruleMarketBias : null;
-            String userMarketBias = validatedMarketBias == null ? "WAIT" : validatedMarketBias;
+            String userMarketBias = validatedMarketBias == null
+                    ? "RANGE".equals(ruleMarketBias) ? "RANGE" : "WAIT"
+                    : validatedMarketBias;
             String userConfidenceLevel = dataQualitySufficient ? confidenceLevel : "LOW";
 
             // ==================== 3. 决策上下文：冲突 / 困惑 / 快照（本 run K 线事实） ====================
