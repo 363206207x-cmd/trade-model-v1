@@ -18,6 +18,7 @@
     var homeFallbackTimer = null;
     var homeReconciliationTimer = null;
     var homeLiveState = "连接中";
+    var homeRequestFailed = false;
     var liveSnapshotVersions = new Map();
     var csrfToken = document.querySelector('meta[name="_csrf"]')?.content || "";
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || "";
@@ -149,6 +150,15 @@
         return /^[A-Z0-9][A-Z0-9._:/-]{1,31}$/.test(raw) ? raw : "";
     }
     function announce(message) { setText("homeLiveRegion", message || ""); }
+    function reportHomeRequestFailure(error) {
+        homeRequestFailed = true;
+        announce(error && error.message ? error.message : "请求失败");
+    }
+    function clearHomeRequestFailure() {
+        if (!homeRequestFailed) return;
+        homeRequestFailed = false;
+        announce("");
+    }
     function apiData(envelope) {
         if (typeof contract.parseApiEnvelope === "function") {
             var parsed = contract.parseApiEnvelope(envelope);
@@ -890,13 +900,16 @@
                 query.set("positionId", requestedPositionId);
             }
             render(await api("/api/dashboard/home?" + query.toString()));
+            clearHomeRequestFailure();
         } catch (error) {
             if (Number(error.status) === 401 || Number(error.status) === 403) {
                 announce("登录会话已失效，请重新登录后继续。当前页面数据已保留。");
                 return;
             }
-            announce(error.message);
-            render({ states: { overall: "ERROR" }, diagnostics: {}, assets: [], positions: [], aiDecision: { tabs: [] } });
+            reportHomeRequestFailure(error);
+            if (!Array.isArray(currentHome.assets) || !currentHome.assets.length) {
+                render({ states: { overall: "ERROR" }, diagnostics: {}, assets: [], positions: [], aiDecision: { tabs: [] } });
+            }
         }
     }
 
@@ -1013,7 +1026,7 @@
             renderPlan(currentHome);
         } else if (event.eventType === "POSITION_MONITOR_UPDATED") {
             if (payload.refreshRequired === true) {
-                lightweightHomeRefresh().catch(function (error) { announce(error.message); });
+                lightweightHomeRefresh().catch(reportHomeRequestFailure);
                 return;
             }
             var positions = Array.isArray(currentHome.positions) ? currentHome.positions : [];
@@ -1040,11 +1053,12 @@
             currentHome.executionSuggestion = fresh.executionSuggestion;
             renderPlan(currentHome);
         }
+        clearHomeRequestFailure();
     }
     function scheduleHomeFallbackPoll() {
         if (homeFallbackTimer) return;
         homeFallbackTimer = window.setInterval(function () {
-            lightweightHomeRefresh().catch(function (error) { announce(error.message); });
+            lightweightHomeRefresh().catch(reportHomeRequestFailure);
         }, 15000);
     }
     function stopHomeFallbackPoll() {
