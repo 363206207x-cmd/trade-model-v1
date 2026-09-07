@@ -119,6 +119,18 @@ class WebLiveDashboardContractTest {
     }
 
     @Test
+    void completedNonFinalPreviewIsNotDescribedAsStillGenerating() throws Exception {
+        String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String reasons = desktop.substring(desktop.indexOf("function humanReason"),
+                desktop.indexOf("var alertTokenLabels"));
+
+        assertThat(reasons).contains(
+                "ANALYSIS_PREVIEW_NON_FINAL",
+                "规则参考计划尚未通过 Final 校验，当前不可执行"
+        ).doesNotContain("ANALYSIS_PREVIEW_NON_FINAL: \"当前分析仍在生成，完成后自动更新\"");
+    }
+
+    @Test
     void desktopPreservesLastGoodSnapshotAndClearsRecoveredRequestError() throws Exception {
         String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
 
