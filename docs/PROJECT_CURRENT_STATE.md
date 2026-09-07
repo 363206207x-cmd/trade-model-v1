@@ -8,17 +8,46 @@ Completion Effective State: derived by v1 state runtime
 Existing Module Maturity: PARTIAL
 Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
-Product Phase: TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization
-Product Phase Status: WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: Register the exact desktop-web live direction, risk, plan, SSE and read-only position-monitor package; this gate PR contains no business code or deployment
-Next Business Phase: V41_WEB_LIVE_DIRECTION_RISK_CLOSURE
+Product Phase: TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization
+Product Phase Status: WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
+Current Work Package: B01-B07 exact runtime snapshot, CURRENT plan, independent evidence and durable CoinGlass metadata; gate-only registration before implementation
+Next Business Phase: V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE
 Next Business Phase Allowed: NO on this gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
 Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke Harness recorded on branch codex/pdr-m7-real-provider-live-smoke-harness
 
 ---
 
-## TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization
+## TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization
+
+The exact implementation package is `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`,
+branch `codex/v4-1-web-runtime-truth-plan-closure`, starting full SHA
+`f4dd92dae4623a42a2bff626bc653c4db5bde3b0`. The eight gate-owner paths register
+exactly 35 implementation paths; fingerprints are
+`91bc1358febd5a1b1303db117bc8ac0152308c1e` and
+`8d01408be2820eccbf9e457ab3851391f9d401ea`, respectively.
+The earlier Web Live Direction worktree and merged fixes are preserved.
+This gate changes no business capability. Implementation remains NOT_STARTED
+and blocked until exact authorization is merged to main.
+
+B01-B07 are frozen in PRODUCT_SOURCE_OF_TRUTH. Desktop official-domain
+1440x900 acceptance must prove same-snapshot Home/full-pool projection,
+CURRENT conditional plan, numeric confidence, real evidence drawers and
+CoinGlass freshness/restart continuity. Algorithms, APP/mobile, existing 28
+positions, AI calls, Telegram and trading are unchanged/forbidden.
+
+V23 temporary CREATE permission is authorized only when the exact merged-main
+artifact is ready for Staging, after read-only V22/database/role/table checks.
+No permission is granted now. CREATE must be revoked on every exit path and
+verified false, with SUPERUSER=false; failure to verify stops deployment and
+browser acceptance, preserving/restoring Staging
+`075f103babb2907cac4935ba191cf442ca5a0d25`.
+No permanent privileges or existing-table grants are authorized.
+
+FINAL_GATE: FAIL
+CURRENT_PHASE_DONE: NO
+
+## TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization (historical compatibility evidence)
 
 The Owner-authorized successor is
 `V41_WEB_LIVE_DIRECTION_RISK_CLOSURE` on

@@ -566,7 +566,10 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$gpt_background_three_ai_timeout_closure_implementation_status" == "COMPLETE" ]] || fail "GPT background/Three-AI timeout closure must remain complete"
 [[ "$official_domain_session_runtime_visibility_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "official-domain session and runtime visibility authorization must remain effective on merged main"
 [[ "$official_domain_session_runtime_visibility_closure_implementation_status" == "COMPLETE" ]] || fail "official-domain session and runtime visibility implementation must remain complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_runtime_truth_plan_closure_authorization_status)" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "runtime truth authorization must await merged main"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_runtime_truth_plan_closure_implementation_status)" == "NOT_STARTED" ]] || fail "runtime truth implementation must remain not started in the gate package"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$web_live_direction_risk_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "Web live direction and risk closure authorization must remain pending merged-main effectivity"
   [[ "$web_live_direction_risk_closure_implementation_status" == "NOT_STARTED" ]] || fail "Web live direction and risk closure implementation must remain not started in the gate package"
 else
@@ -580,7 +583,31 @@ fi
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
+  [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
+  [[ "$current_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
+  [[ "$current_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" && "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Web live direction and risk closure authorization starting SHA mismatch"
+  [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Web live direction and risk closure authorization permissions mismatch"
+  [[ "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]] || fail "authorized Web live direction and risk closure package mismatch"
+  [[ "$authorized_next_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure" ]] || fail "authorized Web live direction and risk closure branch mismatch"
+  [[ "$authorized_next_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" && "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized Web live direction and risk closure starting SHA mismatch"
+  [[ "$authorized_next_package_mode" == "IMPLEMENTATION" && "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "authorized Web live direction and risk closure mode mismatch"
+  [[ "$authorized_next_package_edits" == "true" && "$authorized_next_package_implementation" == "true" && "$authorized_next_package_pr" == "true" && "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Web live direction and risk closure permissions mismatch"
+  [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
+  [[ "$p1b_scope" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY"
+  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
+    fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
+  fi
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_count)" == "35" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_count)" == "8" ]] || fail "runtime truth registered path counts mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_fingerprint)" == "8d01408be2820eccbf9e457ab3851391f9d401ea" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_fingerprint)" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "runtime truth registered fingerprints mismatch"
+  for runtime_truth_flag in algorithm_changes_allowed ai_calls_allowed telegram_sends_allowed trading_allowed owner_position_mutation_allowed database_permission_now_allowed database_permanent_privilege_expansion_allowed; do
+    [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml "web_runtime_truth_plan_$runtime_truth_flag")" == "false" ]] || fail "runtime truth forbidden permission: $runtime_truth_flag"
+  done
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_window)" == "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_recovery_required)" == "true" ]] || fail "runtime truth temporary migration boundary mismatch"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
   [[ "$current_package_branch" == "codex/v4-1-web-live-direction-risk-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
@@ -632,7 +659,14 @@ fi
 [[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package authorization scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  for transition_condition in \
+    EXACT_EIGHT_PATH_GATE_ALLOWLIST \
+    EXACT_THIRTY_FIVE_PATH_IMPLEMENTATION_ALLOWLIST; do
+    printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
+      || fail "missing v4.1 authorization transition condition: $transition_condition"
+  done
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   for transition_condition in \
     EXACT_TEN_PATH_GATE_ALLOWLIST \
     EXACT_SIXTY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST; do
@@ -700,7 +734,13 @@ authorization_final_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERG
 authorization_pending_reason="BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
 authorization_permission_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE"
 authorization_scope_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  authorization_review_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_REVIEW"
+  authorization_final_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+  authorization_pending_reason="BLOCKED_PENDING_V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+  authorization_permission_reason="BLOCKED_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_CONTRACT"
+  authorization_scope_reason="BLOCKED_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_CONTRACT"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   authorization_review_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_REVIEW"
   authorization_final_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
   authorization_pending_reason="BLOCKED_PENDING_V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_MERGED_MAIN"
@@ -735,7 +775,14 @@ assert_handoff_blocked authorization_merged_unsynced "$authorization_pending_rea
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  for v4_1_status_expected in \
+    "V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS: AUTHORIZED" \
+    "V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED"; do
+    printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_status_expected" \
+      || fail "v4.1 handoff omitted: $v4_1_status_expected"
+  done
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   for v4_1_status_expected in \
     "V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_STATUS: AUTHORIZED" \
     "V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED"; do
@@ -793,7 +840,8 @@ for v4_1_expected in \
   "MOBILE_IMPLEMENTATION_ALLOWED: false" \
   "CANONICAL_FIGMA_FILE_KEY: NONE" \
   "GENERATED_PACKAGE: $authorized_next_package_phase"; do
-  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
+  if [[ ( "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ) \
     && ( "$v4_1_expected" == *"AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
       || "$v4_1_expected" == "V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: EFFECTIVE_MERGED_MAIN" \
       || "$v4_1_expected" == "V4_1_BASELINE_RECONCILIATION_GATE_STATUS: EFFECTIVE_MERGED_MAIN" ) ]]; then
@@ -1030,7 +1078,22 @@ for exact_gate_case in \
   WEB_TRANSITION_07_ALLOWLIST_ADDED \
   WEB_TRANSITION_08_ALLOWLIST_MISSING \
   WEB_TRANSITION_09_PRODUCTION_FORBIDDEN \
-  WEB_TRANSITION_10_PRODUCT_SOURCE_REQUIRED; do
+  WEB_TRANSITION_10_PRODUCT_SOURCE_REQUIRED \
+  RUNTIME_TRUTH_01_UNMERGED \
+  RUNTIME_TRUTH_02_MERGED_EXACT \
+  RUNTIME_TRUTH_REJECT_authorized_next_package_phase_WRONG_PACKAGE \
+  RUNTIME_TRUTH_REJECT_authorized_next_package_branch_codex/wrong-branch \
+  RUNTIME_TRUTH_REJECT_authorized_next_package_starting_full_sha_f4dd92d \
+  RUNTIME_TRUTH_current_package_allowed_paths_ADDED \
+  RUNTIME_TRUTH_authorized_next_package_allowed_paths_MISSING \
+  RUNTIME_TRUTH_authorized_next_package_allowed_paths_DUPLICATE \
+  RUNTIME_TRUTH_REJECT_web_runtime_truth_plan_database_permission_now_allowed_true \
+  RUNTIME_TRUTH_REJECT_web_runtime_truth_plan_database_permission_recovery_required_false \
+  RUNTIME_TRUTH_REJECT_web_runtime_truth_plan_database_permanent_privilege_expansion_allowed_true \
+  RUNTIME_TRUTH_PRODUCT_SOURCE_REQUIRED \
+  RUNTIME_TRUTH_MACHINE_IDENTITY_REQUIRED \
+  RUNTIME_TRUTH_UNMERGED_IMPLEMENTATION_PATH \
+  RUNTIME_TRUTH_NON_ALLOWLIST_CHANGE; do
   printf '%s\n' "$exact_gate_text" | grep -Fq "$exact_gate_case: PASS" \
     || fail "missing exact machine-gate case: $exact_gate_case"
 done

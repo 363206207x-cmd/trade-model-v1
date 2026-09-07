@@ -93,6 +93,73 @@ web_live_direction_risk_contract_matches() {
     && [[ "$authorized_next_canonical_figma_file_key" == "NONE" ]]
 }
 
+web_runtime_truth_plan_contract_matches() {
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]] \
+    && [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] \
+    && [[ "$current_package_status" == "COMPLETED" ]] \
+    && [[ "$current_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure-authorization" ]] \
+    && [[ "$current_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" ]] \
+    && [[ "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]] \
+    && [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] \
+    && [[ "$authorized_next_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure" ]] \
+    && [[ "$authorized_next_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" ]] \
+    && is_full_git_sha "$current_package_starting_full_sha" \
+    && is_full_git_sha "$authorized_next_package_starting_full_sha" \
+    && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] \
+    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] \
+    && ! printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$' \
+    && [[ "$web_runtime_truth_plan_closure_authorization_declared_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] \
+    && [[ "$web_runtime_truth_plan_closure_implementation_status" == "NOT_STARTED" ]] \
+    && is_true_flag "$current_package_repository_edits_allowed" \
+    && is_false_flag "$current_package_implementation_allowed" \
+    && is_true_flag "$current_package_implementation_pr_allowed" \
+    && is_true_flag "$current_package_push_allowed" \
+    && is_true_flag "$current_package_merge_allowed" \
+    && is_false_flag "$current_package_deployment_allowed" \
+    && is_true_flag "$authorized_next_repository_edits_allowed" \
+    && is_true_flag "$authorized_next_implementation_allowed" \
+    && is_true_flag "$authorized_next_implementation_pr_allowed" \
+    && is_true_flag "$authorized_next_push_allowed" \
+    && is_true_flag "$authorized_next_merge_allowed" \
+    && is_false_flag "$authorized_next_deployment_allowed" \
+    && is_true_flag "$authorized_next_staging_deployment_allowed" \
+    && is_false_flag "$authorized_next_production_deployment_allowed" \
+    && is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    && is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    && [[ "$authorized_next_canonical_figma_file_key" == "NONE" ]] \
+    && is_false_flag "$web_runtime_truth_plan_algorithm_changes_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_ai_calls_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_telegram_sends_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_trading_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_owner_position_mutation_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_database_permission_now_allowed" \
+    && is_false_flag "$web_runtime_truth_plan_database_permanent_privilege_expansion_allowed" \
+    && [[ "$web_runtime_truth_plan_database_permission_window" == "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY" ]] \
+    && is_true_flag "$web_runtime_truth_plan_database_permission_recovery_required" \
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_count" == "35" ]] \
+    && [[ "$web_runtime_truth_plan_gate_allowlist_count" == "8" ]] \
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_fingerprint" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] \
+    && [[ "$web_runtime_truth_plan_gate_allowlist_fingerprint" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]]
+}
+
+load_web_runtime_truth_plan_contract() {
+  web_runtime_truth_plan_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_web_runtime_truth_plan_closure_authorization_status)"
+  web_runtime_truth_plan_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_runtime_truth_plan_closure_implementation_status)"
+  web_runtime_truth_plan_algorithm_changes_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_algorithm_changes_allowed)"
+  web_runtime_truth_plan_ai_calls_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_ai_calls_allowed)"
+  web_runtime_truth_plan_telegram_sends_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_telegram_sends_allowed)"
+  web_runtime_truth_plan_trading_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_trading_allowed)"
+  web_runtime_truth_plan_owner_position_mutation_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_owner_position_mutation_allowed)"
+  web_runtime_truth_plan_database_permission_now_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_database_permission_now_allowed)"
+  web_runtime_truth_plan_database_permanent_privilege_expansion_allowed="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_database_permanent_privilege_expansion_allowed)"
+  web_runtime_truth_plan_database_permission_window="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_database_permission_window)"
+  web_runtime_truth_plan_database_permission_recovery_required="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_database_permission_recovery_required)"
+  web_runtime_truth_plan_implementation_allowlist_count="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_implementation_allowlist_count)"
+  web_runtime_truth_plan_gate_allowlist_count="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_gate_allowlist_count)"
+  web_runtime_truth_plan_implementation_allowlist_fingerprint="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_implementation_allowlist_fingerprint)"
+  web_runtime_truth_plan_gate_allowlist_fingerprint="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_gate_allowlist_fingerprint)"
+}
+
 changed_paths_from_starting_sha() {
   local starting_sha="$1"
   {
@@ -258,6 +325,8 @@ emit_resolved_task_state() {
   printf 'V4_1_REAL_LOGIC_CHAIN_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${real_logic_chain_closure_implementation_status:-UNDECLARED}"
   printf 'V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${web_live_direction_risk_closure_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${web_live_direction_risk_closure_implementation_status:-UNDECLARED}"
+  printf 'V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${web_runtime_truth_plan_closure_authorization_runtime_status:-BLOCKED}"
+  printf 'V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${web_runtime_truth_plan_closure_implementation_status:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -345,6 +414,7 @@ resolve_task_handoff() {
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
     elif { [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]] \
       && [[ "${machine_identity_allowed:-NO}" != "YES" ]]; }; then
@@ -359,6 +429,7 @@ resolve_task_handoff() {
 
     if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
       if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
@@ -439,6 +510,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
@@ -474,6 +547,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT_AUTHORIZATION" ]]; then
@@ -549,6 +624,8 @@ resolve_task_handoff() {
     resolved_handoff_stage="V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]]; then
     resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE"
+  elif [[ "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]]; then
+    resolved_handoff_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE" ]]; then
     resolved_handoff_stage="V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
   elif [[ "$authorized_next_package_phase" == "LOCAL_REAL_READINESS_SYNC_AND_REAL_ANALYSIS_ENABLEMENT" ]]; then
@@ -1567,7 +1644,41 @@ evaluate_web_live_direction_risk_closure_transition() {
   next_task_authorization_status="ALLOWED"
 }
 
+evaluate_web_runtime_truth_plan_closure_transition() {
+  web_runtime_truth_plan_closure_authorization_runtime_status="BLOCKED"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_CONTRACT"
+
+  web_runtime_truth_plan_contract_matches || return 0
+  if [[ "$product_source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
+    web_runtime_truth_plan_closure_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+    next_task_authorization_status="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+    return 0
+  fi
+
+  web_runtime_truth_plan_closure_authorization_runtime_status="AUTHORIZED"
+  next_transition_allowed="YES"
+  authorization_status="AUTHORIZED"
+  next_task_authorization_status="ALLOWED"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
+    && "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]]; then
+    evaluate_web_runtime_truth_plan_closure_transition
+    return 0
+  fi
+
+
   if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE" ]]; then
     evaluate_web_live_direction_risk_closure_transition
@@ -1992,6 +2103,7 @@ machine_gate_policy_check() {
   if [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
     || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
     || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
+    || "$expected_package" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" \
     || "$expected_package" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE" \
     || "$expected_package" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]]; then
     [[ -n "$allowed_paths" ]] || return 1
@@ -2092,6 +2204,7 @@ evaluate_machine_runtime_identity() {
     elif [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
       || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
       || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
+      || "$expected_package" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" \
       || "$expected_package" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE" \
       || "$expected_package" == "V41_REAL_LOGIC_CHAIN_CLOSURE" ]] \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
@@ -2129,7 +2242,7 @@ run_exact_machine_gate_self_test() {
   local owner_paths target_paths web_gate_paths
   owner_paths="$(gate_owner_paths)"
   target_paths="$(awk '
-    $0 ~ "^authorized_next_package_allowed_paths:[[:space:]]*$" { capture=1; next }
+    $0 ~ "^historical_web_live_direction_risk_authorized_next_package_allowed_paths:[[:space:]]*$" { capture=1; next }
     capture && $0 ~ "^[^[:space:]]" { exit }
     capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
       value=$0
@@ -2140,7 +2253,7 @@ run_exact_machine_gate_self_test() {
     }
   ' "$TASK_FILE")"
   web_gate_paths="$(awk '
-    $0 ~ "^current_package_allowed_paths:[[:space:]]*$" { capture=1; next }
+    $0 ~ "^historical_web_live_direction_risk_current_package_allowed_paths:[[:space:]]*$" { capture=1; next }
     capture && $0 ~ "^[^[:space:]]" { exit }
     capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
       value=$0
@@ -2339,6 +2452,115 @@ run_exact_machine_gate_self_test() {
   product_source_gate_status="BLOCKED"
   assert_web_transition WEB_TRANSITION_10_PRODUCT_SOURCE_REQUIRED BLOCKED NO BLOCKED BLOCKED_PRODUCT_SOURCE_GATE
 
+  # New task fixtures never change runtime Git-derived effectivity outside this self-test.
+  prepare_runtime_truth_transition_fixture() {
+    prepare_web_transition_fixture
+    current_package_phase="TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION"
+    current_package_branch="codex/v4-1-web-runtime-truth-plan-closure-authorization"
+    current_package_starting_full_sha="f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+    current_package_allowed_paths="$(yaml_list "$TASK_FILE" current_package_allowed_paths)"
+    authorized_next_package_phase="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
+    authorized_next_package_branch="codex/v4-1-web-runtime-truth-plan-closure"
+    authorized_next_package_starting_full_sha="$current_package_starting_full_sha"
+    authorized_next_package_allowed_paths="$(yaml_list "$TASK_FILE" authorized_next_package_allowed_paths)"
+    load_web_runtime_truth_plan_contract
+    web_live_direction_risk_closure_authorization_runtime_status="OLD_WEB_RUNTIME_SENTINEL"
+    machine_gate_effective_on_origin_main="NO"
+  }
+
+  assert_runtime_truth_transition() {
+    local name="$1" expected_runtime="$2" expected_transition="$3" expected_reason="$4"
+    local before_effectivity="$machine_gate_effective_on_origin_main"
+    evaluate_web_runtime_truth_plan_closure_transition
+    if [[ "$web_runtime_truth_plan_closure_authorization_runtime_status" == "$expected_runtime" \
+      && "$next_transition_allowed" == "$expected_transition" \
+      && "$next_task_authorization_status" == "$expected_reason" \
+      && "$machine_gate_effective_on_origin_main" == "$before_effectivity" \
+      && "$web_live_direction_risk_closure_authorization_runtime_status" == "OLD_WEB_RUNTIME_SENTINEL" \
+      && "$web_live_direction_risk_closure_authorization_declared_status" == "AUTHORIZED_PENDING_MERGED_MAIN" \
+      && "$web_live_direction_risk_closure_implementation_status" == "NOT_STARTED" \
+      && "$real_logic_chain_closure_authorization_runtime_status" == "LEGACY_RUNTIME_SENTINEL" \
+      && "$real_logic_chain_closure_authorization_declared_status" == "LEGACY_DECLARED_SENTINEL" \
+      && "$real_logic_chain_closure_implementation_status" == "LEGACY_IMPLEMENTATION_SENTINEL" ]] \
+      && { [[ "$expected_transition" == "YES" && "$authorization_status" == "AUTHORIZED" ]] \
+        || [[ "$expected_transition" == "NO" && "$authorization_status" == "BLOCKED" ]]; }; then
+      printf '%s: PASS\n' "$name"
+    else
+      printf '%s: FAIL\n' "$name"
+      failed=1
+    fi
+  }
+
+  prepare_runtime_truth_transition_fixture
+  assert_runtime_truth_transition RUNTIME_TRUTH_01_UNMERGED PENDING_MERGED_MAIN NO BLOCKED_PENDING_V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_MERGED_MAIN
+  prepare_runtime_truth_transition_fixture
+  machine_gate_effective_on_origin_main="YES"
+  assert_runtime_truth_transition RUNTIME_TRUTH_02_MERGED_EXACT AUTHORIZED YES ALLOWED
+
+  local mutation_field mutation_value
+  while IFS='|' read -r mutation_field mutation_value; do
+    prepare_runtime_truth_transition_fixture
+    machine_gate_effective_on_origin_main="YES"
+    printf -v "$mutation_field" '%s' "$mutation_value"
+    assert_runtime_truth_transition "RUNTIME_TRUTH_REJECT_${mutation_field}_${mutation_value}" BLOCKED NO BLOCKED_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_CONTRACT
+  done <<'RUNTIME_TRUTH_REJECTED_CONTRACTS'
+current_package_phase|WRONG_GATE_PACKAGE
+current_package_branch|codex/wrong-gate
+current_package_starting_full_sha|f4dd92d
+authorized_next_package_phase|WRONG_PACKAGE
+authorized_next_package_branch|codex/wrong-branch
+authorized_next_package_starting_full_sha|b87cb1878405a6fe8693add1036251d6631e2520
+authorized_next_package_starting_full_sha|f4dd92d
+authorized_next_production_deployment_allowed|true
+authorized_next_mobile_implementation_allowed|true
+web_runtime_truth_plan_algorithm_changes_allowed|true
+web_runtime_truth_plan_ai_calls_allowed|true
+web_runtime_truth_plan_telegram_sends_allowed|true
+web_runtime_truth_plan_trading_allowed|true
+web_runtime_truth_plan_owner_position_mutation_allowed|true
+web_runtime_truth_plan_database_permission_now_allowed|true
+web_runtime_truth_plan_database_permanent_privilege_expansion_allowed|true
+web_runtime_truth_plan_database_permission_recovery_required|false
+web_runtime_truth_plan_database_permission_window|UNBOUNDED
+web_runtime_truth_plan_implementation_allowlist_count|36
+web_runtime_truth_plan_gate_allowlist_count|9
+web_runtime_truth_plan_implementation_allowlist_fingerprint|wrong
+web_runtime_truth_plan_gate_allowlist_fingerprint|wrong
+RUNTIME_TRUTH_REJECTED_CONTRACTS
+
+  local manifest mutation_kind
+  for manifest in current_package_allowed_paths authorized_next_package_allowed_paths; do
+    for mutation_kind in ADDED MISSING DUPLICATE; do
+      prepare_runtime_truth_transition_fixture
+      machine_gate_effective_on_origin_main="YES"
+      case "$mutation_kind" in
+        ADDED) printf -v "$manifest" '%s\n%s' "${!manifest}" src/main/java/Unauthorized.java ;;
+        MISSING) printf -v "$manifest" '%s' "$(printf '%s\n' "${!manifest}" | sed '1d')" ;;
+        DUPLICATE) printf -v "$manifest" '%s\n%s' "${!manifest}" "$(printf '%s\n' "${!manifest}" | sed -n '1p')" ;;
+      esac
+      assert_runtime_truth_transition "RUNTIME_TRUTH_${manifest}_${mutation_kind}" BLOCKED NO BLOCKED_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_CONTRACT
+    done
+  done
+  prepare_runtime_truth_transition_fixture
+  machine_gate_effective_on_origin_main="YES"
+  product_source_gate_status="BLOCKED"
+  assert_runtime_truth_transition RUNTIME_TRUTH_PRODUCT_SOURCE_REQUIRED BLOCKED NO BLOCKED_PRODUCT_SOURCE_GATE
+  prepare_runtime_truth_transition_fixture
+  machine_gate_effective_on_origin_main="YES"
+  machine_identity_allowed="NO"
+  machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+  assert_runtime_truth_transition RUNTIME_TRUTH_MACHINE_IDENTITY_REQUIRED BLOCKED NO BLOCKED_EXACT_MACHINE_IDENTITY
+  prepare_runtime_truth_transition_fixture
+  assert_machine_blocked RUNTIME_TRUTH_UNMERGED_IMPLEMENTATION_PATH \
+    "$authorized_next_package_phase" "$authorized_next_package_phase" "$authorized_next_package_branch" "$authorized_next_package_branch" \
+    "$authorized_next_package_starting_full_sha" "$authorized_next_package_starting_full_sha" \
+    IMPLEMENTATION NO NO true true true true true false src/main/resources/static/js/home-runtime.js "$authorized_next_package_allowed_paths" YES YES
+  assert_machine_blocked RUNTIME_TRUTH_NON_ALLOWLIST_CHANGE \
+    "$authorized_next_package_phase" "$authorized_next_package_phase" "$authorized_next_package_branch" "$authorized_next_package_branch" \
+    "$authorized_next_package_starting_full_sha" "$authorized_next_package_starting_full_sha" \
+    IMPLEMENTATION NO YES true true true true true false src/main/resources/static/js/dashboard-mobile.js "$authorized_next_package_allowed_paths" YES YES
+
+
   if [[ "$failed" -eq 0 ]]; then
     echo "EXACT_MACHINE_GATE_TESTS: PASS"
     return 0
@@ -2381,11 +2603,6 @@ if [[ "$run_policy_self_test" == "YES" ]]; then
   exit $?
 fi
 
-if [[ "$run_exact_gate_self_test" == "YES" ]]; then
-  run_exact_machine_gate_self_test
-  exit $?
-fi
-
 yaml_value() {
   local file="$1"
   local key="$2"
@@ -2423,6 +2640,11 @@ yaml_list() {
     }
   ' "$file"
 }
+
+if [[ "$run_exact_gate_self_test" == "YES" ]]; then
+  run_exact_machine_gate_self_test
+  exit $?
+fi
 
 load_task_package_contract() {
   current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
@@ -2508,6 +2730,7 @@ load_task_package_contract() {
   real_logic_chain_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_implementation_status)"
   web_live_direction_risk_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_authorization_status)"
   web_live_direction_risk_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_implementation_status)"
+  load_web_runtime_truth_plan_contract
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2567,6 +2790,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+        web_runtime_truth_plan_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="WEB_RUNTIME_TRUTH_PLAN_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
         web_live_direction_risk_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="WEB_LIVE_DIRECTION_RISK_CLOSURE_NOT_AUTHORIZED"
@@ -2680,6 +2906,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+        web_runtime_truth_plan_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="WEB_RUNTIME_TRUTH_PLAN_CLOSURE_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
         web_live_direction_risk_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="WEB_LIVE_DIRECTION_RISK_CLOSURE_NOT_AUTHORIZED"
@@ -3002,6 +3231,7 @@ real_logic_chain_closure_authorization_declared_status="$(yaml_value "$TASK_FILE
 real_logic_chain_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_real_logic_chain_closure_implementation_status)"
 web_live_direction_risk_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_authorization_status)"
 web_live_direction_risk_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_implementation_status)"
+load_web_runtime_truth_plan_contract
 local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -3295,6 +3525,10 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUT
 fi
 if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]] \
   && ! web_live_direction_risk_contract_matches; then
+  blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+fi
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]] \
+  && ! web_runtime_truth_plan_contract_matches; then
   blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
 fi
 if [[ "$current_package_phase" == "FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_CHANNEL_REMEDIATION_AUTHORIZATION" ]]; then
