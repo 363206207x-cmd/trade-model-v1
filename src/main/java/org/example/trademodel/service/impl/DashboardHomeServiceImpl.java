@@ -1381,8 +1381,30 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                         String provider,
                                                         String marketType,
                                                         long analysisTimeMs) {
-        return persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
-                symbol, timeframe, provider, marketType, analysisTimeMs);
+        PersistedOhlcvBarDO latestByCloseTime = persistedOhlcvBarMapper
+                .selectLatestClosedBarBySourceAtOrBefore(
+                        symbol, timeframe, provider, marketType, analysisTimeMs);
+        if (wasAvailableAtAnalysis(latestByCloseTime, analysisTimeMs)) {
+            return latestByCloseTime;
+        }
+        List<PersistedOhlcvBarDO> candidates = persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                symbol, timeframe, provider, marketType, 512);
+        if (candidates == null) return null;
+        return candidates.stream()
+                .filter(row -> wasAvailableAtAnalysis(row, analysisTimeMs))
+                .max(Comparator.comparing(PersistedOhlcvBarDO::getCloseTimeMs,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElse(null);
+    }
+
+    private boolean wasAvailableAtAnalysis(PersistedOhlcvBarDO row, long analysisTimeMs) {
+        if (row == null || row.getCloseTimeMs() == null || row.getCloseTimeMs() > analysisTimeMs
+                || row.getIngestedAt() == null) {
+            return false;
+        }
+        LocalDateTime analysisTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(analysisTimeMs), ZoneOffset.UTC);
+        return !row.getIngestedAt().isAfter(analysisTime);
     }
 
     private boolean analysisBoundSourceOwned(PersistedOhlcvBarDO row,
@@ -1401,7 +1423,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && "READY".equalsIgnoreCase(trimToNull(row.getSourceStatus()))
                 && row.getCloseTimeMs() != null
                 && row.getCloseTimeMs() > 0
-                && row.getCloseTimeMs() <= analysisTimeMs;
+                && wasAvailableAtAnalysis(row, analysisTimeMs);
     }
 
     private LocalDateTime closedAt(PersistedOhlcvBarDO row) {
