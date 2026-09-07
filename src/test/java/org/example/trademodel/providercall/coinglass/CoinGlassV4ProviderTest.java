@@ -50,6 +50,44 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CoinGlassV4ProviderTest {
+    @Test
+    void aggregateReadFreshnessUsesTheSameScheduledWindowWithoutChangingEvidenceOrCallingProvider() {
+        TestContext context = context("open-interest-success.json", "funding-success.json",
+                "liquidation-success.json", "long-short-success.json");
+        // History fixtures are observed at NOW - 60s; age must be measured from that real timestamp.
+        context.clock.instant = NOW.minusSeconds(60);
+        context.derivativesService.get("BTCUSDT", AssetPriority.P0_POSITION,
+                Duration.ofSeconds(120), "cadence-initial");
+        context.clock.instant = NOW.plusSeconds(61);
+        var read = context.derivativesService.peek("BTCUSDT", AssetPriority.P0_POSITION,
+                Duration.ofSeconds(60), "cadence-read");
+        assertThat(read.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.READY);
+        assertThat(read.payload().evidenceAvailability()).isEqualTo("COMPLETE");
+        assertThat(read.payload().providerDataTime()).isBeforeOrEqualTo(NOW);
+        assertThat(context.transport.calls).hasValue(4);
+        context.clock.instant = NOW.plusSeconds(73);
+        var stale = context.derivativesService.peek("BTCUSDT", AssetPriority.P0_POSITION,
+                Duration.ofSeconds(60), "cadence-stale");
+        assertThat(stale.metadata().sourceStatus()).isEqualTo(UnifiedSourceStatus.STALE);
+        assertThat(context.transport.calls).hasValue(4);
+    }
+
+    @Test
+    void readFreshnessCoversScheduledCadenceAndJitterWithoutDelayingActualRefresh() {
+        TestContext context = context("open-interest-success.json");
+        context.oiService.setRuntimeHealth(context.health);
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(120), "first");
+        context.clock.instant = NOW.plusSeconds(121);
+
+        var duringNextScan = context.oiService.peek(
+                "BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(60), "read-only");
+        assertThat(duringNextScan.metadata().freshnessStatus()).isEqualTo(SnapshotFreshnessStatus.FRESH);
+        assertThat(context.transport.calls).hasValue(1);
+        context.oiService.get("BTCUSDT", AssetPriority.P1_WATCHLIST, Duration.ofSeconds(120), "scheduled");
+        assertThat(context.transport.calls).hasValue(2);
+        assertThat(context.coinGlassProperties.getFreshTtlSeconds()).isEqualTo(60);
+    }
+
     private static final Instant NOW = Instant.parse("2026-07-10T10:00:00Z");
 
     @Test
@@ -205,6 +243,12 @@ class CoinGlassV4ProviderTest {
         assertThat(health.rateLimit().apiKeyMaxLimit()).isEqualTo(300);
         assertThat(health.rateLimit().apiKeyUseLimit()).isEqualTo(1);
         assertThat(health.toString()).doesNotContain("fixture-secret-key");
+        var persisted = context.health.runtimeSnapshot().get(
+                CoinGlassV4ResponseValidator.OI_CAPABILITY + "|BTCUSDT");
+        assertThat(persisted.lastAttemptAt()).isEqualTo(NOW);
+        assertThat(persisted.lastSuccessAt()).isEqualTo(NOW);
+        assertThat(persisted.providerDataAt()).isNotNull().isBeforeOrEqualTo(NOW);
+        assertThat(persisted.toString()).doesNotContain("fixture-secret-key");
     }
 
     @Test
@@ -457,7 +501,7 @@ class CoinGlassV4ProviderTest {
         CoinGlassRateLimitMetadataParser rateParser = new CoinGlassRateLimitMetadataParser();
         CoinGlassV4Client client = new CoinGlassV4Client(coinGlassProperties, transport, rateParser,
                 new ObjectMapper(), clock);
-        CoinGlassProviderHealthService health = new CoinGlassProviderHealthService();
+        CoinGlassProviderHealthService health = new CoinGlassProviderHealthService(clock);
         CoinGlassV4ProviderAdapter adapter = new CoinGlassV4ProviderAdapter(coinGlassProperties, client,
                 mapper, new CoinGlassV4ResponseValidator(), health);
 
@@ -478,12 +522,17 @@ class CoinGlassV4ProviderTest {
                 coordinator, coinGlassProperties, mapper, adapter);
         CoinGlassLongShortSnapshotService longShortService = new CoinGlassLongShortSnapshotService(
                 coordinator, coinGlassProperties, mapper, adapter);
+        oiService.setRuntimeHealth(health);
+        fundingService.setRuntimeHealth(health);
+        liquidationService.setRuntimeHealth(health);
+        longShortService.setRuntimeHealth(health);
         CoinGlassDerivativesSnapshotAssembler assembler = new CoinGlassDerivativesSnapshotAssembler(
                 coinGlassProperties, clock);
         CoinGlassDerivativesSnapshotService derivativesService = new CoinGlassDerivativesSnapshotService(
                 coinGlassProperties, oiService, fundingService, liquidationService, longShortService, assembler);
+        derivativesService.setRuntimeHealth(health);
         return new TestContext(coinGlassProperties, transport, coordinator, adapter, health, oiService,
-                fundingService, assembler, derivativesService);
+                fundingService, assembler, derivativesService, clock);
     }
 
     private static CoinGlassV4HttpTransport.CoinGlassHttpResponse response(
@@ -537,7 +586,8 @@ class CoinGlassV4ProviderTest {
             CoinGlassOpenInterestSnapshotService oiService,
             CoinGlassFundingSnapshotService fundingService,
             CoinGlassDerivativesSnapshotAssembler assembler,
-            CoinGlassDerivativesSnapshotService derivativesService
+            CoinGlassDerivativesSnapshotService derivativesService,
+            MutableClock clock
     ) {
     }
 

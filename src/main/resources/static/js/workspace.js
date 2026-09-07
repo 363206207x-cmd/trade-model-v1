@@ -20,6 +20,7 @@
     let assetPoolItems = [];
     let assetPoolLoaded = false;
     let assetPoolProjections = [];
+    let assetPoolProjectionVersion = 0;
     let latestTasks = [];
     let poolScanRuntime = null;
     let telegramStatus = null;
@@ -562,18 +563,18 @@
             const live = bySymbol.get(String(asset.symbol || "").toUpperCase()) || null;
             const direction = live
                 ? text(live.marketBiasLabel, label(live.marketBias, "暂不可判断")) : "数据待同步";
-            const confidence = live
-                ? text(live.confidenceLabel, hasValue(live.confidenceLevel)
-                    ? label(live.confidenceLevel, "—") : "—") : "—";
+            const confidence = window.TrineDesktopSemantics.confidenceText(live);
             const row = document.createElement("tr");
             row.dataset.analysisId = text(live?.analysisId, "");
+            row.dataset.snapshotId = text(live?.snapshotId, "");
             row.dataset.decisionId = text(live?.decisionId, "");
             row.dataset.directionCalculatedAt = text(live?.directionCalculatedAt, "");
             row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td>'
                 + '<td>' + escapeHtml(window.TrineDesktopSemantics.priceText(live?.latestPrice)) + '</td>'
                 + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong></td>'
                 + '<td class="pool-confidence">' + escapeHtml(confidence) + (confidence === "—" ? '<small>' + escapeHtml(live?.unavailableReason || live?.marketBiasLabel || "尚无置信度计算结果") + '</small>' : '') + '</td>'
-                + '<td><div tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情">'
+                + '<td><div' + (window.TrineDesktopSemantics.hasConfirmedRisks(live || {})
+                    ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情"' : '') + '>'
                 + window.TrineDesktopSemantics.riskSummary(live || {}) + '</div></td>'
                 + '<td><span>' + escapeHtml(text(live?.oneHourOpportunityLabel, "1小时数据不足")) + '</span><small>' + escapeHtml(text(live?.fourHourTrendLabel, "4小时数据不足")) + '</small></td>'
                 + '<td>' + escapeHtml(window.TrineDesktopSemantics.beijingTime(live?.directionCalculatedAt || live?.updatedAt)) + '</td>'
@@ -582,24 +583,29 @@
         });
     }
 
-    async function loadAssetPoolProjection(asset) {
-        const symbol = String(asset?.symbol || "").trim().toUpperCase();
-        if (!symbol) return { asset: null, header: null };
-        try {
-            const home = await api("/api/dashboard/home?selectedSymbol=" + encodeURIComponent(symbol) + "&limit=1");
-            return { asset: home?.selectedAssetContext || null, header: home?.header || null };
-        } catch (_) {
-            return { asset: null, header: null };
+    async function loadAssetPoolProjection() {
+        const snapshot = await api("/api/dashboard/runtime-snapshot");
+        if (!snapshot?.snapshotComplete || !snapshot.snapshotId
+                || !Number.isSafeInteger(snapshot.projectionVersion)
+                || !Array.isArray(snapshot.poolMembers) || !Array.isArray(snapshot.assetPool)) {
+            throw new Error("完整资产池快照尚未就绪");
         }
+        const projected = new Map(snapshot.assetPool.map(asset => [asset.rawSymbol, asset]));
+        if (!snapshot.poolMembers.every(member => projected.get(member.symbol)?.snapshotId === snapshot.snapshotId)) {
+            throw new Error("资产池存在未完成的同批次投影");
+        }
+        return snapshot;
     }
 
     async function loadAssetPool() {
         try {
-            const items = await api("/api/asset-pool") || [];
-            const projectionResults = await Promise.all(items.map(loadAssetPoolProjection));
-            const projections = projectionResults.map(function (result) { return result.asset; }).filter(Boolean);
+            const snapshot = await loadAssetPoolProjection();
+            if (snapshot.projectionVersion <= assetPoolProjectionVersion) return;
+            const items = snapshot.poolMembers;
+            const projections = snapshot.assetPool;
+            assetPoolProjectionVersion = snapshot.projectionVersion;
             assetPoolProjections = projections;
-            poolScanRuntime = projectionResults.find(function (result) { return result.header; })?.header || null;
+            poolScanRuntime = snapshot.header || null;
             assetPoolItems = items;
             assetPoolLoaded = true;
             renderAssetPoolRows(items, projections);
@@ -618,9 +624,10 @@
             }
             updatePoolScanCta();
         } catch (_) {
-            assetPoolItems = [];
             assetPoolLoaded = true;
-            empty(document.getElementById("assetPoolRows")?.parentElement, "资产池当前不可查看", "未返回可信资产池数据。请稍后重试。");
+            if (!assetPoolItems.length) empty(document.getElementById("assetPoolRows")?.parentElement,
+                "资产池当前不可查看", "未返回完整资产池快照。请稍后重试。");
+            else announce("资产池更新失败，已保留上一份完整快照");
             updatePoolScanCta(true);
         }
     }

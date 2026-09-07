@@ -434,6 +434,12 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
             return item("DERIVATIVES_CONTEXT", "COINGLASS", STATUS_NOT_CONFIGURED,
                     false, false, false, "COINGLASS_NOT_CONFIGURED");
         }
+        synchronized (coinGlassProviderHealthService) {
+            return coinGlassRuntimeStatus();
+        }
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO coinGlassRuntimeStatus() {
         UnifiedSourceStatus source = coinGlassProviderHealthService.configurationStatus(coinGlassProperties);
         String status = switch (source) {
             case READY -> STATUS_CONNECTED;
@@ -443,17 +449,39 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         };
         boolean configured = source != UnifiedSourceStatus.NOT_CONFIGURED
                 && source != UnifiedSourceStatus.DISABLED;
-        Instant latestSuccess = coinGlassProviderHealthService.snapshot().values().stream()
+        List<CoinGlassProviderHealthService.RuntimeSnapshot> runtime =
+                coinGlassProviderHealthService.latestCapabilities();
+        Instant latestSuccess = runtime.isEmpty() ? coinGlassProviderHealthService.snapshot().values().stream()
                 .filter(value -> value.status() == UnifiedSourceStatus.READY)
                 .map(CoinGlassProviderHealthService.CoinGlassEndpointHealth::fetchTime)
                 .filter(java.util.Objects::nonNull)
-                .max(Instant::compareTo).orElse(null);
-        return item("DERIVATIVES_CONTEXT", "COINGLASS", status,
+                .max(Instant::compareTo).orElse(null) : runtime.stream()
+                .map(CoinGlassProviderHealthService.RuntimeSnapshot::lastSuccessAt)
+                .filter(java.util.Objects::nonNull).max(Instant::compareTo).orElse(null);
+        ProviderReadinessVO.ProviderStatusVO result = item("DERIVATIVES_CONTEXT", "COINGLASS", status,
                 coinGlassProperties.isEnabled(), configured, source == UnifiedSourceStatus.READY,
                 "COINGLASS_" + source.name(), latestSuccess,
                 source == UnifiedSourceStatus.READY ? "FRESH" : source.name(), ageMs(latestSuccess),
                 "衍生品风险补充；缺失时规则方向降级为部分覆盖",
                 source == UnifiedSourceStatus.READY ? "自动持续采集" : "等待下一轮自动重试");
+        result.setRuntimeState(configured ? coinGlassProviderHealthService.runtimeState() : "DISABLED");
+        result.setLastAttemptAt(runtime.stream().map(CoinGlassProviderHealthService.RuntimeSnapshot::lastAttemptAt)
+                .filter(java.util.Objects::nonNull).max(Instant::compareTo).orElse(null));
+        // The oldest observation of the latest required endpoints bounds complete coverage.
+        result.setProviderDataAt(runtime.stream().map(CoinGlassProviderHealthService.RuntimeSnapshot::providerDataAt)
+                .filter(java.util.Objects::nonNull).min(Instant::compareTo).orElse(null));
+        result.setStateVersion(coinGlassProviderHealthService.runtimeSnapshot().values().stream()
+                .mapToLong(CoinGlassProviderHealthService.RuntimeSnapshot::stateVersion).sum());
+        CoinGlassProviderHealthService.RuntimeSnapshot scheduled = runtime.stream()
+                .filter(row -> row.nextCheckAt() != null)
+                .min(java.util.Comparator.comparing(CoinGlassProviderHealthService.RuntimeSnapshot::nextCheckAt))
+                .orElse(null);
+        if (configured && scheduled != null) {
+            result.setNextCheckAt(scheduled.nextCheckAt());
+            result.setNextCheckStatus(!scheduled.nextCheckAt().isAfter(clock.instant()) ? "DUE"
+                    : "RATE_LIMITED".equals(scheduled.runtimeState()) ? "RETRY_AFTER" : "SCHEDULED");
+        }
+        return result;
     }
 
     private ProviderReadinessVO.ProviderStatusVO externalContextStatus() {

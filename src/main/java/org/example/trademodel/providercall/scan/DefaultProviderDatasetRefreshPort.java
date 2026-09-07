@@ -38,6 +38,12 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     private final ProviderRefreshStateRegistry registry;
     private final ProviderCapabilityRegistry capabilityRegistry;
     private final Clock clock;
+    private org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService coinGlassRuntime;
+
+    @Autowired(required = false)
+    void setCoinGlassRuntime(org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService runtime) {
+        this.coinGlassRuntime = runtime;
+    }
 
     @Autowired
     public DefaultProviderDatasetRefreshPort(MarketPriceSnapshotService priceService,
@@ -100,6 +106,7 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
     public void refresh(ScanPlanItem item, ProviderDatasetType datasetType) {
         String traceId = "provider-scan-" + UUID.randomUUID();
         Instant attemptedAt = clock.instant();
+        try {
         switch (datasetType) {
             case PRICE -> refreshPrice(item, traceId, attemptedAt);
             case OHLCV -> refreshOhlcv(item, traceId, attemptedAt);
@@ -115,11 +122,19 @@ public class DefaultProviderDatasetRefreshPort implements ProviderDatasetRefresh
             case AI_REVIEW -> unavailable(item, datasetType, UnifiedSourceStatus.DISABLED,
                     "AI_ROUTINE_SCAN_DISABLED", traceId, attemptedAt);
         }
+        } catch (RuntimeException failure) {
+            // Keep the real attempt for the existing cadence gate, even on an unexpected provider failure.
+            unavailable(item, datasetType, UnifiedSourceStatus.ERROR, "DATASET_REFRESH_EXCEPTION", traceId, attemptedAt);
+            throw failure;
+        }
     }
 
     private void refreshDerivatives(ScanPlanItem item, String traceId, Instant attemptedAt) {
         int seconds = properties.intervalSeconds(item.effectiveProfile(), item.effectivePriority(),
                 ProviderDatasetType.DERIVATIVES);
+        if (coinGlassRuntime != null) {
+            coinGlassRuntime.noteRefreshSchedule(item.providerSymbol(), Duration.ofSeconds(Math.max(1, seconds)));
+        }
         ProviderCallResult<DerivativesRiskSnapshot> result = derivativesService.get(item.canonicalInstrumentId(),
                 item.effectivePriority(), Duration.ofSeconds(Math.max(1, seconds)), traceId);
         record(item, ProviderDatasetType.DERIVATIVES, result, attemptedAt, traceId);

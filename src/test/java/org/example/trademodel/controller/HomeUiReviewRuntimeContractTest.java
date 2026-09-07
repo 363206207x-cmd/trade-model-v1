@@ -98,8 +98,25 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
-                assert.equal(eth.includes('data-desktop-hover="risk"'), true);
+                assert.equal(eth.includes('data-desktop-hover="risk"'), false);
                 assert.equal(eth.includes('尚无独立风险证据'), true);
+                assert.equal(eth.includes('风险证据待更新'), true);
+                const evidencedRisk = {riskType:'EVENT_RISK', evidenceStatus:'AVAILABLE', severity:'HIGH',
+                  currentValue:'2', source:'fixture-event-source', observedAt:'2026-09-07T05:00:00Z',
+                  primaryEvidence:'Test-only independently observed event count', evidenceId:'fixture-evidence-1'};
+                const withRisk = opportunityCard({...assets[1],riskItems:[evidencedRisk]}, 'ETHUSDT');
+                assert.equal(withRisk.includes('data-desktop-hover="risk"'), true);
+                assert.equal(withRisk.includes('tabindex="0"'), true);
+                assert.equal(withRisk.includes('aria-haspopup="dialog"'), true);
+                assert.equal(withRisk.includes('aria-expanded="false"'), true);
+                assert.equal(withRisk.includes('aria-label="ETHUSDT 风险详情"'), true);
+                assert.equal(desktop.riskDrawer({...assets[1],riskItems:[evidencedRisk]}).includes('fixture-event-source'), true);
+                // Complete evidence with no confirmed risk must not become a hover action.
+                // An explicit non-risk severity is not inferred from a missing score or a low aggregate score.
+                const completeNoRisk = {...assets[1],riskItems:[{...evidencedRisk,severity:'NONE',currentValue:'0'}]};
+                assert.equal(opportunityCard(completeNoRisk,'ETHUSDT').includes('data-desktop-hover="risk"'), false);
+                assert.equal(desktop.riskDrawer(completeNoRisk), '');
+                assert.equal(desktop.riskDrawer({...assets[1],riskItems:[]}), '');
                 assert.equal(eth.includes('<b data-live-field="direction" class="semantic-value semantic-bullish">偏多</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">80%%</strong></div>'), true);
                 assert.equal(eth.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(eth.includes('<small>状态</small>'), false);
@@ -201,8 +218,10 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-unavailable">暂不可判断</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
-                assert.equal(observationHtml.includes('data-desktop-hover="risk"'), true);
+                assert.equal(observationHtml.includes('data-desktop-hover="risk"'), false);
                 assert.equal(observationHtml.includes('尚无独立风险证据'), true);
+                assert.equal(observationHtml.includes('风险证据待更新'), true);
+                assert.equal(desktop.riskDrawer(observation), '');
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
                 assert.equal(observationHtml.includes('<small>状态</small>'), false);

@@ -50,6 +50,37 @@ import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 
 class DefaultProviderScanUniverseSourceTest {
+    @Test void unmappedPoolMemberCannotEraseSupportedWatchlistAssets() {
+        var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+        List<String> members = List.of("UNSUPPORTEDUSDT", "BTCUSDT", "ETHUSDT", "BTCUSDT");
+        when(pool.listScanSymbols()).thenReturn(members);
+        var configured = new org.example.trademodel.providercall.universe.ConfiguredWatchlistAssetSource(
+                new org.example.trademodel.providercall.universe.WatchlistProperties(),
+                ProviderCallTestFixtures.binanceRegistry("BTCUSDT", "ETHUSDT"), pool);
+
+        assertThat(configured.currentWatchlist()).containsExactlyElementsOf(instruments("BTCUSDT", "ETHUSDT"));
+        assertThat(members).containsExactly("UNSUPPORTEDUSDT", "BTCUSDT", "ETHUSDT", "BTCUSDT");
+        verify(pool).listScanSymbols();
+        org.mockito.Mockito.verifyNoMoreInteractions(pool);
+    }
+
+    @Test void discoveryLimitAppliesToVerifiedMappingsWithoutChangingPoolMembership() {
+        var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+        List<String> members = List.of("UNSUPPORTEDUSDT", "BTCUSDT", "UNKNOWNUSDT", "ETHUSDT", "SOLUSDT");
+        when(pool.listScanSymbols()).thenReturn(members);
+        var discovery = new org.example.trademodel.providercall.universe.DiscoveryProperties();
+        discovery.setMaxAssets(2);
+        var configured = new org.example.trademodel.providercall.universe.ConfiguredDiscoveryUniverseSource(
+                discovery, ProviderCallTestFixtures.binanceRegistry("BTCUSDT", "ETHUSDT", "SOLUSDT"), pool);
+
+        assertThat(configured.currentDiscoveryUniverse()).containsExactlyElementsOf(instruments("BTCUSDT", "ETHUSDT"));
+        assertThat(members).hasSize(5);
+        discovery.setEnabled(false);
+        assertThat(configured.currentDiscoveryUniverse()).isEmpty();
+        verify(pool).listScanSymbols();
+        org.mockito.Mockito.verifyNoMoreInteractions(pool);
+    }
+
     private UserPositionMapper positionMapper;
     private AssetStateMapper stateMapper;
     private PushSnapshotMapper pushSnapshotMapper;

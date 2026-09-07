@@ -159,6 +159,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private LocalRealReadinessService localRealReadinessService;
     private AssetStateMapper assetStateMapper;
     private AssetPoolService assetPoolService;
+    private final java.util.concurrent.atomic.AtomicLong runtimeProjectionVersion = new java.util.concurrent.atomic.AtomicLong();
     private OpportunityPriorityRankingService opportunityPriorityRankingService;
     private AccountRiskSnapshotMapper accountRiskSnapshotMapper;
     private PersistedRealMarketEnvironmentService persistedRealMarketEnvironmentService;
@@ -304,6 +305,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public DashboardHomeVO getHomeForUser(Long userId, String selectedSymbol, Integer limit, Long selectedPositionId) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("userId is required");
@@ -433,8 +435,80 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         assets.forEach(this::applyDesktopFacts);
         if (selectedContext != null && !assets.contains(selectedContext)) applyDesktopFacts(selectedContext);
         applyPlanPauseEvidence(executionSuggestion);
+        attachCompleteRuntimeProjection(home, userId, providerReadiness);
         registerLiveStructuralContexts(userId, assets);
         return home;
+    }
+
+    private void attachCompleteRuntimeProjection(DashboardHomeVO home, Long userId,
+                                                 ProviderReadinessVO readiness) {
+        Map<String, DashboardHomeVO.AssetVO> shared = new LinkedHashMap<>();
+        home.getAssets().forEach(asset -> shared.put(normalizeSymbol(asset.getRawSymbol()), asset));
+        // Preserve the already resolved selected Analysis/Decision used by this response's plan and AI.
+        // A second latest-row lookup must not substitute another run when selection is outside Top6.
+        if (home.getSelectedAssetContext() != null) {
+            shared.put(normalizeSymbol(home.getSelectedAssetContext().getRawSymbol()), home.getSelectedAssetContext());
+        }
+        List<org.example.trademodel.dto.assetpool.AssetPoolAssetDTO> members = userId != null && assetPoolService != null
+                ? assetPoolService.listForUser(userId) : List.of();
+        if (members == null) throw new IllegalStateException("ASSET_POOL_SNAPSHOT_UNAVAILABLE");
+        home.setPoolMembers(members);
+        if (!members.isEmpty()) {
+            List<String> symbols = members.stream().map(item -> normalizeSymbol(item.symbol())).distinct().toList();
+            List<DecisionResultVO> decisions = decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(
+                    symbols, "USER", userId);
+            if (decisions == null) throw new IllegalStateException("ASSET_POOL_DECISION_SNAPSHOT_UNAVAILABLE");
+            List<DashboardHomeVO.AssetVO> pool = new ArrayList<>();
+            for (var member : members) {
+                String symbol = normalizeSymbol(member.symbol());
+                DashboardHomeVO.AssetVO asset = shared.get(symbol);
+                if (asset == null) {
+                    DecisionResultVO decision = decisions.stream()
+                            .filter(row -> symbol.equals(normalizeSymbol(row.getSymbol())))
+                            .filter(row -> AnalysisTimePolicy.isExecutionPlanPrimaryTimeframe(row.getTimeframe()))
+                            .findFirst().orElse(null);
+                    if (decision == null) {
+                        asset = assetPlaceholder(pool.size() + 1, symbol);
+                        applyPersistedMarketData(asset, symbol);
+                    } else {
+                        HomeTopAssetProjection projection = new HomeTopAssetProjection(member.assetId(), symbol,
+                                member.displayName(), null, decision.getFinalMarketBias(),
+                                decision.getConfidenceLevel(), decision.getRiskLevel(), decision.getPlanMode(),
+                                decision.getAiConflictLevel(), decision.getDataQualityScore(), null, null, null, 0,
+                                "PERSISTED_POOL_DECISION", decision.getAnalysisId(), null, "OBSERVING", null,
+                                decision.getTimeframe(), decision.getPlanMode(), 0, null,
+                                decision.getCreateTime(), decision);
+                        asset = buildRankedAssets(List.of(projection), 1, userId, null).get(0);
+                    }
+                    asset.setAssetId(member.assetId());
+                    asset.setName(canonicalAssetName(symbol, member.displayName()));
+                    applyDesktopFacts(asset);
+                    shared.put(symbol, asset);
+                }
+                pool.add(asset);
+            }
+            home.setAssetPool(pool);
+        } else {
+            home.setAssetPool(home.getAssets());
+        }
+        String selected = normalizeSymbol(home.getSelectedSymbol());
+        if (shared.containsKey(selected)) home.setSelectedAssetContext(shared.get(selected));
+        Instant generatedAt = planValidityClock.instant();
+        long version = runtimeProjectionVersion.updateAndGet(previous -> Math.max(previous + 1, generatedAt.toEpochMilli()));
+        String snapshotId = "web-" + version;
+        home.setSnapshotId(snapshotId);
+        home.setProjectionVersion(version);
+        home.setGeneratedAt(generatedAt);
+        home.setNextOneHourCloseAt(generatedAt.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusSeconds(3600));
+        try {
+            byte[] providerFacts = objectMapper.writeValueAsBytes(readiness);
+            home.setProviderStateVersion(java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(providerFacts)));
+        } catch (java.security.NoSuchAlgorithmException | com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new IllegalStateException("PROVIDER_STATE_VERSION_UNAVAILABLE", failure);
+        }
+        shared.values().forEach(asset -> asset.setSnapshotId(snapshotId));
+        home.setSnapshotComplete(true);
     }
 
     private List<DashboardHomeVO.AssetVO> replaceSelectedAssetDecision(
@@ -2964,6 +3038,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         ExecutionPlanDO executionPlan = assetPlan.executionPlan();
+        if (V41StructuralPlanPolicy.VERSION.equals(trimToNull(executionPlan.getRuleVersion()))
+                && !Boolean.TRUE.equals(executionPlan.getFinalPlan())) {
+            projectStructuralRulePlan(suggestion, decision, assetPlan);
+            return suggestion;
+        }
         PersistedPlanState planState = ExecutionPlanReviewPolicy.currentProjectionPlanState(
                 executionPlan,
                 LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC));
@@ -3102,6 +3181,68 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         return suggestion;
     }
 
+    private boolean currentStructuralPlan(ExecutionPlanDO plan) {
+        LocalDateTime now = LocalDateTime.ofInstant(planValidityClock.instant(), ZoneOffset.UTC);
+        return V41StructuralPlanPolicy.VERSION.equals(trimToNull(plan.getRuleVersion()))
+                && Boolean.TRUE.equals(plan.getNotTradeInstruction())
+                && List.of("CURRENT", "WAITING_TRIGGER", "SUSPENDED").contains(upper(plan.getPlanLifecycleState()))
+                && !List.of("INVALID", "REVIEW_ONLY").contains(upper(plan.getExecutionPlanStatus()))
+                && plan.getValidFrom() != null && !plan.getValidFrom().isAfter(now)
+                && plan.getValidUntil() != null && plan.getValidUntil().isAfter(now);
+    }
+
+    /** A persisted rule reference is visible without promoting it to the Final execution contract. */
+    private void projectStructuralRulePlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
+                                           DecisionResultVO decision,
+                                           AssetExecutionPlanResolution resolution) {
+        ExecutionPlanDO plan = resolution.executionPlan();
+        if (directionalPushBlocked(decision)
+                && (!"READY".equals(upper(decision.getDirectionDataState())) || !currentStructuralPlan(plan))) {
+            blockSuggestion(suggestion, "DIRECTION_BLOCKED", "当前执行计划已阻断", firstPlanReason(plan));
+            applyPersistedPlanAudit(suggestion, resolution, plan);
+            suggestion.setDirection(trimToNull(plan.getRuleMarketBias()));
+            return;
+        }
+        if (!currentStructuralPlan(plan)) {
+            blockSuggestion(suggestion, "RULE_PLAN_NOT_CURRENT", "规则参考计划当前不可用",
+                    "计划已过期、被替代或有效期尚未确认；等待新的同批次规则计划");
+            applyPersistedPlanAudit(suggestion, resolution, plan);
+            return;
+        }
+        String direction = firstNonBlank(decision.getValidatedMarketBias(), decision.getMarketBiasHierarchy());
+        if (!"READY".equals(upper(decision.getDirectionDataState()))
+                || !List.of("STRONG_BULLISH", "BULLISH", "WEAK_BULLISH",
+                            "WEAK_BEARISH", "BEARISH", "STRONG_BEARISH").contains(upper(direction))
+                || !Objects.equals(direction, trimToNull(plan.getRuleMarketBias()))
+                || !Objects.equals(decision.getDecisionId(), trimToNull(plan.getDecisionId()))
+                || !hasText(resolution.sourceTraceId())
+                || !Objects.equals(resolution.sourceTraceId(), trimToNull(plan.getTraceId()))) {
+            blockSuggestion(suggestion, "RULE_PLAN_SNAPSHOT_UNVERIFIED", "规则参考计划暂不可用",
+                    "当前方向、Decision 与计划来源未形成同一完整快照");
+            return;
+        }
+        if (!ExecutionPlanReviewPolicy.hasCompleteBoundaries(plan)
+                || !hasText(plan.getInvalidCondition())) {
+            blockSuggestion(suggestion, "BOUNDARY_INCOMPLETE", "规则参考计划边界缺失",
+                    BOUNDARY_INCOMPLETE_VALID_PERIOD);
+            return;
+        }
+        boolean paused = "SUSPENDED".equals(upper(plan.getPlanLifecycleState()))
+                || Boolean.TRUE.equals(plan.getNeedsRevalidation())
+                || "BLOCKED".equals(upper(plan.getRuleValidationStatus()))
+                || "BLOCKED".equals(upper(plan.getSourceGateStatus()))
+                || "BLOCKED".equals(upper(plan.getExecutionPlanStatus()));
+        applyPersistedPlanAudit(suggestion, resolution, plan);
+        suggestion.setSourceDecisionId(decision.getDecisionId());
+        suggestion.setStatus(paused ? "RULE_CONDITIONAL_SUSPENDED" : "RULE_CONDITIONAL_PLAN");
+        suggestion.setStatusLabel(paused ? "规则参考计划 · 暂停" : "规则参考计划 · 等待触发");
+        suggestion.setModuleState(paused ? "BLOCKED" : "READY");
+        suggestion.setBlockedReason(paused ? firstPlanReason(plan) : null);
+        suggestion.setWorthOpening(false);
+        suggestion.setFinalPlan(false);
+        suggestion.setNotTradeInstruction(true);
+    }
+
     private void blockPersistedAssetPlan(DashboardHomeVO.ExecutionSuggestionVO suggestion,
                                          ExecutionPlanDO executionPlan,
                                          PersistedPlanState planState) {
@@ -3138,6 +3279,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                          ExecutionPlanDO plan) {
         if (suggestion == null || resolution == null || plan == null) return;
         boolean queryablePlanResult = Boolean.TRUE.equals(plan.getFinalPlan())
+                || currentStructuralPlan(plan)
                 || "BLOCKED".equalsIgnoreCase(trimToNull(plan.getExecutionPlanStatus()))
                 || "BLOCKED".equalsIgnoreCase(trimToNull(plan.getRuleValidationStatus()))
                 || Boolean.TRUE.equals(plan.getNeedsRevalidation());
@@ -3160,7 +3302,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
         suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
-        if (V41StructuralPlanPolicy.VERSION.equals(trimToNull(plan.getRuleVersion()))) {
+        if (currentStructuralPlan(plan)) {
             suggestion.setDirection(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
             suggestion.setFinalMarketBias(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
             suggestion.setFinalPlanMode(firstNonBlank(plan.getFinalPlanMode(), plan.getPlanMode()));

@@ -55,6 +55,28 @@ class DashboardHomeControllerTest {
     }
 
     @Test
+    void runtimeSnapshotUsesAuthenticatedIdentityAndPreservesAllThirtySixPoolMembers() throws Exception {
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setSnapshotId("web-123");
+        home.setProjectionVersion(123);
+        home.setSnapshotComplete(true);
+        home.setAssetPool(java.util.stream.IntStream.range(0, 36).mapToObj(index -> {
+            var asset = new DashboardHomeVO.AssetVO();
+            asset.setRawSymbol("ASSET" + index);
+            asset.setSnapshotId("web-123");
+            return asset;
+        }).toList());
+        when(dashboardHomeService.getHomeForUser(7L, null, null, null)).thenReturn(home);
+        mockMvc.perform(get("/api/dashboard/runtime-snapshot").param("ownerId", "999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapshotId").value("web-123"))
+                .andExpect(jsonPath("$.data.snapshotComplete").value(true))
+                .andExpect(jsonPath("$.data.assetPool.length()").value(36))
+                .andExpect(jsonPath("$.data.assetPool[35].snapshotId").value("web-123"));
+        verify(dashboardHomeService).getHomeForUser(7L, null, null, null);
+    }
+
+    @Test
     void homeSerializesBusinessLabelsAndFailClosedPlanSemantics() throws Exception {
         DashboardHomeVO home = new DashboardHomeVO();
         home.setSelectedSymbol("BTCUSDT");

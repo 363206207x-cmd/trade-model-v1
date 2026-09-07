@@ -31,6 +31,12 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
     private final CoinGlassSymbolMapper symbolMapper;
     private final ProviderCapabilityRegistry capabilityRegistry;
     private final Clock clock;
+    private CoinGlassProviderHealthService runtimeHealth;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRuntimeHealth(CoinGlassProviderHealthService health) {
+        this.runtimeHealth = health;
+    }
 
     AbstractCoinGlassDatasetSnapshotService(ProviderDatasetType datasetType,
                                              String timeframe,
@@ -106,7 +112,10 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
         Duration minimum = Duration.ofSeconds(Math.max(1, properties.getEmergencyMinRefreshGapSeconds()));
         Duration freshTtl = requestedFreshTtl == null || requestedFreshTtl.compareTo(minimum) < 0
                 ? minimum : requestedFreshTtl;
+        if (runtimeHealth != null) runtimeHealth.noteRefreshCadence(capabilityId(), symbol, freshTtl);
         Duration staleTtl = Duration.ofSeconds(Math.max(1, properties.getStaleTtlSeconds()));
+        Duration readWindow = properties.readFreshnessWindow(freshTtl);
+        if (staleTtl.compareTo(readWindow) < 0) staleTtl = readWindow;
         Duration timeout = Duration.ofMillis(Math.max(1, properties.getRequestTimeoutMs()));
         Supplier<ProviderAdapterResponse<T>> observedCall = () -> {
             ProviderAdapterResponse<T> response = call.get();
@@ -138,7 +147,20 @@ abstract class AbstractCoinGlassDatasetSnapshotService<T> {
         Duration minimum = Duration.ofSeconds(Math.max(1, properties.getEmergencyMinRefreshGapSeconds()));
         Duration freshTtl = requestedFreshTtl == null || requestedFreshTtl.compareTo(minimum) < 0
                 ? minimum : requestedFreshTtl;
-        return coordinator.peek(key, priority, freshTtl, traceId);
+        Duration cadence = runtimeHealth == null ? freshTtl : runtimeHealth.refreshCadence(capabilityId(), symbol);
+        if (cadence.compareTo(freshTtl) < 0) cadence = freshTtl;
+        // Read coverage tolerates scan jitter; execute above still uses the original cadence.
+        return coordinator.peek(key, priority, properties.readFreshnessWindow(cadence), traceId);
+    }
+
+    private String capabilityId() {
+        return switch (datasetType) {
+            case COINGLASS_OPEN_INTEREST -> CoinGlassV4ResponseValidator.OI_CAPABILITY;
+            case COINGLASS_FUNDING -> CoinGlassV4ResponseValidator.FUNDING_CAPABILITY;
+            case COINGLASS_LIQUIDATION -> CoinGlassV4ResponseValidator.LIQUIDATION_CAPABILITY;
+            case COINGLASS_LONG_SHORT_RATIO -> CoinGlassV4ResponseValidator.LONG_SHORT_CAPABILITY;
+            default -> throw new IllegalStateException("COINGLASS_COMPONENT_CAPABILITY_REQUIRED");
+        };
     }
 
     private ProviderInstrumentCapability authorize(String symbol, boolean externalRefresh) {

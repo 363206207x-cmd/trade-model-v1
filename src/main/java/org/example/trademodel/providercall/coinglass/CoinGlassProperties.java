@@ -50,6 +50,11 @@ public class CoinGlassProperties {
     public void setRequestTimeoutMs(int requestTimeoutMs) { this.requestTimeoutMs = requestTimeoutMs; }
     public int getFreshTtlSeconds() { return freshTtlSeconds; }
     public void setFreshTtlSeconds(int freshTtlSeconds) { this.freshTtlSeconds = freshTtlSeconds; }
+    public java.time.Duration readFreshnessWindow(java.time.Duration refreshCadence) {
+        long cadence = Math.max(1L, refreshCadence == null ? freshTtlSeconds : refreshCadence.toSeconds());
+        long jitter = Math.max(5L, cadence / 10L);
+        return java.time.Duration.ofSeconds(Math.max(freshTtlSeconds, cadence + jitter));
+    }
     public int getStaleTtlSeconds() { return staleTtlSeconds; }
     public void setStaleTtlSeconds(int staleTtlSeconds) { this.staleTtlSeconds = staleTtlSeconds; }
     public int getEmergencyMinRefreshGapSeconds() { return emergencyMinRefreshGapSeconds; }

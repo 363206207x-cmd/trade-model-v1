@@ -21,6 +21,16 @@ public class CoinGlassDerivativesSnapshotService {
     private final CoinGlassLongShortSnapshotService longShortService;
     private final CoinGlassDerivativesSnapshotAssembler assembler;
     private final CoinGlassSymbolMapper symbolMapper;
+    private CoinGlassProviderHealthService runtimeHealth;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRuntimeHealth(CoinGlassProviderHealthService health) {
+        this.runtimeHealth = health;
+    }
+
+    private CoinGlassDerivativesSnapshotAssembler assemblerFor(String symbol) {
+        return runtimeHealth == null ? assembler : runtimeHealth.readAssembler(properties, symbol);
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
     public CoinGlassDerivativesSnapshotService(CoinGlassProperties properties,
@@ -61,7 +71,7 @@ public class CoinGlassDerivativesSnapshotService {
                 liquidationService.get(symbol, priority, ttl, traceId);
         ProviderCallResult<CoinGlassLongShortSnapshot> longShort =
                 longShortService.get(symbol, priority, ttl, traceId);
-        return assembler.assemble(symbol, traceId, oi, funding, liquidation, longShort);
+        return assemblerFor(symbol).assemble(symbol, traceId, oi, funding, liquidation, longShort);
     }
 
     public ProviderCallResult<DerivativesRiskSnapshot> get(
@@ -101,6 +111,6 @@ public class CoinGlassDerivativesSnapshotService {
                 liquidationService.peek(symbol, priority, ttl, traceId);
         ProviderCallResult<CoinGlassLongShortSnapshot> longShort =
                 longShortService.peek(symbol, priority, ttl, traceId);
-        return assembler.assemble(symbol, traceId, oi, funding, liquidation, longShort);
+        return assemblerFor(symbol).assemble(symbol, traceId, oi, funding, liquidation, longShort);
     }
 }

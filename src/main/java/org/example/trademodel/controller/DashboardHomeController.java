@@ -30,7 +30,7 @@ public class DashboardHomeController {
         this.dashboardLiveEventService = value;
     }
 
-    @GetMapping("/home")
+    @GetMapping({"/home", "/runtime-snapshot"})
     public ApiResponse<DashboardHomeVO> home(
             @RequestParam(value = "selectedSymbol", required = false) String selectedSymbol,
             @RequestParam(value = "limit", required = false) Integer limit,
