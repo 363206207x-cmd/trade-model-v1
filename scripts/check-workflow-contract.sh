@@ -594,7 +594,7 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOS
   [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
   [[ "$p1b_scope" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY"
   [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "7b5cf25f5dc0632643a09b5086322bf860c1fea3" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
-  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "f6f6d0ab58885d14fd962f17c9b7ef305823439a" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "1a61ae42eb9cf387e9fa13c89cca5dd7803eb108" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
   if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
   fi
@@ -635,7 +635,7 @@ fi
 if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   for transition_condition in \
     EXACT_TEN_PATH_GATE_ALLOWLIST \
-    EXACT_SIXTY_SIX_PATH_IMPLEMENTATION_ALLOWLIST; do
+    EXACT_SIXTY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST; do
     printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
       || fail "missing v4.1 authorization transition condition: $transition_condition"
   done
