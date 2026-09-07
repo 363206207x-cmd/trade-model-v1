@@ -697,7 +697,7 @@ class DashboardHomeServiceImplTest {
         assertThat(btc.getConfidenceLevel()).isNull();
         assertThat(btc.getConfidenceLabel()).isEqualTo("—");
         assertThat(btc.getRiskLevel()).isNull();
-        assertThat(btc.getRiskLabel()).isEqualTo("暂不可判断");
+        assertThat(btc.getRiskLabel()).isEqualTo("待评估");
         assertThat(btc.getOneHourOpportunityLabel()).isEqualTo("1小时分析未完成");
         assertThat(btc.getFourHourTrendLabel()).isEqualTo("4小时分析未完成");
         assertThat(btc.getPlanMode()).isNull();
@@ -991,7 +991,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void strongDirectionWithoutVisibleConfidenceFailsClosedInsteadOfLookingCurrent() {
+    void strongRuleDirectionWithoutConfidenceKeepsDirectionButShowsNoInventedConfidence() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setAssetPoolService(assetPoolService);
@@ -1009,16 +1009,16 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, null, 6, null)
                 .getAssets().get(0);
 
-        assertThat(asset.getMarketBias()).isNull();
-        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("强偏空");
         assertThat(asset.getConfidenceLevel()).isNull();
         assertThat(asset.getConfidenceLabel()).isEqualTo("—");
-        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "INVALID")
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "DERIVED")
                 .containsEntry("confidence", "MISSING");
     }
 
     @Test
-    void anyDirectionalBiasWithoutVisibleConfidenceFailsClosedAcrossWebSurfaces() {
+    void anyValidRuleDirectionWithoutConfidenceRemainsVisibleAcrossWebSurfaces() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setAssetPoolService(assetPoolService);
@@ -1036,11 +1036,11 @@ class DashboardHomeServiceImplTest {
         DashboardHomeVO.AssetVO asset = service.getHomeForUser(USER_ID, null, 6, null)
                 .getAssets().get(0);
 
-        assertThat(asset.getMarketBias()).isNull();
-        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getMarketBias()).isEqualTo("BULLISH");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("偏多");
         assertThat(asset.getConfidenceLevel()).isNull();
         assertThat(asset.getConfidenceLabel()).isEqualTo("—");
-        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "INVALID")
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "DERIVED")
                 .containsEntry("confidence", "MISSING");
     }
 
@@ -1063,11 +1063,197 @@ class DashboardHomeServiceImplTest {
                 .getAssets().get(0);
 
         assertThat(asset.getMarketBias()).isNull();
-        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("数据不足");
         assertThat(asset.getConfidenceLevel()).isNull();
         assertThat(asset.getRiskLevel()).isNull();
         assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
         assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时数据不足");
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "MISSING");
+    }
+
+    @Test
+    void queuedAnalysisUsesExplicitUpdatingStateWithoutInventingDirection() {
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                301L, null, "BTCUSDT", "QUEUED", "QUEUED", "analysis-queued"));
+
+        assertThat(asset.getFreshnessStatus()).isEqualTo("QUEUED");
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("更新中");
+        assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+        assertThat(asset.getRiskLabel()).isEqualTo("待评估");
+    }
+
+    @Test
+    void runningAnalysisUsesExplicitUpdatingStateWithoutInventingDirection() {
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                302L, null, "ETHUSDT", "RUNNING", "RUNNING", "analysis-running"));
+
+        assertThat(asset.getFreshnessStatus()).isEqualTo("RUNNING");
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("更新中");
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时更新中");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时更新中");
+    }
+
+    @Test
+    void explicitOneHourMissingDoesNotMislabelFreshFourHourData() {
+        DecisionResultVO decision = nonFinalDecision("SOLUSDT", "INSUFFICIENT_DATA", null, null, null,
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"INSUFFICIENT_DATA\",\"direction\":\"MISSING\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"BULLISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                303L, decision, "SOLUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("INSUFFICIENT_DATA");
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时数据不足");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时偏多");
+    }
+
+    @Test
+    void explicitFourHourStaleDoesNotMislabelFreshOneHourData() {
+        DecisionResultVO decision = nonFinalDecision("XRPUSDT", "STALE", null, null, null,
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"FOUND\",\"direction\":\"BEARISH\"},"
+                        + "\"4h\":{\"state\":\"STALE\",\"direction\":\"BEARISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                304L, decision, "XRPUSDT", "OBSERVING", "STALE", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("STALE");
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时偏空");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时数据已过期");
+    }
+
+    @Test
+    void oppositeValidTimeframesExposeCycleConflictAndEachRealDirection() {
+        DecisionResultVO decision = nonFinalDecision("ADAUSDT", "MULTI_TIMEFRAME_CONFLICT", null, null, null,
+                "{\"state1hScore\":0.42,\"trend4hScore\":-0.61,\"multiTimeframeDetails\":{"
+                        + "\"1h\":{\"state\":\"FOUND\",\"direction\":\"BULLISH\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"BEARISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                305L, decision, "ADAUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("MULTI_TIMEFRAME_CONFLICT");
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("周期冲突");
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时偏多");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时偏空");
+    }
+
+    @Test
+    void explicitSingleTimeframeSignalConflictIsNotPromotedToCycleConflict() {
+        DecisionResultVO decision = nonFinalDecision("LINKUSDT", "INSUFFICIENT_DATA", null, null, null,
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"SIGNAL_CONFLICT\",\"direction\":\"FLAT\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"BULLISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                306L, decision, "LINKUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isNotEqualTo("MULTI_TIMEFRAME_CONFLICT");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("数据不足");
+        assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时信号分歧");
+        assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时偏多");
+    }
+
+    @Test
+    void completeNeutralRuleSnapshotRemainsVisibleAsWait() {
+        DecisionResultVO decision = nonFinalDecision("DOGEUSDT", "READY", "WAIT", 66, "LOW",
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"FOUND\",\"direction\":\"FLAT\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"FLAT\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                307L, decision, "DOGEUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("READY");
+        assertThat(asset.getMarketBias()).isEqualTo("WAIT");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("观望");
+        assertThat(asset.getHasFinal()).isFalse();
+    }
+
+    @Test
+    void completeSnapshotWithoutTrustedRuleDirectionRemainsUndecidable() {
+        DecisionResultVO decision = nonFinalDecision("AVAXUSDT", "READY", null, 72, "MEDIUM",
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"FOUND\",\"direction\":\"FLAT\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"FLAT\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                308L, decision, "AVAXUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("READY");
+        assertThat(decision.getValidatedMarketBias()).isNull();
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+    }
+
+    @Test
+    void validRuleDirectionWithoutFinalKeepsRuleFactsAndMissingValuesHonest() {
+        DecisionResultVO decision = nonFinalDecision("BNBUSDT", "READY", "BULLISH", null, null,
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"FOUND\",\"direction\":\"BULLISH\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"BULLISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                309L, decision, "BNBUSDT", "OBSERVING", "FRESH", decision.getAnalysisId()));
+
+        assertThat(decision.getDirectionDataState()).isEqualTo("READY");
+        assertThat(asset.getMarketBias()).isEqualTo("BULLISH");
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("偏多");
+        assertThat(asset.getConfidenceLevel()).isNull();
+        assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+        assertThat(asset.getRiskLevel()).isNull();
+        assertThat(asset.getRiskLabel()).isEqualTo("待评估");
+        assertThat(asset.getHasFinal()).isFalse();
+        assertThat(asset.getFinalMarketBias()).isNull();
+    }
+
+    @Test
+    void mismatchedAnalysisRunCannotSupplyDirectionConfidenceOrRisk() {
+        DecisionResultVO decision = nonFinalDecision("UNIUSDT", "READY", "BEARISH", 83, "HIGH",
+                "{\"multiTimeframeDetails\":{\"1h\":{\"state\":\"FOUND\",\"direction\":\"BEARISH\"},"
+                        + "\"4h\":{\"state\":\"FOUND\",\"direction\":\"BEARISH\"}}}");
+        DashboardHomeVO.AssetVO asset = rankedAsset(projectionWithState(
+                310L, decision, "UNIUSDT", "OBSERVING", "FRESH", "analysis-other-run"));
+
+        assertThat(decision.getAnalysisId()).isNotEqualTo("analysis-other-run");
+        assertThat(asset.getMarketBias()).isNull();
+        assertThat(asset.getMarketBiasLabel()).isEqualTo("暂不可判断");
+        assertThat(asset.getConfidenceLabel()).isEqualTo("—");
+        assertThat(asset.getRiskLabel()).isEqualTo("待评估");
+        assertThat(asset.getFieldSourceStatus()).containsEntry("direction", "INVALID")
+                .containsEntry("confidence", "INVALID");
+    }
+
+    @Test
+    void batchedSixAssetStatesRemainIndependentAndNeverBecomeUniformConflict() {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        DecisionResultVO conflict = nonFinalDecision("BTCUSDT", "MULTI_TIMEFRAME_CONFLICT", null, null, null,
+                "{\"state1hScore\":1,\"trend4hScore\":-1}");
+        DecisionResultVO bullish = nonFinalDecision("ETHUSDT", "READY", "BULLISH", 81, "MEDIUM", "{}");
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projectionWithState(311L, conflict, "BTCUSDT", "OBSERVING", "FRESH", conflict.getAnalysisId()),
+                projectionWithState(312L, bullish, "ETHUSDT", "OBSERVING", "FRESH", bullish.getAnalysisId()),
+                projectionWithState(313L, null, "SOLUSDT", "QUEUED", "QUEUED", "analysis-sol"),
+                projectionWithState(314L, null, "XRPUSDT", "RUNNING", "RUNNING", "analysis-xrp"),
+                projectionWithState(315L, null, "ADAUSDT", "OBSERVING", "STALE", "analysis-ada"),
+                projectionWithState(316L, null, "DOGEUSDT", "OBSERVING", "INSUFFICIENT_DATA", "analysis-doge")));
+
+        List<DashboardHomeVO.AssetVO> assets = service.getHomeForUser(USER_ID, null, 6, null).getAssets();
+
+        assertThat(assets).hasSize(6);
+        assertThat(assets).extracting(DashboardHomeVO.AssetVO::getMarketBiasLabel)
+                .containsExactly("周期冲突", "偏多", "更新中", "更新中", "数据已过期", "数据不足");
+        assertThat(assets).filteredOn(asset -> "周期冲突".equals(asset.getMarketBiasLabel())).hasSize(1);
+    }
+
+    @Test
+    void oneDecisionSnapshotOwnsDirectionConfidenceAndRiskTogether() {
+        DecisionResultVO decision = nonFinalDecision("AAVEUSDT", "READY", "STRONG_BEARISH", 77, "HIGH", "{}");
+        HomeTopAssetProjection projection = new HomeTopAssetProjection(
+                317L, "AAVEUSDT", "AAVE", 55, "BULLISH", "12", "LOW", null, null,
+                90, "FRESH", 0L, 0L, 55, "MISMATCH_FIXTURE", decision.getAnalysisId(), null,
+                "OBSERVING", null, "1h", null, 0, "ALIGNED", LocalDateTime.of(2026, 1, 1, 0, 0), decision);
+
+        DashboardHomeVO.AssetVO asset = rankedAsset(projection);
+
+        assertThat(asset.getAnalysisId()).isEqualTo(decision.getAnalysisId());
+        assertThat(asset.getMarketBias()).isEqualTo("STRONG_BEARISH");
+        assertThat(asset.getConfidenceLabel()).isEqualTo("77%");
+        assertThat(asset.getRiskLevel()).isEqualTo("HIGH");
     }
 
     @Test
@@ -4939,6 +5125,75 @@ class DashboardHomeServiceImplTest {
                 decision.getPlanMode(),
                 0,
                 "ALIGNED",
+                LocalDateTime.of(2026, 1, 1, 0, 0),
+                decision);
+    }
+
+    private DashboardHomeVO.AssetVO rankedAsset(HomeTopAssetProjection projection) {
+        AssetPoolService assetPoolService = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setAssetPoolService(assetPoolService);
+        service.setOpportunityPriorityRankingService(rankingService);
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(projection));
+        return service.getHomeForUser(USER_ID, projection.symbol(), 6, null).getAssets().get(0);
+    }
+
+    private DecisionResultVO nonFinalDecision(String symbol,
+                                              String directionDataState,
+                                              String validatedBias,
+                                              Integer finalConfidence,
+                                              String riskLevel,
+                                              String explanationJson) {
+        DecisionResultVO decision = decision(symbol,
+                validatedBias == null ? null : validatedBias,
+                finalConfidence == null ? null : String.valueOf(finalConfidence),
+                riskLevel,
+                90,
+                0,
+                "LEVEL_1_CONSISTENT",
+                false,
+                "{\"state\":\"OBSERVING\"}");
+        decision.setValidatedMarketBias(validatedBias);
+        decision.setDirectionDataState(directionDataState);
+        decision.setFinalConfidence(finalConfidence);
+        decision.setRiskLevel(riskLevel);
+        decision.setExplanationJson(explanationJson);
+        decision.setOneHourOpportunityQuality(65);
+        decision.setFourHourTrendAlignment(65);
+        return decision;
+    }
+
+    private HomeTopAssetProjection projectionWithState(Long assetId,
+                                                       DecisionResultVO decision,
+                                                       String symbol,
+                                                       String opportunityState,
+                                                       String freshness,
+                                                       String analysisId) {
+        return new HomeTopAssetProjection(
+                assetId,
+                symbol,
+                symbol.replace("USDT", ""),
+                null,
+                decision == null ? null : decision.getMarketBiasHierarchy(),
+                decision == null ? null : decision.getConfidenceLevel(),
+                decision == null ? null : decision.getRiskLevel(),
+                null,
+                null,
+                decision == null ? null : decision.getDataQualityScore(),
+                freshness,
+                0L,
+                0L,
+                0,
+                "SLOT_TYPE=OBSERVATION|OBSERVATION_STATE=" + opportunityState + "|DATA_STATUS=" + freshness,
+                analysisId,
+                null,
+                opportunityState,
+                null,
+                "1h",
+                null,
+                0,
+                decision != null && "MULTI_TIMEFRAME_CONFLICT".equals(decision.getDirectionDataState())
+                        ? "TIMEFRAME_CONFLICT" : "ALIGNED",
                 LocalDateTime.of(2026, 1, 1, 0, 0),
                 decision);
     }

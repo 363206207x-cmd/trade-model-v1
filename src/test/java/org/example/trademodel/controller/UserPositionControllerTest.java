@@ -99,6 +99,27 @@ class UserPositionControllerTest {
     }
 
     @Test
+    void mistakeArchiveEndpointIsOwnerScopedAndNotAClosingAction() throws Exception {
+        when(userPositionService.archiveMistakeForUser(eq(11L), eq(7L), any()))
+                .thenReturn(vo(11L, "ARCHIVED_MISTAKE"));
+
+        mockMvc.perform(post("/api/user-positions/11/mistake-archive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "submission_id": "position-archive:test-11",
+                                  "reason": "验收临时记录"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ARCHIVED_MISTAKE"))
+                .andExpect(jsonPath("$.data.closedAt").doesNotExist())
+                .andExpect(jsonPath("$.data.closePrice").doesNotExist())
+                .andExpect(jsonPath("$.data.notTradeInstruction").value(true))
+                .andExpect(jsonPath("$.data.notAutoTrading").value(true));
+    }
+
+    @Test
     void openPositionsEndpointReturnsOnlyServiceOpenRows() throws Exception {
         when(userPositionService.listOpenPositionsForUser(7L)).thenReturn(List.of(
                 vo(1L, "OPEN"),

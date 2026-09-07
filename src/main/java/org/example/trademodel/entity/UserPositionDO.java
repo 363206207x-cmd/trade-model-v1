@@ -8,6 +8,7 @@ public class UserPositionDO {
     private Long userId;
     private String submissionId;
     private String closeSubmissionId;
+    private String archiveSubmissionId;
     private String assetSymbol;
     private String side;
     private String status;
@@ -20,6 +21,8 @@ public class UserPositionDO {
     private LocalDateTime closedAt;
     private BigDecimal closePrice;
     private String closeReason;
+    private LocalDateTime archivedAt;
+    private String archiveReason;
     private String sourceType;
     private String sourceRefId;
     private String finalPlanId;
@@ -62,6 +65,9 @@ public class UserPositionDO {
     public void setCloseSubmissionId(String closeSubmissionId) {
         this.closeSubmissionId = closeSubmissionId;
     }
+
+    public String getArchiveSubmissionId() { return archiveSubmissionId; }
+    public void setArchiveSubmissionId(String archiveSubmissionId) { this.archiveSubmissionId = archiveSubmissionId; }
 
     public String getAssetSymbol() {
         return assetSymbol;
@@ -158,6 +164,11 @@ public class UserPositionDO {
     public void setCloseReason(String closeReason) {
         this.closeReason = closeReason;
     }
+
+    public LocalDateTime getArchivedAt() { return archivedAt; }
+    public void setArchivedAt(LocalDateTime archivedAt) { this.archivedAt = archivedAt; }
+    public String getArchiveReason() { return archiveReason; }
+    public void setArchiveReason(String archiveReason) { this.archiveReason = archiveReason; }
 
     public String getSourceType() {
         return sourceType;

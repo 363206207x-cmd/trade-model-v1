@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.dto.req.ArchiveUserPositionReq;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.enums.UserPositionSideEnum;
@@ -206,6 +207,46 @@ public class UserPositionServiceImpl implements UserPositionService {
     }
 
     @Override
+    public UserPositionVO archiveMistakeForUser(Long id, Long userId, ArchiveUserPositionReq request) {
+        requireUserId(userId);
+        if (id == null || id <= 0) throw new IllegalArgumentException("UserPosition id is required");
+        if (request == null) throw new IllegalArgumentException("mistake archive request is required");
+        rejectForbiddenInputFields(request.getExtraFields());
+        String submissionId = requireSubmissionId(request.getSubmissionId());
+        String reason = trimToNull(request.getReason());
+        if (reason != null && reason.length() > 512) {
+            throw new IllegalArgumentException("archive reason must be at most 512 characters");
+        }
+        UserPositionDO existing = userPositionMapper.selectByIdAndUserId(id, userId);
+        if (existing == null) throw new UserPositionNotFoundException();
+        if (UserPositionStatusEnum.ARCHIVED_MISTAKE.name().equals(existing.getStatus())) {
+            return toVo(requireSameArchivePayload(existing, submissionId, reason));
+        }
+        if (!isManualArchiveSource(existing.getSourceType())) {
+            throw new IllegalArgumentException("Only manually entered UserPosition records can be archived as mistakes");
+        }
+        LocalDateTime archivedAt = UtcLocalTimePolicy.now(clock);
+        int updated;
+        try {
+            updated = userPositionMapper.archiveMistakeByIdAndUserId(
+                    id, userId, submissionId, archivedAt, reason);
+        } catch (DuplicateKeyException duplicate) {
+            UserPositionDO canonical = userPositionMapper
+                    .selectByArchiveSubmissionIdAndUserId(submissionId, userId);
+            if (canonical == null || !Objects.equals(canonical.getId(), id)) {
+                throw new UserPositionConflictException(
+                        "archive submission_id was already used for another position");
+            }
+            return toVo(requireSameArchivePayload(canonical, submissionId, reason));
+        }
+        UserPositionDO archived = userPositionMapper.selectByIdAndUserId(id, userId);
+        if (updated != 1 || archived == null) {
+            throw new UserPositionNotFoundException();
+        }
+        return toVo(requireSameArchivePayload(archived, submissionId, reason));
+    }
+
+    @Override
     public List<UserPositionVO> listOpenPositionsForUser(Long userId) {
         requireUserId(userId);
         List<UserPositionDO> rows = userPositionMapper.listOpenByUserId(userId);
@@ -356,6 +397,25 @@ public class UserPositionServiceImpl implements UserPositionService {
             throw new UserPositionConflictException("UserPosition close state does not match this submission_id");
         }
         return existing;
+    }
+
+    private static UserPositionDO requireSameArchivePayload(UserPositionDO existing,
+                                                            String submissionId,
+                                                            String reason) {
+        if (!UserPositionStatusEnum.ARCHIVED_MISTAKE.name().equals(existing.getStatus())
+                || !Objects.equals(existing.getArchiveSubmissionId(), submissionId)
+                || !Objects.equals(existing.getArchiveReason(), reason)) {
+            throw new UserPositionConflictException(
+                    "UserPosition archive state does not match this submission_id");
+        }
+        return existing;
+    }
+
+    private static boolean isManualArchiveSource(String sourceType) {
+        String normalized = sourceType == null ? "" : sourceType.trim().toUpperCase(Locale.ROOT);
+        return "MANUAL_INDEPENDENT".equals(normalized)
+                || "MANUAL_POSITION".equals(normalized)
+                || "MANUAL".equals(normalized);
     }
 
     private static boolean sameNumber(BigDecimal left, BigDecimal right) {

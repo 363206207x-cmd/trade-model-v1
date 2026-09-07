@@ -39,6 +39,10 @@ public interface UserPositionMapper {
     UserPositionDO selectByCloseSubmissionIdAndUserId(@Param("submissionId") String submissionId,
                                                       @Param("userId") Long userId);
 
+    @Select("SELECT * FROM tm_user_position WHERE user_id = #{userId} AND archive_submission_id = #{submissionId}")
+    UserPositionDO selectByArchiveSubmissionIdAndUserId(@Param("submissionId") String submissionId,
+                                                        @Param("userId") Long userId);
+
     @Select("SELECT * FROM tm_user_position " +
             "WHERE user_id = #{userId} AND status IN ('OPEN', 'PARTIALLY_CLOSED') " +
             "ORDER BY opened_at DESC, id DESC")
@@ -96,6 +100,23 @@ public interface UserPositionMapper {
                                  @Param("closeReason") String closeReason,
                                  @Param("submissionId") String submissionId,
                                  @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("UPDATE tm_user_position SET " +
+            "archive_submission_id = CASE WHEN status = 'ARCHIVED_MISTAKE' THEN archive_submission_id ELSE #{submissionId} END, " +
+            "archived_at = CASE WHEN status = 'ARCHIVED_MISTAKE' THEN archived_at ELSE #{archivedAt} END, " +
+            "archive_reason = CASE WHEN status = 'ARCHIVED_MISTAKE' THEN archive_reason ELSE #{archiveReason} END, " +
+            "updated_at = CASE WHEN status = 'ARCHIVED_MISTAKE' THEN updated_at ELSE #{archivedAt} END, " +
+            "status = 'ARCHIVED_MISTAKE' " +
+            "WHERE id = #{id} AND user_id = #{userId} " +
+            "AND source_type IN ('MANUAL_INDEPENDENT', 'MANUAL_POSITION', 'MANUAL') " +
+            "AND (status <> 'ARCHIVED_MISTAKE' " +
+            "OR (archive_submission_id = #{submissionId} " +
+            "AND ((archive_reason IS NULL AND #{archiveReason} IS NULL) OR archive_reason = #{archiveReason})))")
+    int archiveMistakeByIdAndUserId(@Param("id") Long id,
+                                    @Param("userId") Long userId,
+                                    @Param("submissionId") String submissionId,
+                                    @Param("archivedAt") LocalDateTime archivedAt,
+                                    @Param("archiveReason") String archiveReason);
 
     /**
      * Compatibility entry point for historical tests and non-request migrations. New owner actions must use the

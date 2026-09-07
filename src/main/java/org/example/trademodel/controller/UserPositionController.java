@@ -3,6 +3,7 @@ package org.example.trademodel.controller;
 import org.example.trademodel.common.ApiResponse;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.dto.req.ArchiveUserPositionReq;
 import org.example.trademodel.service.UserPositionService;
 import org.example.trademodel.security.AuthenticatedUserIdResolver;
 import org.example.trademodel.vo.UserPositionVO;
@@ -39,6 +40,13 @@ public class UserPositionController {
                                                                    @RequestBody CloseUserPositionReq request) {
         Long userId = authenticatedUserIdResolver.requireCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(userPositionService.manualCloseForUser(id, userId, request)));
+    }
+
+    @PostMapping("/{id}/mistake-archive")
+    public ResponseEntity<ApiResponse<UserPositionVO>> archiveMistake(@PathVariable Long id,
+                                                                      @RequestBody ArchiveUserPositionReq request) {
+        Long userId = authenticatedUserIdResolver.requireCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(userPositionService.archiveMistakeForUser(id, userId, request)));
     }
 
     @GetMapping("/open")

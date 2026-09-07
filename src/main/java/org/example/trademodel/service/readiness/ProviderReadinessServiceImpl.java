@@ -1,6 +1,10 @@
 package org.example.trademodel.service.readiness;
 
 import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +21,8 @@ import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
 import org.example.trademodel.vo.ProviderReadinessVO;
+import org.example.trademodel.config.FundamentalAiV41Properties;
+import org.example.trademodel.service.AiCallLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -38,6 +44,8 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     private CoinGlassProviderHealthService coinGlassProviderHealthService;
     private RoutedPublicOhlcvProvider routedPublicOhlcvProvider;
     private PersistedOhlcvBarMapper persistedOhlcvBarMapper;
+    private FundamentalAiV41Properties fundamentalAiV41Properties;
+    private AiCallLogService aiCallLogService;
     private Clock clock = Clock.systemUTC();
 
     public ProviderReadinessServiceImpl(Environment environment) {
@@ -67,6 +75,13 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         this.persistedOhlcvBarMapper = mapper;
     }
 
+    @Autowired(required = false)
+    void setAiBudgetReadiness(FundamentalAiV41Properties properties,
+                              AiCallLogService callLogService) {
+        this.fundamentalAiV41Properties = properties;
+        this.aiCallLogService = callLogService;
+    }
+
     @Override
     public ProviderReadinessVO getReadiness() {
         ProviderReadinessVO.ProviderStatusVO market = marketDataStatus();
@@ -92,6 +107,7 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         summary.put("aiProvider", readiness.getAiProviderStatus());
         summary.put("externalContextProvider", readiness.getExternalContextProviderStatus());
         summary.put("coinglassProvider", coinGlass.getStatus());
+        appendAiBudgetSummary(summary);
         readiness.setSummary(summary);
         return readiness;
     }
@@ -169,8 +185,10 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
             boolean connected = runtimeReady && "FRESH".equals(freshness);
 
             if (connected) {
-                return item("MARKET_DATA", providerName, STATUS_CONNECTED,
-                        true, true, true, provider + "_RUNTIME_PROVIDER_VERIFIED_FRESH");
+                return detail(item("MARKET_DATA", providerName, STATUS_CONNECTED,
+                        true, true, true, provider + "_RUNTIME_PROVIDER_VERIFIED_FRESH"),
+                        health.lastSuccessAt(), freshness, ageMs(health.lastSuccessAt()),
+                        "价格、方向、计划与持仓监控", "自动持续采集");
             }
             if (providerHealthFailed(health)) {
                 return item("MARKET_DATA", providerName, STATUS_FAIL_CLOSED,
@@ -364,7 +382,11 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
             default -> true;
         };
         return item("AI", readiness.provider(), status, enabled, configured,
-                readiness.ready(), readiness.reasonCode());
+                readiness.ready(), readiness.reasonCode(), readiness.verifiedAt(),
+                readiness.expiresAt() == null ? "UNKNOWN" : readiness.expiresAt().isAfter(clock.instant()) ? "FRESH" : "STALE",
+                readiness.verifiedAt() == null ? null : ageMs(readiness.verifiedAt()),
+                "按需三AI分析；不影响规则方向、规则计划或持仓监控",
+                readiness.ready() ? "按需调用" : "等待配置或下次健康检查");
     }
 
     private ProviderReadinessVO.ProviderStatusVO aiProviderStatus(String name, String prefix, boolean orchestratorEnabled) {
@@ -421,9 +443,17 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         };
         boolean configured = source != UnifiedSourceStatus.NOT_CONFIGURED
                 && source != UnifiedSourceStatus.DISABLED;
+        Instant latestSuccess = coinGlassProviderHealthService.snapshot().values().stream()
+                .filter(value -> value.status() == UnifiedSourceStatus.READY)
+                .map(CoinGlassProviderHealthService.CoinGlassEndpointHealth::fetchTime)
+                .filter(java.util.Objects::nonNull)
+                .max(Instant::compareTo).orElse(null);
         return item("DERIVATIVES_CONTEXT", "COINGLASS", status,
                 coinGlassProperties.isEnabled(), configured, source == UnifiedSourceStatus.READY,
-                "COINGLASS_" + source.name());
+                "COINGLASS_" + source.name(), latestSuccess,
+                source == UnifiedSourceStatus.READY ? "FRESH" : source.name(), ageMs(latestSuccess),
+                "衍生品风险补充；缺失时规则方向降级为部分覆盖",
+                source == UnifiedSourceStatus.READY ? "自动持续采集" : "等待下一轮自动重试");
     }
 
     private ProviderReadinessVO.ProviderStatusVO externalContextStatus() {
@@ -457,7 +487,65 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         item.setConfigured(configured);
         item.setConnected(connected);
         item.setReason(reason);
+        item.setImpact(defaultImpact(category));
+        item.setRetryStatus(connected ? "自动持续运行" : "等待自动重试");
         return item;
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO item(String category, String name, String status,
+                                                       boolean enabled, boolean configured, boolean connected,
+                                                       String reason, Instant lastSuccessAt, String freshness,
+                                                       Long latencyMs, String impact, String retryStatus) {
+        return detail(item(category, name, status, enabled, configured, connected, reason),
+                lastSuccessAt, freshness, latencyMs, impact, retryStatus);
+    }
+
+    private ProviderReadinessVO.ProviderStatusVO detail(ProviderReadinessVO.ProviderStatusVO item,
+                                                         Instant lastSuccessAt, String freshness,
+                                                         Long latencyMs, String impact, String retryStatus) {
+        item.setLastSuccessAt(lastSuccessAt);
+        item.setFreshness(freshness);
+        item.setLatencyMs(latencyMs);
+        item.setImpact(impact);
+        item.setRetryStatus(retryStatus);
+        return item;
+    }
+
+    private Long ageMs(Instant value) {
+        return value == null ? null : Math.max(0L, clock.millis() - value.toEpochMilli());
+    }
+
+    private String defaultImpact(String category) {
+        return switch (upper(category)) {
+            case "MARKET_DATA" -> "价格、方向、计划与持仓监控";
+            case "AI" -> "仅按需三AI分析；不影响规则链";
+            case "DERIVATIVES_CONTEXT" -> "衍生品风险补充";
+            default -> "外部背景信息补充";
+        };
+    }
+
+    private void appendAiBudgetSummary(Map<String, String> summary) {
+        if (fundamentalAiV41Properties == null || aiCallLogService == null
+                || fundamentalAiV41Properties.getAiGate() == null
+                || fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit() == null) return;
+        BigDecimal limit = BigDecimal.valueOf(
+                fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit(), 6);
+        BigDecimal used;
+        try {
+            used = aiCallLogService.sumChargeableCostSince(
+                    LocalDate.now(ZoneOffset.UTC).atStartOfDay());
+        } catch (RuntimeException ignored) {
+            summary.put("aiBudgetStatus", "UNAVAILABLE");
+            return;
+        }
+        if (used == null) used = BigDecimal.ZERO;
+        summary.put("aiDailyLimitUsd", limit.toPlainString());
+        summary.put("aiUsedTodayUsd", used.toPlainString());
+        summary.put("aiRemainingUsd", limit.subtract(used).max(BigDecimal.ZERO).toPlainString());
+        summary.put("aiBudgetStatus", used.compareTo(limit) >= 0 ? "EXHAUSTED" : "AVAILABLE");
+        summary.put("aiBudgetResetAt", LocalDate.now(ZoneOffset.UTC).plusDays(1)
+                .atStartOfDay().toInstant(ZoneOffset.UTC).toString());
+        summary.put("aiBudgetImpact", "仅影响按需三AI；规则方向、风险、计划和持仓监控继续运行");
     }
 
     private String dataSourceText(ProviderReadinessVO.ProviderStatusVO market) {

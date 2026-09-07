@@ -175,11 +175,40 @@ class UserPositionOwnershipSecurityIntegrationTest {
         mockMvc.perform(post("/api/user-positions/{id}/manual-close", openA.getId())
                         .with(user(USER_A).roles("OPERATOR"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(closeJson()))
+                .content(closeJson()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/user-positions/{id}/mistake-archive", openA.getId())
+                        .with(user(USER_A).roles("OPERATOR"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(archiveJson()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/position-monitor/user-positions/{id}/run", openA.getId())
                         .with(user(USER_A).roles("OPERATOR")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void mistakeArchiveCannotCrossOwnerBoundaryOrCreateCloseFacts() throws Exception {
+        mockMvc.perform(post("/api/user-positions/{id}/mistake-archive", openB.getId())
+                        .with(user(USER_A).roles("OPERATOR"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(archiveJson()))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/user-positions/{id}/mistake-archive", openA.getId())
+                        .with(user(USER_A).roles("OPERATOR"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(archiveJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ARCHIVED_MISTAKE"));
+
+        UserPositionDO archived = userPositionMapper.selectByIdAndUserId(openA.getId(), userAId);
+        assertThat(archived.getClosedAt()).isNull();
+        assertThat(archived.getClosePrice()).isNull();
+        assertThat(userPositionMapper.selectByIdAndUserId(openB.getId(), userBId).getStatus())
+                .isEqualTo("OPEN");
     }
 
     @Test
@@ -543,6 +572,10 @@ class UserPositionOwnershipSecurityIntegrationTest {
     private static String closeJson() {
         return "{\"submission_id\": \"ownership-close:manual-position\", \"close_price\": 105, \"closed_at\": \"2026-07-01T09:00:00\", "
                 + "\"close_reason\": \"manual close\"}";
+    }
+
+    private static String archiveJson() {
+        return "{\"submission_id\": \"ownership-archive:manual-position\", \"reason\": \"mistake\"}";
     }
 
     private static String reviewFeedbackJson(String outcome, String suggestion) {

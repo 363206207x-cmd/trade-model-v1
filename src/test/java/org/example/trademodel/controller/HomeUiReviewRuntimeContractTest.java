@@ -72,6 +72,7 @@ class HomeUiReviewRuntimeContractTest {
                 function escapeHtml(value) { return text(value, '').replace(/[&<>'\"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' })[character]); }
                 function label(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
                 function number(value) { return String(value); }
+                function clockTime(value) { return has(value) ? String(value) : '—'; }
                 function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
                 %s
                 %s
@@ -94,7 +95,7 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
-                assert.equal(eth.includes('<small>风险</small><strong data-live-field="risk" class="semantic-value semantic-medium-risk">中</strong>'), true);
+                assert.equal(eth.includes('<small>风险</small><strong data-live-field="risk" class="opportunity-risk" aria-label="综合风险 · 中"><span class="risk-type-copy">综合风险</span><span class="risk-level-copy risk-level-medium"> · 中</span></strong>'), true);
                 assert.equal(eth.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(eth.includes('<small>状态</small>'), false);
                 assert.equal(eth.includes('<small>数据</small>'), false);
@@ -154,6 +155,7 @@ class HomeUiReviewRuntimeContractTest {
                 function label(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
                 function number(value) { return String(value); }
                 function time(value) { return has(value) ? String(value) : '—'; }
+                function clockTime(value) { return has(value) ? String(value) : '—'; }
                 function symbolOf(asset) { return String(asset && asset.symbol || '').toUpperCase(); }
                 function loadHome() {}
                 %s
@@ -190,7 +192,7 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-neutral">暂不可判断</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
-                assert.equal(observationHtml.includes('<small>风险</small><strong data-live-field="risk" class="semantic-value semantic-neutral">暂不可判断</strong>'), true);
+                assert.equal(observationHtml.includes('<small>风险</small><strong data-live-field="risk" class="opportunity-risk" aria-label="暂不可判断"><span class="risk-type-copy">暂不可判断</span></strong>'), true);
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
                 assert.equal(observationHtml.includes('<small>状态</small>'), false);
@@ -198,6 +200,15 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('数据新鲜'), false);
                 const blockedHtml = opportunityCard(blockedObservation, '');
                 assert.doesNotMatch(blockedHtml, /高风险观察|数据过期/);
+                const ruleOnly = {
+                  ...observation,
+                  symbol: 'BNBUSDT', name: 'BNB', marketBias: 'BEARISH', marketBiasLabel: '偏空',
+                  confidenceLabel: '—', confidenceLevel: null, riskLevel: null, riskLabel: '待评估'
+                };
+                const ruleOnlyHtml = opportunityCard(ruleOnly, '');
+                assert.equal(ruleOnlyHtml.includes('data-live-field="direction" class="semantic-value semantic-bearish">偏空'), true);
+                assert.equal(ruleOnlyHtml.includes('data-live-field="confidence">—'), true);
+                assert.equal(ruleOnlyHtml.includes('待重新分析'), false);
                 const all = [
                   observation,
                   blockedObservation,

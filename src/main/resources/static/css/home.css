@@ -25,13 +25,6 @@
     --danger: var(--negative);
     --danger-soft: #FEF3F2;
     --rail: #111827;
-    --semantic-strong-bullish: #166534;
-    --semantic-bullish: #15803D;
-    --semantic-neutral: #64748B;
-    --semantic-bearish: #DC2626;
-    --semantic-strong-bearish: #991B1B;
-    --semantic-medium-risk: #B45309;
-    --semantic-analyzing: #2563EB;
     font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -202,13 +195,6 @@ a { color: inherit; text-decoration: none; }
 .tone-negative { color: var(--negative); }
 .tone-info { color: var(--accent); }
 .tone-unknown { color: var(--unknown); }
-.semantic-strong-bullish { color: var(--semantic-strong-bullish); }
-.semantic-bullish { color: var(--semantic-bullish); }
-.semantic-neutral { color: var(--semantic-neutral); }
-.semantic-bearish { color: var(--semantic-bearish); }
-.semantic-strong-bearish { color: var(--semantic-strong-bearish); }
-.semantic-medium-risk { color: var(--semantic-medium-risk); }
-.semantic-analyzing { color: var(--semantic-analyzing); }
 .position-detail-link { justify-self: start; color: var(--accent); font-size: 10px; }
 .position-row-actions { display: flex; align-items: center; gap: 10px; }
 .position-close-button { padding: 0; border: 0; background: transparent; color: var(--negative); font-size: 10px; font-weight: 650; cursor: pointer; }
@@ -219,6 +205,16 @@ a { color: inherit; text-decoration: none; }
 .secondary-action { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 11px; font-weight: 650; cursor: pointer; }
 
 .home-dialog { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 48px); padding: 0; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 28px 72px rgba(23,25,28,.22); }
+.home-audit-drawer { width: min(520px, calc(100vw - 32px)); height: calc(100vh - 32px); max-height: none; margin: 16px 16px 16px auto; }
+.service-status-cell { position: relative; }
+.service-status-cell button { padding: 0; border: 0; background: transparent; cursor: pointer; }
+.service-status-cell button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.service-status-popover { position: absolute; z-index: 40; top: calc(100% + 8px); left: 50%; width: 280px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: 0 10px 28px rgba(20,31,50,.14); color: var(--text); white-space: normal; transform: translateX(-50%); visibility: hidden; opacity: 0; pointer-events: none; }
+.service-status-cell:hover .service-status-popover, .service-status-cell:focus-within .service-status-popover { visibility: visible; opacity: 1; }
+.opportunity-risk { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.opportunity-updated { margin-left: auto; }
+.audit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.audit-actions button { min-height: 32px; }
 .home-dialog.compact { width: min(480px, calc(100vw - 48px)); }
 .home-dialog::backdrop { background: rgba(23,25,28,.32); backdrop-filter: blur(2px); }
 .home-dialog-content { display: grid; gap: 14px; padding: 0 18px 18px; }

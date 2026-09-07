@@ -214,6 +214,11 @@ class ProviderReadinessServiceImplTest {
             if ("BINANCE_PUBLIC_MARKET_DATA".equals(provider.getName())) {
                 assertThat(provider.getConnected()).isTrue();
                 assertThat(provider.getReason()).isEqualTo("BINANCE_RUNTIME_PROVIDER_VERIFIED_FRESH");
+                assertThat(provider.getLastSuccessAt()).isEqualTo(now.minusSeconds(20));
+                assertThat(provider.getFreshness()).isEqualTo("FRESH");
+                assertThat(provider.getLatencyMs()).isEqualTo(20_000L);
+                assertThat(provider.getImpact()).contains("方向", "持仓监控");
+                assertThat(provider.getRetryStatus()).isEqualTo("自动持续采集");
             }
         });
         verify(mapper).selectLatestClosedBarBySource("BINANCE_PUBLIC", "SPOT");
@@ -309,6 +314,8 @@ class ProviderReadinessServiceImplTest {
             if ("COINGLASS".equals(provider.getName())) {
                 assertThat(provider.getReason()).isEqualTo("COINGLASS_STALE");
                 assertThat(provider.getConnected()).isFalse();
+                assertThat(provider.getImpact()).contains("衍生品风险补充");
+                assertThat(provider.getRetryStatus()).contains("自动重试");
             }
         });
     }

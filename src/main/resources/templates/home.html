@@ -8,6 +8,7 @@
     <meta name="description" content="TRINE LOGIC 专业金融决策首页">
     <title>TRINE LOGIC</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}" href="/favicon.svg">
+    <link rel="stylesheet" th:href="@{/css/semantic-tokens.css}" href="/css/semantic-tokens.css">
     <link rel="stylesheet" th:href="@{/css/home.css}" href="/css/home.css">
 </head>
 <body class="approved-home" data-page-key="home" data-figma-node="636:708">
@@ -38,7 +39,7 @@
             <span><small>环境</small><strong id="statusEnvironment">等待同步</strong></span>
             <span><small>系统</small><strong id="statusSystem">等待同步</strong></span>
             <span><small>数据</small><strong id="statusData">等待同步</strong></span>
-            <span><small>服务</small><strong id="statusService">等待同步</strong></span>
+            <span class="service-status-cell"><small>服务</small><button id="serviceStatusButton" type="button" data-open-home-status aria-haspopup="dialog" aria-controls="homeStatusDialog"><strong id="statusService">等待同步</strong></button><span class="service-status-popover" id="serviceStatusPopover" role="tooltip">服务明细等待同步</span></span>
             <span><small>账户·已录入</small><strong id="statusAccount">等待同步</strong></span>
             <span><small>Hot Reset</small><strong id="statusReset">等待同步</strong></span>
         </section>
@@ -94,7 +95,7 @@
                 </div>
             </header>
             <div class="ai-layout" id="aiLayout"><article class="ai-role-panel" id="aiRolePanel"></article><aside class="conflict-summary" id="conflictSummary" hidden aria-label="冲突摘要"></aside></div>
-            <footer class="ai-footer"><div id="aiMetadata">角色状态待同步</div><a id="auditChainLink" aria-disabled="true">审计链尚未形成</a></footer>
+            <footer class="ai-footer"><div><div id="aiMetadata">角色状态待同步</div><small id="aiBudgetSummary">AI额度等待同步；不影响规则方向、计划和持仓监控</small></div><button class="text-button" id="auditChainLink" type="button" data-open-selected-audit>审计详情</button></footer>
         </section>
     </main>
 </div>
@@ -110,11 +111,22 @@
 <dialog class="home-dialog compact" id="homePositionCloseDialog" aria-labelledby="homePositionCloseHeading">
     <form id="homePositionCloseForm" class="home-dialog-content">
         <header class="home-dialog-header"><div><h2 id="homePositionCloseHeading">记录平仓</h2><p>仅记录用户已完成的手动平仓，不会向交易所下单。</p></div><button type="button" data-close-position-dialog aria-label="关闭平仓窗口">关闭</button></header>
-        <label>实际平仓价格<input name="closePrice" type="number" step="any" min="0" required></label><label>实际平仓时间<input name="closedAt" type="datetime-local" required></label><label>结果备注<textarea name="closeReason" rows="3" required></textarea></label>
+        <label>实际平仓价格<input name="closePrice" type="number" step="any" min="0" required></label><label>实际平仓时间<input name="closedAt" type="datetime-local" required></label><label>结果备注（选填）<textarea name="closeReason" rows="3"></textarea></label>
         <input name="submissionId" type="hidden">
         <p class="home-form-status" id="homePositionCloseStatus" role="status"></p>
         <footer class="home-dialog-actions"><button class="home-button secondary" type="button" data-close-position-dialog>取消</button><button class="home-button primary" type="submit">确认记录</button></footer>
     </form>
+</dialog>
+<dialog class="home-dialog compact" id="homePositionArchiveDialog" aria-labelledby="homePositionArchiveHeading">
+    <form id="homePositionArchiveForm" class="home-dialog-content">
+        <header class="home-dialog-header"><div><h2 id="homePositionArchiveHeading">归档误录持仓</h2><p>仅将误录记录移出默认列表；不会生成平仓、订单或交易动作。</p></div><button type="button" data-close-position-dialog>关闭</button></header>
+        <label>归档原因（选填）<textarea name="reason" rows="3"></textarea></label><input name="submissionId" type="hidden">
+        <p class="home-form-status" id="homePositionArchiveStatus" role="status"></p>
+        <footer class="home-dialog-actions"><button class="home-button secondary" type="button" data-close-position-dialog>取消</button><button class="home-button primary" type="submit">确认归档误录</button></footer>
+    </form>
+</dialog>
+<dialog class="home-dialog home-audit-drawer" id="homeAuditDialog" aria-labelledby="homeAuditHeading">
+    <div class="home-dialog-content"><header class="home-dialog-header"><div><h2 id="homeAuditHeading">审计详情</h2><p>技术编号与原始状态仅在此处显示。</p></div><button type="button" data-close-home-audit>关闭</button></header><div id="homeAuditDetail" class="status-detail"></div></div>
 </dialog>
 <dialog class="home-dialog compact" id="homeStatusDialog" aria-labelledby="homeStatusHeading" data-overlay-code="O01">
     <div class="home-dialog-content">

@@ -3,6 +3,7 @@ package org.example.trademodel.userposition;
 import org.example.trademodel.TradeModelApplication;
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.dto.req.ArchiveUserPositionReq;
 import org.example.trademodel.entity.PersonalUserDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.PersonalUserMapper;
@@ -110,6 +111,36 @@ class UserPositionIdempotencyIntegrationTest {
         }
     }
 
+    @Test
+    void twoConcurrentMistakeArchiveRetriesProduceOneArchivedState() throws Exception {
+        Long userId = userId("idempotent-archive-owner");
+        UserPositionVO opened = service.manualOpenForUser(
+                userId, openRequest("position-open:for-archive"));
+        ArchiveUserPositionReq request = new ArchiveUserPositionReq();
+        request.setSubmissionId("position-archive:two-concurrent");
+        request.setReason("验收临时记录");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<UserPositionVO> first = executor.submit(
+                    () -> archiveAfterReady(opened.getId(), userId, request, ready, start));
+            Future<UserPositionVO> second = executor.submit(
+                    () -> archiveAfterReady(opened.getId(), userId, request, ready, start));
+            ready.await();
+            start.countDown();
+
+            assertThat(get(first).getStatus()).isEqualTo("ARCHIVED_MISTAKE");
+            assertThat(get(second).getStatus()).isEqualTo("ARCHIVED_MISTAKE");
+            UserPositionDO canonical = userPositionMapper.selectByIdAndUserId(opened.getId(), userId);
+            assertThat(canonical.getArchiveSubmissionId()).isEqualTo(request.getSubmissionId());
+            assertThat(canonical.getClosedAt()).isNull();
+            assertThat(canonical.getClosePrice()).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private UserPositionVO closeAfterReady(Long positionId,
                                            Long userId,
                                            CloseUserPositionReq request,
@@ -118,6 +149,16 @@ class UserPositionIdempotencyIntegrationTest {
         ready.countDown();
         start.await();
         return service.manualCloseForUser(positionId, userId, request);
+    }
+
+    private UserPositionVO archiveAfterReady(Long positionId,
+                                             Long userId,
+                                             ArchiveUserPositionReq request,
+                                             CountDownLatch ready,
+                                             CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        return service.archiveMistakeForUser(positionId, userId, request);
     }
 
     private <T> T get(Future<T> future) {

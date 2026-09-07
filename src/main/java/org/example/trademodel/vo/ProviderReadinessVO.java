@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 
 public class ProviderReadinessVO {
     private String marketDataProviderStatus = "WAITING_SYNC";
@@ -69,6 +70,11 @@ public class ProviderReadinessVO {
         private Boolean configured = false;
         private Boolean connected = false;
         private String reason;
+        private Instant lastSuccessAt;
+        private String freshness;
+        private Long latencyMs;
+        private String impact;
+        private String retryStatus;
 
         public String getCategory() {
             return category;
@@ -125,5 +131,16 @@ public class ProviderReadinessVO {
         public void setReason(String reason) {
             this.reason = reason;
         }
+
+        public Instant getLastSuccessAt() { return lastSuccessAt; }
+        public void setLastSuccessAt(Instant value) { this.lastSuccessAt = value; }
+        public String getFreshness() { return freshness; }
+        public void setFreshness(String value) { this.freshness = value; }
+        public Long getLatencyMs() { return latencyMs; }
+        public void setLatencyMs(Long value) { this.latencyMs = value; }
+        public String getImpact() { return impact; }
+        public void setImpact(String value) { this.impact = value; }
+        public String getRetryStatus() { return retryStatus; }
+        public void setRetryStatus(String value) { this.retryStatus = value; }
     }
 }
