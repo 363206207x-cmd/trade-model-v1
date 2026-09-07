@@ -355,6 +355,63 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void priceAtDecisionDoesNotChangeWhenAnOlderClosedBarIsIngestedAfterTheAnalysis() {
+        OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(rankingService);
+
+        String analysisId = "analysis-BTCUSDT-immutable-price";
+        LocalDateTime analysisTime = LocalDateTime.of(2026, 9, 7, 4, 46, 49);
+        AnalysisRunDO run = formalSchedulerRun(analysisId, "BTCUSDT", 101L);
+        run.setAnalysisTime(analysisTime);
+        when(analysisRunMapper.selectReadableByUser(analysisId, USER_ID)).thenReturn(run);
+
+        EvidenceItemDO evidence = marketEvidence(analysisId, "BTCUSDT", "btc-analysis-source");
+        evidence.setObservedAt(LocalDateTime.of(2026, 9, 7, 4, 40));
+        when(evidenceItemMapper.listByAnalysisId(analysisId)).thenReturn(List.of(evidence));
+        when(rankingService.rankForHome(USER_ID, 6)).thenReturn(List.of(observationProjection(
+                101L, "BTCUSDT", "OBSERVING", "FRESH", analysisTime, analysisId)));
+
+        PersistedOhlcvBarDO decisionPrice = sourceOwnedBar(
+                "BTCUSDT", "5m", "btc-0439", Instant.parse("2026-09-07T04:39:59.999Z"));
+        decisionPrice.setClosePrice(new BigDecimal("79620.14"));
+        decisionPrice.setIngestedAt(LocalDateTime.of(2026, 9, 7, 4, 41, 13));
+        PersistedOhlcvBarDO lateBackfill = sourceOwnedBar(
+                "BTCUSDT", "5m", "btc-0444-late", Instant.parse("2026-09-07T04:44:59.999Z"));
+        lateBackfill.setClosePrice(new BigDecimal("79680.85"));
+        lateBackfill.setIngestedAt(LocalDateTime.of(2026, 9, 7, 4, 50, 32));
+        PersistedOhlcvBarDO oneHour = sourceOwnedBar(
+                "BTCUSDT", "1h", "btc-1h", Instant.parse("2026-09-07T03:59:59.999Z"));
+        oneHour.setIngestedAt(LocalDateTime.of(2026, 9, 7, 4, 3, 9));
+        PersistedOhlcvBarDO fourHour = sourceOwnedBar(
+                "BTCUSDT", "4h", "btc-4h", Instant.parse("2026-09-07T03:59:59.999Z"));
+        fourHour.setIngestedAt(LocalDateTime.of(2026, 9, 7, 4, 3, 9));
+
+        long asOfMs = analysisTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "BTCUSDT", "5m", "BINANCE_PUBLIC", "SPOT", asOfMs))
+                .thenReturn(decisionPrice, lateBackfill);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "BTCUSDT", "1h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(oneHour);
+        when(persistedOhlcvBarMapper.selectLatestClosedBarBySourceAtOrBefore(
+                "BTCUSDT", "4h", "BINANCE_PUBLIC", "SPOT", asOfMs)).thenReturn(fourHour);
+        when(persistedOhlcvBarMapper.selectLatestClosedWindowBySource(
+                "BTCUSDT", "5m", "BINANCE_PUBLIC", "SPOT", 512))
+                .thenReturn(List.of(lateBackfill, decisionPrice));
+        stubLatestClosedBars("BTCUSDT", lateBackfill, oneHour, fourHour);
+
+        DashboardHomeVO.AssetVO beforeBackfill = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null)
+                .getAssets().get(0);
+        DashboardHomeVO.AssetVO afterBackfill = service.getHomeForUser(USER_ID, "BTCUSDT", 6, null)
+                .getAssets().get(0);
+
+        assertThat(beforeBackfill.getPriceAtDecision()).isEqualByComparingTo("79620.14");
+        assertThat(afterBackfill.getPriceAtDecision()).isEqualByComparingTo("79620.14");
+        assertThat(afterBackfill.getLatestPrice()).isEqualByComparingTo("79680.85");
+        assertThat(afterBackfill.getPriceDriftPct()).isEqualByComparingTo("0.0762");
+        assertThat(afterBackfill.getAnalysisId()).isEqualTo(analysisId);
+    }
+
+    @Test
     void newerClosedOneHourBarNeverMixesOldStrongDirectionWithCurrentPrice() {
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setOpportunityPriorityRankingService(rankingService);
@@ -5322,6 +5379,9 @@ class DashboardHomeServiceImplTest {
         bar.setClosed(true);
         bar.setSourceStatus("READY");
         bar.setFreshnessStatus("FRESH");
+        if (closedAt != null) {
+            bar.setIngestedAt(LocalDateTime.ofInstant(closedAt.plusSeconds(1), ZoneOffset.UTC));
+        }
         return bar;
     }
 
