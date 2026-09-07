@@ -88,6 +88,27 @@ class WebLiveDashboardContractTest {
     }
 
     @Test
+    void aiResultMustMatchTheSelectedCardAnalysisAndDecisionBeforeItCanRenderOrResume() throws Exception {
+        String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
+        String rendering = desktop.substring(desktop.indexOf("function renderAi"),
+                desktop.indexOf("function render(home)"));
+        String resume = desktop.substring(desktop.indexOf("function openOrResumeAssetAnalysis"),
+                desktop.indexOf("function readDraft"));
+
+        assertThat(desktop).contains("function aiMatchesSelectedSnapshot(home, ai)");
+        assertThat(rendering).contains(
+                "aiMatchesSelectedSnapshot(home, ai)",
+                "String(role.traceId) === String(asset.traceId)",
+                "当前结果已过期，等待当前批次重新分析",
+                "当前同批次审计链尚未形成"
+        );
+        assertThat(resume).contains(
+                "currentAiCompleteForAsset(refreshedAsset)",
+                "三 AI 分析已恢复"
+        );
+    }
+
+    @Test
     void desktopKeepsDirectionalBlockedAndObservationPlansInSixCardGrid() throws Exception {
         String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
 
