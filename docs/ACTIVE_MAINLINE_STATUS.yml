@@ -24,7 +24,7 @@ active_block_cn: "Owner 授权的桌面网页版实时方向、风险、计划�
 next_required_action: "Validate, push and merge this exact gate-only authorization, then continue the preserved implementation branch."
 next_business_phase: "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character baseline SHA and forty-one literal implementation paths become effective only after this gate is merged; native APP and mobile-web paths are absent."
+compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character baseline SHA and sixty-eight literal implementation paths become effective only after this gate is merged; native APP and mobile-web paths are absent."
 
 production_deployment_readiness: "BLOCKED"
 
