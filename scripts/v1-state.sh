@@ -70,7 +70,7 @@ web_live_direction_risk_contract_matches() {
     && is_full_git_sha "$current_package_starting_full_sha" \
     && is_full_git_sha "$authorized_next_package_starting_full_sha" \
     && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "7b5cf25f5dc0632643a09b5086322bf860c1fea3" ]] \
-    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "1a61ae42eb9cf387e9fa13c89cca5dd7803eb108" ]] \
+    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "762545081db4e62a92e37af104345b21ec9cd935" ]] \
     && ! printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$' \
     && [[ "$web_live_direction_risk_closure_authorization_declared_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] \
     && [[ "$web_live_direction_risk_closure_implementation_status" == "NOT_STARTED" ]] \
