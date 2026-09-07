@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class ProviderScanCoordinatorScheduler {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProviderScanCoordinatorScheduler.class);
     private final ProviderCallProperties properties;
     private final boolean globalSchedulersEnabled;
     private final ProviderScanPlanService scanPlanService;
@@ -84,6 +85,11 @@ public class ProviderScanCoordinatorScheduler {
         try {
             port.refresh(item, dataset);
             return true;
+        } catch (RuntimeException failure) {
+            // One dataset failure must not starve later due assets; never log credentials or raw responses.
+            log.warn("Provider dataset refresh failed: dataset={}, failureType={}", dataset,
+                    failure.getClass().getSimpleName());
+            return false;
         } finally {
             activeKeys.remove(key);
         }

@@ -33,6 +33,20 @@ class DecisionResultMapperLatestPlanIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    void latestPlanNeverJoinsAnotherDecisionFromTheSameAnalysisRun() {
+        jdbcTemplate.update("INSERT INTO tm_analysis_run(analysis_id,symbol,timeframe,analysis_time,owner_type,owner_id) "
+                + "VALUES ('same-run','BTCUSDT','1h',CURRENT_TIMESTAMP,'SYSTEM',0)");
+        jdbcTemplate.update("INSERT INTO tm_decision_result(decision_id,analysis_id,symbol,create_time) "
+                + "VALUES ('decision-current','same-run','BTCUSDT',CURRENT_TIMESTAMP)");
+        insertValidatedFinalPlan("same-run", "BTCUSDT", "1h", "other-decision-plan", "CONFIRMATION", "FINAL_VALIDATED");
+        jdbcTemplate.update("UPDATE tm_execution_plan SET decision_id='decision-other' WHERE plan_id='other-decision-plan'");
+        assertThat(decisionResultMapper.findLatestDecisionResultsJoined(1).get(0).getEntryZone()).isNull();
+        assertThat(decisionResultMapper.findLatestDecisionResultBySymbolJoined("BTCUSDT").getEntryZone()).isNull();
+        assertThat(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(List.of("BTCUSDT"), "SYSTEM", 0L)
+                .get(0).getEntryZone()).isNull();
+    }
+
+    @Test
     void findLatestDecisionResultsJoined_doesNotProjectLegacyPlansAsFinal() {
         jdbcTemplate.update(
                 "INSERT INTO tm_analysis_run(analysis_id, symbol, timeframe, analysis_time, data_quality_score) VALUES (?,?,?, TIMESTAMP '2025-01-02 00:00:00', ?)",
@@ -330,6 +344,9 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         ExecutionPlanDO finalPlan = FrozenFinalExecutionPlanTestFixture.complete(
                 planId, analysisId, createdAt.toLocalDateTime());
         finalPlan.setOpportunityId(opportunityId);
+        finalPlan.setDecisionId(jdbcTemplate.queryForList(
+                "SELECT decision_id FROM tm_decision_result WHERE analysis_id=? ORDER BY create_time DESC LIMIT 1",
+                String.class, analysisId).stream().findFirst().orElse(null));
         finalPlan.setCandidateId(candidateId);
         finalPlan.setResolverResultId(resolverId);
         finalPlan.setTraceId(traceId);

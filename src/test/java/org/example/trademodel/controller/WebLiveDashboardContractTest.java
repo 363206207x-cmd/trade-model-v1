@@ -45,13 +45,14 @@ class WebLiveDashboardContractTest {
                 desktop.indexOf("function stableSubmissionId"));
 
         assertThat(runtime).contains(
-                "if (homeFallbackTimer) return",
+                "homePollIntervalMs === delay",
                 "homeFallbackTimer = window.setInterval",
-                "if (!document.hidden) lightweightHomeRefresh()",
-                "}, 15000)",
+                "if (!document.hidden && !homeAbortController) lightweightHomeRefresh()",
+                "homeStreamConnected ? 60000 : 15000",
                 "scheduleHomeFallbackPoll();",
                 "visibilitychange",
-                "if (!document.hidden) loadHome(selectedSymbol)"
+                "loadHome(selectedSymbol)",
+                "stopHomeFallbackPoll()"
         ).doesNotContain("homeReconciliationTimer = window.setInterval");
         assertThat(countOccurrences(runtime, "window.setInterval(")).isEqualTo(1);
     }
@@ -64,9 +65,37 @@ class WebLiveDashboardContractTest {
         String selection = desktop.substring(desktop.indexOf("function renderOpportunities"),
                 desktop.indexOf("function trustedMonitor"));
 
-        assertThat(scheduler).contains("if (homeFallbackTimer) return");
+        assertThat(scheduler).contains("homePollIntervalMs === delay");
         assertThat(selection).contains("loadHome(selectedSymbol)")
                 .doesNotContain("setInterval", "scheduleHomeFallbackPoll", "openOrResumeAssetAnalysis", "method: \"POST\"");
+    }
+
+    @Test
+    void sseUsesOneSixtySecondReconcilerAndOnlyDisconnectUsesFifteenSecondPolling() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
+                const handlers={},timers=new Map();let seq=0,refreshes=0,streams=0;
+                let homeFallbackTimer=null,homePollIntervalMs=0,homeStreamConnected=false,homeEventSource=null,
+                    homeRuntimeStarted=false,homeAbortController=null,homeLiveState='',currentHome={},selectedSymbol='BTCUSDT';
+                const document={hidden:false,addEventListener:(type,fn)=>handlers[type]=fn};
+                function EventSource(){streams++;this.close=()=>{};this.addEventListener=()=>{};}
+                const window={EventSource,setInterval(fn,delay){timers.set(++seq,{fn,delay});return seq;},
+                    clearInterval(id){timers.delete(id);},addEventListener(){}};
+                const loadHome=async()=>{refreshes++;},lightweightHomeRefresh=loadHome,
+                    renderHeader=()=>{},announce=()=>{},reportHomeRequestFailure=()=>{},applyHomeLiveEvent=()=>{};
+                eval(source.slice(source.indexOf('function scheduleHomeFallbackPoll('),source.indexOf('function stableSubmissionId('))
+                    + ';startHomeLiveRuntime();startHomeLiveRuntime();');
+                assert.equal(streams,1);assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,15000);
+                homeEventSource.onopen();homeEventSource.onopen();
+                assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,60000);
+                homeEventSource.onerror();homeEventSource.onerror();
+                assert.equal(timers.size,1);assert.equal([...timers.values()][0].delay,15000);
+                document.hidden=true;handlers.visibilitychange();assert.equal(timers.size,0);
+                document.hidden=false;handlers.visibilitychange();assert.equal(refreshes,1);assert.equal(timers.size,1);
+                assert.equal([...timers.values()][0].delay,15000);
+                console.log('PASS');
+                """);
     }
 
     @Test
@@ -227,15 +256,14 @@ class WebLiveDashboardContractTest {
                 workspace.indexOf("function updatePoolScanCta"));
 
         assertThat(pool).contains(
-                "const items = await api(\"/api/asset-pool\")",
-                "items.map(loadAssetPoolProjection)",
+                "const snapshot = await loadAssetPoolProjection()",
+                "snapshot.poolMembers",
+                "snapshot.assetPool",
                 "items.forEach(function (asset)",
-                "selectedSymbol=",
-                "home?.selectedAssetContext",
                 "renderAssetPoolRows(items, projections)",
                 "latestPrice",
                 "marketBiasLabel",
-                "confidenceLabel",
+                "window.TrineDesktopSemantics.confidenceText(live)",
                 "window.TrineDesktopSemantics.riskSummary(live || {})",
                 "oneHourOpportunityLabel",
                 "fourHourTrendLabel",
@@ -244,6 +272,8 @@ class WebLiveDashboardContractTest {
                 "row.dataset.decisionId"
         ).doesNotContain(
                 "/api/dashboard/home?limit=6",
+                "items.map(loadAssetPoolProjection)",
+                "&limit=1",
                 "items.slice(",
                 "asset.marketType",
                 "asset.watchStatus",
@@ -356,12 +386,20 @@ class WebLiveDashboardContractTest {
                 assert.equal(ui.priceText('79865.10'), '79,865.1');
                 const asset={symbol:'BTCUSDT',riskItems:[{riskType:'LIQUIDITY_RISK',evidenceStatus:'AVAILABLE',currentValue:'72',score:72,severity:'HIGH',primaryEvidence:'<script>',source:'Binance',observedAt:'2026-09-07T05:03:00Z'}]};
                 const risk=ui.riskDrawer(asset);
-                assert.equal((risk.match(/<tr>/g)||[]).length,9);
+                assert.equal((risk.match(/class="risk-evidence-item"/g)||[]).length,1);
                 assert.ok(risk.includes('&lt;script&gt;')); assert.ok(!risk.includes('<script>'));
                 assert.ok(risk.includes('证据完整')); assert.ok(risk.includes('72'));
-                assert.ok(risk.includes('证据不足 · 待评估'));
+                assert.ok(risk.includes('7 项证据待补齐'));
+                assert.ok(!risk.includes('<table>'));
                 assert.ok(ui.riskSummary(asset).includes('risk-level-high'));
                 assert.ok(!ui.riskSummary({riskItems:[{riskType:'LIQUIDITY_RISK',severity:'HIGH',score:100}]}).includes('risk-level-high'));
+                assert.equal(ui.hasConfirmedRisks({riskItems:[]}),false);
+                assert.equal(ui.riskDrawer({riskItems:[]}),'');
+                assert.ok(ui.riskSummary({riskItems:[]}).includes('风险证据待更新'));
+                assert.equal(ui.confidenceText({confidenceLabel:'高',confidenceLevel:'HIGH'}),'—');
+                assert.equal(ui.confidenceText({confidenceLabel:'82%'}),'82%');
+                assert.equal(ui.confidenceText({confidenceLevel:0}),'0%');
+                assert.equal(ui.confidenceText({confidenceLevel:101}),'—');
                 const precision={tickSize:'0.005',pricePrecision:3,priceMetadataSource:'BINANCE_SPOT_EXCHANGE_INFO_PRICE_FILTER'};
                 assert.equal(ui.planPriceText('100.123456 – 101.7777',precision),'100.123 – 101.778');
                 assert.equal(ui.planPriceText('100.123456',{}),'100.123456');
@@ -373,11 +411,24 @@ class WebLiveDashboardContractTest {
                 assert.equal((service.match(/<tr>/g)||[]).length,6);
                 assert.ok(!/Telegram|MACRO|数据库|调度|心跳/.test(service));
                 assert.ok(service.includes('尚未计划'));
+                providers[1]={name:'COINGLASS',status:'FAIL_CLOSED',runtimeState:'RUNNING',
+                  lastAttemptAt:'2026-09-07T05:04:00Z',lastSuccessAt:'2026-09-07T04:03:00Z',
+                  providerDataAt:'2026-09-07T03:03:00Z',nextCheckAt:'2026-09-07T05:05:00Z'};
+                assert.equal(ui.serviceSummary(home),'4/5 · CoinGlass检查中');
+                const runtimeService=ui.serviceDrawer(home);
+                assert.ok(runtimeService.includes('最近尝试')); assert.ok(runtimeService.includes('13:04'));
+                assert.ok(runtimeService.includes('11:03')); assert.ok(runtimeService.includes('13:05'));
+                assert.ok(runtimeService.includes('risk-level-unknown'));
+                providers[1].runtimeState='RATE_LIMITED';
+                assert.equal(ui.serviceSummary(home),'4/5 · CoinGlass限流');
                 const card=node('card'), riskTrigger=node('trigger',card), inner=node('inner',riskTrigger), inner2=node('inner',riskTrigger);
                 riskTrigger.dataset={desktopHover:'risk'};
                 const serviceTrigger=node('service'); serviceTrigger.dataset={desktopHover:'service'};
                 let opens=0;
                 ui.installHoverDrawers(trigger=>{opens++; return trigger.dataset.desktopHover==='risk'?risk:service;});
+                const handlerCount = Object.values(handlers).reduce((n,a)=>n+a.length,0);
+                ui.installHoverDrawers(()=>{throw Error('duplicate hover controller');});
+                assert.equal(Object.values(handlers).reduce((n,a)=>n+a.length,0),handlerCount);
                 function emit(type,target,relatedTarget,key) { let stopped=false;
                   for(const fn of handlers[type]||[]) fn({target,relatedTarget,key,stopPropagation(){stopped=true;}});
                   return stopped;
@@ -385,6 +436,8 @@ class WebLiveDashboardContractTest {
                 emit('pointerover',inner); assert.equal(opens,0); assert.equal(timers.size,1);
                 emit('pointerout',inner,inner2); emit('pointerover',inner2); assert.equal(timers.size,1);
                 fire(250); assert.equal(opens,1); assert.equal(drawer.hidden,false);
+                emit('pointerout',riskTrigger,card); fire(300); assert.equal(drawer.hidden,true);
+                emit('focusin',riskTrigger); assert.equal(drawer.hidden,false);
                 emit('pointerout',riskTrigger,drawer); fire(300); assert.equal(drawer.hidden,false);
                 emit('pointerout',drawer,null); assert.equal(drawer.hidden,false); fire(300); assert.equal(drawer.hidden,true);
                 emit('focusin',riskTrigger); assert.equal(drawer.hidden,false);
@@ -413,12 +466,13 @@ class WebLiveDashboardContractTest {
                 const validOpportunityCard=()=>true, validObservationCard=()=>true;
                 function render(home){currentHome=home;} function clearHomeRequestFailure(){} function announce(){}
                 function reportHomeRequestFailure(){errors++;}
-                function asset(symbol){return {symbol,analysisId:'run-'+symbol+'-'+stage,decisionId:'decision-'+symbol+'-'+stage};}
+                function asset(symbol){return {symbol,analysisId:'run-'+symbol+'-'+stage,decisionId:'decision-'+symbol+'-'+stage,snapshotId:'snapshot-'+stage};}
                 async function api(url,options){
                   requests.push({url,options}); if(fail) throw Error('timeout');
                   const q=new URL(url,'https://example.test').searchParams, selected=q.get('selectedSymbol')||initial[0];
                   const members=stage===0?initial:initial.filter(s=>s!==selected).concat('LINKUSDT');
-                  return {assets:members.map(s=>({...asset(s),decisionId:'older-'+s})),selectedAssetContext:asset(selected),selectedSymbol:selected};
+                  return {assets:members.map(asset),assetPool:initial.concat('LINKUSDT').map(asset),snapshotComplete:true,
+                    snapshotId:'snapshot-'+stage,projectionVersion:stage+1,selectedAssetContext:asset(selected),selectedSymbol:selected};
                 }
                 const load=eval(fn+';loadHome');
                 (async()=>{
@@ -427,14 +481,21 @@ class WebLiveDashboardContractTest {
                     assert.deepEqual(currentHome.assets.map(symbolOf),initial);
                     assert.equal(currentHome.assets.find(a=>a.symbol===symbol).decisionId,currentHome.selectedAssetContext.decisionId);
                   }
+                  assert.equal(requests.length,7); // one complete GET, not per-missing-card fanout
                   const preserved=currentHome; fail=true; await load(initial[0]);
                   assert.equal(currentHome,preserved); assert.equal(errors,1); fail=false;
                   const queue=[]; api=(url,options)=>new Promise(resolve=>queue.push(resolve));
                   const old=load('BTCUSDT'), newer=load('ETHUSDT');
-                  const fresh={assets:initial.map(asset),selectedAssetContext:asset('ETHUSDT')};
+                  const fresh={assets:initial.map(asset),assetPool:initial.map(asset),snapshotComplete:true,snapshotId:'snapshot-'+stage,
+                    projectionVersion:stage+2,selectedAssetContext:asset('ETHUSDT')};
                   queue[1](fresh); await newer;
                   queue[0]({assets:[],selectedAssetContext:asset('BTCUSDT')}); await old;
                   assert.equal(currentHome.selectedAssetContext.symbol,'ETHUSDT');
+                  const complete=currentHome;
+                  api=async()=>({...fresh,projectionVersion:stage+3,assets:[],assetPool:[]});
+                  await load('ETHUSDT'); assert.equal(currentHome,complete);
+                  api=async()=>({...fresh,projectionVersion:1});
+                  await load('ETHUSDT'); assert.equal(currentHome,complete);
                   assert.ok(requests.every(r=>!r.options.method || r.options.method==='GET'));
                   assert.ok(requests.every(r=>r.url.startsWith('/api/dashboard/home?')));
                   console.log('PASS');
@@ -459,7 +520,10 @@ class WebLiveDashboardContractTest {
                 const asset={symbol:'BTCUSDT',analysisId:'a1',decisionId:'d1',traceId:'t1',marketBias:'BULLISH'};
                 const plan={sourceAnalysisId:'a1',sourceDecisionId:'d1',sourceTraceId:'t1',planLifecycleState:'WAITING_TRIGGER',
                   entryZone:'100 – 101',stopLoss:'98',takeProfitRules:'TP1 105；TP2 108',invalidCondition:'价格跌破98'};
-                function html(a,p){drawPlan({selectedAssetContext:a,executionSuggestion:p});return nodes.planContent.innerHTML;}
+                function html(a,p){drawPlan({selectedAssetContext:a,executionSuggestion:p,nextOneHourCloseAt:'2026-09-07T13:00:00Z'});return nodes.planContent.innerHTML;}
+                assert.ok(html(asset,{...plan,planLifecycleState:'CURRENT',status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('TP1'));
+                assert.ok(html(asset,{...plan,planLifecycleState:'CURRENT',status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('规则参考'));
+                assert.ok(!html(asset,{...plan,planLifecycleState:'SUPERSEDED'}).includes('100 – 101'));
                 for(const bias of ['STRONG_BULLISH','BULLISH','WEAK_BULLISH','WEAK_BEARISH','BEARISH','STRONG_BEARISH']) {
                   const result=html({...asset,marketBias:bias},plan);
                   assert.ok(result.includes('条件计划 · 等待触发'));
@@ -467,7 +531,7 @@ class WebLiveDashboardContractTest {
                   assert.ok(!result.includes('恢复条件'));
                 }
                 const blocked=html(asset,{...plan,planLifecycleState:'SUSPENDED',validationStatus:'BLOCKED',pauseReason:'流动性风险72，高于执行上限70'});
-                assert.ok(blocked.includes('条件计划 · 暂停')); assert.ok(blocked.includes('暂停：流动性风险72，高于执行上限70'));
+                assert.ok(blocked.includes('条件计划 · 当前暂缓执行')); assert.ok(blocked.includes('暂停：流动性风险72，高于执行上限70'));
                 assert.ok(!blocked.includes('已阻断'));
                 const internal=html(asset,{...plan,validationStatus:'BLOCKED',blockedReason:'ANALYSIS_PREVIEW_NON_FINAL'});
                 assert.ok(!internal.includes('ANALYSIS_PREVIEW_NON_FINAL'));
@@ -477,11 +541,44 @@ class WebLiveDashboardContractTest {
                 }
                 const conflict=html({...asset,marketBias:'TIMEFRAME_CONFLICT',oneHourOpportunityLabel:'1小时偏空',fourHourTrendLabel:'4小时偏多'},plan);
                 assert.ok(conflict.includes('周期冲突：1小时偏空 / 4小时偏多')); assert.ok(!conflict.includes('100 – 101'));
+                assert.ok(conflict.includes('暂无条件计划')); assert.ok(conflict.includes('当前动作：等待'));
+                assert.ok(conflict.includes('下一根1小时K线闭合后')); assert.ok(conflict.includes('21:00'));
                 const missing=html({...asset,marketBias:'INSUFFICIENT_DATA',marketBiasLabel:'数据不足',oneHourOpportunityLabel:'1小时有效',fourHourTrendLabel:'缺少4小时闭合K线'},plan);
                 assert.ok(missing.includes('缺少4小时闭合K线')); assert.ok(!missing.includes('100 – 101'));
                 assert.ok(html(asset,{...plan,takeProfitRules:null}).includes('可分别展示的 TP1、TP2'));
                 assert.ok(!html(asset,{...plan,takeProfitRules:null}).includes('100 – 101'));
                 console.log('PASS');
+                """);
+    }
+
+    @Test
+    void completeAssetPoolKeepsAllMembersAndRejectsOlderOrThinResponses() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
+                const functions=source.slice(source.indexOf('async function loadAssetPoolProjection()'),source.indexOf('function updatePoolScanCta('));
+                let assetPoolProjections=[],assetPoolItems=[],assetPoolLoaded=false,poolScanRuntime=null,assetPoolProjectionVersion=0;
+                let waiters=[], renders=[], messages=[];
+                const api=path=>{assert.equal(path,'/api/dashboard/runtime-snapshot');return new Promise(resolve=>waiters.push(resolve));};
+                const document={getElementById:()=>null};
+                const renderAssetPoolRows=(items,projections)=>renders.push({items,projections});
+                const updatePoolScanCta=()=>{},announce=message=>messages.push(message),empty=()=>{throw Error('unexpected empty');};
+                function snapshot(version){const poolMembers=Array.from({length:36},(_,i)=>({symbol:'ASSET'+i}));
+                  return {snapshotComplete:true,snapshotId:'snapshot-'+version,projectionVersion:version,poolMembers,
+                    assets:poolMembers.slice(version%10,version%10+6),assetPool:poolMembers.map(p=>({...p,rawSymbol:p.symbol,
+                      snapshotId:'snapshot-'+version,analysisId:'analysis-'+version+'-'+p.symbol,decisionId:'decision-'+version+'-'+p.symbol}))};}
+                eval(functions);
+                (async()=>{
+                  const older=loadAssetPool(),newer=loadAssetPool();
+                  waiters[1](snapshot(2));await newer;waiters[0](snapshot(1));await older;
+                  assert.equal(renders.length,1);assert.equal(assetPoolItems.length,36);assert.equal(assetPoolProjectionVersion,2);
+                  assert.equal(assetPoolProjections[0].analysisId,'analysis-2-ASSET0');
+                  const partial=loadAssetPool(),thin=snapshot(3);thin.assetPool.pop();waiters[2](thin);await partial;
+                  assert.equal(renders.length,1);assert.equal(assetPoolItems.length,36);assert.equal(messages.length,1);
+                  const refresh=loadAssetPool();waiters[3](snapshot(4));await refresh;
+                  assert.deepEqual(assetPoolItems.map(p=>p.symbol),snapshot(1).poolMembers.map(p=>p.symbol));
+                  assert.equal(renders.length,2);console.log('PASS');
+                })().catch(e=>{console.error(e);process.exitCode=1;});
                 """);
     }
 

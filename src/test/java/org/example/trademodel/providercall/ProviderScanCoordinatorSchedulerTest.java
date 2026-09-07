@@ -104,6 +104,20 @@ class ProviderScanCoordinatorSchedulerTest {
         verify(fixture.refreshPort).refresh(item, ProviderDatasetType.PRICE);
     }
 
+    @Test
+    void datasetFailureDoesNotSkipRemainingAssetsAndReleasesItsSingleFlightKey() {
+        Fixture fixture = fixture(true, true, true);
+        ScanPlanItem first = item(Set.of(ProviderDatasetType.PRICE, ProviderDatasetType.DERIVATIVES));
+        when(fixture.planService.planForExecution(anyString())).thenReturn(List.of(first));
+        org.mockito.Mockito.doThrow(new IllegalStateException("fixture failure"))
+                .doNothing().when(fixture.refreshPort).refresh(first, ProviderDatasetType.PRICE);
+
+        assertThat(fixture.scheduler.scanOnce()).isEqualTo(1);
+        verify(fixture.refreshPort).refresh(first, ProviderDatasetType.DERIVATIVES);
+        assertThat(fixture.scheduler.scanOnce()).isEqualTo(2);
+        verify(fixture.refreshPort, times(2)).refresh(first, ProviderDatasetType.PRICE);
+    }
+
     @SuppressWarnings("unchecked")
     private static Fixture fixture(boolean globalEnabled, boolean providerEnabled, boolean portAvailable) {
         ProviderCallProperties properties = new ProviderCallProperties();

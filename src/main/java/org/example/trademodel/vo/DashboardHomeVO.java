@@ -15,6 +15,33 @@ import java.util.List;
 import java.util.Map;
 
 public class DashboardHomeVO {
+    private String snapshotId;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private Instant generatedAt;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private Instant nextOneHourCloseAt;
+    private long projectionVersion;
+    private String providerStateVersion;
+    private boolean snapshotComplete;
+    private List<AssetVO> assetPool = List.of();
+    private List<org.example.trademodel.dto.assetpool.AssetPoolAssetDTO> poolMembers = List.of();
+
+    public String getSnapshotId() { return snapshotId; }
+    public void setSnapshotId(String value) { snapshotId = value; }
+    public Instant getGeneratedAt() { return generatedAt; }
+    public void setGeneratedAt(Instant value) { generatedAt = value; }
+    public Instant getNextOneHourCloseAt() { return nextOneHourCloseAt; }
+    public void setNextOneHourCloseAt(Instant value) { nextOneHourCloseAt = value; }
+    public long getProjectionVersion() { return projectionVersion; }
+    public void setProjectionVersion(long value) { projectionVersion = value; }
+    public String getProviderStateVersion() { return providerStateVersion; }
+    public void setProviderStateVersion(String value) { providerStateVersion = value; }
+    public boolean isSnapshotComplete() { return snapshotComplete; }
+    public void setSnapshotComplete(boolean value) { snapshotComplete = value; }
+    public List<AssetVO> getAssetPool() { return assetPool; }
+    public void setAssetPool(List<AssetVO> value) { assetPool = List.copyOf(value); }
+    public List<org.example.trademodel.dto.assetpool.AssetPoolAssetDTO> getPoolMembers() { return poolMembers; }
+    public void setPoolMembers(List<org.example.trademodel.dto.assetpool.AssetPoolAssetDTO> value) { poolMembers = List.copyOf(value); }
     private HeaderVO header = new HeaderVO();
     private SystemStateVO systemState = new SystemStateVO();
     private List<AlertRowVO> alerts = new ArrayList<>();
@@ -529,6 +556,9 @@ public class DashboardHomeVO {
     }
 
     public static class AssetVO {
+        private String snapshotId;
+        public String getSnapshotId() { return snapshotId; }
+        public void setSnapshotId(String value) { snapshotId = value; }
         private Integer slot;
         private String slotType;
         private String symbol;

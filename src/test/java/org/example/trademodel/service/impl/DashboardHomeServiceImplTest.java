@@ -2171,6 +2171,89 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
+    void currentStructuralRulePlanRetainsExactIdentityAndNumbersWithoutPretendingToBeFinal() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        decision.setDirectionDataState("READY");
+        decision.setValidatedMarketBias("BULLISH");
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setDecisionId(decision.getDecisionId());
+        plan.setTraceId("trace-" + decision.getAnalysisId());
+        plan.setRuleVersion(org.example.trademodel.v41.V41StructuralPlanPolicy.VERSION);
+        plan.setFinalPlan(false);
+        plan.setFinalMarketBias(null);
+        plan.setChainStatus("RULE_BASE_ASSESSMENT");
+        plan.setRuleValidationStatus("NOT_RUN");
+        plan.setExecutionPlanStatus("INCOMPLETE");
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setNotTradeInstruction(true);
+        plan.setTakeProfitRules("TP1 110；TP2 120");
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+
+        var suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+        assertThat(suggestion.getStatus()).isEqualTo("RULE_CONDITIONAL_PLAN");
+        assertThat(suggestion.getStatusLabel()).isEqualTo("规则参考计划 · 等待触发");
+        assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
+        assertThat(suggestion.getSourceDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
+        assertThat(suggestion.getSourceTraceId()).isEqualTo(plan.getTraceId());
+        assertThat(suggestion.getEntryZone()).isEqualTo(plan.getEntryZone());
+        assertThat(suggestion.getTakeProfitRules()).isEqualTo("TP1 110；TP2 120");
+        assertThat(suggestion.getFinalPlan()).isFalse();
+        assertThat(suggestion.getWorthOpening()).isFalse();
+        assertThat(suggestion.getNotTradeInstruction()).isTrue();
+
+        plan.setPlanLifecycleState("SUSPENDED");
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setValidationReasons("DATA_QUALITY_BLOCKED");
+        suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+        assertThat(suggestion.getStatus()).isEqualTo("RULE_CONDITIONAL_SUSPENDED");
+        assertThat(suggestion.getEntryZone()).isEqualTo(plan.getEntryZone());
+        assertThat(suggestion.getPauseReason()).contains("数据质量校验未通过");
+
+        plan.setPlanLifecycleState("SUPERSEDED");
+        suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+        assertThat(suggestion.getEntryZone()).isNull();
+        plan.setPlanLifecycleState("CURRENT");
+        plan.setValidUntil(LocalDateTime.of(2026, 7, 1, 11, 59));
+        suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+        assertThat(suggestion.getEntryZone()).isNull();
+    }
+
+    @Test
+    void completeRuntimeProjectionKeepsAllPoolMembersAndSharesCardObjectsInOneSnapshot() {
+        var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+        service.setAssetPoolService(pool);
+        var members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
+                new org.example.trademodel.dto.assetpool.AssetPoolAssetDTO((long) index,
+                        "ASSET" + index + "USDT", "Asset " + index, "SPOT", "USDT", true, index, "USER"))
+                .toList();
+        when(pool.listForUser(USER_ID)).thenReturn(members);
+        when(pool.listFocusSymbols(USER_ID, 6)).thenReturn(members.subList(0, 6).stream()
+                .map(org.example.trademodel.dto.assetpool.AssetPoolAssetDTO::symbol).toList());
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(List.of());
+        var home = service.getHomeForUser(USER_ID, "ASSET1USDT", 6);
+        assertThat(home.getPoolMembers()).hasSize(36);
+        assertThat(home.getAssetPool()).hasSize(36);
+        assertThat(home.getSnapshotId()).isNotBlank();
+        assertThat(home.getGeneratedAt()).isNotNull();
+        assertThat(home.getNextOneHourCloseAt()).isEqualTo(home.getGeneratedAt()
+                .truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusSeconds(3600));
+        assertThat(home.getProjectionVersion()).isPositive();
+        assertThat(home.getProviderStateVersion()).isNotBlank();
+        assertThat(home.getAssets()).hasSize(6).allSatisfy(card -> {
+            assertThat(home.getAssetPool()).anySatisfy(row -> assertThat(row).isSameAs(card));
+            assertThat(card.getSnapshotId()).isEqualTo(home.getSnapshotId());
+        });
+        assertThat(home.getAssetPool()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactlyElementsOf(members.stream().map(
+                        org.example.trademodel.dto.assetpool.AssetPoolAssetDTO::symbol).toList());
+        verify(decisionResultMapper, times(1)).findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID));
+        assertThat(home.getAssetPool().get(35).getMarketBias()).isNull();
+    }
+
+    @Test
     void validatedFinalPlanExposesEveryFrozenHomeFieldWithoutCandidateSubstitution() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);

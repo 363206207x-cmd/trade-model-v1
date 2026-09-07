@@ -75,6 +75,12 @@ public class ProviderReadinessVO {
         private String reason;
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         private Instant lastSuccessAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        private Instant lastAttemptAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        private Instant providerDataAt;
+        private String runtimeState;
+        private long stateVersion;
         @JsonInclude(JsonInclude.Include.ALWAYS)
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         private Instant nextCheckAt;
@@ -142,6 +148,15 @@ public class ProviderReadinessVO {
 
         public Instant getLastSuccessAt() { return lastSuccessAt; }
         public Instant getNextCheckAt() { return nextCheckAt; }
+        public void setNextCheckAt(Instant value) { nextCheckAt = value; }
+        public Instant getLastAttemptAt() { return lastAttemptAt; }
+        public void setLastAttemptAt(Instant value) { lastAttemptAt = value; }
+        public Instant getProviderDataAt() { return providerDataAt; }
+        public void setProviderDataAt(Instant value) { providerDataAt = value; }
+        public String getRuntimeState() { return runtimeState; }
+        public void setRuntimeState(String value) { runtimeState = value; }
+        public long getStateVersion() { return stateVersion; }
+        public void setStateVersion(long value) { stateVersion = value; }
         public String getNextCheckStatus() { return nextCheckStatus; }
         public void setNextCheckStatus(String value) { nextCheckStatus = value; }
         public void setLastSuccessAt(Instant value) { this.lastSuccessAt = value; }

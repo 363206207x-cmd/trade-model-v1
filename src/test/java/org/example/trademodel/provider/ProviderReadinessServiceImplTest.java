@@ -37,6 +37,31 @@ import org.springframework.web.client.RestTemplate;
 class ProviderReadinessServiceImplTest {
 
     @Test
+    void coinGlassRuntimeShowsRealAttemptSuccessObservationAndRetrySeparately() {
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        Instant now = Instant.now();
+        CoinGlassProviderHealthService health = new CoinGlassProviderHealthService();
+        String capability = "CG_V4_OPEN_INTEREST_EXCHANGE_LIST";
+        health.recordDataset(capability, "ETHUSDT", UnifiedSourceStatus.READY, 200, "0", "READY", null,
+                now.minusSeconds(20), now.minusSeconds(25), java.time.Duration.ofSeconds(120));
+        health.recordDataset(capability, "ETHUSDT", UnifiedSourceStatus.DEGRADED, 429, "429", "RATE_LIMITED",
+                new org.example.trademodel.providercall.coinglass.CoinGlassRateLimitMetadata(300, 300, 45L),
+                now, null, java.time.Duration.ofSeconds(120));
+        ReflectionTestUtils.setField(service, "coinGlassProperties", coinGlassProperties());
+        ReflectionTestUtils.setField(service, "coinGlassProviderHealthService", health);
+        var row = service.getReadiness().getProviders().stream()
+                .filter(provider -> "COINGLASS".equals(provider.getName())).findFirst().orElseThrow();
+        assertThat(row.getRuntimeState()).isEqualTo("RATE_LIMITED");
+        assertThat(row.getLastAttemptAt()).isEqualTo(now);
+        assertThat(row.getLastSuccessAt()).isEqualTo(now.minusSeconds(20));
+        assertThat(row.getProviderDataAt()).isEqualTo(now.minusSeconds(25));
+        assertThat(row.getNextCheckAt()).isEqualTo(now.plusSeconds(45));
+        assertThat(row.getNextCheckStatus()).isEqualTo("RETRY_AFTER");
+        assertThat(row.getConnected()).isFalse();
+        assertThat(row.getStateVersion()).isPositive();
+    }
+
+    @Test
     void readinessDoesNotInventTheNextCheckFromTtlOrRetryCopy() throws Exception {
         ProviderReadinessServiceImpl service = service(new MockEnvironment());
         Instant now = Instant.parse("2026-09-07T08:00:00Z");

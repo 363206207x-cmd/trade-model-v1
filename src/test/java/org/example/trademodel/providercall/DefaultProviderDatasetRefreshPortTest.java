@@ -75,6 +75,17 @@ class DefaultProviderDatasetRefreshPortTest {
         verify(priceService, never()).get(any(CanonicalInstrumentId.class), any(), any(), anyString());
     }
 
+    @Test void unexpectedDatasetFailureRecordsItsAttemptWithoutPretendingDataIsReady() {
+        when(derivativesService.get(any(CanonicalInstrumentId.class), any(), any(), anyString()))
+                .thenThrow(new IllegalStateException("fixture failure"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> port.refresh(item(), ProviderDatasetType.DERIVATIVES))
+                .isInstanceOf(IllegalStateException.class);
+        var observed = registry.get(ProviderCallTestFixtures.perpetual("BTCUSDT"), ProviderDatasetType.DERIVATIVES);
+        assertThat(observed.sourceStatus()).isEqualTo(UnifiedSourceStatus.ERROR);
+        assertThat(observed.attemptedAt()).isEqualTo(NOW);
+        assertThat(observed.reasonCode()).isEqualTo("DATASET_REFRESH_EXCEPTION");
+    }
+
     @Test void scanPlanCanonicalIdentitySurvivesEntireRefreshPath() {
         when(priceService.get(any(CanonicalInstrumentId.class), any(), any(), anyString()))
                 .thenReturn(result(ProviderDatasetType.PRICE));

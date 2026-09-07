@@ -125,7 +125,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
 
         try (Connection connection = DriverManager.getConnection(
                 target.jdbcUrl(), target.username(), target.password())) {
-            assertThat(countTradeModelTables(connection)).isEqualTo(41);
+            assertThat(countTradeModelTables(connection)).isEqualTo(42);
             assertTablesExist(connection, List.of(
                     "tm_asset",
                     "tm_analysis_run",
@@ -148,6 +148,7 @@ class PostgreSqlFlywayMigrationSmokeTest {
                     "tm_message",
                     "tm_channel_delivery",
                     "tm_telegram_channel_test_audit",
+                    "tm_coinglass_runtime_snapshot",
                     "tm_user_registration_guard",
                     "tm_owner_password_setup_token",
                     "tm_async_task",

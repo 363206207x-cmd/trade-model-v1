@@ -26,10 +26,20 @@ public class ConfiguredWatchlistAssetSource implements WatchlistAssetSource {
     public List<CanonicalInstrumentId> currentWatchlist() {
         if (properties.getMaxAssets() <= 0) return List.of();
         return assetPoolService.listScanSymbols().stream()
-                .map(symbol -> registry.resolveConfiguredInstrument(symbol, properties.getMarketType(),
-                        properties.getVenue(), properties.getContractType()))
+                .flatMap(this::verifiedInstrument)
                 .distinct()
                 .limit(properties.getMaxAssets())
                 .toList();
+    }
+
+    private java.util.stream.Stream<CanonicalInstrumentId> verifiedInstrument(String symbol) {
+        try {
+            return java.util.stream.Stream.of(registry.resolveConfiguredInstrument(symbol,
+                    properties.getMarketType(), properties.getVenue(), properties.getContractType()));
+        } catch (IllegalArgumentException unsupportedMapping) {
+            // One unsupported pool member must not erase other verified scan members.
+            // This changes neither pool membership nor Provider mapping/capability facts.
+            return java.util.stream.Stream.empty();
+        }
     }
 }
