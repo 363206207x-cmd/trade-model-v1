@@ -62,6 +62,32 @@ class DecisionChainAiOrchestratorServiceImplTest {
     }
 
     @Test
+    void gptPromptSeparatesRuleDirectionFromTheNoActionRecommendation() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AiDecisionChainPromptBuilder builder = new AiDecisionChainPromptBuilder(
+                objectMapper, new AiOrchestratorProperties());
+        AiDecisionChainRequest request = request(AiDecisionChainRole.GPT_FINAL);
+        request.setInput(Map.of("decisionBundle", Map.of("ruleDirection", "BEARISH")));
+
+        JsonNode root = objectMapper.readTree(builder.build(request).dataJson());
+        JsonNode directionContract = root.path("ruleDirectionContract");
+
+        assertThat(directionContract.path("immutableRuleDirection").asText()).isEqualTo("BEARISH");
+        assertThat(directionContract.path("biasAdjustmentBeforeMustEqual").asText()).isEqualTo("BEARISH");
+        assertThat(directionContract.path("biasAdjustmentAfterAllowedValues"))
+                .extracting(JsonNode::asText)
+                .containsExactly("STRONG_BEARISH", "BEARISH", "WEAK_BEARISH");
+        assertThat(directionContract.path("noActionField").asText())
+                .isEqualTo("candidateSummary.recommendedAction");
+        assertThat(AiDecisionChainPromptBuilder.systemInstruction(AiDecisionChainRole.GPT_FINAL))
+                .contains(
+                        "biasAdjustment.before MUST exactly equal input.decisionBundle.ruleDirection",
+                        "biasAdjustment.after MUST be one of ruleDirectionContract.biasAdjustmentAfterAllowedValues",
+                        "WAIT or RANGE is forbidden unless it is the supplied rule direction",
+                        "candidateSummary.recommendedAction and worthOpening");
+    }
+
+    @Test
     void eachDecisionRoleIsRoutedOnlyToItsAuthorizedProviderRoleAndAudited() {
         AiProviderClient gpt = client(AiProviderName.OPENAI, AiProviderRole.GPT_RULE_REVIEW);
         AiProviderClient gemini = client(AiProviderName.GEMINI, AiProviderRole.GEMINI_CONSISTENCY_REVIEW);

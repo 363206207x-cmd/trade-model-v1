@@ -85,7 +85,7 @@
         var raw = Array.isArray(value) ? value[0] : value;
         var normalized = String(raw || "").trim().toUpperCase();
         var reasons = {
-            ANALYSIS_PREVIEW_NON_FINAL: "当前分析仍在生成，完成后自动更新",
+            ANALYSIS_PREVIEW_NON_FINAL: "规则参考计划尚未通过 Final 校验，当前不可执行",
             VALIDATED_MARKET_BIAS_REQUIRED: "方向尚未通过完整规则校验",
             BOUNDARY_INCOMPLETE: "计划边界尚未完整形成",
             PLAN_BLOCKED: "当前风险或规则条件不允许执行",
