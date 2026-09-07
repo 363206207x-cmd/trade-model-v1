@@ -20,8 +20,10 @@ function extractFunction(name) {
 }
 
 function formatter() {
-    const context = { Intl, Date };
-    vm.runInNewContext(`${extractFunction("has")}\n${extractFunction("clockTime")}\nthis.clockTime = clockTime;`, context);
+    const context = { Intl, Date, window: {} };
+    const shared = source.slice(0, source.indexOf("/* Desktop Home runtime */"));
+    assert.ok(shared.includes("window.TrineDesktopSemantics"));
+    vm.runInNewContext(`${shared}\nvar desktop = window.TrineDesktopSemantics;\n${extractFunction("clockTime")}\nthis.clockTime = clockTime;`, context);
     return context.clockTime;
 }
 
@@ -55,22 +57,21 @@ if (process.argv.includes("--child")) {
 
     const utc = run("UTC");
     const shanghai = run("Asia/Shanghai");
+    const newYork = run("America/New_York");
 
-    assert.equal(utc.status, "09:56");
-    assert.equal(utc.header, "09:56");
-    assert.equal(shanghai.status, "17:56");
-    assert.equal(shanghai.header, "17:56");
-    assert.equal(shanghai.legacyWithoutOffset, "09:56");
-    assert.notEqual(shanghai.status, shanghai.legacyWithoutOffset);
-    for (const result of [utc, shanghai]) {
-        assert.equal(result.nullValue, "—");
-        assert.equal(result.undefinedValue, "—");
-        assert.equal(result.emptyValue, "—");
+    for (const result of [utc, shanghai, newYork]) {
+        assert.equal(result.status, "17:56");
+        assert.equal(result.header, "17:56");
+        assert.equal(result.legacyWithoutOffset, "17:56");
+        assert.equal(result.nullValue, "尚无记录");
+        assert.equal(result.undefinedValue, "尚无记录");
+        assert.equal(result.emptyValue, "尚无记录");
     }
 
     console.log("HOME_TIMESTAMP_TRANSPORT_MATRIX=PASS");
-    console.log("UTC_STATUS=09:56 UTC_HEADER=09:56");
+    console.log("UTC_STATUS=17:56 UTC_HEADER=17:56");
     console.log("ASIA_SHANGHAI_STATUS=17:56 ASIA_SHANGHAI_HEADER=17:56");
-    console.log("LEGACY_NO_OFFSET_ASIA_SHANGHAI=09:56");
-    console.log("NULL_TIMESTAMP=—");
+    console.log("AMERICA_NEW_YORK_STATUS=17:56 AMERICA_NEW_YORK_HEADER=17:56");
+    console.log("LEGACY_NO_OFFSET_ASIA_SHANGHAI=17:56");
+    console.log("NULL_TIMESTAMP=尚无记录");
 }

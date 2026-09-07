@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -122,14 +123,14 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
             }
             CatalogFetchResult fetched = providerEnabled && externalCallsEnabled
                     ? fetchExchangeInfo()
-                    : new CatalogFetchResult(List.of(), ProviderCapabilityState.NOT_CONFIGURED,
+                    : new CatalogFetchResult(List.of(), Map.of(), ProviderCapabilityState.NOT_CONFIGURED,
                     "BINANCE_EXCHANGE_INFO_NOT_CONFIGURED");
             List<MarketAssetDTO> loaded = fetched.assets();
             boolean directoryVerified = fetched.capabilityState() == ProviderCapabilityState.SUPPORTED
                     && !loaded.isEmpty();
             if (!directoryVerified) loaded = configuredFallback();
             cache = new CatalogSnapshot(List.copyOf(loaded), now, directoryVerified,
-                    fetched.capabilityState(), fetched.failureReason());
+                    fetched.capabilityState(), fetched.failureReason(), fetched.priceMetadata());
             return cache.assets();
         }
     }
@@ -201,15 +202,17 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
                         response.statusCode(), reason)
                         ? ProviderCapabilityState.REGION_RESTRICTED
                         : ProviderCapabilityState.SOURCE_UNAVAILABLE;
-                return new CatalogFetchResult(List.of(), state, reason);
+                return new CatalogFetchResult(List.of(), Map.of(), state, reason);
             }
-            List<MarketAssetDTO> assets = parseExchangeInfo(objectMapper.readTree(response.body()));
+            JsonNode payload = objectMapper.readTree(response.body());
+            List<MarketAssetDTO> assets = parseExchangeInfo(payload);
             return assets.isEmpty()
-                    ? new CatalogFetchResult(List.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
+                    ? new CatalogFetchResult(List.of(), Map.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
                     "BINANCE_EXCHANGE_INFO_EMPTY")
-                    : new CatalogFetchResult(assets, ProviderCapabilityState.SUPPORTED, null);
+                    : new CatalogFetchResult(assets, parsePriceMetadata(payload, assets, Instant.now()),
+                    ProviderCapabilityState.SUPPORTED, null);
         } catch (Exception ignored) {
-            return new CatalogFetchResult(List.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
+            return new CatalogFetchResult(List.of(), Map.of(), ProviderCapabilityState.SOURCE_UNAVAILABLE,
                     "BINANCE_EXCHANGE_INFO_UNAVAILABLE");
         }
     }
@@ -235,6 +238,39 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
         }
         return new ArrayList<>(assets.values());
     }
+
+    /** Read-only projection: never refreshes the catalog or creates a provider call. */
+    public PriceMetadata cachedPriceMetadata(String symbol, String marketType) {
+        CatalogSnapshot snapshot = cache;
+        if (!"SPOT".equals(marketType) || snapshot == null || !snapshot.directoryVerified()
+                || !Instant.now().isBefore(snapshot.loadedAt().plus(CACHE_TTL))) return null;
+        return snapshot.priceMetadata().get(normalizeSymbol(symbol));
+    }
+
+    private static Map<String, PriceMetadata> parsePriceMetadata(JsonNode root, List<MarketAssetDTO> assets,
+                                                                 Instant observedAt) {
+        Map<String, PriceMetadata> result = new LinkedHashMap<>();
+        for (JsonNode item : root.path("symbols")) {
+            if (!"TRADING".equalsIgnoreCase(item.path("status").asText())
+                    || !"USDT".equalsIgnoreCase(item.path("quoteAsset").asText())) continue;
+            String symbol = normalizeSymbol(item.path("symbol").asText());
+            if (assets.stream().noneMatch(asset -> asset.symbol().equals(symbol))) continue;
+            for (JsonNode filter : item.path("filters")) {
+                if (!"PRICE_FILTER".equals(filter.path("filterType").asText())) continue;
+                try {
+                    BigDecimal tick = new BigDecimal(filter.path("tickSize").asText()).stripTrailingZeros();
+                    if (tick.signum() <= 0) continue;
+                    result.put(symbol, new PriceMetadata(tick, Math.max(0, tick.scale()), observedAt,
+                            "BINANCE_SPOT_EXCHANGE_INFO_PRICE_FILTER"));
+                } catch (NumberFormatException invalidMetadata) {
+                    // Missing/invalid precision remains unavailable, never an asset-specific default.
+                }
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    public record PriceMetadata(BigDecimal tickSize, Integer pricePrecision, Instant observedAt, String source) { }
 
     private List<MarketAssetDTO> configuredFallback() {
         Map<String, MarketAssetDTO> assets = new LinkedHashMap<>();
@@ -276,10 +312,12 @@ public class BinanceMarketAssetCatalog implements MarketAssetCatalog, ProviderCa
                                    Instant loadedAt,
                                    boolean directoryVerified,
                                    ProviderCapabilityState capabilityState,
-                                   String failureReason) {
+                                   String failureReason,
+                                   Map<String, PriceMetadata> priceMetadata) {
     }
 
     private record CatalogFetchResult(List<MarketAssetDTO> assets,
+                                      Map<String, PriceMetadata> priceMetadata,
                                       ProviderCapabilityState capabilityState,
                                       String failureReason) {
     }

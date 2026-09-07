@@ -43,7 +43,7 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "grid-template-columns: repeat(3, minmax(0, 1fr))",
                 "grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr)",
                 "grid-template-columns: minmax(0,22fr) minmax(0,28fr) minmax(0,28fr) minmax(0,22fr)",
-                "@container (max-width: 1239px)", "height: 120px")
+                "@container (max-width: 1239px)", "height: 146px")
                 .doesNotContain("mini-chart", "sparkline");
         assertThat(html).containsOnlyOnce("id=\"aiRolePanel\"")
                 .doesNotContain("60:40", "pageKey == 'home'");
@@ -219,17 +219,17 @@ class FundamentalAiV41FinalP1RemediationContractTest {
         String sharedTokens = Files.readString(Path.of("src/main/resources/static/css/semantic-tokens.css"));
 
         assertThat(sharedTokens).contains(
-                "--direction-bullish: #22AB94;",
-                "--direction-bullish-strong: #12806F;",
-                "--direction-bullish-weak: #55BFAE;",
-                "--direction-bearish: #F23645;",
-                "--direction-bearish-strong: #C92131;",
-                "--direction-bearish-weak: #F36A75;",
+                "--direction-bullish: #0F7D6A;",
+                "--direction-bullish-strong: var(--direction-bullish);",
+                "--direction-bullish-weak: var(--direction-bullish);",
+                "--direction-bearish: #C92A3A;",
+                "--direction-bearish-strong: var(--direction-bearish);",
+                "--direction-bearish-weak: var(--direction-bearish);",
                 "--direction-neutral: #32383E;",
-                "--status-updating: #2563EB;",
+                "--status-updating: #667085;",
                 "--risk-low: #667085;",
-                "--risk-medium: #D97706;",
-                "--risk-high: #F23645;");
+                "--risk-medium: #B45309;",
+                "--risk-high: #C92A3A;");
         assertThat(sharedTokens).contains(
                 ".semantic-strong-bullish", ".semantic-bullish", ".semantic-weak-bullish",
                 ".semantic-neutral", ".semantic-weak-bearish", ".semantic-bearish",
@@ -260,9 +260,9 @@ class FundamentalAiV41FinalP1RemediationContractTest {
         assertThat(homeScript).contains(
                 "class=\"opportunity-risk\"",
                 "class=\"risk-type-copy\"",
-                "class=\"risk-level-copy")
+                "riskClass(row.item.severity)")
                 .doesNotContain("class=\"opportunity-risk' + riskSemanticClass");
-        assertThat(workspaceScript).contains("class=\"risk-type-copy\"")
+        assertThat(workspaceScript).contains("window.TrineDesktopSemantics.riskSummary(live || {})")
                 .doesNotContain("<strong class=\"' + riskSemanticClass");
         assertThat(homeCss + workspaceCss).doesNotContain(
                 ".opportunity-card.semantic-bullish", ".surface.semantic-bearish");

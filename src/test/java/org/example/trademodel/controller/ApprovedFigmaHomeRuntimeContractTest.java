@@ -61,10 +61,10 @@ class ApprovedFigmaHomeRuntimeContractTest {
         String cardRule = css.substring(css.indexOf(".opportunity-card {"),
                 css.indexOf(".opportunity-card:hover"));
 
-        assertThat(cardRule).contains("height: 120px", "padding: 8px 10px")
+        assertThat(cardRule).contains("height: 146px", "padding: 8px 10px")
                 .doesNotContain("overflow: hidden");
         assertThat(css).contains(
-                "grid-template-rows: repeat(4, minmax(0, 1fr))",
+                "grid-template-rows: 24px 23px 40px minmax(0,1fr)",
                 ".opportunity-final { display: flex;",
                 ".opportunity-metrics { display: flex;",
                 ".opportunity-context { min-width: 0; display: flex;",
@@ -132,7 +132,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "has(asset.confidenceLevel)", "has(asset.riskLevel)",
                 "[\"OBSERVATION\", \"DECISION\"].indexOf(slotType) >= 0",
-                "asset.marketBiasLabel", "asset.confidenceLabel", "asset.riskLabel",
+                "asset.marketBiasLabel", "asset.confidenceLabel", "desktop.riskSummary(asset)",
                 "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel",
                 "access.visible", "plan.finalPlan === true",
                 "position.entryPrice", "position.openedAt", "trustedMonitor(position)",
@@ -142,7 +142,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "方向判断", "机会进度", "候选参与方式", "一句话结论",
                 "Gemini 冲突复核", "复核结果", "Grok 反方挑战", "失败路径",
                 "completeFailurePath", "failurePathStateView", "来源不可用",
-                "plan.stopZone || plan.stopLoss", "止损", "失效条件",
+                "plan.stopLoss || plan.stopZone", "止损", "失效条件",
                 "collectionStateLabel", "形成原因", "支持证据", "反对证据",
                 "has(header.updatedAt)", "clockTime(header.updatedAt)",
                 "header.systemRuntimeLabel", "header.lastCompletedScanAt",
@@ -169,7 +169,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "COLLECTION_STATE_VIEWS.SOURCE_UNAVAILABLE");
         assertThat(script).contains(
                 "return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || \"当前不可查看\") : raw;",
-                "statusValue(state.serviceAvailability, \"等待同步\")");
+                "desktop.serviceSummary(home)");
     }
 
     @Test
@@ -213,7 +213,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"]",
                 "function assetTicker(asset)",
-                "asset.marketBiasLabel", "asset.confidenceLabel", "asset.riskLabel",
+                "asset.marketBiasLabel", "asset.confidenceLabel", "desktop.riskSummary(asset)",
                 "await api(\"/api/asset-pool\", { method: \"POST\"",
                 "await api(\"/api/asset-pool/search/\"",
                 "window.location.assign(\"/analysis/\"")

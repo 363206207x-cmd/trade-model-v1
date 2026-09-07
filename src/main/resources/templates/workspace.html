@@ -61,7 +61,7 @@
             </div>
             <div class="pool-scan-status" id="poolScanStatus" data-component-family="PoolScanStatus" role="status">尚未开始扫描</div>
             <div class="table-shell" data-component-family="AssetPoolTable">
-                <table><thead><tr><th>资产</th><th>当前价格</th><th>方向 / 置信度</th><th>主要风险</th><th>1小时 / 4小时</th><th>更新时间</th><th class="align-right">操作</th></tr></thead><tbody id="assetPoolRows"></tbody></table>
+                <table><thead><tr><th>资产</th><th>当前价格</th><th>方向</th><th>置信度</th><th>主要风险</th><th>1小时 / 4小时</th><th>判断时间</th><th class="align-right">操作</th></tr></thead><tbody id="assetPoolRows"></tbody></table>
                 <div class="empty-state" id="assetPoolEmpty" data-component-family="EmptyState" hidden><strong>资产池为空</strong><span>补齐默认资产，或搜索后加入观察。</span></div>
             </div>
         </section>
@@ -211,6 +211,7 @@
 <dialog class="overlay drawer" id="overlay-event-detail" data-overlay-code="O11" data-component-family="Drawer"><div class="overlay-header"><h2>事件详情</h2><button type="button" data-close-overlay>关闭</button></div><div id="eventDetailContent" class="overlay-content"><p class="muted">暂无数据</p></div></dialog>
 
 <script th:src="@{/js/frontend-contract.js}" src="/js/frontend-contract.js" defer></script>
+<script th:if="${pageKey == 'asset-pool'}" th:src="@{/js/home-runtime.js}" src="/js/home-runtime.js" defer></script>
 <script th:src="@{/js/workspace.js}" src="/js/workspace.js" defer></script>
 </body>
 </html>

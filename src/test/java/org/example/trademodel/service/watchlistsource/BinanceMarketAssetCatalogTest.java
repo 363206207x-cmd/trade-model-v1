@@ -70,4 +70,37 @@ class BinanceMarketAssetCatalogTest {
 
         verifyNoInteractions(httpClient);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void priceMetadataUsesOnlyTheExistingVerifiedCacheWithoutAnAdditionalRequest() throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {"symbols":[
+                  {"symbol":"TESTUSDT","baseAsset":"TEST","quoteAsset":"USDT","status":"TRADING",
+                   "filters":[{"filterType":"PRICE_FILTER","tickSize":"0.00500000"}]},
+                  {"symbol":"EMPTYUSDT","baseAsset":"EMPTY","quoteAsset":"USDT","status":"TRADING"},
+                  {"symbol":"BADUSDT","baseAsset":"BAD","quoteAsset":"USDT","status":"TRADING",
+                   "filters":[{"filterType":"PRICE_FILTER","tickSize":"0"}]}
+                ]}
+                """);
+        when(httpClient.send(any(), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+        BinanceMarketAssetCatalog catalog = new BinanceMarketAssetCatalog(
+                new ObjectMapper(), mock(ProviderSymbolMappingRegistry.class), httpClient);
+        assertThat(catalog.cachedPriceMetadata("TESTUSDT", "SPOT")).isNull();
+        verifyNoInteractions(httpClient);
+        catalog.search("TEST", 10);
+        BinanceMarketAssetCatalog.PriceMetadata metadata = catalog.cachedPriceMetadata("TESTUSDT", "SPOT");
+        assertThat(metadata.tickSize()).isEqualByComparingTo("0.005");
+        assertThat(metadata.pricePrecision()).isEqualTo(3);
+        assertThat(metadata.source()).isEqualTo("BINANCE_SPOT_EXCHANGE_INFO_PRICE_FILTER");
+        assertThat(metadata.observedAt()).isNotNull();
+        assertThat(catalog.cachedPriceMetadata("TESTUSDT", "PERPETUAL")).isNull();
+        assertThat(catalog.cachedPriceMetadata("EMPTYUSDT", "SPOT")).isNull();
+        assertThat(catalog.cachedPriceMetadata("BADUSDT", "SPOT")).isNull();
+        org.mockito.Mockito.verify(httpClient, org.mockito.Mockito.times(1))
+                .send(any(), any(HttpResponse.BodyHandler.class));
+    }
 }

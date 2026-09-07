@@ -78,7 +78,7 @@ import org.example.trademodel.vo.MarketEnvironmentVO;
 import org.example.trademodel.vo.PositionSyncStatusVO;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.example.trademodel.vo.UserPositionVO;
-import org.example.trademodel.v41.V41RiskVectorPolicy;
+import org.example.trademodel.service.watchlistsource.BinanceMarketAssetCatalog;
 import org.example.trademodel.v41.V41StructuralPlanPolicy;
 import org.example.trademodel.v41.DashboardLiveEventService;
 import org.example.trademodel.entity.TmAccountRiskSnapshotDO;
@@ -228,6 +228,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     @Autowired(required = false)
     void setHomeProvenanceSource(EvidenceItemMapper evidenceItemMapper) {
         this.evidenceItemMapper = evidenceItemMapper;
+    }
+
+    private BinanceMarketAssetCatalog priceMetadataCatalog;
+
+    @Autowired(required = false)
+    void setPriceMetadataCatalog(BinanceMarketAssetCatalog catalog) {
+        this.priceMetadataCatalog = catalog;
     }
 
     @Autowired(required = false)
@@ -423,6 +430,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         home.setStates(moduleStates);
         home.getHeader().setDataStatus(moduleStates.getOverall());
         home.getHeader().setUpdatedAt(globalDataUpdatedAt);
+        assets.forEach(this::applyDesktopFacts);
+        if (selectedContext != null && !assets.contains(selectedContext)) applyDesktopFacts(selectedContext);
+        applyPlanPauseEvidence(executionSuggestion);
         registerLiveStructuralContexts(userId, assets);
         return home;
     }
@@ -2039,26 +2049,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private void applyAssetRiskVector(DashboardHomeVO.AssetVO asset, DecisionResultVO decision) {
         if (asset == null || decision == null) return;
-        int baseRisk = clamp(decision.getRiskScore() == null ? riskScore(decision.getRiskLevel())
-                : decision.getRiskScore());
-        int dataRisk = clamp(100 - (decision.getDataQualityScore() == null ? 0 : decision.getDataQualityScore()));
-        int reversalRisk = clamp(100 - (decision.getFourHourTrendAlignment() == null
-                ? 50 : decision.getFourHourTrendAlignment()));
-        int chaseRisk = clamp(decision.getOneHourOpportunityQuality() == null ? baseRisk
-                : decision.getOneHourOpportunityQuality());
-        int crowding = baseRisk / 2;
-        int liquidation = baseRisk / 2;
-        int liquidity = baseRisk;
-        V41RiskVectorPolicy.RiskVector vector = V41RiskVectorPolicy.assess(new V41RiskVectorPolicy.Input(
-                chaseRisk, Math.max(0, baseRisk - 10), reversalRisk, crowding, liquidation,
-                liquidity, Math.max(0, baseRisk - 20), dataRisk,
-                asset.getCoinGlassDataAt() == null ? "BINANCE" : "BINANCE+COINGLASS",
-                decision.getCreateTime() == null ? planValidityClock.instant()
-                        : decision.getCreateTime().toInstant(ZoneOffset.UTC)));
-        asset.setRiskVersion(vector.version());
-        asset.setRiskItems(vector.items().stream()
-                .sorted(Comparator.comparingInt(V41RiskVectorPolicy.RiskItem::score).reversed())
-                .map(this::riskItemView).toList());
+        // Independent evidence is joined after the complete Analysis/Decision identity is bound.
+        // The rule-owned composite score is not evidence for any individual risk type.
         asset.setStructuralDirection(firstNonBlank(decision.getValidatedMarketBias(),
                 decision.getFinalMarketBias(), decision.getMarketBiasHierarchy()));
         asset.setStructuralDirectionScore(explanationDecimal(decision.getExplanationJson(),
@@ -2071,31 +2063,102 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         setFieldSource(asset, "riskLevel", "DERIVED");
     }
 
-    private DashboardHomeVO.AssetRiskItemVO riskItemView(V41RiskVectorPolicy.RiskItem item) {
-        DashboardHomeVO.AssetRiskItemVO view = new DashboardHomeVO.AssetRiskItemVO();
-        view.setRiskType(item.riskType());
-        view.setRiskTypeLabel(item.riskTypeLabel());
-        view.setScore(item.score());
-        view.setSeverity(item.severity());
-        view.setPrimaryEvidence(item.primaryEvidence());
-        view.setSource(item.source());
-        view.setObservedAt(item.observedAt());
-        view.setRecoveryCondition(item.recoveryCondition());
-        return view;
+    private void applyDesktopFacts(DashboardHomeVO.AssetVO asset) {
+        applyIndependentRiskEvidence(asset);
+        if (priceMetadataCatalog == null || !"BINANCE_PUBLIC".equals(primaryPersistedOhlcvProvider())) return;
+        BinanceMarketAssetCatalog.PriceMetadata metadata = priceMetadataCatalog.cachedPriceMetadata(
+                asset.getRawSymbol(), primaryPersistedOhlcvMarketType());
+        if (metadata == null) return;
+        asset.setTickSize(metadata.tickSize());
+        asset.setPricePrecision(metadata.pricePrecision());
+        asset.setPriceMetadataSource(metadata.source());
+        asset.setPriceMetadataObservedAt(metadata.observedAt());
     }
 
-    private int riskScore(String riskLevel) {
-        return switch (upper(riskLevel)) {
-            case "EXTREME" -> 90;
-            case "HIGH" -> 78;
-            case "MEDIUM" -> 52;
-            case "LOW" -> 24;
-            default -> 50;
+    private void applyIndependentRiskEvidence(DashboardHomeVO.AssetVO asset) {
+        if (asset == null) return;
+        String[][] types = {{"CHASE_RISK", "追高风险"}, {"RAPID_MOVE_RISK", "急涨急跌风险"},
+                {"TREND_REVERSAL_RISK", "趋势反转风险"}, {"CROWDING_RISK", "拥挤风险"},
+                {"LIQUIDATION_RISK", "清算风险"}, {"LIQUIDITY_RISK", "流动性风险"},
+                {"EVENT_RISK", "事件风险"}, {"DATA_RISK", "数据风险"}};
+        List<DashboardHomeVO.AssetRiskItemVO> items = new ArrayList<>();
+        for (String[] type : types) {
+            DashboardHomeVO.AssetRiskItemVO item = new DashboardHomeVO.AssetRiskItemVO();
+            item.setRiskType(type[0]);
+            item.setRiskTypeLabel(type[1]);
+            item.setAnalysisId(asset.getAnalysisId());
+            item.setMissingReason("当前分析未记录该项独立指标、来源时间及等级");
+            items.add(item);
+        }
+        asset.setRiskVersion("PERSISTED_INDEPENDENT_EVIDENCE_V1");
+        asset.setRiskItems(List.copyOf(items));
+        if (evidenceItemMapper == null || !hasText(asset.getAnalysisId())
+                || !hasText(asset.getDecisionId()) || !hasText(asset.getTraceId())
+                || asset.getDirectionCalculatedAt() == null) return;
+        List<EvidenceItemDO> evidence;
+        try {
+            evidence = evidenceItemMapper.listByAnalysisId(asset.getAnalysisId());
+        } catch (RuntimeException unavailable) {
+            items.forEach(item -> item.setMissingReason("当前分析的独立风险证据读取失败"));
+            return;
+        }
+        if (evidence == null) return;
+        // Only external event evidence currently persists a type-specific severity.
+        // Broad RISK/PRICE/FUNDING evidence must not be relabelled as liquidity/crowding/etc.
+        EvidenceItemDO event = evidence.stream().filter(java.util.Objects::nonNull)
+                .filter(item -> asset.getAnalysisId().equals(item.getAnalysisId()))
+                .filter(item -> List.of("事件", "宏观", "新闻").contains(upper(item.getEvidenceType())))
+                .filter(item -> hasText(item.getExternalEventId()) && hasText(item.getEvidenceId())
+                        && hasText(item.getSourceProvider()) && hasText(item.getSourceReference())
+                        && hasText(item.getSourceTraceId()) && hasText(item.getCurrentValue()))
+                .filter(item -> "FRESH".equals(item.getFreshness())
+                        && item.getObservedAt() != null
+                        && !item.getObservedAt().isAfter(asset.getDirectionCalculatedAt())
+                        && item.getEventWindowEnd() != null
+                        && !item.getEventWindowEnd().toInstant(ZoneOffset.UTC).isBefore(planValidityClock.instant()))
+                .filter(item -> item.getSeverity() != null
+                        && List.of("LOW", "MEDIUM", "HIGH", "EXTREME").contains(item.getSeverity()))
+                .max(Comparator.comparing(EvidenceItemDO::getObservedAt)
+                        .thenComparing(EvidenceItemDO::getEvidenceId)).orElse(null);
+        if (event == null) return;
+        DashboardHomeVO.AssetRiskItemVO item = items.get(6);
+        item.setEvidenceStatus("AVAILABLE");
+        item.setCurrentValue(event.getCurrentValue());
+        item.setSeverity(event.getSeverity());
+        item.setPrimaryEvidence(event.getDescription());
+        item.setSource(event.getSourceProvider());
+        item.setObservedAt(event.getObservedAt().toInstant(ZoneOffset.UTC));
+        item.setEvidenceId(event.getEvidenceId());
+        item.setSourceReference(event.getSourceReference());
+        item.setSourceTraceId(event.getSourceTraceId());
+        item.setMissingReason(null);
+    }
+
+    private void applyPlanPauseEvidence(DashboardHomeVO.ExecutionSuggestionVO plan) {
+        boolean paused = "SUSPENDED".equals(upper(plan.getPlanLifecycleState()))
+                || Boolean.TRUE.equals(plan.getNeedsRevalidation())
+                || "BLOCKED".equals(upper(plan.getValidationStatus()))
+                || upper(plan.getStatus()).contains("BLOCKED");
+        plan.setPauseEvidenceStatus(paused ? "INSUFFICIENT_EVIDENCE" : "NOT_APPLICABLE");
+        plan.setPauseReason(null);
+        plan.setMissingPauseFields(List.of());
+        if (!paused) return;
+        // RuleValidationResult persists reason codes, not a historical comparator/threshold tuple.
+        // Reading today's config or reverse-engineering a number would falsify that decision.
+        List<String> missing = new ArrayList<>(List.of("实测值", "比较符", "阈值", "单位"));
+        if (!hasText(plan.getRevalidationRule())) missing.add("恢复条件");
+        plan.setMissingPauseFields(missing);
+        String reason = firstNonBlank(plan.getValidationReasons(), plan.getRuleVetoReason(),
+                plan.getRevalidationReason(), plan.getExecutionFeasibilityReason(), plan.getBlockedReason());
+        String fact = switch (upper(reason)) {
+            case "DATA_QUALITY_BLOCKED" -> "数据质量校验未通过";
+            case "CONFUSED_BLOCKED" -> "信号冲突校验未通过";
+            case "RULE_INPUT_MISSING" -> "规则输入缺失";
+            case "CANDIDATE_MISSING" -> "候选计划缺失";
+            case "CONFLICT_RESULT_MISSING" -> "冲突复核结果缺失";
+            default -> "规则引擎仅记录了泛化阻断结果";
         };
-    }
-
-    private static int clamp(int value) {
-        return Math.max(0, Math.min(100, value));
+        plan.setPauseReason(fact + "；未记录" + String.join("、", missing));
     }
 
 

@@ -1,5 +1,8 @@
 package org.example.trademodel.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -70,7 +73,12 @@ public class ProviderReadinessVO {
         private Boolean configured = false;
         private Boolean connected = false;
         private String reason;
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
         private Instant lastSuccessAt;
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        private Instant nextCheckAt;
+        private String nextCheckStatus = "UNSCHEDULED";
         private String freshness;
         private Long latencyMs;
         private String impact;
@@ -133,6 +141,9 @@ public class ProviderReadinessVO {
         }
 
         public Instant getLastSuccessAt() { return lastSuccessAt; }
+        public Instant getNextCheckAt() { return nextCheckAt; }
+        public String getNextCheckStatus() { return nextCheckStatus; }
+        public void setNextCheckStatus(String value) { nextCheckStatus = value; }
         public void setLastSuccessAt(Instant value) { this.lastSuccessAt = value; }
         public String getFreshness() { return freshness; }
         public void setFreshness(String value) { this.freshness = value; }

@@ -77,10 +77,32 @@ class HomeTimestampTransportContractTest {
         assertThat(process.exitValue()).as(output).isZero();
         assertThat(output).contains(
                 "HOME_TIMESTAMP_TRANSPORT_MATRIX=PASS",
-                "UTC_STATUS=09:56 UTC_HEADER=09:56",
+                "UTC_STATUS=17:56 UTC_HEADER=17:56",
                 "ASIA_SHANGHAI_STATUS=17:56 ASIA_SHANGHAI_HEADER=17:56",
-                "LEGACY_NO_OFFSET_ASIA_SHANGHAI=09:56",
-                "NULL_TIMESTAMP=—");
+                "AMERICA_NEW_YORK_STATUS=17:56 AMERICA_NEW_YORK_HEADER=17:56",
+                "LEGACY_NO_OFFSET_ASIA_SHANGHAI=17:56",
+                "NULL_TIMESTAMP=尚无记录");
+    }
+
+    @Test
+    void assetRiskAndPlanTimestampsHaveExplicitZonesWithoutChangingStoredInstants() {
+        java.time.LocalDateTime instant = java.time.LocalDateTime.of(2026, 9, 7, 8, 0, 1, 123456789);
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setLatestPriceAt(instant);
+        asset.setDirectionCalculatedAt(instant);
+        asset.setMarketDataAsOf(instant);
+        asset.setUpdatedAt(instant);
+        JsonNode json = objectMapper.valueToTree(asset);
+        for (String field : java.util.List.of("latestPriceAt", "directionCalculatedAt", "marketDataAsOf", "updatedAt")) {
+            assertThat(json.path(field).asText()).isEqualTo("2026-09-07T08:00:01.123456789Z");
+            assertThat(Instant.parse(json.path(field).asText()))
+                    .isEqualTo(instant.toInstant(java.time.ZoneOffset.UTC));
+        }
+        assertThat(asset.getLatestPriceAt()).isEqualTo(instant);
+        DashboardHomeVO.AssetRiskItemVO risk = new DashboardHomeVO.AssetRiskItemVO();
+        risk.setObservedAt(instant.toInstant(java.time.ZoneOffset.UTC));
+        assertThat(objectMapper.valueToTree(risk).path("observedAt").asText())
+                .isEqualTo("2026-09-07T08:00:01.123456789Z");
     }
 
     private DashboardHomeVO homeWithTimestamp(Instant timestamp) {

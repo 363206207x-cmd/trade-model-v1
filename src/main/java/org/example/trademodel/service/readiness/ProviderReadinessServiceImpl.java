@@ -487,6 +487,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         item.setConfigured(configured);
         item.setConnected(connected);
         item.setReason(reason);
+        item.setNextCheckStatus("UNSCHEDULED");
+        // Existing health sources expose freshness/TTL, not an actual scheduled check.
+        // nextCheckAt stays null; do not turn expiration or retry copy into a fake schedule.
         item.setImpact(defaultImpact(category));
         item.setRetryStatus(connected ? "自动持续运行" : "等待自动重试");
         return item;
