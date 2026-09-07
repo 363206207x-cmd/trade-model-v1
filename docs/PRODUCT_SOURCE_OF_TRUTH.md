@@ -837,3 +837,78 @@ Stop before editing when any of these is true:
 - `docs/PRODUCT_BASELINE_FREEZE_REPORT.md`
 
 These are derived product baselines under this source index. They may explain or assess the product, but they cannot silently change a registered formal source.
+
+## 10. Owner-authorized desktop runtime truth and plan closure
+
+- Package: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+- Implementation branch: `codex/v4-1-web-runtime-truth-plan-closure`.
+- Starting merged main: `f4dd92dae4623a42a2bff626bc653c4db5bde3b0`.
+- Stable Staging rollback: `075f103babb2907cac4935ba191cf442ca5a0d25`.
+- Target: authenticated `https://trinelogic.com/dashboard`, desktop 1440x900 only.
+- Source: Owner's 2026-09-07 Desktop Web Runtime Truth, Snapshot, Risk Drawer and Execution Plan Closure instructions; this bounded supplement does not change Appendix G algorithms.
+- Implementation remains forbidden until this exact authorization is effective on merged main.
+
+### Product, interaction and data-source mapping
+
+| Issue | Existing owner / source | Required correction |
+| --- | --- | --- |
+| B01, B07 | DashboardHomeServiceImpl, exact DecisionResult/ExecutionPlan identity | Recognize CURRENT structural conditional plans independently of AI; retain real numeric boundaries under risk suspension; reject expired, superseded and other-Decision plans. |
+| B02, B06 | DashboardHomeServiceImpl, DashboardHomeVO, DecisionResultMapper | Publish one complete versioned projection with snapshotId/generatedAt, per-asset Analysis/Decision/plan identity and providerStateVersion. Home and full asset pool share the projection and confidenceScore/confidenceState. |
+| B03, B04 | home-runtime.js, workspace.js, shared semantic tokens | Distinguish evidenced risk, complete no-risk and pending evidence; 360-420px risk drawer, max-height 320px; real pointer 250ms open / 300ms leave close plus focus/Esc. |
+| B05 | Existing CoinGlass adapter, dataset cache, scan universe and readiness owners | Preserve supported scan members when another member is unmapped; record actual attempt, success, provider observation, failure and due retry separately; restore persisted real state after restart; obey existing subscription and call budgets. |
+
+The current scan universe maps the entire asset pool before returning it: one unmapped member throws and the caller replaces the whole universe with an empty list. Staging has no active protected positions to supply a fallback universe. CoinGlass provider health, refresh observations and payload caches are memory-only. Existing tm_evidence_item rows are Analysis-bound; recent rows report DERIVATIVES_SNAPSHOT_UNAVAILABLE and do not prove a recent successful provider observation.
+
+The Owner's migration exception is necessary for a minimal independent CoinGlass runtime snapshot store: no suitable durable Provider snapshot table exists in the repository migrations or the verified Staging schema. V23 is restricted to that store and its integrity/index definitions; it must not update any existing business rows or modify V1-V22 objects. Retain bounded latest-per-dataset/symbol metadata with deterministic keys and UPSERT, never raw responses, credentials or an unbounded request log. Only the new V23 table may grant rine_app SELECT, INSERT and UPDATE; no DELETE or grants on existing tables.
+
+The subsequent explicit database authorization is TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY, not a grant now. Complete gate, implementation, tests, PR and merge first. Immediately before deploying the exact merged-main artifact, read-only verify rine_logic_staging, rine_migrator, public-schema CREATE=false, latest migration V22 SUCCESS, and no CoinGlass runtime table. Grant CREATE ON SCHEMA public only to rine_migrator for that artifact's V23 execution. On success, failure or interruption immediately REVOKE CREATE, then verify public-schema CREATE=false and role SUPERUSER=false. If recovery cannot be verified, stop deployment and browser acceptance and preserve or restore the previous Staging service; do not try other privilege operations. No permanent privileges, ALTER OWNER, SUPERUSER, other-schema grants, Production or Owner-position changes are authorized. Do not fake AnalysisRuns or repurpose existing business records to avoid V23.
+
+### Exact implementation allowlist (35 paths)
+
+```text
+src/main/java/org/example/trademodel/controller/DashboardHomeController.java
+src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java
+src/main/java/org/example/trademodel/providercall/coinglass/AbstractCoinGlassDatasetSnapshotService.java
+src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassDerivativesSnapshotService.java
+src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProperties.java
+src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthService.java
+src/main/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderAdapter.java
+src/main/java/org/example/trademodel/providercall/scan/DefaultProviderDatasetRefreshPort.java
+src/main/java/org/example/trademodel/providercall/scan/ProviderRefreshStateRegistry.java
+src/main/java/org/example/trademodel/providercall/scan/ProviderScanCoordinatorScheduler.java
+src/main/java/org/example/trademodel/providercall/universe/ConfiguredDiscoveryUniverseSource.java
+src/main/java/org/example/trademodel/providercall/universe/ConfiguredWatchlistAssetSource.java
+src/main/java/org/example/trademodel/service/DashboardHomeService.java
+src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java
+src/main/java/org/example/trademodel/service/readiness/ProviderReadinessServiceImpl.java
+src/main/java/org/example/trademodel/vo/DashboardHomeVO.java
+src/main/java/org/example/trademodel/vo/ProviderReadinessVO.java
+src/main/resources/db/migration/V23__coinglass_runtime_snapshot.sql
+src/main/resources/schema.sql
+src/main/resources/static/css/semantic-tokens.css
+src/main/resources/static/js/home-runtime.js
+src/main/resources/static/js/workspace.js
+src/test/java/org/example/trademodel/controller/DashboardHomeControllerTest.java
+src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java
+src/test/java/org/example/trademodel/controller/WebLiveDashboardContractTest.java
+src/test/java/org/example/trademodel/mapper/DecisionResultMapperLatestPlanIntegrationTest.java
+src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java
+src/test/java/org/example/trademodel/postgresql/V23CoinGlassRuntimeSnapshotMigrationContractTest.java
+src/test/java/org/example/trademodel/provider/ProviderReadinessServiceImplTest.java
+src/test/java/org/example/trademodel/providercall/DefaultProviderDatasetRefreshPortTest.java
+src/test/java/org/example/trademodel/providercall/DefaultProviderScanUniverseSourceTest.java
+src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedulerTest.java
+src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java
+src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderTest.java
+src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java
+```
+
+### Acceptance and non-expansion boundaries
+
+- All 17 Owner scenarios require focused/frontend/full Maven regression, machine gate, product-source-gate, workflow-contract, diff checks and exact-head CI.
+- Screenshots and actual interactions on the official domain must prove CURRENT plan prices, conflict plan semantics, six-card atomic stability, full 36-member pool alignment, confidence, real CoinGlass state and pure mouse hover.
+- SSE is primary; 15-second disconnected polling and 60-second full reconciliation share monotonic complete-snapshot acceptance. Asset selection must not change six-card membership.
+- Risk entries require independent evidence, numeric facts, source and observation time. Complete no-risk has no hover target; pending evidence is a gray status, not eight empty risk rows.
+- Preserve the existing direction, confidence and risk algorithms, thresholds, calibration caps and weights. No AI invocation, Telegram transmission, automatic trading, protected-position mutation, native/mobile client work or Production deployment.
+- The 28 protected position rows are read-only. Baseline full-row fingerprint: `734c099a9e21af6e08a88f11d2b90303`; no task-created positions are needed.
+- Gate registration is not product completion. Only exact merged-main Staging deployment and complete live desktop acceptance permit `PASS_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.

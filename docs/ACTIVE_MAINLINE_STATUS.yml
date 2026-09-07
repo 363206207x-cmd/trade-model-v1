@@ -13,23 +13,23 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 
-product_phase: "TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization"
-product_phase_status: "WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
+product_phase: "TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization"
+product_phase_status: "WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN"
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "Owner-authorized exact machine gate for the desktop-web live direction, risk, plan, SSE and read-only position-monitor closure"
-active_block_cn: "Owner 授权的桌面网页版实时方向、风险、计划、SSE 与只读持仓监控闭环精确机器门禁"
+active_block: "B01-B07 exact desktop runtime snapshot, CURRENT plan, evidenced risk and CoinGlass runtime closure"
+active_block_cn: "B01–B07 桌面完整快照、CURRENT 计划、真实风险证据与 CoinGlass 运行链闭环"
 
 next_required_action: "Validate, push and merge this exact gate-only authorization, then continue the preserved implementation branch."
-next_business_phase: "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
+next_business_phase: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "This derived file does not independently authorize implementation. The exact package, branch, 40-character baseline SHA and seventy-six literal implementation paths become effective only after this gate is merged; native APP and mobile-web paths are absent."
+compatibility_next_business_phase_allowed_note: "Derived only. Exactly eight gate paths and thirty-five implementation paths, exact package/branch/full SHA, Product Source PASS and merged-main effectivity are required. No business implementation before gate merge."
 
 production_deployment_readiness: "BLOCKED"
 
-current_pr: "NONE; one docs/gate-only web live direction and risk closure authorization PR is authorized after local validation"
-current_branch: "codex/v4-1-web-live-direction-risk-closure-authorization"
+current_pr: "NONE; exact gate-only PR after validation"
+current_branch: "codex/v4-1-web-runtime-truth-plan-closure-authorization"
 current_package_pr: "NONE; Owner one-pass authorization permits exact-head push/PR/merge"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
@@ -41,12 +41,24 @@ v4_1_unique_product_source: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_C
 v4_1_final_interaction_design_status: "FROZEN"
 v4_1_final_interaction_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_final_interaction_implementation_status: "COMPLETE"
-v4_1_authorized_package: "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE"
+v4_1_authorized_package: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-web-live-direction-risk-closure"
-v4_1_authorized_successor_starting_full_sha: "b6904ba7c12759ab8a89da40991f9809cdc73e24"
+v4_1_authorized_successor_branch: "codex/v4-1-web-runtime-truth-plan-closure"
+v4_1_authorized_successor_starting_full_sha: "f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+historical_web_live_authorized_successor_branch: "codex/v4-1-web-live-direction-risk-closure"
+historical_web_live_authorized_successor_starting_full_sha: "b87cb1878405a6fe8693add1036251d6631e2520"
+v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
+web_runtime_truth_plan_implementation_allowlist_count: 35
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "8d01408be2820eccbf9e457ab3851391f9d401ea"
+web_runtime_truth_plan_gate_allowlist_count: 8
+web_runtime_truth_plan_gate_allowlist_fingerprint: "91bc1358febd5a1b1303db117bc8ac0152308c1e"
+web_runtime_truth_plan_database_permission_window: "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY"
+web_runtime_truth_plan_database_permission_now_allowed: false
+web_runtime_truth_plan_database_permission_recovery_required: true
+web_runtime_truth_plan_staging_rollback_sha: "075f103babb2907cac4935ba191cf442ca5a0d25"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
 v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"
