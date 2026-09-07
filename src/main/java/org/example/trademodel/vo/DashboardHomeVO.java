@@ -545,14 +545,27 @@ public class DashboardHomeVO {
         private String providerMatrixVersion;
         private String provider;
         private String sourceId;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime priceObservedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime oneHourClosedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime fourHourClosedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime latestOneHourClosedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime latestFourHourClosedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime latestPriceAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime marketDataAsOf;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime directionCalculatedAt;
+        private BigDecimal tickSize;
+        private Integer pricePrecision;
+        private String priceMetadataSource;
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        private Instant priceMetadataObservedAt;
         private Long decisionAgeSeconds;
         private BigDecimal priceAtDecision;
         private BigDecimal priceDriftPct;
@@ -606,6 +619,7 @@ public class DashboardHomeVO {
         private String sourceProvider;
         private String unavailableReason;
         private Integer evidenceCount;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime latestAnalysisTime;
         private String currentConclusion;
         private String moduleState = "MISSING";
@@ -613,7 +627,17 @@ public class DashboardHomeVO {
         private String dataQuality = "MISSING";
         private String multiTimeframeState;
         private Boolean confused;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
         private LocalDateTime updatedAt;
+
+        public BigDecimal getTickSize() { return tickSize; }
+        public void setTickSize(BigDecimal value) { tickSize = value; }
+        public Integer getPricePrecision() { return pricePrecision; }
+        public void setPricePrecision(Integer value) { pricePrecision = value; }
+        public String getPriceMetadataSource() { return priceMetadataSource; }
+        public void setPriceMetadataSource(String value) { priceMetadataSource = value; }
+        public Instant getPriceMetadataObservedAt() { return priceMetadataObservedAt; }
+        public void setPriceMetadataObservedAt(Instant value) { priceMetadataObservedAt = value; }
 
         public Integer getSlot() {
             return slot;
@@ -691,28 +715,20 @@ public class DashboardHomeVO {
         public void setProvider(String provider) { this.provider = provider; }
         public String getSourceId() { return sourceId; }
         public void setSourceId(String sourceId) { this.sourceId = sourceId; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getPriceObservedAt() { return priceObservedAt; }
         public void setPriceObservedAt(LocalDateTime priceObservedAt) { this.priceObservedAt = priceObservedAt; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getOneHourClosedAt() { return oneHourClosedAt; }
         public void setOneHourClosedAt(LocalDateTime oneHourClosedAt) { this.oneHourClosedAt = oneHourClosedAt; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getFourHourClosedAt() { return fourHourClosedAt; }
         public void setFourHourClosedAt(LocalDateTime fourHourClosedAt) { this.fourHourClosedAt = fourHourClosedAt; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getLatestOneHourClosedAt() { return latestOneHourClosedAt; }
         public void setLatestOneHourClosedAt(LocalDateTime value) { this.latestOneHourClosedAt = value; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getLatestFourHourClosedAt() { return latestFourHourClosedAt; }
         public void setLatestFourHourClosedAt(LocalDateTime value) { this.latestFourHourClosedAt = value; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getLatestPriceAt() { return latestPriceAt; }
         public void setLatestPriceAt(LocalDateTime value) { this.latestPriceAt = value; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getMarketDataAsOf() { return marketDataAsOf; }
         public void setMarketDataAsOf(LocalDateTime value) { this.marketDataAsOf = value; }
-        @JsonFormat(shape = JsonFormat.Shape.STRING)
         public LocalDateTime getDirectionCalculatedAt() { return directionCalculatedAt; }
         public void setDirectionCalculatedAt(LocalDateTime value) { this.directionCalculatedAt = value; }
         public Long getDecisionAgeSeconds() { return decisionAgeSeconds; }
@@ -909,12 +925,35 @@ public class DashboardHomeVO {
     public static class AssetRiskItemVO {
         private String riskType;
         private String riskTypeLabel;
+        private String evidenceStatus = "INSUFFICIENT_EVIDENCE";
+        private String currentValue;
+        private String missingReason;
+        private String evidenceId;
+        private String analysisId;
+        private String sourceReference;
+        private String sourceTraceId;
         private Integer score;
         private String severity;
         private String primaryEvidence;
         private String source;
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
         private Instant observedAt;
         private String recoveryCondition;
+
+        public String getEvidenceStatus() { return evidenceStatus; }
+        public void setEvidenceStatus(String value) { evidenceStatus = value; }
+        public String getCurrentValue() { return currentValue; }
+        public void setCurrentValue(String value) { currentValue = value; }
+        public String getMissingReason() { return missingReason; }
+        public void setMissingReason(String value) { missingReason = value; }
+        public String getEvidenceId() { return evidenceId; }
+        public void setEvidenceId(String value) { evidenceId = value; }
+        public String getAnalysisId() { return analysisId; }
+        public void setAnalysisId(String value) { analysisId = value; }
+        public String getSourceReference() { return sourceReference; }
+        public void setSourceReference(String value) { sourceReference = value; }
+        public String getSourceTraceId() { return sourceTraceId; }
+        public void setSourceTraceId(String value) { sourceTraceId = value; }
 
         public String getRiskType() { return riskType; }
         public void setRiskType(String value) { this.riskType = value; }
@@ -1244,6 +1283,16 @@ public class DashboardHomeVO {
 
     public static class ExecutionSuggestionVO {
         private String status;
+        private String pauseEvidenceStatus = "NOT_APPLICABLE";
+        private String pauseReason;
+        private List<String> missingPauseFields = List.of();
+
+        public String getPauseEvidenceStatus() { return pauseEvidenceStatus; }
+        public void setPauseEvidenceStatus(String value) { pauseEvidenceStatus = value; }
+        public String getPauseReason() { return pauseReason; }
+        public void setPauseReason(String value) { pauseReason = value; }
+        public List<String> getMissingPauseFields() { return missingPauseFields; }
+        public void setMissingPauseFields(List<String> value) { missingPauseFields = List.copyOf(value); }
         private String statusLabel;
         private String blockedReason;
         private String sourceAnalysisId;

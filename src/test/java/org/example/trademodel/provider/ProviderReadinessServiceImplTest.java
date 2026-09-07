@@ -37,6 +37,27 @@ import org.springframework.web.client.RestTemplate;
 class ProviderReadinessServiceImplTest {
 
     @Test
+    void readinessDoesNotInventTheNextCheckFromTtlOrRetryCopy() throws Exception {
+        ProviderReadinessServiceImpl service = service(new MockEnvironment());
+        Instant now = Instant.parse("2026-09-07T08:00:00Z");
+        ReflectionTestUtils.setField(service, "clock", Clock.fixed(now, ZoneOffset.UTC));
+        ProviderReadinessVO readiness = service.getReadiness();
+        assertThat(readiness.getProviders()).isNotEmpty().allSatisfy(provider -> {
+            assertThat(provider.getNextCheckAt()).isNull();
+            assertThat(provider.getNextCheckStatus()).isEqualTo("UNSCHEDULED");
+        });
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .findAndRegisterModules();
+        mapper.setSerializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
+        com.fasterxml.jackson.databind.JsonNode json = mapper.valueToTree(readiness);
+        assertThat(json.path("providers").get(0).path("nextCheckAt").isNull()).isTrue();
+        ProviderReadinessVO.ProviderStatusVO row = readiness.getProviders().get(0);
+        row.setLastSuccessAt(now.minusSeconds(123));
+        assertThat(mapper.valueToTree(row).path("lastSuccessAt").asText())
+                .isEqualTo("2026-09-07T07:57:57Z");
+    }
+
+    @Test
     void missingProviderConfigDoesNotProduceFakeConnected() {
         ProviderReadinessVO readiness = service(new MockEnvironment()
                 .withProperty("position.provider.type", "SIMULATED"))

@@ -87,6 +87,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.Instant;
 import java.time.Clock;
+import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -343,9 +344,9 @@ class DashboardHomeServiceImplTest {
                 .andExpect(jsonPath("$.data.assets[0].providerMatrixVersion").value("provider-matrix-v4.1"))
                 .andExpect(jsonPath("$.data.assets[0].provider").value("BINANCE_PUBLIC"))
                 .andExpect(jsonPath("$.data.assets[0].sourceId").value(sourceTraceId))
-                .andExpect(jsonPath("$.data.assets[0].priceObservedAt").value("2026-08-11T12:05:00"))
-                .andExpect(jsonPath("$.data.assets[0].oneHourClosedAt").value("2026-08-11T12:00:00"))
-                .andExpect(jsonPath("$.data.assets[0].fourHourClosedAt").value("2026-08-11T12:00:00"))
+                .andExpect(jsonPath("$.data.assets[0].priceObservedAt").value("2026-08-11T12:05:00.000000000Z"))
+                .andExpect(jsonPath("$.data.assets[0].oneHourClosedAt").value("2026-08-11T12:00:00.000000000Z"))
+                .andExpect(jsonPath("$.data.assets[0].fourHourClosedAt").value("2026-08-11T12:00:00.000000000Z"))
                 .andExpect(jsonPath("$.data.assets[0].freshnessStatus").value("FRESH"))
                 .andExpect(jsonPath("$.data.assets[0].dataQualityScore").value(88))
                 .andExpect(jsonPath("$.data.assets[0].directionMaturity").value("NON_FINAL"))
@@ -5383,6 +5384,108 @@ class DashboardHomeServiceImplTest {
             bar.setIngestedAt(LocalDateTime.ofInstant(closedAt.plusSeconds(1), ZoneOffset.UTC));
         }
         return bar;
+    }
+
+    @Test
+    void eightRiskFactsNeverSplitTheCompositeScoreOrInventEvidence() {
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setAnalysisId("fact-run");
+        asset.setDecisionId("fact-decision");
+        asset.setTraceId("fact-trace");
+        asset.setDirectionCalculatedAt(LocalDateTime.of(2026, 7, 1, 12, 0));
+        asset.setRiskLevel("HIGH");
+        when(evidenceItemMapper.listByAnalysisId("fact-run")).thenReturn(List.of());
+
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+
+        assertThat(asset.getRiskItems()).hasSize(8).allSatisfy(item -> {
+            assertThat(item.getEvidenceStatus()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            assertThat(item.getSeverity()).isNull();
+            assertThat(item.getScore()).isNull();
+            assertThat(item.getCurrentValue()).isNull();
+            assertThat(item.getSource()).isNull();
+            assertThat(item.getObservedAt()).isNull();
+        });
+        assertThat(asset.getRiskLevel()).isEqualTo("HIGH");
+        EvidenceItemDO untyped = new EvidenceItemDO();
+        untyped.setAnalysisId("fact-run");
+        untyped.setCurrentValue("123");
+        when(evidenceItemMapper.listByAnalysisId("fact-run")).thenReturn(List.of(untyped));
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        assertThat(asset.getRiskItems()).allSatisfy(item -> {
+            assertThat(item.getEvidenceStatus()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            assertThat(item.getSeverity()).isNull();
+        });
+    }
+
+    @Test
+    void eventRiskCopiesIndependentSameRunFactsAndRejectsOtherRunOrStaleEvidence() {
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setAnalysisId("event-run");
+        asset.setDecisionId("event-decision");
+        asset.setTraceId("event-run-trace");
+        asset.setDirectionCalculatedAt(LocalDateTime.of(2026, 7, 1, 12, 0));
+        EvidenceItemDO event = new EvidenceItemDO();
+        event.setAnalysisId("event-run");
+        event.setEvidenceId("independent-event");
+        event.setEvidenceType("宏观");
+        event.setExternalEventId("calendar-event");
+        event.setSourceProvider("CALENDAR_PROVIDER");
+        event.setSourceReference("event-source-record");
+        event.setSourceTraceId("event-source-trace");
+        event.setCurrentValue("IN_WINDOW");
+        event.setSeverity("HIGH");
+        event.setImpactScore(87);
+        event.setDescription("Scheduled publication in active event window");
+        event.setObservedAt(LocalDateTime.of(2026, 7, 1, 11, 50));
+        event.setEventWindowEnd(LocalDateTime.of(2026, 7, 1, 13, 0));
+        event.setFreshness("FRESH");
+        when(evidenceItemMapper.listByAnalysisId("event-run")).thenReturn(List.of(event));
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        DashboardHomeVO.AssetRiskItemVO risk = asset.getRiskItems().stream()
+                .filter(item -> "EVENT_RISK".equals(item.getRiskType())).findFirst().orElseThrow();
+        assertThat(risk.getEvidenceStatus()).isEqualTo("AVAILABLE");
+        assertThat(risk.getCurrentValue()).isEqualTo("IN_WINDOW");
+        assertThat(risk.getSeverity()).isEqualTo("HIGH");
+        assertThat(risk.getScore()).as("event impact score is not a risk score").isNull();
+        assertThat(risk.getSource()).isEqualTo("CALENDAR_PROVIDER");
+        assertThat(risk.getObservedAt()).isEqualTo(Instant.parse("2026-07-01T11:50:00Z"));
+        assertThat(risk.getAnalysisId()).isEqualTo("event-run");
+        assertThat(risk.getSourceTraceId()).isEqualTo("event-source-trace");
+        assertThat(asset.getRiskItems()).filteredOn(item -> !"EVENT_RISK".equals(item.getRiskType()))
+                .allSatisfy(item -> assertThat(item.getEvidenceStatus()).isEqualTo("INSUFFICIENT_EVIDENCE"));
+
+        event.setAnalysisId("another-run");
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        assertThat(asset.getRiskItems()).allSatisfy(item -> assertThat(item.getSeverity()).isNull());
+        event.setAnalysisId("event-run");
+        event.setFreshness("STALE");
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        assertThat(asset.getRiskItems()).allSatisfy(item -> assertThat(item.getSeverity()).isNull());
+        event.setFreshness("FRESH");
+        event.setObservedAt(LocalDateTime.of(2026, 7, 1, 12, 1));
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        assertThat(asset.getRiskItems()).allSatisfy(item -> assertThat(item.getSeverity()).isNull());
+    }
+
+    @Test
+    void genericPlanBlockerReportsMissingComparisonWithoutInventingThresholds() {
+        DashboardHomeVO.ExecutionSuggestionVO plan = new DashboardHomeVO.ExecutionSuggestionVO();
+        plan.setPlanLifecycleState("SUSPENDED");
+        plan.setValidationReasons("DATA_QUALITY_BLOCKED");
+        plan.setEntryZone("100 - 101");
+        ReflectionTestUtils.invokeMethod(service, "applyPlanPauseEvidence", plan);
+        assertThat(plan.getPauseEvidenceStatus()).isEqualTo("INSUFFICIENT_EVIDENCE");
+        assertThat(plan.getMissingPauseFields()).containsExactly("实测值", "比较符", "阈值", "单位", "恢复条件");
+        assertThat(plan.getPauseReason()).contains("数据质量校验未通过", "未记录", "实测值", "阈值")
+                .doesNotContain("72", "70");
+        assertThat(plan.getValidationReasons()).isEqualTo("DATA_QUALITY_BLOCKED");
+        assertThat(plan.getEntryZone()).isEqualTo("100 - 101");
+        plan.setPlanLifecycleState("WAITING_TRIGGER");
+        plan.setValidationReasons(null);
+        ReflectionTestUtils.invokeMethod(service, "applyPlanPauseEvidence", plan);
+        assertThat(plan.getPauseEvidenceStatus()).isEqualTo("NOT_APPLICABLE");
+        assertThat(plan.getPauseReason()).isNull();
     }
 
     private EvidenceItemDO marketEvidence(String analysisId, String symbol, String sourceTraceId) {

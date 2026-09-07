@@ -67,6 +67,9 @@ class HomeUiReviewRuntimeContractTest {
                 const assert = require('node:assert/strict');
                 var contract = { assetStateView: value => ({ label: value, tone: 'neutral' }) };
                 var labels = Object.freeze({});
+                var window = {};
+                eval(require('node:fs').readFileSync('src/main/resources/static/js/home-runtime.js', 'utf8').split('/* Desktop Home runtime */')[0]);
+                var desktop = window.TrineDesktopSemantics;
                 function has(value) { return value !== null && value !== undefined && value !== ''; }
                 function text(value, fallback) { return has(value) ? String(value) : (fallback || '当前不可查看'); }
                 function escapeHtml(value) { return text(value, '').replace(/[&<>'\"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' })[character]); }
@@ -95,7 +98,9 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/aria-pressed=\"true\"/g) || []).length, 1);
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
-                assert.equal(eth.includes('<small>风险</small><strong data-live-field="risk" class="opportunity-risk" aria-label="综合风险 · 中"><span class="risk-type-copy">综合风险</span><span class="risk-level-copy risk-level-medium"> · 中</span></strong>'), true);
+                assert.equal(eth.includes('data-desktop-hover="risk"'), true);
+                assert.equal(eth.includes('尚无独立风险证据'), true);
+                assert.equal(eth.includes('<b data-live-field="direction" class="semantic-value semantic-bullish">偏多</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">80%%</strong></div>'), true);
                 assert.equal(eth.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(eth.includes('<small>状态</small>'), false);
                 assert.equal(eth.includes('<small>数据</small>'), false);
@@ -145,6 +150,10 @@ class HomeUiReviewRuntimeContractTest {
                 const assert = require('node:assert/strict');
                 var labels = Object.freeze({});
                 var selectedSymbol = '';
+                var homeCardSymbols = [];
+                var window = {};
+                eval(require('node:fs').readFileSync('src/main/resources/static/js/home-runtime.js', 'utf8').split('/* Desktop Home runtime */')[0]);
+                var desktop = window.TrineDesktopSemantics;
                 var contract = {
                   assetStateView: value => ({ label: String(value || ''), tone: 'neutral' }),
                   replaceUrlParam: () => {}
@@ -190,9 +199,10 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(validOpportunityCard({ ...blockedObservation, slotType: 'DECISION', analysisId: null }), false);
                 const observationHtml = opportunityCard(observation, '');
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
-                assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-neutral">暂不可判断</b>'), true);
+                assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-unavailable">暂不可判断</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
-                assert.equal(observationHtml.includes('<small>风险</small><strong data-live-field="risk" class="opportunity-risk" aria-label="暂不可判断"><span class="risk-type-copy">暂不可判断</span></strong>'), true);
+                assert.equal(observationHtml.includes('data-desktop-hover="risk"'), true);
+                assert.equal(observationHtml.includes('尚无独立风险证据'), true);
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
                 assert.equal(observationHtml.includes('<small>状态</small>'), false);

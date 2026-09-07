@@ -78,7 +78,7 @@ class B123OwnerCopyAndPositionDetailContractTest {
                         "positions.size() + \" 笔\"", "Boolean.TRUE.equals(hotResetFired) ? \"已触发\" : \"关闭\"")
                 .doesNotContain("case \"CONNECTED\" -> card(\"dataQuality\"", "valueLabel = \"正常\"");
         assertThat(runtime).contains("has(state.dataQuality?.value)",
-                "statusValue(state.serviceAvailability, \"等待同步\")",
+                "desktop.serviceSummary(home)",
                 "statusValue(state.accountStatus, \"等待同步\")", "statusValue(state.hotReset, \"等待同步\")");
         assertThat(uiReview).contains("\"全局数据\", \"—\", \"SOURCE_UNAVAILABLE\"",
                         "\"服务可用性\", \"—\", \"SOURCE_UNAVAILABLE\"")

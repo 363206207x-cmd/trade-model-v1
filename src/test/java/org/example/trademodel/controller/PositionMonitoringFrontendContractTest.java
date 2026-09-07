@@ -217,9 +217,9 @@ class PositionMonitoringFrontendContractTest {
                         "基础价格监控",
                         "positionFact(\"行情来源\", label(position.markPriceSource",
                         "监控时间",
-                        "已阻断",
-                        "阻断原因 · ",
-                        "恢复条件 · ")
+                        "条件计划 · ",
+                        "暂停：",
+                        "触发后校验：行情新鲜度、方向状态和失效位")
                 .doesNotContain("window.location.href = \"/analysis");
     }
 }

@@ -89,9 +89,9 @@ class GlobalFrozenUiAlignmentContractTest {
     void planAndThreeAiUseSourceOwnedSemantics() throws Exception {
         String script = Files.readString(HOME_JS);
         assertThat(script).contains(
-                "plan-status-layer", "plan-key-layer", "plan-metadata-layer", "plan.planVersion",
-                "plan.planLifecycleState", "plan.revalidationReason", "plan.revalidationRule",
-                "plan.stopZone || plan.stopLoss",
+                "plan-status-layer", "plan-key-layer", "plan-trigger-check", "plan.sourceDecisionId",
+                "plan.planLifecycleState", "plan.sourceAnalysisId", "plan.sourceTraceId",
+                "plan.stopLoss || plan.stopZone", "条件计划 · ", "等待触发", "暂停",
                 "[\"APPROVE\", \"DOWNGRADE\", \"REJECT_CANDIDATE\", \"RISK_WARNING\"]",
                 "GPT 综合判断 · 非最终计划", "Gemini 冲突复核", "Grok 反方挑战",
                 "return roleUnavailable(role)", "触发 → 演化 → 失效",
@@ -117,7 +117,7 @@ class GlobalFrozenUiAlignmentContractTest {
                 .contains(
                         "statusValue(state.marketTrend)", "header.systemRuntimeLabel",
                         "header.lastCompletedScanAt", "上次扫描",
-                        "has(state.dataQuality?.value)", "statusValue(state.serviceAvailability",
+                        "has(state.dataQuality?.value)", "desktop.serviceSummary(home)",
                         "statusValue(state.accountStatus", "statusValue(state.hotReset",
                         "GPT 综合判断 · 非最终计划", "方向判断", "机会进度", "候选参与方式",
                         "复核结果：", "completeFailurePath", "已发现可验证失败路径",

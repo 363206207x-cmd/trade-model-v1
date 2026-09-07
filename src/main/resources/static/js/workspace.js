@@ -19,6 +19,7 @@
     let analysisAudit = null;
     let assetPoolItems = [];
     let assetPoolLoaded = false;
+    let assetPoolProjections = [];
     let latestTasks = [];
     let poolScanRuntime = null;
     let telegramStatus = null;
@@ -306,8 +307,8 @@
         if (["BEARISH", "SHORT"].includes(normalized)) return "semantic-bearish";
         if (["STRONG_BEARISH", "STRONG_SHORT"].includes(normalized)) return "semantic-strong-bearish";
         if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS", "RUNNING"].includes(normalized)) return "semantic-analyzing";
-        if (["UNKNOWN", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "STALE", "NEVER_SCANNED"].includes(normalized)) return "semantic-neutral";
-        return "semantic-neutral";
+        if (["UNKNOWN", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "STALE", "NEVER_SCANNED", "CONFLICT", "CONFUSED"].includes(normalized)) return "semantic-unavailable";
+        return "semantic-unavailable";
     }
 
     function riskSemanticClass(value) {
@@ -559,30 +560,23 @@
         }));
         items.forEach(function (asset) {
             const live = bySymbol.get(String(asset.symbol || "").toUpperCase()) || null;
-            const riskItems = hasValue(live?.riskLevel) && Array.isArray(live?.riskItems) ? live.riskItems : [];
-            const primaryRisk = riskItems[0];
             const direction = live
                 ? text(live.marketBiasLabel, label(live.marketBias, "暂不可判断")) : "数据待同步";
             const confidence = live
                 ? text(live.confidenceLabel, hasValue(live.confidenceLevel)
                     ? label(live.confidenceLevel, "—") : "—") : "—";
-            const riskType = primaryRisk
-                ? text(primaryRisk.riskTypeLabel, "具体风险")
-                : hasValue(live?.riskLevel) ? "综合风险" : text(live?.riskLabel, "待评估");
-            const riskSeverity = primaryRisk
-                ? label(primaryRisk.severity, "需关注")
-                : hasValue(live?.riskLevel) ? text(live?.riskLabel, label(live.riskLevel, "待评估")) : "";
             const row = document.createElement("tr");
             row.dataset.analysisId = text(live?.analysisId, "");
             row.dataset.decisionId = text(live?.decisionId, "");
             row.dataset.directionCalculatedAt = text(live?.directionCalculatedAt, "");
             row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td>'
-                + '<td>' + escapeHtml(hasValue(live?.latestPrice) ? formatNumber(live.latestPrice) : "价格待同步") + '</td>'
-                + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong><small>' + escapeHtml(confidence) + '</small></td>'
-                + '<td><span class="risk-type-copy">' + escapeHtml(riskType) + '</span>'
-                + (riskSeverity ? '<strong class="risk-level-copy ' + riskSemanticClass(primaryRisk?.severity || live?.riskLevel) + '"> · ' + escapeHtml(riskSeverity) + '</strong>' : '') + '</td>'
+                + '<td>' + escapeHtml(window.TrineDesktopSemantics.priceText(live?.latestPrice)) + '</td>'
+                + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong></td>'
+                + '<td class="pool-confidence">' + escapeHtml(confidence) + (confidence === "—" ? '<small>' + escapeHtml(live?.unavailableReason || live?.marketBiasLabel || "尚无置信度计算结果") + '</small>' : '') + '</td>'
+                + '<td><div tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情">'
+                + window.TrineDesktopSemantics.riskSummary(live || {}) + '</div></td>'
                 + '<td><span>' + escapeHtml(text(live?.oneHourOpportunityLabel, "1小时数据不足")) + '</span><small>' + escapeHtml(text(live?.fourHourTrendLabel, "4小时数据不足")) + '</small></td>'
-                + '<td>' + escapeHtml(formatTime(live?.directionCalculatedAt || live?.updatedAt)) + '</td>'
+                + '<td>' + escapeHtml(window.TrineDesktopSemantics.beijingTime(live?.directionCalculatedAt || live?.updatedAt)) + '</td>'
                 + '<td class="align-right"><button class="button button-quiet" type="button" data-remove-asset="' + escapeHtml(asset.symbol) + '">移除</button></td>';
             rows.appendChild(row);
         });
@@ -604,6 +598,7 @@
             const items = await api("/api/asset-pool") || [];
             const projectionResults = await Promise.all(items.map(loadAssetPoolProjection));
             const projections = projectionResults.map(function (result) { return result.asset; }).filter(Boolean);
+            assetPoolProjections = projections;
             poolScanRuntime = projectionResults.find(function (result) { return result.header; })?.header || null;
             assetPoolItems = items;
             assetPoolLoaded = true;
@@ -2650,7 +2645,15 @@
         bindOverlays();
         bindPositionForms();
         loadTasks();
-        if (pageKey === "asset-pool") bindAssetPool();
+        if (pageKey === "asset-pool") {
+            window.TrineDesktopSemantics.installHoverDrawers(function (trigger) {
+                const asset = assetPoolProjections.find(function (item) {
+                    return String(item.rawSymbol || item.symbol).toUpperCase() === trigger.dataset.riskSymbol;
+                });
+                return asset ? window.TrineDesktopSemantics.riskDrawer(asset) : null;
+            });
+            bindAssetPool();
+        }
         if (pageKey === "positions") {
             const query = new URLSearchParams(window.location.search);
             const state = query.get("state");
