@@ -97,6 +97,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -370,9 +371,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         ExternalContextSnapshot externalContext = safeExternalContext(normalizedSelected, displayDecision);
         PushInboxContext pushInboxContext = buildPushInbox(positions, effectiveLimit);
 
-        DecisionResultVO aiDecisionSource = displayDecision != selectedDecision
-                ? displayDecision : aiPreviewMarker != null ? aiPreviewMarker : selectedDecision;
-        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(aiDecisionSource);
+        DashboardHomeVO.AiDecisionVO aiDecision = buildAiDecision(displayDecision);
         PositionRowsResult positionRowsResult = buildPositions(userId, positions);
         Instant globalDataUpdatedAt = latestPersistedClosedBarAt();
         DashboardHomeVO home = new DashboardHomeVO();
@@ -3406,10 +3405,13 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
             DecisionResultVO preview = decisionResultMapper.findByAnalysisIdAndPlanIdJoined(
                     marker.getAnalysisId(), plan.getPlanId());
-            if (!coherentAlignedAiPreview(preview, normalizedSymbol, userId)
-                    || fallback != null && fallback.getCreateTime() != null
+            if (!coherentAlignedAiPreview(preview, normalizedSymbol, userId)) {
+                return fallback;
+            }
+            boolean fallbackCompletedLater = fallback != null && fallback.getCreateTime() != null
                     && (preview.getCreateTime() == null
-                    || preview.getCreateTime().isBefore(fallback.getCreateTime()))) {
+                    || preview.getCreateTime().isBefore(fallback.getCreateTime()));
+            if (fallbackCompletedLater && !sameClosedHourAnalysisBucket(preview, fallback, userId)) {
                 return fallback;
             }
             return preview;
@@ -3456,6 +3458,34 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     && preview.getAnalysisId().equals(trimToNull(rolePayload.analysisId()))
                     && Objects.equals(traceId, trimToNull(rolePayload.traceId()));
         });
+    }
+
+    private boolean sameClosedHourAnalysisBucket(DecisionResultVO preview,
+                                                 DecisionResultVO fallback,
+                                                 Long userId) {
+        if (preview == null || fallback == null || analysisRunMapper == null
+                || !hasText(preview.getAnalysisId()) || !hasText(fallback.getAnalysisId())) {
+            return false;
+        }
+        AnalysisRunDO previewRun = analysisRunMapper.selectById(preview.getAnalysisId());
+        AnalysisRunDO fallbackRun = analysisRunMapper.selectById(fallback.getAnalysisId());
+        if (previewRun == null || fallbackRun == null
+                || previewRun.getAnalysisTime() == null || fallbackRun.getAnalysisTime() == null
+                || !Boolean.TRUE.equals(previewRun.getPreview())
+                || Boolean.TRUE.equals(fallbackRun.getPreview())
+                || !"SUCCESS".equalsIgnoreCase(trimToNull(previewRun.getStatus()))
+                || !"SUCCESS".equalsIgnoreCase(trimToNull(fallbackRun.getStatus()))
+                || !"USER".equalsIgnoreCase(trimToNull(previewRun.getOwnerType()))
+                || !"USER".equalsIgnoreCase(trimToNull(fallbackRun.getOwnerType()))
+                || !Objects.equals(userId, previewRun.getOwnerId())
+                || !Objects.equals(userId, fallbackRun.getOwnerId())
+                || previewRun.getAssetId() != null && fallbackRun.getAssetId() != null
+                && !Objects.equals(previewRun.getAssetId(), fallbackRun.getAssetId())
+                || !Objects.equals(normalizeSymbol(previewRun.getSymbol()), normalizeSymbol(fallbackRun.getSymbol()))) {
+            return false;
+        }
+        return previewRun.getAnalysisTime().truncatedTo(ChronoUnit.HOURS)
+                .equals(fallbackRun.getAnalysisTime().truncatedTo(ChronoUnit.HOURS));
     }
 
     private String analysisTraceId(DecisionResultVO decision) {

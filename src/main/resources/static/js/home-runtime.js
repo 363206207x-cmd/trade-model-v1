@@ -984,12 +984,52 @@
             ["恢复条件", text(consistency.recoveryCondition)]
         ]);
     }
+    function aiMatchesSelectedSnapshot(home, ai) {
+        var asset = home && home.selectedAssetContext || {};
+        var roles = typeof contract.normalizeAiTabs === "function"
+            ? contract.normalizeAiTabs(ai && ai.tabs) : (Array.isArray(ai && ai.tabs) ? ai.tabs : []);
+        var available = roles.filter(function (role) { return role && role.resultAvailable === true; });
+        if (!has(ai && ai.analysisId) && !has(ai && ai.decisionId) && !available.length) return true;
+        if (!has(asset.analysisId) || !has(asset.decisionId) || !has(asset.traceId)
+                || !has(ai && ai.analysisId) || !has(ai && ai.decisionId)
+                || String(asset.analysisId) !== String(ai.analysisId)
+                || String(asset.decisionId) !== String(ai.decisionId)) return false;
+        return available.every(function (role) {
+            return has(role.analysisId) && has(role.decisionId) && has(role.traceId)
+                && String(role.analysisId) === String(asset.analysisId)
+                && String(role.decisionId) === String(asset.decisionId)
+                && String(role.traceId) === String(asset.traceId);
+        });
+    }
+    function currentAiCompleteForAsset(asset) {
+        var ai = currentHome && currentHome.aiDecision || {};
+        if (!asset || !aiMatchesSelectedSnapshot({ selectedAssetContext: asset }, ai)) return false;
+        var roles = typeof contract.normalizeAiTabs === "function"
+            ? contract.normalizeAiTabs(ai.tabs) : (Array.isArray(ai.tabs) ? ai.tabs : []);
+        return roles.length === 3 && roles.every(function (role) {
+            return role && role.resultAvailable === true
+                && String(role.analysisId || "") === String(asset.analysisId || "")
+                && String(role.decisionId || "") === String(asset.decisionId || "")
+                && String(role.traceId || "") === String(asset.traceId || "");
+        });
+    }
     function renderAi(home) {
         var ai = home.aiDecision || {};
         var roles = typeof contract.normalizeAiTabs === "function" ? contract.normalizeAiTabs(ai.tabs) : (Array.isArray(ai.tabs) ? ai.tabs : []);
         var role = roles.find(function (item) { return item.role === activeRole; });
         var panel = document.getElementById("aiRolePanel");
         setText("aiContext", symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || "等待分析上下文");
+        if (!aiMatchesSelectedSnapshot(home, ai)) {
+            panel.innerHTML = '<div class="empty-state"><strong>当前结果已过期，等待当前批次重新分析</strong>'
+                + '<span>不会把其他 Analysis 或 Decision 的结果拼接到当前资产。</span></div>';
+            setText("aiMetadata", "当前同批次审计链尚未形成");
+            var staleAudit = document.getElementById("auditChainLink");
+            staleAudit.removeAttribute("href");
+            staleAudit.textContent = "当前同批次审计链尚未形成";
+            staleAudit.setAttribute("aria-disabled", "true");
+            renderConflict({ aiDecision: { consistency: {} } });
+            return;
+        }
         var roleContent;
         if (!role || role.resultAvailable !== true) roleContent = roleUnavailable(role);
         else if (activeRole === "GPT_FINAL") roleContent = renderGpt(role);
@@ -1222,6 +1262,10 @@
                 var refreshedAsset = liveAsset(symbol);
                 analysisId = refreshedAsset && refreshedAsset.analysisId || analysisId;
                 if (!analysisId) throw new Error("当前资产缺少可追溯分析");
+                if (currentAiCompleteForAsset(refreshedAsset)) {
+                    announce(symbol + " 三 AI 分析已恢复");
+                    return;
+                }
                 var previewState = analysisPreviewSubmission(symbol, analysisId);
                 var result = await api("/api/asset-pool/search/" + encodeURIComponent(symbol)
                     + "/analysis-preview?timeframe=1h&submissionId="
@@ -1721,7 +1765,8 @@
                 var roles = currentHome && currentHome.aiDecision
                     && Array.isArray(currentHome.aiDecision.tabs) ? currentHome.aiDecision.tabs : [];
                 var role = roles.find(function (item) { return item && item.role === activeRole; });
-                if (!role || role.resultAvailable !== true) {
+                if (!aiMatchesSelectedSnapshot(currentHome, currentHome && currentHome.aiDecision)
+                        || !role || role.resultAvailable !== true) {
                     openOrResumeAssetAnalysis(liveAsset(selectedSymbol));
                 }
             });
