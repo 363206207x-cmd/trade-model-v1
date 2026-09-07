@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -24,6 +25,8 @@ class UserPositionMapperIntegrationTest {
     private UserPositionMapper userPositionMapper;
     @Autowired
     private PersonalUserMapper personalUserMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void insertSelectAndManualClosePersistManualSafetyFields() {
@@ -145,6 +148,52 @@ class UserPositionMapperIntegrationTest {
                 .isEqualTo("CLOSED");
         assertThat(userPositionMapper.selectByIdAndUserId(partialA.getId(), userA).getStatus())
                 .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void mistakeArchiveRequiresExactOwnerAndNeverCreatesCloseFacts() {
+        Long owner = userId("mapper-archive-owner");
+        Long other = userId("mapper-archive-other");
+        UserPositionDO row = row("ETHUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        row.setUserId(owner);
+        userPositionMapper.insert(row);
+        LocalDateTime archivedAt = LocalDateTime.of(2026, 6, 22, 9, 0);
+
+        assertThat(userPositionMapper.archiveMistakeByIdAndUserId(
+                row.getId(), other, "archive:other-owner", archivedAt, "wrong owner")).isZero();
+        assertThat(userPositionMapper.archiveMistakeByIdAndUserId(
+                row.getId(), owner, "archive:owner-position", archivedAt, "误录")).isEqualTo(1);
+        assertThat(userPositionMapper.archiveMistakeByIdAndUserId(
+                row.getId(), owner, "archive:owner-position", archivedAt.plusMinutes(1), "误录")).isEqualTo(1);
+        assertThat(userPositionMapper.archiveMistakeByIdAndUserId(
+                row.getId(), owner, "archive:different-request", archivedAt.plusMinutes(1), "误录")).isZero();
+
+        UserPositionDO archived = userPositionMapper.selectByArchiveSubmissionIdAndUserId(
+                "archive:owner-position", owner);
+        assertThat(archived.getStatus()).isEqualTo("ARCHIVED_MISTAKE");
+        assertThat(archived.getArchivedAt()).isEqualTo(archivedAt);
+        assertThat(archived.getClosedAt()).isNull();
+        assertThat(archived.getClosePrice()).isNull();
+        assertThat(userPositionMapper.listOpenByUserId(owner)).isEmpty();
+        assertThat(userPositionMapper.listClosedManualByUserId(owner, 10)).isEmpty();
+    }
+
+    @Test
+    void mistakeArchiveRejectsSystemPlanSourceAtTheDatabaseBoundary() {
+        Long owner = userId("mapper-archive-system-plan-owner");
+        UserPositionDO row = row("BTCUSDT", "OPEN", LocalDateTime.of(2026, 6, 22, 8, 0));
+        row.setUserId(owner);
+        row.setSourceType("SYSTEM_PLAN_POSITION");
+        row.setFinalPlanId("plan-owned-by-user");
+        jdbcTemplate.update("INSERT INTO tm_execution_plan(plan_id, analysis_id) VALUES (?, ?)",
+                row.getFinalPlanId(), "analysis-system-plan-archive-boundary");
+        userPositionMapper.insert(row);
+
+        assertThat(userPositionMapper.archiveMistakeByIdAndUserId(
+                row.getId(), owner, "archive:system-plan", LocalDateTime.of(2026, 6, 22, 9, 0), null))
+                .isZero();
+        assertThat(userPositionMapper.selectByIdAndUserId(row.getId(), owner).getStatus())
+                .isEqualTo("OPEN");
     }
 
     @Test

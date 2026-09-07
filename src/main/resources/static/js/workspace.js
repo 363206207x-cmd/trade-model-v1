@@ -31,6 +31,7 @@
     let analysisSubmissionPromise = null;
     let analysisPollGeneration = 0;
     let activeClosePositionId = resourceId;
+    let activeArchivePositionId = "";
     const ANALYSIS_POLL_INTERVAL_MS = 1500;
     const ANALYSIS_POLL_TIMEOUT_MS = 300000;
 
@@ -285,13 +286,37 @@
     function semanticClass(value) {
         const normalized = String(value || "").trim().toUpperCase();
         if (["STRONG_BULLISH", "STRONG_LONG"].includes(normalized)) return "semantic-strong-bullish";
-        if (["BULLISH", "LONG", "WEAK_BULLISH", "WEAK_LONG", "LOW", "READY", "SUCCESS", "RUNNING"].includes(normalized)) return "semantic-bullish";
+        if (["BULLISH", "LONG"].includes(normalized)) return "semantic-bullish";
+        if (["WEAK_BULLISH", "WEAK_LONG"].includes(normalized)) return "semantic-weak-bullish";
         if (["WAIT", "RANGE", "NEUTRAL", "STALE", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "UNKNOWN", "NEVER_SCANNED"].includes(normalized)) return "semantic-neutral";
-        if (["STRONG_BEARISH", "STRONG_SHORT", "EXTREME", "BLOCKED"].includes(normalized)) return "semantic-strong-bearish";
-        if (["BEARISH", "SHORT", "WEAK_BEARISH", "WEAK_SHORT", "HIGH", "FAILED", "ERROR", "STOPPED"].includes(normalized)) return "semantic-bearish";
-        if (normalized === "MEDIUM") return "semantic-medium-risk";
-        if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS"].includes(normalized)) return "semantic-analyzing";
+        if (["WEAK_BEARISH", "WEAK_SHORT"].includes(normalized)) return "semantic-weak-bearish";
+        if (["BEARISH", "SHORT"].includes(normalized)) return "semantic-bearish";
+        if (["STRONG_BEARISH", "STRONG_SHORT"].includes(normalized)) return "semantic-strong-bearish";
+        if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS", "RUNNING"].includes(normalized)) return "semantic-analyzing";
         return "semantic-neutral";
+    }
+
+    function directionSemanticClass(value) {
+        const normalized = String(value || "").trim().toUpperCase();
+        if (["STRONG_BULLISH", "STRONG_LONG"].includes(normalized)) return "semantic-strong-bullish";
+        if (["BULLISH", "LONG"].includes(normalized)) return "semantic-bullish";
+        if (["WEAK_BULLISH", "WEAK_LONG"].includes(normalized)) return "semantic-weak-bullish";
+        if (["WAIT", "RANGE", "NEUTRAL"].includes(normalized)) return "semantic-neutral";
+        if (["WEAK_BEARISH", "WEAK_SHORT"].includes(normalized)) return "semantic-weak-bearish";
+        if (["BEARISH", "SHORT"].includes(normalized)) return "semantic-bearish";
+        if (["STRONG_BEARISH", "STRONG_SHORT"].includes(normalized)) return "semantic-strong-bearish";
+        if (["ANALYZING", "STARTED", "QUEUED", "IN_PROGRESS", "RUNNING"].includes(normalized)) return "semantic-analyzing";
+        if (["UNKNOWN", "SOURCE_UNAVAILABLE", "INSUFFICIENT_DATA", "STALE", "NEVER_SCANNED"].includes(normalized)) return "semantic-neutral";
+        return "semantic-neutral";
+    }
+
+    function riskSemanticClass(value) {
+        const normalized = String(value || "").trim().toUpperCase();
+        if (normalized === "EXTREME") return "risk-level-extreme";
+        if (normalized === "HIGH") return "risk-level-high";
+        if (normalized === "MEDIUM") return "risk-level-medium";
+        if (normalized === "LOW") return "risk-level-low";
+        return "risk-level-unknown";
     }
 
     function trustedDirectionProjection(direction, finalConfidence, visibleConfidence) {
@@ -523,30 +548,66 @@
         }
     }
 
-    function renderAssetPoolRows(items) {
+    function renderAssetPoolRows(items, projections) {
         const rows = document.getElementById("assetPoolRows");
         const emptyNode = document.getElementById("assetPoolEmpty");
         if (!rows) return;
         rows.innerHTML = "";
         emptyNode.hidden = items.length > 0;
+        const bySymbol = new Map((projections || []).map(function (asset) {
+            return [String(asset?.rawSymbol || asset?.symbol || "").toUpperCase(), asset];
+        }));
         items.forEach(function (asset) {
+            const live = bySymbol.get(String(asset.symbol || "").toUpperCase()) || null;
+            const riskItems = hasValue(live?.riskLevel) && Array.isArray(live?.riskItems) ? live.riskItems : [];
+            const primaryRisk = riskItems[0];
+            const direction = live
+                ? text(live.marketBiasLabel, label(live.marketBias, "暂不可判断")) : "数据待同步";
+            const confidence = live
+                ? text(live.confidenceLabel, hasValue(live.confidenceLevel)
+                    ? label(live.confidenceLevel, "—") : "—") : "—";
+            const riskType = primaryRisk
+                ? text(primaryRisk.riskTypeLabel, "具体风险")
+                : hasValue(live?.riskLevel) ? "综合风险" : text(live?.riskLabel, "待评估");
+            const riskSeverity = primaryRisk
+                ? label(primaryRisk.severity, "需关注")
+                : hasValue(live?.riskLevel) ? text(live?.riskLabel, label(live.riskLevel, "待评估")) : "";
             const row = document.createElement("tr");
-            row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td><td>' + escapeHtml(label(asset.marketType)) + '</td><td>' + stateBadge(asset.watchStatus || (asset.focusEnabled ? "OBSERVING" : "PAUSED")) + '</td><td>' + escapeHtml(label(asset.sourceType || asset.source)) + '</td><td class="align-right"><button class="button button-quiet" type="button" data-remove-asset="' + escapeHtml(asset.symbol) + '">移除</button></td>';
+            row.dataset.analysisId = text(live?.analysisId, "");
+            row.dataset.decisionId = text(live?.decisionId, "");
+            row.dataset.directionCalculatedAt = text(live?.directionCalculatedAt, "");
+            row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td>'
+                + '<td>' + escapeHtml(hasValue(live?.latestPrice) ? formatNumber(live.latestPrice) : "价格待同步") + '</td>'
+                + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong><small>' + escapeHtml(confidence) + '</small></td>'
+                + '<td><span class="risk-type-copy">' + escapeHtml(riskType) + '</span>'
+                + (riskSeverity ? '<strong class="risk-level-copy ' + riskSemanticClass(primaryRisk?.severity || live?.riskLevel) + '"> · ' + escapeHtml(riskSeverity) + '</strong>' : '') + '</td>'
+                + '<td><span>' + escapeHtml(text(live?.oneHourOpportunityLabel, "1小时数据不足")) + '</span><small>' + escapeHtml(text(live?.fourHourTrendLabel, "4小时数据不足")) + '</small></td>'
+                + '<td>' + escapeHtml(formatTime(live?.directionCalculatedAt || live?.updatedAt)) + '</td>'
+                + '<td class="align-right"><button class="button button-quiet" type="button" data-remove-asset="' + escapeHtml(asset.symbol) + '">移除</button></td>';
             rows.appendChild(row);
         });
     }
 
+    async function loadAssetPoolProjection(asset) {
+        const symbol = String(asset?.symbol || "").trim().toUpperCase();
+        if (!symbol) return { asset: null, header: null };
+        try {
+            const home = await api("/api/dashboard/home?selectedSymbol=" + encodeURIComponent(symbol) + "&limit=1");
+            return { asset: home?.selectedAssetContext || null, header: home?.header || null };
+        } catch (_) {
+            return { asset: null, header: null };
+        }
+    }
+
     async function loadAssetPool() {
         try {
-            const result = await Promise.all([
-                api("/api/asset-pool"),
-                api("/api/dashboard/home?limit=1").catch(function () { return null; })
-            ]);
-            const items = result[0] || [];
-            poolScanRuntime = result[1]?.header || null;
+            const items = await api("/api/asset-pool") || [];
+            const projectionResults = await Promise.all(items.map(loadAssetPoolProjection));
+            const projections = projectionResults.map(function (result) { return result.asset; }).filter(Boolean);
+            poolScanRuntime = projectionResults.find(function (result) { return result.header; })?.header || null;
             assetPoolItems = items;
             assetPoolLoaded = true;
-            renderAssetPoolRows(items);
+            renderAssetPoolRows(items, projections);
             const batch = document.getElementById("poolBatchList");
             if (batch) batch.innerHTML = items.map(function (asset) {
                 const symbol = escapeHtml(asset.symbol);
@@ -1042,7 +1103,9 @@
         const detailLink = showDetailLink ? '<a class="text-action" href="' + detailHref + '">查看详情</a>' : "";
         const closeAction = showDetailLink && positionCloseActionVisible(userPosition.status)
             ? '<button class="position-close-inline" type="button" data-direct-close-position="' + escapeHtml(positionId) + '" data-direct-close-symbol="' + escapeHtml(symbol) + '">记录平仓</button>' : "";
-        const inlineActions = '<div class="position-inline-actions">' + detailLink + closeAction + '</div>';
+        const archiveAction = manualPositionArchiveVisible(userPosition)
+            ? '<button class="position-close-inline danger" type="button" data-direct-archive-position="' + escapeHtml(positionId) + '">删除误录</button>' : "";
+        const inlineActions = '<div class="position-inline-actions">' + detailLink + closeAction + archiveAction + '</div>';
         const monitoring = trusted
             ? '<section class="position-judgement">' + factGrid(judgment) + '</section><section class="position-conclusion">' + factGrid(conclusion) + inlineActions + '</section>'
             : '<section class="position-untrusted-state" role="status"><strong>' + escapeHtml(monitorUnavailableText(monitor)) + '</strong>' + inlineActions + '</section>';
@@ -1285,6 +1348,31 @@
         setPositionFormStatus("closePositionFormStatus", draft ? "已恢复未提交内容" : "", false);
     }
 
+    function prepareArchivePositionForm(position, trigger) {
+        const form = document.getElementById("archivePositionForm");
+        if (!form || !manualPositionArchiveVisible(position)) return;
+        activeArchivePositionId = String(position.id);
+        form.reset();
+        form.elements.submissionId.value = stableSubmissionId("position-mistake-archive");
+        form.dataset.positionId = activeArchivePositionId;
+        form.dataset.submitting = "false";
+        const heading = document.getElementById("archivePositionHeading");
+        if (heading) heading.textContent = "删除误录 · " + text(position.assetSymbol, "持仓");
+        setPositionFormStatus("archivePositionFormStatus",
+            "资产 " + text(position.assetSymbol, "当前不可查看")
+                + " · 开仓时间 " + formatTime(position.openedAt)
+                + " · 开仓价 " + formatNumber(position.entryPrice)
+                + "。仅移除本系统中的持仓监控记录，不会在交易所平仓或执行交易", false);
+        openOverlay("archive-position", trigger);
+    }
+
+    function manualPositionArchiveVisible(position) {
+        const source = String(position?.sourceType || "").trim().toUpperCase();
+        const status = String(position?.status || "").trim().toUpperCase();
+        return ["MANUAL", "MANUAL_POSITION", "MANUAL_INDEPENDENT"].includes(source)
+            && status !== "ARCHIVED_MISTAKE";
+    }
+
     function bindPositionForms() {
         preserveDateTimeDialogOnEscape(document.getElementById("actualPositionForm"), "actualPositionFormStatus");
         preserveDateTimeDialogOnEscape(document.getElementById("closePositionForm"), "closePositionFormStatus");
@@ -1299,6 +1387,15 @@
                 prepareClosePositionForm(directClose.dataset.directClosePosition, directClose.dataset.directCloseSymbol);
                 openOverlay("close-position", directClose);
             }
+            const directArchive = event.target.closest("[data-direct-archive-position]");
+            if (directArchive) {
+                event.preventDefault();
+                const targetId = String(directArchive.dataset.directArchivePosition || "");
+                const row = positionRows.find(function (item) {
+                    return String(item?.position?.id || "") === targetId;
+                });
+                if (row?.position) prepareArchivePositionForm(row.position, directArchive);
+            }
         }, true);
         document.getElementById("actualPositionForm")?.addEventListener("input", function (event) {
             event.currentTarget.dataset.dirty = "true";
@@ -1310,39 +1407,41 @@
         });
         document.getElementById("actualPositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
-            const values = formJson(event.currentTarget);
+            const form = event.currentTarget;
+            const values = formJson(form);
             values.sourceType = values.finalPlanId ? "SYSTEM_PLAN_POSITION" : "MANUAL_INDEPENDENT";
             if (values.openedAt) values.openedAt = new Date(values.openedAt).toISOString().slice(0, 19);
-            setPositionSubmitBusy(event.currentTarget, true, "确认录入");
+            setPositionSubmitBusy(form, true, "确认录入");
             setPositionFormStatus("actualPositionFormStatus", "正在保存", false);
             try {
                 await api("/api/user-positions/manual-open", { method: "POST", body: JSON.stringify(values) });
                 removePositionDraft("trine.position.openDraft");
-                event.currentTarget.dataset.dirty = "false";
-                closeOverlay(event.currentTarget.closest("dialog"));
+                form.dataset.dirty = "false";
+                closeOverlay(form.closest("dialog"));
                 announce("持仓录入成功");
                 if (pageKey === "positions") await loadPositions();
             } catch (error) {
                 setPositionFormStatus("actualPositionFormStatus", error.message, true);
                 announce(error.message);
-            } finally { setPositionSubmitBusy(event.currentTarget, false, "确认录入"); }
+            } finally { setPositionSubmitBusy(form, false, "确认录入"); }
         });
         document.getElementById("closePositionForm")?.addEventListener("submit", async function (event) {
             event.preventDefault();
+            const form = event.currentTarget;
             const requestedPositionId = activeClosePositionId || resourceId;
             const gate = manualCloseSubmitGate(event.currentTarget.dataset.positionId, requestedPositionId, uiReviewMode);
             if (gate === "MISSING_POSITION_ID") return announce("缺少持仓标识");
             if (gate === "POSITION_ID_MISMATCH") return announce("持仓标识不一致，未提交");
             if (gate === "UI_REVIEW_READ_ONLY") return announce("UI-review 只读验收不提交平仓");
-            const values = formJson(event.currentTarget);
+            const values = formJson(form);
             if (values.closedAt) values.closedAt = new Date(values.closedAt).toISOString().slice(0, 19);
-            setPositionSubmitBusy(event.currentTarget, true, "确认记录");
+            setPositionSubmitBusy(form, true, "确认记录");
             setPositionFormStatus("closePositionFormStatus", "正在保存", false);
             try {
                 await api("/api/user-positions/" + encodeURIComponent(requestedPositionId) + "/manual-close", { method: "POST", body: JSON.stringify(values) });
                 removePositionDraft("trine.position.closeDraft." + requestedPositionId);
-                event.currentTarget.dataset.dirty = "false";
-                closeOverlay(event.currentTarget.closest("dialog"));
+                form.dataset.dirty = "false";
+                closeOverlay(form.closest("dialog"));
                 announce("平仓记录成功");
                 if (pageKey === "positions") {
                     activeClosePositionId = "";
@@ -1353,7 +1452,34 @@
             } catch (error) {
                 setPositionFormStatus("closePositionFormStatus", error.message, true);
                 announce(error.message);
-            } finally { setPositionSubmitBusy(event.currentTarget, false, "确认记录"); }
+            } finally { setPositionSubmitBusy(form, false, "确认记录"); }
+        });
+        document.getElementById("archivePositionForm")?.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const form = event.currentTarget;
+            if (form.dataset.submitting === "true") return;
+            if (!activeArchivePositionId || form.dataset.positionId !== activeArchivePositionId) {
+                return announce("归档目标不一致，未提交");
+            }
+            form.dataset.submitting = "true";
+            setPositionSubmitBusy(form, true, "确认归档误录");
+            setPositionFormStatus("archivePositionFormStatus", "正在归档误录记录", false);
+            try {
+                await api("/api/user-positions/" + encodeURIComponent(activeArchivePositionId) + "/mistake-archive",
+                    { method: "POST", body: JSON.stringify(formJson(form)) });
+                form.dataset.dirty = "false";
+                closeOverlay(form.closest("dialog"));
+                form.reset();
+                activeArchivePositionId = "";
+                announce("误录记录已归档");
+                if (pageKey === "positions") await loadPositions();
+            } catch (error) {
+                setPositionFormStatus("archivePositionFormStatus", error.message, true);
+                announce(error.message);
+            } finally {
+                form.dataset.submitting = "false";
+                setPositionSubmitBusy(form, false, "确认归档误录");
+            }
         });
     }
 

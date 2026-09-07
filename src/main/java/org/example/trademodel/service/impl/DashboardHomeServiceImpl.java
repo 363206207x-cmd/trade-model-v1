@@ -1421,12 +1421,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setAiDecisionResult(null);
         asset.setDataQualityScore(null);
         asset.setMarketBias(null);
-        asset.setMarketBiasLabel("暂不可判断");
+        asset.setMarketBiasLabel(nonFinalDirectionLabel(null, projection));
         asset.setCompositeScore(null);
         asset.setConfidenceLevel(null);
         asset.setConfidenceLabel("—");
         asset.setRiskLevel(null);
-        asset.setRiskLabel("暂不可判断");
+        asset.setRiskLabel("待评估");
         asset.setWorthOpening(null);
         clearCardFinalProjection(asset);
         asset.setOpportunityState(observationState);
@@ -1456,14 +1456,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                             HomeTopAssetProjection projection) {
         if (asset == null) return;
         asset.setWorthOpening(null);
-        String marketBias = trustedAnalysisBias(decision);
-        if (marketBias == null) {
+        if (!sameProjectionDecisionRun(decision, projection)) {
             asset.setMarketBias(null);
             asset.setMarketBiasLabel("暂不可判断");
             asset.setConfidenceLevel(null);
             asset.setConfidenceLabel("—");
             asset.setRiskLevel(null);
-            asset.setRiskLabel("暂不可判断");
+            asset.setRiskLabel("待评估");
+            asset.setRiskItems(List.of());
+            asset.setOneHourOpportunityLabel("1小时分析批次不一致");
+            asset.setFourHourTrendLabel("4小时分析批次不一致");
+            setFieldSource(asset, "direction", "INVALID");
+            setFieldSource(asset, "confidence", "INVALID");
+            setFieldSource(asset, "riskLevel", "INVALID");
+            return;
+        }
+        String marketBias = readyRuleBias(decision);
+        if (marketBias == null) {
+            asset.setMarketBias(null);
+            asset.setMarketBiasLabel(nonFinalDirectionLabel(decision, projection));
+            asset.setConfidenceLevel(null);
+            asset.setConfidenceLabel("—");
+            asset.setRiskLevel(null);
+            asset.setRiskLabel("待评估");
             asset.setOneHourOpportunityLabel(unavailableTimeframeLabel("1小时", decision, projection));
             asset.setFourHourTrendLabel(unavailableTimeframeLabel("4小时", decision, projection));
             setFieldSource(asset, "direction", analysisFieldState(decision));
@@ -1479,7 +1494,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setConfidenceLabel(confidence == null ? "—" : confidence + "%");
         String riskLevel = trimToNull(decision.getRiskLevel());
         asset.setRiskLevel(riskLevel);
-        asset.setRiskLabel(riskLevel == null ? "暂不可判断" : riskLabel(riskLevel));
+        asset.setRiskLabel(riskLevel == null ? "待评估" : riskLabel(riskLevel));
         asset.setOneHourOpportunityLabel(decision.getOneHourOpportunityQuality() == null
                 ? "1小时分析未完成" : oneHourOpportunityLabel(decision.getOneHourOpportunityQuality()));
         asset.setFourHourTrendLabel(decision.getFourHourTrendAlignment() == null
@@ -1530,14 +1545,95 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private String unavailableTimeframeLabel(String timeframe,
                                              DecisionResultVO decision,
                                              HomeTopAssetProjection projection) {
-        String state = upper(decision == null ? null : decision.getDirectionDataState());
-        if (!hasText(state)) state = upper(projection == null ? null : projection.freshness());
+        String detailState = timeframeDetailText(decision, timeframe, "state");
+        String detailDirection = timeframeDetailText(decision, timeframe, "direction");
+        if (hasText(detailState)) {
+            String explicit = switch (upper(detailState)) {
+                case "INSUFFICIENT_DATA", "MISSING" -> timeframe + "数据不足";
+                case "STALE", "EXPIRED" -> timeframe + "数据已过期";
+                case "SIGNAL_CONFLICT", "INDICATOR_CONFLICT" -> timeframe + "信号分歧";
+                case "FOUND", "READY" -> timeframeDirectionLabel(timeframe, detailDirection);
+                default -> null;
+            };
+            if (explicit != null) return explicit;
+        }
+        String state = nonFinalState(decision, projection);
         return switch (state) {
             case "INSUFFICIENT_DATA" -> timeframe + "数据不足";
             case "STALE" -> timeframe + "数据已过期";
             case "SOURCE_UNAVAILABLE" -> timeframe + "来源不可用";
-            case "MULTI_TIMEFRAME_CONFLICT", "TIMEFRAME_CONFLICT" -> timeframe + "方向冲突";
+            case "MULTI_TIMEFRAME_CONFLICT", "TIMEFRAME_CONFLICT" -> conflictTimeframeLabel(timeframe, decision);
             case "NEVER_SCANNED" -> timeframe + "等待分析";
+            case "QUEUED", "RUNNING", "UPDATING", "ANALYZING", "PENDING" -> timeframe + "更新中";
+            case "WAITING_NEW_CLOSE", "WAITING_CLOSE" -> timeframe + "等待新闭线";
+            default -> timeframe + "分析未完成";
+        };
+    }
+
+    private boolean sameProjectionDecisionRun(DecisionResultVO decision,
+                                              HomeTopAssetProjection projection) {
+        if (decision == null || projection == null) return decision == null;
+        return Objects.equals(trimToNull(decision.getAnalysisId()), trimToNull(projection.analysisId()))
+                && Objects.equals(normalizeSymbol(decision.getSymbol()), normalizeSymbol(projection.symbol()));
+    }
+
+    private String readyRuleBias(DecisionResultVO decision) {
+        if (decision == null || !"READY".equals(upper(decision.getDirectionDataState()))) return null;
+        String validated = trimToNull(decision.getValidatedMarketBias());
+        if (validated != null) return upper(validated);
+        String neutral = upper(decision.getMarketBiasHierarchy());
+        return "RANGE".equals(neutral) || "WAIT".equals(neutral) ? neutral : null;
+    }
+
+    private String nonFinalDirectionLabel(DecisionResultVO decision,
+                                          HomeTopAssetProjection projection) {
+        return switch (nonFinalState(decision, projection)) {
+            case "INSUFFICIENT_DATA" -> "数据不足";
+            case "STALE" -> "数据已过期";
+            case "SOURCE_UNAVAILABLE" -> "数据来源不可用";
+            case "MULTI_TIMEFRAME_CONFLICT", "TIMEFRAME_CONFLICT" -> "周期冲突";
+            case "NEVER_SCANNED" -> "等待首次分析";
+            case "QUEUED", "RUNNING", "UPDATING", "ANALYZING", "PENDING" -> "更新中";
+            case "WAITING_NEW_CLOSE", "WAITING_CLOSE" -> "等待更新";
+            default -> "暂不可判断";
+        };
+    }
+
+    private String nonFinalState(DecisionResultVO decision,
+                                 HomeTopAssetProjection projection) {
+        String state = upper(decision == null ? null : decision.getDirectionDataState());
+        if (!hasText(state)) state = upper(projection == null ? null : projection.freshness());
+        if (!hasText(state)) state = upper(projection == null ? null : projection.opportunityState());
+        return state;
+    }
+
+    private String conflictTimeframeLabel(String timeframe, DecisionResultVO decision) {
+        String detailDirection = timeframeDetailText(decision, timeframe, "direction");
+        if (hasText(detailDirection)) return timeframeDirectionLabel(timeframe, detailDirection);
+        String scoreField = timeframe.startsWith("1") ? "state1hScore" : "trend4hScore";
+        BigDecimal score = decision == null ? null : explanationDecimal(decision.getExplanationJson(), scoreField);
+        if (score == null) return timeframe + "方向冲突";
+        return score.signum() > 0 ? timeframe + "偏多"
+                : score.signum() < 0 ? timeframe + "偏空" : timeframe + "震荡/观望";
+    }
+
+    private String timeframeDetailText(DecisionResultVO decision, String timeframe, String field) {
+        if (decision == null || !hasText(decision.getExplanationJson())) return null;
+        try {
+            JsonNode value = objectMapper.readTree(decision.getExplanationJson())
+                    .path("multiTimeframeDetails").path(timeframe.startsWith("1") ? "1h" : "4h")
+                    .path(field);
+            return value.isTextual() ? trimToNull(value.asText()) : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String timeframeDirectionLabel(String timeframe, String direction) {
+        return switch (upper(direction)) {
+            case "BULLISH", "LONG" -> timeframe + "偏多";
+            case "BEARISH", "SHORT" -> timeframe + "偏空";
+            case "FLAT", "RANGE", "WAIT", "NEUTRAL" -> timeframe + "震荡/观望";
             default -> timeframe + "分析未完成";
         };
     }

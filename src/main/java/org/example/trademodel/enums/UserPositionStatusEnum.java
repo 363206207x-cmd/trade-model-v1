@@ -3,7 +3,8 @@ package org.example.trademodel.enums;
 public enum UserPositionStatusEnum {
     OPEN,
     PARTIALLY_CLOSED,
-    CLOSED;
+    CLOSED,
+    ARCHIVED_MISTAKE;
 
     public boolean visibleInOpenPositions() {
         return this == OPEN || this == PARTIALLY_CLOSED;

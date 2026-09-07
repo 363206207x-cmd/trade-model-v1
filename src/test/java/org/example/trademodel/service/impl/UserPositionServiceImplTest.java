@@ -2,6 +2,7 @@ package org.example.trademodel.service.impl;
 
 import org.example.trademodel.dto.req.CloseUserPositionReq;
 import org.example.trademodel.dto.req.CreateUserPositionReq;
+import org.example.trademodel.dto.req.ArchiveUserPositionReq;
 import org.example.trademodel.entity.ExecutionPlanDO;
 import org.example.trademodel.entity.UserPositionDO;
 import org.example.trademodel.mapper.ExecutionPlanMapper;
@@ -282,6 +283,47 @@ class UserPositionServiceImplTest {
     }
 
     @Test
+    void mistakeArchiveIsIdempotentAndDoesNotWriteCloseFields() {
+        UserPositionDO open = row(10L, "OPEN");
+        UserPositionDO archived = row(10L, "ARCHIVED_MISTAKE");
+        archived.setArchiveSubmissionId("position-archive:test-10");
+        archived.setArchiveReason("误录");
+        archived.setArchivedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        when(userPositionMapper.selectByIdAndUserId(10L, USER_ID)).thenReturn(open, archived, archived);
+        when(userPositionMapper.archiveMistakeByIdAndUserId(
+                eq(10L), eq(USER_ID), eq("position-archive:test-10"), any(), eq("误录")))
+                .thenReturn(1);
+
+        ArchiveUserPositionReq request = archiveRequest("position-archive:test-10", "误录");
+        UserPositionVO first = service.archiveMistakeForUser(10L, USER_ID, request);
+        UserPositionVO retry = service.archiveMistakeForUser(10L, USER_ID, request);
+
+        assertThat(first.getStatus()).isEqualTo("ARCHIVED_MISTAKE");
+        assertThat(retry.getStatus()).isEqualTo("ARCHIVED_MISTAKE");
+        assertThat(first.getClosedAt()).isNull();
+        assertThat(first.getClosePrice()).isNull();
+        verify(userPositionMapper, times(1)).archiveMistakeByIdAndUserId(
+                eq(10L), eq(USER_ID), eq("position-archive:test-10"), any(), eq("误录"));
+        verify(userPositionMapper, never()).manualCloseByIdAndUserId(
+                any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void mistakeArchiveRejectsSystemPlanPositionsWithoutMutation() {
+        UserPositionDO systemPlan = row(11L, "OPEN");
+        systemPlan.setSourceType("SYSTEM_PLAN_POSITION");
+        when(userPositionMapper.selectByIdAndUserId(11L, USER_ID)).thenReturn(systemPlan);
+
+        assertThatThrownBy(() -> service.archiveMistakeForUser(
+                11L, USER_ID, archiveRequest("position-archive:system-plan-11", null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("manually entered");
+
+        verify(userPositionMapper, never()).archiveMistakeByIdAndUserId(
+                any(), any(), any(), any(), any());
+    }
+
+    @Test
     void manualCloseRejectsInvalidClosePriceAndForbiddenFields() {
         CloseUserPositionReq badPrice = closeRequest("0", "bad");
         assertThatThrownBy(() -> service.manualCloseForUser(1L, USER_ID, badPrice))
@@ -458,6 +500,13 @@ class UserPositionServiceImplTest {
         request.setSubmissionId("close-submission-1");
         request.setCloseReason(reason);
         request.setClosedAt(LocalDateTime.of(2026, 6, 22, 9, 0));
+        return request;
+    }
+
+    private static ArchiveUserPositionReq archiveRequest(String submissionId, String reason) {
+        ArchiveUserPositionReq request = new ArchiveUserPositionReq();
+        request.setSubmissionId(submissionId);
+        request.setReason(reason);
         return request;
     }
 

@@ -651,6 +651,7 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     user_id BIGINT,
     submission_id VARCHAR(128),
     close_submission_id VARCHAR(128),
+    archive_submission_id VARCHAR(128),
     asset_symbol VARCHAR(32) NOT NULL,
     side VARCHAR(10) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -663,6 +664,8 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     closed_at TIMESTAMP,
     close_price DECIMAL(20, 8),
     close_reason VARCHAR(512),
+    archived_at TIMESTAMP,
+    archive_reason VARCHAR(512),
     source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL_INDEPENDENT',
     source_ref_id VARCHAR(128),
     final_plan_id VARCHAR(64),
@@ -674,7 +677,7 @@ CREATE TABLE IF NOT EXISTS tm_user_position (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_tm_user_position_side CHECK (side IN ('LONG', 'SHORT')),
-    CONSTRAINT ck_tm_user_position_status CHECK (status IN ('OPEN', 'PARTIALLY_CLOSED', 'CLOSED')),
+    CONSTRAINT ck_tm_user_position_status CHECK (status IN ('OPEN', 'PARTIALLY_CLOSED', 'CLOSED', 'ARCHIVED_MISTAKE')),
     CONSTRAINT ck_tm_user_position_source_type CHECK (
         (source_type = 'MANUAL_INDEPENDENT' AND final_plan_id IS NULL)
         OR (source_type = 'SYSTEM_PLAN_POSITION' AND final_plan_id IS NOT NULL)
@@ -705,6 +708,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_submission
     ON tm_user_position(user_id, submission_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_close_submission
     ON tm_user_position(user_id, close_submission_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_tm_user_position_user_archive_submission
+    ON tm_user_position(user_id, archive_submission_id);
+CREATE INDEX IF NOT EXISTS idx_tm_user_position_user_archive_time
+    ON tm_user_position(user_id, archived_at DESC);
 CREATE TABLE IF NOT EXISTS tm_position_monitor_log (
     log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     monitor_run_key VARCHAR(180),

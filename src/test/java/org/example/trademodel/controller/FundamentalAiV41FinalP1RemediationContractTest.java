@@ -214,23 +214,56 @@ class FundamentalAiV41FinalP1RemediationContractTest {
         String workspaceScript = Files.readString(SCRIPT);
         String homeCss = Files.readString(HOME_STYLE);
         String workspaceCss = Files.readString(STYLE);
-        String tokens = "--semantic-strong-bullish: #166534;\n"
-                + "    --semantic-bullish: #15803D;\n"
-                + "    --semantic-neutral: #64748B;\n"
-                + "    --semantic-bearish: #DC2626;\n"
-                + "    --semantic-strong-bearish: #991B1B;\n"
-                + "    --semantic-medium-risk: #B45309;\n"
-                + "    --semantic-analyzing: #2563EB;";
+        String homeHtml = Files.readString(HOME);
+        String workspaceHtml = Files.readString(WORKSPACE);
+        String sharedTokens = Files.readString(Path.of("src/main/resources/static/css/semantic-tokens.css"));
 
-        assertThat(homeCss).contains(tokens);
-        assertThat(workspaceCss).contains(tokens);
-        assertThat(homeScript + workspaceScript).contains(
-                "semantic-strong-bullish", "semantic-bullish", "semantic-neutral",
-                "semantic-bearish", "semantic-strong-bearish", "semantic-medium-risk",
-                "semantic-analyzing");
+        assertThat(sharedTokens).contains(
+                "--direction-bullish: #22AB94;",
+                "--direction-bullish-strong: #12806F;",
+                "--direction-bullish-weak: #55BFAE;",
+                "--direction-bearish: #F23645;",
+                "--direction-bearish-strong: #C92131;",
+                "--direction-bearish-weak: #F36A75;",
+                "--direction-neutral: #32383E;",
+                "--status-updating: #2563EB;",
+                "--risk-low: #667085;",
+                "--risk-medium: #D97706;",
+                "--risk-high: #F23645;");
+        assertThat(sharedTokens).contains(
+                ".semantic-strong-bullish", ".semantic-bullish", ".semantic-weak-bullish",
+                ".semantic-neutral", ".semantic-weak-bearish", ".semantic-bearish",
+                ".semantic-strong-bearish", ".semantic-analyzing",
+                ".risk-level-low", ".risk-level-medium", ".risk-level-high", ".risk-level-extreme");
+        assertThat(homeHtml).containsOnlyOnce(
+                "<link rel=\"stylesheet\" th:href=\"@{/css/semantic-tokens.css}\" href=\"/css/semantic-tokens.css\">");
+        assertThat(workspaceHtml).containsOnlyOnce(
+                "<link rel=\"stylesheet\" th:href=\"@{/css/semantic-tokens.css}\" href=\"/css/semantic-tokens.css\">");
+
+        String combinedScripts = homeScript + workspaceScript;
+        assertThat(combinedScripts).contains(
+                "function directionSemanticClass(value)",
+                "function riskSemanticClass(value)",
+                "semantic-strong-bullish", "semantic-bullish", "semantic-weak-bullish",
+                "semantic-neutral", "semantic-weak-bearish", "semantic-bearish",
+                "semantic-strong-bearish", "semantic-analyzing",
+                "risk-level-low", "risk-level-medium", "risk-level-high", "risk-level-extreme");
+        assertThat(slice(homeScript, "function directionSemanticClass(value)", "function riskSemanticClass(value)"))
+                .contains("STRONG_BULLISH", "BULLISH", "WEAK_BULLISH", "RANGE", "WAIT", "NEUTRAL",
+                        "WEAK_BEARISH", "BEARISH", "STRONG_BEARISH", "ANALYZING", "UNKNOWN");
+        assertThat(slice(homeScript, "function riskSemanticClass(value)", "function toneText(value, raw)"))
+                .contains("LOW", "MEDIUM", "HIGH", "EXTREME")
+                .doesNotContain("directionSemanticClass", "semantic-bullish", "semantic-bearish");
+        assertThat(homeScript + workspaceScript)
+                .contains("directionSemanticClass(finalDirection)", "directionSemanticClass(live?.marketBias)")
+                .doesNotContain("directionSemanticClass(asset.riskLevel)", "directionSemanticClass(live?.riskLevel)");
         assertThat(homeScript).contains(
-                "semanticClass(asset.marketBias)", "semanticClass(asset.riskLevel)",
-                "applySemanticClass(\"statusSystem\"");
+                "class=\"opportunity-risk\"",
+                "class=\"risk-type-copy\"",
+                "class=\"risk-level-copy")
+                .doesNotContain("class=\"opportunity-risk' + riskSemanticClass");
+        assertThat(workspaceScript).contains("class=\"risk-type-copy\"")
+                .doesNotContain("<strong class=\"' + riskSemanticClass");
         assertThat(homeCss + workspaceCss).doesNotContain(
                 ".opportunity-card.semantic-bullish", ".surface.semantic-bearish");
     }

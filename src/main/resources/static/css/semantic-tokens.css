@@ -1,0 +1,39 @@
+:root {
+    --direction-bullish: #22AB94;
+    --direction-bullish-strong: #12806F;
+    --direction-bullish-weak: #55BFAE;
+    --direction-bearish: #F23645;
+    --direction-bearish-strong: #C92131;
+    --direction-bearish-weak: #F36A75;
+    --direction-neutral: #32383E;
+    --status-updating: #2563EB;
+    --status-warning: #D97706;
+    --risk-low: #667085;
+    --risk-medium: #D97706;
+    --risk-high: #F23645;
+    --risk-unknown: #667085;
+    --semantic-strong-bullish: var(--direction-bullish-strong);
+    --semantic-bullish: var(--direction-bullish);
+    --semantic-weak-bullish: var(--direction-bullish-weak);
+    --semantic-neutral: var(--direction-neutral);
+    --semantic-weak-bearish: var(--direction-bearish-weak);
+    --semantic-bearish: var(--direction-bearish);
+    --semantic-strong-bearish: var(--direction-bearish-strong);
+    --semantic-medium-risk: var(--risk-medium);
+    --semantic-analyzing: var(--status-updating);
+}
+
+.semantic-strong-bullish { color: var(--semantic-strong-bullish) !important; font-weight: 760; }
+.semantic-bullish { color: var(--semantic-bullish) !important; font-weight: 680; }
+.semantic-weak-bullish { color: var(--semantic-weak-bullish) !important; font-weight: 620; }
+.semantic-neutral { color: var(--semantic-neutral) !important; }
+.semantic-weak-bearish { color: var(--semantic-weak-bearish) !important; font-weight: 620; }
+.semantic-bearish { color: var(--semantic-bearish) !important; font-weight: 680; }
+.semantic-strong-bearish { color: var(--semantic-strong-bearish) !important; font-weight: 760; }
+.semantic-analyzing { color: var(--semantic-analyzing) !important; }
+.risk-level-low { color: var(--risk-low) !important; }
+.risk-level-medium { color: var(--risk-medium) !important; }
+.risk-level-high, .risk-level-extreme { color: var(--risk-high) !important; }
+.risk-level-unknown { color: var(--risk-unknown) !important; }
+.risk-type-copy { color: inherit; }
+.risk-level-copy { margin-inline-start: 0.15em; }
