@@ -97,16 +97,16 @@ web_runtime_truth_plan_contract_matches() {
   [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]] \
     && [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] \
     && [[ "$current_package_status" == "COMPLETED" ]] \
-    && [[ "$current_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure-authorization" ]] \
-    && [[ "$current_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" ]] \
+    && [[ "$current_package_branch" == "codex/v4-1-web-home-runtime-priority-closure-authorization" ]] \
+    && [[ "$current_package_starting_full_sha" == "0d6a1e36518c4bf935bba7e7074ec87edbd6947f" ]] \
     && [[ "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]] \
     && [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] \
-    && [[ "$authorized_next_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure" ]] \
-    && [[ "$authorized_next_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" ]] \
+    && [[ "$authorized_next_package_branch" == "codex/v4-1-web-home-runtime-priority-closure" ]] \
+    && [[ "$authorized_next_package_starting_full_sha" == "0d6a1e36518c4bf935bba7e7074ec87edbd6947f" ]] \
     && is_full_git_sha "$current_package_starting_full_sha" \
     && is_full_git_sha "$authorized_next_package_starting_full_sha" \
-    && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] \
-    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] \
+    && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "935d97dd7525424f366e3c86610e867b72081208" ]] \
+    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "ed5ef17092582f1d8672660c81ae1e647956ad40" ]] \
     && ! printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$' \
     && [[ "$web_runtime_truth_plan_closure_authorization_declared_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] \
     && [[ "$web_runtime_truth_plan_closure_implementation_status" == "NOT_STARTED" ]] \
@@ -134,12 +134,12 @@ web_runtime_truth_plan_contract_matches() {
     && is_false_flag "$web_runtime_truth_plan_owner_position_mutation_allowed" \
     && is_false_flag "$web_runtime_truth_plan_database_permission_now_allowed" \
     && is_false_flag "$web_runtime_truth_plan_database_permanent_privilege_expansion_allowed" \
-    && [[ "$web_runtime_truth_plan_database_permission_window" == "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY" ]] \
+    && [[ "$web_runtime_truth_plan_database_permission_window" == "NONE_EXISTING_ASSET_POOL_STORAGE_NO_MIGRATION" ]] \
     && is_true_flag "$web_runtime_truth_plan_database_permission_recovery_required" \
-    && [[ "$web_runtime_truth_plan_implementation_allowlist_count" == "37" ]] \
-    && [[ "$web_runtime_truth_plan_gate_allowlist_count" == "8" ]] \
-    && [[ "$web_runtime_truth_plan_implementation_allowlist_fingerprint" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] \
-    && [[ "$web_runtime_truth_plan_gate_allowlist_fingerprint" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]]
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_count" == "46" ]] \
+    && [[ "$web_runtime_truth_plan_gate_allowlist_count" == "10" ]] \
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_fingerprint" == "ed5ef17092582f1d8672660c81ae1e647956ad40" ]] \
+    && [[ "$web_runtime_truth_plan_gate_allowlist_fingerprint" == "935d97dd7525424f366e3c86610e867b72081208" ]]
 }
 
 load_web_runtime_truth_plan_contract() {
@@ -2456,11 +2456,11 @@ run_exact_machine_gate_self_test() {
   prepare_runtime_truth_transition_fixture() {
     prepare_web_transition_fixture
     current_package_phase="TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION"
-    current_package_branch="codex/v4-1-web-runtime-truth-plan-closure-authorization"
-    current_package_starting_full_sha="f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+    current_package_branch="codex/v4-1-web-home-runtime-priority-closure-authorization"
+    current_package_starting_full_sha="0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
     current_package_allowed_paths="$(yaml_list "$TASK_FILE" current_package_allowed_paths)"
     authorized_next_package_phase="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
-    authorized_next_package_branch="codex/v4-1-web-runtime-truth-plan-closure"
+    authorized_next_package_branch="codex/v4-1-web-home-runtime-priority-closure"
     authorized_next_package_starting_full_sha="$current_package_starting_full_sha"
     authorized_next_package_allowed_paths="$(yaml_list "$TASK_FILE" authorized_next_package_allowed_paths)"
     load_web_runtime_truth_plan_contract
@@ -2506,11 +2506,11 @@ run_exact_machine_gate_self_test() {
   done <<'RUNTIME_TRUTH_REJECTED_CONTRACTS'
 current_package_phase|WRONG_GATE_PACKAGE
 current_package_branch|codex/wrong-gate
-current_package_starting_full_sha|f4dd92d
+current_package_starting_full_sha|0d6a1e3
 authorized_next_package_phase|WRONG_PACKAGE
 authorized_next_package_branch|codex/wrong-branch
 authorized_next_package_starting_full_sha|b87cb1878405a6fe8693add1036251d6631e2520
-authorized_next_package_starting_full_sha|f4dd92d
+authorized_next_package_starting_full_sha|0d6a1e3
 authorized_next_production_deployment_allowed|true
 authorized_next_mobile_implementation_allowed|true
 web_runtime_truth_plan_algorithm_changes_allowed|true

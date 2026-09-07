@@ -873,3 +873,44 @@ second Analysis, Decision, Plan, Position, Monitor, Message, or frontend stack.
 Acceptance requires real Binance, CoinGlass, database, three-AI, Staging, and
 official-domain browser evidence. Unit tests, fixtures, or a safely empty UI
 cannot by themselves close this package.
+
+## Appendix H. Owner Desktop Home Runtime and Priority Supplement
+
+Status: `ACTIVE / OWNER_AUTHORIZED / 2026-09-08`.
+This supplement records the Owner-approved desktop-web continuation only.
+It takes priority solely over conflicting system-only Top6/no-user-pin ranking,
+Telegram delivery of safety/Hot Reset/REDUCED plans, and mandatory empty-risk
+placeholders. All other existing product contracts remain effective.
+
+1. Home is "重点资产", showing at most six assets.
+2. User-pinned assets come first, in the user's exact saved pin order.
+3. Fill remaining slots with unpinned eligible opportunities only: effective
+   direction, trusted fresh data, not RANGE/WAIT/timeframe conflict, not
+   INVALIDATED/COOLING/CONFUSED/BLOCKED, and LOW or MEDIUM risk only. Sort by
+   direction strength, risk, confidence, Final Plan Mode, Opportunity Score,
+   freshness and analysis time. This changes selection, not any score formula.
+4. When fewer than six assets qualify, show the actual count. Ordinary
+   observation assets must not backfill the list.
+5. Clicking/selecting an asset must not change Home membership or its order.
+6. A CURRENT Final Execution Plan must use the same real Analysis, Decision,
+   Trace and Plan identity chain and show actual entry, trigger, stop, targets,
+   invalidation conditions and validity period. Do not invent identities or
+   prices, borrow a different run, or label an incomplete rule plan as Final.
+7. Real risks show "主要风险 · 等级 +N", where N counts additional actual risks.
+   No risk items means hiding the entire row; unknown risk shows only "风险 —".
+8. Telegram outbound is limited to two categories: currently valid,
+   final-validated CONFIRMATION plans with STRONG_BULLISH or STRONG_BEARISH;
+   and material risk changes for active positions with VERIFIED + FRESH
+   monitoring. Existing identity, source, freshness, ownership, risk and
+   deduplication safeguards remain required; no notification category expands.
+9. Hot Reset and all other plan safety changes remain in-app Message/audit
+   facts but must not create Telegram ChannelDelivery. Queue creation, orphan
+   recovery and pre-HTTP dispatch must exclude them, including old pending
+   safety messages, without deleting historical in-app Messages.
+10. Pinning, reordering, refreshing, ordinary analysis and Provider status
+    must not trigger Telegram.
+
+This does not change direction, confidence or risk algorithms/thresholds.
+The existing 28 Owner positions remain untouched. No APP/mobile-web work,
+Production deployment, trades, real Telegram test send or real AI invocation
+is authorized by this supplement. Registration is not business completion.

@@ -34,19 +34,34 @@ This track measures product delivery under `docs/PRODUCT_SOURCE_OF_TRUTH.md`.
 It does not rewrite the legacy delivery-phase rows below. Technical or
 governance rows marked DONE do not make a product module complete.
 
-Current bounded continuation: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`, branch
-`codex/v4-1-web-runtime-truth-plan-closure`, exact baseline
-`f4dd92dae4623a42a2bff626bc653c4db5bde3b0`.
-Gate registration: IN_PROGRESS; business implementation: NOT_STARTED;
-existing maturity: PARTIAL; FINAL_GATE=FAIL.
-Eight exact gate paths authorize 37 exact implementation paths only after
-merged-main effectivity. No existing phase or historical DONE status is changed.
-The implementation fingerprint is `bddcb47abbe57fde2f391a3012cc9d24c261f1d6`;
-the gate fingerprint is `91bc1358febd5a1b1303db117bc8ac0152308c1e`.
-Completion additionally requires full tests, exact-head CI, business merge,
-exact merged-main Staging deployment and real desktop official-domain acceptance.
-V23's temporary CREATE window must end with verified CREATE=false and
-SUPERUSER=false before deployment/acceptance continues; no grant is allowed now.
+## Desktop Home runtime, pinned priority, Final plan and Telegram continuation (2026-09-08)
+
+Same package: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+Implementation branch: `codex/v4-1-web-home-runtime-priority-closure`.
+Exact starting/stable Staging SHA: `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
+The previous 37-path V23 implementation and all merged work remain preserved.
+This revision registers 46 exact implementation/test paths (fingerprint
+`ed5ef17092582f1d8672660c81ae1e647956ad40`) and 10 exact gate/product-contract paths
+(fingerprint `935d97dd7525424f366e3c86610e867b72081208`). Product Source PASS, exact identity and
+merged-main effectivity remain mandatory; no runtime effectivity is assigned
+by this amendment. Implementation is NOT_STARTED/PENDING_MERGED_MAIN.
+
+The active Owner supplement is recorded in the canonical product source:
+complete same-run CURRENT Final plans; atomic last-good Home/full-pool truth;
+independent numeric confidence, evidenced risks and Beijing direction time;
+owner-scoped max-six pin order; strict automatic opportunity selection without
+observation backfill; Telegram limited to qualified strong CONFIRMATION Final
+plans and verified material manual-position risk, with safety/Hot Reset retained
+in-app only. Mock-only Telegram validation; no real Telegram or AI calls.
+
+Reuse existing AssetPool extJson; no migration or privilege change is included.
+V23 and its recovered permissions are already complete, not a new migration.
+Preserve all 28 Owner position rows. No algorithm/threshold, APP/mobile,
+Production or trading changes. New-version acceptance failure requires evidence
+and restoration of stable Staging `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
+Full tests, exact-head CI, business merge, exact-SHA Staging deployment and
+real official-domain 1440x900 acceptance are still required.
+FINAL_GATE=FAIL; CURRENT_PHASE_DONE=NO.
 
 Allowed Product Status values are defined by
 `docs/PRODUCT_COMPLETION_MATRIX.md`.

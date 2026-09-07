@@ -18,18 +18,18 @@ product_phase_status: "WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_PENDING_MERG
 product_source_gate_required: true
 product_implementation_allowed: false
 
-active_block: "B01-B07 exact desktop runtime snapshot, CURRENT plan, evidenced risk and CoinGlass runtime closure"
-active_block_cn: "B01–B07 桌面完整快照、CURRENT 计划、真实风险证据与 CoinGlass 运行链闭环"
+active_block: "Desktop Home atomic truth, CURRENT Final identity, owner pins and two-category Telegram delivery"
+active_block_cn: "桌面首页原子快照、CURRENT Final 身份、用户置顶及两类 Telegram 投递"
 
 next_required_action: "Validate, push and merge this exact gate-only authorization, then continue the preserved implementation branch."
 next_business_phase: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Derived only. Exactly eight gate paths and thirty-five implementation paths, exact package/branch/full SHA, Product Source PASS and merged-main effectivity are required. No business implementation before gate merge."
+compatibility_next_business_phase_allowed_note: "Derived only. Exactly ten gate paths and forty-six implementation/test paths, exact package/branch/full SHA, Product Source PASS and merged-main effectivity are required. No business implementation before gate merge."
 
 production_deployment_readiness: "BLOCKED"
 
 current_pr: "NONE; exact gate-only PR after validation"
-current_branch: "codex/v4-1-web-runtime-truth-plan-closure-authorization"
+current_branch: "codex/v4-1-web-home-runtime-priority-closure-authorization"
 current_package_pr: "NONE; Owner one-pass authorization permits exact-head push/PR/merge"
 unrelated_open_prs: "DERIVED_BY_V1_STATE_ACTIVE_OPEN_PR_CHECK"
 block_next_business_phase_only: true
@@ -45,20 +45,20 @@ v4_1_authorized_package: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 v4_1_canonical_figma_file_key: "rdMYmsAvZYkXHJX8hdl7UN"
 v4_1_canonical_figma_desktop_implementation_allowed: false
 v4_1_mobile_implementation_allowed: false
-v4_1_authorized_successor_branch: "codex/v4-1-web-runtime-truth-plan-closure"
-v4_1_authorized_successor_starting_full_sha: "f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+v4_1_authorized_successor_branch: "codex/v4-1-web-home-runtime-priority-closure"
+v4_1_authorized_successor_starting_full_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
 historical_web_live_authorized_successor_branch: "codex/v4-1-web-live-direction-risk-closure"
 historical_web_live_authorized_successor_starting_full_sha: "b87cb1878405a6fe8693add1036251d6631e2520"
 v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
-web_runtime_truth_plan_implementation_allowlist_count: 37
-web_runtime_truth_plan_implementation_allowlist_fingerprint: "bddcb47abbe57fde2f391a3012cc9d24c261f1d6"
-web_runtime_truth_plan_gate_allowlist_count: 8
-web_runtime_truth_plan_gate_allowlist_fingerprint: "91bc1358febd5a1b1303db117bc8ac0152308c1e"
-web_runtime_truth_plan_database_permission_window: "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY"
+web_runtime_truth_plan_implementation_allowlist_count: 46
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "ed5ef17092582f1d8672660c81ae1e647956ad40"
+web_runtime_truth_plan_gate_allowlist_count: 10
+web_runtime_truth_plan_gate_allowlist_fingerprint: "935d97dd7525424f366e3c86610e867b72081208"
+web_runtime_truth_plan_database_permission_window: "NONE_EXISTING_ASSET_POOL_STORAGE_NO_MIGRATION"
 web_runtime_truth_plan_database_permission_now_allowed: false
 web_runtime_truth_plan_database_permission_recovery_required: true
-web_runtime_truth_plan_staging_rollback_sha: "075f103babb2907cac4935ba191cf442ca5a0d25"
+web_runtime_truth_plan_staging_rollback_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
 v4_1_target_runtime_remediation_authorization_status: "EFFECTIVE_MERGED_MAIN"
 v4_1_target_runtime_remediation_implementation_status: "COMPLETE"
 v4_1_target_runtime_status: "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE"

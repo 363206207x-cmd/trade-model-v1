@@ -586,27 +586,27 @@ fi
 if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
-  [[ "$current_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
-  [[ "$current_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" && "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Web live direction and risk closure authorization starting SHA mismatch"
+  [[ "$current_package_branch" == "codex/v4-1-web-home-runtime-priority-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
+  [[ "$current_package_starting_full_sha" == "0d6a1e36518c4bf935bba7e7074ec87edbd6947f" && "$current_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "Web live direction and risk closure authorization starting SHA mismatch"
   [[ "$current_package_edits" == "true" && "$current_package_implementation" == "false" && "$current_package_pr" == "true" && "$current_package_push" == "true" && "$current_package_merge" == "true" && "$current_package_deployment" == "false" ]] || fail "Web live direction and risk closure authorization permissions mismatch"
   [[ "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]] || fail "authorized Web live direction and risk closure package mismatch"
-  [[ "$authorized_next_package_branch" == "codex/v4-1-web-runtime-truth-plan-closure" ]] || fail "authorized Web live direction and risk closure branch mismatch"
-  [[ "$authorized_next_package_starting_full_sha" == "f4dd92dae4623a42a2bff626bc653c4db5bde3b0" && "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized Web live direction and risk closure starting SHA mismatch"
+  [[ "$authorized_next_package_branch" == "codex/v4-1-web-home-runtime-priority-closure" ]] || fail "authorized Web live direction and risk closure branch mismatch"
+  [[ "$authorized_next_package_starting_full_sha" == "0d6a1e36518c4bf935bba7e7074ec87edbd6947f" && "$authorized_next_package_starting_full_sha" =~ ^[0-9a-fA-F]{40}$ ]] || fail "authorized Web live direction and risk closure starting SHA mismatch"
   [[ "$authorized_next_package_mode" == "IMPLEMENTATION" && "$authorized_next_package_mode" != "$current_package_mode" ]] || fail "authorized Web live direction and risk closure mode mismatch"
   [[ "$authorized_next_package_edits" == "true" && "$authorized_next_package_implementation" == "true" && "$authorized_next_package_pr" == "true" && "$authorized_next_package_push" == "true" && "$authorized_next_package_merge" == "true" && "$authorized_next_package_deployment" == "false" && "$authorized_next_package_staging_deployment" == "true" && "$authorized_next_package_production_deployment" == "false" ]] || fail "authorized Web live direction and risk closure permissions mismatch"
   [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
   [[ "$p1b_scope" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY"
-  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
-  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "935d97dd7525424f366e3c86610e867b72081208" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "ed5ef17092582f1d8672660c81ae1e647956ad40" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
   if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
   fi
-  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_count)" == "37" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_count)" == "8" ]] || fail "runtime truth registered path counts mismatch"
-  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_fingerprint)" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_fingerprint)" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "runtime truth registered fingerprints mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_count)" == "46" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_count)" == "10" ]] || fail "runtime truth registered path counts mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_fingerprint)" == "ed5ef17092582f1d8672660c81ae1e647956ad40" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_fingerprint)" == "935d97dd7525424f366e3c86610e867b72081208" ]] || fail "runtime truth registered fingerprints mismatch"
   for runtime_truth_flag in algorithm_changes_allowed ai_calls_allowed telegram_sends_allowed trading_allowed owner_position_mutation_allowed database_permission_now_allowed database_permanent_privilege_expansion_allowed; do
     [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml "web_runtime_truth_plan_$runtime_truth_flag")" == "false" ]] || fail "runtime truth forbidden permission: $runtime_truth_flag"
   done
-  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_window)" == "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_recovery_required)" == "true" ]] || fail "runtime truth temporary migration boundary mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_window)" == "NONE_EXISTING_ASSET_POOL_STORAGE_NO_MIGRATION" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_database_permission_recovery_required)" == "true" ]] || fail "runtime truth temporary migration boundary mismatch"
 elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
@@ -1083,7 +1083,7 @@ for exact_gate_case in \
   RUNTIME_TRUTH_02_MERGED_EXACT \
   RUNTIME_TRUTH_REJECT_authorized_next_package_phase_WRONG_PACKAGE \
   RUNTIME_TRUTH_REJECT_authorized_next_package_branch_codex/wrong-branch \
-  RUNTIME_TRUTH_REJECT_authorized_next_package_starting_full_sha_f4dd92d \
+  RUNTIME_TRUTH_REJECT_authorized_next_package_starting_full_sha_0d6a1e3 \
   RUNTIME_TRUTH_current_package_allowed_paths_ADDED \
   RUNTIME_TRUTH_authorized_next_package_allowed_paths_MISSING \
   RUNTIME_TRUTH_authorized_next_package_allowed_paths_DUPLICATE \

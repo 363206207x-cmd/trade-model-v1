@@ -58,7 +58,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|84e3eeab3ee9197c9484d0a0e79e10afba5ca265acfd6c3665898add7d419472|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|4609c5b701c03501f1f5bf619e7478b7ee979cffdf39774112ac4aa1ea7362ea|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
@@ -185,7 +185,7 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `84e3eeab3ee9197c9484d0a0e79e10afba5ca265acfd6c3665898add7d419472` |
+| Repository SHA-256 | `4609c5b701c03501f1f5bf619e7478b7ee979cffdf39774112ac4aa1ea7362ea` |
 | Version/date | v4.1 unified final freeze plus Owner-final Web Live Direction and Risk Amendment; updated `2026-09-06` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
@@ -914,3 +914,79 @@ src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.
 - Preserve the existing direction, confidence and risk algorithms, thresholds, calibration caps and weights. No AI invocation, Telegram transmission, automatic trading, protected-position mutation, native/mobile client work or Production deployment.
 - The 28 protected position rows are read-only. Baseline full-row fingerprint: `734c099a9e21af6e08a88f11d2b90303`; no task-created positions are needed.
 - Gate registration is not product completion. Only exact merged-main Staging deployment and complete live desktop acceptance permit `PASS_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+
+## 11. Active Desktop Home runtime and priority supplement
+
+Owner's explicit 2026-09-08 authorization registers Appendix H of
+`docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` as this task's
+formal supplement. Its precedence is limited to the three conflicts stated
+there: system-only Top6 without pins, safety/Hot Reset/REDUCED Telegram delivery,
+and mandatory no-risk placeholders. All other existing product contracts
+remain effective; no algorithm or safety boundary is weakened.
+
+- Existing package: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+- Implementation branch: `codex/v4-1-web-home-runtime-priority-closure`.
+- Starting/stable Staging SHA: `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
+- Implementation/test allowlist: 46 exact paths, fingerprint
+  `ed5ef17092582f1d8672660c81ae1e647956ad40`.
+- Gate allowlist: 10 exact paths, fingerprint
+  `935d97dd7525424f366e3c86610e867b72081208`.
+- Product Source PASS and exact package/branch/full SHA/path identity remain
+  mandatory. Implementation stays blocked until the amendment is merged main.
+- Earlier V23 and merged work remain preserved. No migration or privilege
+  change is registered; pins reuse the existing owner-scoped AssetPool store.
+- Tests/CI/merge are not live acceptance. The existing task still requires the
+  exact merged-main Staging artifact and real official-domain desktop 1440x900
+  verification. No actual Telegram/AI call, Owner-position mutation, algorithm
+  change, native APP, mobile web, Production or trading is permitted.
+
+### Current exact implementation/test allowlist (46 paths)
+
+```text
+src/main/java/org/example/trademodel/common/GlobalExceptionHandler.java
+src/main/java/org/example/trademodel/controller/AssetPoolController.java
+src/main/java/org/example/trademodel/dto/assetpool/AssetPoolAssetDTO.java
+src/main/java/org/example/trademodel/mapper/AssetPoolItemMapper.java
+src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java
+src/main/java/org/example/trademodel/mapper/ExecutionPlanMapper.java
+src/main/java/org/example/trademodel/mapper/MessageMapper.java
+src/main/java/org/example/trademodel/service/ChannelDeliveryService.java
+src/main/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImpl.java
+src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java
+src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java
+src/main/java/org/example/trademodel/service/watchlistsource/AssetPoolService.java
+src/main/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolService.java
+src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java
+src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java
+src/main/java/org/example/trademodel/telegram/TelegramDedupeKey.java
+src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java
+src/main/java/org/example/trademodel/v41/DashboardLiveEventService.java
+src/main/java/org/example/trademodel/vo/DashboardHomeVO.java
+src/main/resources/static/css/home.css
+src/main/resources/static/css/workspace.css
+src/main/resources/static/js/home-runtime.js
+src/main/resources/static/js/workspace.js
+src/main/resources/templates/home.html
+src/main/resources/templates/workspace.html
+src/test/java/org/example/trademodel/common/GlobalExceptionSseTest.java
+src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java
+src/test/java/org/example/trademodel/controller/AssetPoolControllerTaskSemanticsTest.java
+src/test/java/org/example/trademodel/controller/FundamentalAiV41ExecutionPlanSemanticAlignmentContractTest.java
+src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java
+src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java
+src/test/java/org/example/trademodel/controller/WebLiveDashboardContractTest.java
+src/test/java/org/example/trademodel/integration/AnalysisDecisionExecutionPlanIntegrationTest.java
+src/test/java/org/example/trademodel/mapper/DecisionResultMapperLatestPlanIntegrationTest.java
+src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java
+src/test/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImplTest.java
+src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java
+src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java
+src/test/java/org/example/trademodel/service/watchlistsource/AssetPoolPinPersistenceIntegrationTest.java
+src/test/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolServiceTest.java
+src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java
+src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java
+src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java
+src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java
+src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java
+src/test/java/org/example/trademodel/v41/DashboardLiveEventServiceTest.java
+```
