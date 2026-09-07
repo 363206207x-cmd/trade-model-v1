@@ -100,6 +100,8 @@ authorized_next_package_allowed_paths:
   - "src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java"
   - "src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderTest.java"
   - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java"
+  - "src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java"
 historical_real_logic_chain_allowed_paths:
   - "docs/evidence/v4_1_real_logic_chain/ROOT_CAUSE_AUDIT.md"
   - "docs/evidence/v4_1_real_logic_chain/IMPLEMENTATION_AND_ACCEPTANCE.md"
@@ -371,8 +373,8 @@ historical_web_live_direction_risk_authorized_next_package_allowed_paths:
   - "scripts/home-timestamp-transport-matrix.mjs"
 v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
-web_runtime_truth_plan_implementation_allowlist_count: 35
-web_runtime_truth_plan_implementation_allowlist_fingerprint: "8d01408be2820eccbf9e457ab3851391f9d401ea"
+web_runtime_truth_plan_implementation_allowlist_count: 37
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "bddcb47abbe57fde2f391a3012cc9d24c261f1d6"
 web_runtime_truth_plan_gate_allowlist_count: 8
 web_runtime_truth_plan_gate_allowlist_fingerprint: "91bc1358febd5a1b1303db117bc8ac0152308c1e"
 web_runtime_truth_plan_staging_rollback_sha: "075f103babb2907cac4935ba191cf442ca5a0d25"

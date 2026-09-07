@@ -39,9 +39,9 @@ Current bounded continuation: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`, branch
 `f4dd92dae4623a42a2bff626bc653c4db5bde3b0`.
 Gate registration: IN_PROGRESS; business implementation: NOT_STARTED;
 existing maturity: PARTIAL; FINAL_GATE=FAIL.
-Eight exact gate paths authorize 35 exact implementation paths only after
+Eight exact gate paths authorize 37 exact implementation paths only after
 merged-main effectivity. No existing phase or historical DONE status is changed.
-The implementation fingerprint is `8d01408be2820eccbf9e457ab3851391f9d401ea`;
+The implementation fingerprint is `bddcb47abbe57fde2f391a3012cc9d24c261f1d6`;
 the gate fingerprint is `91bc1358febd5a1b1303db117bc8ac0152308c1e`.
 Completion additionally requires full tests, exact-head CI, business merge,
 exact merged-main Staging deployment and real desktop official-domain acceptance.

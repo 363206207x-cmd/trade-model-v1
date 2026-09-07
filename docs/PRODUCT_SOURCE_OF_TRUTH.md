@@ -863,7 +863,7 @@ The Owner's migration exception is necessary for a minimal independent CoinGlass
 
 The subsequent explicit database authorization is TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY, not a grant now. Complete gate, implementation, tests, PR and merge first. Immediately before deploying the exact merged-main artifact, read-only verify rine_logic_staging, rine_migrator, public-schema CREATE=false, latest migration V22 SUCCESS, and no CoinGlass runtime table. Grant CREATE ON SCHEMA public only to rine_migrator for that artifact's V23 execution. On success, failure or interruption immediately REVOKE CREATE, then verify public-schema CREATE=false and role SUPERUSER=false. If recovery cannot be verified, stop deployment and browser acceptance and preserve or restore the previous Staging service; do not try other privilege operations. No permanent privileges, ALTER OWNER, SUPERUSER, other-schema grants, Production or Owner-position changes are authorized. Do not fake AnalysisRuns or repurpose existing business records to avoid V23.
 
-### Exact implementation allowlist (35 paths)
+### Exact implementation allowlist (37 paths)
 
 ```text
 src/main/java/org/example/trademodel/controller/DashboardHomeController.java
@@ -901,6 +901,8 @@ src/test/java/org/example/trademodel/providercall/ProviderScanCoordinatorSchedul
 src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassProviderHealthServiceTest.java
 src/test/java/org/example/trademodel/providercall/coinglass/CoinGlassV4ProviderTest.java
 src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java
+src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java
+src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java
 ```
 
 ### Acceptance and non-expansion boundaries

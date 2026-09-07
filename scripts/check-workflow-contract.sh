@@ -597,12 +597,12 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSU
   [[ "$authorized_next_package_canonical_figma" == "false" && "$authorized_next_package_mobile" == "false" && "$authorized_next_package_canonical_figma_key" == "NONE" ]] || fail "authorized Web live direction and risk closure client boundary mismatch"
   [[ "$p1b_scope" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY" ]] || fail "scope must remain V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY"
   [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "Web live direction and risk closure authorization allowlist fingerprint mismatch"
-  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
+  [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] || fail "Web live direction and risk closure implementation allowlist fingerprint mismatch"
   if printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
     fail "Web live direction and risk closure allowlists must not contain wildcards or directory-level grants"
   fi
-  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_count)" == "35" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_count)" == "8" ]] || fail "runtime truth registered path counts mismatch"
-  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_fingerprint)" == "8d01408be2820eccbf9e457ab3851391f9d401ea" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_fingerprint)" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "runtime truth registered fingerprints mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_count)" == "37" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_count)" == "8" ]] || fail "runtime truth registered path counts mismatch"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_implementation_allowlist_fingerprint)" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" && "$(yaml_value docs/CODEX_NEXT_TASK.yml web_runtime_truth_plan_gate_allowlist_fingerprint)" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] || fail "runtime truth registered fingerprints mismatch"
   for runtime_truth_flag in algorithm_changes_allowed ai_calls_allowed telegram_sends_allowed trading_allowed owner_position_mutation_allowed database_permission_now_allowed database_permanent_privilege_expansion_allowed; do
     [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml "web_runtime_truth_plan_$runtime_truth_flag")" == "false" ]] || fail "runtime truth forbidden permission: $runtime_truth_flag"
   done
