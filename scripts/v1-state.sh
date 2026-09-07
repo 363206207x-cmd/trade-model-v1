@@ -106,7 +106,7 @@ web_runtime_truth_plan_contract_matches() {
     && is_full_git_sha "$current_package_starting_full_sha" \
     && is_full_git_sha "$authorized_next_package_starting_full_sha" \
     && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]] \
-    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] \
+    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] \
     && ! printf '%s\n%s\n' "$current_package_allowed_paths" "$authorized_next_package_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$' \
     && [[ "$web_runtime_truth_plan_closure_authorization_declared_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] \
     && [[ "$web_runtime_truth_plan_closure_implementation_status" == "NOT_STARTED" ]] \
@@ -136,9 +136,9 @@ web_runtime_truth_plan_contract_matches() {
     && is_false_flag "$web_runtime_truth_plan_database_permanent_privilege_expansion_allowed" \
     && [[ "$web_runtime_truth_plan_database_permission_window" == "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY" ]] \
     && is_true_flag "$web_runtime_truth_plan_database_permission_recovery_required" \
-    && [[ "$web_runtime_truth_plan_implementation_allowlist_count" == "35" ]] \
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_count" == "37" ]] \
     && [[ "$web_runtime_truth_plan_gate_allowlist_count" == "8" ]] \
-    && [[ "$web_runtime_truth_plan_implementation_allowlist_fingerprint" == "8d01408be2820eccbf9e457ab3851391f9d401ea" ]] \
+    && [[ "$web_runtime_truth_plan_implementation_allowlist_fingerprint" == "bddcb47abbe57fde2f391a3012cc9d24c261f1d6" ]] \
     && [[ "$web_runtime_truth_plan_gate_allowlist_fingerprint" == "91bc1358febd5a1b1303db117bc8ac0152308c1e" ]]
 }
 

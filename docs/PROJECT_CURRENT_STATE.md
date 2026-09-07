@@ -23,9 +23,9 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 The exact implementation package is `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`,
 branch `codex/v4-1-web-runtime-truth-plan-closure`, starting full SHA
 `f4dd92dae4623a42a2bff626bc653c4db5bde3b0`. The eight gate-owner paths register
-exactly 35 implementation paths; fingerprints are
+exactly 37 implementation paths; fingerprints are
 `91bc1358febd5a1b1303db117bc8ac0152308c1e` and
-`8d01408be2820eccbf9e457ab3851391f9d401ea`, respectively.
+`bddcb47abbe57fde2f391a3012cc9d24c261f1d6`, respectively.
 The earlier Web Live Direction worktree and merged fixes are preserved.
 This gate changes no business capability. Implementation remains NOT_STARTED
 and blocked until exact authorization is merged to main.
