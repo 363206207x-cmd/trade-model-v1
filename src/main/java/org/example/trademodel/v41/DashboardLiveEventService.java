@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class DashboardLiveEventService {
-    public static final long STREAM_TIMEOUT_MILLIS = 65_000L;
+    public static final long STREAM_TIMEOUT_MILLIS = 0L;
     private final Map<String, DashboardLiveEvent> latestByIdentity = new ConcurrentHashMap<>();
     private final Map<Long, CopyOnWriteArrayList<SseEmitter>> subscribers = new ConcurrentHashMap<>();
     private final Map<String, ScopedStructuralContext> structuralContexts = new ConcurrentHashMap<>();
