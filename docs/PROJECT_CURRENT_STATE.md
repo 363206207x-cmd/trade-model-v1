@@ -23,7 +23,7 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 The Owner-authorized successor is
 `V41_WEB_LIVE_DIRECTION_RISK_CLOSURE` on
 `codex/v4-1-web-live-direction-risk-closure`, anchored to exact merged-main
-baseline `b87cb1878405a6fe8693add1036251d6631e2520`. It is limited to the sixty-eight
+baseline `b87cb1878405a6fe8693add1036251d6631e2520`. It is limited to the seventy-six
 literal implementation paths in `docs/CODEX_NEXT_TASK.yml`: the Desktop
 `trinelogic.com` browser, its necessary shared backend and exact-path tests.
 
