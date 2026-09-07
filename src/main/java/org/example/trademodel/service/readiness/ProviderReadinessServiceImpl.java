@@ -525,11 +525,9 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
     }
 
     private void appendAiBudgetSummary(Map<String, String> summary) {
-        if (fundamentalAiV41Properties == null || aiCallLogService == null
-                || fundamentalAiV41Properties.getAiGate() == null
-                || fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit() == null) return;
-        BigDecimal limit = BigDecimal.valueOf(
-                fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit(), 6);
+        if (aiCallLogService == null) return;
+        BigDecimal limit = configuredAiDailyBudget();
+        if (limit == null) return;
         BigDecimal used;
         try {
             used = aiCallLogService.sumChargeableCostSince(
@@ -546,6 +544,24 @@ public class ProviderReadinessServiceImpl implements ProviderReadinessService {
         summary.put("aiBudgetResetAt", LocalDate.now(ZoneOffset.UTC).plusDays(1)
                 .atStartOfDay().toInstant(ZoneOffset.UTC).toString());
         summary.put("aiBudgetImpact", "仅影响按需三AI；规则方向、风险、计划和持仓监控继续运行");
+    }
+
+    private BigDecimal configuredAiDailyBudget() {
+        String runtimeBudget = property("trade-model.ai.daily-budget-usd");
+        if (hasText(runtimeBudget)) {
+            try {
+                BigDecimal configured = new BigDecimal(runtimeBudget.trim());
+                return configured.compareTo(BigDecimal.ZERO) > 0 ? configured : null;
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        if (fundamentalAiV41Properties == null || fundamentalAiV41Properties.getAiGate() == null
+                || fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit() == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(
+                fundamentalAiV41Properties.getAiGate().getDailyCostMicrosLimit(), 6);
     }
 
     private String dataSourceText(ProviderReadinessVO.ProviderStatusVO market) {

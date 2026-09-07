@@ -3,6 +3,7 @@ package org.example.trademodel.provider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.example.trademodel.dto.ohlcv.PublicProviderHealthSnapshot;
+import org.example.trademodel.config.FundamentalAiV41Properties;
 import org.example.trademodel.entity.PersistedOhlcvBarDO;
 import org.example.trademodel.localreal.LocalRealDataStatusService;
 import org.example.trademodel.mapper.PersistedOhlcvBarMapper;
@@ -25,6 +27,7 @@ import org.example.trademodel.providercall.UnifiedSourceStatus;
 import org.example.trademodel.providercall.coinglass.CoinGlassProperties;
 import org.example.trademodel.providercall.coinglass.CoinGlassProviderHealthService;
 import org.example.trademodel.service.readiness.ProviderReadinessServiceImpl;
+import org.example.trademodel.service.AiCallLogService;
 import org.example.trademodel.vo.ProviderReadinessVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
@@ -318,6 +321,25 @@ class ProviderReadinessServiceImplTest {
                 assertThat(provider.getRetryStatus()).contains("自动重试");
             }
         });
+    }
+
+    @Test
+    void aiBudgetSummaryUsesTheRuntimeOrchestratorCapInsteadOfTheLegacyHundredDollarGate() {
+        ProviderReadinessServiceImpl service = service(new MockEnvironment()
+                .withProperty("trade-model.ai.daily-budget-usd", "5"));
+        AiCallLogService callLogService = mock(AiCallLogService.class);
+        when(callLogService.sumChargeableCostSince(any())).thenReturn(new java.math.BigDecimal("0.94"));
+        ReflectionTestUtils.setField(service, "fundamentalAiV41Properties",
+                FundamentalAiV41Properties.contractFixture());
+        ReflectionTestUtils.setField(service, "aiCallLogService", callLogService);
+
+        ProviderReadinessVO readiness = service.getReadiness();
+
+        assertThat(readiness.getSummary())
+                .containsEntry("aiDailyLimitUsd", "5")
+                .containsEntry("aiUsedTodayUsd", "0.94")
+                .containsEntry("aiRemainingUsd", "4.06")
+                .containsEntry("aiBudgetStatus", "AVAILABLE");
     }
 
     @Test

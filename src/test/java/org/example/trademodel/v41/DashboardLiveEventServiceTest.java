@@ -11,6 +11,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DashboardLiveEventServiceTest {
 
     @Test
+    void authenticatedDashboardStreamDoesNotExpireWhileHeartbeatKeepsConnectionAlive() {
+        DashboardLiveEventService service = new DashboardLiveEventService();
+
+        var emitter = service.subscribe(7L);
+
+        assertThat(emitter.getTimeout()).isZero();
+    }
+
+    @Test
     void rejectsDuplicateAndOutOfOrderSnapshotsPerSymbol() {
         DashboardLiveEventService service = new DashboardLiveEventService();
         var newer = new DashboardLiveEvent("event-2", "ASSET_PRICE_UPDATED", "BTCUSDT", 2L,

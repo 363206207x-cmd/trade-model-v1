@@ -803,6 +803,12 @@ class DashboardHomeServiceImplTest {
         previewDecision.setDecisionId("decision-preview-btc");
         previewDecision.setSymbol("BTCUSDT");
         previewDecision.setCreateTime(LocalDateTime.of(2026, 8, 11, 12, 20));
+        previewDecision.setDirectionDataState("READY");
+        previewDecision.setValidatedMarketBias("BULLISH");
+        previewDecision.setFinalConfidence(60);
+        previewDecision.setRiskLevel("MEDIUM");
+        previewDecision.setOneHourOpportunityQuality(68);
+        previewDecision.setFourHourTrendAlignment(71);
         when(decisionResultMapper.findLatestSuccessfulPreviewForUserAndSymbol(USER_ID, "BTCUSDT"))
                 .thenReturn(previewDecision);
 
@@ -833,6 +839,14 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getAnalysisId()).isEqualTo("analysis-dashboard-ai");
             assertThat(asset.getDecisionId()).isEqualTo("decision-preview-btc");
             assertThat(asset.getTraceId()).isEqualTo("trace-dashboard-ai");
+            assertThat(asset.getMarketBias()).isEqualTo("BULLISH");
+            assertThat(asset.getMarketBiasLabel()).isEqualTo("偏多");
+            assertThat(asset.getConfidenceLevel()).isEqualTo("60");
+            assertThat(asset.getConfidenceLabel()).isEqualTo("60%");
+            assertThat(asset.getRiskLevel()).isEqualTo("MEDIUM");
+            assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时机会形成");
+            assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时趋势偏多");
+            assertThat(asset.getHasFinal()).isFalse();
         });
         assertThat(home.getSelectedAssetContext()).isSameAs(home.getAssets().get(0));
     }

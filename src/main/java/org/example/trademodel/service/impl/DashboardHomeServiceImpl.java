@@ -468,6 +468,19 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                         replacement.getPrimaryOpportunityId(), replacement.getPrimaryTimeframe(),
                         replacement.getPrimaryPlanMode(), replacement.getSecondaryOpportunityCount(),
                         replacement.getTimeframeConflictState(), decision.getCreateTime(), decision);
+                if (Boolean.TRUE.equals(replacement.getHasFinal())
+                        && decision.getFinalConfidence() != null) {
+                    replacement.setMarketBias(replacement.getFinalMarketBias());
+                    replacement.setMarketBiasLabel(biasLabel(replacement.getFinalMarketBias()));
+                    replacement.setConfidenceLevel(String.valueOf(decision.getFinalConfidence()));
+                    replacement.setConfidenceLabel(decision.getFinalConfidence() + "%");
+                    replacement.setOneHourOpportunityLabel(oneHourOpportunityLabel(
+                            decision.getOneHourOpportunityQuality()));
+                    replacement.setFourHourTrendLabel(fourHourTrendLabel(
+                            replacement.getFinalMarketBias(), decision.getFourHourTrendAlignment()));
+                } else {
+                    applyNonFinalCardSemantics(replacement, decision, previewProjection);
+                }
                 applyAnalysisProvenance(replacement, previewProjection, userId);
                 aligned.set(index, replacement);
                 return List.copyOf(aligned);
