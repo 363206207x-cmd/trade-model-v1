@@ -1,5 +1,28 @@
 # Contract Change Log
 
+## 2026-09-08 — Owner-approved Desktop Home runtime and priority supplement
+
+Reason: register the already-approved desktop-web closure and remove three
+conflicting legacy semantics that prevent implementing it consistently.
+Owner explicitly authorized these exact three files and Appendix H content.
+
+Before: Home ranking had no user-pin layer; safety/Hot Reset or REDUCED plans
+could qualify for Telegram; no-risk UI could require placeholder content.
+After: saved pins first, then strictly eligible opportunities up to six with
+no observation backfill; Telegram only qualified strong CONFIRMATION Final
+opportunities or VERIFIED/FRESH active-position material risk; hide no-risk
+rows and show "风险 —" only for unknown risk. Safety remains in-app/audit only.
+CURRENT Final plans retain the same real Analysis/Decision/Trace/Plan identity.
+
+Same package: V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE.
+Branch: codex/v4-1-web-home-runtime-priority-closure.
+Starting SHA: 0d6a1e36518c4bf935bba7e7074ec87edbd6947f.
+The explicitly approved 46 implementation/test and 10 gate paths stay exact.
+Phase order and DONE criteria do not change. Direction/confidence/risk formulas,
+thresholds, the 28 Owner positions, APP/mobile, Production and trading are
+unchanged/protected. No actual Telegram test send or real AI call is allowed.
+
+
 ## v1.0
 
 Initial active project delivery contract.

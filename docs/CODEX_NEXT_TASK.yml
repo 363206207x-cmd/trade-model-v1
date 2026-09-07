@@ -5,7 +5,7 @@ current_phase_status: "DONE"
 completion_effective_state: "DERIVED_BY_V1_STATE"
 existing_module_maturity: "PARTIAL"
 module: "TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization"
-branch: "codex/v4-1-web-runtime-truth-plan-closure-authorization"
+branch: "codex/v4-1-web-home-runtime-priority-closure-authorization"
 task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_task_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 authorized_next_task_mode: "IMPLEMENTATION"
@@ -14,11 +14,11 @@ authorized_next_product_phase: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 
 current_package_phase: "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION"
 current_package_name: "TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization"
-current_package_active_block: "Exact B01-B07 desktop runtime projection and CoinGlass persistence authorization"
+current_package_active_block: "Exact same-package desktop Home runtime, pinned priority, Final plan and Telegram scope amendment"
 current_package_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 current_package_status: "COMPLETED"
-current_package_branch: "codex/v4-1-web-runtime-truth-plan-closure-authorization"
-current_package_starting_full_sha: "f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+current_package_branch: "codex/v4-1-web-home-runtime-priority-closure-authorization"
+current_package_starting_full_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
 current_package_risk: "A_EXACT_GATE_ONLY"
 current_package_repository_edits_allowed: true
 current_package_implementation_allowed: false
@@ -41,17 +41,19 @@ current_package_allowed_paths:
   - "scripts/v1-state.sh"
   - "scripts/codex-next-task.sh"
   - "scripts/check-workflow-contract.sh"
+  - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
+  - "docs/CONTRACT_CHANGE_LOG.md"
 current_package_blocked_scope:
   - "Java, runtime configuration, frontend and business-test changes in this gate branch"
   - "Any wildcard, directory grant, global-policy weakening or unrelated successor permission"
-  - "Production deployment, product-source/Figma/Mobile redesign, fake data, automatic trading, protected-position mutation, secret access or any Telegram send by this task"
+  - "Production deployment, Figma/Mobile redesign, fake data, automatic trading, protected-position mutation, secret access or any Telegram send by this task"
 
 authorized_next_package_phase: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 authorized_next_package_name: "TRINE LOGIC v4.1 Desktop Web Runtime Truth, Snapshot, Risk Drawer and Execution Plan Closure"
-authorized_next_package_active_block: "B01-B07: exact CURRENT plan, atomic full asset projection, confidence, evidenced risk and service hover, real CoinGlass runtime"
+authorized_next_package_active_block: "Atomic Home/pool truth, complete Final identity, numeric confidence, risk/time presentation, persistent pins and two Telegram categories"
 authorized_next_package_mode: "IMPLEMENTATION"
-authorized_next_package_branch: "codex/v4-1-web-runtime-truth-plan-closure"
-authorized_next_package_starting_full_sha: "f4dd92dae4623a42a2bff626bc653c4db5bde3b0"
+authorized_next_package_branch: "codex/v4-1-web-home-runtime-priority-closure"
+authorized_next_package_starting_full_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
 authorized_next_package_risk: "B_EXACT_WEB_LIVE_RUNTIME_CLOSURE"
 authorized_next_package_repository_edits_allowed: true
 authorized_next_package_implementation_allowed: true
@@ -65,6 +67,53 @@ authorized_next_package_canonical_figma_desktop_implementation_allowed: false
 authorized_next_package_mobile_implementation_allowed: false
 authorized_next_package_canonical_figma_file_key: "NONE"
 authorized_next_package_allowed_paths:
+  - "src/main/java/org/example/trademodel/common/GlobalExceptionHandler.java"
+  - "src/main/java/org/example/trademodel/controller/AssetPoolController.java"
+  - "src/main/java/org/example/trademodel/dto/assetpool/AssetPoolAssetDTO.java"
+  - "src/main/java/org/example/trademodel/mapper/AssetPoolItemMapper.java"
+  - "src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java"
+  - "src/main/java/org/example/trademodel/mapper/ExecutionPlanMapper.java"
+  - "src/main/java/org/example/trademodel/mapper/MessageMapper.java"
+  - "src/main/java/org/example/trademodel/service/ChannelDeliveryService.java"
+  - "src/main/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImpl.java"
+  - "src/main/java/org/example/trademodel/service/watchlistsource/AssetPoolService.java"
+  - "src/main/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolService.java"
+  - "src/main/java/org/example/trademodel/telegram/HighValueAlertMessageService.java"
+  - "src/main/java/org/example/trademodel/telegram/HighValueAlertPolicy.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramDedupeKey.java"
+  - "src/main/java/org/example/trademodel/telegram/TelegramDeliveryDispatcher.java"
+  - "src/main/java/org/example/trademodel/v41/DashboardLiveEventService.java"
+  - "src/main/java/org/example/trademodel/vo/DashboardHomeVO.java"
+  - "src/main/resources/static/css/home.css"
+  - "src/main/resources/static/css/workspace.css"
+  - "src/main/resources/static/js/home-runtime.js"
+  - "src/main/resources/static/js/workspace.js"
+  - "src/main/resources/templates/home.html"
+  - "src/main/resources/templates/workspace.html"
+  - "src/test/java/org/example/trademodel/common/GlobalExceptionSseTest.java"
+  - "src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/AssetPoolControllerTaskSemanticsTest.java"
+  - "src/test/java/org/example/trademodel/controller/FundamentalAiV41ExecutionPlanSemanticAlignmentContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/WebLiveDashboardContractTest.java"
+  - "src/test/java/org/example/trademodel/integration/AnalysisDecisionExecutionPlanIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/mapper/DecisionResultMapperLatestPlanIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/service/ChannelDeliveryTelegramContractTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/AnalysisAssemblerServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/service/impl/OpportunityPriorityRankingServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/service/watchlistsource/AssetPoolPinPersistenceIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/service/watchlistsource/PersistentAssetPoolServiceTest.java"
+  - "src/test/java/org/example/trademodel/telegram/HighValueAlertMessageServiceTest.java"
+  - "src/test/java/org/example/trademodel/telegram/HighValueAlertPolicyTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramDeliveryDispatcherTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramDeliveryOrphanMapperIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/telegram/TelegramMessageCommitListenerTest.java"
+  - "src/test/java/org/example/trademodel/v41/DashboardLiveEventServiceTest.java"
+historical_runtime_truth_plan_0d6_allowed_paths:
   - "src/main/java/org/example/trademodel/controller/DashboardHomeController.java"
   - "src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java"
   - "src/main/java/org/example/trademodel/providercall/coinglass/AbstractCoinGlassDatasetSnapshotService.java"
@@ -373,17 +422,17 @@ historical_web_live_direction_risk_authorized_next_package_allowed_paths:
   - "scripts/home-timestamp-transport-matrix.mjs"
 v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
-web_runtime_truth_plan_implementation_allowlist_count: 37
-web_runtime_truth_plan_implementation_allowlist_fingerprint: "bddcb47abbe57fde2f391a3012cc9d24c261f1d6"
-web_runtime_truth_plan_gate_allowlist_count: 8
-web_runtime_truth_plan_gate_allowlist_fingerprint: "91bc1358febd5a1b1303db117bc8ac0152308c1e"
-web_runtime_truth_plan_staging_rollback_sha: "075f103babb2907cac4935ba191cf442ca5a0d25"
+web_runtime_truth_plan_implementation_allowlist_count: 46
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "ed5ef17092582f1d8672660c81ae1e647956ad40"
+web_runtime_truth_plan_gate_allowlist_count: 10
+web_runtime_truth_plan_gate_allowlist_fingerprint: "935d97dd7525424f366e3c86610e867b72081208"
+web_runtime_truth_plan_staging_rollback_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
 web_runtime_truth_plan_algorithm_changes_allowed: false
 web_runtime_truth_plan_ai_calls_allowed: false
 web_runtime_truth_plan_telegram_sends_allowed: false
 web_runtime_truth_plan_trading_allowed: false
 web_runtime_truth_plan_owner_position_mutation_allowed: false
-web_runtime_truth_plan_database_permission_window: "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY"
+web_runtime_truth_plan_database_permission_window: "NONE_EXISTING_ASSET_POOL_STORAGE_NO_MIGRATION"
 web_runtime_truth_plan_database_permission_now_allowed: false
 web_runtime_truth_plan_database_permission_recovery_required: true
 web_runtime_truth_plan_database_permanent_privilege_expansion_allowed: false
@@ -453,29 +502,28 @@ required_product_sources:
   - PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION
 
 product_contract_mapping: |
-  B01/B07 project the existing same-Decision CURRENT conditional plan without requiring AI Final. B02/B06 publish a complete atomic Home/full-pool snapshot and real numeric confidence. B03/B04 present independent risk evidence and honest missing-evidence state. B05 restores real CoinGlass collection and durable runtime metadata without changing direction, confidence or risk algorithms.
+  The 2026-09-08 Owner supplement controls this continuation: show numbers only for a complete same-Run CURRENT Final plan; retain last complete Home/full-pool snapshot; numeric confidence only; evidence-driven risk and Beijing direction time; persist owner pins in existing AssetPool storage; Telegram only strong CONFIRMATION Final opportunities or verified material manual-position risks. Preserve V23 and all algorithms.
 
 design_interaction_mapping: |
-  Desktop official-domain 1440x900 only. Preserve six Home cards, the full asset pool, selected-asset context and existing information structure. Verify real 250ms pointer hover, 300ms leave, compact risk/service drawers, SSE plus disconnected polling and reconciliation; no native APP or mobile-web changes.
+  Desktop official-domain 1440x900 only. Preserve authoritative Home membership (0-6 eligible/pinned assets), the full asset pool, selected-asset context and existing information structure. Verify real 250ms pointer hover, 300ms leave, compact risk/service drawers, SSE plus disconnected polling and reconciliation; no native APP or mobile-web changes.
 
 data_source_mapping: |
   AnalysisRun/Decision/ExecutionPlan identities and provider observation times come from real database/provider facts. Preserve all 28 existing Owner position rows and their fingerprint. No AI calls, Telegram sends, trading, fake provider states or position writes.
 
 current_implementation_gap: |
-  CURRENT plan projection can lose identity/numeric values; Home and per-asset pool reads mix snapshots; confidence falls back to labels; risk drawers render missing evidence as risk; one unsupported pool member empties the scan universe; CoinGlass runtime health is memory-only.
+  Remaining gaps: missing/mismatched plan Trace, incomplete CURRENT selection, SSE/error snapshot replacement, confidence label contamination, risk/time presentation, user pin persistence and observation backfill, safety-event Telegram leakage. V23/runtime deployment already succeeded and must not be repeated.
 
 allowed_scope:
-  - "Exact eight-file docs/gate registration and fail-closed tests only"
+  - "Exact ten-file product-contract/docs/gate amendment and fail-closed tests only"
 
 authorized_next_allowed_scope:
-  - "B01_B07_EXISTING_CURRENT_SAME_DECISION_CONDITIONAL_PLAN_PROJECTION"
-  - "B02_B06_ATOMIC_HOME_FULL_POOL_SNAPSHOT_AND_CONFIDENCE"
-  - "B03_B04_REAL_POINTER_COMPACT_EVIDENCED_RISK_AND_SERVICE_DRAWERS"
-  - "B05_EXISTING_COINGLASS_SCAN_RUNTIME_AND_BOUNDED_PERSISTED_METADATA"
-  - "V23_NEW_COINGLASS_RUNTIME_TABLE_CONSTRAINTS_INDEXES_ONLY"
-  - "NEW_V23_TABLE_SELECT_INSERT_UPDATE_FOR_RINE_APP_ONLY"
-  - "TEMPORARY_STAGING_V23_MIGRATION_WINDOW_ONLY_AFTER_MERGED_MAIN_ARTIFACT_READY"
-  - "IMMEDIATE_CREATE_REVOKE_ON_SUCCESS_FAILURE_OR_INTERRUPTION_AND_VERIFIED_RECOVERY"
+  - "SAME_RUN_CURRENT_FINAL_PLAN_IDENTITY_AND_EXACT_PROJECTION"
+  - "ATOMIC_HOME_FULL_POOL_SNAPSHOT_LAST_GOOD_SSE_AND_STABLE_SELECTION"
+  - "NUMERIC_CONFIDENCE_EVIDENCED_RISK_AND_BEIJING_DIRECTION_TIME"
+  - "OWNER_ASSET_POOL_PINS_MAX_SIX_ORDER_IDEMPOTENCY_AND_STRICT_AUTOMATIC_PRIORITY"
+  - "TELEGRAM_STRONG_CONFIRMATION_FINAL_AND_VERIFIED_MANUAL_POSITION_RISK_ONLY"
+  - "SAFETY_AND_HOT_RESET_REMAIN_IN_APP_WITH_COMMIT_ORPHAN_DISPATCH_HTTP_EXCLUSION"
+  - "REUSE_EXISTING_ASSET_POOL_EXT_JSON_NO_MIGRATION_OR_PERMISSION_CHANGE"
   - "EXACT_HEAD_CI_MERGED_MAIN_STAGING_AND_REAL_DESKTOP_BROWSER_ACCEPTANCE"
 
 authorized_next_blocked_scope:
@@ -496,7 +544,7 @@ forbidden_scope:
   - "Staging/Production deployment, Provider call, Telegram send, fake data, position mutation or automatic trading in this gate package"
 
 real_scenario_requirement: |
-  This gate package performs no runtime scenario. The successor must use the real official domain and Owner session, isolate synthetic persistence tests from Staging, prove one controlled Telegram receipt, and rerun every frozen audit interaction on one merged Staging SHA.
+  This gate package performs no runtime scenario. The successor must use the real official domain and Owner session, isolate synthetic persistence tests from Staging, prove Telegram exclusions/deduplication using mock-only tests without any real send, and rerun every frozen audit interaction on one merged Staging SHA.
 
 hard_boundaries:
   auto_trading: "BLOCKED"

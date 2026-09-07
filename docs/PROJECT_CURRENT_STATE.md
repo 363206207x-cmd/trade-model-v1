@@ -10,7 +10,7 @@ Product Direction: PRODUCT_FIRST
 Product Authority: docs/PRODUCT_SOURCE_OF_TRUTH.md
 Product Phase: TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization
 Product Phase Status: WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_PENDING_MERGED_MAIN
-Current Work Package: B01-B07 exact runtime snapshot, CURRENT plan, independent evidence and durable CoinGlass metadata; gate-only registration before implementation
+Current Work Package: Same-package Desktop Home runtime, pinned priority, Final plan and Telegram scope amendment
 Next Business Phase: V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE
 Next Business Phase Allowed: NO on this gate branch; the exact successor is allowed only after this authorization is effective on merged main
 Production Deployment Readiness: BLOCKED
@@ -18,34 +18,34 @@ Historical Latest Production Readiness Package: PDR-M7 Real Provider Live Smoke 
 
 ---
 
-## TRINE LOGIC v4.1 Web Runtime Truth and Plan Closure Authorization
+## Desktop Home runtime, pinned priority, Final plan and Telegram continuation (2026-09-08)
 
-The exact implementation package is `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`,
-branch `codex/v4-1-web-runtime-truth-plan-closure`, starting full SHA
-`f4dd92dae4623a42a2bff626bc653c4db5bde3b0`. The eight gate-owner paths register
-exactly 37 implementation paths; fingerprints are
-`91bc1358febd5a1b1303db117bc8ac0152308c1e` and
-`bddcb47abbe57fde2f391a3012cc9d24c261f1d6`, respectively.
-The earlier Web Live Direction worktree and merged fixes are preserved.
-This gate changes no business capability. Implementation remains NOT_STARTED
-and blocked until exact authorization is merged to main.
+Same package: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+Implementation branch: `codex/v4-1-web-home-runtime-priority-closure`.
+Exact starting/stable Staging SHA: `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
+The previous 37-path V23 implementation and all merged work remain preserved.
+This revision registers 46 exact implementation/test paths (fingerprint
+`ed5ef17092582f1d8672660c81ae1e647956ad40`) and 10 exact gate/product-contract paths
+(fingerprint `935d97dd7525424f366e3c86610e867b72081208`). Product Source PASS, exact identity and
+merged-main effectivity remain mandatory; no runtime effectivity is assigned
+by this amendment. Implementation is NOT_STARTED/PENDING_MERGED_MAIN.
 
-B01-B07 are frozen in PRODUCT_SOURCE_OF_TRUTH. Desktop official-domain
-1440x900 acceptance must prove same-snapshot Home/full-pool projection,
-CURRENT conditional plan, numeric confidence, real evidence drawers and
-CoinGlass freshness/restart continuity. Algorithms, APP/mobile, existing 28
-positions, AI calls, Telegram and trading are unchanged/forbidden.
+The active Owner supplement is recorded in the canonical product source:
+complete same-run CURRENT Final plans; atomic last-good Home/full-pool truth;
+independent numeric confidence, evidenced risks and Beijing direction time;
+owner-scoped max-six pin order; strict automatic opportunity selection without
+observation backfill; Telegram limited to qualified strong CONFIRMATION Final
+plans and verified material manual-position risk, with safety/Hot Reset retained
+in-app only. Mock-only Telegram validation; no real Telegram or AI calls.
 
-V23 temporary CREATE permission is authorized only when the exact merged-main
-artifact is ready for Staging, after read-only V22/database/role/table checks.
-No permission is granted now. CREATE must be revoked on every exit path and
-verified false, with SUPERUSER=false; failure to verify stops deployment and
-browser acceptance, preserving/restoring Staging
-`075f103babb2907cac4935ba191cf442ca5a0d25`.
-No permanent privileges or existing-table grants are authorized.
-
-FINAL_GATE: FAIL
-CURRENT_PHASE_DONE: NO
+Reuse existing AssetPool extJson; no migration or privilege change is included.
+V23 and its recovered permissions are already complete, not a new migration.
+Preserve all 28 Owner position rows. No algorithm/threshold, APP/mobile,
+Production or trading changes. New-version acceptance failure requires evidence
+and restoration of stable Staging `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
+Full tests, exact-head CI, business merge, exact-SHA Staging deployment and
+real official-domain 1440x900 acceptance are still required.
+FINAL_GATE=FAIL; CURRENT_PHASE_DONE=NO.
 
 ## TRINE LOGIC v4.1 Web Live Direction and Risk Closure Authorization (historical compatibility evidence)
 
