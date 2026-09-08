@@ -41,6 +41,45 @@ import static org.mockito.Mockito.lenient;
 @ExtendWith(MockitoExtension.class)
 @Tag("core-regression")
 class UserPositionServiceImplTest {
+    @Test
+    void successfulManualEntryRefreshesOnlyItsUsersMemoryAfterCommit() {
+        // Mockito-only fixture: no database, network, fixed Owner or persisted position ID.
+        long userId = java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
+        long generatedId = java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
+        var scheduler = org.mockito.Mockito.mock(org.example.trademodel.service.PositionMonitorScheduler.class);
+        var subject = new UserPositionServiceImpl(userPositionMapper, executionPlanMapper, scheduler);
+        var request = validOpenRequest();
+        request.setSubmissionId(java.util.UUID.randomUUID().toString());
+        when(userPositionMapper.insert(any())).thenAnswer(invocation -> {
+            ((UserPositionDO) invocation.getArgument(0)).setId(generatedId);
+            return 1;
+        });
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            subject.manualOpenForUser(userId, request);
+            verify(scheduler, never()).refreshStructuralContextsForUser(any());
+            var callbacks = org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations();
+            assertThat(callbacks).hasSize(1);
+            callbacks.forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(scheduler).refreshStructuralContextsForUser(userId);
+            verify(scheduler).requestInitialMonitor(generatedId, userId);
+            verify(scheduler, never()).monitorOpenUserPositionsScheduled();
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void failedManualEntryNeverRefreshesMemoryContext() {
+        long userId = java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE);
+        var scheduler = org.mockito.Mockito.mock(org.example.trademodel.service.PositionMonitorScheduler.class);
+        var subject = new UserPositionServiceImpl(userPositionMapper, executionPlanMapper, scheduler);
+        when(userPositionMapper.insert(any())).thenReturn(0);
+        assertThatThrownBy(() -> subject.manualOpenForUser(userId, validOpenRequest())).isInstanceOf(IllegalStateException.class);
+        org.mockito.Mockito.verifyNoInteractions(scheduler);
+    }
     private static final Long USER_ID = 17L;
 
     @Mock

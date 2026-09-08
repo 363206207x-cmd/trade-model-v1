@@ -69,7 +69,7 @@ public class DashboardLiveEventService {
         return List.copyOf(latestByIdentity.values());
     }
 
-    public void recordStructuralContext(Long userId, StructuralContext context) {
+    public synchronized void recordStructuralContext(Long userId, StructuralContext context) {
         if (userId == null || userId < 0 || context == null || normalize(context.symbol()) == null
                 || context.calculatedAt() == null) return;
         String key = userId + "|" + normalize(context.symbol());
@@ -78,7 +78,17 @@ public class DashboardLiveEventService {
                 ? new ScopedStructuralContext(userId, context) : current);
     }
 
-    public List<ScopedStructuralContext> structuralContexts(String symbol) {
+    /** Called only by the position-monitor lifecycle. A null user replaces the full active-position snapshot. */
+    public synchronized void replacePositionStructuralContexts(Long userId, List<ScopedStructuralContext> contexts) {
+        structuralContexts.entrySet().removeIf(entry -> userId == null || userId.equals(entry.getValue().userId()));
+        for (ScopedStructuralContext scoped : contexts) {
+            if (scoped != null && (userId == null || userId.equals(scoped.userId()))) {
+                recordStructuralContext(scoped.userId(), scoped.context());
+            }
+        }
+    }
+
+    public synchronized List<ScopedStructuralContext> structuralContexts(String symbol) {
         String normalized = normalize(symbol);
         if (normalized == null) return List.of();
         return structuralContexts.values().stream()

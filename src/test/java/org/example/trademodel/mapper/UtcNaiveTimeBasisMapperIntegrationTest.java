@@ -35,6 +35,13 @@ import static org.mockito.Mockito.when;
 @Tag("core-regression")
 class UtcNaiveTimeBasisMapperIntegrationTest {
 
+    @org.junit.jupiter.api.BeforeEach
+    void proveInMemoryIsolationBeforeAnyFixtureWrite() throws Exception {
+        try (var connection = jdbcTemplate.getDataSource().getConnection()) {
+            assertThat(connection.getMetaData().getURL()).startsWith("jdbc:h2:mem:");
+        }
+    }
+
     @Autowired
     private DecisionResultMapper decisionResultMapper;
 
@@ -149,9 +156,9 @@ class UtcNaiveTimeBasisMapperIntegrationTest {
 
         assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(before + 1);
         MonitorAlertDO stored = monitorAlertMapper.listByAnalysisId("writer-baseline-current").get(0);
-        assertThat(stored.getCreatedAt()).isEqualTo("2026-07-14 12:00:00");
-        assertThat(stored.getUpdatedAt()).isEqualTo("2026-07-14 12:00:00");
-        assertThat(stored.getCooldownUntil()).isEqualTo("2026-07-14 12:15:00");
+        assertThat(stored.getCreatedAt()).isEqualTo("2026-07-14T12:00:00Z");
+        assertThat(stored.getUpdatedAt()).isEqualTo("2026-07-14T12:00:00Z");
+        assertThat(stored.getCooldownUntil()).isEqualTo("2026-07-14T12:15:00Z");
     }
 
     @Test
@@ -166,7 +173,7 @@ class UtcNaiveTimeBasisMapperIntegrationTest {
         assertThat(monitorAlertMapper.listByAnalysisId("writer-baseline-future"))
                 .singleElement()
                 .extracting(MonitorAlertDO::getCreatedAt)
-                .isEqualTo("2026-07-14 12:00:01");
+                .isEqualTo("2026-07-14T12:00:01Z");
         assertThat(baseline.getAlertSummary().getOpenCountWindow()).isEqualTo(before);
     }
 
