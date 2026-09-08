@@ -127,6 +127,7 @@ authorized_next_package_allowed_paths:
   - "src/test/java/org/example/trademodel/service/impl/UserPositionServiceImplTest.java"
   - "src/main/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationService.java"
   - "src/test/java/org/example/trademodel/derivatives/DerivativesBusinessIntegrationServiceTest.java"
+  - "src/main/java/org/example/trademodel/derivatives/DerivativesEvidenceItem.java"
 historical_runtime_truth_plan_0d6_allowed_paths:
   - "src/main/java/org/example/trademodel/controller/DashboardHomeController.java"
   - "src/main/java/org/example/trademodel/mapper/DecisionResultMapper.java"
@@ -436,8 +437,8 @@ historical_web_live_direction_risk_authorized_next_package_allowed_paths:
   - "scripts/home-timestamp-transport-matrix.mjs"
 v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
-web_runtime_truth_plan_implementation_allowlist_count: 60
-web_runtime_truth_plan_implementation_allowlist_fingerprint: "8ff45564f051f65350bcef2d54e0f3e8c31b7808"
+web_runtime_truth_plan_implementation_allowlist_count: 61
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "e029dfa6ed68f7c68df95f99fcf211d6e210c55c"
 web_runtime_truth_plan_gate_allowlist_count: 10
 web_runtime_truth_plan_gate_allowlist_fingerprint: "935d97dd7525424f366e3c86610e867b72081208"
 web_runtime_truth_plan_staging_rollback_sha: "0d6a1e36518c4bf935bba7e7074ec87edbd6947f"
