@@ -24,7 +24,7 @@ active_block_cn: "桌面首页原子快照、CURRENT Final 身份、用户置顶
 next_required_action: "Validate, push and merge this exact gate-only authorization, then continue the preserved implementation branch."
 next_business_phase: "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE"
 next_business_phase_allowed: false
-compatibility_next_business_phase_allowed_note: "Derived only. Exactly ten gate paths and forty-six implementation/test paths, exact package/branch/full SHA, Product Source PASS and merged-main effectivity are required. No business implementation before gate merge."
+compatibility_next_business_phase_allowed_note: "Derived only. Exactly ten gate paths and forty-nine implementation/test paths, exact package/branch/full SHA, Product Source PASS and merged-main effectivity are required. No business implementation before gate merge."
 
 production_deployment_readiness: "BLOCKED"
 
@@ -51,8 +51,8 @@ historical_web_live_authorized_successor_branch: "codex/v4-1-web-live-direction-
 historical_web_live_authorized_successor_starting_full_sha: "b87cb1878405a6fe8693add1036251d6631e2520"
 v4_1_web_runtime_truth_plan_closure_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v4_1_web_runtime_truth_plan_closure_implementation_status: "NOT_STARTED"
-web_runtime_truth_plan_implementation_allowlist_count: 46
-web_runtime_truth_plan_implementation_allowlist_fingerprint: "ed5ef17092582f1d8672660c81ae1e647956ad40"
+web_runtime_truth_plan_implementation_allowlist_count: 49
+web_runtime_truth_plan_implementation_allowlist_fingerprint: "e03886975ff0136da7c6f690088796f2ec8ffb11"
 web_runtime_truth_plan_gate_allowlist_count: 10
 web_runtime_truth_plan_gate_allowlist_fingerprint: "935d97dd7525424f366e3c86610e867b72081208"
 web_runtime_truth_plan_database_permission_window: "NONE_EXISTING_ASSET_POOL_STORAGE_NO_MIGRATION"
