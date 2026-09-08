@@ -12,6 +12,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebLiveDashboardContractTest {
 
     @Test
+    void desktopPoolTimeframesAndActionsHaveExplicitNonOverlappingLayout() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                global.window={};eval(fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8').split('/* Desktop Home runtime */')[0]);
+                const ui=window.TrineDesktopSemantics;
+                assert.equal(ui.poolTimeframes({oneHourOpportunityLabel:'1小时机会较弱',fourHourTrendLabel:'4小时趋势偏空'}),
+                    '1小时 机会较弱 · 4小时 趋势偏空');
+                assert.equal(ui.poolTimeframes({oneHourOpportunityLabel:'1小时偏空',fourHourTrendLabel:'4小时偏多'}),
+                    '1小时 偏空 · 4小时 偏多');
+                const js=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
+                assert.ok(js.includes('TrineDesktopSemantics.poolTimeframes(live)'));
+                const css=fs.readFileSync('src/main/resources/static/css/workspace.css','utf8');
+                assert.match(css,/\\.pool-pin-actions\\s*\\{[^}]*flex-wrap:\\s*nowrap/s);
+                assert.match(css,/\\.pool-pin-actions button\\s*\\{[^}]*white-space:\\s*nowrap/s);
+                console.log('PASS');
+                """);
+    }
+
+    @Test
     void alertAndServiceTimesAreShanghaiAcrossDatesAndDeviceDst() throws Exception {
         runNode("""
                 const assert=require('node:assert/strict'),fs=require('node:fs');
@@ -50,6 +69,13 @@ class WebLiveDashboardContractTest {
                 const complete={riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
                 assert.equal(ui.riskSummary(complete),'');assert.equal(ui.riskDrawer(complete),'');
                 assert.equal(ui.riskSummary({riskItems:[]}),'<span class="risk-summary-line risk-level-unknown">风险 —</span>');
+                const unknown={rawSymbol:'TRXUSDT',riskItems:[{riskType:'LIQUIDITY_RISK',evidenceStatus:'INSUFFICIENT_EVIDENCE',
+                    missingReason:'本轮缺少独立流动性指标'}, {riskType:'CROWDING_RISK',evidenceStatus:'INSUFFICIENT_EVIDENCE',
+                    missingReason:'CoinGlass 本轮风险证据已过期'}]};
+                assert.ok(ui.riskDataStatus(unknown).includes('本轮缺少独立流动性指标'));
+                assert.ok(ui.riskDataStatus(unknown).includes('CoinGlass 本轮风险证据已过期'));
+                assert.ok(!ui.riskDataStatus(unknown).includes('risk-evidence-item'));
+                assert.equal(ui.riskDataStatus(complete),'');
                 const risks={riskItems:types.slice(0,3).map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'MEDIUM',currentValue:'72'}))};
                 const summary=ui.riskSummary(risks);
                 assert.equal((summary.match(/risk-summary-line/g)||[]).length,1);
@@ -350,8 +376,7 @@ class WebLiveDashboardContractTest {
                 "marketBiasLabel",
                 "window.TrineDesktopSemantics.confidenceText(live)",
                 "window.TrineDesktopSemantics.riskSummary(live || {})",
-                "oneHourOpportunityLabel",
-                "fourHourTrendLabel",
+                "window.TrineDesktopSemantics.poolTimeframes(live)",
                 "directionCalculatedAt",
                 "row.dataset.analysisId",
                 "row.dataset.decisionId"

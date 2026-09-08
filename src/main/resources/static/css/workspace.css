@@ -24,7 +24,10 @@
 * { box-sizing: border-box; }
 .pool-pin-help { color: var(--text-muted); font-size: 12px; margin: 8px 0; }
 .pool-pin-group th { background: var(--surface-subtle); color: var(--text-secondary); font-size: 11px; }
-.pool-pin-actions { display: flex; justify-content: flex-end; align-items: center; gap: 3px; }
+.pool-pin-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; align-items: center; gap: 3px; }
+.pool-pin-actions button { flex: 0 0 auto; white-space: nowrap; }
+body[data-page-key="asset-pool"] .table-shell table { table-layout: auto; }
+.pool-timeframes { min-width: 194px; white-space: nowrap; }
 .pool-pin-toggle, .pool-pin-order { border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); border-radius: 4px; min-width: 26px; min-height: 28px; cursor: pointer; }
 .pool-pin-toggle { font-size: 18px; }
 .pool-pin-toggle[aria-pressed="true"] { color: var(--accent); background: var(--surface-selected); }

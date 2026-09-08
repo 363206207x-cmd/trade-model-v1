@@ -27,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -87,7 +88,7 @@ public class DerivativesBusinessIntegrationService {
             evidence.add(item(input, snapshot, DerivativesEvidenceType.DERIVATIVES_DATA_PARTIAL,
                     "NEUTRAL", BigDecimal.valueOf(snapshot.availableDatasets().size()),
                     BigDecimal.valueOf(config.minimumDatasetCount), "GLOBAL", "availableDatasets/minimumDatasetCount",
-                    "DERIVATIVES_PARTIAL", 70, 70));
+                    "DERIVATIVES_PARTIAL", 70, 70, "MEDIUM"));
         }
 
         BigDecimal oiChange = first(snapshot.openInterestChange5m(), snapshot.openInterestChange15m());
@@ -105,7 +106,8 @@ public class DerivativesBusinessIntegrationService {
         } else if (oiContraction) {
             evidence.add(item(input, snapshot, DerivativesEvidenceType.OPEN_INTEREST_CONTRACTION,
                     "NEUTRAL", oiChange, oiWeak.negate(), oiWindow, "openInterestChange" + oiWindow,
-                    oiCollapse ? "OI_COLLAPSE" : "OI_CONTRACTION", oiCollapse ? 100 : 70, 80));
+                    oiCollapse ? "OI_COLLAPSE" : "OI_CONTRACTION", oiCollapse ? 100 : 70, 80,
+                    !stale && oiCollapse ? "HIGH" : null));
         }
 
         int priceSign = compare(input.currentPrice(), input.comparisonPrice());
@@ -131,7 +133,7 @@ public class DerivativesBusinessIntegrationService {
                 String code = priceSign > 0 ? "PRICE_UP_OI_DOWN_SHORT_COVERING" : "PRICE_DOWN_OI_DOWN_DELEVERAGING";
                 evidence.add(item(input, snapshot, DerivativesEvidenceType.OPEN_INTEREST_PRICE_DIVERGENCE,
                         "NEUTRAL", oiChange, input.currentPrice(), oiWindow,
-                        "openInterestChange" + oiWindow + "+ohlcv.close", code, 85, 80));
+                        "openInterestChange" + oiWindow + "+ohlcv.close", code, 85, 80, stale ? null : "MEDIUM"));
                 reasons.add(code);
             }
         }
@@ -156,12 +158,15 @@ public class DerivativesBusinessIntegrationService {
                 && snapshot.longShortRatio().compareTo(config.longCrowding) >= 0;
         boolean shortCrowding = snapshot.longShortRatio() != null
                 && snapshot.longShortRatio().compareTo(config.shortCrowding) <= 0;
+        boolean fundingCrowdingRisk = (fundingPositiveExtreme && longCrowding)
+                || (fundingNegativeExtreme && shortCrowding);
         if (longCrowding || shortCrowding) {
             DerivativesEvidenceType type = longCrowding
                     ? DerivativesEvidenceType.LONG_CROWDING : DerivativesEvidenceType.SHORT_CROWDING;
             evidence.add(item(input, snapshot, type, "NEUTRAL", snapshot.longShortRatio(),
                     longCrowding ? config.longCrowding : config.shortCrowding,
-                    "CURRENT", "longShortRatio", type.name(), 75, 70));
+                    "CURRENT", "longShortRatio", type.name(), 75, 70,
+                    !stale && fundingCrowdingRisk ? "HIGH" : null));
         }
 
         BigDecimal longLiquidation = first(snapshot.longLiquidationUsd5m(), snapshot.longLiquidationUsd15m());
@@ -177,19 +182,19 @@ public class DerivativesBusinessIntegrationService {
         if (longLiquidationSpike) {
             evidence.add(item(input, snapshot, DerivativesEvidenceType.LONG_LIQUIDATION_SPIKE,
                     "NEUTRAL", longLiquidation, liquidationThreshold, liquidationWindow,
-                    "longLiquidationUsd" + liquidationWindow, "LONG_LIQUIDATION_SPIKE", 95, 80));
+                    "longLiquidationUsd" + liquidationWindow, "LONG_LIQUIDATION_SPIKE", 95, 80, stale ? null : "HIGH"));
         }
         if (shortLiquidationSpike) {
             evidence.add(item(input, snapshot, DerivativesEvidenceType.SHORT_LIQUIDATION_SPIKE,
                     "NEUTRAL", shortLiquidation, liquidationThreshold, liquidationWindow,
-                    "shortLiquidationUsd" + liquidationWindow, "SHORT_LIQUIDATION_SPIKE", 95, 80));
+                    "shortLiquidationUsd" + liquidationWindow, "SHORT_LIQUIDATION_SPIKE", 95, 80, stale ? null : "HIGH"));
         }
         boolean liquidationImbalance = liquidationImbalance(longLiquidation, shortLiquidation, config.liquidationImbalance);
         if (liquidationImbalance) {
             BigDecimal ratio = imbalanceRatio(longLiquidation, shortLiquidation);
             evidence.add(item(input, snapshot, DerivativesEvidenceType.LIQUIDATION_IMBALANCE,
                     "NEUTRAL", ratio, config.liquidationImbalance, liquidationWindow,
-                    "longLiquidationUsd/shortLiquidationUsd", "LIQUIDATION_IMBALANCE", 85, 75));
+                    "longLiquidationUsd/shortLiquidationUsd", "LIQUIDATION_IMBALANCE", 85, 75, stale ? null : "HIGH"));
         }
 
         boolean concentrationHigh = snapshot.exchangeConcentrationScore() != null
@@ -197,11 +202,9 @@ public class DerivativesBusinessIntegrationService {
         if (concentrationHigh) {
             evidence.add(item(input, snapshot, DerivativesEvidenceType.EXCHANGE_CONCENTRATION_HIGH,
                     "NEUTRAL", snapshot.exchangeConcentrationScore(), config.exchangeConcentrationHigh,
-                    "CURRENT", "exchangeConcentrationScore", "EXCHANGE_CONCENTRATION_HIGH", 85, 70));
+                    "CURRENT", "exchangeConcentrationScore", "EXCHANGE_CONCENTRATION_HIGH", 85, 70, stale ? null : "HIGH"));
         }
 
-        boolean fundingCrowdingRisk = (fundingPositiveExtreme && longCrowding)
-                || (fundingNegativeExtreme && shortCrowding);
         boolean liquidationRisk = longLiquidationSpike || shortLiquidationSpike || liquidationImbalance;
         boolean highRisk = fundingCrowdingRisk || liquidationRisk || concentrationHigh || oiCollapse;
         boolean formalConvergence = formalConvergence(input.timeframeDirections(), input.baseDirection());
@@ -292,6 +295,10 @@ public class DerivativesBusinessIntegrationService {
         if (assessment == null) return List.of();
         List<EvidenceItemVO> result = new ArrayList<>();
         for (DerivativesEvidenceItem item : assessment.evidence()) {
+            if (!Objects.equals(assessment.analysisId(), item.analysisId())
+                    || !Objects.equals(assessment.traceId(), item.traceId())
+                    || !Objects.equals(assessment.symbol(), item.symbol())
+                    || !Objects.equals(assessment.ruleVersion(), item.ruleVersion())) continue;
             EvidenceItemVO vo = new EvidenceItemVO();
             vo.setEvidenceId(AnalysisPersistenceIds.derivativesEvidenceId(
                     assessment.analysisId(), item.evidenceType().name(), result.size()));
@@ -312,6 +319,8 @@ public class DerivativesBusinessIntegrationService {
             vo.setObservedAt(item.providerDataTime() == null ? null
                     : LocalDateTime.ofInstant(item.providerDataTime(), ZoneOffset.UTC));
             vo.setFreshness(evidenceFreshness(item));
+            // Copy the branch-owned judgment; aggregate risk/strength/confidence are not item grades.
+            vo.setSeverity("FRESH".equals(vo.getFreshness()) ? item.riskSeverity() : null);
             result.add(vo);
         }
         return result;
@@ -439,7 +448,7 @@ public class DerivativesBusinessIntegrationService {
                 DerivativesEvidenceType.DERIVATIVES_DATA_UNAVAILABLE, input.symbol(), "NEUTRAL",
                 BigDecimal.valueOf(100), BigDecimal.valueOf(100), null, null, "GLOBAL", "COINGLASS_V4",
                 null, null, UnifiedSourceStatus.WAITING_SYNC, SnapshotFreshnessStatus.UNAVAILABLE,
-                "snapshot", reason, input.traceId(), input.analysisId(), input.ruleVersion());
+                "snapshot", reason, input.traceId(), input.analysisId(), input.ruleVersion(), null, null);
         Map<String, Double> deltas = emptyScoreDeltas();
         add(deltas, CREDIBILITY_SCORE, -config.staleConfidencePenalty);
         return new DerivativesBusinessAssessment(input.symbol(), normalizeDirection(input.baseDirection()),
@@ -488,11 +497,38 @@ public class DerivativesBusinessIntegrationService {
                                                 BigDecimal currentValue, BigDecimal comparisonValue,
                                                 String timeframe, String sourceField, String reasonCode,
                                                 int strength, int confidence) {
+        return item(input, snapshot, type, direction, currentValue, comparisonValue, timeframe,
+                sourceField, reasonCode, strength, confidence, null);
+    }
+
+    private static DerivativesEvidenceItem item(DerivativesBusinessInput input, DerivativesRiskSnapshot snapshot,
+                                                DerivativesEvidenceType type, String direction,
+                                                BigDecimal currentValue, BigDecimal comparisonValue,
+                                                String timeframe, String sourceField, String reasonCode,
+                                                int strength, int confidence, String riskSeverity) {
+        // Missing/stale facts never acquire a grade, even if a cached numeric value remains present.
+        boolean trusted = Objects.equals(input.symbol(), snapshot.symbol())
+                && input.analysisId() != null && input.traceId() != null
+                && snapshot.providerDataTime() != null && snapshot.expiresAt() != null
+                && !snapshot.expiresAt().isBefore(Instant.now())
+                && snapshot.freshnessStatus() == SnapshotFreshnessStatus.FRESH
+                && (snapshot.sourceStatus() == UnifiedSourceStatus.READY
+                    || snapshot.sourceStatus() == UnifiedSourceStatus.DEGRADED)
+                && currentValue != null && comparisonValue != null;
+        List<String> required = switch (type) {
+            case LONG_CROWDING, SHORT_CROWDING -> List.of(FUNDING_DATASET, LONG_SHORT_DATASET);
+            case LONG_LIQUIDATION_SPIKE, SHORT_LIQUIDATION_SPIKE, LIQUIDATION_IMBALANCE -> List.of(LIQUIDATION_DATASET);
+            case OPEN_INTEREST_CONTRACTION, OPEN_INTEREST_PRICE_DIVERGENCE -> List.of(OI_DATASET);
+            case EXCHANGE_CONCENTRATION_HIGH -> List.of(OI_DATASET);
+            default -> List.of();
+        };
+        trusted &= required.stream().allMatch(dataset -> contains(snapshot.availableDatasets(), dataset)
+                && !contains(snapshot.missingDatasets(), dataset) && !contains(snapshot.degradedDatasets(), dataset));
         return new DerivativesEvidenceItem(type, input.symbol(), direction, BigDecimal.valueOf(strength),
                 BigDecimal.valueOf(confidence), currentValue, comparisonValue, timeframe,
                 snapshot.provider(), snapshot.providerDataTime(), snapshot.fetchTime(), snapshot.sourceStatus(),
                 snapshot.freshnessStatus(), sourceField, reasonCode, input.traceId(), input.analysisId(),
-                input.ruleVersion());
+                input.ruleVersion(), trusted ? riskSeverity : null, snapshot.expiresAt());
     }
 
     private static String sourceReference(DerivativesEvidenceItem item) {
@@ -504,7 +540,10 @@ public class DerivativesBusinessIntegrationService {
                 + ";freshnessStatus=" + value(item.freshnessStatus())
                 + ";reasonCode=" + value(item.reasonCode())
                 + ";analysisId=" + value(item.analysisId())
-                + ";ruleVersion=" + value(item.ruleVersion());
+                + ";ruleVersion=" + value(item.ruleVersion())
+                + ";evidenceType=" + item.evidenceType().name()
+                + ";symbol=" + value(item.symbol())
+                + ";expiresAt=" + value(item.expiresAt());
     }
 
     private static String adjustConfidence(String current, int adjustment) {

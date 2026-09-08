@@ -629,9 +629,12 @@
                 + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong></td>'
                 + '<td class="pool-confidence">' + escapeHtml(confidence) + '</td>'
                 + '<td><div' + (window.TrineDesktopSemantics.hasConfirmedRisks(live || {})
-                    ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情"' : '') + '>'
+                    ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情"'
+                    : window.TrineDesktopSemantics.riskSummary(live || {}) ? ' tabindex="0" data-desktop-hover="risk-status" data-risk-symbol="'
+                        + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="'
+                        + escapeHtml(asset.symbol) + ' 风险数据状态"' : '') + '>'
                 + window.TrineDesktopSemantics.riskSummary(live || {}) + '</div></td>'
-                + '<td><span>' + escapeHtml(text(live?.oneHourOpportunityLabel, "1小时数据不足")) + '</span><small>' + escapeHtml(text(live?.fourHourTrendLabel, "4小时数据不足")) + '</small></td>'
+                + '<td class="pool-timeframes">' + escapeHtml(window.TrineDesktopSemantics.poolTimeframes(live)) + '</td>'
                 + '<td>' + (live?.directionCalculatedAt ? escapeHtml(window.TrineDesktopSemantics.beijingTime(live.directionCalculatedAt)) : '—') + '</td>'
                 + '<td class="align-right"><div class="pool-pin-actions"><button class="pool-pin-toggle" type="button" data-home-pin="'
                 + escapeHtml(asset.symbol) + '" aria-pressed="' + String(asset.homePinned === true) + '" aria-label="'
@@ -2730,7 +2733,8 @@
                 const asset = assetPoolProjections.find(function (item) {
                     return String(item.rawSymbol || item.symbol).toUpperCase() === trigger.dataset.riskSymbol;
                 });
-                return asset ? window.TrineDesktopSemantics.riskDrawer(asset) : null;
+                return asset ? (trigger.dataset.desktopHover === "risk-status"
+                    ? window.TrineDesktopSemantics.riskDataStatus(asset) : window.TrineDesktopSemantics.riskDrawer(asset)) : null;
             });
             bindAssetPool();
         }

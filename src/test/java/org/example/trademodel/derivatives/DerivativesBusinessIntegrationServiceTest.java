@@ -35,6 +35,90 @@ class DerivativesBusinessIntegrationServiceTest {
     private final DerivativesBusinessIntegrationService service = new DerivativesBusinessIntegrationService(null);
 
     @Test
+    void individualRuleGradesRemainDifferentWithinOneHighRiskAssessment() {
+        DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("-0.06"), bd("0.0001"), bd("1"),
+                        bd("4000000"), bd("500000"), bd("0.20")), false));
+        assertThat(result.riskAdjustment()).isEqualTo("HIGH");
+        assertThat(result.evidence()).filteredOn(e -> e.evidenceType() == DerivativesEvidenceType.LONG_LIQUIDATION_SPIKE)
+                .singleElement().extracting(DerivativesEvidenceItem::riskSeverity).isEqualTo("HIGH");
+        List<EvidenceItemVO> projected = service.toEvidenceVos(result);
+        assertThat(projected).allSatisfy(v -> assertThat(v.getSourceReference().length()).isLessThanOrEqualTo(512));
+        assertThat(projected).filteredOn(v -> "LONG_LIQUIDATION_SPIKE".equals(v.getEvidenceType()))
+                .singleElement().satisfies(v -> {
+                    assertThat(v.getSeverity()).isEqualTo("HIGH");
+                    assertThat(v.getCurrentValue()).isEqualTo("4000000");
+                    assertThat(v.getSourceReference()).contains("comparisonValue=1000000", "evidenceType=LONG_LIQUIDATION_SPIKE");
+                });
+        assertThat(projected).filteredOn(v -> "OPEN_INTEREST_PRICE_DIVERGENCE".equals(v.getEvidenceType()))
+                .singleElement().extracting(EvidenceItemVO::getSeverity).isEqualTo("MEDIUM");
+        assertThat(projected).filteredOn(v -> "FUNDING_NORMAL".equals(v.getEvidenceType()))
+                .singleElement().extracting(EvidenceItemVO::getSeverity).isNull();
+    }
+
+    @Test
+    void crowdingGradeRequiresTheExistingMatchingFundingRuleNotEvidenceStrength() {
+        for (String[] pair : List.of(new String[]{"0.001", "1.4"}, new String[]{"-0.001", "0.6"})) {
+            DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                    all("BULLISH"), complete(bd("0.06"), bd(pair[0]), bd(pair[1]),
+                            bd("1000"), bd("1000"), bd("0.20")), false));
+            assertThat(service.toEvidenceVos(result)).filteredOn(v -> v.getEvidenceType().endsWith("_CROWDING"))
+                    .singleElement().extracting(EvidenceItemVO::getSeverity).isEqualTo("HIGH");
+            assertThat(service.toEvidenceVos(result)).filteredOn(v -> v.getEvidenceType().contains("CONFIRMATION")
+                            || v.getEvidenceType().contains("EXPANSION") || v.getEvidenceType().startsWith("FUNDING_"))
+                    .allSatisfy(v -> assertThat(v.getSeverity()).isNull());
+        }
+        DerivativesBusinessAssessment unpaired = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.4"),
+                        bd("4000000"), bd("500000"), bd("0.20")), false));
+        assertThat(unpaired.riskAdjustment()).isEqualTo("HIGH");
+        assertThat(service.toEvidenceVos(unpaired)).filteredOn(v -> v.getEvidenceType().endsWith("_CROWDING"))
+                .singleElement().extracting(EvidenceItemVO::getSeverity).isNull();
+    }
+
+    @Test
+    void unavailableStaleMissingDatasetAndWrongSymbolNeverProduceCurrentMarketRisk() {
+        assertThat(service.toEvidenceVos(service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), null, false)))).allSatisfy(v -> assertThat(v.getSeverity()).isNull());
+        for (DerivativesRiskSnapshot invalid : List.of(
+                snapshot(bd("0.06"), bd("0.001"), bd("1.4"), bd("4000000"), bd("500000"), bd("0.8"),
+                        UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, "COMPLETE",
+                        List.of(OI, FUNDING, LIQUIDATION, LONG_SHORT), List.of(), List.of(), Instant.now().minusSeconds(600)),
+                snapshot(bd("0.06"), bd("0.0001"), bd("1"), bd("4000000"), bd("500000"), bd("0.2"),
+                        UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, "PARTIAL",
+                        List.of(OI, FUNDING, LONG_SHORT), List.of(LIQUIDATION), List.of(), Instant.now()))) {
+            assertThat(service.toEvidenceVos(service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                    all("BULLISH"), invalid, false))))
+                    .filteredOn(v -> !"DERIVATIVES_DATA_PARTIAL".equals(v.getEvidenceType()))
+                    .allSatisfy(v -> assertThat(v.getSeverity()).isNull());
+        }
+        DerivativesBusinessInput wrongSymbol = new DerivativesBusinessInput("ETHUSDT", "BULLISH",
+                bd("110"), bd("100"), true, all("BULLISH"), true, 90, true, false, false, null,
+                complete(bd("0.06"), bd("0.001"), bd("1.4"), bd("4000000"), bd("500000"), bd("0.8")),
+                "trace-other", "analysis-other", "v1.0");
+        assertThat(service.toEvidenceVos(service.evaluate(wrongSymbol)))
+                .allSatisfy(v -> assertThat(v.getSeverity()).isNull());
+    }
+
+    @Test
+    void conversionRejectsAnEvidenceRecordFromAnotherAnalysisTraceOrRuleVersion() throws ReflectiveOperationException {
+        DerivativesBusinessAssessment original = service.evaluate(input("BULLISH", bd("110"), bd("100"),
+                all("BULLISH"), complete(bd("0.06"), bd("0.001"), bd("1.4"),
+                        bd("4000000"), bd("500000"), bd("0.8")), false));
+        var components = DerivativesBusinessAssessment.class.getRecordComponents();
+        var signature = java.util.Arrays.stream(components).map(java.lang.reflect.RecordComponent::getType).toArray(Class<?>[]::new);
+        for (String mismatch : List.of("analysisId", "traceId", "ruleVersion")) {
+            Object[] values = new Object[components.length];
+            for (int index = 0; index < components.length; index++) {
+                values[index] = mismatch.equals(components[index].getName()) ? "other"
+                        : components[index].getAccessor().invoke(original);
+            }
+            DerivativesBusinessAssessment mixed = DerivativesBusinessAssessment.class.getDeclaredConstructor(signature).newInstance(values);
+            assertThat(service.toEvidenceVos(mixed)).isEmpty();
+        }
+    }
+
+    @Test
     void bullishPriceAndOiExpansionConfirmsBullishRuleDirection() {
         DerivativesBusinessAssessment result = service.evaluate(input("BULLISH", bd("110"), bd("100"),
                 all("BULLISH"), complete(bd("0.06"), bd("0.0001"), bd("1.0"), bd("1000"), bd("1000"), bd("0.20")), false));
