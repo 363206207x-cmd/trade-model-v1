@@ -2128,8 +2128,72 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return;
         }
         if (evidence == null) return;
-        // Only external event evidence currently persists a type-specific severity.
-        // Broad RISK/PRICE/FUNDING evidence must not be relabelled as liquidity/crowding/etc.
+        // Only explicitly typed, individually graded facts may populate a risk row.
+        // Neither a composite grade nor broad RISK/PRICE/FUNDING evidence identifies a risk type.
+        for (EvidenceItemDO row : evidence) {
+            if (row == null || !"COINGLASS_V4".equals(row.getSourceProvider())) continue;
+            Map<String, String> fact = derivativeEvidenceFacts(row.getSourceReference());
+            String type = fact.getOrDefault("evidenceType", "");
+            int index = switch (type) {
+                case "LONG_CROWDING", "SHORT_CROWDING" -> 3;
+                case "LONG_LIQUIDATION_SPIKE", "SHORT_LIQUIDATION_SPIKE", "LIQUIDATION_IMBALANCE" -> 4;
+                case "DERIVATIVES_DATA_PARTIAL" -> 7;
+                default -> -1; // OI divergence/concentration alone do not prove reversal/liquidity risk.
+            };
+            if (index < 0) continue;
+            DashboardHomeVO.AssetRiskItemVO risk = items.get(index);
+            if (!asset.getAnalysisId().equals(row.getAnalysisId())
+                    || !asset.getAnalysisId().equals(fact.get("analysisId"))
+                    || !asset.getTraceId().equals(row.getSourceTraceId())
+                    || !Objects.equals(normalizeSymbol(asset.getRawSymbol()), normalizeSymbol(fact.get("symbol")))) {
+                risk.setMissingReason("风险证据与当前资产、分析或追踪身份不一致");
+                continue;
+            }
+            Instant expiresAt;
+            try {
+                expiresAt = Instant.parse(fact.getOrDefault("expiresAt", ""));
+            } catch (java.time.format.DateTimeParseException invalidTime) {
+                risk.setMissingReason("本轮风险证据未记录带时区的有效期");
+                continue;
+            }
+            if (!"FRESH".equals(row.getFreshness()) || !"FRESH".equals(fact.get("freshnessStatus"))
+                    || expiresAt.isBefore(planValidityClock.instant())) {
+                risk.setMissingReason("CoinGlass 本轮风险证据已过期或尚未完成新鲜度校验");
+                continue;
+            }
+            if (!List.of("READY", "DEGRADED").contains(fact.getOrDefault("sourceStatus", ""))
+                    || row.getObservedAt() == null || row.getObservedAt().isAfter(asset.getDirectionCalculatedAt())
+                    || !hasText(row.getEvidenceId()) || !hasText(row.getCurrentValue())
+                    || !Objects.equals(row.getCurrentValue(), fact.get("currentValue"))
+                    || !hasText(fact.get("sourceField")) || !hasText(fact.get("comparisonValue"))
+                    || !List.of("LOW", "MEDIUM", "HIGH", "EXTREME").contains(firstNonBlank(row.getSeverity(), "UNKNOWN"))) {
+                risk.setMissingReason("本轮未记录可信的独立等级、指标值或观察时间");
+                continue;
+            }
+            // Keep the latest deterministic fact of this type, not the aggregate risk level.
+            if (risk.getObservedAt() != null && (risk.getObservedAt().isAfter(row.getObservedAt().toInstant(ZoneOffset.UTC))
+                    || risk.getObservedAt().equals(row.getObservedAt().toInstant(ZoneOffset.UTC))
+                    && risk.getEvidenceId().compareTo(row.getEvidenceId()) >= 0)) continue;
+            String label = switch (type) {
+                case "LONG_CROWDING" -> "多头拥挤：多空比";
+                case "SHORT_CROWDING" -> "空头拥挤：多空比";
+                case "LONG_LIQUIDATION_SPIKE" -> "多头清算金额（USD）";
+                case "SHORT_LIQUIDATION_SPIKE" -> "空头清算金额（USD）";
+                case "LIQUIDATION_IMBALANCE" -> "多空清算金额比";
+                default -> "已就绪数据集数量";
+            };
+            risk.setEvidenceStatus("AVAILABLE");
+            risk.setSeverity(row.getSeverity());
+            risk.setCurrentValue(row.getCurrentValue());
+            risk.setPrimaryEvidence(label + " " + row.getCurrentValue() + "；规则比较值 "
+                    + fact.get("comparisonValue") + "；窗口 " + fact.getOrDefault("timeframe", "尚未记录"));
+            risk.setSource(row.getSourceProvider());
+            risk.setObservedAt(row.getObservedAt().toInstant(ZoneOffset.UTC));
+            risk.setEvidenceId(row.getEvidenceId());
+            risk.setSourceReference(row.getSourceReference());
+            risk.setSourceTraceId(row.getSourceTraceId());
+            risk.setMissingReason(null);
+        }
         EvidenceItemDO event = evidence.stream().filter(java.util.Objects::nonNull)
                 .filter(item -> asset.getAnalysisId().equals(item.getAnalysisId()))
                 .filter(item -> List.of("事件", "宏观", "新闻").contains(upper(item.getEvidenceType())))
@@ -2157,6 +2221,18 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         item.setSourceReference(event.getSourceReference());
         item.setSourceTraceId(event.getSourceTraceId());
         item.setMissingReason(null);
+    }
+
+    private static Map<String, String> derivativeEvidenceFacts(String reference) {
+        Map<String, String> facts = new LinkedHashMap<>();
+        if (reference == null) return facts;
+        for (String field : reference.split(";")) {
+            int separator = field.indexOf('=');
+            if (separator <= 0) continue;
+            String key = field.substring(0, separator);
+            if (facts.putIfAbsent(key, field.substring(separator + 1)) != null) return Map.of();
+        }
+        return facts;
     }
 
     private void applyPlanPauseEvidence(DashboardHomeVO.ExecutionSuggestionVO plan) {
@@ -3259,7 +3335,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setPlanLifecycleState(trimToNull(plan.getPlanLifecycleState()));
         suggestion.setNeedsRevalidation(Boolean.TRUE.equals(plan.getNeedsRevalidation()));
         suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
-        suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
+        suggestion.setRevalidationRule("BLOCKED".equalsIgnoreCase(plan.getRuleValidationStatus())
+                && (!hasText(plan.getRevalidationRule()) || "触发后重新验证行情新鲜度、风险与结构失效位".equals(plan.getRevalidationRule()))
+                ? "等待下一根1小时K线闭合，使用新行情重新验证上述方向、未平仓量、风险和缺失的执行边界条件"
+                : trimToNull(plan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
         if ("USABLE_REVIEW_PLAN".equals(suggestion.getStatus())
                 && Boolean.TRUE.equals(plan.getFinalPlan()) && currentStructuralPlan(plan)
@@ -3302,10 +3381,37 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 .map(this::trimToNull)
                 .filter(java.util.Objects::nonNull)
                 .forEach(value -> {
-                    for (String token : value.split("[\\s,;:|\\[\\]{}\\\"]+")) {
+                    for (String rawToken : value.split("[,;:|\\[\\]{}\\\"]+")) {
+                        String token = rawToken.trim();
                         if (token.isBlank()) continue;
                         String readable = switch (token) {
-                            case "AI_TRIGGER_NOT_MET" -> "本轮未达到AI触发条件";
+                            case "AI_TRIGGER_NOT_MET" -> "本轮未达到AI分析触发条件";
+                            case "VALIDATED_MARKET_BIAS_REQUIRED" -> "本轮尚未形成通过规则校验的方向";
+                            case "GPT_CANDIDATE_REQUIRED" -> "本轮尚无GPT候选方案，不能生成最终执行计划";
+                            case "FUNDING_RISK_EXTREME_POSITIVE" -> "多头资金费率达到风险阈值，需等待拥挤缓解";
+                            case "FUNDING_RISK_EXTREME_NEGATIVE" -> "空头资金费率达到风险阈值，需等待拥挤缓解";
+                            case "LIQUIDATION_RISK_BLOCKED" -> "清算规模或多空清算失衡达到风险阈值";
+                            case "PRICE_DOWN_OI_DOWN_DELEVERAGING" -> "价格与未平仓量同时下降，市场正在去杠杆";
+                            case "PRICE_UP_OI_DOWN_SHORT_COVERING" -> "价格上涨但未平仓量下降，尚不能确认新增资金入场";
+                            case "PRICE_OI_ALIGNED_VOLUME_UNCONFIRMED" -> "价格与未平仓量同向，但成交量尚未确认";
+                            case "DERIVATIVES_SNAPSHOT_UNAVAILABLE" -> "本轮缺少可验证的衍生品数据快照";
+                            case "DERIVATIVES_PARTIAL" -> "本轮衍生品数据覆盖不完整";
+                            case "DERIVATIVES_REQUIRED" -> "本轮缺少执行校验必需的衍生品数据";
+                            case "FUNDING", "COINGLASS_FUNDING" -> "本轮资金费率数据未就绪";
+                            case "CG_V4_OI_WEIGHTED_FUNDING_HISTORY" -> "未平仓量加权资金费率历史数据未就绪";
+                            case "PROVIDER_DATA_EMPTY" -> "数据服务本轮返回空结果";
+                            case "EXTREME_PRICE_MOVE", "EXTREME_PRICE_MOVE_THRESHOLD_REACHED" -> "价格剧烈变动达到风险阈值，需使用新行情确认结构";
+                            case "liquiditySource" -> "本轮缺少流动性边界证据";
+                            case "multiTimeframeSource" -> "本轮缺少多周期执行边界证据";
+                            case "eventSource" -> "本轮缺少事件窗口边界证据";
+                            case "wickSource" -> "本轮缺少影线与假突破边界证据";
+                            case "sourceTrace", "INCOMPLETE", "MISSING", "missingFields",
+                                    "sourceTrace missing", "sourceTrace fallbackStatus=INCOMPLETE",
+                                    "sourceTrace missingFields present" -> "执行边界来源链不完整";
+                            case "liquidity source missing" -> "本轮缺少流动性边界证据";
+                            case "multi-timeframe source missing" -> "本轮缺少多周期执行边界证据";
+                            case "event window source missing" -> "本轮缺少事件窗口边界证据";
+                            case "wick confirmation source missing" -> "本轮缺少影线与假突破边界证据";
                             case "HIGH_RISK_REVIEW_REQUIRED" -> "当前风险较高，需完成风险复核";
                             case "OI_COLLAPSE", "OI_COLLAPSE_THRESHOLD_REACHED" -> "未平仓量下降达到风险阈值，结构仍需确认";
                             case "EXECUTION_BOUNDARY_SOURCE_UNAVAILABLE" -> "当前执行边界缺少可验证的数据来源";
@@ -3749,6 +3855,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && "SUCCESS".equalsIgnoreCase(callStatus);
         tab.setResultAvailable(resultAvailable);
         tab.setStatusMessage(aiRoleStatusMessage(callStatus, rolePayload.fallbackReason()));
+        if (!resultAvailable) tab.setRunStatusLabel(tab.getStatusMessage());
         if (!resultAvailable && "DISABLED".equals(upper(callStatus))
                 && "AI_TRIGGER_NOT_MET".equals(upper(rolePayload.fallbackReason()))) {
             tab.setRunStatusLabel("GPT_FINAL".equals(role) ? "本轮未触发" : "本轮未运行");
@@ -4765,23 +4872,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     private String aiRoleStatusMessage(String status, String reason) {
-        if ("BUDGET_BLOCKED".equals(upper(status))
-                && "DAILY_BUDGET_EXCEEDED".equals(upper(reason))) {
+        if ("AI_TRIGGER_NOT_MET".equals(upper(reason))
+                || "NOT_TRIGGERED".equals(upper(status))) {
+            return "本轮未满足AI触发条件";
+        }
+        if ("BUDGET_EXHAUSTED".equals(upper(status))
+                || "BUDGET_BLOCKED".equals(upper(status)) && "DAILY_BUDGET_EXCEEDED".equals(upper(reason))) {
             return "今日AI额度已用完";
         }
         if ("FAILED".equals(upper(status))
                 && "GPT_DEPENDENCY_FAILED".equals(upper(reason))) {
-            return "上游 GPT 分析未完成，当前角色未运行";
+            return "等待上游分析完成";
         }
         return switch (upper(status)) {
-            case "SUCCESS" -> "根据角色结果展示";
-            case "DISABLED" -> "AI 复核未启用";
-            case "NOT_CALLED", "STARTED" -> "本轮未调用该角色";
-            case "TIMEOUT" -> "AI 复核超时，本轮未采纳该角色";
-            case "FAILED" -> "AI 复核失败，本轮未采纳该角色";
+            case "SUCCESS", "AVAILABLE" -> "本轮分析已完成";
+            case "DISABLED", "PROVIDER_DISABLED" -> "该AI服务未启用";
+            case "UPSTREAM_PENDING" -> "等待上游分析完成";
+            case "NOT_CALLED" -> "本轮尚未运行，等待分析任务状态更新";
+            case "STARTED", "RUNNING", "QUEUED" -> "本轮分析进行中";
+            case "TIMEOUT" -> "本轮分析超时，可稍后重试";
+            case "FAILED" -> "本轮分析失败，可稍后重试";
             case "INVALID_RESPONSE" -> "AI 返回内容无效，本轮未采纳";
             case "NOT_CONFIGURED" -> "AI 模型未配置";
-            case "MODEL_UNAVAILABLE" -> "AI 模型不可用";
+            case "MODEL_UNAVAILABLE", "PROVIDER_UNAVAILABLE" -> "该AI服务暂时不可用";
             case "BUDGET_BLOCKED" -> "AI 预算门控阻断";
             case "RATE_LIMITED" -> "AI 调用受限";
             default -> "本轮未调用该角色";

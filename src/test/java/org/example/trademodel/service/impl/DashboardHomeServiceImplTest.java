@@ -242,7 +242,7 @@ class DashboardHomeServiceImplTest {
         var projected = service.getHomeForUser(USER_ID, "DOGEUSDT", 6).getExecutionSuggestion();
 
         assertThat(projected.getStatusLabel()).isEqualTo("暂不执行");
-        assertThat(projected.getBlockedReason()).contains("本轮未达到AI触发条件", "未平仓量下降达到风险阈值")
+        assertThat(projected.getBlockedReason()).contains("本轮未达到AI分析触发条件", "未平仓量下降达到风险阈值")
                 .doesNotContain("AI_TRIGGER_NOT_MET", "OI_COLLAPSE", "110", "115");
         assertThat(projected.getEntryZone()).isNull();
         assertThat(projected.getStopLoss()).isNull();
@@ -277,6 +277,40 @@ class DashboardHomeServiceImplTest {
             assertThat(tab.getResultAvailable()).isFalse();
             assertThat(tab.getStatusMessage()).doesNotContain("复核未启用", "AI_TRIGGER_NOT_MET");
             assertThat(tab.getDecisionId()).isEqualTo(decision.getDecisionId());
+        }
+    }
+
+    @Test
+    void persistedPlanReasonsAreNotLostInsideJsonOrSourceTraceDetails() {
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setValidationReasons("[\"AI_TRIGGER_NOT_MET\",\"OI_COLLAPSE_THRESHOLD_REACHED\"]");
+        plan.setRevalidationReason("FUNDING_RISK_EXTREME_POSITIVE,LIQUIDATION_RISK_BLOCKED");
+        plan.setSourceMissingReasons("liquiditySource,multiTimeframeSource,eventSource,wickSource");
+        String reason = ReflectionTestUtils.invokeMethod(service, "firstPlanReason", plan);
+        assertThat(reason).contains("本轮未达到AI分析触发条件", "未平仓量下降达到风险阈值",
+                        "资金费率", "清算", "流动性", "多周期", "事件", "影线")
+                .doesNotContain("AI_TRIGGER_NOT_MET", "LIQUIDATION_RISK_BLOCKED",
+                        "当前风险或规则条件不允许执行", "不展示旧计划价格", "该项阻断尚未记录可读解释");
+        assertThat(plan.getValidationReasons()).isEqualTo("[\"AI_TRIGGER_NOT_MET\",\"OI_COLLAPSE_THRESHOLD_REACHED\"]");
+    }
+
+    @Test
+    void aiAvailabilityExplainsEveryActualRoleStateWithoutDisabledFallbackCopy() {
+        String[][] cases = {
+                {"NOT_TRIGGERED", "", "本轮未满足AI触发条件"},
+                {"DISABLED", "AI_TRIGGER_NOT_MET", "本轮未满足AI触发条件"},
+                {"BUDGET_EXHAUSTED", "", "今日AI额度已用完"},
+                {"BUDGET_BLOCKED", "DAILY_BUDGET_EXCEEDED", "今日AI额度已用完"},
+                {"PROVIDER_DISABLED", "", "该AI服务未启用"},
+                {"DISABLED", "", "该AI服务未启用"},
+                {"UPSTREAM_PENDING", "", "等待上游分析完成"},
+                {"FAILED", "GPT_DEPENDENCY_FAILED", "等待上游分析完成"},
+                {"PROVIDER_UNAVAILABLE", "", "该AI服务暂时不可用"},
+                {"FAILED", "", "本轮分析失败，可稍后重试"}
+        };
+        for (String[] test : cases) {
+            String result = ReflectionTestUtils.invokeMethod(service, "aiRoleStatusMessage", test[0], test[1]);
+            assertThat(result).as(test[0] + ":" + test[1]).isEqualTo(test[2]);
         }
     }
 
@@ -3524,17 +3558,17 @@ class DashboardHomeServiceImplTest {
 
     @Test
     void disabledAiRoleHasNoBusinessResult() {
-        assertNonSuccessfulAiRole(AiProviderCallStatus.DISABLED, "AI 复核未启用");
+        assertNonSuccessfulAiRole(AiProviderCallStatus.DISABLED, "该AI服务未启用");
     }
 
     @Test
     void timeoutAiRoleHasNoBusinessResult() {
-        assertNonSuccessfulAiRole(AiProviderCallStatus.TIMEOUT, "AI 复核超时，本轮未采纳该角色");
+        assertNonSuccessfulAiRole(AiProviderCallStatus.TIMEOUT, "本轮分析超时，可稍后重试");
     }
 
     @Test
     void failedAiRoleHasNoBusinessResult() {
-        assertNonSuccessfulAiRole(AiProviderCallStatus.FAILED, "AI 复核失败，本轮未采纳该角色");
+        assertNonSuccessfulAiRole(AiProviderCallStatus.FAILED, "本轮分析失败，可稍后重试");
     }
 
     @Test
@@ -3597,9 +3631,9 @@ class DashboardHomeServiceImplTest {
 
         assertThat(aiTab(home, "GPT_FINAL").getStatusMessage()).isEqualTo("今日AI额度已用完");
         assertThat(aiTab(home, "GEMINI_REVIEW").getStatusMessage())
-                .isEqualTo("上游 GPT 分析未完成，当前角色未运行");
+                .isEqualTo("等待上游分析完成");
         assertThat(aiTab(home, "GROK_CHALLENGE").getStatusMessage())
-                .isEqualTo("上游 GPT 分析未完成，当前角色未运行");
+                .isEqualTo("等待上游分析完成");
     }
 
     @Test
@@ -4343,7 +4377,7 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
         assertThat(suggestion.getValidationStatus()).isEqualTo("BLOCKED");
-        assertThat(suggestion.getBlockedReason()).contains("本轮未达到AI触发条件")
+        assertThat(suggestion.getBlockedReason()).contains("本轮未达到AI分析触发条件")
                 .doesNotContain("AI_TRIGGER_NOT_MET");
         assertThat(suggestion.getRevalidationRule())
                 .isEqualTo("等待新数据并重新分析通过规则校验");
@@ -5679,6 +5713,137 @@ class DashboardHomeServiceImplTest {
         event.setObservedAt(LocalDateTime.of(2026, 7, 1, 12, 1));
         ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
         assertThat(asset.getRiskItems()).allSatisfy(item -> assertThat(item.getSeverity()).isNull());
+    }
+
+    @Test
+    void persistedDerivativeRiskUsesOnlyExplicitSameChainGradeAndRealMetrics() {
+        DashboardHomeVO.AssetVO asset = independentRiskAsset();
+        EvidenceItemDO liquidation = independentDerivative("LONG_LIQUIDATION_SPIKE", "HIGH", "4000000",
+                "1000000", "longLiquidationUsd5m");
+        EvidenceItemDO partial = independentDerivative("DERIVATIVES_DATA_PARTIAL", "MEDIUM", "3",
+                "4", "availableDatasets/minimumDatasetCount");
+        EvidenceItemDO confirmation = independentDerivative("OPEN_INTEREST_PRICE_CONFIRMATION", null, "0.06",
+                "110", "openInterestChange5m+ohlcv.close+ohlcv.volume");
+        when(evidenceItemMapper.listByAnalysisId("risk-run")).thenReturn(List.of(liquidation, partial, confirmation));
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+        assertThat(asset.getRiskItems()).filteredOn(r -> "LIQUIDATION_RISK".equals(r.getRiskType()))
+                .singleElement().satisfies(r -> {
+                    assertThat(r.getEvidenceStatus()).isEqualTo("AVAILABLE");
+                    assertThat(r.getSeverity()).isEqualTo("HIGH");
+                    assertThat(r.getCurrentValue()).isEqualTo("4000000");
+                    assertThat(r.getPrimaryEvidence()).contains("4000000", "1000000", "5m");
+                    assertThat(r.getAnalysisId()).isEqualTo("risk-run");
+                    assertThat(r.getSourceTraceId()).isEqualTo("risk-trace");
+                    assertThat(r.getScore()).isNull();
+                });
+        assertThat(asset.getRiskItems()).filteredOn(r -> "DATA_RISK".equals(r.getRiskType()))
+                .singleElement().extracting(DashboardHomeVO.AssetRiskItemVO::getSeverity).isEqualTo("MEDIUM");
+        assertThat(asset.getRiskItems()).filteredOn(r -> !List.of("DATA_RISK", "LIQUIDATION_RISK").contains(r.getRiskType()))
+                .allSatisfy(r -> assertThat(r.getSeverity()).isNull());
+        assertThat(asset.getRiskLevel()).isEqualTo("HIGH");
+    }
+
+    @Test
+    void derivativeRiskRejectsOtherRunTraceSymbolExpiredOrUngradedEvidenceAndTrxWithoutAnalysis() {
+        DashboardHomeVO.AssetVO asset = independentRiskAsset();
+        for (String invalid : List.of("run", "trace", "symbol", "expired", "stale", "grade", "future")) {
+            EvidenceItemDO evidence = independentDerivative("LONG_LIQUIDATION_SPIKE", "HIGH", "4000000",
+                    "1000000", "longLiquidationUsd5m");
+            switch (invalid) {
+                case "run" -> evidence.setAnalysisId("other-run");
+                case "trace" -> evidence.setSourceTraceId("other-trace");
+                case "symbol" -> evidence.setSourceReference(evidence.getSourceReference().replace("BTCUSDT", "ETHUSDT"));
+                case "expired" -> evidence.setSourceReference(evidence.getSourceReference().replace("12:01:00Z", "11:59:00Z"));
+                case "stale" -> evidence.setFreshness("STALE");
+                case "grade" -> evidence.setSeverity(null);
+                case "future" -> evidence.setObservedAt(LocalDateTime.of(2026, 7, 1, 12, 1));
+            }
+            when(evidenceItemMapper.listByAnalysisId("risk-run")).thenReturn(List.of(evidence));
+            ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", asset);
+            assertThat(asset.getRiskItems()).as(invalid).allSatisfy(r -> {
+                assertThat(r.getSeverity()).isNull();
+                assertThat(r.getEvidenceStatus()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            });
+        }
+        DashboardHomeVO.AssetVO trx = new DashboardHomeVO.AssetVO();
+        trx.setRawSymbol("TRXUSDT");
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", trx);
+        assertThat(trx.getAnalysisId()).isNull();
+        assertThat(trx.getRiskItems()).allSatisfy(r -> assertThat(r.getSeverity()).isNull());
+    }
+
+    private DashboardHomeVO.AssetVO independentRiskAsset() {
+        DashboardHomeVO.AssetVO asset = new DashboardHomeVO.AssetVO();
+        asset.setRawSymbol("BTCUSDT");
+        asset.setAnalysisId("risk-run");
+        asset.setDecisionId("risk-decision");
+        asset.setTraceId("risk-trace");
+        asset.setDirectionCalculatedAt(LocalDateTime.of(2026, 7, 1, 12, 0));
+        asset.setRiskLevel("HIGH");
+        return asset;
+    }
+
+    @Test
+    void observedProviderEmptyAndExtremeMoveReasonsAreAllReadableWithoutGenericSubstitution() {
+        ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setValidationReasons("AI_TRIGGER_NOT_MET");
+        plan.setRevalidationReason("COINGLASS_FUNDING:CG_V4_OI_WEIGHTED_FUNDING_HISTORY:PROVIDER_DATA_EMPTY,"
+                + "DERIVATIVES_PARTIAL,DERIVATIVES_REQUIRED:FUNDING,EXTREME_PRICE_MOVE:EXTREME_PRICE_MOVE_THRESHOLD_REACHED");
+        String text = ReflectionTestUtils.invokeMethod(service, "firstPlanReason", plan);
+        assertThat(text).contains("本轮未达到AI分析触发条件", "资金费率", "空结果", "覆盖不完整", "必需", "剧烈变动达到风险阈值")
+                .doesNotContain("尚未记录可读解释", "AI_TRIGGER", "DERIVATIVES", "COINGLASS", "EXTREME_PRICE_MOVE");
+    }
+
+    @Test
+    void homeAndAllPoolMembersReuseTheIdenticalRiskAnalysisDecisionTraceSnapshot() {
+        var pool = mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+        service.setAssetPoolService(pool);
+        var members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
+                new org.example.trademodel.dto.assetpool.AssetPoolAssetDTO((long) index,
+                        index == 1 ? "BTCUSDT" : index == 36 ? "TRXUSDT" : "ASSET" + index + "USDT",
+                        "Asset " + index, "SPOT", "USDT", true, index, "USER")).toList();
+        when(pool.listForUser(USER_ID)).thenReturn(members);
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(List.of());
+        DashboardHomeVO.AssetVO card = independentRiskAsset();
+        when(evidenceItemMapper.listByAnalysisId("risk-run")).thenReturn(List.of(independentDerivative(
+                "LONG_LIQUIDATION_SPIKE", "HIGH", "4000000", "1000000", "longLiquidationUsd5m")));
+        ReflectionTestUtils.invokeMethod(service, "applyIndependentRiskEvidence", card);
+        DashboardHomeVO home = new DashboardHomeVO();
+        home.setAssets(List.of(card));
+        home.setSelectedSymbol("BTCUSDT");
+        home.setSelectedAssetContext(card);
+        ReflectionTestUtils.invokeMethod(service, "attachCompleteRuntimeProjection", home, USER_ID, null);
+        assertThat(home.getAssetPool()).hasSize(36);
+        DashboardHomeVO.AssetVO row = home.getAssetPool().get(0);
+        assertThat(row).isSameAs(home.getAssets().get(0)).isSameAs(home.getSelectedAssetContext());
+        assertThat(row.getAnalysisId()).isEqualTo("risk-run");
+        assertThat(row.getDecisionId()).isEqualTo("risk-decision");
+        assertThat(row.getTraceId()).isEqualTo("risk-trace");
+        assertThat(row.getSnapshotId()).isEqualTo(home.getSnapshotId());
+        assertThat(row.getRiskItems()).filteredOn(r -> "LIQUIDATION_RISK".equals(r.getRiskType()))
+                .singleElement().extracting(DashboardHomeVO.AssetRiskItemVO::getSeverity).isEqualTo("HIGH");
+        assertThat(home.getAssetPool().get(35).getAnalysisId()).isNull();
+        assertThat(home.getAssetPool().get(35).getRiskItems()).allSatisfy(r -> assertThat(r.getSeverity()).isNull());
+    }
+
+    private EvidenceItemDO independentDerivative(String type, String severity, String value,
+                                                  String threshold, String field) {
+        EvidenceItemDO evidence = new EvidenceItemDO();
+        evidence.setEvidenceId("risk-" + type);
+        evidence.setAnalysisId("risk-run");
+        evidence.setEvidenceType("风险");
+        evidence.setSourceProvider("COINGLASS_V4");
+        evidence.setSourceTraceId("risk-trace");
+        evidence.setSourceReference("sourceField=" + field + ";currentValue=" + value
+                + ";comparisonValue=" + threshold + ";timeframe=5m;sourceStatus=READY;freshnessStatus=FRESH"
+                + ";reasonCode=" + type + ";analysisId=risk-run;ruleVersion=v1.0;evidenceType=" + type
+                + ";symbol=BTCUSDT;expiresAt=2026-07-01T12:01:00Z");
+        evidence.setSeverity(severity);
+        evidence.setCurrentValue(value);
+        evidence.setObservedAt(LocalDateTime.of(2026, 7, 1, 11, 59, 50));
+        evidence.setFreshness("FRESH");
+        return evidence;
     }
 
     @Test

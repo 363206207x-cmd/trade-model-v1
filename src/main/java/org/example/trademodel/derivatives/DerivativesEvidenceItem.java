@@ -24,6 +24,8 @@ public record DerivativesEvidenceItem(
         String reasonCode,
         String traceId,
         String analysisId,
-        String ruleVersion
+        String ruleVersion,
+        String riskSeverity,
+        Instant expiresAt
 ) {
 }

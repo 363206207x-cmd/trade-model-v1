@@ -72,6 +72,14 @@
         return { LOW: "risk-level-low", MEDIUM: "risk-level-medium", HIGH: "risk-level-high",
             EXTREME: "risk-level-extreme" }[String(level || "").toUpperCase()] || "risk-level-unknown";
     }
+    function poolTimeframes(asset) {
+        function timeframe(value, prefix) {
+            var detail = String(value || prefix + "数据不足").replace(new RegExp("^" + prefix + "\\s*"), "");
+            return prefix + " " + detail;
+        }
+        return timeframe(asset && asset.oneHourOpportunityLabel, "1小时") + " · "
+            + timeframe(asset && asset.fourHourTrendLabel, "4小时");
+    }
     function riskLevel(level) {
         return { LOW: "低", MEDIUM: "中", HIGH: "高", EXTREME: "极高" }[String(level || "").toUpperCase()] || "待评估";
     }
@@ -125,6 +133,17 @@
                     + escape(item.source || "尚无来源记录") + ' · ' + beijingTime(item.observedAt) + '</small></section>';
             }).join("")
             + (missing ? '<p class="risk-evidence-pending">' + missing + ' 项证据待补齐；不代表低风险或无风险。</p>' : '');
+    }
+    function riskDataStatus(asset) {
+        if (hasConfirmedRisks(asset) || !riskSummary(asset)) return "";
+        var reasons = [];
+        riskRows(asset).forEach(function (row) {
+            var reason = row.item && row.item.missingReason;
+            if (reason && reasons.indexOf(reason) < 0) reasons.push(reason);
+        });
+        if (!reasons.length) reasons.push(asset && asset.analysisId
+            ? "本轮尚未记录完整的独立风险证据" : "该资产尚无成功分析，风险无法判断");
+        return '<h3>风险数据状态</h3><p>' + reasons.map(escape).join('；') + '</p>';
     }
     function coreProviders(home) {
         var providers = home && home.diagnostics && home.diagnostics.providerReadiness && home.diagnostics.providerReadiness.providers || [];
@@ -235,7 +254,7 @@
         return window.__trineDesktopHoverController;
     }
     window.TrineDesktopSemantics = Object.freeze({ beijingTime: beijingTime, fullBeijingTime: fullBeijingTime, directionTimeLabel: directionTimeLabel, priceText: priceText, confidenceText: confidenceText, planPriceText: planPriceText, riskSummary: riskSummary,
-        riskDrawer: riskDrawer, hasConfirmedRisks: hasConfirmedRisks, serviceSummary: serviceSummary, serviceDrawer: serviceDrawer, installHoverDrawers: installHoverDrawers });
+        riskDrawer: riskDrawer, riskDataStatus: riskDataStatus, hasConfirmedRisks: hasConfirmedRisks, poolTimeframes: poolTimeframes, serviceSummary: serviceSummary, serviceDrawer: serviceDrawer, installHoverDrawers: installHoverDrawers });
 })();
 
 /* Desktop Home runtime */
@@ -736,7 +755,9 @@
             + '</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
             + '</strong></div>' + (risk ? '<div class="opportunity-risk" data-live-field="risk"'
             + (desktop.hasConfirmedRisks(asset) ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(symbol)
-            + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"' : '') + '>' + risk + '</div>' : '')
+            + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"'
+            : ' tabindex="0" data-desktop-hover="risk-status" data-risk-symbol="' + escapeHtml(symbol)
+                + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险数据状态"') + '>' + risk + '</div>' : '')
             + '<div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span>'
             + (timeLabel ? '<time class="opportunity-updated" datetime="' + escapeHtml(asset.directionCalculatedAt)
@@ -1297,7 +1318,8 @@
             + " · Decision " + shortId((role && role.decisionId) || ai.decisionId)
             + " · Trace " + shortId(role && role.traceId)
             + " · 生成时间 " + time(role && role.generatedAt);
-        setText("aiMetadata", (role ? "角色状态 " + label(role.roleState, "当前不可用") + " · 模型来源 " + text(role.provider, "当前不可查看") + " · " : "") + provenanceCopy);
+        setText("aiMetadata", (role ? "本轮状态 " + text(role.runStatusLabel, role.statusMessage)
+            + " · 模型来源 " + text(role.provider, "尚未记录") + " · " : "") + provenanceCopy);
         var trace = role && role.traceId;
         var analysis = role && role.analysisId;
         var audit = document.getElementById("auditChainLink");
@@ -2096,7 +2118,7 @@
     desktop.installHoverDrawers(function (trigger) {
         if (trigger.dataset.desktopHover === "service") return desktop.serviceDrawer(currentHome);
         var asset = liveAsset(trigger.dataset.riskSymbol);
-        return asset ? desktop.riskDrawer(asset) : null;
+        return asset ? (trigger.dataset.desktopHover === "risk-status" ? desktop.riskDataStatus(asset) : desktop.riskDrawer(asset)) : null;
     });
     bindSearch();
     bindTabs();
