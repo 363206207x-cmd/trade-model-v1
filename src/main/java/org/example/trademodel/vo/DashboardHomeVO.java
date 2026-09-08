@@ -37,6 +37,7 @@ public class DashboardHomeVO {
     public String getProviderStateVersion() { return providerStateVersion; }
     public void setProviderStateVersion(String value) { providerStateVersion = value; }
     public boolean isSnapshotComplete() { return snapshotComplete; }
+    public int getHomeAssetCount() { return assets.size(); }
     public void setSnapshotComplete(boolean value) { snapshotComplete = value; }
     public List<AssetVO> getAssetPool() { return assetPool; }
     public void setAssetPool(List<AssetVO> value) { assetPool = List.copyOf(value); }

@@ -90,6 +90,9 @@ public class HighValueAlertMessageService {
                 && opportunity != null && hasText(opportunity.opportunityId())
                 && persistedLog != null && hasText(persistedLog.getOpportunityId())
                 && Objects.equals(run.getAnalysisId(), plan.getAnalysisId())
+                && decision != null && hasText(decision.getDecisionId())
+                && Objects.equals(run.getAnalysisId(), decision.getAnalysisId())
+                && Objects.equals(decision.getDecisionId(), plan.getDecisionId())
                 && Objects.equals(opportunity.opportunityId(), persistedLog.getOpportunityId())
                 && Objects.equals(opportunity.opportunityId(), plan.getOpportunityId())
                 && hasText(run.getTraceId()) && Objects.equals(run.getTraceId(), plan.getTraceId())
@@ -233,9 +236,9 @@ public class HighValueAlertMessageService {
                     + "\n止损：" + decimalOrUnset(position.getStopLoss())
                     + "  目标：" + decimalOrUnset(position.getTakeProfit())
                     + "\n\n操作：打开持仓详情");
-            message.setDedupeKey(TelegramDedupeKey.create(HighValueAlertPolicy.POSITION_EVENT,
-                    change.name(), change.severityRank(), telegramProperties.getCooldownMinutes(),
-                    position.getUserId(), "USER_POSITION", String.valueOf(position.getId()), now));
+            message.setDedupeKey(TelegramDedupeKey.createPlanLifetime(HighValueAlertPolicy.POSITION_EVENT,
+                    change.name(), change.severityRank(),
+                    position.getUserId(), "USER_POSITION", String.valueOf(position.getId())));
         } else {
             ExecutionPlanDO sourcePlan = hasText(position.getFinalPlanId())
                     ? executionPlanMapper.selectByPlanId(position.getFinalPlanId()) : null;

@@ -39,7 +39,7 @@ public class HighValueAlertPolicy {
                 && value.persistedOpportunity()
                 && value.finalPlan()
                 && value.ruleValidated()
-                && Set.of("CONFIRMATION", "REDUCED").contains(normalized(value.finalPlanMode()))
+                && "CONFIRMATION".equals(normalized(value.finalPlanMode()))
                 && Set.of("STRONG_BULLISH", "STRONG_BEARISH").contains(normalized(value.finalMarketBias()))
                 && Set.of("LOW", "MEDIUM").contains(normalized(value.finalRiskLevel()))
                 && "CURRENT".equals(normalized(value.planLifecycleState()))
@@ -121,8 +121,7 @@ public class HighValueAlertPolicy {
         if (!TelegramDedupeKey.managed(dedupeKey)) return false;
         String event = normalized(TelegramDedupeKey.eventType(dedupeKey));
         String state = normalized(TelegramDedupeKey.state(dedupeKey));
-        return (OPPORTUNITY_EVENT.equals(event) && Set.of("CONFIRMATION", "REDUCED").contains(state))
-                || (SAFETY_EVENT.equals(event) && isSafetyState(state))
+        return (OPPORTUNITY_EVENT.equals(event) && "CONFIRMATION".equals(state))
                 || (POSITION_EVENT.equals(event) && TELEGRAM_POSITION_STATES.contains(state));
     }
 
@@ -155,21 +154,6 @@ public class HighValueAlertPolicy {
             return Optional.of(new TelegramDeliveryIdentity(
                     OPPORTUNITY_TELEGRAM_CATEGORY, state, "FINAL_PLAN",
                     message.getPlanId().trim(), 3));
-        }
-        if (SAFETY_EVENT.equals(event)) {
-            if (!"OPPORTUNITY_PLAN_SAFETY_CHANGE".equals(normalized(message.getCategory()))
-                    || !SAFETY_SHORT_TITLE.equals(message.getTitle().trim())
-                    || !safetyShortBody(message)) {
-                return Optional.empty();
-            }
-            String subjectType = hasText(message.getPlanId()) ? "FINAL_PLAN" : "OPPORTUNITY";
-            String subjectId = hasText(message.getPlanId()) ? message.getPlanId() : message.getSourceId();
-            if (!hasText(subjectId) || !TelegramDedupeKey.matchesSubject(message.getDedupeKey(),
-                    message.getUserId(), subjectType, subjectId)) {
-                return Optional.empty();
-            }
-            return Optional.of(new TelegramDeliveryIdentity(
-                    SAFETY_TELEGRAM_CATEGORY, state, subjectType, subjectId, safetySeverity(state)));
         }
         if (!"POSITION_LOGIC_RISK_CHANGE".equals(normalized(message.getCategory()))
                 || !POSITION_SHORT_TITLE.equals(message.getTitle().trim())
@@ -204,7 +188,7 @@ public class HighValueAlertPolicy {
         String[] lines = message.getBody().split("\\n", -1);
         return lines.length == 9
                 && lines[0].startsWith(message.getSymbol().trim() + "  ·  ")
-                && (lines[0].endsWith("  ·  确认型") || lines[0].endsWith("  ·  缩减型"))
+                && lines[0].endsWith("  ·  确认型")
                 && lines[0].length() > message.getSymbol().trim().length() + "  ·    ·  缩减型".length()
                 && lines[1].isEmpty()
                 && populatedLine(lines[2], "入场：")

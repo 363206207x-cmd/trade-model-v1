@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api/asset-pool")
@@ -46,6 +49,44 @@ public class AssetPoolController {
     @GetMapping
     public ApiResponse<List<AssetPoolAssetDTO>> list() {
         return ApiResponse.success(assetPoolService.listForUser(userIdResolver.requireCurrentUserId()));
+    }
+
+    public record HomePinRequest(@NotNull Boolean pinned) {}
+    public record HomePinOrderRequest(@NotNull List<String> symbols) {
+        @com.fasterxml.jackson.annotation.JsonAnySetter
+        public void rejectUnexpectedField(String name, Object value) {
+            throw new IllegalArgumentException("unsupported home pin sequence field");
+        }
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(
+            org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Object>> invalidPayload() {
+        return ResponseEntity.badRequest().body(ApiResponse.badRequest("invalid request"));
+    }
+
+    @PostMapping("/{symbol}/home-pin")
+    public ResponseEntity<ApiResponse<List<AssetPoolAssetDTO>>> homePin(
+            @PathVariable String symbol, @Valid @RequestBody HomePinRequest request) {
+        Long userId = userIdResolver.requireCurrentUserId();
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    assetPoolService.setHomePin(userId, symbol, request.pinned())));
+        } catch (IllegalArgumentException invalidPreference) {
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(invalidPreference.getMessage()));
+        }
+    }
+
+    @PostMapping("/home-pins/sequence")
+    public ResponseEntity<ApiResponse<List<AssetPoolAssetDTO>>> homePinOrder(
+            @Valid @RequestBody HomePinOrderRequest request) {
+        Long userId = userIdResolver.requireCurrentUserId();
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    assetPoolService.reorderHomePins(userId, request.symbols())));
+        } catch (IllegalArgumentException invalidPreference) {
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(invalidPreference.getMessage()));
+        }
     }
 
     @GetMapping("/search")

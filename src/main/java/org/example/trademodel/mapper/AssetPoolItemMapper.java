@@ -11,6 +11,9 @@ import java.util.List;
 
 @Mapper
 public interface AssetPoolItemMapper {
+    @Select("SELECT id FROM tm_user WHERE id = #{userId} FOR UPDATE")
+    Long lockUserForHomePins(@Param("userId") Long userId);
+
     @Select("SELECT * FROM tm_asset_pool_item WHERE owner_type = 'SYSTEM' AND owner_id = 0 "
             + "AND active = TRUE ORDER BY sort_order, id")
     List<AssetPoolItemDO> listSystemDefaults();

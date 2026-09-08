@@ -21,6 +21,7 @@
     let assetPoolLoaded = false;
     let assetPoolProjections = [];
     let assetPoolProjectionVersion = 0;
+    let pinMutationPending = false;
     let latestTasks = [];
     let poolScanRuntime = null;
     let telegramStatus = null;
@@ -550,6 +551,49 @@
         }
     }
 
+    function orderedHomePins() {
+        return assetPoolItems.filter(item => item.homePinned === true)
+            .slice().sort((a, b) => a.homePinOrder - b.homePinOrder);
+    }
+
+    async function persistHomePinPreference(path, payload, message) {
+        if (pinMutationPending) return;
+        pinMutationPending = true;
+        renderAssetPoolRows(assetPoolItems, assetPoolProjections);
+        try {
+            const saved = await api(path, { method: "POST", body: JSON.stringify(payload) });
+            if (!Array.isArray(saved)) throw new Error("置顶保存结果未确认，请刷新后核对");
+            assetPoolItems = saved;
+            announce(message);
+            await loadAssetPool();
+        } catch (error) {
+            announce(error.message || "置顶保存失败，已保留原列表");
+        } finally {
+            pinMutationPending = false;
+            renderAssetPoolRows(assetPoolItems, assetPoolProjections);
+        }
+    }
+
+    async function updateHomePin(symbol, pinned) {
+        if (pinMutationPending) return;
+        const item = assetPoolItems.find(asset => asset.symbol === symbol);
+        if (!item || (item.homePinned === true) === pinned) return;
+        if (pinned && orderedHomePins().length >= 6) {
+            announce("最多置顶 6 个资产，请先取消一个置顶"); return;
+        }
+        await persistHomePinPreference("/api/asset-pool/" + encodeURIComponent(symbol) + "/home-pin",
+            { pinned }, symbol + (pinned ? " 已置顶首页" : " 已取消置顶"));
+    }
+
+    async function moveHomePin(symbol, offset) {
+        if (pinMutationPending || ![-1, 1].includes(offset)) return;
+        const symbols = orderedHomePins().map(item => item.symbol);
+        const from = symbols.indexOf(symbol), to = from + offset;
+        if (from < 0 || to < 0 || to >= symbols.length) return;
+        [symbols[from], symbols[to]] = [symbols[to], symbols[from]];
+        await persistHomePinPreference("/api/asset-pool/home-pins/sequence", { symbols }, "首页置顶顺序已保存");
+    }
+
     function renderAssetPoolRows(items, projections) {
         const rows = document.getElementById("assetPoolRows");
         const emptyNode = document.getElementById("assetPoolEmpty");
@@ -559,7 +603,18 @@
         const bySymbol = new Map((projections || []).map(function (asset) {
             return [String(asset?.rawSymbol || asset?.symbol || "").toUpperCase(), asset];
         }));
-        items.forEach(function (asset) {
+        const pins = items.filter(asset => asset.homePinned === true)
+            .slice().sort((a, b) => a.homePinOrder - b.homePinOrder);
+        const ordered = pins.concat(items.filter(asset => asset.homePinned !== true));
+        let previousGroup = null;
+        ordered.forEach(function (asset) {
+            const group = asset.homePinned === true ? "置顶首页 · " + pins.length + "/6" : "全部观察资产 · 未置顶";
+            if (group !== previousGroup) {
+                const divider = document.createElement("tr");
+                divider.className = "pool-pin-group";
+                divider.innerHTML = '<th scope="rowgroup" colspan="8">' + escapeHtml(group) + '</th>';
+                rows.appendChild(divider); previousGroup = group;
+            }
             const live = bySymbol.get(String(asset.symbol || "").toUpperCase()) || null;
             const direction = live
                 ? text(live.marketBiasLabel, label(live.marketBias, "暂不可判断")) : "数据待同步";
@@ -572,13 +627,24 @@
             row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td>'
                 + '<td>' + escapeHtml(window.TrineDesktopSemantics.priceText(live?.latestPrice)) + '</td>'
                 + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong></td>'
-                + '<td class="pool-confidence">' + escapeHtml(confidence) + (confidence === "—" ? '<small>' + escapeHtml(live?.unavailableReason || live?.marketBiasLabel || "尚无置信度计算结果") + '</small>' : '') + '</td>'
+                + '<td class="pool-confidence">' + escapeHtml(confidence) + '</td>'
                 + '<td><div' + (window.TrineDesktopSemantics.hasConfirmedRisks(live || {})
                     ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情"' : '') + '>'
                 + window.TrineDesktopSemantics.riskSummary(live || {}) + '</div></td>'
                 + '<td><span>' + escapeHtml(text(live?.oneHourOpportunityLabel, "1小时数据不足")) + '</span><small>' + escapeHtml(text(live?.fourHourTrendLabel, "4小时数据不足")) + '</small></td>'
-                + '<td>' + escapeHtml(window.TrineDesktopSemantics.beijingTime(live?.directionCalculatedAt || live?.updatedAt)) + '</td>'
-                + '<td class="align-right"><button class="button button-quiet" type="button" data-remove-asset="' + escapeHtml(asset.symbol) + '">移除</button></td>';
+                + '<td>' + (live?.directionCalculatedAt ? escapeHtml(window.TrineDesktopSemantics.beijingTime(live.directionCalculatedAt)) : '—') + '</td>'
+                + '<td class="align-right"><div class="pool-pin-actions"><button class="pool-pin-toggle" type="button" data-home-pin="'
+                + escapeHtml(asset.symbol) + '" aria-pressed="' + String(asset.homePinned === true) + '" aria-label="'
+                + escapeHtml((asset.homePinned ? '取消置顶首页 ' : '置顶首页 ') + asset.symbol) + '"'
+                + (pinMutationPending || !asset.homePinned && pins.length >= 6 ? ' disabled' : '') + '><span aria-hidden="true">'
+                + (asset.homePinned ? '★' : '☆') + '</span></button>'
+                + (asset.homePinned ? [-1, 1].map(function (step) {
+                    const index = pins.indexOf(asset), disabled = pinMutationPending || index + step < 0 || index + step >= pins.length;
+                    return '<button class="pool-pin-order" type="button" data-home-pin-move="' + escapeHtml(asset.symbol)
+                        + '" data-pin-step="' + step + '" aria-label="' + escapeHtml(asset.symbol + (step < 0 ? ' 置顶顺序上移' : ' 置顶顺序下移'))
+                        + '"' + (disabled ? ' disabled' : '') + '>' + (step < 0 ? '↑' : '↓') + '</button>';
+                }).join('') : '')
+                + '<button class="button button-quiet" type="button" data-remove-asset="' + escapeHtml(asset.symbol) + '">移除</button></div></td>';
             rows.appendChild(row);
         });
     }
@@ -995,8 +1061,15 @@
             const result = event.target.closest("[data-search-symbol]");
             const remove = event.target.closest("[data-remove-asset]");
             const detail = event.target.closest("[data-pool-detail]");
+            const pin = event.target.closest("[data-home-pin]");
+            const move = event.target.closest("[data-home-pin-move]");
             try {
-                if (result) {
+                if (pin) {
+                    const item = assetPoolItems.find(asset => asset.symbol === pin.dataset.homePin);
+                    if (!pin.disabled && item) await updateHomePin(item.symbol, item.homePinned !== true);
+                } else if (move) {
+                    if (!move.disabled) await moveHomePin(move.dataset.homePinMove, Number(move.dataset.pinStep));
+                } else if (result) {
                     result.disabled = true;
                     if (result.dataset.preview === "true") await previewAsset(result.dataset.searchSymbol);
                     else if (result.dataset.existingPool === "true") openPoolAssetDetail(result.dataset.searchSymbol, result);

@@ -30,7 +30,8 @@ class B123OwnerCopyAndPositionDetailContractTest {
         String login = Files.readString(LOGIN);
 
         assertThat(home).contains("<title>TRINE LOGIC</title>", ">TRINE LOGIC</h1>",
-                ">资产</h2>", ">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>");
+                ">重点资产</h2>", ">持仓监控</h2>", ">执行计划</h2>", ">AI 分析</h2>")
+                .doesNotContain(">资产</h2>");
         assertThat(workspace).contains("' · TRINE LOGIC'", ">TRINE LOGIC</strong>",
                 "<h2 id=\"positionsHeading\">持仓监控</h2>");
         assertThat(login).contains("<title>登录 · TRINE LOGIC</title>", ">TRINE LOGIC</h1>");

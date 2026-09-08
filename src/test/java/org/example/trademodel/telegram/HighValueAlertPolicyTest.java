@@ -15,11 +15,11 @@ class HighValueAlertPolicyTest {
     private final HighValueAlertPolicy policy = new HighValueAlertPolicy();
 
     @Test
-    void onlyCompleteCurrentStrongConfirmationOrReducedFinalPassesOpportunityPolicy() {
+    void onlyCompleteCurrentStrongConfirmationFinalPassesOpportunityPolicy() {
         assertThat(policy.allowsOpportunity(opportunity("CONFIRMATION", "CURRENT", "TRIGGERED",
                 true, true, true, true, true))).isTrue();
         assertThat(policy.allowsOpportunity(opportunity("REDUCED", "CURRENT", "TRIGGERED",
-                true, true, true, true, true))).isTrue();
+                true, true, true, true, true))).isFalse();
         assertThat(policy.allowsOpportunity(opportunity("PREPARATION", "CURRENT", "TRIGGERED",
                 true, true, true, true, true))).isFalse();
         assertThat(policy.allowsOpportunity(opportunity("CONFIRMATION", "NEEDS_REVALIDATION", "TRIGGERED",
@@ -111,16 +111,21 @@ class HighValueAlertPolicyTest {
     }
 
     @Test
-    void deliveryAllowlistAcceptsCanonicalSafetyAndRejectsLegacyLongFormMessages() {
+    void deliveryAllowlistRejectsSafetyAndLegacyLongFormMessages() {
         MessageDO opportunity = eligibleOpportunityMessage();
         assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(opportunity))
                 .get().extracting(HighValueAlertPolicy.TelegramDeliveryIdentity::telegramCategory)
                 .isEqualTo("EXECUTABLE_FINAL_PLAN");
 
         MessageDO safety = eligibleSafetyMessage();
-        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(safety))
-                .get().extracting(HighValueAlertPolicy.TelegramDeliveryIdentity::telegramCategory)
-                .isEqualTo("PLAN_SAFETY_CHANGE");
+        assertThat(HighValueAlertPolicy.telegramDeliveryIdentity(safety)).isEmpty();
+        for (var change : HighValueAlertPolicy.SafetyChangeType.values()) {
+            assertThat(policy.allowsSafetyChange(new HighValueAlertPolicy.SafetyQualification(
+                    41L, change, true, true, true))).isTrue();
+            assertThat(HighValueAlertPolicy.telegramDeliveryEventEligible(TelegramDedupeKey.create(
+                    "PLAN_SAFETY_CHANGE", change.name(), 4, 15, 41L, "FINAL_PLAN", "plan-9", LocalDateTime.now())))
+                    .isFalse();
+        }
 
         MessageDO legacyPosition = eligiblePositionMessage("STRONG_REVERSAL");
         legacyPosition.setTitle("【持仓逻辑发生重要变化】");

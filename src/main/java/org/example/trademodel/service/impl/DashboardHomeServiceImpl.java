@@ -436,6 +436,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (selectedContext != null && !assets.contains(selectedContext)) applyDesktopFacts(selectedContext);
         applyPlanPauseEvidence(executionSuggestion);
         attachCompleteRuntimeProjection(home, userId, providerReadiness);
+        home.setSnapshotComplete(!rankingRead.failed() && !decisionRead.failed()
+                && !selectedDecisionReadFailed && !positionRead.failed());
         registerLiveStructuralContexts(userId, assets);
         return home;
     }
@@ -1139,12 +1141,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         List<DashboardHomeVO.AssetVO> assets = new ArrayList<>();
         String normalizedSelected = normalizeSymbol(selectedSymbol);
         LinkedHashSet<String> ordered = new LinkedHashSet<>(focusSymbols == null ? List.of() : focusSymbols);
-        if (normalizedSelected != null && ordered.remove(normalizedSelected)) {
-            LinkedHashSet<String> selectedFirst = new LinkedHashSet<>();
-            selectedFirst.add(normalizedSelected);
-            selectedFirst.addAll(ordered);
-            ordered = selectedFirst;
-        }
+        // Selection changes the reading context, never the authoritative collection or order.
         for (String symbol : ordered) {
             if (assets.size() >= limit) {
                 break;
@@ -1244,26 +1241,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             String selectedSymbol,
             int limit) {
         List<HomeTopAssetProjection> source = projections == null ? List.of() : projections;
-        String normalizedSelected = normalizeSymbol(selectedSymbol);
-        if (normalizedSelected == null || limit <= 0 || source.size() <= limit) {
-            return source;
-        }
-        int selectedIndex = -1;
-        for (int index = 0; index < source.size(); index++) {
-            HomeTopAssetProjection projection = source.get(index);
-            if (projection != null
-                    && normalizedSelected.equals(normalizeSymbol(projection.symbol()))) {
-                selectedIndex = index;
-                break;
-            }
-        }
-        if (selectedIndex < 0 || selectedIndex < limit) {
-            return source;
-        }
-        List<HomeTopAssetProjection> prioritized = new ArrayList<>(source);
-        HomeTopAssetProjection selected = prioritized.remove(selectedIndex);
-        prioritized.add(Math.min(limit - 1, prioritized.size()), selected);
-        return prioritized;
+        // An out-of-list selection has a separate context below the cards.
+        return source.subList(0, Math.min(source.size(), Math.max(0, limit)));
     }
 
     private void applyAnalysisProvenance(DashboardHomeVO.AssetVO asset,
@@ -3234,10 +3213,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 || "BLOCKED".equals(upper(plan.getExecutionPlanStatus()));
         applyPersistedPlanAudit(suggestion, resolution, plan);
         suggestion.setSourceDecisionId(decision.getDecisionId());
-        suggestion.setStatus(paused ? "RULE_CONDITIONAL_SUSPENDED" : "RULE_CONDITIONAL_PLAN");
-        suggestion.setStatusLabel(paused ? "规则参考计划 · 暂停" : "规则参考计划 · 等待触发");
-        suggestion.setModuleState(paused ? "BLOCKED" : "READY");
-        suggestion.setBlockedReason(paused ? firstPlanReason(plan) : null);
+        suggestion.setStatus(paused ? "PLAN_BLOCKED" : "FINAL_VALIDATION_PENDING");
+        suggestion.setStatusLabel(paused ? "当前执行计划已阻断" : "Final 执行计划尚未完成");
+        suggestion.setModuleState(paused ? "BLOCKED" : "PARTIAL");
+        suggestion.setBlockedReason(paused ? firstPlanReason(plan) : "规则参考计划尚未通过最终校验");
         suggestion.setWorthOpening(false);
         suggestion.setFinalPlan(false);
         suggestion.setNotTradeInstruction(true);
@@ -3302,7 +3281,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
         suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
-        if (currentStructuralPlan(plan)) {
+        if (Boolean.TRUE.equals(plan.getFinalPlan()) && currentStructuralPlan(plan)
+                && "PASS".equals(upper(plan.getRuleValidationStatus()))
+                && "FINAL_VALIDATED".equals(upper(plan.getChainStatus()))
+                && "CURRENT".equals(upper(plan.getPlanLifecycleState()))
+                && !Boolean.TRUE.equals(plan.getNeedsRevalidation())) {
             suggestion.setDirection(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
             suggestion.setFinalMarketBias(firstNonBlank(plan.getFinalMarketBias(), plan.getRuleMarketBias()));
             suggestion.setFinalPlanMode(firstNonBlank(plan.getFinalPlanMode(), plan.getPlanMode()));
@@ -3351,6 +3334,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return AssetExecutionPlanResolution.error("执行计划精确身份读取能力不可用");
         }
         try {
+            ExecutionPlanDO currentFinal = executionPlanMapper.selectLatestCurrentFinalByDecisionIdentity(
+                    analysisId, decisionId);
+            if (currentFinal != null) {
+                return validateExactPlanIdentity(currentFinal, analysisId, decisionId, symbol, currentFinal.getPlanId());
+            }
             List<OpportunityLogDTO> relations = opportunityLogService.queryForSystem(
                     analysisId, decisionId, null, symbol, null, null, null, null, 2);
             if (relations == null || relations.isEmpty()) {
@@ -3400,7 +3388,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         if (plan == null || planId == null
                 || relatedPlanId != null && !relatedPlanId.equals(planId)
                 || !analysisId.equals(trimToNull(plan.getAnalysisId()))
-                || planDecisionId != null && !decisionId.equals(planDecisionId)) {
+                || !decisionId.equals(planDecisionId)) {
             return AssetExecutionPlanResolution.error("执行计划记录与精确关系不一致");
         }
         AnalysisRunDO run = analysisRunMapper.selectById(analysisId);
@@ -3408,6 +3396,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 || !analysisId.equals(trimToNull(run.getAnalysisId()))
                 || !symbol.equals(normalizeSymbol(run.getSymbol()))) {
             return AssetExecutionPlanResolution.error("分析来源与当前资产身份不一致");
+        }
+        if (!hasText(run.getTraceId()) || !hasText(plan.getTraceId())
+                || !Objects.equals(trimToNull(run.getTraceId()), trimToNull(plan.getTraceId()))) {
+            return AssetExecutionPlanResolution.error("计划 Trace 缺失或与当前 Analysis Run 不一致；等待同批次计划重新评估");
         }
         return new AssetExecutionPlanResolution(
                 ExactPlanIdentityState.READY, plan, analysisId, planId,
@@ -3620,6 +3612,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                                     DecisionResultVO fallback,
                                                     DecisionResultVO marker) {
         if (marker == null || executionPlanMapper == null || analysisRunMapper == null) {
+            return fallback;
+        }
+        // An AI preview is not a replacement for the ranked rule Decision, even in the same
+        // closed-hour bucket. Otherwise clicking a card changes that card and the Pool's facts.
+        if (fallback == null || !Objects.equals(marker.getAnalysisId(), fallback.getAnalysisId())
+                || !Objects.equals(marker.getDecisionId(), fallback.getDecisionId())) {
             return fallback;
         }
         try {

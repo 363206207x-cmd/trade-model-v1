@@ -266,6 +266,17 @@ class ChannelDeliveryTelegramContractTest {
     }
 
     @Test
+    void repeatedPositionRiskAfterCooldownOrRestartReusesOriginalDelivery() {
+        var original = new ChannelDeliveryDO();
+        original.setDeliveryId("position-risk-original");
+        original.setStatus("SENT");
+        when(messageFactService.findForUser(41L, "later-monitor-message")).thenReturn(message(3));
+        when(mapper.selectExistingLifetimeDelivery(anyLong(), anyString())).thenReturn(original);
+        assertThat(service.queueTelegram(41L, "later-monitor-message")).isSameAs(original);
+        verify(mapper, never()).insert(any());
+    }
+
+    @Test
     void providerRetryingPlanReusesOriginalDeliveryButNewPlanMayQueue() {
         MessageDO retryMessage = eligiblePlanMessage("message-plan-retry", "plan-1");
         MessageDO newPlanMessage = eligiblePlanMessage("message-plan-2", "plan-2");

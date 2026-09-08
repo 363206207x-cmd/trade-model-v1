@@ -28,9 +28,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Comparator;
+import java.util.Objects;
+import java.time.ZoneOffset;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Service
 public class PersistentAssetPoolService implements AssetPoolService {
+    private static final ObjectMapper PIN_JSON = new ObjectMapper();
     private final AssetPoolItemMapper mapper;
     private final AssetMapper assetMapper;
     private final MarketAssetCatalog marketAssetCatalog;
@@ -90,6 +96,92 @@ public class PersistentAssetPoolService implements AssetPoolService {
                 .sorted((left, right) -> Integer.compare(sortOrder(left), sortOrder(right)))
                 .map(PersistentAssetPoolService::toDto)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public List<AssetPoolAssetDTO> setHomePin(Long userId, String symbol, boolean pinned) {
+        lockPinOwner(userId);
+        String normalized = normalizeSymbol(symbol);
+        List<AssetPoolAssetDTO> members = listForUser(userId);
+        if (members.stream().noneMatch(asset -> normalized.equals(asset.symbol()))) {
+            throw new IllegalArgumentException("该资产不在你的资产池中，请刷新后重试");
+        }
+        List<String> order = new ArrayList<>(pinnedSymbols(members));
+        if (pinned && !order.contains(normalized)) {
+            if (order.size() >= 6) throw new IllegalArgumentException("最多置顶6个资产，请先取消一个置顶");
+            order.add(normalized);
+        } else if (!pinned) {
+            order.remove(normalized);
+        }
+        persistPinOrder(userId, members, order);
+        return listForUser(userId);
+    }
+
+    @Override
+    @Transactional
+    public List<AssetPoolAssetDTO> reorderHomePins(Long userId, List<String> symbols) {
+        lockPinOwner(userId);
+        if (symbols == null || symbols.size() > 6 || symbols.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("置顶顺序无效，请刷新后重试");
+        }
+        List<String> order = symbols.stream().map(PersistentAssetPoolService::normalizeSymbol).toList();
+        List<AssetPoolAssetDTO> members = listForUser(userId);
+        List<String> current = pinnedSymbols(members);
+        if (order.size() != current.size() || order.stream().distinct().count() != order.size()
+                || !Set.copyOf(order).equals(Set.copyOf(current))) {
+            throw new IllegalArgumentException("置顶列表已变化，请刷新后重新排序");
+        }
+        persistPinOrder(userId, members, order);
+        return listForUser(userId);
+    }
+
+    private void lockPinOwner(Long userId) {
+        requireUserId(userId);
+        if (mapper.lockUserForHomePins(userId) == null) {
+            throw new IllegalArgumentException("登录身份已失效，请重新验证");
+        }
+    }
+
+    private static List<String> pinnedSymbols(List<AssetPoolAssetDTO> members) {
+        return members.stream().filter(AssetPoolAssetDTO::homePinned)
+                .sorted(Comparator.comparing(AssetPoolAssetDTO::homePinOrder)
+                        .thenComparing(AssetPoolAssetDTO::symbol))
+                .map(AssetPoolAssetDTO::symbol).toList();
+    }
+
+    private void persistPinOrder(Long userId, List<AssetPoolAssetDTO> members, List<String> order) {
+        for (AssetPoolAssetDTO asset : members) {
+            int index = order.indexOf(asset.symbol());
+            Integer pinOrder = index < 0 ? null : index + 1;
+            if (Objects.equals(pinOrder, asset.homePinOrder())) continue;
+            AssetPoolItemDO existing = mapper.selectByOwnerAndSymbol("USER", userId, asset.symbol());
+            AssetPoolItemDO source = existing == null
+                    ? mapper.selectByOwnerAndSymbol("SYSTEM", 0L, asset.symbol()) : existing;
+            if (source == null || !Boolean.TRUE.equals(source.getActive())) {
+                throw new IllegalArgumentException("资产池已变化，请刷新后重试");
+            }
+            AssetPoolItemDO row = defaultOverride(userId, source, existing, true,
+                    defaultWatchStatus(source), LocalDateTime.now(ZoneOffset.UTC));
+            if (existing != null) row.setSourceType(existing.getSourceType());
+            row.setExtJson(withPinOrder(row.getExtJson(), pinOrder));
+            mapper.upsert(row);
+        }
+    }
+
+    private static String withPinOrder(String extJson, Integer order) {
+        if ((extJson == null || extJson.isBlank()) && order == null) return extJson;
+        try {
+            var parsed = extJson == null || extJson.isBlank()
+                    ? PIN_JSON.createObjectNode() : PIN_JSON.readTree(extJson);
+            if (!(parsed instanceof ObjectNode object)) {
+                throw new IllegalArgumentException("资产池偏好数据异常，未修改原记录");
+            }
+            if (order == null) object.remove("homePinOrder"); else object.put("homePinOrder", order);
+            return PIN_JSON.writeValueAsString(object);
+        } catch (java.io.IOException malformedMetadata) {
+            throw new IllegalArgumentException("资产池偏好数据异常，未修改原记录");
+        }
     }
 
     @Override
@@ -162,6 +254,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
     @Transactional
     public AssetPoolAssetDTO addForUser(Long userId, String symbol, boolean focusEnabled) {
         requireUserId(userId);
+        mapper.lockUserForHomePins(userId);
         MarketAssetDTO marketAsset = marketAssetCatalog.requireTradable(symbol);
         LocalDateTime now = LocalDateTime.now();
         String normalized = normalizeSymbol(marketAsset.symbol());
@@ -202,6 +295,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
     @Transactional
     public void removeForUser(Long userId, String symbol) {
         requireUserId(userId);
+        mapper.lockUserForHomePins(userId);
         String normalized = normalizeSymbol(symbol);
         if (normalized.isBlank()) {
             throw new IllegalArgumentException("symbol is required");
@@ -229,7 +323,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
         row.setSourceType("USER_OVERRIDE");
         row.setWatchStatus("TRACKING_STOPPED");
         row.setVersion(nextVersion(existing));
-        row.setExtJson(existing == null ? null : existing.getExtJson());
+        row.setExtJson(withPinOrder(existing == null ? null : existing.getExtJson(), null));
         row.setCreatedAt(existing == null || existing.getCreatedAt() == null ? now : existing.getCreatedAt());
         row.setUpdatedAt(now);
         mapper.upsert(row);
@@ -246,6 +340,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
     @Transactional
     public List<AssetPoolAssetDTO> topUpDefaults(Long userId) {
         requireUserId(userId);
+        mapper.lockUserForHomePins(userId);
         Map<String, AssetPoolItemDO> overrides = safe(mapper.listUserOverrides(userId)).stream()
                 .collect(Collectors.toMap(row -> normalizeSymbol(row.getSymbol()), row -> row,
                         (left, right) -> right, LinkedHashMap::new));
@@ -265,6 +360,7 @@ public class PersistentAssetPoolService implements AssetPoolService {
     @Transactional
     public List<AssetPoolAssetDTO> resetDefaults(Long userId) {
         requireUserId(userId);
+        mapper.lockUserForHomePins(userId);
         Set<String> defaultSymbols = safe(mapper.listSystemDefaults()).stream()
                 .map(row -> normalizeSymbol(row.getSymbol()))
                 .collect(Collectors.toSet());

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -89,9 +91,18 @@ class GlobalFrozenUiAlignmentContractTest {
     void planAndThreeAiUseSourceOwnedSemantics() throws Exception {
         String script = Files.readString(HOME_JS);
         assertThat(script).contains(
-                "plan-status-layer", "plan-key-layer", "plan-trigger-check", "plan.sourceDecisionId",
+                "plan-status-layer", "plan-key-layer", "plan.sourceDecisionId",
                 "plan.planLifecycleState", "plan.sourceAnalysisId", "plan.sourceTraceId",
-                "plan.stopLoss || plan.stopZone", "条件计划 · ", "等待触发", "暂停",
+                "String(plan.sourceAnalysisId) === String(asset.analysisId)",
+                "String(plan.sourceDecisionId) === String(asset.decisionId)",
+                "String(plan.sourceTraceId) === String(asset.traceId)",
+                "has(plan.sourceExecutionPlanId)", "conditionalState === \"CURRENT\" && plan.finalPlan === true",
+                "String(plan.validationStatus || \"\").toUpperCase() === \"PASS\"",
+                "String(plan.chainStatus || \"\").toUpperCase() === \"FINAL_VALIDATED\"",
+                "sameSnapshot && currentFinal && access.visible && validNow",
+                "plan.entryZone", "plan.triggerCondition", "plan.stopLoss || plan.stopZone",
+                "planField(\"TP1\"", "planField(\"TP2\"", "plan.invalidCondition || plan.abandonCondition",
+                "plan.validFrom", "plan.expiresAt", "有效期（北京时间）", "等待触发",
                 "[\"APPROVE\", \"DOWNGRADE\", \"REJECT_CANDIDATE\", \"RISK_WARNING\"]",
                 "GPT 综合判断 · 非最终计划", "Gemini 冲突复核", "Grok 反方挑战",
                 "return roleUnavailable(role)", "触发 → 演化 → 失效",
@@ -162,7 +173,9 @@ class GlobalFrozenUiAlignmentContractTest {
         String workspaceCss = Files.readString(WORKSPACE_CSS);
 
         assertThat(homeScript).contains(
-                "<small>方向</small>", "<small>置信</small>", "<small>风险</small>",
+                "<small>方向</small>", "<small>置信</small>",
+                "desktop.riskSummary(asset)", "desktop.hasConfirmedRisks(asset)",
+                "risk ? '<div class=\"opportunity-risk\"", "data-desktop-hover=\"risk\"",
                 "PENDING: \"等待监控数据\"", "STALE: \"监控数据已过期\"",
                 "INVALID: \"当前不可查看\"", "SOURCE_UNAVAILABLE: \"监控来源不可用\"",
                 "position-trust-state", "is-untrusted")
@@ -191,6 +204,50 @@ class GlobalFrozenUiAlignmentContractTest {
                 "background: #111827", "width: 216px", ".empty-state .button { align-self: flex-start; width: auto; }");
         assertThat(home + workspace).contains("/icons/app-shell.svg#home", "/icons/app-shell.svg#logout")
                 .doesNotContain("⌂", "▦", "✦", "▤", "↪");
+    }
+
+    @Test
+    void renderedCardRiskTargetsRequireIndependentEvidenceAndHideCompletedNoRisk() throws Exception {
+        Process process = new ProcessBuilder("node", "-e", """
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
+                const window={};eval(source.split('/* Desktop Home runtime */')[0]);
+                const desktop=window.TrineDesktopSemantics;
+                const has=v=>v!==null&&v!==undefined&&v!=='';
+                const text=(v,f='')=>has(v)?String(v):f,label=text,escapeHtml=v=>String(v);
+                const symbolOf=a=>a.symbol,assetProvenance=()=>({}),provenanceAttributes=()=>'',directionSemanticClass=()=>'';
+                const drawCard=eval(source.slice(source.indexOf('function assetTicker('),source.indexOf('function renderOpportunities('))+';opportunityCard');
+                const types=['CHASE_RISK','RAPID_MOVE_RISK','TREND_REVERSAL_RISK','CROWDING_RISK',
+                    'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
+                const asset={symbol:'TESTUSDT',name:'Test fixture',marketBias:'BULLISH',confidenceLevel:65,
+                    riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
+                assert.equal(desktop.hasConfirmedRisks(asset),false);
+                assert.equal(desktop.riskSummary(asset),'');assert.equal(desktop.riskDrawer(asset),'');
+                const clear=drawCard(asset,'TESTUSDT');
+                assert.ok(!clear.includes('opportunity-risk'));assert.ok(!clear.includes('data-desktop-hover="risk"'));
+                for(const items of [[],asset.riskItems.slice(1),asset.riskItems.map(x=>({...x,evidenceStatus:'INSUFFICIENT_EVIDENCE'}))]) {
+                    const unknown={...asset,riskItems:items},html=drawCard(unknown,'TESTUSDT');
+                    assert.equal(desktop.hasConfirmedRisks(unknown),false);assert.equal(desktop.riskDrawer(unknown),'');
+                    assert.equal(desktop.riskSummary(unknown),'<span class="risk-summary-line risk-level-unknown">风险 —</span>');
+                    assert.ok(html.includes('risk-level-unknown">风险 —'));
+                    assert.ok(!html.includes('data-desktop-hover="risk"'));assert.ok(!html.includes('risk-evidence-item'));
+                }
+                const risky={...asset,riskItems:asset.riskItems.map((x,i)=>({...x,severity:i===0?'MEDIUM':i===1?'HIGH':'NONE',
+                    currentValue:i===1?'72':'0',primaryEvidence:'Independent fixture metric',source:'ISOLATED_TEST',observedAt:'2026-09-08T01:00:00Z'}))};
+                const html=drawCard(risky,'TESTUSDT');
+                assert.equal(desktop.hasConfirmedRisks(risky),true);
+                for(const value of ['risk-type-copy">急涨急跌','risk-level-high">高','risk-count">+1',
+                    'tabindex="0" data-desktop-hover="risk"','aria-haspopup="dialog"','aria-label="TESTUSDT 风险详情"']) assert.ok(html.includes(value),value);
+                assert.equal((desktop.riskDrawer(risky).match(/risk-evidence-item/g)||[]).length,2);
+                for(const value of ['72','ISOLATED_TEST','Independent fixture metric']) assert.ok(desktop.riskDrawer(risky).includes(value));
+                console.log('PASS');
+                """).redirectErrorStream(true).start();
+        boolean completed = process.waitFor(30, TimeUnit.SECONDS);
+        if (!completed) process.destroyForcibly();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(completed).as(output).isTrue();
+        assertThat(process.exitValue()).as(output).isZero();
+        assertThat(output).contains("PASS");
     }
 
     @Test

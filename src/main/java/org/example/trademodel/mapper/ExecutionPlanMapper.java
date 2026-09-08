@@ -12,6 +12,24 @@ import java.util.List;
 @Mapper
 public interface ExecutionPlanMapper {
 
+    // Projection identity only: generation, prices and rule thresholds remain unchanged.
+    String CURRENT_FINAL_IDENTITY = """
+            ep.final_plan = TRUE AND ep.rule_validation_status = 'PASS'
+            AND ep.chain_status = 'FINAL_VALIDATED' AND ep.plan_lifecycle_state = 'CURRENT'
+            AND ep.decision_id IS NOT NULL AND TRIM(ep.decision_id) != ''
+            AND ep.trace_id IS NOT NULL AND TRIM(ep.trace_id) != ''
+            AND EXISTS (SELECT 1 FROM tm_analysis_run identity_run
+              WHERE identity_run.analysis_id = ep.analysis_id AND identity_run.trace_id = ep.trace_id)
+            AND EXISTS (SELECT 1 FROM tm_decision_result identity_decision
+              WHERE identity_decision.analysis_id = ep.analysis_id AND identity_decision.decision_id = ep.decision_id)
+            """;
+
+    @Select("SELECT ep.* FROM tm_execution_plan ep WHERE ep.analysis_id = #{analysisId} "
+            + "AND ep.decision_id = #{decisionId} AND " + CURRENT_FINAL_IDENTITY
+            + " ORDER BY ep.create_time DESC, ep.plan_id DESC LIMIT 1")
+    ExecutionPlanDO selectLatestCurrentFinalByDecisionIdentity(@Param("analysisId") String analysisId,
+                                                               @Param("decisionId") String decisionId);
+
     @Insert("INSERT INTO tm_execution_plan(plan_id, analysis_id, decision_id, plan_mode, execution_plan_status, source_gate_status, source_gate_complete, source_missing_reasons, source_blocker_reasons, source_completeness_summary, recommended_action, entry_zone, stop_loss, take_profit_rules, leverage_suggestion, position_suggestion, account_risk_json, execution_feasibility_status, slippage_status, depth_status, entry_drift_status, trigger_status, execution_feasibility_reason, execution_feasibility_observed_at, execution_feasibility_fresh_until, execution_feasibility_source_refs_json, invalid_condition, invalidation_source, invalidation_reason, manual_review_required, not_trade_instruction, not_executable, not_auto_trading, not_order_execution, not_user_position_creation, candidate_id, opportunity_id, resolver_result_id, trace_id, chain_status, rule_validation_status, rule_veto_reason, finalized_at, final_plan, "
             + "asset_id, rule_version, rule_market_bias, final_market_bias, candidate_plan_mode, final_plan_mode, bias_adjustment_reason, plan_mode_adjustment_reason, adjustment_reason, downgrade_reason, opportunity_type, entry_logic, entry_source, entry_reason, trigger_condition, stop_logic, stop_source, stop_reason, target_logic, target_source, target_reason, add_position_condition, reduce_position_condition, abandon_condition, risk_explanation, leverage_limit, position_limit, risk_limit, expected_risk_reward, expected_risk_reward_source, expected_risk_reward_reason, account_risk_snapshot_id, analysis_timeframes_json, trigger_timeframe, valid_from, valid_until, holding_horizon, revalidation_rule, data_quality, source_refs_json, evidence_refs_json, score_refs_json, validation_result_id, validation_reasons, source_status, "
             + "needs_revalidation, revalidation_reason, plan_lifecycle_state, plan_version, supersedes_plan_id, superseded_by_plan_id, create_time) " +

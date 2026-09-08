@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verify;
 class TelegramMessageCommitListenerTest {
 
     @Test
-    void allThreeCanonicalCategoriesQueueAfterCommitAndMalformedEventsRemainInAppOnly() throws Exception {
+    void onlyTwoCategoriesQueueAfterCommitAndSafetyRemainsInAppOnly() throws Exception {
         ChannelDeliveryService delivery = mock(ChannelDeliveryService.class);
         TelegramMessageCommitListener listener = new TelegramMessageCommitListener(delivery);
 
@@ -35,7 +35,7 @@ class TelegramMessageCommitListenerTest {
         verify(delivery, never()).queueTelegram(41L, "message-legacy");
         verify(delivery).queueTelegram(41L, "message-plan");
         verify(delivery).queueTelegram(41L, "message-position");
-        verify(delivery).queueTelegram(41L, "message-safety");
+        verify(delivery, never()).queueTelegram(41L, "message-safety");
 
         TransactionalEventListener annotation = TelegramMessageCommitListener.class
                 .getMethod("afterMessageCommit", MessageRecordedEvent.class)
