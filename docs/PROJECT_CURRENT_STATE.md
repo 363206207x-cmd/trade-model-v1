@@ -24,8 +24,8 @@ Same package: `V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
 Implementation branch: `codex/v4-1-web-home-runtime-priority-closure`.
 Exact starting/stable Staging SHA: `0d6a1e36518c4bf935bba7e7074ec87edbd6947f`.
 The previous 37-path V23 implementation and all merged work remain preserved.
-This revision registers 46 exact implementation/test paths (fingerprint
-`ed5ef17092582f1d8672660c81ae1e647956ad40`) and 10 exact gate/product-contract paths
+This revision registers 49 exact implementation/test paths (fingerprint
+`e03886975ff0136da7c6f690088796f2ec8ffb11`) and 10 exact gate/product-contract paths
 (fingerprint `935d97dd7525424f366e3c86610e867b72081208`). Product Source PASS, exact identity and
 merged-main effectivity remain mandatory; no runtime effectivity is assigned
 by this amendment. Implementation is NOT_STARTED/PENDING_MERGED_MAIN.
