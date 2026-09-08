@@ -12,6 +12,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebLiveDashboardContractTest {
 
     @Test
+    void alertAndServiceTimesAreShanghaiAcrossDatesAndDeviceDst() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
+                global.window={};eval(source.split('/* Desktop Home runtime */')[0]);
+                const ui=window.TrineDesktopSemantics;
+                for(const tz of ['UTC','Asia/Shanghai','America/New_York','Europe/Berlin']) {
+                  process.env.TZ=tz;
+                  assert.equal(ui.beijingTime('2026-09-08T20:01:00Z'),'09/09 04:01');
+                  assert.equal(ui.beijingTime('2026-09-09T04:01:00+08:00'),'09/09 04:01');
+                  assert.equal(ui.beijingTime('2026-03-08T07:01:00Z'),'03/08 15:01');
+                  assert.equal(ui.beijingTime('2026-11-01T06:01:00Z'),'11/01 14:01');
+                  assert.ok(ui.fullBeijingTime('2026-09-08T20:01:00Z').includes('2026-09-09 04:01'));
+                  assert.ok(ui.fullBeijingTime('2026-09-08T20:01:00Z').includes('UTC+08:00'));
+                }
+                assert.ok(source.includes('alertNode.querySelector("time").title'));
+                assert.ok(source.includes('class="desktop-service-table"'));
+                const css=fs.readFileSync('src/main/resources/static/css/semantic-tokens.css','utf8');
+                assert.ok(css.includes('min-width: 96px'));
+                assert.ok(css.includes('.desktop-service-table time'));
+                assert.ok(css.includes('white-space: nowrap'));
+                assert.ok(!css.includes('width: 52px'));
+                assert.ok(css.includes('-webkit-line-clamp: 2'));
+                console.log('PASS');
+                """);
+    }
+
+    @Test
     void riskSummaryOnlyUsesRealEvidenceAndTimeAlwaysUsesBeijingWithFullYear() throws Exception {
         runNode("""
                 const assert=require('node:assert/strict'),fs=require('node:fs');
@@ -604,6 +632,13 @@ class WebLiveDashboardContractTest {
                 }
                 const blocked=html(asset,{...plan,planLifecycleState:'SUSPENDED',validationStatus:'BLOCKED',pauseReason:'流动性风险72，高于执行上限70'});
                 assert.ok(blocked.includes('流动性风险72，高于执行上限70')); assert.ok(!blocked.includes('100 – 101'));
+                const blockedFact={...plan,finalPlan:false,sourceTraceId:null,status:'PLAN_BLOCKED',validationStatus:'BLOCKED',
+                  blockedReason:'本轮未达到AI触发条件；未平仓量下降达到风险阈值，结构仍需确认',
+                  revalidationRule:'等待下一根1小时K线闭合，使用新行情重新验证方向、未平仓量和风险条件'};
+                const blockedHtml=html(asset,blockedFact);
+                for(const reason of ['暂不执行','本轮未达到AI触发条件','未平仓量下降达到风险阈值','下一根1小时K线闭合']) assert.ok(blockedHtml.includes(reason));
+                for(const oldValue of ['100 – 101','TP1 105','AI_TRIGGER_NOT_MET','OI_COLLAPSE_THRESHOLD_REACHED']) assert.ok(!blockedHtml.includes(oldValue));
+                assert.ok(!html({...asset,decisionId:'different'},blockedFact).includes('未平仓量下降达到风险阈值'));
                 const internal=html(asset,{...plan,validationStatus:'BLOCKED',blockedReason:'ANALYSIS_PREVIEW_NON_FINAL'});
                 assert.ok(!internal.includes('ANALYSIS_PREVIEW_NON_FINAL'));
                 assert.ok(internal.includes('规则参考计划尚未通过 Final 校验'));

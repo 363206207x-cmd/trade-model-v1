@@ -51,34 +51,34 @@ public interface MonitorAlertMapper {
 
     /** 未删除记录按 created_at 倒序，最多 {@code limit} 条；时间列为格式化字符串。 */
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
-            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd HH:mm:ss') END AS cooldown_until, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd''T''HH:mm:ss''Z''') END AS cooldown_until, "
             + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
-            + "FORMATDATETIME(created_at, 'yyyy-MM-dd HH:mm:ss') AS created_at, "
-            + "FORMATDATETIME(updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
+            + "FORMATDATETIME(created_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''') AS created_at, "
+            + "FORMATDATETIME(updated_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT #{limit}")
     @Select(value = "SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
-            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD HH24:MI:SS') END AS cooldown_until, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') END AS cooldown_until, "
             + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
-            + "TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at, "
-            + "TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at, "
+            + "TO_CHAR(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at, "
+            + "TO_CHAR(updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT #{limit}",
             databaseId = "postgresql")
     List<MonitorAlertDO> selectRecent(@Param("limit") int limit);
 
     @Select("SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
-            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd HH:mm:ss') END AS cooldown_until, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE FORMATDATETIME(cooldown_until, 'yyyy-MM-dd''T''HH:mm:ss''Z''') END AS cooldown_until, "
             + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
-            + "FORMATDATETIME(created_at, 'yyyy-MM-dd HH:mm:ss') AS created_at, "
-            + "FORMATDATETIME(updated_at, 'yyyy-MM-dd HH:mm:ss') AS updated_at, "
+            + "FORMATDATETIME(created_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''') AS created_at, "
+            + "FORMATDATETIME(updated_at, 'yyyy-MM-dd''T''HH:mm:ss''Z''') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC")
     @Select(value = "SELECT id, analysis_id, asset_symbol, alert_type, alert_level, alert_message, status, "
-            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD HH24:MI:SS') END AS cooldown_until, "
+            + "CASE WHEN cooldown_until IS NULL THEN NULL ELSE TO_CHAR(cooldown_until, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') END AS cooldown_until, "
             + "suppress_reason, trace_id, rule_version, created_by, updated_by, "
-            + "TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at, "
-            + "TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at, "
+            + "TO_CHAR(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at, "
+            + "TO_CHAR(updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS updated_at, "
             + "is_deleted, version_no "
             + "FROM tm_monitor_alert WHERE is_deleted = 0 AND analysis_id = #{analysisId} ORDER BY created_at DESC",
             databaseId = "postgresql")

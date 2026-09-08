@@ -136,10 +136,36 @@ public class UserPositionServiceImpl implements UserPositionService {
         if (positionMonitorScheduler == null || position == null || position.getId() == null) return;
         try {
             positionMonitorScheduler.requestInitialMonitor(position.getId(), position.getUserId());
+            refreshMonitorContextAfterCommit(position.getUserId());
         } catch (RuntimeException failure) {
             log.warn("[user-position] initial monitoring request could not be queued for positionId={}",
                     position.getId());
         }
+    }
+
+    private void refreshMonitorContextAfterCommit(Long userId) {
+        if (positionMonitorScheduler == null) return;
+        Runnable refresh = () -> {
+            try {
+                positionMonitorScheduler.refreshStructuralContextsForUser(userId);
+            } catch (RuntimeException failure) {
+                log.warn("[user-position] memory context refresh deferred to monitor lifecycle");
+            }
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { refresh.run(); }
+                    });
+        } else {
+            refresh.run();
+        }
+    }
+
+    private UserPositionVO completedManualMutation(UserPositionDO position) {
+        refreshMonitorContextAfterCommit(position.getUserId());
+        return toVo(position);
     }
 
     @Override
@@ -171,7 +197,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         }
         String closeReason = trimToNull(request.getCloseReason());
         if (!isActivePositionStatus(existing.getStatus())) {
-            return toVo(requireSameClosePayload(existing, submissionId, closedAt, closePrice, closeReason));
+            return completedManualMutation(requireSameClosePayload(existing, submissionId, closedAt, closePrice, closeReason));
         }
         int updated;
         try {
@@ -189,21 +215,21 @@ public class UserPositionServiceImpl implements UserPositionService {
             if (canonical == null || !Objects.equals(canonical.getId(), id)) {
                 throw new UserPositionConflictException("close submission_id was already used for another position");
             }
-            return toVo(requireSameClosePayload(canonical, submissionId, closedAt, closePrice, closeReason));
+            return completedManualMutation(requireSameClosePayload(canonical, submissionId, closedAt, closePrice, closeReason));
         }
         if (updated != 1) {
             UserPositionDO current = userPositionMapper.selectByIdAndUserId(id, userId);
             if (current == null) {
                 throw new UserPositionNotFoundException();
             }
-            return toVo(requireSameClosePayload(current, submissionId, closedAt, closePrice, closeReason));
+            return completedManualMutation(requireSameClosePayload(current, submissionId, closedAt, closePrice, closeReason));
         }
         UserPositionDO closed = userPositionMapper.selectByIdAndUserId(id, userId);
         if (closed == null) {
             throw new UserPositionNotFoundException();
         }
         applySafetyFlags(closed);
-        return toVo(closed);
+        return completedManualMutation(closed);
     }
 
     @Override
@@ -220,7 +246,7 @@ public class UserPositionServiceImpl implements UserPositionService {
         UserPositionDO existing = userPositionMapper.selectByIdAndUserId(id, userId);
         if (existing == null) throw new UserPositionNotFoundException();
         if (UserPositionStatusEnum.ARCHIVED_MISTAKE.name().equals(existing.getStatus())) {
-            return toVo(requireSameArchivePayload(existing, submissionId, reason));
+            return completedManualMutation(requireSameArchivePayload(existing, submissionId, reason));
         }
         if (!isManualArchiveSource(existing.getSourceType())) {
             throw new IllegalArgumentException("Only manually entered UserPosition records can be archived as mistakes");
@@ -237,13 +263,13 @@ public class UserPositionServiceImpl implements UserPositionService {
                 throw new UserPositionConflictException(
                         "archive submission_id was already used for another position");
             }
-            return toVo(requireSameArchivePayload(canonical, submissionId, reason));
+            return completedManualMutation(requireSameArchivePayload(canonical, submissionId, reason));
         }
         UserPositionDO archived = userPositionMapper.selectByIdAndUserId(id, userId);
         if (updated != 1 || archived == null) {
             throw new UserPositionNotFoundException();
         }
-        return toVo(requireSameArchivePayload(archived, submissionId, reason));
+        return completedManualMutation(requireSameArchivePayload(archived, submissionId, reason));
     }
 
     @Override

@@ -305,7 +305,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public DashboardHomeVO getHomeForUser(Long userId, String selectedSymbol, Integer limit, Long selectedPositionId) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("userId is required");
@@ -438,7 +438,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         attachCompleteRuntimeProjection(home, userId, providerReadiness);
         home.setSnapshotComplete(!rankingRead.failed() && !decisionRead.failed()
                 && !selectedDecisionReadFailed && !positionRead.failed());
-        registerLiveStructuralContexts(userId, assets);
         return home;
     }
 
@@ -572,25 +571,6 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             }
         }
         return assets;
-    }
-
-    private void registerLiveStructuralContexts(Long userId, List<DashboardHomeVO.AssetVO> assets) {
-        if (dashboardLiveEventService == null || userId == null || assets == null) return;
-        for (DashboardHomeVO.AssetVO asset : assets) {
-            if (asset == null || !hasText(asset.getStructuralDirection())
-                    || !positive(asset.getStructuralAtr1h()) || asset.getDirectionCalculatedAt() == null) continue;
-            Instant calculatedAt = asset.getDirectionCalculatedAt().toInstant(ZoneOffset.UTC);
-            dashboardLiveEventService.recordStructuralContext(userId,
-                    new DashboardLiveEventService.StructuralContext(asset.getRawSymbol(),
-                            asset.getStructuralDirection(), asset.getStructuralAtr1h(),
-                            numericInvalidationLevel(asset.getPlanInvalidationLevel()),
-                            exactInteger(asset.getConfidenceLevel()), asset.getAnalysisId(),
-                            asset.getDecisionId(), asset.getTraceId(), calculatedAt,
-                            calculatedAt.plus(Duration.ofMinutes(90)),
-                            asset.getCoinGlassDataAt() != null
-                                    && !asset.getCoinGlassDataAt().isBefore(planValidityClock.instant()
-                                    .minus(Duration.ofMinutes(10)))));
-        }
     }
 
     private DashboardHomeVO.ModuleStatesVO buildModuleStates(
@@ -1863,17 +1843,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             if ("NEEDS_REVALIDATION".equalsIgnoreCase(asset.getPlanState())) return;
             return;
         }
-        if (planRevalidationService == null) {
-            asset.setPlanState("BLOCKED");
-            return;
-        }
-        try {
-            planRevalidationService.requestSystem(
-                    asset.getPlanId(), PlanRevalidationTriggerTypeEnum.DATA_REFRESH, reason);
-            asset.setPlanState("NEEDS_REVALIDATION");
-        } catch (RuntimeException failure) {
-            asset.setPlanState("BLOCKED");
-        }
+        // Read projection only. Background analysis owns persisted revalidation and task scheduling.
+        // Hide a stale/invalid plan immediately without queuing work or writing from this GET.
+        asset.setPlanState("NEEDS_REVALIDATION");
     }
 
     private String planInvalidationLevel(ExecutionPlanDO plan) {
@@ -3012,6 +2984,14 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             return suggestion;
         }
         if (assetPlan.state() == ExactPlanIdentityState.ERROR || !assetPlan.verified()) {
+            ExecutionPlanDO blockedFact = assetPlan.executionPlan();
+            if (blockedFact != null && !Boolean.TRUE.equals(blockedFact.getFinalPlan())
+                    && "BLOCKED".equals(upper(blockedFact.getRuleValidationStatus()))) {
+                blockSuggestion(suggestion, "PLAN_BLOCKED", "暂不执行", firstPlanReason(blockedFact));
+                applyPersistedPlanAudit(suggestion, assetPlan, blockedFact);
+                suggestion.setRevalidationRule("等待下一根1小时K线闭合，使用新行情重新验证方向、未平仓量和风险条件");
+                return suggestion;
+            }
             blockSuggestion(suggestion, "PLAN_IDENTITY_ERROR", "当前执行计划不可用",
                     assetPlan.reason());
             return suggestion;
@@ -3281,7 +3261,8 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         suggestion.setRevalidationReason(trimToNull(plan.getRevalidationReason()));
         suggestion.setRevalidationRule(trimToNull(plan.getRevalidationRule()));
         suggestion.setNotTradeInstruction(Boolean.TRUE.equals(plan.getNotTradeInstruction()));
-        if (Boolean.TRUE.equals(plan.getFinalPlan()) && currentStructuralPlan(plan)
+        if ("USABLE_REVIEW_PLAN".equals(suggestion.getStatus())
+                && Boolean.TRUE.equals(plan.getFinalPlan()) && currentStructuralPlan(plan)
                 && "PASS".equals(upper(plan.getRuleValidationStatus()))
                 && "FINAL_VALIDATED".equals(upper(plan.getChainStatus()))
                 && "CURRENT".equals(upper(plan.getPlanLifecycleState()))
@@ -3314,13 +3295,29 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private String firstPlanReason(ExecutionPlanDO plan) {
         if (plan == null) return null;
-        return java.util.stream.Stream.of(plan.getValidationReasons(), plan.getRuleVetoReason(),
+        java.util.LinkedHashSet<String> reasons = new java.util.LinkedHashSet<>();
+        java.util.stream.Stream.of(plan.getValidationReasons(), plan.getRuleVetoReason(),
                         plan.getSourceBlockerReasons(), plan.getSourceMissingReasons(),
                         plan.getExecutionFeasibilityReason(), plan.getRevalidationReason())
                 .map(this::trimToNull)
                 .filter(java.util.Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+                .forEach(value -> {
+                    for (String token : value.split("[\\s,;:|\\[\\]{}\\\"]+")) {
+                        if (token.isBlank()) continue;
+                        String readable = switch (token) {
+                            case "AI_TRIGGER_NOT_MET" -> "本轮未达到AI触发条件";
+                            case "HIGH_RISK_REVIEW_REQUIRED" -> "当前风险较高，需完成风险复核";
+                            case "OI_COLLAPSE", "OI_COLLAPSE_THRESHOLD_REACHED" -> "未平仓量下降达到风险阈值，结构仍需确认";
+                            case "EXECUTION_BOUNDARY_SOURCE_UNAVAILABLE" -> "当前执行边界缺少可验证的数据来源";
+                            case "DERIVATIVES_STALE" -> "衍生品数据已过期，等待新数据验证";
+                            case "DATA_QUALITY_BLOCKED" -> "本轮数据质量尚未通过执行校验";
+                            default -> token.matches(".*\\p{IsHan}.*") ? token
+                                    : "该项阻断尚未记录可读解释，需核对规则审计；不展示旧计划价格";
+                        };
+                        reasons.add(readable);
+                    }
+                });
+        return reasons.isEmpty() ? "本轮未通过执行校验，具体原因尚未记录" : String.join("；", reasons);
     }
 
     private AssetExecutionPlanResolution resolveAssetExecutionPlan(DecisionResultVO decision) {
@@ -3399,6 +3396,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         }
         if (!hasText(run.getTraceId()) || !hasText(plan.getTraceId())
                 || !Objects.equals(trimToNull(run.getTraceId()), trimToNull(plan.getTraceId()))) {
+            if (!hasText(plan.getTraceId()) && !Boolean.TRUE.equals(plan.getFinalPlan())
+                    && "BLOCKED".equals(upper(plan.getRuleValidationStatus()))) {
+                // Exact Analysis/Decision blockers are audit facts, not a verified Final Plan identity.
+                return new AssetExecutionPlanResolution(ExactPlanIdentityState.ERROR, plan,
+                        analysisId, planId, null, "阻断记录缺少计划 Trace，不展示执行价格");
+            }
             return AssetExecutionPlanResolution.error("计划 Trace 缺失或与当前 Analysis Run 不一致；等待同批次计划重新评估");
         }
         return new AssetExecutionPlanResolution(
@@ -3746,6 +3749,16 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                 && "SUCCESS".equalsIgnoreCase(callStatus);
         tab.setResultAvailable(resultAvailable);
         tab.setStatusMessage(aiRoleStatusMessage(callStatus, rolePayload.fallbackReason()));
+        if (!resultAvailable && "DISABLED".equals(upper(callStatus))
+                && "AI_TRIGGER_NOT_MET".equals(upper(rolePayload.fallbackReason()))) {
+            tab.setRunStatusLabel("GPT_FINAL".equals(role) ? "本轮未触发" : "本轮未运行");
+            tab.setStatusMessage(switch (role) {
+                case "GPT_FINAL" -> "本轮未触发：当前方向、风险或计划状态未达到AI分析条件";
+                case "GEMINI_REVIEW" -> "本轮未运行：需在本轮GPT分析完成后进行冲突复核";
+                case "GROK_CHALLENGE" -> "本轮未运行：需在本轮GPT分析完成后进行反方挑战";
+                default -> "本轮未达到AI分析条件";
+            });
+        }
         tab.setStance(trimToNull(rolePayload.stance()));
         if (resultAvailable) {
             populateLegacyJavaProjection(tab, role, rolePayload);
