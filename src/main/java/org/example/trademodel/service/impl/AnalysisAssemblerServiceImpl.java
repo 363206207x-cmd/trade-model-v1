@@ -470,6 +470,7 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                         ruleAssessmentPlan, effectiveContext.getTraceId(), analysisId);
             }
             if (plan != null) {
+                requirePlanTraceIdentity(plan, effectiveContext.getTraceId());
                 plan.setAccountRiskSnapshotId(accountRiskSnapshot == null ? null : accountRiskSnapshot.getId());
                 plan.setAccountRiskJson(pushSnapshotService.accountRiskJson(accountRiskSnapshot));
                 if (accountRiskSnapshot != null) {
@@ -666,11 +667,24 @@ public class AnalysisAssemblerServiceImpl implements AnalysisAssemblerService {
                 marketEnv,
                 executionContext);
         ExecutionPlanVO plan = planService.buildRuleExecutionAssessment(decision, boundaryResult);
+        requirePlanTraceIdentity(plan, executionContext.getTraceId());
         if (executionFeasibilityAssessmentService != null) {
             executionFeasibilityAssessmentService.assessAndApply(
                     plan, executionContext, boundaryResult, boundaryDirection(decision));
         }
         return plan;
+    }
+
+    static void requirePlanTraceIdentity(ExecutionPlanVO plan, String runTraceId) {
+        if (plan == null) return;
+        if (runTraceId == null || runTraceId.isBlank()) {
+            throw new IllegalStateException("PLAN_RUN_TRACE_MISSING");
+        }
+        if (plan.getTraceId() != null && !plan.getTraceId().isBlank()
+                && !runTraceId.equals(plan.getTraceId())) {
+            throw new IllegalStateException("PLAN_TRACE_IDENTITY_MISMATCH");
+        }
+        plan.setTraceId(runTraceId);
     }
 
     private SourceTraceBoundaryProducerResult buildBoundaryProducerResult(

@@ -32,7 +32,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
         String css = Files.readString(STYLE);
 
         assertThat(html).contains(
-                "class=\"home-rail\"", "<h2 id=\"opportunityHeading\">资产</h2>", "id=\"homeAssetSearch\"",
+                "class=\"home-rail\"", "<h2 id=\"opportunityHeading\">重点资产</h2>", "id=\"homeAssetSearch\"",
                 "data-position-plan-ratio=\"70:30\"", "<h2 id=\"positionHeading\">持仓监控</h2>",
                 "<h2 id=\"planHeading\">执行计划</h2>", "<h2 id=\"aiWorkspaceHeading\">AI 分析</h2>",
                 "id=\"positionAggregate\"", "id=\"planContent\"",
@@ -128,7 +128,7 @@ class ApprovedFigmaHomeRuntimeContractTest {
         assertThat(script).contains(
                 "/api/dashboard/home?", "/api/asset-pool/search?query=",
                 "function validOpportunityCard(asset)", "function validObservationCard(asset)",
-                "validOpportunityCard(asset) || validObservationCard(asset)", ".slice(0, 6)",
+                "fresh.homeAssetCount !== fresh.assets.length", ".slice(0, 6)",
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",
                 "has(asset.confidenceLevel)", "has(asset.riskLevel)",
                 "[\"OBSERVATION\", \"DECISION\"].indexOf(slotType) >= 0",
@@ -205,9 +205,9 @@ class ApprovedFigmaHomeRuntimeContractTest {
 
         assertThat(script).contains(
                 "var assets = all.filter(function (asset)",
-                "validOpportunityCard(asset) || validObservationCard(asset)",
+                "fresh.homeAssetCount !== fresh.assets.length",
                 ".slice(0, 6)",
-                "setText(\"opportunityHeading\", [\"机会资产\", assets.length].join(\" · \"))",
+                "setText(\"opportunityHeading\", [\"重点资产\", assets.length].join(\" · \"))",
                 "has(asset && (asset.opportunityId || asset.primaryOpportunityId))",
                 "has(asset && asset.analysisId)",
                 "asset.hasFinal === true", "has(asset.finalMarketBias)",

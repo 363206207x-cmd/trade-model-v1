@@ -29,6 +29,24 @@ class AnalysisAssemblerServiceImplTest {
     private static final String FALLBACK = "PLACEHOLDER_FALLBACK";
 
     @Test
+    void planTraceMustBeInheritedFromItsRealRunAndNeverOverwriteAnotherRun() {
+        var plan = new org.example.trademodel.vo.ExecutionPlanVO();
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                AnalysisAssemblerServiceImpl.class, "requirePlanTraceIdentity", plan, "trace-real-run");
+        assertEquals("trace-real-run", plan.getTraceId());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                        AnalysisAssemblerServiceImpl.class, "requirePlanTraceIdentity", plan, "trace-other-run"))
+                .hasMessageContaining("PLAN_TRACE_IDENTITY_MISMATCH");
+        assertEquals("trace-real-run", plan.getTraceId());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                        AnalysisAssemblerServiceImpl.class, "requirePlanTraceIdentity",
+                        new org.example.trademodel.vo.ExecutionPlanVO(), null))
+                .hasMessageContaining("PLAN_RUN_TRACE_MISSING");
+    }
+
+    @Test
     void derivativesSnapshotReadUsesConfiguredCompositeFreshnessWindow() {
         assertEquals(Duration.ofSeconds(120), AnalysisAssemblerServiceImpl.derivativesFreshTtl(120));
         assertEquals(Duration.ofSeconds(1), AnalysisAssemblerServiceImpl.derivativesFreshTtl(0));

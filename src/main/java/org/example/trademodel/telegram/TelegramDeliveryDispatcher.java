@@ -60,6 +60,7 @@ public class TelegramDeliveryDispatcher {
         LocalDateTime now = LocalDateTime.now(clock);
         for (MessageDO message : messageMapper.listTelegramDeliveryOrphans(
                 now, properties.getDeliveryBatchSize())) {
+            if (HighValueAlertPolicy.telegramDeliveryIdentity(message).isEmpty()) continue;
             try {
                 deliveryService.queueTelegram(message.getUserId(), message.getMessageId());
                 queued++;
@@ -85,6 +86,7 @@ public class TelegramDeliveryDispatcher {
             suppressExpired(delivery, now);
             return;
         }
+        if (!sourceStillCurrent(delivery, message)) return;
         String configuredRecipient = TelegramSecretSanitizer.recipientFingerprint(properties.getChatId());
         if (configuredRecipient == null || !configuredRecipient.equals(delivery.getRecipientFingerprint())) {
             terminal(delivery, "RECIPIENT_CONFIGURATION_CHANGED",
@@ -113,6 +115,7 @@ public class TelegramDeliveryDispatcher {
             return;
         }
 
+        if (!sourceStillCurrent(delivery, message)) return;
         TelegramClientResult result = providerCall(() -> client.sendMessage(formatter.format(message)));
         readinessService.observe(result);
         if (result.success() && verifiedReceipt(result, botProbe.botUsername(), configuredRecipient)) {
@@ -131,6 +134,23 @@ public class TelegramDeliveryDispatcher {
                 ? identityFailure("DELIVERY_RECEIPT_UNVERIFIED",
                 "Telegram provider receipt did not match the verified bot and recipient")
                 : result);
+    }
+
+    private boolean sourceStillCurrent(ChannelDeliveryDO delivery, MessageDO message) {
+        try {
+            if (messageMapper.countCurrentTelegramSource(message.getMessageId(), message.getUserId(),
+                    LocalDateTime.now(clock)) == 1) return true;
+        } catch (RuntimeException failure) {
+            terminal(delivery, "TELEGRAM_SOURCE_READ_FAILED", "Current message source could not be verified", 0);
+            return false;
+        }
+        delivery.setStatus(TelegramDeliveryStatus.SUPPRESSED.name());
+        delivery.setNextAttemptAt(null);
+        delivery.setRetryAfterSeconds(null);
+        delivery.setErrorCode("TELEGRAM_SOURCE_NOT_CURRENT");
+        delivery.setErrorMessage("Message source is no longer current, trusted and owner-scoped");
+        completeKnownOutcome(delivery);
+        return false;
     }
 
     private void completeProviderFailure(ChannelDeliveryDO delivery, TelegramClientResult result) {

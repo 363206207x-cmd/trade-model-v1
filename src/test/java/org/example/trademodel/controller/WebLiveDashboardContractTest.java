@@ -12,6 +12,62 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebLiveDashboardContractTest {
 
     @Test
+    void riskSummaryOnlyUsesRealEvidenceAndTimeAlwaysUsesBeijingWithFullYear() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                global.window={};eval(fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8').split('/* Desktop Home runtime */')[0]);
+                const ui=window.TrineDesktopSemantics;
+                const types=['CHASE_RISK','RAPID_MOVE_RISK','TREND_REVERSAL_RISK','CROWDING_RISK',
+                    'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
+                const complete={riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
+                assert.equal(ui.riskSummary(complete),'');assert.equal(ui.riskDrawer(complete),'');
+                assert.equal(ui.riskSummary({riskItems:[]}),'<span class="risk-summary-line risk-level-unknown">风险 —</span>');
+                const risks={riskItems:types.slice(0,3).map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'MEDIUM',currentValue:'72'}))};
+                const summary=ui.riskSummary(risks);
+                assert.equal((summary.match(/risk-summary-line/g)||[]).length,1);
+                assert.equal((summary.match(/risk-type-copy/g)||[]).length,1);
+                assert.ok(summary.includes('class="risk-count">+2'));
+                assert.equal((ui.riskDrawer(risks).match(/risk-evidence-item/g)||[]).length,3);
+                assert.equal(ui.beijingTime('2026-09-08T15:01:00Z',true),'23:01');
+                assert.equal(ui.directionTimeLabel('2026-09-08T15:01:00Z'),'方向计算时间：2026-09-08 23:01（北京时间）');
+                for(const value of ['周期冲突','偏多','观望低','待评估','101%','-1%'])
+                    assert.equal(ui.confidenceText({confidenceLabel:value,confidenceLevel:value}),'—');
+                console.log('PASS');
+                """);
+    }
+
+    @Test
+    void pinsUseOnlyExplicitIdempotentPostsAndNeverTruncateTheFullPool() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
+                const fn=source.slice(source.indexOf('function orderedHomePins('),source.indexOf('function renderAssetPoolRows('));
+                let assetPoolItems=Array.from({length:36},(_,i)=>({symbol:'ASSET'+i,homePinned:i<3,homePinOrder:i<3?i+1:null}));
+                let pinMutationPending=false,assetPoolProjections=[],calls=[],messages=[],refreshes=0,resolvePost;
+                const announce=m=>messages.push(m),renderAssetPoolRows=()=>{},loadAssetPool=async()=>{refreshes++;};
+                const api=(url,options)=>{calls.push({url,options});return new Promise(resolve=>{resolvePost=resolve;});};
+                eval(fn);
+                (async()=>{
+                    assert.equal(calls.length,0);assert.equal(orderedHomePins().length,3);
+                    const saved=assetPoolItems.map(x=>x.symbol);
+                    const pin=updateHomePin('ASSET3',true);
+                    await Promise.all(Array.from({length:10},()=>updateHomePin('ASSET3',true)));
+                    assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/asset-pool/ASSET3/home-pin');
+                    assert.deepEqual(JSON.parse(calls[0].options.body),{pinned:true});
+                    resolvePost(assetPoolItems.map(x=>x.symbol==='ASSET3'?{...x,homePinned:true,homePinOrder:4}:x));await pin;
+                    assert.equal(pinMutationPending,false);assert.deepEqual(assetPoolItems.map(x=>x.symbol),saved);
+                    const move=moveHomePin('ASSET3',-1);
+                    assert.deepEqual(JSON.parse(calls[1].options.body),{symbols:['ASSET0','ASSET1','ASSET3','ASSET2']});
+                    resolvePost(assetPoolItems);await move;
+                    assetPoolItems=assetPoolItems.map((x,i)=>({...x,homePinned:i<6,homePinOrder:i<6?i+1:null}));
+                    await updateHomePin('ASSET7',true);assert.equal(calls.length,2);assert.ok(messages.some(x=>x.includes('6')));
+                    assert.ok(calls.every(x=>x.options.method==='POST'&&x.url.startsWith('/api/asset-pool/')));
+                    assert.equal(assetPoolItems.length,36);assert.equal(refreshes,2);console.log('PASS');
+                })().catch(e=>{console.error(e);process.exitCode=1;});
+                """);
+    }
+
+    @Test
     void desktopUsesAuthenticatedSseWithBoundedFallback() throws Exception {
         String desktop = Files.readString(Path.of("src/main/resources/static/js/home-runtime.js"));
         String controller = Files.readString(Path.of(
@@ -169,7 +225,7 @@ class WebLiveDashboardContractTest {
                 "var homeRequestFailed = false",
                 "function reportHomeRequestFailure(error)",
                 "function clearHomeRequestFailure()",
-                "if (!Array.isArray(currentHome.assets) || !currentHome.assets.length)",
+                "if (!currentHome.snapshotId)",
                 "clearHomeRequestFailure();"
         );
     }
@@ -259,7 +315,8 @@ class WebLiveDashboardContractTest {
                 "const snapshot = await loadAssetPoolProjection()",
                 "snapshot.poolMembers",
                 "snapshot.assetPool",
-                "items.forEach(function (asset)",
+                "ordered.forEach(function (asset)",
+                "pins.concat(items.filter(asset => asset.homePinned !== true))",
                 "renderAssetPoolRows(items, projections)",
                 "latestPrice",
                 "marketBiasLabel",
@@ -395,7 +452,7 @@ class WebLiveDashboardContractTest {
                 assert.ok(!ui.riskSummary({riskItems:[{riskType:'LIQUIDITY_RISK',severity:'HIGH',score:100}]}).includes('risk-level-high'));
                 assert.equal(ui.hasConfirmedRisks({riskItems:[]}),false);
                 assert.equal(ui.riskDrawer({riskItems:[]}),'');
-                assert.ok(ui.riskSummary({riskItems:[]}).includes('风险证据待更新'));
+                assert.ok(ui.riskSummary({riskItems:[]}).includes('风险 —'));
                 assert.equal(ui.confidenceText({confidenceLabel:'高',confidenceLevel:'HIGH'}),'—');
                 assert.equal(ui.confidenceText({confidenceLabel:'82%'}),'82%');
                 assert.equal(ui.confidenceText({confidenceLevel:0}),'0%');
@@ -470,8 +527,8 @@ class WebLiveDashboardContractTest {
                 async function api(url,options){
                   requests.push({url,options}); if(fail) throw Error('timeout');
                   const q=new URL(url,'https://example.test').searchParams, selected=q.get('selectedSymbol')||initial[0];
-                  const members=stage===0?initial:initial.filter(s=>s!==selected).concat('LINKUSDT');
-                  return {assets:members.map(asset),assetPool:initial.concat('LINKUSDT').map(asset),snapshotComplete:true,
+                  const members=initial;
+                  return {assets:members.map(asset),homeAssetCount:members.length,assetPool:initial.concat('LINKUSDT').map(asset),snapshotComplete:true,
                     snapshotId:'snapshot-'+stage,projectionVersion:stage+1,selectedAssetContext:asset(selected),selectedSymbol:selected};
                 }
                 const load=eval(fn+';loadHome');
@@ -486,7 +543,7 @@ class WebLiveDashboardContractTest {
                   assert.equal(currentHome,preserved); assert.equal(errors,1); fail=false;
                   const queue=[]; api=(url,options)=>new Promise(resolve=>queue.push(resolve));
                   const old=load('BTCUSDT'), newer=load('ETHUSDT');
-                  const fresh={assets:initial.map(asset),assetPool:initial.map(asset),snapshotComplete:true,snapshotId:'snapshot-'+stage,
+                  const fresh={assets:initial.map(asset),homeAssetCount:6,assetPool:initial.map(asset),snapshotComplete:true,snapshotId:'snapshot-'+stage,
                     projectionVersion:stage+2,selectedAssetContext:asset('ETHUSDT')};
                   queue[1](fresh); await newer;
                   queue[0]({assets:[],selectedAssetContext:asset('BTCUSDT')}); await old;
@@ -496,6 +553,18 @@ class WebLiveDashboardContractTest {
                   await load('ETHUSDT'); assert.equal(currentHome,complete);
                   api=async()=>({...fresh,projectionVersion:1});
                   await load('ETHUSDT'); assert.equal(currentHome,complete);
+                  // A complete authoritative set may have fewer than six opportunities; never backfill it.
+                  api=async()=>({...fresh,projectionVersion:stage+4,homeAssetCount:2,assets:initial.slice(0,2).map(asset)});
+                  await load('ETHUSDT');assert.equal(currentHome.assets.length,2);
+                  // Selection outside the priority set remains readable without changing that set.
+                  api=async()=>({...fresh,projectionVersion:stage+5,homeAssetCount:2,assets:initial.slice(0,2).map(asset),
+                      selectedSymbol:'SOLUSDT',selectedAssetContext:asset('SOLUSDT'),selectedContextState:'EXITED_TOP6',
+                      selectedContextExitReason:'NO_LONGER_IN_CURRENT_TOP6'});
+                  await load('SOLUSDT');assert.deepEqual(currentHome.assets.map(symbolOf),initial.slice(0,2));
+                  assert.equal(currentHome.selectedAssetContext.symbol,'SOLUSDT');
+                  // An explicit complete zero-member priority set is different from a partial empty response.
+                  api=async()=>({...fresh,projectionVersion:stage+6,homeAssetCount:0,assets:[]});
+                  await load('ETHUSDT');assert.equal(currentHome.assets.length,0);
                   assert.ok(requests.every(r=>!r.options.method || r.options.method==='GET'));
                   assert.ok(requests.every(r=>r.url.startsWith('/api/dashboard/home?')));
                   console.log('PASS');
@@ -514,39 +583,43 @@ class WebLiveDashboardContractTest {
                 const document={getElementById:id=>nodes[id]}, setText=()=>{};
                 const symbolOf=a=>a.symbol, has=v=>v!==null&&v!==undefined&&v!=='';
                 const text=(v,f)=>has(v)?String(v):f, escapeHtml=v=>String(v);
-                const selectedFinalAccess=home=>({plan:home.executionSuggestion,visible:false});
+                const selectedFinalAccess=home=>({plan:home.executionSuggestion,visible:true});
+                const humanReason=(v,f)=>v==='ANALYSIS_PREVIEW_NON_FINAL'?'规则参考计划尚未通过 Final 校验':v||f;
                 const fn=source.slice(source.indexOf('function planField('),source.indexOf('function collectionLabel('));
                 const drawPlan=eval(fn+';renderPlan');
                 const asset={symbol:'BTCUSDT',analysisId:'a1',decisionId:'d1',traceId:'t1',marketBias:'BULLISH'};
-                const plan={sourceAnalysisId:'a1',sourceDecisionId:'d1',sourceTraceId:'t1',planLifecycleState:'WAITING_TRIGGER',
+                const plan={sourceAnalysisId:'a1',sourceDecisionId:'d1',sourceTraceId:'t1',sourceExecutionPlanId:'p1',
+                  planLifecycleState:'CURRENT',finalPlan:true,validationStatus:'PASS',chainStatus:'FINAL_VALIDATED',finalPlanMode:'CONFIRMATION',
+                  validFrom:'2026-01-01T00:00:00Z',expiresAt:'2099-01-01T00:00:00Z',triggerCondition:'闭线站上101',
                   entryZone:'100 – 101',stopLoss:'98',takeProfitRules:'TP1 105；TP2 108',invalidCondition:'价格跌破98'};
                 function html(a,p){drawPlan({selectedAssetContext:a,executionSuggestion:p,nextOneHourCloseAt:'2026-09-07T13:00:00Z'});return nodes.planContent.innerHTML;}
-                assert.ok(html(asset,{...plan,planLifecycleState:'CURRENT',status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('TP1'));
-                assert.ok(html(asset,{...plan,planLifecycleState:'CURRENT',status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('规则参考'));
+                assert.ok(!html(asset,{...plan,finalPlan:false,status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('100 – 101'));
+                assert.ok(html(asset,{...plan,finalPlan:false,status:'RULE_CONDITIONAL_PLAN',notTradeInstruction:true}).includes('Final'));
                 assert.ok(!html(asset,{...plan,planLifecycleState:'SUPERSEDED'}).includes('100 – 101'));
                 for(const bias of ['STRONG_BULLISH','BULLISH','WEAK_BULLISH','WEAK_BEARISH','BEARISH','STRONG_BEARISH']) {
                   const result=html({...asset,marketBias:bias},plan);
-                  assert.ok(result.includes('条件计划 · 等待触发'));
-                  for(const value of ['100 – 101','98','105','108','触发后校验：行情新鲜度、方向状态和失效位']) assert.ok(result.includes(value));
+                  assert.ok(result.includes('完整执行计划'));
+                  for(const value of ['100 – 101','98','105','108','闭线站上101','CONFIRMATION','有效期']) assert.ok(result.includes(value));
                   assert.ok(!result.includes('恢复条件'));
                 }
                 const blocked=html(asset,{...plan,planLifecycleState:'SUSPENDED',validationStatus:'BLOCKED',pauseReason:'流动性风险72，高于执行上限70'});
-                assert.ok(blocked.includes('条件计划 · 当前暂缓执行')); assert.ok(blocked.includes('暂停：流动性风险72，高于执行上限70'));
-                assert.ok(!blocked.includes('已阻断'));
+                assert.ok(blocked.includes('流动性风险72，高于执行上限70')); assert.ok(!blocked.includes('100 – 101'));
                 const internal=html(asset,{...plan,validationStatus:'BLOCKED',blockedReason:'ANALYSIS_PREVIEW_NON_FINAL'});
                 assert.ok(!internal.includes('ANALYSIS_PREVIEW_NON_FINAL'));
-                assert.ok(internal.includes('服务端未提供规则暂停证据'));
+                assert.ok(internal.includes('规则参考计划尚未通过 Final 校验'));
                 for(const field of ['sourceAnalysisId','sourceDecisionId','sourceTraceId']) {
                   assert.ok(!html(asset,{...plan,[field]:'another-run'}).includes('100 – 101'));
                 }
                 const conflict=html({...asset,marketBias:'TIMEFRAME_CONFLICT',oneHourOpportunityLabel:'1小时偏空',fourHourTrendLabel:'4小时偏多'},plan);
                 assert.ok(conflict.includes('周期冲突：1小时偏空 / 4小时偏多')); assert.ok(!conflict.includes('100 – 101'));
-                assert.ok(conflict.includes('暂无条件计划')); assert.ok(conflict.includes('当前动作：等待'));
+                assert.ok(conflict.includes('暂无完整执行计划')); assert.ok(conflict.includes('当前动作：等待'));
                 assert.ok(conflict.includes('下一根1小时K线闭合后')); assert.ok(conflict.includes('21:00'));
                 const missing=html({...asset,marketBias:'INSUFFICIENT_DATA',marketBiasLabel:'数据不足',oneHourOpportunityLabel:'1小时有效',fourHourTrendLabel:'缺少4小时闭合K线'},plan);
                 assert.ok(missing.includes('缺少4小时闭合K线')); assert.ok(!missing.includes('100 – 101'));
-                assert.ok(html(asset,{...plan,takeProfitRules:null}).includes('可分别展示的 TP1、TP2'));
+                assert.ok(html(asset,{...plan,takeProfitRules:null}).includes('止盈'));
                 assert.ok(!html(asset,{...plan,takeProfitRules:null}).includes('100 – 101'));
+                assert.ok(!html(asset,{...plan,expiresAt:'2025-01-01T00:00:00Z'}).includes('100 – 101'));
+                assert.ok(html(asset,{...plan,takeProfitRules:'110 then 120'}).includes('110 then 120'));
                 console.log('PASS');
                 """);
     }

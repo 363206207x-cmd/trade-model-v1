@@ -32,6 +32,55 @@ class DecisionResultMapperLatestPlanIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private org.mybatis.spring.SqlSessionTemplate sqlSession;
+
+    @Test
+    void newerWrongTraceOrNonCurrentPlanCannotDisplaceTheSameRunCurrentFinal() {
+        insertOwnedAnalysis("analysis-current-identity", "SYSTEM", 0L, "2026-01-01 00:00:00", 92);
+        insertRankingDecision("analysis-current-identity", "decision-current-identity");
+        insertValidatedFinalPlan("analysis-current-identity", "UNIUSDT", "5m",
+                "plan-current-identity", "CONFIRMATION", "FINAL_VALIDATED");
+        ExecutionPlanDO valid = executionPlanMapper.selectByPlanId("plan-current-identity");
+        ExecutionPlanDO newer = new ExecutionPlanDO();
+        org.springframework.beans.BeanUtils.copyProperties(valid, newer);
+        newer.setPlanId("plan-newer-other-trace");
+        newer.setTraceId("trace-another-run");
+        newer.setEntryZone("102-103");
+        newer.setCreateTime(valid.getCreateTime().plusMinutes(1));
+        executionPlanMapper.insert(newer);
+        assertCurrentPlanProjection(valid.getEntryZone());
+        assertThat(executionPlanMapper.selectLatestCurrentFinalByDecisionIdentity(
+                valid.getAnalysisId(), valid.getDecisionId()).getPlanId()).isEqualTo(valid.getPlanId());
+
+        jdbcTemplate.update("UPDATE tm_execution_plan SET trace_id=?,plan_lifecycle_state='NEEDS_REVALIDATION' WHERE plan_id=?",
+                valid.getTraceId(), newer.getPlanId());
+        assertCurrentPlanProjection(valid.getEntryZone());
+
+        jdbcTemplate.update("UPDATE tm_execution_plan SET plan_lifecycle_state='SUPERSEDED' WHERE plan_id=?",
+                valid.getPlanId());
+        assertCurrentPlanProjection(null);
+    }
+
+    @Test
+    void missingRunTraceCannotBeReplacedWithThePlansTrace() {
+        insertOwnedAnalysis("analysis-missing-trace", "SYSTEM", 0L, "2026-01-01 00:00:00", 92);
+        insertRankingDecision("analysis-missing-trace", "decision-missing-trace");
+        insertValidatedFinalPlan("analysis-missing-trace", "UNIUSDT", "5m",
+                "plan-missing-run-trace", "CONFIRMATION", "FINAL_VALIDATED");
+        jdbcTemplate.update("UPDATE tm_analysis_run SET trace_id=NULL WHERE analysis_id='analysis-missing-trace'");
+        assertCurrentPlanProjection(null);
+    }
+
+    private void assertCurrentPlanProjection(String expectedEntry) {
+        // JdbcTemplate fixture mutations bypass MyBatis' per-transaction first-level cache.
+        sqlSession.clearCache();
+        assertThat(decisionResultMapper.findLatestDecisionResultsJoined(1).get(0).getEntryZone()).isEqualTo(expectedEntry);
+        assertThat(decisionResultMapper.findLatestDecisionResultBySymbolJoined("UNIUSDT").getEntryZone()).isEqualTo(expectedEntry);
+        assertThat(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(List.of("UNIUSDT"), "SYSTEM", 0L)
+                .get(0).getEntryZone()).isEqualTo(expectedEntry);
+    }
+
     @Test
     void latestPlanNeverJoinsAnotherDecisionFromTheSameAnalysisRun() {
         jdbcTemplate.update("INSERT INTO tm_analysis_run(analysis_id,symbol,timeframe,analysis_time,owner_type,owner_id) "
@@ -310,7 +359,8 @@ class DecisionResultMapperLatestPlanIntegrationTest {
         String opportunityId = "opportunity-" + planId;
         String candidateId = "candidate-" + planId;
         String resolverId = "resolver-" + planId;
-        String traceId = "trace-" + planId;
+        String traceId = "trace-" + analysisId;
+        jdbcTemplate.update("UPDATE tm_analysis_run SET trace_id=? WHERE analysis_id=?", traceId, analysisId);
         Timestamp createdAt = Timestamp.valueOf("2026-01-01 00:00:00");
         Timestamp freshUntil = Timestamp.valueOf("2026-01-01 01:00:00");
         long accountRiskSnapshotId = insertVerifiedAccountRiskSnapshot(
@@ -358,6 +408,7 @@ class DecisionResultMapperLatestPlanIntegrationTest {
             clearDirectionalParameters(finalPlan);
         }
         finalPlan.setChainStatus(chainStatus);
+        finalPlan.setPlanLifecycleState("CURRENT");
         finalPlan.setAccountRiskSnapshotId(accountRiskSnapshotId);
         finalPlan.setCreateTime(createdAt.toLocalDateTime());
         executionPlanMapper.insert(finalPlan);

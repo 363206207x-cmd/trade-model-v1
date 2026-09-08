@@ -217,9 +217,17 @@ class PositionMonitoringFrontendContractTest {
                         "基础价格监控",
                         "positionFact(\"行情来源\", label(position.markPriceSource",
                         "监控时间",
-                        "条件计划 · ",
-                        "暂停：",
-                        "触发后校验：行情新鲜度、方向状态和失效位")
+                        "conditionalState === \"CURRENT\" && plan.finalPlan === true",
+                        "sameSnapshot && currentFinal && access.visible && validNow",
+                        "String(plan.sourceAnalysisId) === String(asset.analysisId)",
+                        "String(plan.sourceDecisionId) === String(asset.decisionId)",
+                        "String(plan.sourceTraceId) === String(asset.traceId)",
+                        "has(plan.sourceExecutionPlanId)",
+                        "plan.pauseReason || plan.blockedReason || access.reason",
+                        "原因：", "恢复条件：", "plan.recoveryCondition",
+                        "plan.entryZone", "plan.triggerCondition", "plan.stopLoss || plan.stopZone",
+                        "planField(\"TP1\"", "planField(\"TP2\"", "plan.invalidCondition || plan.abandonCondition",
+                        "plan.validFrom", "plan.expiresAt", "有效期（北京时间）")
                 .doesNotContain("window.location.href = \"/analysis");
     }
 }

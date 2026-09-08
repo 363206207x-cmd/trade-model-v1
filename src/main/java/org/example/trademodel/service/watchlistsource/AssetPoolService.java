@@ -13,6 +13,14 @@ public interface AssetPoolService {
 
     List<AssetPoolAssetDTO> listSystemDefaults();
 
+    default List<AssetPoolAssetDTO> setHomePin(Long userId, String symbol, boolean pinned) {
+        throw new UnsupportedOperationException("Home pin persistence is unavailable");
+    }
+
+    default List<AssetPoolAssetDTO> reorderHomePins(Long userId, List<String> symbols) {
+        throw new UnsupportedOperationException("Home pin persistence is unavailable");
+    }
+
     List<String> listFocusSymbols(Long userId, int limit);
 
     List<String> listScanSymbols();
