@@ -99,8 +99,8 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal((eth.match(/>当前</g) || []).length, 0);
                 assert.doesNotMatch(eth, /HIGH_RISK/);
                 assert.equal(eth.includes('data-desktop-hover="risk"'), false);
-                assert.equal(eth.includes('尚无独立风险证据'), true);
-                assert.equal(eth.includes('风险证据待更新'), true);
+                assert.equal(eth.includes('尚无独立风险证据'), false);
+                assert.equal(eth.includes('风险 —'), true);
                 const evidencedRisk = {riskType:'EVENT_RISK', evidenceStatus:'AVAILABLE', severity:'HIGH',
                   currentValue:'2', source:'fixture-event-source', observedAt:'2026-09-07T05:00:00Z',
                   primaryEvidence:'Test-only independently observed event count', evidenceId:'fixture-evidence-1'};
@@ -219,8 +219,8 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="semantic-value semantic-unavailable">暂不可判断</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
                 assert.equal(observationHtml.includes('data-desktop-hover="risk"'), false);
-                assert.equal(observationHtml.includes('尚无独立风险证据'), true);
-                assert.equal(observationHtml.includes('风险证据待更新'), true);
+                assert.equal(observationHtml.includes('尚无独立风险证据'), false);
+                assert.equal(observationHtml.includes('风险 —'), true);
                 assert.equal(desktop.riskDrawer(observation), '');
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
@@ -256,7 +256,7 @@ class HomeUiReviewRuntimeContractTest {
                 assert.deepEqual(symbols, ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LINKUSDT']);
                 assert.equal(symbols.filter(symbol => symbol === 'ETHUSDT').length, 1);
                 assert.equal(nodes.opportunityGrid.innerHTML.includes('DEFAULT_SLOT'), false);
-                assert.equal(nodes.opportunityHeading.textContent, '机会资产 · 6');
+                assert.equal(nodes.opportunityHeading.textContent, '重点资产 · 6');
                 console.log('HOME_REAL_CARD_RUNTIME=PASS');
                 """.formatted(semanticClass, validators, renderers);
 

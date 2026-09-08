@@ -226,7 +226,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void selectedRankedAssetOutsideRequestedLimitRemainsVisibleForSmallHomeSurfaces() {
+    void selectedAssetOutsideRequestedLimitKeepsContextWithoutChangingHomeOrder() {
         AssetPoolService assetPoolService = mock(AssetPoolService.class);
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setAssetPoolService(assetPoolService);
@@ -250,11 +250,11 @@ class DashboardHomeServiceImplTest {
 
         assertThat(home.getAssets()).hasSize(3);
         assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
-                .containsExactly("BTCUSDT", "SOLUSDT", "ETHUSDT");
+                .containsExactly("BTCUSDT", "SOLUSDT", "XRPUSDT");
         assertThat(home.getSelectedSymbol()).isEqualTo("ETHUSDT");
         assertThat(home.getSelectedAssetContext()).isNotNull();
         assertThat(home.getSelectedAssetContext().getRawSymbol()).isEqualTo("ETHUSDT");
-        assertThat(home.getSelectedContextState()).isEqualTo("RANKED");
+        assertThat(home.getSelectedContextState()).isEqualTo("EXITED_TOP6");
         verify(rankingService).rankForHome(USER_ID, 6);
         verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
     }
@@ -562,6 +562,7 @@ class DashboardHomeServiceImplTest {
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
         when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
         ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-invalidation");
+        plan.setTraceId(run.getTraceId());
         plan.setPlanLifecycleState("CURRENT");
         when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of(
                 marketEvidence(decision.getAnalysisId(), "ETHUSDT", "trace-price-eth-invalidation")));
@@ -603,10 +604,12 @@ class DashboardHomeServiceImplTest {
         LocalDateTime analysisTime = LocalDateTime.of(2026, 7, 1, 11, 50);
         decision.setCreateTime(analysisTime);
         AnalysisRunDO run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 205L);
+        run.setTraceId("trace-eth-missing-provenance");
         run.setAnalysisTime(analysisTime);
         when(analysisRunMapper.selectById(decision.getAnalysisId())).thenReturn(run);
         when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
         ExecutionPlanDO plan = allowAssetExecutionPlan(decision, "plan-eth-missing-provenance");
+        plan.setTraceId(run.getTraceId());
         plan.setPlanLifecycleState("CURRENT");
         when(evidenceItemMapper.listByAnalysisId(decision.getAnalysisId())).thenReturn(List.of());
 
@@ -838,7 +841,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void completedPreviewFromSameClosedHourKeepsCardPlanAndAiOnOneRunEvenWhenScanFinishesLater() {
+    void olderPreviewInSameClosedHourCannotReplaceCurrentDirectionConfidenceRiskOrAiOnSelection() {
         OpportunityPriorityRankingService rankingService = mock(OpportunityPriorityRankingService.class);
         service.setOpportunityPriorityRankingService(rankingService);
 
@@ -898,28 +901,28 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getSlotType()).isEqualTo("DECISION");
             assertThat(asset.getOpportunityId()).isEqualTo("opportunity-natural-btc");
             assertThat(asset.getOpportunityState()).isEqualTo("HIGH_RISK");
-            assertThat(asset.getAnalysisId()).isEqualTo("analysis-dashboard-ai");
-            assertThat(asset.getDecisionId()).isEqualTo("decision-preview-btc");
-            assertThat(asset.getTraceId()).isEqualTo("trace-dashboard-ai");
-            assertThat(asset.getMarketBias()).isEqualTo("BULLISH");
-            assertThat(asset.getMarketBiasLabel()).isEqualTo("偏多");
-            assertThat(asset.getConfidenceLevel()).isEqualTo("60");
-            assertThat(asset.getConfidenceLabel()).isEqualTo("60%");
-            assertThat(asset.getRiskLevel()).isEqualTo("MEDIUM");
-            assertThat(asset.getOneHourOpportunityLabel()).isEqualTo("1小时机会形成");
-            assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时趋势偏多");
+            assertThat(asset.getAnalysisId()).isEqualTo("analysis-natural-btc");
+            assertThat(asset.getDecisionId()).isEqualTo("decision-natural-btc");
+            assertThat(asset.getTraceId()).isEqualTo("trace-natural-btc");
+            assertThat(asset.getMarketBias()).isNotEqualTo("BULLISH");
+            assertThat(asset.getConfidenceLabel()).isNotEqualTo("60%");
+            assertThat(asset.getRiskLevel()).isNull(); // No ready risk result in this formal snapshot.
             assertThat(asset.getHasFinal()).isFalse();
         });
         assertThat(home.getSelectedAssetContext()).isSameAs(home.getAssets().get(0));
-        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-dashboard-ai");
-        assertThat(home.getAiDecision().getAnalysisId()).isEqualTo("analysis-dashboard-ai");
-        assertThat(home.getAiDecision().getDecisionId()).isEqualTo("decision-preview-btc");
+        assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo("analysis-natural-btc");
+        assertThat(home.getAiDecision().getAnalysisId()).isEqualTo("analysis-natural-btc");
+        assertThat(home.getAiDecision().getDecisionId()).isEqualTo("decision-natural-btc");
         assertThat(home.getAiDecision().getTabs())
                 .extracting(DashboardHomeVO.AiTabVO::getAnalysisId)
-                .containsOnly("analysis-dashboard-ai");
+                .doesNotContain("analysis-dashboard-ai");
         assertThat(home.getAiDecision().getTabs())
                 .extracting(DashboardHomeVO.AiTabVO::getDecisionId)
-                .containsOnly("decision-preview-btc");
+                .doesNotContain("decision-preview-btc");
+        DashboardHomeVO unselected = service.getHomeForUser(USER_ID, "ETHUSDT", 6, null);
+        assertThat(unselected.getAssets().get(0).getAnalysisId()).isEqualTo(home.getAssets().get(0).getAnalysisId());
+        assertThat(unselected.getAssets().get(0).getConfidenceLabel()).isEqualTo(home.getAssets().get(0).getConfidenceLabel());
+        assertThat(unselected.getAssets().get(0).getRiskLevel()).isEqualTo(home.getAssets().get(0).getRiskLevel());
     }
 
     @Test
@@ -2171,7 +2174,7 @@ class DashboardHomeServiceImplTest {
     }
 
     @Test
-    void currentStructuralRulePlanRetainsExactIdentityAndNumbersWithoutPretendingToBeFinal() {
+    void currentStructuralRulePlanRetainsIdentityAndPendingReasonsButNeverFinalNumbers() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
         decision.setDirectionDataState("READY");
@@ -2191,14 +2194,16 @@ class DashboardHomeServiceImplTest {
         when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
 
         var suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
-        assertThat(suggestion.getStatus()).isEqualTo("RULE_CONDITIONAL_PLAN");
-        assertThat(suggestion.getStatusLabel()).isEqualTo("规则参考计划 · 等待触发");
+        assertThat(suggestion.getStatus()).isEqualTo("FINAL_VALIDATION_PENDING");
+        assertThat(suggestion.getStatusLabel()).isEqualTo("Final 执行计划尚未完成");
+        assertThat(suggestion.getBlockedReason()).contains("最终校验");
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
         assertThat(suggestion.getSourceDecisionId()).isEqualTo(decision.getDecisionId());
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
         assertThat(suggestion.getSourceTraceId()).isEqualTo(plan.getTraceId());
-        assertThat(suggestion.getEntryZone()).isEqualTo(plan.getEntryZone());
-        assertThat(suggestion.getTakeProfitRules()).isEqualTo("TP1 110；TP2 120");
+        assertThat(suggestion.getEntryZone()).isNull();
+        assertThat(suggestion.getStopLoss()).isNull();
+        assertThat(suggestion.getTakeProfitRules()).isNull();
         assertThat(suggestion.getFinalPlan()).isFalse();
         assertThat(suggestion.getWorthOpening()).isFalse();
         assertThat(suggestion.getNotTradeInstruction()).isTrue();
@@ -2207,8 +2212,8 @@ class DashboardHomeServiceImplTest {
         plan.setRuleValidationStatus("BLOCKED");
         plan.setValidationReasons("DATA_QUALITY_BLOCKED");
         suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
-        assertThat(suggestion.getStatus()).isEqualTo("RULE_CONDITIONAL_SUSPENDED");
-        assertThat(suggestion.getEntryZone()).isEqualTo(plan.getEntryZone());
+        assertThat(suggestion.getStatus()).isEqualTo("PLAN_BLOCKED");
+        assertThat(suggestion.getEntryZone()).isNull();
         assertThat(suggestion.getPauseReason()).contains("数据质量校验未通过");
 
         plan.setPlanLifecycleState("SUPERSEDED");
@@ -2379,6 +2384,46 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getEntryZone()).isNull();
         assertThat(suggestion.getStopLoss()).isNull();
         assertThat(suggestion.getTakeProfitRules()).isNull();
+    }
+
+    @Test
+    void currentFinalWithCompleteIdentityWinsOverNewerIncompleteRelationship() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO incomplete = allowMatchingSnapshot(decision);
+        ExecutionPlanDO complete = new ExecutionPlanDO();
+        org.springframework.beans.BeanUtils.copyProperties(incomplete, complete);
+        complete.setDecisionId(decision.getDecisionId());
+        complete.setPlanLifecycleState("CURRENT");
+        complete.setPlanId("plan-current-complete");
+        incomplete.setTraceId(null);
+        incomplete.setFinalPlan(false);
+        when(executionPlanMapper.selectLatestCurrentFinalByDecisionIdentity(decision.getAnalysisId(), decision.getDecisionId()))
+                .thenReturn(complete);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+        var suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+        assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(complete.getPlanId());
+        assertThat(suggestion.getSourceDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(suggestion.getSourceTraceId()).isEqualTo(complete.getTraceId());
+        assertThat(suggestion.getEntryZone()).isEqualTo(complete.getEntryZone());
+    }
+
+    @Test
+    void planTraceMissingOrDifferentNeverBorrowsRunTraceToExposeNumbers() {
+        DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setDecisionId(decision.getDecisionId());
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+        for (String trace : new String[]{null, "trace-another-run"}) {
+            plan.setTraceId(trace);
+            var suggestion = service.getHomeForUser(USER_ID, "BTCUSDT", 6).getExecutionSuggestion();
+            assertThat(suggestion.getStatus()).isEqualTo("PLAN_IDENTITY_ERROR");
+            assertThat(suggestion.getEntryZone()).isNull();
+            assertThat(suggestion.getStopLoss()).isNull();
+            assertThat(suggestion.getTakeProfitRules()).isNull();
+            assertThat(suggestion.getBlockedReason()).contains("Trace");
+        }
     }
 
     @Test
@@ -4164,7 +4209,8 @@ class DashboardHomeServiceImplTest {
     void mismatchedAssetStateTraceBlocksPlan() {
         DecisionResultVO decision = completePlanDecision("BTCUSDT", ACTIVE_VALID_PERIOD);
         setActivePlanValidity(decision);
-        allowMatchingSnapshot(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setTraceId("trace-original-plan");
         AssetStateDO state = new AssetStateDO();
         state.setSymbol("BTCUSDT");
         state.setState(AssetStateEnum.CANDIDATE);
@@ -4627,10 +4673,12 @@ class DashboardHomeServiceImplTest {
         ExecutionPlanDO plan = FrozenFinalExecutionPlanTestFixture.complete(
                 planId, analysisId, LocalDateTime.of(2026, 7, 1, 12, 0));
         plan.setExecutionFeasibilityFreshUntil(LocalDateTime.of(2026, 7, 3, 11, 59));
+        plan.setPlanLifecycleState("CURRENT");
         return plan;
     }
 
     private void copyExactPlanFields(ExecutionPlanDO plan, DecisionResultVO decision) {
+        plan.setDecisionId(decision.getDecisionId());
         plan.setRuleMarketBias(decision.getMarketBiasHierarchy());
         plan.setFinalMarketBias(decision.getMarketBiasHierarchy());
         plan.setFinalPlanMode("CONFIRMATION");

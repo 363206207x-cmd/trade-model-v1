@@ -5,10 +5,40 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
+import java.io.IOException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 
 class DashboardLiveEventServiceTest {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void brokenConnectionAndCompletionCannotAbortAnalysisPublishOrOtherSubscribers() throws Exception {
+        DashboardLiveEventService service = new DashboardLiveEventService();
+        SseEmitter disconnected = mock(SseEmitter.class);
+        SseEmitter healthy = mock(SseEmitter.class);
+        doThrow(new IOException("closed client")).when(disconnected).send(any(SseEmitter.SseEventBuilder.class));
+        doThrow(new IllegalStateException("already completed")).when(disconnected).complete();
+        Map<Long, CopyOnWriteArrayList<SseEmitter>> subscriptions =
+                (Map<Long, CopyOnWriteArrayList<SseEmitter>>) ReflectionTestUtils.getField(service, "subscribers");
+        subscriptions.put(7L, new CopyOnWriteArrayList<>(java.util.List.of(disconnected, healthy)));
+        Instant now = Instant.now();
+        var event = new DashboardLiveEvent("event-live-1", "ASSET_DIRECTION_UPDATED", "ETHUSDT",
+                1L, now, now, Map.of("analysisId", "run-live-1"));
+
+        assertThatCode(() -> service.publish(event)).doesNotThrowAnyException();
+        verify(healthy).send(any(SseEmitter.SseEventBuilder.class));
+        assertThat(subscriptions.get(7L)).containsExactly(healthy);
+        assertThat(service.latest("ETHUSDT").orElseThrow()).isEqualTo(event);
+        assertThatCode(service::heartbeat).doesNotThrowAnyException();
+        verify(disconnected, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    }
 
     @Test
     void authenticatedDashboardStreamDoesNotExpireWhileHeartbeatKeepsConnectionAlive() {

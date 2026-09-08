@@ -216,6 +216,22 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
     }
 
     @Test
+    void rulePlanWithoutAiFinalInheritsItsActualPersistedRunIdentity() {
+        AnalysisRunResult result = runAiContractAnalysis("LTCUSDT", "req-rule-plan-trace");
+        assertThat(result.isSuccessfulAnalysisAvailable()).isTrue();
+        AnalysisRunDO run = analysisRunMapper.selectById(result.getAnalysisId());
+        DecisionResult decision = decisionResultMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        ExecutionPlanDO plan = executionPlanMapper.selectLatestByAnalysisId(result.getAnalysisId());
+        assertThat(run.getTraceId()).isNotBlank();
+        assertThat(plan).isNotNull();
+        assertThat(plan.getPlanId()).isNotBlank();
+        assertThat(plan.getAnalysisId()).isEqualTo(run.getAnalysisId());
+        assertThat(plan.getDecisionId()).isEqualTo(decision.getDecisionId());
+        assertThat(plan.getTraceId()).isEqualTo(run.getTraceId());
+        assertThat(plan.getFinalPlan()).isFalse();
+    }
+
+    @Test
     void nonFinalDirectionBlockedAnalysisKeepsAiExplanationSeparateFromFinalPlan() {
         String symbol = "BNBUSDT";
         AnalysisRunResult result = runAiContractAnalysis(symbol, "req-ai-home");
@@ -959,6 +975,8 @@ class AnalysisDecisionExecutionPlanIntegrationTest {
         conflictResolverResultMapper.insert(resolver);
 
         ExecutionPlanDO plan = new ExecutionPlanDO();
+        plan.setDecisionId("dec-int-1");
+        plan.setPlanLifecycleState("CURRENT");
         plan.setPlanId("plan-int-1");
         plan.setAnalysisId(ANALYSIS_ID);
         plan.setPlanMode("CONFIRMATION");

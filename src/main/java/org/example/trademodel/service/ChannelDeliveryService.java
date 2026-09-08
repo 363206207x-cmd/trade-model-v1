@@ -58,7 +58,7 @@ public class ChannelDeliveryService {
                 identity.subjectType(), identity.subjectId());
         ChannelDeliveryDO existing = mapper.selectByMessageAndChannel(messageId, "TELEGRAM");
         if (existing != null) return existing;
-        if (lifetimePlan(identity)) {
+        if (lifetimeNotification(identity)) {
             existing = mapper.selectExistingLifetimeDelivery(userId, cooldownKey);
             if (existing != null) return existing;
         }
@@ -92,7 +92,7 @@ public class ChannelDeliveryService {
         String cooldownKey = TelegramDedupeKey.deliveryCooldownKey(
                 identity.telegramCategory(), identity.changeState(), message.getUserId(),
                 identity.subjectType(), identity.subjectId());
-        if (lifetimePlan(identity)) {
+        if (lifetimeNotification(identity)) {
             ChannelDeliveryDO lifetime = mapper.selectExistingLifetimeDelivery(userId, cooldownKey);
             if (lifetime != null) return lifetime;
         }
@@ -244,10 +244,12 @@ public class ChannelDeliveryService {
         return row != null && TelegramDeliveryStatus.SENT.name().equals(row.getStatus());
     }
 
-    private static boolean lifetimePlan(HighValueAlertPolicy.TelegramDeliveryIdentity identity) {
+    private static boolean lifetimeNotification(HighValueAlertPolicy.TelegramDeliveryIdentity identity) {
         return identity != null
-                && "EXECUTABLE_FINAL_PLAN".equals(identity.telegramCategory())
+                && (("EXECUTABLE_FINAL_PLAN".equals(identity.telegramCategory())
                 && "CONFIRMATION".equals(identity.changeState())
-                && "FINAL_PLAN".equals(identity.subjectType());
+                && "FINAL_PLAN".equals(identity.subjectType()))
+                || ("ACTIVE_POSITION_ATTENTION".equals(identity.telegramCategory())
+                && "USER_POSITION".equals(identity.subjectType())));
     }
 }

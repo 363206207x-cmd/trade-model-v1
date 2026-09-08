@@ -99,7 +99,11 @@ public class DashboardLiveEventService {
             emitter.send(SseEmitter.event().id(event.eventId()).name(event.eventType()).data(event));
         } catch (IOException | IllegalStateException failure) {
             subscribers.forEach((userId, emitters) -> emitters.remove(emitter));
-            emitter.complete();
+            try {
+                emitter.complete();
+            } catch (IllegalStateException alreadyClosed) {
+                // The subscriber is detached. A closed browser must not abort analysis publication.
+            }
         }
     }
 

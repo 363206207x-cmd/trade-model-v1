@@ -16,6 +16,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,6 +49,8 @@ class TelegramDeliveryDispatcherTest {
         dispatcher = new TelegramDeliveryDispatcher(
                 properties, client, readiness, formatter, deliveryService, messageMapper, true);
         recipientFingerprint = TelegramSecretSanitizer.recipientFingerprint(properties.getChatId());
+        org.mockito.Mockito.lenient().when(messageMapper.countCurrentTelegramSource(anyString(), anyLong(), any()))
+                .thenReturn(1);
         org.mockito.Mockito.lenient().when(deliveryService.extendClaimForProviderCall(any())).thenReturn(true);
         org.mockito.Mockito.lenient().when(deliveryService.completeClaim(any())).thenReturn(true);
         org.mockito.Mockito.lenient().when(client.getMe())
@@ -247,20 +251,52 @@ class TelegramDeliveryDispatcherTest {
     }
 
     @Test
-    void laterOrphanRecoveryQueuesCanonicalSafetyMessageAfterCommitListenerFailure() {
+    void orphanRecoveryRejectsSafetyEvenIfAnOldQueryReturnsIt() {
         MessageDO safety = HighValueAlertPolicyTest.eligibleSafetyMessage();
         safety.setMessageId("message-safety");
         safety.setExpiresAt(LocalDateTime.now(Clock.systemUTC()).plusMinutes(5));
         when(messageMapper.listTelegramDeliveryOrphans(any(LocalDateTime.class), org.mockito.ArgumentMatchers.eq(20)))
                 .thenReturn(List.of(safety));
-        when(deliveryService.queueTelegram(41L, "message-safety"))
-                .thenThrow(new IllegalStateException("after-commit queue unavailable"))
-                .thenReturn(new ChannelDeliveryDO());
-
         assertThat(dispatcher.reconcileOrphanedMessages()).isZero();
-        assertThat(dispatcher.reconcileOrphanedMessages()).isEqualTo(1);
+        assertThat(dispatcher.reconcileOrphanedMessages()).isZero();
 
-        verify(deliveryService, times(2)).queueTelegram(41L, "message-safety");
+        verify(deliveryService, never()).queueTelegram(41L, "message-safety");
+        verify(client, never()).getMe();
+        verify(client, never()).sendMessage(any());
+    }
+
+    @Test
+    void historicalPendingHotResetIsSuppressedBeforeAnyTelegramHttp() {
+        ChannelDeliveryDO delivery = delivery(1);
+        when(messageMapper.selectByIdForUser("message-1", 41L))
+                .thenReturn(HighValueAlertPolicyTest.eligibleSafetyMessage());
+        dispatcher.dispatchOne(delivery);
+        assertThat(delivery.getStatus()).isEqualTo("SUPPRESSED");
+        assertThat(delivery.getErrorCode()).isEqualTo("TELEGRAM_CATEGORY_NOT_ELIGIBLE");
+        org.mockito.Mockito.verifyNoInteractions(client, formatter);
+    }
+
+    @Test
+    void sourceNoLongerCurrentOrReadableNeverReachesTelegramHttp() {
+        var delivery = delivery(1);
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message());
+        when(messageMapper.countCurrentTelegramSource(anyString(), anyLong(), any())).thenReturn(0);
+        dispatcher.dispatchOne(delivery);
+        assertThat(delivery.getStatus()).isEqualTo("SUPPRESSED");
+        assertThat(delivery.getErrorCode()).isEqualTo("TELEGRAM_SOURCE_NOT_CURRENT");
+        org.mockito.Mockito.verifyNoInteractions(client, formatter);
+    }
+
+    @Test
+    void sourceReadFailureDoesNotCallProviderAndDoesNotPretendExpired() {
+        var delivery = delivery(1);
+        when(messageMapper.selectByIdForUser("message-1", 41L)).thenReturn(message());
+        when(messageMapper.countCurrentTelegramSource(anyString(), anyLong(), any()))
+                .thenThrow(new IllegalStateException("database test unavailable"));
+        dispatcher.dispatchOne(delivery);
+        assertThat(delivery.getStatus()).isEqualTo("FAILED");
+        assertThat(delivery.getErrorCode()).isEqualTo("TELEGRAM_SOURCE_READ_FAILED");
+        org.mockito.Mockito.verifyNoInteractions(client, formatter);
     }
 
     @Test

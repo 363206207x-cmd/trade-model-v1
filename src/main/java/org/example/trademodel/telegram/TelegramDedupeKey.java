@@ -24,7 +24,7 @@ public final class TelegramDedupeKey {
                 fingerprint(userId + "|" + safe(sourceType) + "|" + safeIdentity(sourceId)));
     }
 
-    /** Stable business-lifetime identity used only for one Final plan notification. */
+    /** Stable identity for one Final plan or one position's concrete event/risk stage. */
     public static String createPlanLifetime(String eventType, String state, int severity,
                                             Long userId, String sourceType, String sourceId) {
         return String.join("|", PREFIX, safe(eventType), safe(state), String.valueOf(Math.max(0, severity)),

@@ -56,21 +56,10 @@ public interface DecisionResultMapper {
               SELECT plan_id, analysis_id, decision_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
                      leverage_limit, position_limit, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id, decision_id ORDER BY create_time DESC, plan_id DESC) AS rn
-              FROM tm_execution_plan
-              WHERE final_plan = TRUE
-                AND rule_validation_status = 'PASS'
-                AND chain_status = 'FINAL_VALIDATED'
-            ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
-              AND (d.decision_id = p.decision_id OR (p.decision_id IS NULL
-                AND EXISTS (SELECT 1 FROM tm_opportunity_log exact_relation
-                  WHERE exact_relation.analysis_id = d.analysis_id
-                    AND exact_relation.execution_plan_id = p.plan_id
-                    AND exact_relation.decision_id = d.decision_id
-                    AND exact_relation.source_type = 'AUTHORITATIVE_ANALYSIS')
-                AND NOT EXISTS (SELECT 1 FROM tm_opportunity_log other_relation
-                  WHERE other_relation.analysis_id = d.analysis_id
-                    AND other_relation.execution_plan_id = p.plan_id
-                    AND other_relation.decision_id <> d.decision_id)))
+              FROM tm_execution_plan ep
+              WHERE
+            """ + ExecutionPlanMapper.CURRENT_FINAL_IDENTITY + """
+            ) p ON d.analysis_id = p.analysis_id AND d.decision_id = p.decision_id AND p.rn = 1
             LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id
             ORDER BY d.create_time DESC LIMIT #{limit}
             """)
@@ -111,21 +100,10 @@ public interface DecisionResultMapper {
               SELECT plan_id, analysis_id, decision_id, final_plan_mode, recommended_action, entry_zone, stop_loss, take_profit_rules,
                      leverage_limit, position_limit, invalid_condition,
                      ROW_NUMBER() OVER (PARTITION BY analysis_id, decision_id ORDER BY create_time DESC, plan_id DESC) AS rn
-              FROM tm_execution_plan
-              WHERE final_plan = TRUE
-                AND rule_validation_status = 'PASS'
-                AND chain_status = 'FINAL_VALIDATED'
-            ) p ON d.analysis_id = p.analysis_id AND p.rn = 1
-              AND (d.decision_id = p.decision_id OR (p.decision_id IS NULL
-                AND EXISTS (SELECT 1 FROM tm_opportunity_log exact_relation
-                  WHERE exact_relation.analysis_id = d.analysis_id
-                    AND exact_relation.execution_plan_id = p.plan_id
-                    AND exact_relation.decision_id = d.decision_id
-                    AND exact_relation.source_type = 'AUTHORITATIVE_ANALYSIS')
-                AND NOT EXISTS (SELECT 1 FROM tm_opportunity_log other_relation
-                  WHERE other_relation.analysis_id = d.analysis_id
-                    AND other_relation.execution_plan_id = p.plan_id
-                    AND other_relation.decision_id <> d.decision_id)))
+              FROM tm_execution_plan ep
+              WHERE
+            """ + ExecutionPlanMapper.CURRENT_FINAL_IDENTITY + """
+            ) p ON d.analysis_id = p.analysis_id AND d.decision_id = p.decision_id AND p.rn = 1
             LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id
             WHERE UPPER(TRIM(d.symbol)) = #{normalizedSymbol}
             ORDER BY d.create_time DESC LIMIT 1
@@ -202,21 +180,9 @@ public interface DecisionResultMapper {
             "  SELECT plan_id, analysis_id, decision_id, final_plan_mode, final_market_bias, recommended_action, entry_zone, stop_loss,",
             "         take_profit_rules, leverage_limit, position_limit, invalid_condition,",
             "         ROW_NUMBER() OVER (PARTITION BY analysis_id, decision_id ORDER BY create_time DESC, plan_id DESC) AS rn",
-            "  FROM tm_execution_plan",
-            "  WHERE final_plan = TRUE",
-            "    AND rule_validation_status = 'PASS'",
-            "    AND chain_status = 'FINAL_VALIDATED'",
-            ") p ON d.analysis_id = p.analysis_id AND p.rn = 1",
-            "AND (d.decision_id = p.decision_id OR (p.decision_id IS NULL",
-            "AND EXISTS (SELECT 1 FROM tm_opportunity_log exact_relation",
-            "WHERE exact_relation.analysis_id = d.analysis_id",
-            "AND exact_relation.execution_plan_id = p.plan_id",
-            "AND exact_relation.decision_id = d.decision_id",
-            "AND exact_relation.source_type = 'AUTHORITATIVE_ANALYSIS')",
-            "AND NOT EXISTS (SELECT 1 FROM tm_opportunity_log other_relation",
-            "WHERE other_relation.analysis_id = d.analysis_id",
-            "AND other_relation.execution_plan_id = p.plan_id",
-            "AND other_relation.decision_id != d.decision_id)))",
+            "  FROM tm_execution_plan ep",
+            "  WHERE " + ExecutionPlanMapper.CURRENT_FINAL_IDENTITY,
+            ") p ON d.analysis_id = p.analysis_id AND d.decision_id = p.decision_id AND p.rn = 1",
             "LEFT JOIN tm_analysis_run ar ON d.analysis_id = ar.analysis_id",
             "WHERE d.symbol_rank = 1",
             "ORDER BY ar.analysis_time DESC, d.create_time DESC, d.decision_id DESC",
