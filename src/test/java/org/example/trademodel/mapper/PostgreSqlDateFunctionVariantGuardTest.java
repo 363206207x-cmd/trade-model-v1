@@ -195,10 +195,12 @@ class PostgreSqlDateFunctionVariantGuardTest {
         Select generic = genericSelect(method);
         Select postgres = postgresSelect(method);
 
-        assertThat(sql(generic)).contains("FORMATDATETIME");
+        assertThat(sql(generic)).contains("FORMATDATETIME", "yyyy-MM-dd''T''HH:mm:ss''Z''")
+                .doesNotContain("yyyy-MM-dd HH:mm:ss", "TO_CHAR", "DATEADD", "TIMESTAMPADD", "AT TIME ZONE");
         assertThat(sql(postgres))
                 .contains("TO_CHAR")
-                .contains("YYYY-MM-DD HH24:MI:SS")
+                .contains("YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"")
+                .doesNotContain("YYYY-MM-DD HH24:MI:SS", "INTERVAL", "AT TIME ZONE", "TIMESTAMPADD")
                 .doesNotContain("FORMATDATETIME")
                 .doesNotContain("DATEADD");
     }

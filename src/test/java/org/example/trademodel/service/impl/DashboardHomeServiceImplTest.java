@@ -110,6 +110,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -192,6 +193,91 @@ class DashboardHomeServiceImplTest {
         lenient().when(analysisRunMapper.countEvidenceByAnalysisId(anyString())).thenReturn(null);
         lenient().when(persistedOhlcvQueryService.primarySourceProvider()).thenReturn("BINANCE_PUBLIC");
         lenient().when(persistedOhlcvQueryService.primarySourceMarketType()).thenReturn("SPOT");
+    }
+
+    @Test
+    void repeatedHomeReadsDoNotRegisterRealtimeMonitoringContexts() {
+        var liveEvents = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+        service.setDashboardLiveEventService(liveEvents);
+        DecisionResultVO decision = completePlanDecision("ETHUSDT", ACTIVE_VALID_PERIOD);
+        decision.setExplanationJson("{\"atr1h\":12.5}");
+        setActivePlanValidity(decision);
+        allowMatchingSnapshot(decision);
+        var run = formalSchedulerRun(decision.getAnalysisId(), "ETHUSDT", 202L);
+        when(analysisRunMapper.selectReadableByUser(decision.getAnalysisId(), USER_ID)).thenReturn(run);
+        var ranking = mock(OpportunityPriorityRankingService.class);
+        service.setOpportunityPriorityRankingService(ranking);
+        when(ranking.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(202L, decision, 80, "test-readonly-opportunity", "CANDIDATE")));
+
+        for (String symbol : List.of("BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "DOGEUSDT", "UNIUSDT")) {
+            var home = service.getHomeForUser(USER_ID, symbol, 6);
+            assertThat(home.getAssets()).hasSize(1);
+            assertThat(home.getAssets().get(0).getStructuralAtr1h()).isEqualByComparingTo("12.5");
+            assertThat(home.getAssets().get(0).getDirectionCalculatedAt()).isNotNull();
+            service.getHomeForUser(USER_ID, symbol, 6);
+        }
+
+        org.mockito.Mockito.verifyNoInteractions(liveEvents);
+        verify(positionMonitorLogService, never()).recordMonitorRunForSystem(any());
+        verify(positionMonitorLogService, never()).recordMonitorRunForUser(anyLong(), any());
+        verify(planRevalidationService, never()).requestSystem(anyString(), any(), anyString());
+    }
+
+    @Test
+    void blockedNonFinalPlanWithMissingTraceShowsAllRealReasonsWithoutOldPrices() {
+        DecisionResultVO decision = completePlanDecision("DOGEUSDT", ACTIVE_VALID_PERIOD);
+        setActivePlanValidity(decision);
+        ExecutionPlanDO plan = allowMatchingSnapshot(decision);
+        plan.setFinalPlan(false);
+        plan.setTraceId(null);
+        plan.setRuleValidationStatus("BLOCKED");
+        plan.setChainStatus("RULE_VALIDATION_BLOCKED");
+        plan.setRuleVetoReason("AI_TRIGGER_NOT_MET");
+        plan.setRevalidationReason("OI_COLLAPSE:OI_COLLAPSE_THRESHOLD_REACHED");
+        plan.setPlanLifecycleState("NEEDS_REVALIDATION");
+        plan.setNeedsRevalidation(true);
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+
+        var projected = service.getHomeForUser(USER_ID, "DOGEUSDT", 6).getExecutionSuggestion();
+
+        assertThat(projected.getStatusLabel()).isEqualTo("暂不执行");
+        assertThat(projected.getBlockedReason()).contains("本轮未达到AI触发条件", "未平仓量下降达到风险阈值")
+                .doesNotContain("AI_TRIGGER_NOT_MET", "OI_COLLAPSE", "110", "115");
+        assertThat(projected.getEntryZone()).isNull();
+        assertThat(projected.getStopLoss()).isNull();
+        assertThat(projected.getTakeProfitRules()).isNull();
+        assertThat(plan.getRuleValidationStatus()).isEqualTo("BLOCKED");
+        assertThat(plan.getFinalPlan()).isFalse();
+        assertThat(plan.getTraceId()).isNull();
+    }
+
+    @Test
+    void roleTriggerNotMetIsNotMisreportedAsDisabledService() throws Exception {
+        DecisionResultVO decision = completePlanDecision("DOGEUSDT", ACTIVE_VALID_PERIOD);
+        ObjectNode payload = (ObjectNode) objectMapper.readTree(structuredAiRoleResults(List.of(), null));
+        payload.put("analysisId", decision.getAnalysisId());
+        for (String role : List.of("GPT_FINAL", "GEMINI_REVIEW", "GROK_CHALLENGE")) {
+            ObjectNode value = (ObjectNode) payload.path("roles").path(role);
+            value.put("callStatus", "DISABLED");
+            value.put("roleState", "UNAVAILABLE");
+            value.put("resultAvailable", false);
+            value.put("fallbackReason", "AI_TRIGGER_NOT_MET");
+        }
+        decision.setAiRoleResults(objectMapper.writeValueAsString(payload));
+        when(decisionService.getLatestDecisionResultsForUser(eq(USER_ID), anyInt())).thenReturn(List.of(decision));
+
+        var home = service.getHomeForUser(USER_ID, "DOGEUSDT", 6);
+
+        assertThat(aiTab(home, "GPT_FINAL").getStatusMessage()).contains("本轮未触发", "未达到AI分析条件");
+        assertThat(aiTab(home, "GEMINI_REVIEW").getStatusMessage()).contains("本轮未运行", "GPT", "冲突复核");
+        assertThat(aiTab(home, "GROK_CHALLENGE").getStatusMessage()).contains("本轮未运行", "GPT", "反方挑战");
+        for (var tab : home.getAiDecision().getTabs()) {
+            assertThat(tab.getRunStatus()).isEqualTo("DISABLED");
+            assertThat(tab.getResultAvailable()).isFalse();
+            assertThat(tab.getStatusMessage()).doesNotContain("复核未启用", "AI_TRIGGER_NOT_MET");
+            assertThat(tab.getDecisionId()).isEqualTo(decision.getDecisionId());
+        }
     }
 
     @Test
@@ -483,9 +569,8 @@ class DashboardHomeServiceImplTest {
         assertThat(asset.getConfidenceLabel()).isEqualTo("待重新计算");
         assertThat(asset.getRiskLabel()).isEqualTo("待重新计算");
         assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
-        verify(planRevalidationService).requestSystem(
-                "plan-eth-2391", org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
-                "NEW_1H_CLOSE_AFTER_DIRECTION_CALCULATION");
+        verifyNoInteractions(planRevalidationService);
+        assertThat(plan.getPlanLifecycleState()).isEqualTo("CURRENT"); // GET projects, never persists revalidation
     }
 
     @Test
@@ -586,9 +671,7 @@ class DashboardHomeServiceImplTest {
         assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
         assertThat(asset.getMarketBias()).isNull();
         assertThat(asset.getMarketBiasLabel()).isEqualTo("待重新分析");
-        verify(planRevalidationService).requestSystem(
-                "plan-eth-invalidation", org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
-                "PRICE_CROSSED_PLAN_INVALIDATION_LEVEL");
+        verifyNoInteractions(planRevalidationService);
     }
 
     @Test
@@ -632,10 +715,7 @@ class DashboardHomeServiceImplTest {
         assertThat(asset.getMarketBias()).isNull();
         assertThat(asset.getMarketBiasLabel()).isEqualTo("待重新分析");
         assertThat(asset.getPlanState()).isEqualTo("NEEDS_REVALIDATION");
-        verify(planRevalidationService).requestSystem(
-                "plan-eth-missing-provenance",
-                org.example.trademodel.enums.PlanRevalidationTriggerTypeEnum.DATA_REFRESH,
-                "DIRECTION_MARKET_EVIDENCE_UNAVAILABLE");
+        verifyNoInteractions(planRevalidationService);
     }
 
     @Test
@@ -1050,7 +1130,8 @@ class DashboardHomeServiceImplTest {
             assertThat(asset.getFourHourTrendLabel()).isEqualTo("4小时趋势偏多");
         });
         assertThat(home.getExecutionSuggestion().getStatus()).isEqualTo("DIRECTION_BLOCKED");
-        assertThat(home.getExecutionSuggestion().getBlockedReason()).contains("HIGH_RISK_REVIEW_REQUIRED");
+        assertThat(home.getExecutionSuggestion().getBlockedReason()).contains("当前风险较高，需完成风险复核")
+                .doesNotContain("HIGH_RISK_REVIEW_REQUIRED");
         assertThat(home.getExecutionSuggestion().getRevalidationRule()).isEqualTo("风险降级且完成重新分析后恢复");
         assertThat(home.getExecutionSuggestion().getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
         assertThat(home.getExecutionSuggestion().getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
@@ -4262,7 +4343,8 @@ class DashboardHomeServiceImplTest {
         assertThat(suggestion.getSourceAnalysisId()).isEqualTo(decision.getAnalysisId());
         assertThat(suggestion.getSourceExecutionPlanId()).isEqualTo(plan.getPlanId());
         assertThat(suggestion.getValidationStatus()).isEqualTo("BLOCKED");
-        assertThat(suggestion.getBlockedReason()).contains("AI_TRIGGER_NOT_MET");
+        assertThat(suggestion.getBlockedReason()).contains("本轮未达到AI触发条件")
+                .doesNotContain("AI_TRIGGER_NOT_MET");
         assertThat(suggestion.getRevalidationRule())
                 .isEqualTo("等待新数据并重新分析通过规则校验");
         assertThat(suggestion.getEntryZone()).isNull();

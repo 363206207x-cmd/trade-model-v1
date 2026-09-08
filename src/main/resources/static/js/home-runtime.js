@@ -34,6 +34,15 @@
         return "方向计算时间：" + fields.year + "-" + fields.month + "-" + fields.day + " "
             + fields.hour + ":" + fields.minute + "（北京时间）";
     }
+    function fullBeijingTime(value) {
+        var label = directionTimeLabel(value);
+        return label ? label.replace("方向计算时间：", "").replace("（北京时间）", " 北京时间 UTC+08:00") : "尚无记录";
+    }
+    function serviceTime(value) {
+        var date = utcDate(value);
+        return date ? '<time datetime="' + escape(date.toISOString()) + '" title="'
+            + escape(fullBeijingTime(value)) + '">' + beijingTime(value) + '</time>' : '<span>尚无记录</span>';
+    }
     function priceText(value) {
         if (value == null || value === "" || !Number.isFinite(Number(value))) return "价格待同步";
         // Preserve API precision; the payload does not yet provide the exchange tick size.
@@ -147,7 +156,7 @@
     }
     function serviceDrawer(home) {
         return '<h3>核心服务</h3><p class="drawer-timezone">北京时间 UTC+08:00 · 只读</p>'
-            + '<table><thead><tr><th>服务</th><th>状态</th><th>最近尝试 / 成功</th><th>数据时间 / 年龄</th><th>当前影响</th><th>下次检查</th></tr></thead><tbody>'
+            + '<table class="desktop-service-table"><thead><tr><th>服务</th><th>状态</th><th>最近尝试 / 成功</th><th>数据时间 / 年龄</th><th>当前影响</th><th>下次检查</th></tr></thead><tbody>'
             + coreProviders(home).map(function (row) {
                 var p = row.provider, dataTime = p.name === "COINGLASS" ? p.providerDataAt : p.lastSuccessAt;
                 var date = utcDate(dataTime);
@@ -155,9 +164,9 @@
                 var color = row.state === "不可用" ? "risk-level-high" : ["延迟", "限流"].indexOf(row.state) >= 0
                     ? "risk-level-medium" : row.state === "正常" ? "risk-level-low" : "risk-level-unknown";
                 return '<tr><th scope="row">' + row.name + '</th><td><span class="service-state ' + color + '">'
-                    + row.state + '</span></td><td><span>' + beijingTime(p.lastAttemptAt) + '</span><br><small>成功 ' + beijingTime(p.lastSuccessAt)
-                    + '</small></td><td><span>' + beijingTime(dataTime) + '</span><br><small>' + age + '</small></td><td>'
-                    + escape(p.impact || "尚无影响记录") + '</td><td>' + (p.nextCheckAt ? beijingTime(p.nextCheckAt) : "尚未计划") + '</td></tr>';
+                    + row.state + '</span></td><td>' + serviceTime(p.lastAttemptAt) + '<br><small>成功 ' + serviceTime(p.lastSuccessAt)
+                    + '</small></td><td>' + serviceTime(dataTime) + '<br><small>' + age + '</small></td><td>'
+                    + escape(p.impact || "尚无影响记录") + '</td><td>' + (p.nextCheckAt ? serviceTime(p.nextCheckAt) : "尚未计划") + '</td></tr>';
             }).join("") + '</tbody></table>';
     }
     function installHoverDrawers(resolve) {
@@ -225,7 +234,7 @@
         window.__trineDesktopHoverController = { close: close };
         return window.__trineDesktopHoverController;
     }
-    window.TrineDesktopSemantics = Object.freeze({ beijingTime: beijingTime, directionTimeLabel: directionTimeLabel, priceText: priceText, confidenceText: confidenceText, planPriceText: planPriceText, riskSummary: riskSummary,
+    window.TrineDesktopSemantics = Object.freeze({ beijingTime: beijingTime, fullBeijingTime: fullBeijingTime, directionTimeLabel: directionTimeLabel, priceText: priceText, confidenceText: confidenceText, planPriceText: planPriceText, riskSummary: riskSummary,
         riskDrawer: riskDrawer, hasConfirmedRisks: hasConfirmedRisks, serviceSummary: serviceSummary, serviceDrawer: serviceDrawer, installHoverDrawers: installHoverDrawers });
 })();
 
@@ -320,7 +329,7 @@
         return /^[A-Z][A-Z0-9_]*$/.test(raw) ? (fallback || "当前不可查看") : raw;
     }
     function humanReason(value, fallback) {
-        var raw = Array.isArray(value) ? value[0] : value;
+        var raw = Array.isArray(value) ? value.join("；") : value;
         var normalized = String(raw || "").trim().toUpperCase();
         var reasons = {
             ANALYSIS_PREVIEW_NON_FINAL: "规则参考计划尚未通过 Final 校验，当前不可执行",
@@ -625,6 +634,8 @@
             alertNode.querySelector("strong").textContent = alertScope + " · " + userFacingAlertMessage(alert.message);
             alertNode.querySelector("em").textContent = alertTokenLabel(alert.level, "高优先级");
             alertNode.querySelector("time").textContent = has(alert.time) ? time(alert.time) : "";
+            alertNode.querySelector("time").title = has(alert.time) ? desktop.fullBeijingTime(alert.time) : "";
+            alertNode.querySelector("time").setAttribute("datetime", alert.time || "");
         }
         if (event) {
             eventNode.querySelector("strong").textContent = text(event.label, "重要事件");
@@ -946,6 +957,19 @@
             link.hidden = true;
             return;
         }
+        var sameDecision = has(asset.analysisId) && has(asset.decisionId)
+            && String(plan.sourceAnalysisId) === String(asset.analysisId)
+            && String(plan.sourceDecisionId) === String(asset.decisionId);
+        if (sameDecision && /BLOCKED|REVALIDATION/.test(String(plan.status || ""))
+                && (sameSnapshot || plan.finalPlan === false)) {
+            var blockedReasons = humanReason(plan.blockedReason, "本轮未通过执行校验，具体原因尚未记录");
+            target.innerHTML = '<div class="plan-empty"><strong>暂不执行</strong>'
+                + blockedReasons.split("；").map(function (reason) { return '<span>原因：' + escapeHtml(reason) + '</span>'; }).join("")
+                + '<span>下一步：' + escapeHtml(humanReason(plan.revalidationRule,
+                    "等待下一根1小时K线闭合，使用新行情重新验证方向、未平仓量和风险条件")) + '</span></div>';
+            link.hidden = true;
+            return;
+        }
         if (!directional || !sameSnapshot) {
             var unavailable = !sameSnapshot && directional ? "当前判断与计划的同批次关联尚未确认"
                 : ["CONFLICT", "CONFUSED", "TIMEFRAME_CONFLICT", "MULTI_TIMEFRAME_CONFLICT"].indexOf(bias) >= 0 ? "周期冲突：" + text(asset.oneHourOpportunityLabel, "1小时方向未提供") + " / " + text(asset.fourHourTrendLabel, "4小时方向未提供")
@@ -965,7 +989,7 @@
         if (!has(plan.invalidCondition || plan.abandonCondition)) missing.push("失效条件");
         if (!currentFinal || !access.visible) missing.push("当前有效且完成最终校验的 Final 计划");
         if (!validNow) missing.push("当前有效期");
-        var reason = humanReason(plan.pauseReason || plan.blockedReason || access.reason, "尚缺：" + missing.join("、"));
+        var reason = humanReason(plan.blockedReason || plan.pauseReason || access.reason, "尚缺：" + missing.join("、"));
         target.innerHTML = '<div class="plan-empty"><strong>暂无完整执行计划</strong><span>原因：'
             + escapeHtml(reason) + '</span>' + (has(plan.recoveryCondition) ? '<span>恢复条件：' + escapeHtml(plan.recoveryCondition) + '</span>' : '') + '</div>';
         link.hidden = true;

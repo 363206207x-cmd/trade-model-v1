@@ -59,6 +59,8 @@
 .desktop-hover-drawer table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; line-height: 1.5; }
 .desktop-hover-drawer th, .desktop-hover-drawer td { padding: 7px 5px; text-align: left; vertical-align: top; border-bottom: 1px solid #EAECF0; overflow-wrap: anywhere; white-space: normal; color: #32383E; }
 .desktop-hover-drawer th { font-weight: 600; }
-.desktop-hover-drawer th:nth-child(2), .desktop-hover-drawer th:nth-child(3) { width: 52px; }
-.desktop-hover-drawer th:nth-child(4) { width: 28%; }
+.desktop-hover-drawer .desktop-service-table { table-layout: auto; }
+.desktop-service-table th:nth-child(3), .desktop-service-table th:nth-child(4), .desktop-service-table th:nth-child(6) { min-width: 96px; }
+.desktop-service-table time, .desktop-service-table td small { white-space: nowrap; }
+.desktop-service-table .service-state { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-width: 44px; }
 .desktop-hover-drawer tbody tr:last-child > * { border-bottom: 0; }
