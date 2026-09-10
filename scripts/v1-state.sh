@@ -160,6 +160,78 @@ load_web_runtime_truth_plan_contract() {
   web_runtime_truth_plan_gate_allowlist_fingerprint="$(yaml_value "$TASK_FILE" web_runtime_truth_plan_gate_allowlist_fingerprint)"
 }
 
+load_asset_card_live_signal_contract() {
+  local field
+  for field in authorization_status implementation_status scope gate_allowlist_count \
+    gate_allowlist_fingerprint implementation_allowlist_count implementation_allowlist_fingerprint; do
+    printf -v "asset_card_live_signal_$field" '%s' "$(yaml_value "$TASK_FILE" "asset_card_live_signal_$field")"
+  done
+}
+
+# Exact Appendix I registration only. Merge eligibility retains its existing
+# meaning; this check neither merges a PR nor grants deployment permission.
+asset_card_live_signal_contract_matches() {
+  [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]] \
+    && [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] \
+    && [[ "$current_package_status" == "IN_PROGRESS" ]] \
+    && [[ "$current_package_branch" == "codex/v4-1-asset-card-live-signal-closure" ]] \
+    && [[ "$current_package_starting_full_sha" == "094b70a8ed31891999da0814fae5add09e2c4e08" ]] \
+    && [[ "$authorized_next_package_phase" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" ]] \
+    && [[ "$authorized_next_package_mode" == "IMPLEMENTATION" ]] \
+    && [[ "$authorized_next_package_branch" == "$current_package_branch" ]] \
+    && [[ "$authorized_next_package_starting_full_sha" == "$current_package_starting_full_sha" ]] \
+    && is_full_git_sha "$current_package_starting_full_sha" \
+    && is_full_git_sha "$authorized_next_package_starting_full_sha" \
+    && [[ "$asset_card_live_signal_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] \
+    && [[ "$asset_card_live_signal_implementation_status" == "NOT_STARTED" ]] \
+    && [[ "$asset_card_live_signal_scope" == "APPENDIX_I_ASSET_CARDS_ONLY" ]] \
+    && [[ "$asset_card_live_signal_gate_allowlist_count" == "7" ]] \
+    && [[ "$asset_card_live_signal_implementation_allowlist_count" == "48" ]] \
+    && [[ "$asset_card_live_signal_gate_allowlist_fingerprint" == "6e1d73813dd16643f7ebeacf2cb4c3c156048396" ]] \
+    && [[ "$asset_card_live_signal_implementation_allowlist_fingerprint" == "00e6820de3e507b0d716c39a8027c36c35c0f305" ]] \
+    && [[ "$(path_list_fingerprint "$current_package_allowed_paths")" == "$asset_card_live_signal_gate_allowlist_fingerprint" ]] \
+    && [[ "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == "$asset_card_live_signal_implementation_allowlist_fingerprint" ]] \
+    && [[ "$(printf '%s\n' "$current_package_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "7" ]] \
+    && [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "48" ]] \
+    && is_true_flag "$current_package_repository_edits_allowed" \
+    && is_false_flag "$current_package_implementation_allowed" \
+    && is_true_flag "$current_package_implementation_pr_allowed" \
+    && is_true_flag "$current_package_push_allowed" \
+    && is_true_flag "$current_package_merge_allowed" \
+    && is_false_flag "$current_package_deployment_allowed" \
+    && is_true_flag "$authorized_next_repository_edits_allowed" \
+    && is_true_flag "$authorized_next_implementation_allowed" \
+    && is_true_flag "$authorized_next_implementation_pr_allowed" \
+    && is_true_flag "$authorized_next_push_allowed" \
+    && is_true_flag "$authorized_next_merge_allowed" \
+    && is_false_flag "$authorized_next_deployment_allowed" \
+    && is_false_flag "$authorized_next_staging_deployment_allowed" \
+    && is_false_flag "$authorized_next_production_deployment_allowed" \
+    && is_false_flag "$authorized_next_mobile_implementation_allowed" \
+    && is_false_flag "$authorized_next_canonical_figma_desktop_implementation_allowed" \
+    && [[ "$authorized_next_canonical_figma_file_key" == "NONE" ]] \
+    && [[ "$(awk '/^## Appendix I[.]/{capture=1} capture' docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md | shasum -a 256 | awk '{print $1}')" == "6d82166dce9a4cee5ef09f193dfbdd6a8db1bb1b391fa376d8a640b4c7768bb8" ]]
+}
+
+asset_card_live_signal_paths_match() {
+  local changed_path
+  asset_card_live_signal_contract_matches || return 1
+  while IFS= read -r changed_path; do
+    [[ -z "$changed_path" ]] && continue
+    path_is_in_list "$changed_path" "$2" || return 1
+  done <<<"$1"
+}
+
+asset_card_live_signal_declaration_matches() {
+  asset_card_live_signal_contract_matches \
+    && [[ "$current_task_mode" == "$current_package_mode" ]] \
+    && [[ "$authorized_next_task_mode" == "$authorized_next_package_mode" ]] \
+    && [[ "$authorized_next_product_phase" == "$authorized_next_package_phase" ]] \
+    && is_false_flag "$p1a_repository_edits_allowed" \
+    && is_false_flag "$p1a_implementation_allowed" \
+    && is_false_flag "$p1a_implementation_pr_allowed"
+}
+
 changed_paths_from_starting_sha() {
   local starting_sha="$1"
   {
@@ -327,6 +399,8 @@ emit_resolved_task_state() {
   printf 'V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${web_live_direction_risk_closure_implementation_status:-UNDECLARED}"
   printf 'V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS: %s\n' "${web_runtime_truth_plan_closure_authorization_runtime_status:-BLOCKED}"
   printf 'V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${web_runtime_truth_plan_closure_implementation_status:-UNDECLARED}"
+  printf 'ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_STATUS: %s\n' "${asset_card_live_signal_authorization_runtime_status:-BLOCKED}"
+  printf 'ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS: %s\n' "${asset_card_live_signal_implementation_status:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -414,6 +488,7 @@ resolve_task_handoff() {
       current_package_block_reason="BLOCKED_CURRENT_PACKAGE_BRANCH_MISMATCH"
     elif { [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]] \
@@ -429,6 +504,7 @@ resolve_task_handoff() {
 
     if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
@@ -510,6 +586,8 @@ resolve_task_handoff() {
       resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_REVIEW"
+    elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+      resolved_handoff_stage="ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
       resolved_handoff_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_REVIEW"
     elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
@@ -547,6 +625,8 @@ resolve_task_handoff() {
         resolved_handoff_stage="ANALYSIS_RUN_IDEMPOTENCY_TX_FIX_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+        resolved_handoff_stage="ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
         resolved_handoff_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
@@ -1671,7 +1751,37 @@ evaluate_web_runtime_truth_plan_closure_transition() {
   next_task_authorization_status="ALLOWED"
 }
 
+evaluate_asset_card_live_signal_transition() {
+  asset_card_live_signal_authorization_runtime_status="BLOCKED"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_ASSET_CARD_LIVE_SIGNAL_CONTRACT"
+  asset_card_live_signal_contract_matches || return 0
+  if [[ "$product_source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+  if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
+    asset_card_live_signal_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+    next_task_authorization_status="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+    return 0
+  fi
+  asset_card_live_signal_authorization_runtime_status="AUTHORIZED"
+  next_transition_allowed="YES"
+  authorization_status="AUTHORIZED"
+  next_task_authorization_status="ALLOWED"
+}
+
 evaluate_runtime_transition() {
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
+    || "$authorized_next_package_phase" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" ]]; then
+    evaluate_asset_card_live_signal_transition
+    return 0
+  fi
   if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
     && "$authorized_next_package_phase" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]]; then
     evaluate_web_runtime_truth_plan_closure_transition
@@ -2202,6 +2312,7 @@ evaluate_machine_runtime_identity() {
         "$authorized_next_normalization_extra_file_count"; then
       normalized_base_valid="YES"
     elif [[ "$expected_package" == "ANALYSIS_RUN_IDEMPOTENCY_TRANSACTION_BOUNDARY_FIX" \
+      || "$expected_package" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" \
       || "$expected_package" == "V41_REAL_PROVIDER_AND_THREE_AI_RUNTIME_CLOSURE" \
       || "$expected_package" == "V41_GPT_BACKGROUND_THREE_AI_TIMEOUT_CLOSURE" \
       || "$expected_package" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" \
@@ -2220,7 +2331,10 @@ evaluate_machine_runtime_identity() {
     "$started_from_exact_origin_main" "$machine_gate_effective_on_origin_main" \
     "$expected_repository_edits" "$expected_implementation" "$expected_pr" \
     "$expected_push" "$expected_merge" "$expected_deployment" \
-    "$changed_files" "$policy_allowed_paths" "$gate_owners_unchanged" "$normalized_base_valid"; then
+    "$changed_files" "$policy_allowed_paths" "$gate_owners_unchanged" "$normalized_base_valid" \
+    && { [[ "$expected_package" != "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" \
+      && "$expected_package" != "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]] \
+      || asset_card_live_signal_paths_match "$changed_files" "$policy_allowed_paths"; }; then
     machine_identity_allowed="YES"
     machine_identity_block_reason="NONE"
   fi
@@ -2453,6 +2567,16 @@ run_exact_machine_gate_self_test() {
   assert_web_transition WEB_TRANSITION_10_PRODUCT_SOURCE_REQUIRED BLOCKED NO BLOCKED BLOCKED_PRODUCT_SOURCE_GATE
 
   # New task fixtures never change runtime Git-derived effectivity outside this self-test.
+  runtime_truth_baseline_fixture_paths() {
+    git show 094b70a8ed31891999da0814fae5add09e2c4e08:docs/CODEX_NEXT_TASK.yml \
+      | awk -v key="$1" '
+        $0 ~ "^" key ":[[:space:]]*$" { capture=1; next }
+        capture && $0 ~ "^[^[:space:]]" { capture=0 }
+        capture && $0 ~ "^[[:space:]]+-[[:space:]]+" {
+          value=$0; sub("^[[:space:]]+-[[:space:]]+", "", value)
+          gsub(/^\"|\"$/, "", value); print value
+        }'
+  }
   prepare_runtime_truth_transition_fixture() {
     prepare_web_transition_fixture
     current_package_phase="TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION"
@@ -2463,6 +2587,10 @@ run_exact_machine_gate_self_test() {
     authorized_next_package_branch="codex/v4-1-web-home-runtime-priority-closure"
     authorized_next_package_starting_full_sha="$current_package_starting_full_sha"
     authorized_next_package_allowed_paths="$(yaml_list "$TASK_FILE" authorized_next_package_allowed_paths)"
+    if [[ "$(yaml_value "$TASK_FILE" current_package_phase)" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+      current_package_allowed_paths="$(runtime_truth_baseline_fixture_paths current_package_allowed_paths)"
+      authorized_next_package_allowed_paths="$(runtime_truth_baseline_fixture_paths authorized_next_package_allowed_paths)"
+    fi
     load_web_runtime_truth_plan_contract
     web_live_direction_risk_closure_authorization_runtime_status="OLD_WEB_RUNTIME_SENTINEL"
     machine_gate_effective_on_origin_main="NO"
@@ -2561,6 +2689,139 @@ RUNTIME_TRUTH_REJECTED_CONTRACTS
     IMPLEMENTATION NO YES true true true true true false src/main/resources/static/js/dashboard-mobile.js "$authorized_next_package_allowed_paths" YES YES
 
 
+  prepare_asset_card_live_signal_fixture() {
+    load_task_package_contract
+    product_source_gate_status="PASS"
+    machine_identity_allowed="YES"
+    machine_identity_block_reason="NONE"
+    machine_gate_effective_on_origin_main="NO"
+  }
+  asset_card_legacy_statuses() {
+    declare -p real_logic_chain_closure_authorization_declared_status \
+      real_logic_chain_closure_authorization_runtime_status real_logic_chain_closure_implementation_status \
+      web_live_direction_risk_closure_authorization_declared_status web_live_direction_risk_closure_authorization_runtime_status \
+      web_live_direction_risk_closure_implementation_status web_runtime_truth_plan_closure_authorization_declared_status \
+      web_runtime_truth_plan_closure_authorization_runtime_status web_runtime_truth_plan_closure_implementation_status
+  }
+  assert_asset_card_live_signal_transition() {
+    local name="$1" expected_status="$2" expected_allowed="$3" expected_reason="$4"
+    local before_effectivity="$machine_gate_effective_on_origin_main" old_statuses
+    old_statuses="$(asset_card_legacy_statuses)"
+    evaluate_asset_card_live_signal_transition
+    if [[ "$asset_card_live_signal_authorization_runtime_status" == "$expected_status" \
+      && "$next_transition_allowed" == "$expected_allowed" \
+      && "$next_task_authorization_status" == "$expected_reason" \
+      && "$machine_gate_effective_on_origin_main" == "$before_effectivity" \
+      && "$(asset_card_legacy_statuses)" == "$old_statuses" ]] \
+      && { [[ "$expected_allowed" == "YES" && "$authorization_status" == "AUTHORIZED" ]] \
+        || [[ "$expected_allowed" == "NO" && "$authorization_status" == "BLOCKED" ]]; }; then
+      printf '%s: PASS\n' "$name"
+    else
+      printf '%s: FAIL\n' "$name"
+      failed=1
+    fi
+  }
+  if [[ "$(yaml_value "$TASK_FILE" current_package_phase)" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+    prepare_asset_card_live_signal_fixture
+    assert_asset_card_live_signal_transition ASSET_CARD_UNMERGED PENDING_MERGED_MAIN NO BLOCKED_PENDING_ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_MERGED_MAIN
+    machine_gate_effective_on_origin_main="YES"
+    assert_asset_card_live_signal_transition ASSET_CARD_MERGED_EXACT_OLD_STATUSES_UNCHANGED AUTHORIZED YES ALLOWED
+    while IFS='|' read -r mutation_field mutation_value; do
+      prepare_asset_card_live_signal_fixture
+      machine_gate_effective_on_origin_main="YES"
+      printf -v "$mutation_field" '%s' "$mutation_value"
+      assert_asset_card_live_signal_transition "ASSET_CARD_REJECT_${mutation_field}_${mutation_value}" BLOCKED NO BLOCKED_ASSET_CARD_LIVE_SIGNAL_CONTRACT
+    done <<'ASSET_CARD_REJECTED_CONTRACTS'
+current_package_phase|WRONG_GATE
+current_package_branch|codex/wrong-gate
+current_package_starting_full_sha|094b70a8
+authorized_next_package_phase|WRONG_PACKAGE
+authorized_next_package_branch|codex/wrong-branch
+authorized_next_package_starting_full_sha|0d6a1e36518c4bf935bba7e7074ec87edbd6947f
+authorized_next_package_starting_full_sha|094b70a8
+current_package_merge_allowed|false
+authorized_next_merge_allowed|false
+current_package_implementation_allowed|true
+authorized_next_implementation_allowed|false
+current_package_deployment_allowed|true
+authorized_next_deployment_allowed|true
+authorized_next_staging_deployment_allowed|true
+authorized_next_production_deployment_allowed|true
+authorized_next_mobile_implementation_allowed|true
+asset_card_live_signal_scope|UNBOUNDED
+asset_card_live_signal_gate_allowlist_count|8
+asset_card_live_signal_implementation_allowlist_count|49
+asset_card_live_signal_gate_allowlist_fingerprint|wrong
+asset_card_live_signal_implementation_allowlist_fingerprint|wrong
+ASSET_CARD_REJECTED_CONTRACTS
+    for manifest in current_package_allowed_paths authorized_next_package_allowed_paths; do
+      for mutation_kind in ADDED MISSING DUPLICATE; do
+        prepare_asset_card_live_signal_fixture
+        machine_gate_effective_on_origin_main="YES"
+        case "$mutation_kind" in
+          ADDED) printf -v "$manifest" '%s\n%s' "${!manifest}" src/main/java/Unauthorized.java ;;
+          MISSING) printf -v "$manifest" '%s' "$(printf '%s\n' "${!manifest}" | sed '1d')" ;;
+          DUPLICATE) printf -v "$manifest" '%s\n%s' "${!manifest}" "$(printf '%s\n' "${!manifest}" | sed -n '1p')" ;;
+        esac
+        assert_asset_card_live_signal_transition "ASSET_CARD_${manifest}_${mutation_kind}" BLOCKED NO BLOCKED_ASSET_CARD_LIVE_SIGNAL_CONTRACT
+      done
+    done
+    prepare_asset_card_live_signal_fixture
+    machine_gate_effective_on_origin_main="YES"
+    product_source_gate_status="BLOCKED"
+    assert_asset_card_live_signal_transition ASSET_CARD_PRODUCT_SOURCE_REQUIRED BLOCKED NO BLOCKED_PRODUCT_SOURCE_GATE
+    prepare_asset_card_live_signal_fixture
+    machine_gate_effective_on_origin_main="YES"
+    machine_identity_allowed="NO"
+    machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+    assert_asset_card_live_signal_transition ASSET_CARD_MACHINE_IDENTITY_REQUIRED BLOCKED NO BLOCKED_EXACT_MACHINE_IDENTITY
+    prepare_asset_card_live_signal_fixture
+    assert_machine_blocked ASSET_CARD_UNMERGED_IMPLEMENTATION_PATH \
+      "$authorized_next_package_phase" "$authorized_next_package_phase" "$authorized_next_package_branch" "$authorized_next_package_branch" \
+      "$authorized_next_package_starting_full_sha" "$authorized_next_package_starting_full_sha" \
+      IMPLEMENTATION NO NO true true true true true false src/main/resources/static/js/home-runtime.js "$authorized_next_package_allowed_paths" YES YES
+    if asset_card_live_signal_paths_match src/main/java/org/example/trademodel/service/PositionMonitorScheduler.java "$authorized_next_package_allowed_paths"; then
+      echo 'ASSET_CARD_NON_ALLOWLIST_CHANGE: FAIL'; failed=1
+    else
+      echo 'ASSET_CARD_NON_ALLOWLIST_CHANGE: PASS'
+    fi
+    if asset_card_live_signal_paths_match src/main/resources/static/js/home-runtime.js "$current_package_allowed_paths"; then
+      echo 'ASSET_CARD_GATE_EXCLUDES_BUSINESS_CODE: FAIL'; failed=1
+    else
+      echo 'ASSET_CARD_GATE_EXCLUDES_BUSINESS_CODE: PASS'
+    fi
+    current_task_mode="$current_package_mode"
+    authorized_next_task_mode="$authorized_next_package_mode"
+    authorized_next_product_phase="$authorized_next_package_phase"
+    p1a_repository_edits_allowed="false"
+    p1a_implementation_allowed="false"
+    p1a_implementation_pr_allowed="false"
+    authorized_next_package_alias="$(yaml_value "$TASK_FILE" authorized_next_package)"
+    if [[ "$authorized_next_package_alias" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE" ]] \
+      && asset_card_live_signal_declaration_matches; then
+      echo 'ASSET_CARD_HISTORICAL_ALIAS_PRESERVED: PASS'
+    else
+      echo 'ASSET_CARD_HISTORICAL_ALIAS_PRESERVED: FAIL'; failed=1
+    fi
+    while IFS='|' read -r mutation_field mutation_value; do
+      local declaration_before="${!mutation_field}"
+      printf -v "$mutation_field" '%s' "$mutation_value"
+      if asset_card_live_signal_declaration_matches; then
+        printf 'ASSET_CARD_DECLARATION_REJECT_%s: FAIL\n' "$mutation_field"; failed=1
+      else
+        printf 'ASSET_CARD_DECLARATION_REJECT_%s: PASS\n' "$mutation_field"
+      fi
+      printf -v "$mutation_field" '%s' "$declaration_before"
+    done <<'ASSET_CARD_REJECTED_DECLARATIONS'
+current_task_mode|IMPLEMENTATION
+authorized_next_task_mode|DOCS_GATE_BASELINE_RECONCILIATION
+authorized_next_product_phase|WRONG_PACKAGE
+p1a_repository_edits_allowed|true
+p1a_implementation_allowed|true
+p1a_implementation_pr_allowed|true
+ASSET_CARD_REJECTED_DECLARATIONS
+  fi
+
   if [[ "$failed" -eq 0 ]]; then
     echo "EXACT_MACHINE_GATE_TESTS: PASS"
     return 0
@@ -2571,6 +2832,7 @@ RUNTIME_TRUTH_REJECTED_CONTRACTS
 
 run_policy_self_test="NO"
 run_exact_gate_self_test="NO"
+check_asset_card_live_signal_contract="NO"
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --self-test-product-audit-policy)
@@ -2579,6 +2841,10 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --self-test-exact-machine-gate)
       run_exact_gate_self_test="YES"
+      shift
+      ;;
+    --check-asset-card-live-signal-contract)
+      check_asset_card_live_signal_contract="YES"
       shift
       ;;
     --open-pr-none-confirmed)
@@ -2640,11 +2906,6 @@ yaml_list() {
     }
   ' "$file"
 }
-
-if [[ "$run_exact_gate_self_test" == "YES" ]]; then
-  run_exact_machine_gate_self_test
-  exit $?
-fi
 
 load_task_package_contract() {
   current_package_phase="$(yaml_value "$TASK_FILE" current_package_phase)"
@@ -2731,6 +2992,7 @@ load_task_package_contract() {
   web_live_direction_risk_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_authorization_status)"
   web_live_direction_risk_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_implementation_status)"
   load_web_runtime_truth_plan_contract
+  load_asset_card_live_signal_contract
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -2739,6 +3001,17 @@ load_task_package_contract() {
   multi_user_implementation_status="$(yaml_value "$TASK_FILE" multi_user_implementation_status)"
   audit_scope_contract="$(yaml_value "$TASK_FILE" read_only_product_audit_scope_contract)"
 }
+
+if [[ "$run_exact_gate_self_test" == "YES" ]]; then
+  run_exact_machine_gate_self_test
+  exit $?
+fi
+if [[ "$check_asset_card_live_signal_contract" == "YES" ]]; then
+  load_task_package_contract
+  asset_card_live_signal_contract_matches || { echo "ASSET_CARD_LIVE_SIGNAL_CONTRACT: BLOCKED"; exit 1; }
+  echo "ASSET_CARD_LIVE_SIGNAL_CONTRACT: PASS"
+  exit 0
+fi
 
 run_handoff_resolution_simulation() {
   local scenario="$1"
@@ -2790,6 +3063,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+        asset_card_live_signal_authorization_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="ASSET_CARD_LIVE_SIGNAL_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
         web_runtime_truth_plan_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="WEB_RUNTIME_TRUTH_PLAN_CLOSURE_NOT_AUTHORIZED"
@@ -2906,6 +3182,9 @@ run_handoff_resolution_simulation() {
       if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_BASELINE_RECONCILIATION_GATE" ]]; then
         real_data_home_blocker_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="REAL_DATA_HOME_BLOCKER_CLOSURE_NOT_AUTHORIZED"
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+        asset_card_live_signal_authorization_status="BLOCKED_PENDING_REVIEW"
+        blockers_text="ASSET_CARD_LIVE_SIGNAL_NOT_AUTHORIZED"
       elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
         web_runtime_truth_plan_closure_authorization_declared_status="BLOCKED_PENDING_REVIEW"
         blockers_text="WEB_RUNTIME_TRUTH_PLAN_CLOSURE_NOT_AUTHORIZED"
@@ -3232,6 +3511,7 @@ real_logic_chain_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_r
 web_live_direction_risk_closure_authorization_declared_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_authorization_status)"
 web_live_direction_risk_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_implementation_status)"
 load_web_runtime_truth_plan_contract
+load_asset_card_live_signal_contract
 local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
 local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
 frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -3249,7 +3529,11 @@ closed_technical_debt_status="$(yaml_value "$TASK_FILE" paused_governance_status
 closed_technical_debt_merged_status="$(yaml_value "$TASK_FILE" paused_governance_merged_status)"
 
 load_task_package_contract
-if [[ "$current_task_mode" != "$current_package_mode" \
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  if ! asset_card_live_signal_declaration_matches; then
+    blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+  fi
+elif [[ "$current_task_mode" != "$current_package_mode" \
   || "$authorized_next_task_mode" != "$authorized_next_package_mode" \
   || "$authorized_next_product_phase" != "$authorized_next_package_phase" \
   || "$authorized_next_package_alias" != "$authorized_next_package_phase" ]]; then
@@ -3523,6 +3807,10 @@ if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_REAL_LOGIC_CHAIN_CLOSURE_AUT
     blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
   fi
 fi
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]] \
+  && ! asset_card_live_signal_contract_matches; then
+  blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
+fi
 if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]] \
   && ! web_live_direction_risk_contract_matches; then
   blockers+=("TASK_PACKAGE_DECLARATION_CONFLICT")
@@ -3719,7 +4007,17 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       ((open_pr_count+=1))
       pr_line="#$pr_number $pr_head head=$pr_oid $pr_title draft=$pr_draft"
       open_pr_lines+=("$pr_line")
-      if [[ "$pr_head" == "$current_package_branch" || "$pr_head" == "$branch" ]]; then
+      if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
+        && "$requested_package" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" \
+        && "$pr_head" == "$authorized_next_package_branch" ]] \
+        && asset_card_live_signal_contract_matches \
+        && git show origin/main:docs/CODEX_NEXT_TASK.yml 2>/dev/null \
+          | grep -Fx 'current_package_phase: "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION"' >/dev/null \
+        && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1 \
+        && ordinary_package_preserves_gate_owners; then
+        authorized_successor_pr_lines+=("$pr_line status=AUTHORIZED_SUCCESSOR_PR")
+        ((authorized_successor_pr_count+=1))
+      elif [[ "$pr_head" == "$current_package_branch" || "$pr_head" == "$branch" ]]; then
         current_package_pr_lines+=("$pr_line")
         ((current_package_pr_count+=1))
         current_package_pr_draft="$pr_draft"

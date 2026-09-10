@@ -58,7 +58,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|4609c5b701c03501f1f5bf619e7478b7ee979cffdf39774112ac4aa1ea7362ea|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|f7b708d9d87c7392b7e5901880fb2fa5446246a27ee889766a4d493a88468cb6|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
@@ -185,7 +185,7 @@ separate local candidate diff authoritative by existence.
 | Repository path | `docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md` |
 | Original sources | `/Users/xuchao/Documents/唯一产品开发方案_最终冻结版.docx`; `/Users/xuchao/Documents/Fundamental_AI_v4.1_最终交互逻辑与页面设计开发规格_冻结版.docx` |
 | Original SHA-256 | `91bcfbd154bc43b2176107bfc65a948271e10e3e9862027f3647dc13bf5e0900`; `43ec787f3228ec05e4e81a3c07fce4c3969c38850d709efa7097a2a406c463d3` |
-| Repository SHA-256 | `4609c5b701c03501f1f5bf619e7478b7ee979cffdf39774112ac4aa1ea7362ea` |
+| Repository SHA-256 | `f7b708d9d87c7392b7e5901880fb2fa5446246a27ee889766a4d493a88468cb6` |
 | Version/date | v4.1 unified final freeze plus Owner-final Web Live Direction and Risk Amendment; updated `2026-09-06` |
 | Authority | Sole ACTIVE/AUTHORITATIVE v4.1 Product Source; business chapters, final interaction and normative annexes |
 | Applicable modules | full decision chain plus 14 Desktop routes, 11 overlays, 54 component families, 81 acceptance states and runtime contracts |
@@ -914,6 +914,38 @@ src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.
 - Preserve the existing direction, confidence and risk algorithms, thresholds, calibration caps and weights. No AI invocation, Telegram transmission, automatic trading, protected-position mutation, native/mobile client work or Production deployment.
 - The 28 protected position rows are read-only. Baseline full-row fingerprint: `734c099a9e21af6e08a88f11d2b90303`; no task-created positions are needed.
 - Gate registration is not product completion. Only exact merged-main Staging deployment and complete live desktop acceptance permit `PASS_WEB_RUNTIME_TRUTH_PLAN_CLOSURE`.
+
+## 12. Owner-authorized Asset Card Live Signal registration (2026-09-10)
+
+Appendix I of the canonical v4.1 decision-chain source is the card-only
+supplement for `V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE`; its authorization package
+is `TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION`.
+Branch: `codex/v4-1-asset-card-live-signal-closure`.
+Starting SHA: `094b70a8ed31891999da0814fae5add09e2c4e08`.
+Gate scope: 7 exact contract/YAML/script paths, fingerprint
+`6e1d73813dd16643f7ebeacf2cb4c3c156048396`.
+Future implementation scope: the audited 48 exact paths registered in
+`authorized_next_package_allowed_paths`, fingerprint
+`00e6820de3e507b0d716c39a8027c36c35c0f305`. No directory grants.
+
+Contract mapping: separate cardSignal, real Spot price, closed-bar features,
+independently calibrated eight-direction confidence and independent card risks;
+do not overwrite canonical Analysis/Decision/Plan or downstream consumers.
+Interaction mapping: existing Home card geometry, field-only refresh and
+compact user-timezone clock; pins, membership, eligibility and ranking stay fixed.
+Data mapping: time-aligned real market/evidence inputs, versioned model and
+calibration provenance; unknown coverage remains UNKNOWN, not invented metrics.
+Existing contract-test paths permit card assertions only, never changes to
+position monitoring, plans, AI or other module semantics.
+
+Implementation remains NOT_STARTED/PENDING_MERGED_MAIN. Appendix I.7 corrects
+permission semantics: merge_allowed=true means eligibility after all gates,
+not an instruction to merge. Generic policy and all predecessor states remain
+unchanged. This step stops after the authorization Draft PR; actual merge and
+all deployments require separate Owner approval. No runtime actions, Owner
+data mutation, native/mobile edits, real AI, Telegram or trading are authorized.
+Earlier task declarations below are historical evidence, not the new card scope.
+CURRENT_PHASE_DONE=NO; FINAL_GATE=FAIL.
 
 ## 11. Active Desktop Home runtime and priority supplement
 
