@@ -168,6 +168,119 @@ load_asset_card_live_signal_contract() {
   done
 }
 
+load_v42_contract() {
+  v42_authorization_package="$(yaml_value "$TASK_FILE" v42_authorization_package)"
+  v42_implementation_package="$(yaml_value "$TASK_FILE" v42_implementation_package)"
+  v42_gate_branch="$(yaml_value "$TASK_FILE" v42_gate_branch)"
+  v42_implementation_branch="$(yaml_value "$TASK_FILE" v42_implementation_branch)"
+  v42_starting_full_sha="$(yaml_value "$TASK_FILE" v42_starting_full_sha)"
+  v42_source_pr="$(yaml_value "$TASK_FILE" v42_source_pr)"
+  v42_source_head_full_sha="$(yaml_value "$TASK_FILE" v42_source_head_full_sha)"
+  v42_product_source_path="$(yaml_value "$TASK_FILE" v42_product_source_path)"
+  v42_product_source_section="$(yaml_value "$TASK_FILE" v42_product_source_section)"
+  v42_product_source_sha256="$(yaml_value "$TASK_FILE" v42_product_source_sha256)"
+  v42_scope="$(yaml_value "$TASK_FILE" v42_scope)"
+  v42_gate_mode="$(yaml_value "$TASK_FILE" v42_gate_mode)"
+  v42_gate_authorization_status="$(yaml_value "$TASK_FILE" v42_gate_authorization_status)"
+  v42_implementation_status="$(yaml_value "$TASK_FILE" v42_implementation_status)"
+  v42_gate_allowlist_count="$(yaml_value "$TASK_FILE" v42_gate_allowlist_count)"
+  v42_gate_allowlist_fingerprint="$(yaml_value "$TASK_FILE" v42_gate_allowlist_fingerprint)"
+  v42_implementation_allowlist_count="$(yaml_value "$TASK_FILE" v42_implementation_allowlist_count)"
+  v42_implementation_allowlist_fingerprint="$(yaml_value "$TASK_FILE" v42_implementation_allowlist_fingerprint)"
+  v42_gate_repository_edits_allowed="$(yaml_value "$TASK_FILE" v42_gate_repository_edits_allowed)"
+  v42_gate_implementation_allowed="$(yaml_value "$TASK_FILE" v42_gate_implementation_allowed)"
+  v42_gate_implementation_pr_allowed="$(yaml_value "$TASK_FILE" v42_gate_implementation_pr_allowed)"
+  v42_gate_push_allowed="$(yaml_value "$TASK_FILE" v42_gate_push_allowed)"
+  v42_gate_merge_allowed="$(yaml_value "$TASK_FILE" v42_gate_merge_allowed)"
+  v42_gate_deployment_allowed="$(yaml_value "$TASK_FILE" v42_gate_deployment_allowed)"
+  v42_implementation_repository_edits_allowed="$(yaml_value "$TASK_FILE" v42_implementation_repository_edits_allowed)"
+  v42_implementation_allowed="$(yaml_value "$TASK_FILE" v42_implementation_allowed)"
+  v42_implementation_pr_allowed="$(yaml_value "$TASK_FILE" v42_implementation_pr_allowed)"
+  v42_implementation_push_allowed="$(yaml_value "$TASK_FILE" v42_implementation_push_allowed)"
+  v42_implementation_merge_allowed="$(yaml_value "$TASK_FILE" v42_implementation_merge_allowed)"
+  v42_implementation_deployment_allowed="$(yaml_value "$TASK_FILE" v42_implementation_deployment_allowed)"
+  v42_implementation_staging_deployment_allowed="$(yaml_value "$TASK_FILE" v42_implementation_staging_deployment_allowed)"
+  v42_implementation_production_deployment_allowed="$(yaml_value "$TASK_FILE" v42_implementation_production_deployment_allowed)"
+  v42_merge_execution_allowed="$(yaml_value "$TASK_FILE" v42_merge_execution_allowed)"
+  v42_ready_execution_allowed="$(yaml_value "$TASK_FILE" v42_ready_execution_allowed)"
+  v42_deployment_allowed="$(yaml_value "$TASK_FILE" v42_deployment_allowed)"
+  v42_model_mode="$(yaml_value "$TASK_FILE" v42_model_mode)"
+  v42_canary_allowed="$(yaml_value "$TASK_FILE" v42_canary_allowed)"
+  v42_active_allowed="$(yaml_value "$TASK_FILE" v42_active_allowed)"
+  v42_real_provider_calls_allowed="$(yaml_value "$TASK_FILE" v42_real_provider_calls_allowed)"
+  v42_ai_calls_allowed="$(yaml_value "$TASK_FILE" v42_ai_calls_allowed)"
+  v42_telegram_sends_allowed="$(yaml_value "$TASK_FILE" v42_telegram_sends_allowed)"
+  v42_trading_allowed="$(yaml_value "$TASK_FILE" v42_trading_allowed)"
+  v42_owner_position_mutation_allowed="$(yaml_value "$TASK_FILE" v42_owner_position_mutation_allowed)"
+  v42_business_implementation_before_gate_pass="$(yaml_value "$TASK_FILE" v42_business_implementation_before_gate_pass)"
+  v42_gate_allowed_paths="$(yaml_list "$TASK_FILE" v42_gate_allowed_paths)"
+  v42_implementation_allowed_paths="$(yaml_list "$TASK_FILE" v42_implementation_allowed_paths)"
+}
+
+# Exact V42 registration identity. This is additive to V41 and intentionally
+# does not alter the generic machine gate or any predecessor matcher.
+v42_contract_matches() {
+  local appendix_hash gate_unique_count implementation_unique_count
+  [[ "$v42_authorization_package" == "TRINE_LOGIC_V4_2_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE_AUTHORIZATION" ]] || return 1
+  [[ "$v42_implementation_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]] || return 1
+  [[ "$v42_gate_branch" == "codex/v4-2-asset-card-directional-risk-runtime-authorization" ]] || return 1
+  [[ "$v42_implementation_branch" == "codex/v4-1-asset-card-live-signal-closure" ]] || return 1
+  [[ "$v42_starting_full_sha" == "2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2" ]] || return 1
+  [[ "$v42_source_pr" == "1295" ]] || return 1
+  [[ "$v42_source_head_full_sha" == "2921a4a98254a4bd88f3138ed4eb2e0487b3956b" ]] || return 1
+  [[ "$v42_product_source_path" == "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md" ]] || return 1
+  [[ "$v42_product_source_section" == "APPENDIX_J" ]] || return 1
+  [[ "$v42_scope" == "HOME_ASSET_CARD_ONLY" ]] || return 1
+  [[ "$v42_gate_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || return 1
+  [[ "$v42_gate_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || return 1
+  [[ "$v42_implementation_status" == "NOT_STARTED" ]] || return 1
+  is_full_git_sha "$v42_starting_full_sha" || return 1
+  is_full_git_sha "$v42_source_head_full_sha" || return 1
+  [[ "$v42_gate_allowlist_count" == "7" ]] || return 1
+  [[ "$v42_implementation_allowlist_count" == "48" ]] || return 1
+  [[ "$v42_gate_allowlist_fingerprint" == "6e1d73813dd16643f7ebeacf2cb4c3c156048396" ]] || return 1
+  [[ "$v42_implementation_allowlist_fingerprint" == "00e6820de3e507b0d716c39a8027c36c35c0f305" ]] || return 1
+  [[ "$(path_list_fingerprint "$v42_gate_allowed_paths")" == "$v42_gate_allowlist_fingerprint" ]] || return 1
+  [[ "$(path_list_fingerprint "$v42_implementation_allowed_paths")" == "$v42_implementation_allowlist_fingerprint" ]] || return 1
+  [[ "$(printf '%s\n' "$v42_gate_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "$v42_gate_allowlist_count" ]] || return 1
+  [[ "$(printf '%s\n' "$v42_implementation_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "$v42_implementation_allowlist_count" ]] || return 1
+  if printf '%s\n%s\n' "$v42_gate_allowed_paths" "$v42_implementation_allowed_paths" | grep -Eq '[*?]|(^|/)(src|docs|scripts)/?$'; then
+    return 1
+  fi
+  [[ "$v42_gate_repository_edits_allowed" == "true" ]] || return 1
+  [[ "$v42_gate_implementation_allowed" == "false" ]] || return 1
+  [[ "$v42_gate_implementation_pr_allowed" == "true" ]] || return 1
+  [[ "$v42_gate_push_allowed" == "true" ]] || return 1
+  [[ "$v42_gate_merge_allowed" == "true" ]] || return 1
+  [[ "$v42_gate_deployment_allowed" == "false" ]] || return 1
+  [[ "$v42_implementation_repository_edits_allowed" == "true" ]] || return 1
+  [[ "$v42_implementation_allowed" == "true" ]] || return 1
+  [[ "$v42_implementation_pr_allowed" == "true" ]] || return 1
+  [[ "$v42_implementation_push_allowed" == "true" ]] || return 1
+  [[ "$v42_implementation_merge_allowed" == "true" ]] || return 1
+  [[ "$v42_implementation_deployment_allowed" == "false" ]] || return 1
+  [[ "$v42_implementation_staging_deployment_allowed" == "false" ]] || return 1
+  [[ "$v42_implementation_production_deployment_allowed" == "false" ]] || return 1
+  [[ "$v42_merge_execution_allowed" == "false" ]] || return 1
+  [[ "$v42_ready_execution_allowed" == "false" ]] || return 1
+  [[ "$v42_deployment_allowed" == "false" ]] || return 1
+  [[ "$v42_model_mode" == "SHADOW" ]] || return 1
+  [[ "$v42_canary_allowed" == "false" ]] || return 1
+  [[ "$v42_active_allowed" == "false" ]] || return 1
+  [[ "$v42_real_provider_calls_allowed" == "false" ]] || return 1
+  [[ "$v42_ai_calls_allowed" == "false" ]] || return 1
+  [[ "$v42_telegram_sends_allowed" == "false" ]] || return 1
+  [[ "$v42_trading_allowed" == "false" ]] || return 1
+  [[ "$v42_owner_position_mutation_allowed" == "false" ]] || return 1
+  [[ "$v42_business_implementation_before_gate_pass" == "false" ]] || return 1
+  gate_unique_count="$(printf '%s\n' "$v42_gate_allowed_paths" | awk 'NF' | sort -u | awk 'END {print NR+0}')"
+  implementation_unique_count="$(printf '%s\n' "$v42_implementation_allowed_paths" | awk 'NF' | sort -u | awk 'END {print NR+0}')"
+  [[ "$gate_unique_count" == "$v42_gate_allowlist_count" ]] || return 1
+  [[ "$implementation_unique_count" == "$v42_implementation_allowlist_count" ]] || return 1
+  appendix_hash="$(awk '/^## Appendix J[.] Owner-authorized V42 directional risk and runtime closure$/{capture=1} capture{print} /^<!-- END APPENDIX J V42 -->$/{exit}' "$v42_product_source_path" | shasum -a 256 | awk '{print $1}')"
+  [[ "$appendix_hash" == "$v42_product_source_sha256" ]] || return 1
+}
+
 # Exact Appendix I registration only. Merge eligibility retains its existing
 # meaning; this check neither merges a PR nor grants deployment permission.
 asset_card_live_signal_contract_matches() {
@@ -322,9 +435,15 @@ normalization_commit_matches() {
 }
 
 emit_resolved_task_state() {
-  printf 'MACHINE_AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
-  printf 'MACHINE_AUTHORIZED_BRANCH: %s\n' "${authorized_next_package_branch:-UNDECLARED}"
-  printf 'MACHINE_AUTHORIZED_STARTING_FULL_SHA: %s\n' "${authorized_next_package_starting_full_sha:-UNDECLARED}"
+  if [[ "${branch:-}" == "${v42_gate_branch:-}" ]]; then
+    printf 'MACHINE_AUTHORIZED_PACKAGE: %s\n' "${v42_implementation_package:-UNDECLARED}"
+    printf 'MACHINE_AUTHORIZED_BRANCH: %s\n' "${v42_implementation_branch:-UNDECLARED}"
+    printf 'MACHINE_AUTHORIZED_STARTING_FULL_SHA: %s\n' "${v42_starting_full_sha:-UNDECLARED}"
+  else
+    printf 'MACHINE_AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
+    printf 'MACHINE_AUTHORIZED_BRANCH: %s\n' "${authorized_next_package_branch:-UNDECLARED}"
+    printf 'MACHINE_AUTHORIZED_STARTING_FULL_SHA: %s\n' "${authorized_next_package_starting_full_sha:-UNDECLARED}"
+  fi
   printf 'NORMALIZATION_SOURCE_PARENT_SHA: %s\n' "${authorized_next_normalization_source_parent_sha:-UNDECLARED}"
   printf 'NORMALIZED_BASE_FULL_SHA: %s\n' "${normalized_base_full_sha:-UNAVAILABLE}"
   printf 'SOURCE_STARTING_SHA_MATCH: %s\n' "${current_starting_sha_match:-NO}"
@@ -401,6 +520,16 @@ emit_resolved_task_state() {
   printf 'V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: %s\n' "${web_runtime_truth_plan_closure_implementation_status:-UNDECLARED}"
   printf 'ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_STATUS: %s\n' "${asset_card_live_signal_authorization_runtime_status:-BLOCKED}"
   printf 'ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS: %s\n' "${asset_card_live_signal_implementation_status:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_AUTHORIZATION_STATUS: %s\n' "${v42_authorization_runtime_status:-BLOCKED}"
+  printf 'V42_ASSET_CARD_IMPLEMENTATION_STATUS: %s\n' "${v42_implementation_runtime_status:-NOT_STARTED}"
+  printf 'V42_ASSET_CARD_SCOPE: %s\n' "${v42_scope:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_SOURCE_PR: %s\n' "${v42_source_pr:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_SOURCE_HEAD: %s\n' "${v42_source_head_full_sha:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_GATE_ALLOWLIST_COUNT: %s\n' "${v42_gate_allowlist_count:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_IMPLEMENTATION_ALLOWLIST_COUNT: %s\n' "${v42_implementation_allowlist_count:-UNDECLARED}"
+  printf 'V42_ASSET_CARD_MERGE_EXECUTION_ALLOWED: %s\n' "${v42_merge_execution_allowed:-false}"
+  printf 'V42_ASSET_CARD_DEPLOYMENT_ALLOWED: %s\n' "${v42_deployment_allowed:-false}"
+  printf 'V42_ASSET_CARD_MODEL_MODE: %s\n' "${v42_model_mode:-UNDECLARED}"
   printf 'LOCAL_REAL_AUTHORIZATION_STATUS: %s\n' "${local_real_authorization_runtime_status:-BLOCKED}"
   printf 'LOCAL_REAL_IMPLEMENTATION_STATUS: %s\n' "${local_real_implementation_status:-UNDECLARED}"
   printf 'FRONTEND_INTERACTION_AUTHORIZATION_STATUS: %s\n' "${frontend_interaction_authorization_runtime_status:-BLOCKED}"
@@ -1776,7 +1905,49 @@ evaluate_asset_card_live_signal_transition() {
   next_task_authorization_status="ALLOWED"
 }
 
+evaluate_v42_transition() {
+  v42_authorization_runtime_status="BLOCKED"
+  v42_implementation_runtime_status="NOT_STARTED"
+  next_transition_allowed="NO"
+  authorization_status="BLOCKED"
+  next_task_authorization_status="BLOCKED_V42_ASSET_CARD_DIRECTIONAL_RISK_RUNTIME_CONTRACT"
+
+  v42_contract_matches || return 0
+  if [[ "$product_source_gate_status" != "PASS" ]]; then
+    next_task_authorization_status="BLOCKED_PRODUCT_SOURCE_GATE"
+    return 0
+  fi
+
+  # The registration branch is deliberately pending until its contract commit
+  # is present on origin/main. It cannot authorize business implementation.
+  if [[ "${branch:-}" == "$v42_gate_branch" ]]; then
+    v42_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_V42_ASSET_CARD_AUTHORIZATION_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" ]]; then
+    v42_authorization_runtime_status="PENDING_MERGED_MAIN"
+    next_task_authorization_status="BLOCKED_PENDING_V42_ASSET_CARD_AUTHORIZATION_MERGED_MAIN"
+    return 0
+  fi
+  if [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+    next_task_authorization_status="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+    return 0
+  fi
+
+  v42_authorization_runtime_status="AUTHORIZED"
+  authorization_status="AUTHORIZED"
+  next_transition_allowed="YES"
+  next_task_authorization_status="ALLOWED"
+}
+
 evaluate_runtime_transition() {
+  if [[ "${branch:-}" == "${v42_gate_branch:-}" \
+    || "${requested_package:-}" == "${v42_authorization_package:-}" \
+    || "${requested_package:-}" == "${v42_implementation_package:-}" ]]; then
+    evaluate_v42_transition
+    return 0
+  fi
   if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
     || "$authorized_next_package_phase" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" ]]; then
     evaluate_asset_card_live_signal_transition
@@ -2234,6 +2405,108 @@ evaluate_machine_runtime_identity() {
   local gate_owners_unchanged="NO"
   local normalized_base_valid="NO"
   local policy_allowed_paths=""
+
+  # V42 registration has an independent exact machine identity. Keep the
+  # historical V41 declaration and policy path untouched while the gate branch
+  # is pending merged-main effectivity.
+  if [[ "${branch:-}" == "${v42_gate_branch:-}" ]]; then
+    actual_package="${requested_package:-$v42_authorization_package}"
+    expected_package="$v42_authorization_package"
+    expected_branch="$v42_gate_branch"
+    expected_starting_sha="$v42_starting_full_sha"
+    expected_mode="$v42_gate_mode"
+    expected_repository_edits="$v42_gate_repository_edits_allowed"
+    expected_implementation="$v42_gate_implementation_allowed"
+    expected_pr="$v42_gate_implementation_pr_allowed"
+    expected_push="$v42_gate_push_allowed"
+    expected_merge="$v42_gate_merge_allowed"
+    expected_deployment="$v42_gate_deployment_allowed"
+    policy_allowed_paths="$v42_gate_allowed_paths"
+
+    current_package_match="NO"
+    current_branch_match="NO"
+    current_starting_sha_match="NO"
+    machine_identity_allowed="NO"
+    machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+    machine_gate_effective_on_origin_main="NO"
+    [[ "$actual_package" == "$expected_package" ]] && current_package_match="YES"
+    [[ "${branch:-}" == "$expected_branch" ]] && current_branch_match="YES"
+    if is_full_git_sha "$expected_starting_sha" \
+      && git cat-file -e "$expected_starting_sha^{commit}" >/dev/null 2>&1 \
+      && git merge-base --is-ancestor "$expected_starting_sha" HEAD >/dev/null 2>&1; then
+      observed_starting_sha="$expected_starting_sha"
+      current_starting_sha_match="YES"
+    fi
+    if [[ "${origin_main_sha:-}" == "$expected_starting_sha" ]]; then
+      started_from_exact_origin_main="YES"
+    fi
+    changed_files="$(changed_paths_from_starting_sha "$expected_starting_sha")"
+    if machine_gate_policy_check \
+      "$expected_package" "$actual_package" "$expected_branch" "${branch:-}" \
+      "$expected_starting_sha" "$observed_starting_sha" "$expected_mode" \
+      "$started_from_exact_origin_main" "$machine_gate_effective_on_origin_main" \
+      "$expected_repository_edits" "$expected_implementation" "$expected_pr" \
+      "$expected_push" "$expected_merge" "$expected_deployment" \
+      "$changed_files" "$policy_allowed_paths" YES NO; then
+      machine_identity_allowed="YES"
+      machine_identity_block_reason="NONE"
+    fi
+    return 0
+  fi
+
+  if [[ "${requested_package:-}" == "${v42_implementation_package:-}" ]]; then
+    actual_package="$requested_package"
+    expected_package="$v42_implementation_package"
+    expected_branch="$v42_implementation_branch"
+    expected_starting_sha="$v42_starting_full_sha"
+    expected_mode="IMPLEMENTATION"
+    expected_repository_edits="$v42_implementation_repository_edits_allowed"
+    expected_implementation="$v42_implementation_allowed"
+    expected_pr="$v42_implementation_pr_allowed"
+    expected_push="$v42_implementation_push_allowed"
+    expected_merge="$v42_implementation_merge_allowed"
+    expected_deployment="$v42_implementation_deployment_allowed"
+    policy_allowed_paths="$v42_implementation_allowed_paths"
+    current_package_match="NO"
+    current_branch_match="NO"
+    current_starting_sha_match="NO"
+    machine_identity_allowed="NO"
+    machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
+    machine_gate_effective_on_origin_main="NO"
+    [[ "$actual_package" == "$expected_package" ]] && current_package_match="YES"
+    [[ "${branch:-}" == "$expected_branch" ]] && current_branch_match="YES"
+    if is_full_git_sha "$expected_starting_sha" \
+      && git cat-file -e "$expected_starting_sha^{commit}" >/dev/null 2>&1 \
+      && git merge-base --is-ancestor "$expected_starting_sha" HEAD >/dev/null 2>&1; then
+      observed_starting_sha="$expected_starting_sha"
+      current_starting_sha_match="YES"
+    fi
+    if git show origin/main:docs/CODEX_NEXT_TASK.yml 2>/dev/null \
+      | grep -Fxq "v42_authorization_package: \"$v42_authorization_package\"" \
+      && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
+      machine_gate_effective_on_origin_main="YES"
+    fi
+    if ordinary_package_preserves_gate_owners; then
+      gate_owners_unchanged="YES"
+    fi
+    if [[ "$machine_gate_effective_on_origin_main" == "YES" \
+      && "$gate_owners_unchanged" == "YES" ]] \
+      && git merge-base --is-ancestor "$expected_starting_sha" HEAD >/dev/null 2>&1; then
+      changed_files="$(changed_paths_from_origin_main)"
+      normalized_base_valid="YES"
+    fi
+    if machine_gate_policy_check \
+      "$expected_package" "$actual_package" "$expected_branch" "${branch:-}" \
+      "$expected_starting_sha" "$observed_starting_sha" "$expected_mode" \
+      NO "$machine_gate_effective_on_origin_main" \
+      "$expected_repository_edits" "$expected_implementation" "$expected_pr" \
+      "$expected_push" "$expected_merge" "$expected_deployment" \
+      "$changed_files" "$policy_allowed_paths" "$gate_owners_unchanged" "$normalized_base_valid"; then
+      machine_identity_allowed="YES"
+      machine_identity_block_reason="NONE"
+    fi
+    return 0
+  fi
 
   actual_package="${requested_package:-$current_package_phase}"
   if [[ "$actual_package" == "$current_package_phase" ]]; then
@@ -2833,6 +3106,7 @@ ASSET_CARD_REJECTED_DECLARATIONS
 run_policy_self_test="NO"
 run_exact_gate_self_test="NO"
 check_asset_card_live_signal_contract="NO"
+check_v42_contract="NO"
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --self-test-product-audit-policy)
@@ -2847,6 +3121,10 @@ while [[ "$#" -gt 0 ]]; do
       check_asset_card_live_signal_contract="YES"
       shift
       ;;
+    --check-v42-contract)
+      check_v42_contract="YES"
+      shift
+      ;;
     --open-pr-none-confirmed)
       open_pr_none_confirmed="YES"
       open_pr_evidence_input_valid="YES"
@@ -2858,7 +3136,7 @@ while [[ "$#" -gt 0 ]]; do
       shift 2
       ;;
     *)
-      echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy] [--self-test-exact-machine-gate] [--open-pr-none-confirmed] [--request-package PACKAGE]" >&2
+      echo "usage: bash scripts/v1-state.sh [--self-test-product-audit-policy] [--self-test-exact-machine-gate] [--check-v42-contract] [--open-pr-none-confirmed] [--request-package PACKAGE]" >&2
       exit 2
       ;;
   esac
@@ -2993,6 +3271,7 @@ load_task_package_contract() {
   web_live_direction_risk_closure_implementation_status="$(yaml_value "$TASK_FILE" v4_1_web_live_direction_risk_closure_implementation_status)"
   load_web_runtime_truth_plan_contract
   load_asset_card_live_signal_contract
+  load_v42_contract
   local_real_authorization_declared_status="$(yaml_value "$TASK_FILE" local_real_authorization_status)"
   local_real_implementation_status="$(yaml_value "$TASK_FILE" local_real_implementation_status)"
   frontend_interaction_authorization_declared_status="$(yaml_value "$TASK_FILE" frontend_interaction_authorization_status)"
@@ -3010,6 +3289,46 @@ if [[ "$check_asset_card_live_signal_contract" == "YES" ]]; then
   load_task_package_contract
   asset_card_live_signal_contract_matches || { echo "ASSET_CARD_LIVE_SIGNAL_CONTRACT: BLOCKED"; exit 1; }
   echo "ASSET_CARD_LIVE_SIGNAL_CONTRACT: PASS"
+  exit 0
+fi
+if [[ "$check_v42_contract" == "YES" ]]; then
+  load_task_package_contract
+  v42_contract_matches || { echo "V42_ASSET_CARD_DIRECTIONAL_RISK_RUNTIME_CONTRACT: BLOCKED"; exit 1; }
+  asset_card_live_signal_contract_matches \
+    || { echo "V41_ASSET_CARD_CONTRACT_PRESERVED: BLOCKED"; exit 1; }
+  echo "V41_ASSET_CARD_CONTRACT_PRESERVED: PASS"
+  v42_contract_negative_case() {
+    local name="$1" field="$2" value="$3"
+    if ( printf -v "$field" '%s' "$value"; ! v42_contract_matches ); then
+      printf 'V42_NEGATIVE_%s: PASS\n' "$name"
+    else
+      printf 'V42_NEGATIVE_%s: FAIL\n' "$name"
+      return 1
+    fi
+  }
+  v42_contract_negative_case WRONG_PACKAGE v42_implementation_package WRONG_PACKAGE
+  v42_contract_negative_case WRONG_BRANCH v42_gate_branch codex/wrong-branch
+  v42_contract_negative_case WRONG_SHA v42_starting_full_sha b60eff8d83c0e1d04371bd425267f1e8d0e4f95c
+  v42_contract_negative_case SHORT_SHA v42_starting_full_sha 2c71f1cd
+  if ( v42_gate_allowed_paths="${v42_gate_allowed_paths}\ndocs/UNAUTHORIZED.md"; ! v42_contract_matches ); then
+    echo "V42_NEGATIVE_ALLOWLIST_ADDED: PASS"
+  else
+    echo "V42_NEGATIVE_ALLOWLIST_ADDED: FAIL"
+    exit 1
+  fi
+  if ( v42_implementation_allowed_paths="$(printf '%s\n' "$v42_implementation_allowed_paths" | sed '1d')"; ! v42_contract_matches ); then
+    echo "V42_NEGATIVE_ALLOWLIST_MISSING: PASS"
+  else
+    echo "V42_NEGATIVE_ALLOWLIST_MISSING: FAIL"
+    exit 1
+  fi
+  if ( v42_gate_implementation_allowed="true"; ! v42_contract_matches ); then
+    echo "V42_NEGATIVE_IMPLEMENTATION_BEFORE_MERGE: PASS"
+  else
+    echo "V42_NEGATIVE_IMPLEMENTATION_BEFORE_MERGE: FAIL"
+    exit 1
+  fi
+  echo "V42_ASSET_CARD_DIRECTIONAL_RISK_RUNTIME_CONTRACT: PASS"
   exit 0
 fi
 

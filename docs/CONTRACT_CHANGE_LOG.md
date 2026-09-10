@@ -1,5 +1,21 @@
 # Contract Change Log
 
+## 2026-09-11 — Owner-authorized V42 directional risk and runtime registration
+
+Appendix J registers the exact V42 asset-card package, source PR #1295 and
+audited source head `2921a4a98254a4bd88f3138ed4eb2e0487b3956b`, with its
+registration branch, merged-main baseline and HOME_ASSET_CARD_ONLY scope. It
+adds no business implementation and reuses the existing seven gate-owner and
+48 asset-card paths without changing their fingerprints.
+
+The entry makes side identity explicit (LONG, SHORT and NON_DIRECTIONAL),
+keeps signed directional evidence, binds risks to side/observation/version and
+requires atomic side changes, runtime failure isolation and SHADOW-only model
+readiness. V41, predecessor states, generic machine-gate semantics and all
+unrelated plan, position, AI, Telegram, trading, client and deployment
+boundaries remain unchanged. Registration is pending merged-main effectivity;
+merge execution and deployment remain unauthorized.
+
 ## 2026-09-10 — Owner-approved isolated asset-card contract and eligibility correction
 
 Appendix I registers V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE, branch

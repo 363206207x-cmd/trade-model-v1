@@ -133,6 +133,7 @@ validate_contract_task() {
   local real_logic_chain_closure_authorization_status real_logic_chain_closure_implementation_status
   local web_live_direction_risk_closure_authorization_status web_live_direction_risk_closure_implementation_status
   local local_real_authorization_status local_real_implementation_status multi_user_authorization_status multi_user_implementation_status
+  local runtime_branch v42_gate_branch v42_starting_full_sha v42_gate_paths v42_changed_files v42_changed_path
   matrix_status="$(matrix_field P0-0 4)"
   task_phase="$(yaml_value "$TASK_FILE" current_phase)"
   task_allowed="$(yaml_value "$TASK_FILE" next_business_phase_allowed)"
@@ -215,12 +216,26 @@ validate_contract_task() {
   multi_user_authorization_status="$(yaml_value "$TASK_FILE" multi_user_authorization_status)"
   multi_user_implementation_status="$(yaml_value "$TASK_FILE" multi_user_implementation_status)"
   p1b_scope="$(yaml_value "$TASK_FILE" scope)"
+  runtime_branch="$(git branch --show-current)"
+  v42_gate_branch="$(yaml_value "$TASK_FILE" v42_gate_branch)"
+  v42_starting_full_sha="$(yaml_value "$TASK_FILE" v42_starting_full_sha)"
 
   [[ "$compat" == "DERIVED_ONLY" ]] || { echo "TASK_VALIDATION_FAILED CODEX_NEXT_TASK must be DERIVED_ONLY" >&2; failed=1; }
   [[ "$task_phase" == "$matrix_phase" ]] || { echo "TASK_VALIDATION_FAILED task current_phase mismatch: $task_phase" >&2; failed=1; }
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
+  if [[ "$runtime_branch" == "$v42_gate_branch" ]]; then
+    bash scripts/v1-state.sh --check-v42-contract \
+      || { echo "TASK_VALIDATION_FAILED exact V42 registration contract mismatch" >&2; failed=1; }
+    v42_gate_paths="$(yaml_list "$TASK_FILE" v42_gate_allowed_paths)"
+    v42_changed_files="$({ git diff --name-only "$v42_starting_full_sha"..HEAD 2>/dev/null || true; git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git ls-files --others --exclude-standard 2>/dev/null || true; } | awk 'NF && !seen[$0]++')"
+    while IFS= read -r v42_changed_path; do
+      [[ -z "$v42_changed_path" ]] && continue
+      printf '%s\n' "$v42_gate_paths" | grep -Fxq "$v42_changed_path" \
+        || { echo "TASK_VALIDATION_FAILED V42 gate changed path is outside the exact registration allowlist: $v42_changed_path" >&2; failed=1; }
+    done <<<"$v42_changed_files"
+  fi
   if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
     bash scripts/v1-state.sh --check-asset-card-live-signal-contract \
       || { echo "TASK_VALIDATION_FAILED exact asset-card registration mismatch" >&2; failed=1; }

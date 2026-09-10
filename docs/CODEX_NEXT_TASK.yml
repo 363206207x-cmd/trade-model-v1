@@ -595,3 +595,126 @@ paused_governance_stash_object: "b168819d38e46f4fb90131ca92294cb45b5abbf6"
 paused_governance_patch_sha256: "440a2a7f038bb4d2086bb7b0fabba1ca02cc81632a58c99b39283de38550bc0a"
 paused_governance_reason: "Closed without merge; not current product or runtime truth"
 paused_governance_resume_condition: "Only resume when a real product regression proves the missing governance capability is necessary"
+
+# V42 exact registration (additive; V41 and historical package declarations above remain unchanged).
+v42_authorization_package: "TRINE_LOGIC_V4_2_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE_AUTHORIZATION"
+v42_implementation_package: "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE"
+v42_gate_branch: "codex/v4-2-asset-card-directional-risk-runtime-authorization"
+v42_implementation_branch: "codex/v4-1-asset-card-live-signal-closure"
+v42_starting_full_sha: "2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2"
+v42_source_pr: 1295
+v42_source_head_full_sha: "2921a4a98254a4bd88f3138ed4eb2e0487b3956b"
+v42_product_source_path: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
+v42_product_source_section: "APPENDIX_J"
+v42_product_source_sha256: "e77965dd8da9d066c3e063b211c0b7452865131fb210de9ba41b23ed15c9a63b"
+v42_scope: "HOME_ASSET_CARD_ONLY"
+v42_gate_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
+v42_gate_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
+v42_implementation_status: "NOT_STARTED"
+v42_gate_allowlist_count: 7
+v42_gate_allowlist_fingerprint: "6e1d73813dd16643f7ebeacf2cb4c3c156048396"
+v42_implementation_allowlist_count: 48
+v42_implementation_allowlist_fingerprint: "00e6820de3e507b0d716c39a8027c36c35c0f305"
+v42_gate_repository_edits_allowed: true
+v42_gate_implementation_allowed: false
+v42_gate_implementation_pr_allowed: true
+v42_gate_push_allowed: true
+v42_gate_merge_allowed: true
+v42_gate_deployment_allowed: false
+v42_implementation_repository_edits_allowed: true
+v42_implementation_allowed: true
+v42_implementation_pr_allowed: true
+v42_implementation_push_allowed: true
+v42_implementation_merge_allowed: true
+v42_implementation_deployment_allowed: false
+v42_implementation_staging_deployment_allowed: false
+v42_implementation_production_deployment_allowed: false
+v42_merge_execution_allowed: false
+v42_ready_execution_allowed: false
+v42_deployment_allowed: false
+v42_model_mode: "SHADOW"
+v42_canary_allowed: false
+v42_active_allowed: false
+v42_real_provider_calls_allowed: false
+v42_ai_calls_allowed: false
+v42_telegram_sends_allowed: false
+v42_trading_allowed: false
+v42_owner_position_mutation_allowed: false
+v42_business_implementation_before_gate_pass: false
+v42_next_action: "Validate the V42 exact registration, commit/push one Draft PR and stop before merge; do not begin business implementation or deployment"
+v42_transition_conditions:
+  - "EXACT_V42_PACKAGE_MATCH"
+  - "EXACT_V42_BRANCH_MATCH"
+  - "EXACT_40_CHARACTER_V42_STARTING_SHA_MATCH"
+  - "EXACT_V42_GATE_ALLOWLIST"
+  - "EXACT_V42_IMPLEMENTATION_ALLOWLIST"
+  - "APPENDIX_J_PRODUCT_SOURCE_MATCH"
+  - "PRODUCT_SOURCE_GATE_PASS"
+  - "WORKFLOW_CONTRACT_PASS"
+  - "AUTHORIZATION_EFFECTIVE_MERGED_MAIN_BEFORE_IMPLEMENTATION"
+  - "MODEL_MODE_SHADOW"
+v42_gate_allowed_paths:
+  - "docs/CODEX_NEXT_TASK.yml"
+  - "docs/PRODUCT_SOURCE_OF_TRUTH.md"
+  - "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
+  - "docs/CONTRACT_CHANGE_LOG.md"
+  - "scripts/v1-state.sh"
+  - "scripts/codex-next-task.sh"
+  - "scripts/check-workflow-contract.sh"
+v42_implementation_allowed_paths:
+  - "pom.xml"
+  - "src/main/java/org/example/trademodel/controller/DashboardHomeController.java"
+  - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
+  - "src/main/java/org/example/trademodel/vo/DashboardHomeVO.java"
+  - "src/main/java/org/example/trademodel/mapper/AssetCardMapper.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardSnapshot.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardProperties.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardMarketDataService.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardEvidenceService.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardFeatureService.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardBetaCalibration.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardModelBundle.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardSignalService.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardRiskService.java"
+  - "src/main/java/org/example/trademodel/assetcard/AssetCardService.java"
+  - "src/main/resources/db/migration/V24__asset_card_live_signal.sql"
+  - "src/main/resources/schema.sql"
+  - "src/main/resources/static/css/home.css"
+  - "src/main/resources/static/js/home-runtime.js"
+  - "scripts/asset_card_model.py"
+  - "scripts/asset-card-model-requirements.txt"
+  - "scripts/test_asset_card_model.py"
+  - "scripts/asset-card-runtime-matrix.mjs"
+  - "docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md"
+  - "src/test/java/org/example/trademodel/controller/DashboardHomeControllerTest.java"
+  - "src/test/java/org/example/trademodel/controller/DashboardHomeReadOnlyIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/controller/HomeUiReviewRuntimeContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/WebLiveDashboardContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/FundamentalAiV41FinalP1RemediationContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/ApprovedFigmaHomeRuntimeContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/GlobalFrozenUiAlignmentContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/PositionMonitoringFrontendContractTest.java"
+  - "src/test/java/org/example/trademodel/controller/HomeTimestampTransportContractTest.java"
+  - "scripts/home-timestamp-transport-matrix.mjs"
+  - "src/test/java/org/example/trademodel/service/impl/DashboardHomeServiceImplTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/PostgreSqlFlywayMigrationSmokeTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/StandardJarContainsFlywayRuntimeTest.java"
+  - "src/test/java/org/example/trademodel/postgresql/V24AssetCardLiveSignalMigrationContractTest.java"
+  - "src/test/java/org/example/trademodel/mapper/AssetCardMapperIntegrationTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardBetaCalibrationTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardFeatureServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardMarketDataServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardEvidenceServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardSignalServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardRiskServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardServiceTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardModelBundleTest.java"
+  - "src/test/java/org/example/trademodel/assetcard/AssetCardIsolationIntegrationTest.java"
+v42_allowed_scope:
+  - "Signed LONG/SHORT/NON_DIRECTIONAL risk semantics for the existing Home asset-card snapshot"
+  - "Per-side risk identity, runtime event isolation, model provenance and SHADOW readiness evidence"
+  - "Existing 48 exact asset-card paths only after this registration is effective on origin/main"
+v42_blocked_scope:
+  - "Direction, confidence, risk, plan or threshold formula changes"
+  - "Execution plans, positions, Three-AI, Telegram, trading, native/mobile clients or unrelated Home modules"
+  - "Production/Staging deployment, persistent external database access, owner-position mutation or real provider/AI calls"

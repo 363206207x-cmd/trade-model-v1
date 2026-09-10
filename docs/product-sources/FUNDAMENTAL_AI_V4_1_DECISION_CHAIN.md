@@ -915,6 +915,127 @@ The existing 28 Owner positions remain untouched. No APP/mobile-web work,
 Production deployment, trades, real Telegram test send or real AI invocation
 is authorized by this supplement. Registration is not business completion.
 
+## Appendix J. Owner-authorized V42 directional risk and runtime closure
+
+Status: `OWNER_AUTHORIZED / REGISTRATION_CANDIDATE / 2026-09-11`.
+Package: `V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE`.
+Authorization package: `TRINE_LOGIC_V4_2_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE_AUTHORIZATION`.
+Source PR: `#1295`; audited source head: `2921a4a98254a4bd88f3138ed4eb2e0487b3956b`.
+Registration branch: `codex/v4-2-asset-card-directional-risk-runtime-authorization`.
+Implementation branch: `codex/v4-1-asset-card-live-signal-closure`.
+Starting merged-main baseline: `2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2`.
+Scope: `HOME_ASSET_CARD_ONLY`.
+
+Appendix J is an additive V42 registration for the existing 48 exact
+asset-card paths. It does not replace Appendix I, any V41 package, a
+predecessor state, or generic gate policy. Business implementation remains
+blocked until this registration is merged to `origin/main`; this registration
+itself has no merge or deployment execution permission.
+
+### J.1 Direction-to-side identity
+
+The three bullish card directions (`STRONG_BULLISH`, `BULLISH`,
+`WEAK_BULLISH`) map to `LONG`; the three bearish directions
+(`STRONG_BEARISH`, `BEARISH`, `WEAK_BEARISH`) map to `SHORT`; `RANGE` and
+`WATCH` map to `NON_DIRECTIONAL`. This mapping is an identity projection and
+does not alter the frozen direction, confidence, or threshold formulas.
+
+### J.2 Signed, independent risk semantics
+
+The eight existing risk types and their `NONE`/`LOW`/`MEDIUM`/`HIGH` grades
+remain unchanged. A directional metric is interpreted as adverse to the
+current side, never by taking an absolute value: funding, long/short ratio,
+liquidation imbalance, order-book imbalance, structural distance and returns
+retain their sign. `LONG` assesses long-side adverse evidence, `SHORT`
+assesses short-side adverse evidence, and `NON_DIRECTIONAL` never inherits a
+previous side. CHASE, SHOCK, REVERSAL, CROWDING, LIQUIDATION and directional
+LIQUIDITY therefore use the current side; DATA is side-neutral; EVENT is
+directional only where reliable event direction exists and otherwise remains
+two-sided. Opportunity score, direction strength and confidence are not risk
+inputs. `UNKNOWN` is not converted to `LOW`, `NONE` or zero.
+
+Every risk result is bound to `riskBasisSide`, `riskBasisDirection`,
+`riskBasisSignalAsOf`, `riskMarketAsOf` and `riskVersion`, in addition to its
+own evidence status, value, unit, source, observation time and reason. A side
+change atomically recomputes all risk evidence; if the new snapshot cannot be
+completed, risk is temporarily `—`/unknown and old-side evidence is rejected.
+Known high risk cannot be hidden by an unknown item, and no aggregate grade is
+copied into individual risk items.
+
+### J.3 Runtime publication and failure domains
+
+Closed Spot bars are processed once per `symbol + closed5mAt` identity, using
+an idempotent per-symbol or closed-bar batch rather than a global serial lock.
+All displayed assets at one boundary publish within the existing 15-second
+budget or record an explicit timeout state. Real Binance Spot trade price,
+depth and closed-bar work use separate queues or shards with reconnect,
+backoff, queue-depth, dropped-frame and processing-latency evidence. Dynamic
+subscriptions must not empty the displayed set during asset changes or a
+23-hour stream rollover, and official sequence rules govern depth rebuilds.
+
+PRICE, SIGNAL, RISK, PERSISTENCE and RECOVERY health/failure domains are
+independent. A risk failure yields unknown risk only; a signal failure does
+not erase a valid price; only a genuine Spot-price failure clears price. A
+source-loss safety projection also emits DATA `HIGH` evidence. Effective risk
+changes alone allocate a version, persist and publish SSE; health-check clock
+changes do not create per-second risk events. Field-only events never invoke a
+whole-Home reload and reject stale symbol/snapshot/threshold identities.
+
+### J.4 Training and provenance identity
+
+`takerBuySellRatio` is either a verified same-source feature or is removed
+from the feature version before retraining. Historical observations preserve
+instrument identity, source version, unit, observed/available/expiry times,
+and Java/Python apply the same point-in-time freshness checks. Training
+manifests name Binance Spot and each actual CoinGlass source separately.
+Immutable trade observations and mature four-hour labels retain the real
+future 1m/5m path and horizon trade; raw OI, depth, liquidation and trade
+counts are never shared across assets without point-in-time normalization.
+Missing feature combinations remain outside confidence coverage and show `—`.
+
+Long and short XGBoost models and their Beta calibrators remain independent,
+with temporal purged walk-forward splits and embargo. Confidence retains the
+frozen meaning: the calibrated probability that the selected side reaches
+`+1 ATR` before `-0.75 ATR` within four hours. Each published bundle carries
+trained-through, valid-until, data/feature/model/calibration versions and a
+threshold version. Without real training, calibration, stratified validation,
+sample counts and Brier/ECE/LogLoss evidence, model mode remains `SHADOW` and
+`PRODUCTION_MODEL_READY` remains `NO`; CANARY and ACTIVE are forbidden.
+
+### J.5 Snapshot, storage and deployment boundary
+
+Card results, risk side/version identity, SSE payloads and browser projection
+must share one atomic snapshot and compare `expectedSnapshotVersion` before
+publishing. Spot bars, feature history, observations and labels use an
+explicit retention/archive policy; no existing business table or position is
+altered. Any writer is limited to asset-card-owned storage and does not widen
+generic database roles. Runtime model loading is read-only, checksummed and
+manifest-bound; OpenMP/native loading is verified in the final Linux image.
+External Binance access has its own explicit safety switch and cannot be
+enabled by the card flag alone.
+
+### J.6 Acceptance and action boundary
+
+Acceptance must prove side-opposite risk semantics, non-directional RANGE/WATCH
+without numeric confidence, one result per closed bar under 128-asset pressure,
+field-isolated failures/SSE, stale identity rejection, bounded Spot-to-DOM and
+risk latency, native model loading, reconnect recovery, and unchanged Home
+geometry. The 28 existing Owner positions, execution plans, Three-AI,
+Telegram, trading, native clients, mobile web, Production and unrelated Home
+modules remain outside scope. No real AI or Telegram call is part of this
+registration.
+
+The registration gate permits only the seven exact contract/YAML/script paths
+listed in the task handoff, with no wildcard or directory grant. The future
+implementation keeps the existing 48 exact asset-card paths and their
+fingerprint. `MERGE_AUTHORIZATION=NO`, `DEPLOY_AUTHORIZATION=NO`,
+`MODEL_MODE=SHADOW`, and `BUSINESS_IMPLEMENTATION_BEFORE_GATE_PASS=NO` remain
+machine-enforced. Eligibility flags do not execute a merge; only a later
+Owner-approved action may do so after this exact registration is merged and
+the gate is effective on `origin/main`.
+
+<!-- END APPENDIX J V42 -->
+
 ## Appendix I. Owner Asset-Card Live Signal Contract
 
 Status: `OWNER_AUTHORIZED / REGISTRATION_CANDIDATE / 2026-09-10`.
