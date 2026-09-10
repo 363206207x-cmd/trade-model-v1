@@ -218,10 +218,46 @@ class DashboardHomeServiceImplTest {
             service.getHomeForUser(USER_ID, symbol, 6);
         }
 
-        org.mockito.Mockito.verifyNoInteractions(liveEvents);
+        assertThat(org.mockito.Mockito.mockingDetails(liveEvents).getInvocations())
+                .allSatisfy(call -> assertThat(call.getMethod().getName()).isEqualTo("latest"));
         verify(positionMonitorLogService, never()).recordMonitorRunForSystem(any());
         verify(positionMonitorLogService, never()).recordMonitorRunForUser(anyLong(), any());
         verify(planRevalidationService, never()).requestSystem(anyString(), any(), anyString());
+    }
+
+    @Test
+    void cachedLiveCardPriceIsReadOnlyAndDoesNotReplaceDecisionFacts() {
+        var events = new org.example.trademodel.v41.DashboardLiveEventService();
+        service.setDashboardLiveEventService(events);
+        Instant now = Instant.parse("2026-09-10T10:01:00Z");
+        var asset = new DashboardHomeVO.AssetVO();
+        asset.setRawSymbol("BTCUSDT");
+        asset.setAnalysisId("test-analysis"); asset.setDecisionId("test-decision"); asset.setTraceId("test-trace");
+        asset.setFinalConfidence(51); asset.setMarketBias("WEAK_BEARISH"); asset.setRiskLevel("MEDIUM");
+        asset.setLatestPrice(new BigDecimal("100"));
+        var closeAt = LocalDateTime.ofInstant(now.minusSeconds(61), ZoneOffset.UTC);
+        asset.setLatestPriceAt(closeAt); asset.setPriceAtDecision(new BigDecimal("98"));
+        events.publish(new org.example.trademodel.v41.DashboardLiveEvent("test-live", "ASSET_PRICE_UPDATED", "BTCUSDT",
+                1, now.minusSeconds(1), now, Map.of("latestPrice", new BigDecimal("102"),
+                "latestPriceAt", now.minusSeconds(1), "source", "BINANCE_MARK_PRICE_WEBSOCKET", "freshness", "FRESH")));
+        ReflectionTestUtils.invokeMethod(service, "applyCachedCardPrice", asset, now);
+        assertThat(asset.getLatestPrice()).isEqualByComparingTo("102");
+        assertThat(asset.getLatestPriceAt()).isEqualTo(LocalDateTime.ofInstant(now.minusSeconds(1), ZoneOffset.UTC));
+        assertThat(asset.getPriceBasis()).isEqualTo("LIVE");
+        assertThat(asset.getAnalysisId()).isEqualTo("test-analysis");
+        assertThat(asset.getDecisionId()).isEqualTo("test-decision");
+        assertThat(asset.getTraceId()).isEqualTo("test-trace");
+        assertThat(asset.getFinalConfidence()).isEqualTo(51);
+        assertThat(asset.getMarketBias()).isEqualTo("WEAK_BEARISH");
+        assertThat(asset.getRiskLevel()).isEqualTo("MEDIUM");
+        assertThat(asset.getPriceAtDecision()).isEqualByComparingTo("98");
+        asset.setLatestPrice(new BigDecimal("100")); asset.setLatestPriceAt(closeAt);
+        ReflectionTestUtils.invokeMethod(service, "applyCachedCardPrice", asset, now.plusSeconds(100));
+        assertThat(asset.getLatestPrice()).isEqualByComparingTo("100");
+        assertThat(asset.getLatestPriceAt()).isEqualTo(closeAt);
+        assertThat(asset.getPriceBasis()).isEqualTo("CLOSED_5M");
+        assertThat(events.latestEvents()).hasSize(1);
+        assertThat(events.structuralContexts("BTCUSDT")).isEmpty();
     }
 
     @Test
@@ -341,6 +377,8 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getAssets().get(0).getAnalysisId()).isEqualTo("analysis-LINKUSDT");
         assertThat(home.getAssets().get(0).getOpportunityScore()).isEqualTo(94);
         assertThat(home.getAssets().get(0).getRankingReason()).contains("OPPORTUNITY_SCORE=94");
+        assertThat(home.getHomeAssetCount()).isEqualTo(2);
+        assertThat(home.getHomeAssetShortfallReason()).isEqualTo("暂无更多合格资产");
         verify(assetPoolService, never()).listFocusSymbols(any(), anyInt());
         verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
     }

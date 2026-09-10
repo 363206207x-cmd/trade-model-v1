@@ -49,14 +49,27 @@
         return new Intl.NumberFormat("en-US", { maximumFractionDigits: 20 }).format(Number(value));
     }
     function confidenceText(asset) {
-        var values = [asset && asset.confidenceLabel, asset && asset.confidenceLevel];
-        for (var i = 0; i < values.length; i++) {
-            var raw = String(values[i] == null ? "" : values[i]).trim();
-            if (!/^(?:\d+(?:\.\d+)?)%?$/.test(raw)) continue;
-            var value = Number(raw.replace(/%$/, ""));
-            if (value >= 0 && value <= 100) return value + "%";
-        }
-        return "—";
+        var value = asset && asset.finalConfidence;
+        return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
+            ? value + "%" : "—";
+    }
+    function pinnedObservationLabel(asset) {
+        if (!asset || asset.homePinned !== true) return "";
+        var states = [];
+        var risk = { HIGH: "高风险", EXTREME: "极高风险" }[asset.riskLevel];
+        if (risk) states.push(risk);
+        var state = { HIGH_RISK: "高风险观察", INVALIDATED: "已失效", COOLING: "冷却中", CONFUSED: "信号混乱", BLOCKED: "已阻断" }[asset.opportunityState];
+        if (state) states.push(state);
+        if ((asset.finalPlanMode === "BLOCKED" || asset.planMode === "BLOCKED") && asset.opportunityState !== "BLOCKED") states.push("计划阻断");
+        return "置顶观察" + (states.length ? " · " + states.join(" · ") : "");
+    }
+    function priceCaption(asset) {
+        if (!asset || asset.latestPrice == null) return "";
+        var basis = asset.priceBasis === "LIVE" ? "实时价" : asset.priceBasis === "CLOSED_5M" ? "最近闭线价" : "价格来源待确认";
+        return '<small class="asset-price-caption" title="' + escape(basis + ' · ' + (asset.latestPriceSource || '')
+            + ' · ' + fullBeijingTime(asset.latestPriceAt)) + '">' + basis
+            + (asset.latestPriceAt ? ' <time datetime="' + escape(asset.latestPriceAt) + '">'
+                + beijingTime(asset.latestPriceAt, true) + '</time>' : '') + '</small>';
     }
     function planPriceText(value, asset) {
         var precision = asset && asset.pricePrecision;
@@ -101,7 +114,7 @@
             var completeWithoutRisk = riskRows(asset).every(function (row) {
                 return row.item && row.item.evidenceStatus === "AVAILABLE" && row.item.severity === "NONE";
             });
-            return completeWithoutRisk ? "" : '<span class="risk-summary-line risk-level-unknown">风险 —</span>';
+            return completeWithoutRisk ? "" : '<span class="risk-pending-copy">风险待评估</span>';
         }
         var row = items[0];
         return '<span class="risk-summary-line"><span class="risk-type-copy">' + escape(row.name.replace(/风险$/, ""))
@@ -121,7 +134,6 @@
             return row.item && row.item.evidenceStatus === "AVAILABLE"
                 && ["LOW", "MEDIUM", "HIGH", "EXTREME"].indexOf(row.item.severity) >= 0;
         });
-        var missing = rows.length - confirmed.length;
         return '<h3>' + escape(asset.rawSymbol || asset.symbol) + ' · 风险详情</h3><p class="drawer-timezone">风险观察时间 · 北京时间 UTC+08:00</p>'
             + confirmed.map(function (row) {
                 var item = row.item;
@@ -131,8 +143,7 @@
                     + escape(item.currentValue == null ? "未记录" : item.currentValue) + '</p><p>'
                     + escape(item.primaryEvidence || "未提供证据说明") + '</p><small>'
                     + escape(item.source || "尚无来源记录") + ' · ' + beijingTime(item.observedAt) + '</small></section>';
-            }).join("")
-            + (missing ? '<p class="risk-evidence-pending">' + missing + ' 项证据待补齐；不代表低风险或无风险。</p>' : '');
+            }).join("");
     }
     function riskDataStatus(asset) {
         if (hasConfirmedRisks(asset) || !riskSummary(asset)) return "";
@@ -253,8 +264,8 @@
         window.__trineDesktopHoverController = { close: close };
         return window.__trineDesktopHoverController;
     }
-    window.TrineDesktopSemantics = Object.freeze({ beijingTime: beijingTime, fullBeijingTime: fullBeijingTime, directionTimeLabel: directionTimeLabel, priceText: priceText, confidenceText: confidenceText, planPriceText: planPriceText, riskSummary: riskSummary,
-        riskDrawer: riskDrawer, riskDataStatus: riskDataStatus, hasConfirmedRisks: hasConfirmedRisks, poolTimeframes: poolTimeframes, serviceSummary: serviceSummary, serviceDrawer: serviceDrawer, installHoverDrawers: installHoverDrawers });
+    window.TrineDesktopSemantics = Object.freeze({ refreshPolicy: Object.freeze({ reconcileMs: 60000, disconnectedMs: 15000 }), beijingTime: beijingTime, fullBeijingTime: fullBeijingTime, directionTimeLabel: directionTimeLabel, priceText: priceText, confidenceText: confidenceText, planPriceText: planPriceText, riskSummary: riskSummary,
+        pinnedObservationLabel: pinnedObservationLabel, priceCaption: priceCaption, riskDrawer: riskDrawer, riskDataStatus: riskDataStatus, hasConfirmedRisks: hasConfirmedRisks, poolTimeframes: poolTimeframes, serviceSummary: serviceSummary, serviceDrawer: serviceDrawer, installHoverDrawers: installHoverDrawers });
 })();
 
 /* Desktop Home runtime */
@@ -750,14 +761,16 @@
             + escapeHtml(symbol + " 首页资产上下文；" + direction + "；置信度 " + confidence) + '"><header><div class="asset-identity"><strong>'
             + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
             + escapeHtml(text(asset.name, "名称不可用"))
-            + '</small></div><strong class="opportunity-price" data-live-field="price">' + escapeHtml(price)
-            + '</strong></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="semantic-value' + directionSemanticClass(finalDirection) + '">' + escapeHtml(direction)
+            + '</small></div><div class="asset-price-block"><strong class="opportunity-price" data-live-field="price">' + escapeHtml(price)
+            + '</strong>' + desktop.priceCaption(asset) + '</div></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="semantic-value' + directionSemanticClass(finalDirection) + '">' + escapeHtml(direction)
             + '</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
-            + '</strong></div>' + (risk ? '<div class="opportunity-risk" data-live-field="risk"'
+            + '</strong></div>' + (risk || asset.homePinned === true ? '<div class="opportunity-facts">' : '')
+            + (risk ? '<div class="opportunity-risk" data-live-field="risk"'
             + (desktop.hasConfirmedRisks(asset) ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(symbol)
             + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"'
-            : ' tabindex="0" data-desktop-hover="risk-status" data-risk-symbol="' + escapeHtml(symbol)
-                + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险数据状态"') + '>' + risk + '</div>' : '')
+            : '') + '>' + risk + '</div>' : '')
+            + (asset.homePinned === true ? '<div class="pinned-observation-copy">' + escapeHtml(desktop.pinnedObservationLabel(asset)) + '</div>' : '')
+            + (risk || asset.homePinned === true ? '</div>' : '')
             + '<div class="opportunity-context"><span>' + escapeHtml(oneHour)
             + '</span><span>' + escapeHtml(fourHour) + '</span>'
             + (timeLabel ? '<time class="opportunity-updated" datetime="' + escapeHtml(asset.directionCalculatedAt)
@@ -779,10 +792,12 @@
         var grid = document.getElementById("opportunityGrid");
         var empty = document.getElementById("opportunityEmpty");
         var selected = symbolOf(home.selectedAssetContext || { symbol: home.selectedSymbol }) || selectedSymbol;
-        setText("opportunityHeading", ["重点资产", assets.length].join(" · "));
+        setText("opportunityHeading", "重点资产 · " + assets.length + "/6");
         grid.innerHTML = assets.map(function (asset) { return opportunityCard(asset, selected); }).join("");
         grid.hidden = assets.length === 0;
-        empty.hidden = assets.length !== 0;
+        empty.hidden = assets.length >= 6;
+        if (!empty.hidden) empty.textContent = home.homeAssetShortfallReason
+            || (home.snapshotComplete === true ? "暂无更多合格资产" : "完整资产快照尚未就绪");
         grid.querySelectorAll("[data-symbol]").forEach(function (card) {
             function select(event) {
                 if (event && event.target.closest("[data-desktop-hover]")) return;
@@ -1461,7 +1476,8 @@
     }
     function scheduleHomeFallbackPoll() {
         if (document.hidden) return;
-        var delay = homeStreamConnected ? 60000 : 15000;
+        var policy = window.TrineDesktopSemantics.refreshPolicy;
+        var delay = homeStreamConnected ? policy.reconcileMs : policy.disconnectedMs;
         if (homeFallbackTimer && homePollIntervalMs === delay) return;
         stopHomeFallbackPoll();
         homePollIntervalMs = delay;

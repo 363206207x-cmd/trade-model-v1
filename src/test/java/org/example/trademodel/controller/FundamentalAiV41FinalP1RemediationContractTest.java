@@ -200,7 +200,7 @@ class FundamentalAiV41FinalP1RemediationContractTest {
                 "const displayed = hasValue(status)",
                 "[\"-\", \"—\", \"N/A\", \"NA\", \"NULL\"].includes(String(displayed).trim().toUpperCase())",
                 "function lastScanResultText(header)",
-                "updatePoolScanCta();\n        Promise.all([loadAssetPool(), loadTasks()])",
+                "updatePoolScanCta();\n        initializeAssetPoolRefresh();\n        loadTasks().then",
                 "已完成（结果摘要未记录）")
                 .doesNotContain(
                         "[\"调度器\", label(readiness?.schedulerObservationStatus || header.systemRuntimeState, \"当前不可查看\")]",

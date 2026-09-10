@@ -228,8 +228,9 @@ class GlobalFrozenUiAlignmentContractTest {
                 for(const items of [[],asset.riskItems.slice(1),asset.riskItems.map(x=>({...x,evidenceStatus:'INSUFFICIENT_EVIDENCE'}))]) {
                     const unknown={...asset,riskItems:items},html=drawCard(unknown,'TESTUSDT');
                     assert.equal(desktop.hasConfirmedRisks(unknown),false);assert.equal(desktop.riskDrawer(unknown),'');
-                    assert.equal(desktop.riskSummary(unknown),'<span class="risk-summary-line risk-level-unknown">风险 —</span>');
-                    assert.ok(html.includes('risk-level-unknown">风险 —'));
+                    assert.equal(desktop.riskSummary(unknown),'<span class="risk-pending-copy">风险待评估</span>');
+                    assert.ok(html.includes('risk-pending-copy">风险待评估'));
+                    assert.ok(!html.includes('data-desktop-hover="risk-status"'));
                     assert.ok(!html.includes('data-desktop-hover="risk"'));assert.ok(!html.includes('risk-evidence-item'));
                 }
                 const risky={...asset,riskItems:asset.riskItems.map((x,i)=>({...x,severity:i===0?'MEDIUM':i===1?'HIGH':'NONE',

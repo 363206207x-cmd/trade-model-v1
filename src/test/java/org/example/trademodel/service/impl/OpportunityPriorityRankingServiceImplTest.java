@@ -68,6 +68,78 @@ class OpportunityPriorityRankingServiceImplTest {
     }
 
     @Test
+    void fourPinsKeepSavedOrderAndOnlyQualifiedUnpinnedAssetsFillSix() {
+        List<String> symbols = List.of("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT", "GUSDT");
+        var assets = new java.util.ArrayList<>(pool(symbols));
+        for (int i = 0; i < 4; i++) assets.set(i, pinned(assets.get(i), 4 - i));
+        var rows = decisions(symbols.subList(4, 7), List.of(80, 60, 40));
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(assets);
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(states(symbols.subList(4, 7)));
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(rows);
+        var result = service.rankForHome(USER_ID, 6);
+        assertThat(result).extracting(HomeTopAssetProjection::symbol)
+                .containsExactly("DUSDT", "CUSDT", "BUSDT", "AUSDT", "EUSDT", "FUSDT");
+        assertThat(result.subList(0, 4)).allSatisfy(row -> {
+            assertThat(row.sourceDecision()).isNull();
+            assertThat(row.rankingReason()).contains("PINNED");
+        });
+        assertThat(result.subList(4, 6)).allSatisfy(row -> {
+            assertThat(row.sourceDecision().getPlanMode()).isNotEqualTo("BLOCKED");
+            assertThat(row.sourceDecision().getFinalConfidence()).isIn(80, 60);
+        });
+        assertThat(service.rankForHome(USER_ID, 6)).isEqualTo(result);
+        rows.forEach(row -> row.setPlanMode("BLOCKED"));
+        assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
+                .containsExactly("DUSDT", "CUSDT", "BUSDT", "AUSDT");
+        assertThat(assets).hasSize(7);
+    }
+
+    @Test
+    void userPinsRetainUnqualifiedStatesWithoutMakingThemAutomaticOpportunities() {
+        List<String> symbols = List.of("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT");
+        var assets = new java.util.ArrayList<>(pool(symbols));
+        for (int i = 0; i < 6; i++) assets.set(i, pinned(assets.get(i), 6 - i));
+        var rows = decisions(symbols, List.of(90, 80, 70, 60, 50, 40));
+        rows.get(0).setRiskLevel("HIGH"); rows.get(1).setRiskLevel("EXTREME");
+        rows.get(2).setPlanMode("BLOCKED");
+        var stateRows = states(symbols);
+        stateRows.get(3).setState(AssetStateEnum.INVALIDATED);
+        stateRows.get(4).setState(AssetStateEnum.COOLING);
+        stateRows.get(5).setState(AssetStateEnum.CONFUSED);
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(assets);
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID))).thenReturn(stateRows);
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID))).thenReturn(rows);
+        var result = service.rankForHome(USER_ID, 6);
+        assertThat(result).extracting(HomeTopAssetProjection::symbol)
+                .containsExactly("FUSDT", "EUSDT", "DUSDT", "CUSDT", "BUSDT", "AUSDT");
+        assertThat(result.subList(0, 3)).extracting(HomeTopAssetProjection::opportunityState)
+                .containsExactly("CONFUSED", "COOLING", "INVALIDATED");
+        assertThat(result.get(3).finalPlanMode()).isEqualTo("BLOCKED");
+        assertThat(result.get(4).riskLevel()).isEqualTo("EXTREME");
+        assertThat(result.get(5).riskLevel()).isEqualTo("HIGH");
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(pool(symbols));
+        assertThat(service.rankForHome(USER_ID, 6)).isEmpty();
+        assertThat(assetPoolService.listForUser(USER_ID)).hasSize(6);
+    }
+
+    @Test
+    void zeroPinsReturnSixRankedAssetsAndSixPinsReturnOnlySavedSequence() {
+        List<String> symbols = List.of("AUSDT", "BUSDT", "CUSDT", "DUSDT", "EUSDT", "FUSDT", "GUSDT");
+        var assets = new java.util.ArrayList<>(pool(symbols));
+        when(assetPoolService.listForUser(USER_ID)).thenReturn(assets);
+        when(assetStateMapper.listByOwnerAndSymbols(anyList(), eq("USER"), eq(USER_ID))).thenReturn(states(symbols));
+        when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
+                .thenReturn(decisions(symbols, List.of(90, 80, 70, 60, 50, 40, 30)));
+        assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
+                .containsExactlyElementsOf(symbols.subList(0, 6));
+        for (int i = 0; i < 6; i++) assets.set(i, pinned(assets.get(i), 6 - i));
+        assertThat(service.rankForHome(USER_ID, 6)).extracting(HomeTopAssetProjection::symbol)
+                .containsExactly("FUSDT", "EUSDT", "DUSDT", "CUSDT", "BUSDT", "AUSDT");
+    }
+
+    @Test
     void savedPinsLeadInExactOrderIncludingMissingDataThenOnlyQualifiedOpportunities() {
         List<String> symbols = List.of("PINONEUSDT", "PINTWOUSDT", "PINTHREEUSDT",
                 "STRONGUSDT", "NORMALUSDT", "WEAKUSDT", "HIGHUSDT", "WAITUSDT");

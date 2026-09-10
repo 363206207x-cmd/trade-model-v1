@@ -38,6 +38,10 @@ public class DashboardHomeVO {
     public void setProviderStateVersion(String value) { providerStateVersion = value; }
     public boolean isSnapshotComplete() { return snapshotComplete; }
     public int getHomeAssetCount() { return assets.size(); }
+    public String getHomeAssetShortfallReason() {
+        if (assets.size() >= 6) return null;
+        return snapshotComplete ? "暂无更多合格资产" : "完整资产快照尚未就绪";
+    }
     public void setSnapshotComplete(boolean value) { snapshotComplete = value; }
     public List<AssetVO> getAssetPool() { return assetPool; }
     public void setAssetPool(List<AssetVO> value) { assetPool = List.copyOf(value); }
@@ -629,6 +633,19 @@ public class DashboardHomeVO {
         private Integer compositeScore;
         private String confidenceLevel;
         private String confidenceLabel;
+        private Integer finalConfidence;
+        private String priceBasis;
+        private String latestPriceSource;
+        private boolean homePinned;
+
+        public boolean isHomePinned() { return homePinned; }
+        public void setHomePinned(boolean value) { homePinned = value; }
+        public Integer getFinalConfidence() { return finalConfidence; }
+        public void setFinalConfidence(Integer value) { finalConfidence = value; }
+        public String getPriceBasis() { return priceBasis; }
+        public void setPriceBasis(String value) { priceBasis = value; }
+        public String getLatestPriceSource() { return latestPriceSource; }
+        public void setLatestPriceSource(String value) { latestPriceSource = value; }
         private String riskLevel;
         private String riskLabel;
         private String riskVersion;
