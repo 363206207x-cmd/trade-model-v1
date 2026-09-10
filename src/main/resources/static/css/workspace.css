@@ -28,6 +28,8 @@
 .pool-pin-actions button { flex: 0 0 auto; white-space: nowrap; }
 body[data-page-key="asset-pool"] .table-shell table { table-layout: auto; }
 .pool-timeframes { min-width: 194px; white-space: nowrap; }
+body[data-page-key="asset-pool"] .risk-pending-copy { color: var(--risk-unknown); font-size: 11px; border: 0; padding: 0; }
+body[data-page-key="asset-pool"] .asset-price-caption { display: block; color: var(--text-muted); font-size: 10px; font-weight: 400; white-space: nowrap; }
 .pool-pin-toggle, .pool-pin-order { border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); border-radius: 4px; min-width: 26px; min-height: 28px; cursor: pointer; }
 .pool-pin-toggle { font-size: 18px; }
 .pool-pin-toggle[aria-pressed="true"] { color: var(--accent); background: var(--surface-selected); }

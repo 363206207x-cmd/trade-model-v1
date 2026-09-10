@@ -486,6 +486,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                     applyDesktopFacts(asset);
                     shared.put(symbol, asset);
                 }
+                asset.setHomePinned(member.homePinned());
                 pool.add(asset);
             }
             home.setAssetPool(pool);
@@ -508,7 +509,10 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         } catch (java.security.NoSuchAlgorithmException | com.fasterxml.jackson.core.JsonProcessingException failure) {
             throw new IllegalStateException("PROVIDER_STATE_VERSION_UNAVAILABLE", failure);
         }
-        shared.values().forEach(asset -> asset.setSnapshotId(snapshotId));
+        shared.values().forEach(asset -> {
+            asset.setSnapshotId(snapshotId);
+            applyCachedCardPrice(asset, generatedAt);
+        });
         home.setSnapshotComplete(true);
     }
 
@@ -1505,6 +1509,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setRiskLevel(null);
         asset.setRiskLabel("待评估");
         asset.setWorthOpening(null);
+        asset.setFinalConfidence(null);
         clearCardFinalProjection(asset);
         asset.setOpportunityState(observationState);
         asset.setAssetState(observationState);
@@ -1532,6 +1537,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
                                             DecisionResultVO decision,
                                             HomeTopAssetProjection projection) {
         if (asset == null) return;
+        asset.setFinalConfidence(null);
         asset.setWorthOpening(null);
         if (!sameProjectionDecisionRun(decision, projection)) {
             asset.setMarketBias(null);
@@ -1567,6 +1573,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setMarketBias(marketBias);
         asset.setMarketBiasLabel(biasLabel(marketBias));
         Integer confidence = decision.getFinalConfidence();
+        asset.setFinalConfidence(confidence);
         asset.setConfidenceLevel(confidence == null ? null : String.valueOf(confidence));
         asset.setConfidenceLabel(confidence == null ? "—" : confidence + "%");
         String riskLevel = trimToNull(decision.getRiskLevel());
@@ -1669,7 +1676,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             case "STALE" -> "数据已过期";
             case "SOURCE_UNAVAILABLE" -> "数据来源不可用";
             case "MULTI_TIMEFRAME_CONFLICT", "TIMEFRAME_CONFLICT" -> "周期冲突";
-            case "NEVER_SCANNED" -> "等待首次分析";
+            case "NEVER_SCANNED" -> "待首次分析";
             case "QUEUED", "RUNNING", "UPDATING", "ANALYZING", "PENDING" -> "更新中";
             case "WAITING_NEW_CLOSE", "WAITING_CLOSE" -> "等待更新";
             default -> "暂不可判断";
@@ -2036,6 +2043,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setLatestAnalysisTime(decision.getCreateTime());
         asset.setConfidenceLevel(trimToNull(decision.getConfidenceLevel()));
         asset.setConfidenceLabel(confidenceLabel(decision.getConfidenceLevel()));
+        asset.setFinalConfidence(decision.getFinalConfidence());
         setFieldSource(asset, "confidence", hasText(asset.getConfidenceLevel()) ? "DERIVED" : "MISSING");
         asset.setRiskLevel(trimToNull(decision.getRiskLevel()));
         asset.setRiskLabel(asset.getRiskLevel() == null ? null : riskLabel(asset.getRiskLevel()));
@@ -2098,6 +2106,32 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
         asset.setPricePrecision(metadata.pricePrecision());
         asset.setPriceMetadataSource(metadata.source());
         asset.setPriceMetadataObservedAt(metadata.observedAt());
+    }
+
+    /** Read-only card price overlay. Never refresh a provider or alter the rule/plan snapshot. */
+    private void applyCachedCardPrice(DashboardHomeVO.AssetVO asset, Instant now) {
+        asset.setPriceBasis(positive(asset.getLatestPrice()) ? "CLOSED_5M" : "UNAVAILABLE");
+        asset.setLatestPriceSource(positive(asset.getLatestPrice()) ? asset.getSourceProvider() : null);
+        if (dashboardLiveEventService == null) return;
+        var event = dashboardLiveEventService.latest(asset.getRawSymbol(), "ASSET_PRICE_UPDATED").orElse(null);
+        if (event == null || event.payload() == null
+                || !Objects.equals(normalizeSymbol(event.symbol()), normalizeSymbol(asset.getRawSymbol()))
+                || !"BINANCE_MARK_PRICE_WEBSOCKET".equals(event.payload().get("source"))
+                || !"FRESH".equals(event.payload().get("freshness"))) return;
+        try {
+            Instant observedAt = Instant.parse(String.valueOf(event.payload().get("latestPriceAt")));
+            // Same 90-second public-price freshness window already used by the runtime quote consumer.
+            if (observedAt.isAfter(now) || observedAt.isBefore(now.minusSeconds(90))) return;
+            BigDecimal price = new BigDecimal(String.valueOf(event.payload().get("latestPrice")));
+            if (!positive(price)) return;
+            asset.setLatestPrice(price);
+            asset.setLatestPriceAt(LocalDateTime.ofInstant(observedAt, ZoneOffset.UTC));
+            asset.setPriceBasis("LIVE");
+            asset.setLatestPriceSource("BINANCE_MARK_PRICE_WEBSOCKET");
+            setFieldSource(asset, "latestPrice", "REAL");
+        } catch (java.time.DateTimeException | NumberFormatException invalidCacheValue) {
+            // Invalid/missing cache facts retain the explicitly labelled closed-bar fallback.
+        }
     }
 
     private void applyIndependentRiskEvidence(DashboardHomeVO.AssetVO asset) {
@@ -2288,6 +2322,7 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
 
     private DashboardHomeVO.AssetVO assetPlaceholder(int slot, String symbol) {
         DashboardHomeVO.AssetVO asset = assetBase(slot, symbol);
+        asset.setMarketBiasLabel("待首次分析");
         applyPersistedMarketData(asset, symbol);
         asset.setSlotType(asset.getLatestPrice() == null ? "DEFAULT_SLOT" : "MARKET_DATA");
         applyDataQuality(asset, null);

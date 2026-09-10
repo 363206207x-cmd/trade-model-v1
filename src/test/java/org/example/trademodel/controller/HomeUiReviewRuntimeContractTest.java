@@ -84,7 +84,7 @@ class HomeUiReviewRuntimeContractTest {
                   symbol, name: ['Bitcoin', 'Ethereum', 'Solana'][index], opportunityState: index === 2 ? 'HIGH_RISK' : 'WAITING_TRIGGER',
                   finalPlanMode: 'PREPARATION', finalMarketBias: 'BULLISH', confidenceLevel: 'HIGH',
                   marketBias: 'BULLISH', marketBiasLabel: '偏多',
-                  confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
+                  finalConfidence: 80, confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
                   riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
                   fourHourTrendLabel: '4小时趋势偏多', hasFinal: true
                 }));
@@ -100,7 +100,11 @@ class HomeUiReviewRuntimeContractTest {
                 assert.doesNotMatch(eth, /HIGH_RISK/);
                 assert.equal(eth.includes('data-desktop-hover="risk"'), false);
                 assert.equal(eth.includes('尚无独立风险证据'), false);
-                assert.equal(eth.includes('风险 —'), true);
+                assert.equal(eth.includes('风险待评估'), true);
+                assert.equal(eth.includes('data-desktop-hover="risk-status"'), false);
+                const pinned = opportunityCard({...assets[1],homePinned:true,planMode:'BLOCKED'},'ETHUSDT');
+                assert.ok(pinned.includes('<div class="opportunity-facts"><div class="opportunity-risk"'));
+                assert.ok(pinned.includes('置顶观察 · 计划阻断</div></div><div class="opportunity-context">'));
                 const evidencedRisk = {riskType:'EVENT_RISK', evidenceStatus:'AVAILABLE', severity:'HIGH',
                   currentValue:'2', source:'fixture-event-source', observedAt:'2026-09-07T05:00:00Z',
                   primaryEvidence:'Test-only independently observed event count', evidenceId:'fixture-evidence-1'};
@@ -220,7 +224,8 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
                 assert.equal(observationHtml.includes('data-desktop-hover="risk"'), false);
                 assert.equal(observationHtml.includes('尚无独立风险证据'), false);
-                assert.equal(observationHtml.includes('风险 —'), true);
+                assert.equal(observationHtml.includes('风险待评估'), true);
+                assert.equal(observationHtml.includes('data-desktop-hover="risk-status"'), false);
                 assert.equal(desktop.riskDrawer(observation), '');
                 assert.match(observationHtml, /1小时分析未完成/);
                 assert.match(observationHtml, /4小时分析未完成/);
@@ -256,7 +261,12 @@ class HomeUiReviewRuntimeContractTest {
                 assert.deepEqual(symbols, ['ETHUSDT', 'BTCUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LINKUSDT']);
                 assert.equal(symbols.filter(symbol => symbol === 'ETHUSDT').length, 1);
                 assert.equal(nodes.opportunityGrid.innerHTML.includes('DEFAULT_SLOT'), false);
-                assert.equal(nodes.opportunityHeading.textContent, '重点资产 · 6');
+                assert.equal(nodes.opportunityHeading.textContent, '重点资产 · 6/6');
+                renderOpportunities({ assets: all.slice(0, 2), selectedSymbol: 'ETHUSDT', snapshotComplete:true });
+                assert.equal(nodes.opportunityHeading.textContent, '重点资产 · 2/6');
+                assert.equal(nodes.opportunityEmpty.hidden, false);
+                assert.equal(nodes.opportunityEmpty.textContent, '暂无更多合格资产');
+                assert.equal((nodes.opportunityGrid.innerHTML.match(/class="opportunity-card/g)||[]).length,2);
                 console.log('HOME_REAL_CARD_RUNTIME=PASS');
                 """.formatted(semanticClass, validators, renderers);
 

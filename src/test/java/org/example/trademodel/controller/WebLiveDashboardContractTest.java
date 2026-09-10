@@ -12,6 +12,78 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebLiveDashboardContractTest {
 
     @Test
+    void pinnedObservationCopyPreservesActualDisqualifyingStatesWithoutRiskInference() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                global.window={};eval(fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8').split('/* Desktop Home runtime */')[0]);
+                const ui=window.TrineDesktopSemantics;
+                for(const [opportunityState,copy] of Object.entries({BLOCKED:'已阻断',INVALIDATED:'已失效',COOLING:'冷却中',CONFUSED:'信号混乱'})) {
+                  const asset={homePinned:true,opportunityState,finalConfidence:null};
+                  assert.equal(ui.pinnedObservationLabel(asset),'置顶观察 · '+copy);
+                  assert.equal(ui.confidenceText(asset),'—');
+                  assert.equal(ui.hasConfirmedRisks(asset),false);
+                  assert.equal(ui.riskDrawer(asset),'');
+                  assert.equal(ui.pinnedObservationLabel({...asset,homePinned:false}),'');
+                }
+                assert.equal(ui.pinnedObservationLabel({homePinned:true,riskLevel:'HIGH',planMode:'BLOCKED'}),'置顶观察 · 高风险 · 计划阻断');
+                assert.equal(ui.pinnedObservationLabel({homePinned:true,riskLevel:'EXTREME'}),'置顶观察 · 极高风险');
+                assert.equal(ui.pinnedObservationLabel({homePinned:true,riskLevel:null}),'置顶观察');
+                console.log('PASS');
+                """);
+    }
+
+    @Test
+    void unknownRiskIsQuietTextAndNeverAnInteractiveDrawerTarget() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const home=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
+                const pool=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
+                global.window={};eval(home.split('/* Desktop Home runtime */')[0]);
+                const ui=window.TrineDesktopSemantics;
+                assert.equal(ui.riskSummary({riskItems:[]}),'<span class="risk-pending-copy">风险待评估</span>');
+                assert.equal(ui.riskDrawer({riskItems:[]}), '');
+                assert.equal(ui.hasConfirmedRisks({riskItems:[]}),false);
+                const card=home.slice(home.indexOf('function opportunityCard('),home.indexOf('function renderOpportunities('));
+                const rows=pool.slice(pool.indexOf('function renderAssetPoolRows('),pool.indexOf('async function loadAssetPoolProjection('));
+                assert.ok(!card.includes('data-desktop-hover="risk-status"'));
+                assert.ok(!rows.includes('data-desktop-hover="risk-status"'));
+                assert.equal(ui.confidenceText({finalConfidence:51,confidenceLabel:'99%',confidenceLevel:'HIGH'}),'51%');
+                assert.equal(ui.confidenceText({confidenceLabel:'99%'}),'—');
+                console.log('PASS');
+                """);
+    }
+
+    @Test
+    void poolUsesSharedReconciliationCadenceAndVisibleOnlySingletonRefresh() throws Exception {
+        runNode("""
+                const assert=require('node:assert/strict'),fs=require('node:fs');
+                const source=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
+                global.window={};eval(fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8').split('/* Desktop Home runtime */')[0]);
+                assert.equal(window.TrineDesktopSemantics.refreshPolicy.reconcileMs,60000);
+                let poolRefreshTimer=null,poolRefreshBound=false,calls=0,next=0;
+                const timers=new Map(),listeners={};
+                const document={visibilityState:'visible',addEventListener:(type,fn)=>listeners[type]=fn};
+                window.setInterval=(fn,ms)=>{timers.set(++next,{fn,ms});return next;};
+                window.clearInterval=id=>timers.delete(id);
+                const loadAssetPool=()=>{calls++;return Promise.resolve();};
+                const fn=source.slice(source.indexOf('function initializeAssetPoolRefresh('),source.indexOf('function updatePoolScanCta('));
+                eval(fn);
+                (async()=>{
+                initializeAssetPoolRefresh(); initializeAssetPoolRefresh(); await Promise.resolve();
+                assert.equal(calls,1);assert.equal(timers.size,1);
+                assert.equal([...timers.values()][0].ms,60000);
+                for(let i=0;i<3;i++) { [...timers.values()][0].fn(); await Promise.resolve(); }
+                assert.equal(calls,4);
+                document.visibilityState='hidden';listeners.visibilitychange();assert.equal(timers.size,0);
+                document.visibilityState='visible';listeners.visibilitychange();assert.equal(calls,5);assert.equal(timers.size,1);
+                listeners.visibilitychange();assert.equal(timers.size,1);
+                assert.ok(!fn.includes('POST'));assert.ok(!fn.includes('loadTasks'));
+                console.log('PASS');
+                })().catch(e=>{console.error(e);process.exitCode=1;});
+                """);
+    }
+
+    @Test
     void desktopPoolTimeframesAndActionsHaveExplicitNonOverlappingLayout() throws Exception {
         runNode("""
                 const assert=require('node:assert/strict'),fs=require('node:fs');
@@ -68,7 +140,7 @@ class WebLiveDashboardContractTest {
                     'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
                 const complete={riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
                 assert.equal(ui.riskSummary(complete),'');assert.equal(ui.riskDrawer(complete),'');
-                assert.equal(ui.riskSummary({riskItems:[]}),'<span class="risk-summary-line risk-level-unknown">风险 —</span>');
+                assert.equal(ui.riskSummary({riskItems:[]}),'<span class="risk-pending-copy">风险待评估</span>');
                 const unknown={rawSymbol:'TRXUSDT',riskItems:[{riskType:'LIQUIDITY_RISK',evidenceStatus:'INSUFFICIENT_EVIDENCE',
                     missingReason:'本轮缺少独立流动性指标'}, {riskType:'CROWDING_RISK',evidenceStatus:'INSUFFICIENT_EVIDENCE',
                     missingReason:'CoinGlass 本轮风险证据已过期'}]};
@@ -158,7 +230,7 @@ class WebLiveDashboardContractTest {
                 "homePollIntervalMs === delay",
                 "homeFallbackTimer = window.setInterval",
                 "if (!document.hidden && !homeAbortController) lightweightHomeRefresh()",
-                "homeStreamConnected ? 60000 : 15000",
+                "homeStreamConnected ? policy.reconcileMs : policy.disconnectedMs",
                 "scheduleHomeFallbackPoll();",
                 "visibilitychange",
                 "loadHome(selectedSymbol)",
@@ -192,6 +264,7 @@ class WebLiveDashboardContractTest {
                 function EventSource(){streams++;this.close=()=>{};this.addEventListener=()=>{};}
                 const window={EventSource,setInterval(fn,delay){timers.set(++seq,{fn,delay});return seq;},
                     clearInterval(id){timers.delete(id);},addEventListener(){}};
+                eval(source.split('/* Desktop Home runtime */')[0]);
                 const loadHome=async()=>{refreshes++;},lightweightHomeRefresh=loadHome,
                     renderHeader=()=>{},announce=()=>{},reportHomeRequestFailure=()=>{},applyHomeLiveEvent=()=>{};
                 eval(source.slice(source.indexOf('function scheduleHomeFallbackPoll('),source.indexOf('function stableSubmissionId('))
@@ -499,16 +572,16 @@ class WebLiveDashboardContractTest {
                 assert.equal((risk.match(/class="risk-evidence-item"/g)||[]).length,1);
                 assert.ok(risk.includes('&lt;script&gt;')); assert.ok(!risk.includes('<script>'));
                 assert.ok(risk.includes('证据完整')); assert.ok(risk.includes('72'));
-                assert.ok(risk.includes('7 项证据待补齐'));
+                assert.ok(!risk.includes('证据待补齐'));
                 assert.ok(!risk.includes('<table>'));
                 assert.ok(ui.riskSummary(asset).includes('risk-level-high'));
                 assert.ok(!ui.riskSummary({riskItems:[{riskType:'LIQUIDITY_RISK',severity:'HIGH',score:100}]}).includes('risk-level-high'));
                 assert.equal(ui.hasConfirmedRisks({riskItems:[]}),false);
                 assert.equal(ui.riskDrawer({riskItems:[]}),'');
-                assert.ok(ui.riskSummary({riskItems:[]}).includes('风险 —'));
+                assert.ok(ui.riskSummary({riskItems:[]}).includes('风险待评估'));
                 assert.equal(ui.confidenceText({confidenceLabel:'高',confidenceLevel:'HIGH'}),'—');
-                assert.equal(ui.confidenceText({confidenceLabel:'82%'}),'82%');
-                assert.equal(ui.confidenceText({confidenceLevel:0}),'0%');
+                assert.equal(ui.confidenceText({finalConfidence:82,confidenceLabel:'82%'}),'82%');
+                assert.equal(ui.confidenceText({finalConfidence:0}),'0%');
                 assert.equal(ui.confidenceText({confidenceLevel:101}),'—');
                 const precision={tickSize:'0.005',pricePrecision:3,priceMetadataSource:'BINANCE_SPOT_EXCHANGE_INFO_PRICE_FILTER'};
                 assert.equal(ui.planPriceText('100.123456 – 101.7777',precision),'100.123 – 101.778');
@@ -690,7 +763,8 @@ class WebLiveDashboardContractTest {
                 const assert=require('node:assert/strict'),fs=require('node:fs');
                 const source=fs.readFileSync('src/main/resources/static/js/workspace.js','utf8');
                 const functions=source.slice(source.indexOf('async function loadAssetPoolProjection()'),source.indexOf('function updatePoolScanCta('));
-                let assetPoolProjections=[],assetPoolItems=[],assetPoolLoaded=false,poolScanRuntime=null,assetPoolProjectionVersion=0;
+                let assetPoolProjections=[],assetPoolItems=[],assetPoolLoaded=false,poolScanRuntime=null,assetPoolProjectionVersion=0,
+                    assetPoolRequestSequence=0;
                 let waiters=[], renders=[], messages=[];
                 const api=path=>{assert.equal(path,'/api/dashboard/runtime-snapshot');return new Promise(resolve=>waiters.push(resolve));};
                 const document={getElementById:()=>null};
@@ -703,7 +777,7 @@ class WebLiveDashboardContractTest {
                 eval(functions);
                 (async()=>{
                   const older=loadAssetPool(),newer=loadAssetPool();
-                  waiters[1](snapshot(2));await newer;waiters[0](snapshot(1));await older;
+                  waiters[1](snapshot(2));await newer;waiters[0](snapshot(99));await older;
                   assert.equal(renders.length,1);assert.equal(assetPoolItems.length,36);assert.equal(assetPoolProjectionVersion,2);
                   assert.equal(assetPoolProjections[0].analysisId,'analysis-2-ASSET0');
                   const partial=loadAssetPool(),thin=snapshot(3);thin.assetPool.pop();waiters[2](thin);await partial;

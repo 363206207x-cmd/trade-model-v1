@@ -21,6 +21,9 @@
     let assetPoolLoaded = false;
     let assetPoolProjections = [];
     let assetPoolProjectionVersion = 0;
+    let assetPoolRequestSequence = 0;
+    let poolRefreshTimer = null;
+    let poolRefreshBound = false;
     let pinMutationPending = false;
     let latestTasks = [];
     let poolScanRuntime = null;
@@ -623,16 +626,17 @@
             row.dataset.analysisId = text(live?.analysisId, "");
             row.dataset.snapshotId = text(live?.snapshotId, "");
             row.dataset.decisionId = text(live?.decisionId, "");
+            row.dataset.traceId = text(live?.traceId, "");
+            row.dataset.latestPriceAt = text(live?.latestPriceAt, "");
             row.dataset.directionCalculatedAt = text(live?.directionCalculatedAt, "");
             row.innerHTML = '<td><button class="table-link" type="button" data-pool-detail="' + escapeHtml(asset.symbol) + '"><strong>' + escapeHtml(asset.symbol) + '</strong><small>' + escapeHtml(text(asset.displayName || asset.name, "名称待同步")) + '</small></button></td>'
-                + '<td>' + escapeHtml(window.TrineDesktopSemantics.priceText(live?.latestPrice)) + '</td>'
+                + '<td>' + escapeHtml(window.TrineDesktopSemantics.priceText(live?.latestPrice))
+                    + window.TrineDesktopSemantics.priceCaption(live) + '</td>'
                 + '<td><strong class="' + directionSemanticClass(live?.marketBias) + '">' + escapeHtml(direction) + '</strong></td>'
                 + '<td class="pool-confidence">' + escapeHtml(confidence) + '</td>'
                 + '<td><div' + (window.TrineDesktopSemantics.hasConfirmedRisks(live || {})
                     ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(asset.symbol) + ' 风险详情"'
-                    : window.TrineDesktopSemantics.riskSummary(live || {}) ? ' tabindex="0" data-desktop-hover="risk-status" data-risk-symbol="'
-                        + escapeHtml(asset.symbol) + '" aria-haspopup="dialog" aria-expanded="false" aria-label="'
-                        + escapeHtml(asset.symbol) + ' 风险数据状态"' : '') + '>'
+                    : '') + '>'
                 + window.TrineDesktopSemantics.riskSummary(live || {}) + '</div></td>'
                 + '<td class="pool-timeframes">' + escapeHtml(window.TrineDesktopSemantics.poolTimeframes(live)) + '</td>'
                 + '<td>' + (live?.directionCalculatedAt ? escapeHtml(window.TrineDesktopSemantics.beijingTime(live.directionCalculatedAt)) : '—') + '</td>'
@@ -667,9 +671,10 @@
     }
 
     async function loadAssetPool() {
+        const requestSequence = ++assetPoolRequestSequence;
         try {
             const snapshot = await loadAssetPoolProjection();
-            if (snapshot.projectionVersion <= assetPoolProjectionVersion) return;
+            if (requestSequence !== assetPoolRequestSequence || snapshot.projectionVersion <= assetPoolProjectionVersion) return;
             const items = snapshot.poolMembers;
             const projections = snapshot.assetPool;
             assetPoolProjectionVersion = snapshot.projectionVersion;
@@ -693,12 +698,36 @@
             }
             updatePoolScanCta();
         } catch (_) {
+            if (requestSequence !== assetPoolRequestSequence) return;
             assetPoolLoaded = true;
             if (!assetPoolItems.length) empty(document.getElementById("assetPoolRows")?.parentElement,
                 "资产池当前不可查看", "未返回完整资产池快照。请稍后重试。");
             else announce("资产池更新失败，已保留上一份完整快照");
             updatePoolScanCta(true);
         }
+    }
+
+    function initializeAssetPoolRefresh() {
+        if (poolRefreshBound) return;
+        poolRefreshBound = true;
+        let refreshPending = false;
+        function refresh() {
+            if (refreshPending || document.visibilityState === "hidden") return;
+            refreshPending = true;
+            Promise.resolve(loadAssetPool()).finally(function () { refreshPending = false; });
+        }
+        function reconcileVisibility() {
+            if (document.visibilityState === "hidden") {
+                if (poolRefreshTimer !== null) window.clearInterval(poolRefreshTimer);
+                poolRefreshTimer = null;
+                return;
+            }
+            if (poolRefreshTimer !== null) return;
+            refresh();
+            poolRefreshTimer = window.setInterval(refresh, window.TrineDesktopSemantics.refreshPolicy.reconcileMs);
+        }
+        document.addEventListener("visibilitychange", reconcileVisibility);
+        reconcileVisibility();
     }
 
     function updatePoolScanCta(loadFailed) {
@@ -1117,7 +1146,8 @@
             } finally { scanButton.disabled = false; }
         });
         updatePoolScanCta();
-        Promise.all([loadAssetPool(), loadTasks()]).then(function () { updatePoolScanCta(); });
+        initializeAssetPoolRefresh();
+        loadTasks().then(function () { updatePoolScanCta(); });
         updateBatchActions();
     }
 
