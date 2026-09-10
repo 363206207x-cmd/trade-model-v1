@@ -13,6 +13,7 @@ import ml.dmlc.xgboost4j.java.DMatrix;
 import ml.dmlc.xgboost4j.java.Booster;
 import static org.mockito.Mockito.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardModelBundleTest {
     @TempDir Path directory;
     @Test void absentBundleDoesNotInventSamplesMetricsThresholdsOrConfidence() {

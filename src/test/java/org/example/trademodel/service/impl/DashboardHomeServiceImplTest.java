@@ -124,6 +124,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
+@org.junit.jupiter.api.Tag("core-regression")
 class DashboardHomeServiceImplTest {
     private static final Long USER_ID = 17L;
     private static final String ACTIVE_VALID_PERIOD =

@@ -17,6 +17,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardMapperIntegrationTest {
     private JdbcTemplate jdbc;
     private AssetCardMapper mapper;

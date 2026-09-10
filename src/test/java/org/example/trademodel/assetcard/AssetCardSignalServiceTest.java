@@ -20,6 +20,7 @@ import static org.example.trademodel.assetcard.AssetCardProperties.ModelMode.*;
 import static org.example.trademodel.assetcard.AssetCardSnapshot.Direction.*;
 
 /** Synthetic decision fixtures only: no native inference, training, provider, database or production readiness. */
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardSignalServiceTest {
     private static final Instant CLOSE = Instant.parse("2026-09-10T00:04:59.999Z");
     private static final AssetCardModelBundle.Thresholds THRESHOLDS = new AssetCardModelBundle.Thresholds(

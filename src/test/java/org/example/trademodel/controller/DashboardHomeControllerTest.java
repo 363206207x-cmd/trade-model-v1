@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
+@org.junit.jupiter.api.Tag("core-regression")
 class DashboardHomeControllerTest {
     @Mock
     private DashboardHomeService dashboardHomeService;

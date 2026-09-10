@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardEvidenceServiceTest {
     private static final Instant AT = Instant.parse("2026-09-10T12:00:00Z");
     @Test

@@ -64,6 +64,7 @@ V24 was the next unused migration after V23 on the merged baseline. The change a
 - Product Source Gate, task validation, exact machine-gate self-tests and workflow contract: PASS. Runtime handoff output on preserved WIP can still say `BLOCKED_WORKTREE_DIRTY`; this is reported, not bypassed or rewritten as a clean-tree PASS.
 - Offline Python tests using the already installed pinned environment: 15 PASS, 1 ERROR: XGBoost cannot load the missing system `libomp.dylib`. No system library was installed; the failing native test was not deleted/skipped to conceal this error.
 - Java/Python UBJSON interoperability is separately opt-in (`-DassetCard.testPython=...`) and has **not** passed locally. A compatible CPU/OpenMP environment must run it before claiming native interoperability readiness.
+- CI coverage correction: the repository's existing `ci` profile selects `smoke | core-regression`, not the full suite. The card calculation/market/risk/model, Mapper/V24 and Home projection/rendering tests now carry the existing `core-regression` tag. No workflow, global gate or existing assertion was removed or relaxed. The earlier 1,090-test CI run is not presented as card-test coverage; the updated exact-head run must include these tests.
 
 ### Exact local skip reasons (21)
 

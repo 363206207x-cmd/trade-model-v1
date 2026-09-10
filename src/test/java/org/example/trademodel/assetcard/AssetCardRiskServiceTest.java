@@ -7,6 +7,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Card-only synthetic facts. No Spring context, database, network, training or owner records. */
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardRiskServiceTest {
     private static final Instant AT = Instant.parse("2026-09-10T08:00:00Z");
     private final AssetCardRiskService service = new AssetCardRiskService();

@@ -15,6 +15,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardServiceTest {
     @Test
     void priceOnlyPublicationHasIndependentClockAndNoModelOrWholeHomeEvent() {

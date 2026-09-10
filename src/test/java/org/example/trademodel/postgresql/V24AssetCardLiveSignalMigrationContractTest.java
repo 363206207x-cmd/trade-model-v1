@@ -13,6 +13,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class V24AssetCardLiveSignalMigrationContractTest {
     @Test
     void addsOnlyThreeIsolatedCardTablesWithUtcAndNoOwnerMutation() throws Exception {

@@ -3,6 +3,7 @@ package org.example.trademodel.assetcard;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardBetaCalibrationTest {
     @Test void identityAndIndependentSidesUseThePublishedEquation() {
         var identity = new AssetCardBetaCalibration.Parameters(1, 1, 0, 1e-7);

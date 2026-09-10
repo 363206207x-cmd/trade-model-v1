@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardIsolationIntegrationTest {
     @Test
     void repeatedCardReadsNeverRegisterSubscribePublishOrWrite() {

@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardMarketDataServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-10T12:00:00Z");
     private final AssetCardProperties properties = new AssetCardProperties();

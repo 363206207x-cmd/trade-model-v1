@@ -6,6 +6,7 @@ import java.util.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import static org.assertj.core.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("core-regression")
 class AssetCardFeatureServiceTest {
     private final Instant at = Instant.parse("2026-01-01T12:00:00Z");
     @Test void missingHistoryIsUnknownNotZeroAndFutureAvailabilityIsRejected() {
