@@ -435,7 +435,8 @@ normalization_commit_matches() {
 }
 
 emit_resolved_task_state() {
-  if [[ "${branch:-}" == "${v42_gate_branch:-}" ]]; then
+  if [[ "${branch:-}" == "${v42_gate_branch:-}" \
+    || "${requested_package:-}" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
     printf 'MACHINE_AUTHORIZED_PACKAGE: %s\n' "${v42_implementation_package:-UNDECLARED}"
     printf 'MACHINE_AUTHORIZED_BRANCH: %s\n' "${v42_implementation_branch:-UNDECLARED}"
     printf 'MACHINE_AUTHORIZED_STARTING_FULL_SHA: %s\n' "${v42_starting_full_sha:-UNDECLARED}"
@@ -451,14 +452,24 @@ emit_resolved_task_state() {
   printf 'CURRENT_PACKAGE_MATCH: %s\n' "${current_package_match:-NO}"
   printf 'CURRENT_BRANCH_MATCH: %s\n' "${current_branch_match:-NO}"
   printf 'CURRENT_STARTING_SHA_MATCH: %s\n' "${current_starting_sha_match:-NO}"
-  printf 'CURRENT_PACKAGE: %s\n' "${current_package_phase:-UNDECLARED}"
+  if [[ "${requested_package:-}" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+    printf 'CURRENT_PACKAGE: %s\n' "${v42_authorization_package:-UNDECLARED}"
+  else
+    printf 'CURRENT_PACKAGE: %s\n' "${current_package_phase:-UNDECLARED}"
+  fi
   printf 'REQUESTED_PACKAGE: %s\n' "${requested_package:-AUTO}"
   printf 'CURRENT_PACKAGE_ACTION_ALLOWED: %s\n' "${current_package_action_allowed:-NO}"
   printf 'CURRENT_PACKAGE_BLOCK_REASON: %s\n' "${current_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'CURRENT_EFFECTIVE_STATUS: %s\n' "${completion_effective_state:-UNKNOWN}"
-  printf 'AUTHORIZED_NEXT_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
-  printf 'AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
-  printf 'AUTHORIZED_NEXT_TASK_MODE: %s\n' "${authorized_next_package_mode:-UNDECLARED}"
+  if [[ "${requested_package:-}" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+    printf 'AUTHORIZED_NEXT_PACKAGE: %s\n' "${v42_implementation_package:-UNDECLARED}"
+    printf 'AUTHORIZED_PACKAGE: %s\n' "${v42_implementation_package:-UNDECLARED}"
+    printf 'AUTHORIZED_NEXT_TASK_MODE: IMPLEMENTATION\n'
+  else
+    printf 'AUTHORIZED_NEXT_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
+    printf 'AUTHORIZED_PACKAGE: %s\n' "${authorized_next_package_phase:-UNDECLARED}"
+    printf 'AUTHORIZED_NEXT_TASK_MODE: %s\n' "${authorized_next_package_mode:-UNDECLARED}"
+  fi
   printf 'NEXT_PACKAGE_ALLOWED: %s\n' "${next_package_allowed:-NO}"
   printf 'NEXT_PACKAGE_BLOCK_REASON: %s\n' "${next_package_block_reason:-BLOCKED_UNKNOWN_STATE}"
   printf 'OPEN_PR_EVIDENCE_SOURCE: %s\n' "${open_pr_evidence_source:-UNAVAILABLE}"
@@ -557,7 +568,9 @@ emit_resolved_task_state() {
 classify_package_request() {
   request_class="UNKNOWN"
   if [[ -n "${requested_package:-}" ]]; then
-    if [[ "$requested_package" == "${current_package_phase:-UNDECLARED}" ]]; then
+    if [[ "$requested_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+      request_class="AUTHORIZED_IMPLEMENTATION_PACKAGE"
+    elif [[ "$requested_package" == "${current_package_phase:-UNDECLARED}" ]]; then
       request_class="CURRENT_PACKAGE_CONTINUATION"
     elif [[ "$requested_package" == "${authorized_next_package_phase:-UNDECLARED}" ]]; then
       request_class="AUTHORIZED_IMPLEMENTATION_PACKAGE"
@@ -600,6 +613,53 @@ resolve_task_handoff() {
   resolved_next_action="No task is authorized until runtime state resolution succeeds"
 
   classify_package_request
+
+  # V42 is an independently registered implementation, not an alias for the
+  # predecessor declaration. Resolve only after its real runtime identity gate.
+  if [[ "${requested_package:-}" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+    if [[ "$open_pr_evidence_input_valid" != "YES" ]]; then
+      resolution_block_reason="BLOCKED_INVALID_OPEN_PR_EVIDENCE"
+    elif [[ "${product_source_gate_status:-BLOCKED}" != "PASS" ]]; then
+      resolution_block_reason="BLOCKED_PRODUCT_SOURCE_GATE"
+    elif [[ "${worktree_clean:-No}" != "Yes" ]]; then
+      resolution_block_reason="BLOCKED_WORKTREE_DIRTY"
+    elif [[ "${machine_identity_allowed:-NO}" != "YES" ]]; then
+      resolution_block_reason="${machine_identity_block_reason:-BLOCKED_EXACT_MACHINE_IDENTITY}"
+    elif [[ "${machine_gate_effective_on_origin_main:-NO}" != "YES" \
+      || "${v42_authorization_runtime_status:-BLOCKED}" != "AUTHORIZED" \
+      || "${next_transition_allowed:-NO}" != "YES" ]]; then
+      resolution_block_reason="${next_task_authorization_status:-BLOCKED_TRANSITION_NOT_AUTHORIZED}"
+    elif [[ "${current_package_pr_count:-UNKNOWN}" != "0" ]]; then
+      resolution_block_reason="BLOCKED_CURRENT_PACKAGE_PR_PRESENT_OR_UNKNOWN"
+    elif [[ "${active_conflicting_pr_count:-UNKNOWN}" != "0" ]]; then
+      resolution_block_reason="BLOCKED_ACTIVE_CONFLICTING_PR_OR_UNKNOWN"
+    elif [[ "${authorized_successor_pr_count:-UNKNOWN}" != "0" \
+      && "${authorized_successor_pr_count:-UNKNOWN}" != "1" ]]; then
+      resolution_block_reason="BLOCKED_V42_SOURCE_PR_STATE"
+    elif [[ "$v42_implementation_allowed_paths" != "$authorized_next_package_allowed_paths" ]]; then
+      # Existing downstream consumers resolve this scope profile from that exact
+      # list. Do not emit a profile that could expand or substitute V42 paths.
+      resolution_block_reason="BLOCKED_V42_SCOPE_PROFILE_PATH_MISMATCH"
+    else
+      resolution_status="ALLOWED"
+      resolution_block_reason="NONE"
+      resolved_package="$v42_implementation_package"
+      resolved_mode="IMPLEMENTATION"
+      resolved_branch="$v42_implementation_branch"
+      resolved_active_block="$v42_implementation_package"
+      resolved_scope_profile="AUTHORIZED_NEXT_PACKAGE"
+      resolved_handoff_stage="AUTHORIZED_IMPLEMENTATION_REVIEW"
+      resolved_edit_permission="$v42_implementation_repository_edits_allowed"
+      resolved_implementation_permission="$v42_implementation_allowed"
+      resolved_pr_creation_permission="$v42_implementation_pr_allowed"
+      resolved_next_action="Continue the registered V42 home asset-card implementation; keep the business PR Draft and do not merge or deploy"
+      current_package_action_allowed="YES"
+      next_package_allowed="YES"
+    fi
+    current_package_block_reason="$resolution_block_reason"
+    next_package_block_reason="$resolution_block_reason"
+    return 0
+  fi
 
   if [[ "$open_pr_evidence_input_valid" != "YES" ]]; then
     current_package_block_reason="BLOCKED_INVALID_OPEN_PR_EVIDENCE"
@@ -2398,6 +2458,22 @@ machine_gate_policy_check() {
   fi
 }
 
+# V42 uses the existing exact-list policy but must also inspect implementation
+# paths. Preserve Git errors and blank records instead of filtering them away.
+v42_checked_changed_paths() {
+  local output changed_path
+  output="$(git "$@" && printf '\001')" || return 1
+  output="${output%$'\001'}"
+  [[ -n "$output" ]] || return 0
+  while IFS= read -r changed_path || [[ -n "$changed_path" ]]; do
+    [[ -n "$changed_path" && "$changed_path" != *[[:space:]]* \
+      && "$changed_path" != *'*'* && "$changed_path" != *'?'* \
+      && "$changed_path" != *'['* && "$changed_path" != *']'* ]] || return 1
+    path_is_in_list "$changed_path" "$v42_implementation_allowed_paths" || return 1
+    printf '%s\n' "$changed_path"
+  done < <(printf '%s' "$output")
+}
+
 evaluate_machine_runtime_identity() {
   local actual_package expected_package expected_branch expected_starting_sha expected_mode
   local expected_repository_edits expected_implementation expected_pr expected_push expected_merge expected_deployment
@@ -2454,7 +2530,7 @@ evaluate_machine_runtime_identity() {
     return 0
   fi
 
-  if [[ "${requested_package:-}" == "${v42_implementation_package:-}" ]]; then
+  if [[ "${requested_package:-}" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
     actual_package="$requested_package"
     expected_package="$v42_implementation_package"
     expected_branch="$v42_implementation_branch"
@@ -2473,6 +2549,10 @@ evaluate_machine_runtime_identity() {
     machine_identity_allowed="NO"
     machine_identity_block_reason="BLOCKED_EXACT_MACHINE_IDENTITY"
     machine_gate_effective_on_origin_main="NO"
+    if ! v42_contract_matches; then
+      machine_identity_block_reason="BLOCKED_V42_ASSET_CARD_DIRECTIONAL_RISK_RUNTIME_CONTRACT"
+      return 0
+    fi
     [[ "$actual_package" == "$expected_package" ]] && current_package_match="YES"
     [[ "${branch:-}" == "$expected_branch" ]] && current_branch_match="YES"
     if is_full_git_sha "$expected_starting_sha" \
@@ -2482,17 +2562,38 @@ evaluate_machine_runtime_identity() {
       current_starting_sha_match="YES"
     fi
     if git show origin/main:docs/CODEX_NEXT_TASK.yml 2>/dev/null \
-      | grep -Fxq "v42_authorization_package: \"$v42_authorization_package\"" \
+      | grep -Fx "v42_authorization_package: \"$v42_authorization_package\"" >/dev/null \
       && git merge-base --is-ancestor origin/main HEAD >/dev/null 2>&1; then
       machine_gate_effective_on_origin_main="YES"
     fi
+    # The audited implementation is a separate identity from the registration
+    # baseline. All three (baseline, merged main, source) must remain ancestors.
+    if ! git cat-file -e "$v42_source_head_full_sha^{commit}" >/dev/null 2>&1; then
+      machine_identity_block_reason="BLOCKED_V42_SOURCE_HEAD_MISSING_OR_UNVERIFIABLE"
+      return 0
+    fi
+    if ! git merge-base --is-ancestor "$v42_source_head_full_sha" HEAD >/dev/null 2>&1; then
+      machine_identity_block_reason="BLOCKED_V42_SOURCE_HEAD_NOT_ANCESTOR_OR_UNVERIFIABLE"
+      return 0
+    fi
     if ordinary_package_preserves_gate_owners; then
       gate_owners_unchanged="YES"
+    else
+      machine_identity_block_reason="BLOCKED_V42_GATE_OWNER_CHANGED_OR_UNVERIFIABLE"
+      return 0
     fi
     if [[ "$machine_gate_effective_on_origin_main" == "YES" \
       && "$gate_owners_unchanged" == "YES" ]] \
       && git merge-base --is-ancestor "$expected_starting_sha" HEAD >/dev/null 2>&1; then
-      changed_files="$(changed_paths_from_origin_main)"
+      if ! changed_files="$(
+        v42_checked_changed_paths diff --name-only --no-renames origin/main...HEAD \
+          && v42_checked_changed_paths diff --name-only --no-renames \
+          && v42_checked_changed_paths diff --cached --name-only --no-renames \
+          && v42_checked_changed_paths ls-files --others --exclude-standard
+      )"; then
+        machine_identity_block_reason="BLOCKED_V42_CHANGED_PATH_OUTSIDE_ALLOWLIST_OR_UNVERIFIABLE"
+        return 0
+      fi
       normalized_base_valid="YES"
     fi
     if machine_gate_policy_check \
@@ -3103,6 +3204,191 @@ ASSET_CARD_REJECTED_DECLARATIONS
   return 1
 }
 
+# Exercise the public script rather than assigning successful resolver internals.
+# Git/GH functions exist only inside these explicit test subprocesses: no fixture
+# can enable a production request, write a repository, or contact GitHub.
+run_v42_outer_resolution_self_test() {
+  local output positive_output legacy_output name package expected expected_reason failures=0 cases=0
+  local v42_package="V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE"
+  v42_outer_fixture() (
+    export V42_OUTER_CASE="$1"
+    unset V1_REQUESTED_PACKAGE V1_OPEN_PR_NONE_CONFIRMED
+    git() {
+      local source_sha="2921a4a98254a4bd88f3138ed4eb2e0487b3956b"
+      local path="src/main/java/org/example/trademodel/assetcard/AssetCardService.java"
+      case "$*" in
+        'branch --show-current')
+          if [[ "$V42_OUTER_CASE" == WRONG_BRANCH ]]; then printf 'codex/not-authorized\n';
+          else printf 'codex/v4-1-asset-card-live-signal-closure\n'; fi; return 0 ;;
+        'status --short')
+          [[ "$V42_OUTER_CASE" != DIRTY ]] || printf ' M %s\n' "$path"
+          return 0 ;;
+        'rev-parse HEAD') printf '%s\n' "$source_sha"; return 0 ;;
+        'rev-list --left-right --count main...origin/main') printf '0\t0\n'; return 0 ;;
+        'merge-base --is-ancestor HEAD origin/main') return 1 ;;
+        'merge-base --is-ancestor origin/main HEAD')
+          [[ "$V42_OUTER_CASE" != MAIN_NOT_ANCESTOR ]]; return $? ;;
+        "cat-file -e $source_sha^{commit}")
+          [[ "$V42_OUTER_CASE" != SOURCE_MISSING ]]; return $? ;;
+        'cat-file -e 1111111111111111111111111111111111111111^{commit}') return 0 ;;
+        "merge-base --is-ancestor $source_sha 1111111111111111111111111111111111111111") return 1 ;;
+        "merge-base --is-ancestor $source_sha HEAD")
+          case "$V42_OUTER_CASE" in SOURCE_NOT_ANCESTOR) return 1 ;; SOURCE_ERROR) return 128 ;; esac
+          return 0 ;;
+        "merge-base --is-ancestor $source_sha $source_sha") return 0 ;;
+        'merge-base --is-ancestor '*HEAD) return 0 ;;
+        'show origin/main:docs/CODEX_NEXT_TASK.yml')
+          if [[ "$V42_OUTER_CASE" == UNMERGED ]]; then
+            sed '/^v42_/d' docs/CODEX_NEXT_TASK.yml
+          else
+            command git show origin/main:docs/CODEX_NEXT_TASK.yml
+          fi
+          return 0 ;;
+        'diff --quiet origin/main -- '*)
+          [[ "$V42_OUTER_CASE" != GATE_OWNER ]]; return $? ;;
+        'diff --name-only origin/main...HEAD'|'diff --name-only --no-renames origin/main...HEAD')
+          case "$V42_OUTER_CASE" in
+            OUTSIDE) path='src/main/java/NotAuthorized.java' ;;
+            GATE_OWNER) path='scripts/v1-state.sh' ;;
+            WHITESPACE) path='  ' ;;
+            WILDCARD) path='src/main/java/*' ;;
+            EMPTY_ENTRY) printf '%s\n\n%s\n' "$path" "$path"; return 0 ;;
+            DIFF_ERROR) return 128 ;;
+          esac
+          printf '%s\n' "$path"; return 0 ;;
+        'diff --name-only'|'diff --name-only --no-renames')
+          [[ "$V42_OUTER_CASE" != UNSTAGED_ERROR ]] || return 128
+          [[ "$V42_OUTER_CASE" != UNSTAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          return 0 ;;
+        'diff --cached --name-only'|'diff --cached --name-only --no-renames')
+          [[ "$V42_OUTER_CASE" != STAGED_ERROR ]] || return 128
+          [[ "$V42_OUTER_CASE" != STAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          return 0 ;;
+        'ls-files --others --exclude-standard')
+          [[ "$V42_OUTER_CASE" != UNTRACKED_ERROR ]] || return 128
+          [[ "$V42_OUTER_CASE" != UNTRACKED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          return 0 ;;
+      esac
+      # Even an accidental future command in the public entry point cannot use
+      # this fixture to mutate Git state; only these read-only queries delegate.
+      case "${1:-}" in
+        rev-parse|rev-list|log|show|diff|merge-base|cat-file|ls-files) command git "$@" ;;
+        hash-object) [[ "$*" == 'hash-object --stdin' ]] && command git "$@" ;;
+        *) return 127 ;;
+      esac
+    }
+    gh() {
+      case "$1 $2" in
+        'auth status') return 0 ;;
+        'pr list')
+          [[ "$V42_OUTER_CASE" != PR_UNKNOWN ]] || return 1
+          if [[ "$V42_OUTER_CASE" == SAME_BRANCH_OTHER_PR ]]; then
+            printf '9999\tcodex/v4-1-asset-card-live-signal-closure\t2921a4a98254a4bd88f3138ed4eb2e0487b3956b\tIsolated wrong PR fixture\ttrue\n'
+          elif [[ "$V42_OUTER_CASE" == SOURCE_PR_UNRELATED ]]; then
+            printf '1295\tcodex/v4-1-asset-card-live-signal-closure\t1111111111111111111111111111111111111111\tIsolated unrelated source fixture\ttrue\n'
+          else
+            printf '1295\tcodex/v4-1-asset-card-live-signal-closure\t2921a4a98254a4bd88f3138ed4eb2e0487b3956b\tIsolated continuation fixture\ttrue\n'
+          fi
+          if [[ "$V42_OUTER_CASE" == OTHER_PR ]]; then
+            printf '9999\tcodex/other-package\t2921a4a98254a4bd88f3138ed4eb2e0487b3956b\tIsolated conflicting fixture\ttrue\n'
+          fi
+          return 0 ;;
+      esac
+      return 127
+    }
+    export -f git gh
+    bash "$ROOT_DIR/scripts/v1-state.sh" --request-package "$2"
+  )
+  v42_outer_has_line() {
+    # Consume the complete input under pipefail (no grep -q/SIGPIPE).
+    printf '%s\n' "$1" | grep -Fx "$2" >/dev/null
+  }
+  while IFS='|' read -r name package expected; do
+    cases=$((cases + 1))
+    if ! output="$(v42_outer_fixture "$name" "$package" 2>&1)"; then
+      printf 'V42_OUTER_%s: FAIL (script did not complete)\n' "$name"
+      failures=$((failures + 1))
+      continue
+    fi
+    expected_reason=""
+    case "$name" in
+      SOURCE_MISSING) expected_reason="BLOCKED_V42_SOURCE_HEAD_MISSING_OR_UNVERIFIABLE" ;;
+      SOURCE_NOT_ANCESTOR|SOURCE_ERROR) expected_reason="BLOCKED_V42_SOURCE_HEAD_NOT_ANCESTOR_OR_UNVERIFIABLE" ;;
+      OUTSIDE|UNSTAGED_OUTSIDE|STAGED_OUTSIDE|UNTRACKED_OUTSIDE|WHITESPACE|WILDCARD|EMPTY_ENTRY|DIFF_ERROR|UNSTAGED_ERROR|STAGED_ERROR|UNTRACKED_ERROR)
+        expected_reason="BLOCKED_V42_CHANGED_PATH_OUTSIDE_ALLOWLIST_OR_UNVERIFIABLE" ;;
+      GATE_OWNER) expected_reason="BLOCKED_V42_GATE_OWNER_CHANGED_OR_UNVERIFIABLE" ;;
+    esac
+    if [[ "$expected" == ALLOWED ]]; then
+      if v42_outer_has_line "$output" "RESOLVED_PACKAGE: $package" \
+        && v42_outer_has_line "$output" 'REQUEST_CLASS: AUTHORIZED_IMPLEMENTATION_PACKAGE' \
+        && v42_outer_has_line "$output" 'IMPLEMENTATION_ALLOWED: true' \
+        && v42_outer_has_line "$output" 'RESOLUTION_BLOCK_REASON: NONE' \
+        && v42_outer_has_line "$output" 'RESOLVED_SCOPE_PROFILE: AUTHORIZED_NEXT_PACKAGE' \
+        && v42_outer_has_line "$output" 'ACTIVE_CONFLICTING_PRS: 0' \
+        && v42_outer_has_line "$output" 'AUTHORIZED_SUCCESSOR_PRS: 1'; then
+        printf 'V42_OUTER_%s: PASS\n' "$name"
+      else
+        printf 'V42_OUTER_%s: FAIL\n' "$name"
+        printf '%s\n' "$output" | grep -E '^(REQUEST_CLASS|IMPLEMENTATION_ALLOWED|RESOLVED_PACKAGE|RESOLUTION_BLOCK_REASON|ACTIVE_CONFLICTING_PRS|AUTHORIZED_SUCCESSOR_PRS):'
+        failures=$((failures + 1))
+      fi
+    elif v42_outer_has_line "$output" 'IMPLEMENTATION_ALLOWED: false' \
+      && v42_outer_has_line "$output" 'RESOLUTION_STATUS: BLOCKED' \
+      && ! v42_outer_has_line "$output" 'RESOLUTION_BLOCK_REASON: NONE' \
+      && { [[ -z "$expected_reason" ]] || v42_outer_has_line "$output" "RESOLUTION_BLOCK_REASON: $expected_reason"; } \
+      && { [[ "$name" != UNKNOWN_PACKAGE ]] || v42_outer_has_line "$output" 'REQUEST_CLASS: UNKNOWN'; }; then
+      printf 'V42_OUTER_%s: PASS\n' "$name"
+    else
+      printf 'V42_OUTER_%s: FAIL (unsafe public permission)\n' "$name"
+      failures=$((failures + 1))
+    fi
+    [[ "$name" != MERGED_EXACT ]] || positive_output="$output"
+    [[ "$name" != V41_PRESERVED ]] || legacy_output="$output"
+  done <<'V42_OUTER_CASES'
+MERGED_EXACT|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+SOURCE_MISSING|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+SOURCE_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+SOURCE_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNMERGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+MAIN_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+WRONG_BRANCH|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+OUTSIDE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNSTAGED_OUTSIDE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+STAGED_OUTSIDE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNTRACKED_OUTSIDE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+GATE_OWNER|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+WHITESPACE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+WILDCARD|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+EMPTY_ENTRY|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+DIFF_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNSTAGED_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+STAGED_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNTRACKED_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+DIRTY|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+OTHER_PR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+SAME_BRANCH_OTHER_PR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+SOURCE_PR_UNRELATED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+PR_UNKNOWN|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+UNKNOWN_PACKAGE|V42_NOT_AUTHORIZED|BLOCKED
+V41_PRESERVED|V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE|ALLOWED
+V42_OUTER_CASES
+  cases=$((cases + 1))
+  if v42_outer_has_line "${positive_output:-}" 'CURRENT_PACKAGE: TRINE_LOGIC_V4_2_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE_AUTHORIZATION' \
+    && v42_outer_has_line "${positive_output:-}" "AUTHORIZED_PACKAGE: $v42_package" \
+    && v42_outer_has_line "${positive_output:-}" 'V42_ASSET_CARD_AUTHORIZATION_STATUS: AUTHORIZED' \
+    && v42_outer_has_line "${positive_output:-}" 'V42_ASSET_CARD_MERGE_EXECUTION_ALLOWED: false' \
+    && v42_outer_has_line "${positive_output:-}" 'V42_ASSET_CARD_DEPLOYMENT_ALLOWED: false' \
+    && [[ "$(printf '%s\n' "${positive_output:-}" | grep -E '^(V4_1_.*IMPLEMENTATION_STATUS|ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS|P1B_1_STATUS):')" \
+      == "$(printf '%s\n' "${legacy_output:-}" | grep -E '^(V4_1_.*IMPLEMENTATION_STATUS|ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS|P1B_1_STATUS):')" ]]; then
+    printf 'V42_OUTER_IDENTITY_AND_HISTORY_PRESERVED: PASS\n'
+  else
+    printf 'V42_OUTER_IDENTITY_AND_HISTORY_PRESERVED: FAIL\n'
+    failures=$((failures + 1))
+  fi
+  printf 'V42_OUTER_RESOLUTION_TESTS: %s cases, %s failures\n' "$cases" "$failures"
+  [[ "$failures" == 0 ]]
+}
+
 run_policy_self_test="NO"
 run_exact_gate_self_test="NO"
 check_asset_card_live_signal_contract="NO"
@@ -3283,6 +3569,7 @@ load_task_package_contract() {
 
 if [[ "$run_exact_gate_self_test" == "YES" ]]; then
   run_exact_machine_gate_self_test
+  run_v42_outer_resolution_self_test
   exit $?
 fi
 if [[ "$check_asset_card_live_signal_contract" == "YES" ]]; then
@@ -4326,7 +4613,23 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       ((open_pr_count+=1))
       pr_line="#$pr_number $pr_head head=$pr_oid $pr_title draft=$pr_draft"
       open_pr_lines+=("$pr_line")
-      if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
+      if [[ "$requested_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+        # Continue only the registered source PR. A similarly named branch or
+        # another PR must not be interpreted as the audited implementation.
+        if [[ "$pr_number" == "$v42_source_pr" && "$pr_head" == "$v42_implementation_branch" ]] \
+          && is_full_git_sha "$pr_oid" \
+          && git cat-file -e "$pr_oid^{commit}" >/dev/null 2>&1 \
+          && git merge-base --is-ancestor "$v42_source_head_full_sha" "$pr_oid" >/dev/null 2>&1; then
+          authorized_successor_pr_lines+=("$pr_line status=AUTHORIZED_SUCCESSOR_PR")
+          ((authorized_successor_pr_count+=1))
+        else
+          unrelated_open_pr_lines+=("$pr_line")
+          active_conflicting_open_pr_lines+=("$pr_line status=ACTIVE_CONFLICTING_PR")
+          ((active_conflicting_pr_count+=1))
+          block_next_business_phase_only="YES"
+          blockers+=("ACTIVE_CONFLICTING_PR_${pr_number}_BLOCKS_NEXT_BUSINESS_PHASE")
+        fi
+      elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
         && "$requested_package" == "V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE" \
         && "$pr_head" == "$authorized_next_package_branch" ]] \
         && asset_card_live_signal_contract_matches \
@@ -4454,6 +4757,8 @@ resolve_task_handoff
 
 if [[ "$resolution_status" != "ALLOWED" ]]; then
   can_continue="NO"
+elif [[ "$requested_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
+  can_continue="$next_package_allowed"
 elif [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" ]]; then
   can_continue="$current_package_action_allowed"
 elif [[ "$resolved_mode" == "READ_ONLY_PRODUCT_AUDIT" ]]; then
