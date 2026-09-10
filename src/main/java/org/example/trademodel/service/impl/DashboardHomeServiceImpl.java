@@ -168,6 +168,12 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
     private PlanRevalidationService planRevalidationService;
     private DashboardLiveEventService dashboardLiveEventService;
     private Clock planValidityClock = Clock.systemUTC();
+    private org.example.trademodel.assetcard.AssetCardService assetCardService;
+
+    @Autowired(required = false)
+    void setAssetCardService(org.example.trademodel.assetcard.AssetCardService service) {
+        this.assetCardService = service;
+    }
 
     public DashboardHomeServiceImpl(DecisionService decisionService,
                                     MonitorService monitorService,
@@ -513,6 +519,9 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             asset.setSnapshotId(snapshotId);
             applyCachedCardPrice(asset, generatedAt);
         });
+        // Read only after canonical membership/ranking has completed. Card signals cannot influence it.
+        if (assetCardService != null) home.getAssets().forEach(asset ->
+                asset.setCardSignal(assetCardService.snapshot(asset.getRawSymbol(), asset.getName())));
         home.setSnapshotComplete(true);
     }
 

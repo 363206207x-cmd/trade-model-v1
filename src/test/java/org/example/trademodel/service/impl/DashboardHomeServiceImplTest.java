@@ -3,6 +3,12 @@ package org.example.trademodel.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.example.trademodel.assetcard.AssetCardMarketDataService;
+import org.example.trademodel.assetcard.AssetCardProperties;
+import org.example.trademodel.assetcard.AssetCardService;
+import org.example.trademodel.assetcard.AssetCardSnapshot;
+import org.example.trademodel.dto.assetpool.AssetPoolAssetDTO;
+import org.example.trademodel.mapper.AssetCardMapper;
 import org.example.trademodel.ai.AiProviderCallStatus;
 import org.example.trademodel.ai.AiProviderName;
 import org.example.trademodel.ai.AiProviderReviewResult;
@@ -111,6 +117,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -381,6 +388,142 @@ class DashboardHomeServiceImplTest {
         assertThat(home.getHomeAssetShortfallReason()).isEqualTo("暂无更多合格资产");
         verify(assetPoolService, never()).listFocusSymbols(any(), anyInt());
         verify(decisionService, never()).getLatestDecisionResultBySymbolForUser(any(), anyString());
+    }
+
+    @Test
+    void nestedCardProjectionUsesRawSymbolsWithoutMutatingCanonicalHomeOrThirtySixMemberPool() throws Exception {
+        AssetPoolService pool = mock(AssetPoolService.class);
+        AssetCardMapper cardsMapper = mock(AssetCardMapper.class);
+        AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
+        var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+        ObjectMapper cardJson = new ObjectMapper().findAndRegisterModules();
+        AssetCardService cards = new AssetCardService(new AssetCardProperties(), market, cardsMapper, pool, events, cardJson);
+        try {
+            service.setAssetPoolService(pool);
+            service.setAssetCardService(cards);
+            List<AssetPoolAssetDTO> members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
+                    new AssetPoolAssetDTO((long) index,
+                            index == 1 ? "BTCUSDT" : index == 2 ? "LINKUSDT" : "ASSET" + index + "USDT",
+                            "Asset " + index, "SPOT", "USDT", true, index, "USER")).toList();
+            when(pool.listForUser(USER_ID)).thenReturn(members);
+            when(decisionResultMapper.findLatestDecisionResultsForSymbolsJoined(anyList(), eq("USER"), eq(USER_ID)))
+                    .thenReturn(List.of());
+            var link = canonicalCardAsset("LINKUSDT", "LINK/USDT", 72, "BULLISH", "LOW", 94);
+            var btc = canonicalCardAsset("BTCUSDT", "BTC/USDT", 64, "WEAK_BULLISH", "MEDIUM", 88);
+            List<List<Object>> canonicalBefore = List.of(canonicalCardFacts(link), canonicalCardFacts(btc));
+            AssetCardSnapshot linkCard = isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .99);
+            AssetCardSnapshot btcCard = isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.WEAK_LONG, .25, .20);
+            when(cardsMapper.selectSnapshotJson("LINKUSDT")).thenReturn(cardJson.writeValueAsString(linkCard));
+            when(cardsMapper.selectSnapshotJson("BTCUSDT")).thenReturn(cardJson.writeValueAsString(btcCard));
+            DashboardHomeVO home = new DashboardHomeVO();
+            home.setAssets(List.of(link, btc));
+            home.setSelectedSymbol("BTCUSDT");
+            home.setSelectedAssetContext(btc);
+
+            ReflectionTestUtils.invokeMethod(service, "attachCompleteRuntimeProjection", home, USER_ID, null);
+
+            assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                    .containsExactly("LINKUSDT", "BTCUSDT");
+            assertThat(home.getAssets().stream().map(this::canonicalCardFacts).toList()).isEqualTo(canonicalBefore);
+            assertThat(link.getCardSignal().signal().direction()).isEqualTo(AssetCardSnapshot.Direction.STRONG_SHORT);
+            assertThat(link.getCardSignal().signal().calibratedConfidence()).isEqualTo(99);
+            assertThat(btc.getCardSignal().signal().calibratedConfidence()).isEqualTo(25);
+            assertThat(link.getCardSignal().spotPrice()).isEqualByComparingTo("999");
+            assertThat(link.getLatestPrice()).isEqualByComparingTo("100");
+            assertThat(home.getAssetPool()).hasSize(36).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                    .containsExactlyElementsOf(members.stream().map(AssetPoolAssetDTO::symbol).toList());
+            assertThat(home.getPoolMembers()).containsExactlyElementsOf(members);
+            assertThat(home.getAssetPool().get(0)).isSameAs(btc).isSameAs(home.getSelectedAssetContext());
+            assertThat(home.getAssetPool().get(1)).isSameAs(link);
+            assertThat(home.getAssetPool().subList(2, 36)).allSatisfy(asset -> assertThat(asset.getCardSignal()).isNull());
+            assertThat(home.isSnapshotComplete()).isTrue();
+            verify(cardsMapper).selectSnapshotJson("LINKUSDT");
+            verify(cardsMapper).selectSnapshotJson("BTCUSDT");
+            verifyNoMoreInteractions(cardsMapper);
+            verify(pool).listForUser(USER_ID);
+            verifyNoMoreInteractions(pool);
+            verifyNoInteractions(market, events, userPositionService, monitorService, positionSyncService,
+                    positionMonitorLogService, opportunityLogService);
+        } finally {
+            cards.close();
+        }
+    }
+
+    @Test
+    void cardConfidenceAndDirectionCannotInfluenceActualHomeRankingOrCanonicalProjection() {
+        AssetPoolService pool = mock(AssetPoolService.class);
+        OpportunityPriorityRankingService ranking = mock(OpportunityPriorityRankingService.class);
+        AssetCardService cards = mock(AssetCardService.class);
+        service.setAssetPoolService(pool);
+        service.setOpportunityPriorityRankingService(ranking);
+        DecisionResultVO link = decision("LINKUSDT", "BULLISH", "HIGH", "LOW", 91, 8,
+                "LEVEL_1_CONSISTENT", true, "{\"state\":\"CANDIDATE\"}");
+        link.setPlanMode("CONFIRM");
+        DecisionResultVO btc = decision("BTCUSDT", "WEAK_BULLISH", "MEDIUM", "MEDIUM", 84, 21,
+                "LEVEL_2_MINOR_DISAGREEMENT", true, "{\"state\":\"WAITING_TRIGGER\"}");
+        btc.setPlanMode("PREPARE");
+        when(ranking.rankForHome(USER_ID, 6)).thenReturn(List.of(
+                projection(101L, link, 94, "opportunity-link", "CANDIDATE"),
+                projection(102L, btc, 88, "opportunity-btc", "WAITING_TRIGGER")));
+        DashboardHomeVO withoutCards = service.getHomeForUser(USER_ID, null, 6, null);
+        var canonicalBefore = withoutCards.getAssets().stream().map(this::canonicalCardFacts).toList();
+        assertThat(withoutCards.getAssets()).allSatisfy(asset -> assertThat(asset.getCardSignal()).isNull());
+
+        when(cards.snapshot(eq("LINKUSDT"), anyString())).thenReturn(
+                isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .25));
+        when(cards.snapshot(eq("BTCUSDT"), anyString())).thenReturn(
+                isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.STRONG_LONG, .99, .01));
+        service.setAssetCardService(cards);
+        DashboardHomeVO withCards = service.getHomeForUser(USER_ID, null, 6, null);
+
+        assertThat(withCards.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
+                .containsExactly("LINKUSDT", "BTCUSDT");
+        assertThat(withCards.getAssets().stream().map(this::canonicalCardFacts).toList()).isEqualTo(canonicalBefore);
+        assertThat(withCards.getAssetPool().stream().map(this::canonicalCardFacts).toList()).isEqualTo(canonicalBefore);
+        assertThat(withCards.getAssets()).extracting(asset -> asset.getCardSignal().signal().calibratedConfidence())
+                .containsExactly(25, 99);
+        assertThat(withCards.getAssets()).extracting(DashboardHomeVO.AssetVO::getOpportunityScore).containsExactly(94, 88);
+        verify(ranking, times(2)).rankForHome(USER_ID, 6);
+        verifyNoMoreInteractions(ranking);
+        verify(cards).snapshot(eq("LINKUSDT"), anyString());
+        verify(cards).snapshot(eq("BTCUSDT"), anyString());
+        verifyNoMoreInteractions(cards);
+    }
+
+    private DashboardHomeVO.AssetVO canonicalCardAsset(String raw, String display, int confidence,
+                                                       String bias, String risk, int opportunityScore) {
+        var asset = new DashboardHomeVO.AssetVO();
+        asset.setRawSymbol(raw);
+        asset.setSymbol(display);
+        asset.setName(raw);
+        asset.setFinalConfidence(confidence);
+        asset.setMarketBias(bias);
+        asset.setRiskLevel(risk);
+        asset.setOpportunityScore(opportunityScore);
+        asset.setRankingReason("CANONICAL_RANK_" + opportunityScore);
+        asset.setAnalysisId("canonical-analysis-" + raw);
+        asset.setDecisionId("canonical-decision-" + raw);
+        asset.setTraceId("canonical-trace-" + raw);
+        asset.setLatestPrice(new BigDecimal("100"));
+        asset.setPriceAtDecision(new BigDecimal("98"));
+        return asset;
+    }
+
+    private List<Object> canonicalCardFacts(DashboardHomeVO.AssetVO asset) {
+        return Arrays.asList(asset.getRawSymbol(), asset.getSymbol(), asset.getFinalConfidence(), asset.getMarketBias(),
+                asset.getRiskLevel(), asset.getOpportunityScore(), asset.getRankingReason(), asset.getAnalysisId(),
+                asset.getDecisionId(), asset.getTraceId(), asset.getLatestPrice(), asset.getPriceAtDecision());
+    }
+
+    private AssetCardSnapshot isolatedCardFixture(String symbol, AssetCardSnapshot.Direction direction,
+                                                  double pLong, double pShort) {
+        Instant at = Instant.parse("2026-07-01T12:00:00Z");
+        return new AssetCardSnapshot(symbol, "TEST_FIXTURE", new BigDecimal("999"), null,
+                new AssetCardSnapshot.Signal(direction, "VALID", null, pLong, pShort, "机会", "偏空", at),
+                new AssetCardSnapshot.Risk("HIGH", List.of(new AssetCardSnapshot.RiskItem("CROWDING", "ASSESSED",
+                        "HIGH", "TEST_FIXTURE", "TEST_FIXTURE", at, "TEST_FIXTURE", "RATIO")), at),
+                new AssetCardSnapshot.Health("TEST_FIXTURE", "TEST_FIXTURE", at), at, 1,
+                "TEST_FIXTURE_FEATURE", "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION");
     }
 
     @Test

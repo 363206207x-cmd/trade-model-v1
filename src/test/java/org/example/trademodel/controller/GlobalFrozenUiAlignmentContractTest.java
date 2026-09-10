@@ -53,15 +53,14 @@ class GlobalFrozenUiAlignmentContractTest {
     }
 
     @Test
-    void topSixIsDefensiveDedupedAndUsesEachCardsFinal() throws Exception {
+    void topSixIsDefensiveDedupedAndUsesEachCardsIndependentSnapshot() throws Exception {
         String script = Files.readString(HOME_JS);
         assertThat(script).contains(
                 "[\"CANDIDATE\", \"WAITING_TRIGGER\", \"TRIGGERED\", \"HIGH_RISK\"]",
                 "[\"CONFIRMATION\", \"REDUCED\", \"PREPARATION\"].indexOf(finalMode) >= 0",
                 "var seen = new Set()", "seen.has(identity)", ".slice(0, 6)",
-                "asset.hasFinal === true", "asset.finalMarketBias", "asset.finalPlanMode",
-                "asset.confidenceLevel", "asset.riskLevel",
-                "asset.oneHourOpportunityLabel", "asset.fourHourTrendLabel", "DEFAULT_SLOT")
+                "asset.cardSignal", "assetCardDirection(snapshot)", "assetCardConfidence(snapshot)",
+                "assetCardOverallRisk(snapshot)", "assetCardTimeframes(snapshot)", "DEFAULT_SLOT")
                 .doesNotContain("机会评分</small>", "rankingReason", "const assets = [");
     }
 
@@ -174,8 +173,8 @@ class GlobalFrozenUiAlignmentContractTest {
 
         assertThat(homeScript).contains(
                 "<small>方向</small>", "<small>置信</small>",
-                "desktop.riskSummary(asset)", "desktop.hasConfirmedRisks(asset)",
-                "risk ? '<div class=\"opportunity-risk\"", "data-desktop-hover=\"risk\"",
+                "assetCardRiskItemsHtml(snapshot)", "assetCardOverallRisk(snapshot)",
+                "class=\"asset-card-risk-summary\"", "data-live-field=\"risk-items\"",
                 "PENDING: \"等待监控数据\"", "STALE: \"监控数据已过期\"",
                 "INVALID: \"当前不可查看\"", "SOURCE_UNAVAILABLE: \"监控来源不可用\"",
                 "position-trust-state", "is-untrusted")
@@ -213,10 +212,13 @@ class GlobalFrozenUiAlignmentContractTest {
                 const source=fs.readFileSync('src/main/resources/static/js/home-runtime.js','utf8');
                 const window={};eval(source.split('/* Desktop Home runtime */')[0]);
                 const desktop=window.TrineDesktopSemantics;
+                const assetCardSnapshots=new Map(),assetCardFieldVersions=new Map(),assetCardPriceTimers=new Map();
+                const homeCardSymbols=['TESTUSDT'];
                 const has=v=>v!==null&&v!==undefined&&v!=='';
                 const text=(v,f='')=>has(v)?String(v):f,label=text,escapeHtml=v=>String(v);
                 const symbolOf=a=>a.symbol,assetProvenance=()=>({}),provenanceAttributes=()=>'',directionSemanticClass=()=>'';
-                const drawCard=eval(source.slice(source.indexOf('function assetTicker('),source.indexOf('function renderOpportunities('))+';opportunityCard');
+                const renderCard=eval(source.slice(source.indexOf('function assetTicker('),source.indexOf('function renderOpportunities('))+';opportunityCard');
+                const drawCard=(asset,selected)=>{assetCardSnapshots.clear();assetCardFieldVersions.clear();return renderCard(asset,selected);};
                 const types=['CHASE_RISK','RAPID_MOVE_RISK','TREND_REVERSAL_RISK','CROWDING_RISK',
                     'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
                 const asset={symbol:'TESTUSDT',name:'Test fixture',marketBias:'BULLISH',confidenceLevel:65,
@@ -229,15 +231,18 @@ class GlobalFrozenUiAlignmentContractTest {
                     const unknown={...asset,riskItems:items},html=drawCard(unknown,'TESTUSDT');
                     assert.equal(desktop.hasConfirmedRisks(unknown),false);assert.equal(desktop.riskDrawer(unknown),'');
                     assert.equal(desktop.riskSummary(unknown),'<span class="risk-pending-copy">风险待评估</span>');
-                    assert.ok(html.includes('risk-pending-copy">风险待评估'));
+                    assert.ok(html.includes('data-live-field="risk" class="asset-card-risk-unknown">—'));
                     assert.ok(!html.includes('data-desktop-hover="risk-status"'));
                     assert.ok(!html.includes('data-desktop-hover="risk"'));assert.ok(!html.includes('risk-evidence-item'));
                 }
                 const risky={...asset,riskItems:asset.riskItems.map((x,i)=>({...x,severity:i===0?'MEDIUM':i===1?'HIGH':'NONE',
-                    currentValue:i===1?'72':'0',primaryEvidence:'Independent fixture metric',source:'ISOLATED_TEST',observedAt:'2026-09-08T01:00:00Z'}))};
+                    currentValue:i===1?'72':'0',primaryEvidence:'Independent fixture metric',source:'ISOLATED_TEST',observedAt:'2026-09-08T01:00:00Z'})),
+                    cardSignal:{symbol:'TESTUSDT',snapshotVersion:1,risk:{overallLevel:'HIGH',items:[
+                      {type:'CHASE',assessmentStatus:'ASSESSED',level:'MEDIUM',evidenceValue:2,source:'ISOLATED_TEST'},
+                      {type:'SHOCK',assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:72,source:'ISOLATED_TEST'}]}}};
                 const html=drawCard(risky,'TESTUSDT');
                 assert.equal(desktop.hasConfirmedRisks(risky),true);
-                for(const value of ['risk-type-copy">急涨急跌','risk-level-high">高','risk-count">+1',
+                for(const value of ['asset-card-risk-high">急涨急跌·高','asset-card-risk-medium">追高·中','asset-card-risk-high">高',
                     'tabindex="0" data-desktop-hover="risk"','aria-haspopup="dialog"','aria-label="TESTUSDT 风险详情"']) assert.ok(html.includes(value),value);
                 assert.equal((desktop.riskDrawer(risky).match(/risk-evidence-item/g)||[]).length,2);
                 for(const value of ['72','ISOLATED_TEST','Independent fixture metric']) assert.ok(desktop.riskDrawer(risky).includes(value));

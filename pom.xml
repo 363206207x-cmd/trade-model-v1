@@ -21,10 +21,17 @@
 
     <properties>
         <java.version>17</java.version>
+        <xgboost.version>2.1.4</xgboost.version>
         <surefire.includeTags></surefire.includeTags>
     </properties>
 
     <dependencies>
+        <!-- Local CPU inference only; dual offline-trained models, no Spark or runtime training. -->
+        <dependency>
+            <groupId>ml.dmlc</groupId>
+            <artifactId>xgboost4j_2.12</artifactId>
+            <version>${xgboost.version}</version>
+        </dependency>
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

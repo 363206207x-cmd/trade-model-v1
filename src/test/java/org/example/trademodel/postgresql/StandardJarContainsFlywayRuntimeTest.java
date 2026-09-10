@@ -20,6 +20,7 @@ class StandardJarContainsFlywayRuntimeTest {
     private static final Pattern VERSIONED_MIGRATION = Pattern.compile("V(\\d+)__.+\\.sql");
     private static final String V22_MIGRATION = "V22__user_position_mistake_archive.sql";
     private static final String V23_MIGRATION = "V23__coinglass_runtime_snapshot.sql";
+    private static final String V24_MIGRATION = "V24__asset_card_live_signal.sql";
 
     @Test
     void standardDependenciesContainFlywayCoreAndPostgresqlSupportOutsideTestScope() throws Exception {
@@ -29,7 +30,7 @@ class StandardJarContainsFlywayRuntimeTest {
     }
 
     @Test
-    void canonicalMigrationDirectoryContainsEveryVersionFromV1ThroughV23ExactlyOnce() throws Exception {
+    void canonicalMigrationDirectoryContainsEveryVersionFromV1ThroughV24ExactlyOnce() throws Exception {
         try (var files = Files.list(Path.of("src/main/resources/db/migration"))) {
             List<String> migrations = files.map(path -> path.getFileName().toString())
                     .filter(name -> name.startsWith("V") && name.endsWith(".sql"))
@@ -41,10 +42,10 @@ class StandardJarContainsFlywayRuntimeTest {
                     .toList();
 
             assertThat(migrations)
-                    .hasSize(23)
-                    .contains(V22_MIGRATION, V23_MIGRATION);
+                    .hasSize(24)
+                    .contains(V22_MIGRATION, V23_MIGRATION, V24_MIGRATION);
             assertThat(versions)
-                    .containsExactlyElementsOf(IntStream.rangeClosed(1, 23).boxed().toList());
+                    .containsExactlyElementsOf(IntStream.rangeClosed(1, 24).boxed().toList());
             assertThat(new HashSet<>(versions)).hasSameSizeAs(versions);
         }
     }
@@ -67,6 +68,11 @@ class StandardJarContainsFlywayRuntimeTest {
     void standardRuntimeArtifactContainsV23CoinGlassStateMigration() {
         assertThat(StandardJarContainsFlywayRuntimeTest.class.getClassLoader()
                 .getResource("db/migration/" + V23_MIGRATION)).isNotNull();
+    }
+
+    @Test
+    void standardRuntimeArtifactContainsV24AssetCardMigration() {
+        assertThat(getClass().getClassLoader().getResource("db/migration/" + V24_MIGRATION)).isNotNull();
     }
 
     private static void assertRuntimeDependency(Document document, String artifactId) {
