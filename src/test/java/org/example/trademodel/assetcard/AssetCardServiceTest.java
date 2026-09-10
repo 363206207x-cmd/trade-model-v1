@@ -354,7 +354,8 @@ class AssetCardServiceTest {
                     try (var fixture = new RuntimeFixture()) {
                         fixture.properties.setModelMode(mode);
                         fixture.properties.setCanarySymbols(Set.of("BTCUSDT"));
-                        Instant at = Instant.now();
+                        // Exercise Linux nanosecond precision deterministically on every host.
+                        Instant at = Instant.ofEpochSecond(Instant.now().getEpochSecond() - 1, 309_209_149);
                         var stored = publicSignalFixture(at, "feature".equals(mismatch) ? "OLD_FEATURE" : AssetCardFeatureService.FEATURE_VERSION);
                         if (!"missing".equals(mismatch)) {
                             var bundle = metadataOnlyBundle("model".equals(mismatch) ? "NEW_MODEL" : "TEST_FIXTURE_MODEL",
@@ -387,6 +388,8 @@ class AssetCardServiceTest {
                             assertThat(visible.health().asOf()).isBetween(at, Instant.now());
                         }
                         assertThat(stored.signal().calibratedConfidence()).isEqualTo(81);
+                        assertThat(fixture.json.isEnabled(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
+                                .as("Card precision policy must not mutate the shared application mapper").isFalse();
                         verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyString(), nullable(Instant.class));
                         verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
                         verifyNoInteractions(fixture.market, fixture.events);

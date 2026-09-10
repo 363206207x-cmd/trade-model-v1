@@ -56,7 +56,9 @@ public class AssetCardService {
     public AssetCardService(AssetCardProperties properties, AssetCardMarketDataService market, AssetCardMapper mapper,
                             AssetPoolService pool, DashboardLiveEventService events, ObjectMapper json) {
         this.properties = properties; this.market = market; this.mapper = mapper;
-        this.pool = pool; this.events = events; this.json = json;
+        this.pool = pool; this.events = events;
+        // Card JSON trees must preserve fractional epoch seconds without changing the shared application mapper.
+        this.json = json.copy().enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
