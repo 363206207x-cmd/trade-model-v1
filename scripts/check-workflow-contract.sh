@@ -522,6 +522,22 @@ audit_scope_paths="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_paths)"
 audit_scope_domains="$(yaml_list docs/CODEX_NEXT_TASK.yml audit_scope_source_domains)"
 p1a_allowed_changes="$(yaml_list docs/CODEX_NEXT_TASK.yml p1a_allowed_changes)"
 
+# V42 registration is additive to the historical V41 checks below. Validate
+# its exact seven-file gate scope without changing generic workflow semantics.
+v42_gate_branch="$(yaml_value docs/CODEX_NEXT_TASK.yml v42_gate_branch)"
+v42_starting_full_sha="$(yaml_value docs/CODEX_NEXT_TASK.yml v42_starting_full_sha)"
+if [[ "$(git branch --show-current)" == "$v42_gate_branch" ]]; then
+  bash scripts/v1-state.sh --check-v42-contract \
+    || fail "V42 directional risk/runtime registration contract mismatch"
+  v42_gate_paths="$(yaml_list docs/CODEX_NEXT_TASK.yml v42_gate_allowed_paths)"
+  v42_changed_files="$({ git diff --name-only "$v42_starting_full_sha"..HEAD 2>/dev/null || true; git diff --name-only 2>/dev/null || true; git diff --cached --name-only 2>/dev/null || true; git ls-files --others --exclude-standard 2>/dev/null || true; } | awk 'NF && !seen[$0]++')"
+  while IFS= read -r v42_changed_path; do
+    [[ -z "$v42_changed_path" ]] && continue
+    printf '%s\n' "$v42_gate_paths" | grep -Fxq "$v42_changed_path" \
+      || fail "V42 registration changed path is outside its exact gate allowlist: $v42_changed_path"
+  done <<<"$v42_changed_files"
+fi
+
 [[ -n "$current_task_mode" ]] || fail "current_task_mode must be declared"
 [[ -n "$authorized_next_task_mode" ]] || fail "authorized_next_task_mode must be declared"
 [[ "$current_task_mode" != "$authorized_next_task_mode" ]] || fail "current and authorized next task modes must remain distinct"
