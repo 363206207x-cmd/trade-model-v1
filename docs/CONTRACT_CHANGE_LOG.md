@@ -1,5 +1,27 @@
 # Contract Change Log
 
+## 2026-09-10 — Owner-approved isolated asset-card contract and eligibility correction
+
+Appendix I registers V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE, branch
+codex/v4-1-asset-card-live-signal-closure, starting at exact merged main
+094b70a8ed31891999da0814fae5add09e2c4e08. The Owner authorizes the necessary
+active-package YAML transition, seven exact gate paths and the audited 48
+card-only implementation/test paths. Prior package evidence is preserved.
+
+Only card semantics are superseded: eight explicit directions, independent
+calibrated probabilities, independent evidenced risks, Spot price, compact clock
+and field-only events. Canonical algorithms and the plan/AI/position/Telegram
+chain, pool membership/pins/eligibility/ranking and other UI are unchanged.
+Missing model/data evidence cannot be reported as a working production model.
+
+Owner withdraws the unimplemented merge=false special-case design. Both YAML
+merge flags remain true as eligibility, not actual action authorization. Generic
+machine policy, other package rules and historical fingerprints remain intact.
+This step may commit/push a contract-only Draft PR and must stop before merge.
+Business implementation requires this exact gate on origin/main. No deployment,
+Owner-position change, native/mobile work, real AI/Telegram call or trading.
+Product completion criteria and phase order are unchanged; no business DONE.
+
 ## 2026-09-08 — Owner-approved Desktop Home runtime and priority supplement
 
 Reason: register the already-approved desktop-web closure and remove three

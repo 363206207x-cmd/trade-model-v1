@@ -914,3 +914,194 @@ This does not change direction, confidence or risk algorithms/thresholds.
 The existing 28 Owner positions remain untouched. No APP/mobile-web work,
 Production deployment, trades, real Telegram test send or real AI invocation
 is authorized by this supplement. Registration is not business completion.
+
+## Appendix I. Owner Asset-Card Live Signal Contract
+
+Status: `OWNER_AUTHORIZED / REGISTRATION_CANDIDATE / 2026-09-10`.
+Package: `V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE`.
+Branch: `codex/v4-1-asset-card-live-signal-closure`.
+Starting merged main: `094b70a8ed31891999da0814fae5add09e2c4e08`.
+
+This records the Owner's complete Asset Card Live Direction, Calibrated
+Confidence and Explainable Risk Closure instruction. Only the existing Home
+asset-card surface may adopt the following new computation and display
+contract. Earlier card-only five-direction definitions, weighted/proxy/fallback
+confidence, opportunity-derived risk, copied component risk, and price-event
+full-Home reload semantics are superseded here. All other contracts remain
+effective. This is not permission to change the Canonical decision chain.
+
+### I.1 Ownership and isolation
+
+Add a separate `cardSignal` / `AssetCardSnapshot`, never overwrite
+`finalMarketBias`, `finalConfidence`, `riskLevel`, Analysis, Decision, or Plan.
+The snapshot owns symbol, assetName, spotPrice and price observation time;
+signal(direction, status, calibratedConfidence, pLong, pShort, oneHourState,
+fourHourTrend, signalAsOf); risk(overallLevel, items, riskAsOf); cardAsOf;
+monotonic snapshotVersion; featureVersion, modelVersion and calibrationVersion.
+Probabilities and versions are audit metadata, not additional visible fields.
+Persist UTC timestamps and reject older symbol/snapshot versions.
+
+Reuse authenticated Home/SSE transport, Pool reads, stored market/evidence
+reads and existing test infrastructure. Add only genuinely independent card
+snapshots, features, model/bundle and risk owners. Do not modify Pool
+eligibility, saved pin order, automatic ranking/fill, search, other Home
+regions, Final Plan, PositionMonitor, Three-AI, Telegram, login/Cloudflare,
+Analysis pages, native clients or mobile-specific files. User positions are
+immutable for this task. No automatic trading or real AI/Telegram call.
+
+### I.2 Real data and model
+
+The only displayed current price is Binance Spot real trade price. Futures
+Mark Price, CoinGlass price, stale analysis prices and mixed-venue inputs are
+not substitutes. Dynamically subscribe to symbols needed by actual cards and
+the existing observation pool without changing pool membership or ordering.
+Keep the shared futures stream and its existing plan/monitor consumers intact.
+
+Train separate XGBoost Long Success and Short Success binary models offline.
+The horizon is four hours; ATR is fixed at signal time. Long success is first
++1 ATR before -0.75 ATR, with timeout a failure; short is symmetric. If one
+closed 5m bar touches both, resolve with closed 1m ordering. Remaining ambiguous
+samples are excluded from training, calibration and testing, never assigned a
+convenient outcome. Version the ATR/feature definitions in the model bundle.
+
+Features use closed Spot 5m/15m/1h/4h OHLCV, momentum, ATR/volatility, volume,
+slope, structure, taker trades, actual spread/depth, and time-aligned existing
+CoinGlass OI, funding, long/short, liquidation and available taker evidence.
+Both observation time and availability time must not exceed signal time.
+Missing historical inputs remain missing. Current snapshots cannot be copied
+backwards into history; fixtures cannot train a production model.
+
+Fit separate long/short Beta calibrators on an independent calibration split:
+`logit(p_calibrated) = a*ln(p_raw) - b*ln(1-p_raw) + c`, clipping endpoints
+safely. Neither calibrator nor threshold selection may use the final test set.
+Use temporal purged walk-forward splits and embargo for overlapping 4h labels.
+Spring Boot Java 17 only loads verified, checksummed XGBoost model bundles;
+there is no runtime training or resident Python service.
+
+Publish features, both models/calibrators, thresholds, provenance and validation
+report as one atomic version. Strength/probability-gap thresholds come from
+out-of-sample validation, with strict strong > normal > weak ordering,
+adequate probability-band samples and fee/slippage-adjusted positive edge.
+Do not invent thresholds or use 60 samples as a production-readiness shortcut.
+Release gates require calibrated Brier better than raw and base-rate baselines,
+correct binned ECE, non-collapsed calibration curves, LogLoss and per-asset,
+market-regime and volatility strata, plus independent evidence for each tier.
+Missing data, model, calibrator or validation fails closed; no old weighted,
+65/70/90 proxy, AI-derived or alternate numerical confidence is reachable.
+
+### I.3 Eight directions and clocks
+
+The exact card directions are STRONG_LONG (强偏多), LONG (偏多), WEAK_LONG
+(弱偏多), STRONG_SHORT (强偏空), SHORT (偏空), WEAK_SHORT (弱偏空), RANGE
+(震荡), WATCH (观望). RANGE is a supported range state; WATCH requires
+sufficient data but no stable advantage or unresolved conflict. Missing data
+is not WATCH: display `方向：— · 数据不足`.
+
+Only calibrated pLong/pShort supplies an integer confidence percentage for
+the corresponding directional family. RANGE, WATCH, invalidated, missing or
+unvalidated results show `—`, never text confidence or a second formula.
+Each closed 5m triggers one card inference, with publication within 15 seconds.
+Require two consecutive 5m confirmations before switching direction; update
+1h/4h features only on their closes. Structural breach, extreme 1m/5m movement,
+liquidity deterioration or core-source loss may invalidate within 1-5 seconds.
+Invalidation retains the previous direction labelled 已失效, hides confidence
+and shows high risk; it cannot manufacture an opposite direction.
+
+The background line is exactly one of 1小时机会/观察/冲突/数据不足 and
+4小时趋势偏多/偏空/震荡/数据不足, from closed data. It is not another
+confidence formula. Price has its own time. cardAsOf changes only with an
+effective direction/confidence/risk change, not price ticks or unchanged polls.
+
+### I.4 Independent risks
+
+Eight types are CHASE, SHOCK, REVERSAL, CROWDING, LIQUIDATION, LIQUIDITY,
+EVENT, DATA. Every item owns assessmentStatus ASSESSED/UNKNOWN, level
+NONE/LOW/MEDIUM/HIGH, evidenceValue, source, asOf and reason. UNKNOWN is not LOW.
+
+CHASE uses structural-center/ATR distance and extension; SHOCK uses real
+1m/5m volatility, ATR and historical percentiles; REVERSAL uses 5m/1h/4h
+conflict and invalidation; CROWDING uses funding/long-short/OI; LIQUIDATION uses
+directional liquidation amounts and imbalance; LIQUIDITY uses actual spread,
+10/25bps depth and order-book anomalies; EVENT reuses existing macro/news/event
+facts; DATA uses source health, freshness, missingness and identity consistency.
+Thresholds are versioned asset-history distributions, rolling percentiles and
+explicit hard safety conditions. No opportunity score, 24h-range liquidity
+proxy, aggregate-to-item copy or claim that raw CoinGlass facts are risk grades.
+
+Overall risk is HIGH if any assessed item is HIGH, otherwise MEDIUM if one is
+MEDIUM. LOW requires all necessary assessments complete without medium/high;
+otherwise show `—`. Unknown items cannot conceal a known high risk. Display
+at most three medium/high items ordered by severity, invalidation effect and
+freshness; hide the detail row when there are none. Real-time risk reacts in
+1-5 seconds; CoinGlass evidence is reconciled around 60 seconds subject to its
+existing provider limits; event risk updates on evidence arrival.
+
+### I.5 Existing card rendering and events
+
+Preserve the current card dimensions, position, grid and whole-Home layout
+(Owner's UI Freeze 1.2 constraint); do not redesign a screen or add charts,
+buttons, thick shadows, glass effects or long explanations. Show symbol/name,
+Spot price, direction, abnormal-only state, integer confidence or `—`, overall
+risk, up to three real active risks and the closed-timeframe background line.
+Remove card-only 24h/undefined percentage changes, 更新于, normal 有效 labels,
+source/version text and unsupported risk names. The lower-right time is only
+HH:mm:ss in the user's timezone, without date/zone text. Use tabular figures,
+stable numeric layout and subtle field transitions, not whole-card flashing.
+Directional greens/reds have strong/normal/muted levels; RANGE is the frozen
+neutral/blue-gray, WATCH gray; risk medium orange, high red and unknown gray.
+
+ASSET_CARD_PRICE patches price only; ASSET_CARD_SIGNAL patches direction,
+status, confidence and timeframe fields; ASSET_CARD_RISK patches risk fields;
+ASSET_CARD_HEALTH patches abnormal data status. Signal/risk changes carry the
+effective card clock. No card event invokes loadHome, reloads other cards,
+positions, plans or AI, changes membership, or reorders a slot. Throttle price
+rendering to 1-2 seconds. Use one 60-second read-only card reconciliation and
+15-second disconnected fallback; stop fallback on SSE recovery. Reject stale
+responses/events by symbol and snapshotVersion.
+
+### I.6 Readiness, modes and acceptance
+
+ASSET_CARD_MODEL_MODE is LEGACY (rollback only, no numerical fallback), SHADOW
+(compute/audit without displaying unvalidated model results), CANARY (explicit
+symbols only) or ACTIVE. Default new facilities to SHADOW. Missing historical
+data may permit infrastructure completion, but confidence stays `—` and
+PRODUCTION_MODEL_READY remains NO. Record actual sample counts and provenance;
+unknown coverage/counts are UNKNOWN, not fabricated zero or invented metrics.
+
+Tests must cover all eight directions, independent calibration, split/label
+leakage and ambiguity, missing data, confirmation/invalidation, independent
+risks/aggregation, clocks, versions, field-only events and unchanged downstream
+chain/pins/eligibility. Require focused/frontend/data tests, full Maven,
+product/machine/workflow gates, diff checks and exact-head CI. No model or
+business completion can be inferred from docs, DTOs, fixtures or tests alone.
+
+No merge or deployment permission is granted by this registration. Gate-only
+review/PR may proceed; implementation remains blocked until exact registration
+is merged main, and business merge and Staging deployment require separate
+Owner approval. Deployment must not be inferred from earlier packages.
+When authorized, real Staging acceptance requires 30 seconds of Spot price
+observations (p95 <=2s), closed-5m result <=15s, risk/source timestamps, SSE
+disconnect/recovery, zero full-Home reload storm, 1440x900 screenshot and narrow
+window checks, unchanged geometry and zero downstream side effects. Without
+that evidence CURRENT_PHASE_DONE=NO and FINAL_GATE=FAIL.
+
+### I.7 Owner-corrected merge eligibility and actual-action boundary
+
+For this registration, current_package_merge_allowed=true and
+authorized_next_package_merge_allowed=true describe eligibility after all
+required gates pass; neither grants permission to execute a merge now.
+Owner withdraws the earlier merge=false exception design. Do not change the
+generic machine_gate_policy_check, other packages or global merge/deploy rules.
+
+Only exact identity recognition for V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE and its
+authorization package is added: exact branch, 40-character baseline SHA,
+permission tuple, canonical Appendix I, path counts and fingerprints.
+Keep worktree identity and origin/main effectivity checks. Never assign main
+effectivity or copy a predecessor's permission/status to unlock this package.
+
+This step may validate, commit, push and open the contract/gate-only Draft PR,
+then must stop for separate Owner merge approval. MERGE_EXECUTED=NO and
+DEPLOY_EXECUTED=NO. Staging and Production deployment are not authorized.
+Business implementation remains blocked until this exact authorization
+contract and gate have merged into origin/main and the gate passes. The local
+candidate passing checks does not activate the future implementation scope.

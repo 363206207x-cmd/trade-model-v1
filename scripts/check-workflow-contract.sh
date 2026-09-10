@@ -566,7 +566,10 @@ v4_1_baseline_reconciliation_gate_status="$(yaml_value docs/CODEX_NEXT_TASK.yml 
 [[ "$gpt_background_three_ai_timeout_closure_implementation_status" == "COMPLETE" ]] || fail "GPT background/Three-AI timeout closure must remain complete"
 [[ "$official_domain_session_runtime_visibility_closure_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "official-domain session and runtime visibility authorization must remain effective on merged main"
 [[ "$official_domain_session_runtime_visibility_closure_implementation_status" == "COMPLETE" ]] || fail "official-domain session and runtime visibility implementation must remain complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml asset_card_live_signal_authorization_status)" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "asset-card authorization must await merged main"
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml asset_card_live_signal_implementation_status)" == "NOT_STARTED" ]] || fail "asset-card implementation must remain not started"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_runtime_truth_plan_closure_authorization_status)" == "AUTHORIZED_PENDING_MERGED_MAIN" ]] || fail "runtime truth authorization must await merged main"
   [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml v4_1_web_runtime_truth_plan_closure_implementation_status)" == "NOT_STARTED" ]] || fail "runtime truth implementation must remain not started in the gate package"
 elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
@@ -583,7 +586,9 @@ fi
 [[ "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" ]] || fail "multi-user authorization must remain effective on merged main"
 [[ "$multi_user_implementation_status" == "NOT_STARTED" ]] || fail "multi-user implementation must remain not started"
 [[ -n "$current_package_phase" && -n "$current_package_mode" && -n "$current_package_branch" ]] || fail "current package declaration must be complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  bash scripts/v1-state.sh --check-asset-card-live-signal-contract || fail "asset-card exact contract mismatch"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   [[ "$current_package_status" == "COMPLETED" ]] || fail "Web live direction and risk closure authorization declaration mismatch"
   [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || fail "Web live direction and risk closure authorization mode mismatch"
   [[ "$current_package_branch" == "codex/v4-1-web-home-runtime-priority-closure-authorization" ]] || fail "Web live direction and risk closure authorization branch mismatch"
@@ -659,7 +664,14 @@ fi
 [[ -n "$current_package_allowed_scope" && -n "$current_package_allowed_paths" && -n "$current_package_blocked_scope" ]] || fail "current package authorization scope must be explicit"
 [[ "$p1a_allowed_changes" == "NONE" ]] || fail "P1A allowed changes must be NONE"
 [[ -n "$audit_scope_modules" && -n "$audit_scope_paths" && -n "$audit_scope_domains" ]] || fail "machine-readable P1A audit scope must be complete"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  [[ "$(yaml_value docs/CODEX_NEXT_TASK.yml asset_card_live_signal_scope)" == "APPENDIX_I_ASSET_CARDS_ONLY" ]] || fail "asset-card scope must remain Appendix I only"
+  for transition_condition in OWNER_EXPLICIT_ASSET_CARD_SCOPE_AUTHORIZATION \
+    EXACT_SEVEN_PATH_GATE_ALLOWLIST EXACT_FORTY_EIGHT_PATH_IMPLEMENTATION_ALLOWLIST; do
+    printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
+      || fail "missing asset-card authorization transition condition: $transition_condition"
+  done
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   for transition_condition in \
     EXACT_EIGHT_PATH_GATE_ALLOWLIST \
     EXACT_THIRTY_FIVE_PATH_IMPLEMENTATION_ALLOWLIST; do
@@ -689,6 +701,11 @@ for transition_condition in \
   CLEAN_WORKTREE \
   AUTHORIZED_FILE_SCOPE_ONLY \
   NO_ACTIVE_CONFLICTING_PR; do
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
+    && "$transition_condition" == "OWNER_EXPLICIT_ONE_SHOT_END_TO_END_AUTHORIZATION" ]]; then
+    # This package has its own explicit card-scope grant, checked above.
+    continue
+  fi
   printf '%s\n' "$transition_conditions" | grep -Fxq "$transition_condition" \
     || fail "missing v4.1 authorization transition condition: $transition_condition"
 done
@@ -734,7 +751,13 @@ authorization_final_stage="V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_FINAL_MERG
 authorization_pending_reason="BLOCKED_PENDING_V41_REAL_LOGIC_CHAIN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
 authorization_permission_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_PERMISSIONS_INCOMPLETE"
 authorization_scope_reason="BLOCKED_REAL_LOGIC_CHAIN_CLOSURE_SCOPE_NOT_AUTHORIZED"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  authorization_review_stage="ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_REVIEW"
+  authorization_final_stage="ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_FINAL_MERGE_PATH"
+  authorization_pending_reason="BLOCKED_PENDING_ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_MERGED_MAIN"
+  authorization_permission_reason="BLOCKED_ASSET_CARD_LIVE_SIGNAL_CONTRACT"
+  authorization_scope_reason="BLOCKED_ASSET_CARD_LIVE_SIGNAL_CONTRACT"
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   authorization_review_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_REVIEW"
   authorization_final_stage="V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_FINAL_MERGE_PATH"
   authorization_pending_reason="BLOCKED_PENDING_V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_MERGED_MAIN"
@@ -775,7 +798,12 @@ assert_handoff_blocked authorization_merged_unsynced "$authorization_pending_rea
 
 v4_1_handoff="$(run_handoff_scenario authorization_merged_validated --request-package "$authorized_next_package_phase")" \
   || fail "v4.1 merged-main handoff failed"
-if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  for v4_1_status_expected in 'ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_STATUS: AUTHORIZED' \
+    'ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS: NOT_STARTED'; do
+    printf '%s\n' "$v4_1_handoff" | grep -Fq "$v4_1_status_expected" || fail "asset-card handoff omitted: $v4_1_status_expected"
+  done
+elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
   for v4_1_status_expected in \
     "V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS: AUTHORIZED" \
     "V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: NOT_STARTED"; do
@@ -841,6 +869,7 @@ for v4_1_expected in \
   "CANONICAL_FIGMA_FILE_KEY: NONE" \
   "GENERATED_PACKAGE: $authorized_next_package_phase"; do
   if [[ ( "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" \
+      || "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" \
       || "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ) \
     && ( "$v4_1_expected" == *"AUTHORIZATION_STATUS: EFFECTIVE_MERGED_MAIN" \
       || "$v4_1_expected" == "V4_1_MACHINE_GATE_OWNER_AMENDMENT_STATUS: EFFECTIVE_MERGED_MAIN" \
@@ -1099,6 +1128,30 @@ for exact_gate_case in \
 done
 printf '%s\n' "$exact_gate_text" | grep -Fq "EXACT_MACHINE_GATE_TESTS: PASS" \
   || fail "exact machine-gate suite did not report PASS"
+if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+  for exact_gate_case in ASSET_CARD_UNMERGED ASSET_CARD_MERGED_EXACT_OLD_STATUSES_UNCHANGED \
+    ASSET_CARD_REJECT_authorized_next_package_phase_WRONG_PACKAGE \
+    ASSET_CARD_REJECT_authorized_next_package_branch_codex/wrong-branch \
+    ASSET_CARD_REJECT_authorized_next_package_starting_full_sha_094b70a8 \
+    ASSET_CARD_REJECT_current_package_merge_allowed_false \
+    ASSET_CARD_REJECT_authorized_next_merge_allowed_false \
+    ASSET_CARD_REJECT_authorized_next_staging_deployment_allowed_true \
+    ASSET_CARD_current_package_allowed_paths_ADDED \
+    ASSET_CARD_authorized_next_package_allowed_paths_MISSING \
+    ASSET_CARD_authorized_next_package_allowed_paths_DUPLICATE \
+    ASSET_CARD_PRODUCT_SOURCE_REQUIRED ASSET_CARD_MACHINE_IDENTITY_REQUIRED \
+    ASSET_CARD_UNMERGED_IMPLEMENTATION_PATH ASSET_CARD_NON_ALLOWLIST_CHANGE \
+    ASSET_CARD_GATE_EXCLUDES_BUSINESS_CODE ASSET_CARD_HISTORICAL_ALIAS_PRESERVED \
+    ASSET_CARD_DECLARATION_REJECT_current_task_mode \
+    ASSET_CARD_DECLARATION_REJECT_authorized_next_task_mode \
+    ASSET_CARD_DECLARATION_REJECT_authorized_next_product_phase \
+    ASSET_CARD_DECLARATION_REJECT_p1a_repository_edits_allowed \
+    ASSET_CARD_DECLARATION_REJECT_p1a_implementation_allowed \
+    ASSET_CARD_DECLARATION_REJECT_p1a_implementation_pr_allowed; do
+    printf '%s\n' "$exact_gate_text" | grep -Fq "$exact_gate_case: PASS" \
+      || fail "missing asset-card negative gate case: $exact_gate_case"
+  done
+fi
 
 audit_policy_text="$(bash scripts/v1-state.sh --self-test-product-audit-policy)" || fail "product audit policy self-test failed"
 printf '%s\n' "$audit_policy_text" | grep -Fq "PRODUCT_AUDIT_POLICY_TESTS: PASS" \

@@ -221,7 +221,10 @@ validate_contract_task() {
   [[ "$current_phase" == P0-0* ]] || { echo "TASK_VALIDATION_FAILED current state phase mismatch: $current_phase" >&2; failed=1; }
   [[ "$current_status" == "$matrix_status" ]] || { echo "TASK_VALIDATION_FAILED current state status mismatch: $current_status != $matrix_status" >&2; failed=1; }
   [[ -n "$current_package_phase" && -n "$current_package_mode" ]] || { echo "TASK_VALIDATION_FAILED current package declaration is incomplete" >&2; failed=1; }
-  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+    bash scripts/v1-state.sh --check-asset-card-live-signal-contract \
+      || { echo "TASK_VALIDATION_FAILED exact asset-card registration mismatch" >&2; failed=1; }
+  elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
     [[ "$current_package_status" == "COMPLETED" ]] || { echo "TASK_VALIDATION_FAILED Web live direction and risk closure authorization declaration mismatch" >&2; failed=1; }
     [[ "$current_package_mode" == "DOCS_GATE_BASELINE_RECONCILIATION" ]] || { echo "TASK_VALIDATION_FAILED current authorization mode mismatch" >&2; failed=1; }
     [[ "$current_package_branch" == "codex/v4-1-web-home-runtime-priority-closure-authorization" ]] || { echo "TASK_VALIDATION_FAILED Web live direction and risk closure authorization branch mismatch" >&2; failed=1; }
@@ -287,7 +290,10 @@ validate_contract_task() {
   [[ "$product_v4_1_authorization" == "AUTHORIZED_TO_IMPLEMENT" && "$v4_1_design_status" == "FROZEN" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Product Source freeze or matrix authorization mismatch" >&2; failed=1; }
   [[ "$v4_1_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_implementation_status" == "COMPLETE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 Final Interaction predecessor mismatch" >&2; failed=1; }
   [[ "$v4_1_target_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$v4_1_target_implementation_status" == "COMPLETE" && "$v4_1_target_status" == "PENDING_PRIVATE_CONFIGURATION_AND_ACCEPTANCE" ]] || { echo "TASK_VALIDATION_FAILED v4.1 target-runtime predecessor boundary mismatch" >&2; failed=1; }
-  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
+  if [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_ASSET_CARD_LIVE_SIGNAL_CLOSURE_AUTHORIZATION" ]]; then
+    [[ "$(yaml_value "$TASK_FILE" asset_card_live_signal_scope)" == "APPENDIX_I_ASSET_CARDS_ONLY" ]] \
+      || { echo "TASK_VALIDATION_FAILED asset-card scope mismatch" >&2; failed=1; }
+  elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION" ]]; then
     [[ "$(yaml_value "$TASK_FILE" v4_1_web_runtime_truth_plan_closure_authorization_status)" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$(yaml_value "$TASK_FILE" v4_1_web_runtime_truth_plan_closure_implementation_status)" == "NOT_STARTED" && "$p1b_scope" == "V41_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED runtime truth predecessor boundary mismatch" >&2; failed=1; }
   elif [[ "$current_package_phase" == "TRINE_LOGIC_V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION" ]]; then
     [[ "$web_live_direction_risk_closure_authorization_status" == "AUTHORIZED_PENDING_MERGED_MAIN" && "$web_live_direction_risk_closure_implementation_status" == "NOT_STARTED" && "$local_real_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$local_real_implementation_status" == "COMPLETE" && "$frontend_interaction_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$frontend_interaction_implementation_status" == "COMPLETE" && "$multi_user_authorization_status" == "EFFECTIVE_MERGED_MAIN" && "$multi_user_implementation_status" == "NOT_STARTED" && "$p1b_scope" == "V41_WEB_LIVE_DIRECTION_RISK_CLOSURE_ONLY" ]] || { echo "TASK_VALIDATION_FAILED Web live direction and risk closure predecessor boundary mismatch" >&2; failed=1; }
@@ -416,6 +422,8 @@ web_live_direction_risk_closure_authorization_runtime_status="$(state_value "$st
 web_runtime_truth_plan_closure_authorization_runtime_status="$(state_value "$state_text" V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS)"
 web_live_direction_risk_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS)"
 web_runtime_truth_plan_closure_implementation_runtime_status="$(state_value "$state_text" V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS)"
+asset_card_live_signal_authorization_runtime_status="$(state_value "$state_text" ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_STATUS)"
+asset_card_live_signal_implementation_runtime_status="$(state_value "$state_text" ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS)"
 local_real_authorization_runtime_status="$(state_value "$state_text" LOCAL_REAL_AUTHORIZATION_STATUS)"
 local_real_implementation_runtime_status="$(state_value "$state_text" LOCAL_REAL_IMPLEMENTATION_STATUS)"
 frontend_interaction_authorization_runtime_status="$(state_value "$state_text" FRONTEND_INTERACTION_AUTHORIZATION_STATUS)"
@@ -590,6 +598,8 @@ V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_AUTHORIZATION_STATUS: $web_live_direction_r
 V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_AUTHORIZATION_STATUS: $web_runtime_truth_plan_closure_authorization_runtime_status
 V4_1_WEB_LIVE_DIRECTION_RISK_CLOSURE_IMPLEMENTATION_STATUS: $web_live_direction_risk_closure_implementation_runtime_status
 V4_1_WEB_RUNTIME_TRUTH_PLAN_CLOSURE_IMPLEMENTATION_STATUS: $web_runtime_truth_plan_closure_implementation_runtime_status
+ASSET_CARD_LIVE_SIGNAL_AUTHORIZATION_STATUS: $asset_card_live_signal_authorization_runtime_status
+ASSET_CARD_LIVE_SIGNAL_IMPLEMENTATION_STATUS: $asset_card_live_signal_implementation_runtime_status
 LOCAL_REAL_AUTHORIZATION_STATUS: $local_real_authorization_runtime_status
 LOCAL_REAL_IMPLEMENTATION_STATUS: $local_real_implementation_runtime_status
 FRONTEND_INTERACTION_AUTHORIZATION_STATUS: $frontend_interaction_authorization_runtime_status
