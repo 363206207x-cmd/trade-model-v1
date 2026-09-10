@@ -166,6 +166,42 @@ class DashboardHomeControllerTest {
     }
 
     @Test
+    void cardOnlySnapshotFiltersShadowAndExactCanaryCohortsWithoutLegacyFallback() throws Exception {
+        try (CardReadFixture fixture = new CardReadFixture()) {
+            when(fixture.pool.listForUser(7L)).thenReturn(List.of(
+                    new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin", "SPOT", "USDT", true, 1, "USER"),
+                    new AssetPoolAssetDTO(2L, "ETHUSDT", "Ethereum", "SPOT", "USDT", true, 2, "USER")));
+            MockMvc cards = cardMvc(fixture.service);
+            for (var mode : List.of(AssetCardProperties.ModelMode.LEGACY, AssetCardProperties.ModelMode.SHADOW)) {
+                fixture.properties.setModelMode(mode);
+                cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                                .param("symbols", "ETHUSDT", "BTCUSDT"))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+            }
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+            fixture.properties.setEnabled(false);
+            cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                            .param("symbols", "ETHUSDT", "BTCUSDT"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+            verifyNoInteractions(fixture.mapper);
+
+            fixture.properties.setEnabled(true);
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.CANARY);
+            fixture.properties.setCanarySymbols(java.util.Set.of("BTCUSDT"));
+            cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
+                            .param("symbols", "ETHUSDT", "BTCUSDT"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].symbol").value("BTCUSDT"))
+                    .andExpect(jsonPath("$.data[0].signal.status").value("INSUFFICIENT_DATA"))
+                    .andExpect(jsonPath("$.data[0].signal.calibratedConfidence").isEmpty());
+            verify(fixture.mapper).selectSnapshotJson("BTCUSDT");
+            verifyNoMoreInteractions(fixture.mapper);
+            verifyNoInteractions(dashboardHomeService, fixture.market, fixture.events);
+        }
+    }
+
+    @Test
     void installedCardServiceDoesNotReplaceDefaultHomeOrRuntimeSnapshotRouting() throws Exception {
         AssetCardService cards = mock(AssetCardService.class);
         DashboardHomeVO home = new DashboardHomeVO();
@@ -175,6 +211,7 @@ class DashboardHomeControllerTest {
         first.setFinalConfidence(51);
         first.setRiskLevel("MEDIUM");
         first.setOpportunityScore(94);
+        first.setCardSignalDisplayEnabled(true);
         first.setCardSignal(AssetCardSnapshot.unavailable("BTCUSDT", "Bitcoin", "TEST_FIXTURE"));
         DashboardHomeVO.AssetVO second = new DashboardHomeVO.AssetVO();
         second.setRawSymbol("ETHUSDT");
@@ -193,7 +230,9 @@ class DashboardHomeControllerTest {
                     .andExpect(jsonPath("$.data.assets[0].riskLevel").value("MEDIUM"))
                     .andExpect(jsonPath("$.data.assets[0].opportunityScore").value(94))
                     .andExpect(jsonPath("$.data.assets[0].cardSignal.signal.status").value("INSUFFICIENT_DATA"))
+                    .andExpect(jsonPath("$.data.assets[0].cardSignalDisplayEnabled").value(true))
                     .andExpect(jsonPath("$.data.assets[1].rawSymbol").value("ETHUSDT"))
+                    .andExpect(jsonPath("$.data.assets[1].cardSignalDisplayEnabled").value(false))
                     .andExpect(jsonPath("$.data.assetPool[0].rawSymbol").value("ETHUSDT"))
                     .andExpect(jsonPath("$.data.assetPool[1].rawSymbol").value("BTCUSDT"));
         }
@@ -213,8 +252,13 @@ class DashboardHomeControllerTest {
         final AssetCardMapper mapper = mock(AssetCardMapper.class);
         final AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
         final DashboardLiveEventService events = mock(DashboardLiveEventService.class);
-        final AssetCardService service = new AssetCardService(new AssetCardProperties(), market, mapper, pool, events,
-                new ObjectMapper().findAndRegisterModules());
+        final AssetCardProperties properties = new AssetCardProperties();
+        final AssetCardService service;
+        CardReadFixture() {
+            properties.setEnabled(true);
+            properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+            service = new AssetCardService(properties, market, mapper, pool, events, new ObjectMapper().findAndRegisterModules());
+        }
         @Override public void close() { service.close(); }
     }
 

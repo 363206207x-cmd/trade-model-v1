@@ -747,6 +747,21 @@
         return raw.endsWith("USDT") ? raw.slice(0, -4) : raw;
     }
     // Appendix I belongs only to Home cards. Pool/Plan/AI continue using their existing projections.
+    var assetCardDisplaySymbols = new Set();
+    var assetCardDisplayEpoch = 0;
+    function setAssetCardDisplay(symbol, enabled) {
+        if (assetCardDisplaySymbols.has(symbol) !== enabled) {
+            if (enabled) assetCardDisplaySymbols.add(symbol); else assetCardDisplaySymbols.delete(symbol);
+            assetCardDisplayEpoch++;
+            assetCardSnapshots.delete(symbol);
+            ["PRICE", "SIGNAL", "RISK", "HEALTH"].forEach(function (group) { assetCardFieldVersions.delete(symbol + "|" + group); });
+            if (assetCardPriceTimers.has(symbol)) {
+                window.clearTimeout(assetCardPriceTimers.get(symbol));
+                assetCardPriceTimers.delete(symbol);
+            }
+        }
+        return enabled;
+    }
     var assetCardDirections = Object.freeze({ STRONG_LONG: "强偏多", LONG: "偏多", WEAK_LONG: "弱偏多",
         STRONG_SHORT: "强偏空", SHORT: "偏空", WEAK_SHORT: "弱偏空", RANGE: "震荡", WATCH: "观望" });
     var assetCardRiskNames = Object.freeze({ CHASE: "追高", SHOCK: "急涨急跌", REVERSAL: "反转", CROWDING: "拥挤",
@@ -859,7 +874,8 @@
         })] : null);
     }
     function mergeAssetCardGroup(symbol, version, group, payload) {
-        if (homeCardSymbols.indexOf(symbol) < 0 || !Number.isSafeInteger(version) || version <= 0) return false;
+        if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
+                || !Number.isSafeInteger(version) || version <= 0) return false;
         var identity = symbol + "|" + group;
         if (version <= (assetCardFieldVersions.get(identity) || 0)) return false;
         var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
@@ -892,7 +908,7 @@
     }
     function patchAssetCard(symbol, group) {
         var card = liveCard(symbol), snapshot = assetCardSnapshots.get(symbol);
-        if (!card || !snapshot || homeCardSymbols.indexOf(symbol) < 0) return;
+        if (!card || !snapshot || homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)) return;
         if (group === "PRICE") {
             patchAssetCardField(card, "price", assetCardPrice(snapshot));
             card.setAttribute("data-card-price-at", snapshot.latestPriceAt || "");
@@ -940,7 +956,10 @@
     function mergeAssetCardSnapshot(snapshot, renderFields) {
         if (!snapshot || typeof snapshot !== "object") return false;
         var symbol = String(snapshot.symbol || "").toUpperCase(), version = Number(snapshot.snapshotVersion);
-        if (homeCardSymbols.indexOf(symbol) < 0 || !Number.isSafeInteger(version) || version <= 0) return false;
+        if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
+                || !Number.isSafeInteger(version) || version <= 0) return false;
+        if (snapshot.health && snapshot.health.status === "MODEL_UNAVAILABLE"
+                && !currentModelCheck(snapshot.health, assetCardSnapshots.get(symbol))) return false;
         var accepted = false;
         ["PRICE", "SIGNAL", "RISK", "HEALTH"].forEach(function (group) {
             if (!mergeAssetCardGroup(symbol, version, group, snapshot)) return;
@@ -953,25 +972,41 @@
         }
         return accepted;
     }
-    function applyReadSafetyDowngrade(snapshot, sequence) {
+    function currentModelCheck(health, current) {
+        var checkedAt = assetCardDate(health && health.asOf);
+        var signalAt = assetCardDate(current && current.signal && current.signal.signalAsOf);
+        var healthAt = assetCardDate(current && current.health && current.health.asOf);
+        return checkedAt && checkedAt <= new Date() && (!signalAt || checkedAt >= signalAt) && (!healthAt || checkedAt >= healthAt);
+    }
+    function applyReadSafetyDowngrade(snapshot, sequence, renderFields) {
+        var status = snapshot && snapshot.health && snapshot.health.status;
+        if (status !== "SOURCE_UNAVAILABLE" && status !== "MODEL_UNAVAILABLE") return false;
         var symbol = String(snapshot && snapshot.symbol || "").toUpperCase();
         var version = Number(snapshot && snapshot.snapshotVersion);
         var current = assetCardSnapshots.get(symbol);
-        if (sequence !== assetCardRequestSequence || document.hidden || homeCardSymbols.indexOf(symbol) < 0
+        if (sequence != null && sequence !== assetCardRequestSequence || renderFields !== false && document.hidden || homeCardSymbols.indexOf(symbol) < 0
+                || !assetCardDisplaySymbols.has(symbol)
                 || !current || !Number.isSafeInteger(version) || version <= 0 || version !== current.snapshotVersion
-                || !snapshot.health || snapshot.health.status !== "SOURCE_UNAVAILABLE") return false;
+                || status === "MODEL_UNAVAILABLE" && !currentModelCheck(snapshot.health, current)) return false;
+        var modelUnavailable = status === "MODEL_UNAVAILABLE" || snapshot.signal && snapshot.signal.status === "UNVALIDATED";
+        var sourceUnavailable = status === "SOURCE_UNAVAILABLE";
         var signal = current.signal && Object.assign({}, current.signal, { calibratedConfidence: null, pLong: null, pShort: null });
-        if (signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
+        if (modelUnavailable) signal = Object.assign({}, signal, { direction: null, status: "UNVALIDATED",
+            calibratedConfidence: null, pLong: null, pShort: null, oneHourState: "数据不足", fourHourTrend: "数据不足" });
+        else if (signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
         // A read can fail closed without allocating a published version. It cannot manufacture a direction,
         // erase assessed risk, advance the effective card clock, or restore values at this same version.
-        assetCardSnapshots.set(symbol, Object.assign({}, current, { spotPrice: null, latestPriceAt: null,
+        assetCardSnapshots.set(symbol, Object.assign({}, current, {
+            spotPrice: sourceUnavailable ? null : current.spotPrice, latestPriceAt: sourceUnavailable ? null : current.latestPriceAt,
             signal: signal, health: Object.assign({}, snapshot.health) }));
-        ["PRICE", "SIGNAL", "RISK", "HEALTH"].forEach(function (group) {
+        (sourceUnavailable ? ["PRICE", "SIGNAL", "RISK", "HEALTH"] : ["SIGNAL", "HEALTH"]).forEach(function (group) {
             assetCardFieldVersions.set(symbol + "|" + group, version);
         });
-        patchAssetCard(symbol, "PRICE");
-        patchAssetCard(symbol, "SIGNAL");
-        patchAssetCard(symbol, "HEALTH");
+        if (renderFields !== false) {
+            if (sourceUnavailable) patchAssetCard(symbol, "PRICE");
+            patchAssetCard(symbol, "SIGNAL");
+            patchAssetCard(symbol, "HEALTH");
+        }
         return true;
     }
     function applyAssetCardEvent(event) {
@@ -983,14 +1018,67 @@
         if (payload.symbol && String(payload.symbol).toUpperCase() !== symbol) return;
         var version = Number(event.snapshotVersion == null ? payload.snapshotVersion : event.snapshotVersion);
         if (payload.snapshotVersion != null && Number(payload.snapshotVersion) !== version) return;
+        if (group === "HEALTH" && payload.health && payload.health.status === "MODEL_UNAVAILABLE") {
+            var current = assetCardSnapshots.get(symbol);
+            if (current && version < current.snapshotVersion || !currentModelCheck(payload.health, current)) return;
+            if (!current || version > current.snapshotVersion) {
+                if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
+            }
+            applyReadSafetyDowngrade({ symbol: symbol, snapshotVersion: version, health: payload.health }, null);
+            return;
+        }
         if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
         if (group === "PRICE") scheduleAssetCardPrice(symbol); else patchAssetCard(symbol, group);
     }
-    function opportunityCard(asset, selected) {
+    // Pre-switch renderer from merged main. It is reachable only outside the explicit display cohort.
+    function legacyOpportunityCard(asset, selected) {
         var symbol = symbolOf(asset);
         var isSelected = symbol === selected;
         var ticker = assetTicker(asset);
-        if (asset.cardSignal && String(asset.cardSignal.symbol || "").toUpperCase() === symbol) mergeAssetCardSnapshot(asset.cardSignal, false);
+        var finalDirection = asset.hasFinal === true ? asset.finalMarketBias : asset.marketBias;
+        var direction = has(asset.marketBiasLabel) ? text(asset.marketBiasLabel)
+            : has(finalDirection) ? label(finalDirection, "待重新分析") : "待重新分析";
+        var confidence = desktop.confidenceText(asset);
+        var oneHour = text(asset.oneHourOpportunityLabel, "1小时数据不足");
+        var fourHour = text(asset.fourHourTrendLabel, "4小时数据不足");
+        var price = has(asset.latestPrice) ? "$" + desktop.priceText(asset.latestPrice) : "价格待同步";
+        var provenance = assetProvenance(asset);
+        var risk = desktop.riskSummary(asset);
+        var timeLabel = desktop.directionTimeLabel(asset.directionCalculatedAt);
+        return '<article class="opportunity-card' + (isSelected ? " is-selected" : "") + '" tabindex="0" role="button" aria-pressed="'
+            + String(isSelected) + '" data-symbol="'
+            + escapeHtml(symbol) + '"' + provenanceAttributes(asset) + ' aria-label="查看 '
+            + escapeHtml(symbol + " 首页资产上下文；" + direction + "；置信度 " + confidence) + '"><header><div class="asset-identity"><strong>'
+            + escapeHtml(ticker) + '</strong><span aria-hidden="true">/</span><small>'
+            + escapeHtml(text(asset.name, "名称不可用"))
+            + '</small></div><div class="asset-price-block"><strong class="opportunity-price" data-live-field="price">' + escapeHtml(price)
+            + '</strong>' + desktop.priceCaption(asset) + '</div></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="semantic-value' + directionSemanticClass(finalDirection) + '">' + escapeHtml(direction)
+            + '</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
+            + '</strong></div>' + (risk || asset.homePinned === true ? '<div class="opportunity-facts">' : '')
+            + (risk ? '<div class="opportunity-risk" data-live-field="risk"'
+            + (desktop.hasConfirmedRisks(asset) ? ' tabindex="0" data-desktop-hover="risk" data-risk-symbol="' + escapeHtml(symbol)
+            + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"'
+            : '') + '>' + risk + '</div>' : '')
+            + (asset.homePinned === true ? '<div class="pinned-observation-copy">' + escapeHtml(desktop.pinnedObservationLabel(asset)) + '</div>' : '')
+            + (risk || asset.homePinned === true ? '</div>' : '')
+            + '<div class="opportunity-context"><span>' + escapeHtml(oneHour)
+            + '</span><span>' + escapeHtml(fourHour) + '</span>'
+            + (timeLabel ? '<time class="opportunity-updated" datetime="' + escapeHtml(asset.directionCalculatedAt)
+                + '" title="' + escapeHtml(timeLabel) + '" aria-label="' + escapeHtml(timeLabel) + '">'
+                + escapeHtml(desktop.beijingTime(asset.directionCalculatedAt, true)) + '</time>' : '')
+            + '</div></article>';
+    }
+    function opportunityCard(asset, selected) {
+        var symbol = symbolOf(asset);
+        if (!setAssetCardDisplay(symbol, asset.cardSignalDisplayEnabled === true)) return legacyOpportunityCard(asset, selected);
+        var isSelected = symbol === selected;
+        var ticker = assetTicker(asset);
+        var current = assetCardSnapshots.get(symbol);
+        if (asset.cardSignal && String(asset.cardSignal.symbol || "").toUpperCase() === symbol
+                && (!current || Number(asset.cardSignal.snapshotVersion) >= current.snapshotVersion)) {
+            // The Home loader already checks its own request sequence; this projection still checks the card version.
+            if (!applyReadSafetyDowngrade(asset.cardSignal, null, false)) mergeAssetCardSnapshot(asset.cardSignal, false);
+        }
         var snapshot = assetCardSnapshots.get(symbol) || {};
         var direction = assetCardDirection(snapshot), confidence = assetCardConfidence(snapshot);
         var frames = assetCardTimeframes(snapshot), status = assetCardStatus(snapshot);
@@ -1026,6 +1114,9 @@
             return true;
         }).slice(0, 6);
         homeCardSymbols = assets.map(symbolOf);
+        assetCardDisplaySymbols.forEach(function (symbol) {
+            if (homeCardSymbols.indexOf(symbol) < 0) setAssetCardDisplay(symbol, false);
+        });
         assetCardPriceTimers.forEach(function (timer, symbol) {
             if (homeCardSymbols.indexOf(symbol) < 0) { window.clearTimeout(timer); assetCardPriceTimers.delete(symbol); }
         });
@@ -1716,7 +1807,11 @@
     }
     async function lightweightHomeRefresh() {
         if (document.hidden || !homeCardSymbols.length) return;
-        var symbols = homeCardSymbols.slice();
+        // Preserve the pre-switch periodic read while any legacy card is displayed. This is not an event fallback.
+        if (homeCardSymbols.some(function (symbol) { return !assetCardDisplaySymbols.has(symbol); })) return loadHome(selectedSymbol);
+        var symbols = homeCardSymbols.filter(function (symbol) { return assetCardDisplaySymbols.has(symbol); });
+        if (!symbols.length) return;
+        var displayEpoch = assetCardDisplayEpoch;
         var sequence = ++assetCardRequestSequence;
         if (assetCardAbortController) assetCardAbortController.abort();
         var controller = new AbortController();
@@ -1724,7 +1819,7 @@
         try {
             var query = new URLSearchParams({ view: "ASSET_CARDS", symbols: symbols.join(",") });
             var snapshots = await api("/api/dashboard/runtime-snapshot?" + query.toString(), { signal: controller.signal });
-            if (sequence !== assetCardRequestSequence || document.hidden) return;
+            if (sequence !== assetCardRequestSequence || displayEpoch !== assetCardDisplayEpoch || document.hidden) return;
             if (!Array.isArray(snapshots)) throw new Error("资产卡片快照未返回");
             snapshots.forEach(function (snapshot) {
                 var symbol = String(snapshot && snapshot.symbol || "").toUpperCase();
@@ -2412,7 +2507,12 @@
 
     desktop.installHoverDrawers(function (trigger) {
         if (trigger.dataset.desktopHover === "service") return desktop.serviceDrawer(currentHome);
-        var snapshot = assetCardSnapshots.get(String(trigger.dataset.riskSymbol || "").toUpperCase());
+        var symbol = String(trigger.dataset.riskSymbol || "").toUpperCase();
+        if (!assetCardDisplaySymbols.has(symbol)) {
+            var asset = liveAsset(symbol);
+            return asset ? (trigger.dataset.desktopHover === "risk-status" ? desktop.riskDataStatus(asset) : desktop.riskDrawer(asset)) : null;
+        }
+        var snapshot = assetCardSnapshots.get(symbol);
         return snapshot ? assetCardRiskDrawer(snapshot) : null;
     });
     bindSearch();

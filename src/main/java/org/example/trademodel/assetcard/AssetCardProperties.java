@@ -66,5 +66,15 @@ public class AssetCardProperties {
         modelBundleSha256 = checksum;
     }
     public Set<String> getCanarySymbols() { return canarySymbols; }
-    public void setCanarySymbols(Set<String> value) { canarySymbols = value == null ? Set.of() : Set.copyOf(value); }
+    public void setCanarySymbols(Set<String> value) {
+        if (value == null) { canarySymbols = Set.of(); return; }
+        Set<String> normalized = new java.util.HashSet<>();
+        for (String symbol : value) {
+            String canonical = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!canonical.matches("[A-Z0-9]{2,32}"))
+                throw new IllegalArgumentException("Canary requires exact Spot symbols; patterns are not supported");
+            normalized.add(canonical);
+        }
+        canarySymbols = Set.copyOf(normalized);
+    }
 }

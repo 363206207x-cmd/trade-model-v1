@@ -23,7 +23,10 @@ class AssetCardIsolationIntegrationTest {
         var events = mock(DashboardLiveEventService.class);
         when(pool.listForUser(userId)).thenReturn(List.of(new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin",
                 "SPOT", "USDT", true, 1, "USER")));
-        var service = new AssetCardService(new AssetCardProperties(), market, mapper, pool, events,
+        var properties = new AssetCardProperties();
+        properties.setEnabled(true);
+        properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+        var service = new AssetCardService(properties, market, mapper, pool, events,
                 new ObjectMapper().findAndRegisterModules());
         try {
             for (int i = 0; i < 10; i++) {
@@ -43,5 +46,30 @@ class AssetCardIsolationIntegrationTest {
             assertThatThrownBy(() -> service.snapshotsForUser(userId, List.of("BTCUSDT", "BTCUSDT")))
                     .isInstanceOf(IllegalArgumentException.class);
         } finally { service.close(); }
+    }
+
+    @Test
+    void disabledAndShadowCardReadsExposeNoSnapshotButRetainUserMembershipValidation() {
+        for (boolean enabled : List.of(false, true)) {
+            var properties = new AssetCardProperties();
+            properties.setEnabled(enabled);
+            properties.setModelMode(enabled ? AssetCardProperties.ModelMode.SHADOW : AssetCardProperties.ModelMode.ACTIVE);
+            var mapper = mock(AssetCardMapper.class);
+            var pool = mock(AssetPoolService.class);
+            var market = mock(AssetCardMarketDataService.class);
+            var events = mock(DashboardLiveEventService.class);
+            when(pool.listForUser(7L)).thenReturn(List.of(new AssetPoolAssetDTO(1L, "BTCUSDT", "Bitcoin",
+                    "SPOT", "USDT", true, 1, "USER")));
+            var service = new AssetCardService(properties, market, mapper, pool, events,
+                    new ObjectMapper().findAndRegisterModules());
+            try {
+                for (int i = 0; i < 10; i++) assertThat(service.snapshotsForUser(7L, List.of("BTCUSDT"))).isEmpty();
+                assertThatThrownBy(() -> service.snapshotsForUser(7L, List.of("ETHUSDT")))
+                        .isInstanceOf(IllegalArgumentException.class);
+                verify(pool, times(11)).listForUser(7L);
+                verifyNoMoreInteractions(pool);
+                verifyNoInteractions(mapper, market, events);
+            } finally { service.close(); }
+        }
     }
 }

@@ -77,6 +77,7 @@ public class AssetCardService {
 
     /** Source is the existing pool union, never a page visit, click, or a new subscription-writing GET. */
     public void reconcileSubscriptions() {
+        if (!properties.isEnabled()) return;
         market.reconcileSubscriptions(pool.listScanSymbols());
         for (String symbol : market.subscribedSymbols()) recoverRuntimeState(symbol, Instant.now());
     }
@@ -267,6 +268,7 @@ public class AssetCardService {
     }
 
     private void refreshMinuteVolatility(String symbol, Instant at) {
+        if (!properties.isEnabled()) return;
         try {
             var bars = market.bars(symbol, "1m", at, 13);
             if (bars.size() != 13 || Duration.between(bars.get(12).closeTime(), at).getSeconds() > 75) return;
@@ -293,6 +295,7 @@ public class AssetCardService {
     }
 
     synchronized void refreshRisk(String symbol, Instant at) {
+        if (!properties.isEnabled()) return;
         recoverRuntimeState(symbol, at);
         var current = loadSnapshot(symbol, symbol);
         var frame = featureFrames.get(symbol);
@@ -495,6 +498,18 @@ public class AssetCardService {
     }
 
     private void publish(AssetCardSnapshot snapshot, String type, Map<String, Object> values, Instant at) {
+        // Private computation/persistence above is never gated by the browser rollout cohort.
+        if (!usesCardSignalDisplay(snapshot.symbol())) return;
+        var visible = publicModelProjection(snapshot, at);
+        if ("ASSET_CARD_SIGNAL".equals(type)) values.put("signal", visible.signal());
+        if ("ASSET_CARD_HEALTH".equals(type)) values.put("health", visible.health());
+        dispatch(snapshot, type, values, at);
+        // A price/risk-only update must also revoke an already-rendered old percentage, at the same version.
+        if (visible != snapshot && !"ASSET_CARD_HEALTH".equals(type))
+            dispatch(snapshot, "ASSET_CARD_HEALTH", payload("health", visible.health()), at);
+    }
+
+    private void dispatch(AssetCardSnapshot snapshot, String type, Map<String, Object> values, Instant at) {
         values.put("symbol", snapshot.symbol());
         values.put("snapshotVersion", snapshot.snapshotVersion());
         events.publish(new DashboardLiveEvent(type + ":" + snapshot.symbol() + ":" + snapshot.snapshotVersion(), type,
@@ -510,8 +525,8 @@ public class AssetCardService {
     /** No cache insertion, version allocation, event publication, subscription or other write on this path. */
     public AssetCardSnapshot snapshot(String symbol, String name) {
         String normalized = normalize(symbol);
-        var value = loadSnapshot(normalized, name);
         Instant now = Instant.now();
+        var value = publicModelProjection(loadSnapshot(normalized, name), now);
         if (failures.containsKey(normalized) || value.latestPriceAt() != null &&
                 (value.latestPriceAt().isAfter(now) || Duration.between(value.latestPriceAt(), now).compareTo(properties.getPriceTtl()) > 0)) {
             var signal = value.signal() != null && value.signal().direction() != null ? value.signal().invalidated() : value.signal();
@@ -521,6 +536,26 @@ public class AssetCardService {
         }
         return new AssetCardSnapshot(normalized, name, value.spotPrice(), value.latestPriceAt(), value.signal(), value.risk(),
                 value.health(), value.cardAsOf(), value.snapshotVersion(), value.featureVersion(), value.modelVersion(), value.calibrationVersion());
+    }
+
+    /** Current model identity is checked at every public read/event; stored private facts are never rewritten. */
+    private AssetCardSnapshot publicModelProjection(AssetCardSnapshot snapshot, Instant checkedAt) {
+        var signal = snapshot.signal();
+        boolean hasModelResult = signal != null && (signal.direction() != null || signal.calibratedConfidence() != null
+                || signal.pLong() != null || signal.pShort() != null);
+        if (!hasModelResult) return snapshot;
+        var current = model;
+        boolean trusted = current != null && current.validated() && current.validatedAssets().contains(snapshot.symbol())
+                && AssetCardFeatureService.FEATURE_VERSION.equals(snapshot.featureVersion())
+                && current.modelVersion() != null && !current.modelVersion().isBlank()
+                && current.calibrationVersion() != null && !current.calibrationVersion().isBlank()
+                && Objects.equals(current.modelVersion(), snapshot.modelVersion())
+                && Objects.equals(current.calibrationVersion(), snapshot.calibrationVersion());
+        if (trusted) return snapshot;
+        return new AssetCardSnapshot(snapshot.symbol(), snapshot.assetName(), snapshot.spotPrice(), snapshot.latestPriceAt(),
+                AssetCardSnapshot.Signal.unavailable("UNVALIDATED", signal.signalAsOf()), snapshot.risk(),
+                new AssetCardSnapshot.Health("MODEL_UNAVAILABLE", "卡片模型或校准版本不可用", checkedAt),
+                snapshot.cardAsOf(), snapshot.snapshotVersion(), snapshot.featureVersion(), snapshot.modelVersion(), snapshot.calibrationVersion());
     }
 
     private AssetCardSnapshot loadSnapshot(String symbol, String name) {
@@ -549,7 +584,19 @@ public class AssetCardService {
             String normalized = normalize(symbol);
             if (!names.containsKey(normalized) || !symbols.add(normalized)) throw new IllegalArgumentException("Invalid displayed card selection");
         }
-        return symbols.stream().map(symbol -> snapshot(symbol, names.get(symbol))).toList();
+        return symbols.stream().filter(this::usesCardSignalDisplay)
+                .map(symbol -> snapshot(symbol, names.get(symbol))).toList();
+    }
+
+    /** Rollout cohort only: absent/invalid models stay on the new fail-closed projection, never legacy. */
+    public boolean usesCardSignalDisplay(String symbol) {
+        if (!properties.isEnabled() || symbol == null) return false;
+        final String canonical;
+        try { canonical = normalize(symbol); }
+        catch (IllegalArgumentException invalid) { return false; }
+        return properties.getModelMode() == AssetCardProperties.ModelMode.ACTIVE
+                || properties.getModelMode() == AssetCardProperties.ModelMode.CANARY
+                && properties.getCanarySymbols().contains(canonical);
     }
 
     private static String normalize(String symbol) {

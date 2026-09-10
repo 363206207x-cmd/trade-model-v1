@@ -89,7 +89,7 @@ class HomeUiReviewRuntimeContractTest {
                   marketBias: 'BULLISH', marketBiasLabel: '偏多',
                   finalConfidence: 80, confidenceLabel: '80%%', riskLevel: index === 2 ? 'HIGH' : 'MEDIUM',
                   riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
-                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: true,
+                  fourHourTrendLabel: '4小时趋势偏多', hasFinal: true, cardSignalDisplayEnabled: true,
                   cardSignal: { symbol, assetName: ['Bitcoin','Ethereum','Solana'][index], snapshotVersion: 1,
                     featureVersion:'test-only',modelVersion:'test-only',calibrationVersion:'test-only',
                     spotPrice:100,latestPriceAt:'2026-09-10T00:00:00Z',cardAsOf:'2026-09-10T00:00:00Z',
@@ -250,14 +250,14 @@ class HomeUiReviewRuntimeContractTest {
                 %s
                 %s
                 const observation = {
-                  assetId: 1, symbol: 'ETHUSDT', name: 'Ethereum', slotType: 'OBSERVATION',
+                  assetId: 1, symbol: 'ETHUSDT', name: 'Ethereum', slotType: 'OBSERVATION', cardSignalDisplayEnabled: true,
                   opportunityState: 'NO_QUALIFIED_OPPORTUNITY', dataFreshness: 'FRESH',
                   marketBiasLabel: '暂不可判断', confidenceLabel: '—', riskLabel: '暂不可判断',
                   oneHourOpportunityLabel: '1小时分析未完成', fourHourTrendLabel: '4小时分析未完成',
                   latestAnalysisTime: '2026-08-30T10:00:00Z'
                 };
                 const blockedObservation = {
-                  assetId: 2, symbol: 'BTCUSDT', name: 'Bitcoin', slotType: 'DECISION',
+                  assetId: 2, symbol: 'BTCUSDT', name: 'Bitcoin', slotType: 'DECISION', cardSignalDisplayEnabled: true,
                   analysisId: 'analysis-btc', opportunityId: 'opportunity-btc', opportunityScore: 0,
                   opportunityState: 'HIGH_RISK', finalPlanMode: 'BLOCKED', dataFreshness: 'STALE',
                   marketBiasLabel: '暂不可判断', confidenceLabel: '—', riskLabel: '暂不可判断',

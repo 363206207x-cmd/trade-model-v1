@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.trademodel.assetcard.AssetCardMarketDataService;
+import org.example.trademodel.assetcard.AssetCardBetaCalibration;
+import org.example.trademodel.assetcard.AssetCardFeatureService;
+import org.example.trademodel.assetcard.AssetCardModelBundle;
 import org.example.trademodel.assetcard.AssetCardProperties;
 import org.example.trademodel.assetcard.AssetCardService;
 import org.example.trademodel.assetcard.AssetCardSnapshot;
@@ -398,8 +401,12 @@ class DashboardHomeServiceImplTest {
         AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
         var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
         ObjectMapper cardJson = new ObjectMapper().findAndRegisterModules();
-        AssetCardService cards = new AssetCardService(new AssetCardProperties(), market, cardsMapper, pool, events, cardJson);
+        AssetCardProperties properties = new AssetCardProperties();
+        properties.setEnabled(true);
+        properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+        AssetCardService cards = new AssetCardService(properties, market, cardsMapper, pool, events, cardJson);
         try {
+            installCardMetadataOnlyFixture(cards);
             service.setAssetPoolService(pool);
             service.setAssetCardService(cards);
             List<AssetPoolAssetDTO> members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
@@ -426,6 +433,7 @@ class DashboardHomeServiceImplTest {
             assertThat(home.getAssets()).extracting(DashboardHomeVO.AssetVO::getRawSymbol)
                     .containsExactly("LINKUSDT", "BTCUSDT");
             assertThat(home.getAssets().stream().map(this::canonicalCardFacts).toList()).isEqualTo(canonicalBefore);
+            assertThat(home.getAssets()).allSatisfy(asset -> assertThat(asset.isCardSignalDisplayEnabled()).isTrue());
             assertThat(link.getCardSignal().signal().direction()).isEqualTo(AssetCardSnapshot.Direction.STRONG_SHORT);
             assertThat(link.getCardSignal().signal().calibratedConfidence()).isEqualTo(99);
             assertThat(btc.getCardSignal().signal().calibratedConfidence()).isEqualTo(25);
@@ -474,6 +482,8 @@ class DashboardHomeServiceImplTest {
                 isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .25));
         when(cards.snapshot(eq("BTCUSDT"), anyString())).thenReturn(
                 isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.STRONG_LONG, .99, .01));
+        when(cards.usesCardSignalDisplay("LINKUSDT")).thenReturn(true);
+        when(cards.usesCardSignalDisplay("BTCUSDT")).thenReturn(true);
         service.setAssetCardService(cards);
         DashboardHomeVO withCards = service.getHomeForUser(USER_ID, null, 6, null);
 
@@ -488,7 +498,62 @@ class DashboardHomeServiceImplTest {
         verifyNoMoreInteractions(ranking);
         verify(cards).snapshot(eq("LINKUSDT"), anyString());
         verify(cards).snapshot(eq("BTCUSDT"), anyString());
+        verify(cards).usesCardSignalDisplay("LINKUSDT");
+        verify(cards).usesCardSignalDisplay("BTCUSDT");
         verifyNoMoreInteractions(cards);
+    }
+
+    @Test
+    void homeReleaseFlagUsesModeAndExactSymbolNotModelAvailabilityAndClearsHiddenSnapshots() {
+        assertThat(new DashboardHomeVO.AssetVO().isCardSignalDisplayEnabled()).isFalse();
+        for (boolean enabled : List.of(false, true)) {
+            for (var mode : AssetCardProperties.ModelMode.values()) {
+                AssetCardProperties properties = new AssetCardProperties();
+                properties.setEnabled(enabled);
+                properties.setModelMode(mode);
+                properties.setCanarySymbols(java.util.Set.of("BTCUSDT"));
+                AssetPoolService pool = mock(AssetPoolService.class);
+                AssetCardMapper mapper = mock(AssetCardMapper.class);
+                AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
+                var events = mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+                AssetCardService cards = new AssetCardService(properties, market, mapper, pool, events,
+                        new ObjectMapper().findAndRegisterModules());
+                try {
+                    service.setAssetPoolService(pool);
+                    service.setAssetCardService(cards);
+                    var btc = canonicalCardAsset("BTCUSDT", "BTC/USDT", 51, "WEAK_BEARISH", "MEDIUM", 94);
+                    var eth = canonicalCardAsset("ETHUSDT", "ETH/USDT", 78, "BULLISH", "LOW", 83);
+                    // A prior ACTIVE response must not survive a later SHADOW/disabled projection.
+                    btc.setCardSignalDisplayEnabled(true);
+                    eth.setCardSignalDisplayEnabled(true);
+                    btc.setCardSignal(isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.LONG, .99, .01));
+                    eth.setCardSignal(isolatedCardFixture("ETHUSDT", AssetCardSnapshot.Direction.SHORT, .01, .99));
+                    var before = List.of(canonicalCardFacts(btc), canonicalCardFacts(eth));
+                    DashboardHomeVO home = new DashboardHomeVO();
+                    home.setAssets(List.of(btc, eth));
+                    home.setSelectedSymbol("BTCUSDT");
+                    boolean all = enabled && mode == AssetCardProperties.ModelMode.ACTIVE;
+                    boolean btcVisible = all || enabled && mode == AssetCardProperties.ModelMode.CANARY;
+
+                    ReflectionTestUtils.invokeMethod(service, "attachCompleteRuntimeProjection", home, USER_ID, null);
+
+                    assertThat(btc.isCardSignalDisplayEnabled()).as(enabled + ":" + mode).isEqualTo(btcVisible);
+                    assertThat(eth.isCardSignalDisplayEnabled()).isEqualTo(all);
+                    for (var asset : home.getAssets()) {
+                        if (asset.isCardSignalDisplayEnabled()) {
+                            assertThat(asset.getCardSignal()).isNotNull();
+                            assertThat(asset.getCardSignal().signal().status()).isEqualTo("INSUFFICIENT_DATA");
+                            assertThat(asset.getCardSignal().signal().calibratedConfidence()).isNull();
+                            verify(mapper).selectSnapshotJson(asset.getRawSymbol());
+                        } else assertThat(asset.getCardSignal()).isNull();
+                    }
+                    assertThat(home.getAssets().stream().map(this::canonicalCardFacts).toList()).isEqualTo(before);
+                    assertThat(home.getAssetPool().stream().map(this::canonicalCardFacts).toList()).isEqualTo(before);
+                    verifyNoMoreInteractions(mapper);
+                    verifyNoInteractions(market, events);
+                } finally { cards.close(); }
+            }
+        }
     }
 
     private DashboardHomeVO.AssetVO canonicalCardAsset(String raw, String display, int confidence,
@@ -524,7 +589,23 @@ class DashboardHomeServiceImplTest {
                 new AssetCardSnapshot.Risk("HIGH", List.of(new AssetCardSnapshot.RiskItem("CROWDING", "ASSESSED",
                         "HIGH", "TEST_FIXTURE", "TEST_FIXTURE", at, "TEST_FIXTURE", "RATIO")), at),
                 new AssetCardSnapshot.Health("TEST_FIXTURE", "TEST_FIXTURE", at), at, 1,
-                "TEST_FIXTURE_FEATURE", "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION");
+                AssetCardFeatureService.FEATURE_VERSION, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION");
+    }
+
+    /** Explicit test-only metadata binding; no native load, prediction, trained artifacts or production readiness. */
+    private void installCardMetadataOnlyFixture(AssetCardService cards) {
+        try {
+            var constructor = AssetCardModelBundle.class.getDeclaredConstructor(ml.dmlc.xgboost4j.java.Booster.class,
+                    ml.dmlc.xgboost4j.java.Booster.class, AssetCardBetaCalibration.Parameters.class,
+                    AssetCardBetaCalibration.Parameters.class, String.class, String.class, String.class,
+                    AssetCardModelBundle.Thresholds.class, Map.class, java.util.Set.class, String.class);
+            constructor.setAccessible(true);
+            var calibration = new AssetCardBetaCalibration.Parameters(1, 1, 0, 1e-12);
+            var bundle = constructor.newInstance(mock(ml.dmlc.xgboost4j.java.Booster.class), mock(ml.dmlc.xgboost4j.java.Booster.class),
+                    calibration, calibration, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", "TEST_FIXTURE_THRESHOLDS",
+                    null, Map.of(), java.util.Set.of("BTCUSDT", "LINKUSDT"), null);
+            ReflectionTestUtils.setField(cards, "model", bundle);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError("Test-only immutable bundle signature changed", failure); }
     }
 
     @Test

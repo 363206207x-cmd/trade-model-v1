@@ -5,6 +5,7 @@ import pathlib
 import unittest
 from unittest.mock import patch
 import copy
+import json
 
 SPEC = importlib.util.spec_from_file_location("asset_card_model", pathlib.Path(__file__).with_name("asset_card_model.py"))
 model = importlib.util.module_from_spec(SPEC)
@@ -177,6 +178,24 @@ class ModelTests(unittest.TestCase):
         rows.append({"symbol":"BTCUSDT","realInputs":{"fundingRate":{**observation,"availableAt":"2026-01-01T00:02:00Z"}}})
         self.assertEqual(model.risk_distributions(rows,policy),{})
 
+    def test_risk_distribution_metric_keys_survive_deduplication_and_json_roundtrip(self):
+        observations=[]
+        for minute in (0,1):
+            inputs={key:{"value":value+minute,"source":"SYNTHETIC_FIXTURE",
+                         "observedAt":f"2026-01-01T00:0{minute}:00Z",
+                         "availableAt":f"2026-01-01T00:0{minute}:01Z"}
+                    for key,value in (("spreadBps",2),("depth10Bps",100))}
+            observations.append({"symbol":"BTCUSDT","realInputs":inputs})
+        policy={"requiredAssets":["BTCUSDT"],"riskMetrics":{
+            key:{"unit":unit,"higherIsWorse":adverse,"mediumPercentile":.8,
+                 "highPercentile":.95,"minSamples":2}
+            for key,unit,adverse in (("spreadBps","BPS",True),("depth10Bps","QUOTE_CURRENCY",False))}}
+        result=model.risk_distributions(observations+[observations[0]],policy)
+        self.assertEqual(set(result["BTCUSDT"]),{"spreadBps","depth10Bps"})
+        self.assertEqual(result["BTCUSDT"]["spreadBps"]["sortedValues"],[2,3])
+        self.assertEqual(result["BTCUSDT"]["depth10Bps"]["sortedValues"],[100,101])
+        self.assertEqual(json.loads(json.dumps(result,allow_nan=False)),result)
+
     def test_population_counts_and_missing_strata_never_release(self):
         policy={"requiredAssets":["BTCUSDT"],"requiredRegimes":["LONG"],"requiredVolatilityStrata":["LOW"]}
         report={"splits":[{"count":40},{"count":35},{"count":30},{"count":30}],"sides":{},"strata":{},"tiers":{},"thresholdSelectionTiers":{},"rangeEvidence":{"count":3}}
@@ -203,14 +222,21 @@ class ModelTests(unittest.TestCase):
         import xgboost as xgb
         self.assertEqual(xgb.__version__,model.XGBOOST_VERSION)
         data=np.arange(80,dtype=np.float32).reshape(40,2)
-        labels=np.array([i%3==0 for i in range(40)],dtype=np.float32)
-        booster=xgb.train({"objective":"binary:logistic","device":"cpu","nthread":1,"max_depth":2,"eta":.2,"seed":7},xgb.DMatrix(data,label=labels),num_boost_round=4)
-        predictions=booster.predict(xgb.DMatrix(data)).tolist()
-        self.assertEqual(len(predictions),40)
-        long=model.fit_beta(predictions,labels.tolist())
-        short=model.fit_beta(predictions,(1-labels).tolist())
-        self.assertNotEqual(long,short)
-        self.assertTrue(all(0<=model.beta(p,long)<=1 for p in predictions))
+        calibrators={}; raw={}
+        for side,cutoff in (("LONG",20),("SHORT",12)):
+            labels=np.array([i>=cutoff if side=="LONG" else i<cutoff for i in range(40)],dtype=np.float32)
+            booster=xgb.train({"objective":"binary:logistic","device":"cpu","nthread":1,"max_depth":2,"eta":.2,"seed":7},xgb.DMatrix(data,label=labels),num_boost_round=4)
+            raw[side]=booster.predict(xgb.DMatrix(data)).tolist()
+            self.assertEqual(len(raw[side]),40)
+            calibrators[side]=model.fit_beta(raw[side],labels.tolist())
+            self.assertTrue(all(0<=model.beta(p,calibrators[side])<=1 for p in raw[side]))
+        self.assertNotEqual(raw["LONG"],raw["SHORT"])
+        self.assertNotEqual(calibrators["LONG"],calibrators["SHORT"])
+
+    def test_anticorrelated_beta_fit_cannot_silently_publish_collapsed_calibrator(self):
+        if importlib.util.find_spec("scipy") is None: self.skipTest("Fixed offline SciPy test dependency required")
+        with self.assertRaisesRegex(ValueError,"Invalid probability/independent monotone beta calibrator"):
+            model.fit_beta([.1,.2,.8,.9],[1,1,0,0])
 
 
 if __name__ == "__main__": unittest.main()

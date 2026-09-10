@@ -221,7 +221,7 @@ class GlobalFrozenUiAlignmentContractTest {
                 const drawCard=(asset,selected)=>{assetCardSnapshots.clear();assetCardFieldVersions.clear();return renderCard(asset,selected);};
                 const types=['CHASE_RISK','RAPID_MOVE_RISK','TREND_REVERSAL_RISK','CROWDING_RISK',
                     'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
-                const asset={symbol:'TESTUSDT',name:'Test fixture',marketBias:'BULLISH',confidenceLevel:65,
+                const asset={symbol:'TESTUSDT',name:'Test fixture',marketBias:'BULLISH',confidenceLevel:65,cardSignalDisplayEnabled:true,
                     riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
                 assert.equal(desktop.hasConfirmedRisks(asset),false);
                 assert.equal(desktop.riskSummary(asset),'');assert.equal(desktop.riskDrawer(asset),'');

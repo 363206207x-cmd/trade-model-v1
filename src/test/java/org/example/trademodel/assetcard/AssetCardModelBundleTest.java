@@ -135,33 +135,62 @@ class AssetCardModelBundleTest {
     @Test void pythonUbjsonDualModelsLoadAndPredictIdenticallyOnJava17TestFixtureOnly() throws Exception {
         String python=System.getProperty("assetCard.testPython");
         Assumptions.assumeTrue(python!=null,"Opt-in fixed Python/XGBoost test environment required; never real training data");
+        assertThat(Runtime.version().feature()).as("Native interoperability must run on Java 17").isEqualTo(17);
         String script="""
                 import json,sys,numpy as np,xgboost as x
                 from pathlib import Path
+                sys.path.insert(0,sys.argv[3])
+                import asset_card_model as model
+                assert x.__version__ == model.XGBOOST_VERSION == '2.1.4'
                 root=Path(sys.argv[1]); width=int(sys.argv[2])
                 a=np.zeros((40,width),dtype=np.float32); a[:,0]=np.arange(40)
                 result={}
-                for side,period in [('long',3),('short',5)]:
-                    labels=np.asarray([i%period==0 for i in range(40)],dtype=np.float32)
-                    b=x.train({'objective':'binary:logistic','device':'cpu','nthread':1,'max_depth':2,'eta':.2,'seed':7},x.DMatrix(a,label=labels),num_boost_round=4)
+                for side,cutoff in [('long',20),('short',12)]:
+                    labels=np.asarray([i>=cutoff if side=='long' else i<cutoff for i in range(40)],dtype=np.float32)
+                    b=x.train({'objective':'binary:logistic','device':'cpu','nthread':1,'max_depth':2,'eta':.2,'seed':7,'verbosity':0},x.DMatrix(a,label=labels),num_boost_round=4)
+                    calibrator=model.fit_beta(b.predict(x.DMatrix(a)).tolist(),labels.tolist())
                     b.save_model(root/(side+'.ubj'))
-                    result[side]=float(b.predict(x.DMatrix(a[-1:]))[0])
+                    raw=b.predict(x.DMatrix(a[[0,19,39]])).tolist()
+                    result[side]={'raw':raw,'calibrator':calibrator,'calibrated':[model.beta(p,calibrator) for p in raw]}
                 print(json.dumps(result))
                 """;
-        Process process=new ProcessBuilder(python,"-B","-c",script,directory.toString(),String.valueOf(AssetCardFeatureService.FEATURE_NAMES.size())).redirectErrorStream(true).start();
-        String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(process.waitFor()).as(output).isZero();
+        int width=AssetCardFeatureService.FEATURE_NAMES.size();
+        Process process=new ProcessBuilder(python,"-B","-c",script,directory.toString(),String.valueOf(width),
+                Path.of("scripts").toAbsolutePath().toString()).redirectErrorStream(true).start();
+        String output;
+        try {
+            assertThat(process.waitFor(60,java.util.concurrent.TimeUnit.SECONDS)).as("Synthetic native fixture process completed").isTrue();
+            output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(process.exitValue()).as("Synthetic dual-model fixture generation succeeded").isZero();
+        } finally { if(process.isAlive()) process.destroyForcibly().waitFor(); }
         var expected=new ObjectMapper().readTree(output);
-        float[] values=new float[AssetCardFeatureService.FEATURE_NAMES.size()]; values[0]=39;
-        DMatrix matrix=new DMatrix(values,1,values.length,Float.NaN);
+        assertThat(expected.path("long").path("calibrator")).isNotEqualTo(expected.path("short").path("calibrator"));
+        float[] values=new float[width*3]; values[width]=19; values[width*2]=39;
+        DMatrix matrix=new DMatrix(values,3,width,Float.NaN);
         try {
             for(String side:List.of("long","short")) {
                 var booster=XGBoost.loadModel(directory.resolve(side+".ubj").toString());
-                try { assertThat((double)booster.predict(matrix)[0][0]).isCloseTo(expected.path(side).asDouble(),within(1e-7)); }
-                finally { booster.dispose(); }
+                try {
+                    var node=expected.path(side); var parameters=node.path("calibrator");
+                    var calibrator=new AssetCardBetaCalibration.Parameters(parameters.path("a").asDouble(),
+                            parameters.path("b").asDouble(),parameters.path("c").asDouble(),parameters.path("epsilon").asDouble());
+                    float[][] predictions=booster.predict(matrix);
+                    assertThat(predictions.length).isEqualTo(3);
+                    double rawDelta=0,calibratedDelta=0;
+                    for(int row=0;row<3;row++) {
+                        assertThat(predictions[row]).hasSize(1);
+                        double raw=predictions[row][0],calibrated=AssetCardBetaCalibration.calibrate(raw,calibrator);
+                        double expectedRaw=node.path("raw").get(row).asDouble(),expectedCalibrated=node.path("calibrated").get(row).asDouble();
+                        assertThat(raw).isCloseTo(expectedRaw,within(1e-7));
+                        assertThat(calibrated).isCloseTo(expectedCalibrated,within(1e-7));
+                        rawDelta=Math.max(rawDelta,Math.abs(raw-expectedRaw));
+                        calibratedDelta=Math.max(calibratedDelta,Math.abs(calibrated-expectedCalibrated));
+                    }
+                    System.out.printf(Locale.ROOT,"ASSET_CARD_NATIVE_INTEROP side=%s JAVA=17 XGBOOST=2.1.4 UBJ=PASS RAW_MAX_DELTA=%.12g BETA_MAX_DELTA=%.12g%n",side,rawDelta,calibratedDelta);
+                } finally { booster.dispose(); }
             }
         } finally { matrix.dispose(); }
         // No production manifest is emitted: these files are explicitly synthetic test artifacts.
-        assertThat(AssetCardModelBundle.load(directory,"0".repeat(64)).validated()).isFalse();
+        try(var rejected=AssetCardModelBundle.load(directory,"0".repeat(64))) { assertThat(rejected.validated()).isFalse(); }
     }
 }

@@ -433,11 +433,11 @@ def risk_distributions(train,policy):
             # Repeated cached snapshots are one observation, not inflated independent samples.
             unique={}
             for observation in observations:
-                key=(observation["source"],timestamp(observation["observedAt"]))
-                existing=unique.get(key)
+                observation_key=(observation["source"],timestamp(observation["observedAt"]))
+                existing=unique.get(observation_key)
                 if existing is not None and existing["value"]!=observation["value"]:
                     raise ValueError("Conflicting same-source historical risk observation")
-                if existing is None or timestamp(observation["availableAt"])<timestamp(existing["availableAt"]): unique[key]=observation
+                if existing is None or timestamp(observation["availableAt"])<timestamp(existing["availableAt"]): unique[observation_key]=observation
             values=sorted(o["value"] for o in unique.values())
             if len(values)<spec["minSamples"]: continue
             entries[key]={**spec,"sortedValues":values,"samples":len(values),"source":"REAL_HISTORICAL_TRAIN_ONLY",

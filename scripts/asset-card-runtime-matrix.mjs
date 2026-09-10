@@ -7,14 +7,19 @@ const source = fs.readFileSync("src/main/resources/static/js/home-runtime.js", "
 assert.ok(source.includes("function applyAssetCardEvent("), "production Home must own a field-only asset-card event handler");
 const bootstrap = "    desktop.installHoverDrawers(function (trigger) {";
 assert.equal(source.split(bootstrap).length, 2);
+const hoverBody = source.slice(source.indexOf(bootstrap) + bootstrap.length, source.indexOf("    bindSearch();", source.indexOf(bootstrap)))
+  .trim().replace(/\}\);$/, "");
 const exported = `globalThis.cardTest = {
   opportunityCard, applyAssetCardEvent, mergeAssetCardSnapshot, lightweightHomeRefresh, assetCardRiskDrawer,
   scheduleHomeFallbackPoll, stopHomeFallbackPoll, connectHomeStream, assetCardClock,
-  setHome(value) { currentHome = value; homeCardSymbols = value.assets.map(symbolOf); },
+  setHome(value) { currentHome = value; homeCardSymbols = value.assets.map(symbolOf);
+    value.assets.forEach(asset => opportunityCard(asset, value.selectedSymbol)); },
   setConnected(value) { homeStreamConnected = value; },
   stream() { return homeEventSource; },
   snapshot(symbol) { return assetCardSnapshots.get(symbol); },
+  riskDrawerForTrigger(trigger) { ${hoverBody} },
   setApi(value) { api = value; },
+  setHomeLoader(value) { loadHome = value; },
   applyHomeLiveEvent
 }; return;
 `;
@@ -52,6 +57,7 @@ function fixture() {
   vm.runInContext(source.replace(bootstrap, exported + bootstrap), context);
   const home = { assets: ["BTCUSDT", "ETHUSDT"].map((symbol, index) => ({ assetId: index + 1, rawSymbol: symbol,
     name: symbol, slot: index + 1, homePinned: true, finalConfidence: 99, latestPrice: 99999,
+    cardSignalDisplayEnabled: true, hasFinal: true, marketBiasLabel: "偏空",
     finalMarketBias: "STRONG_BEARISH", riskLevel: "LOW" })), selectedSymbol: "BTCUSDT",
     positions: [{ positionId: "123", markPrice: 101 }], executionSuggestion: { status: "BLOCKED" },
     aiDecision: { tabs: [{ role: "GPT_FINAL" }] } };
@@ -72,6 +78,81 @@ function snapshot(symbol = "BTCUSDT", version = 1) {
 function event(type, version, fields, symbol = "BTCUSDT") {
   return { eventType: `ASSET_CARD_${type}`, symbol, snapshotVersion: version, payload: { symbol, snapshotVersion: version, ...fields } };
 }
+
+// The explicit server display cohort, never snapshot presence, owns the renderer switch.
+for (const flag of [false, undefined, "true"]) {
+  const legacy = fixture();
+  const assets = legacy.home.assets.map(asset => ({ ...asset, cardSignalDisplayEnabled: flag, cardSignal: snapshot(asset.rawSymbol),
+    riskItems: [{ riskType: "EVENT_RISK", evidenceStatus: "AVAILABLE", severity: "HIGH", currentValue: "2",
+      source: "fixture-legacy-event", observedAt: "2026-09-10T00:00:00Z", primaryEvidence: "legacy event evidence" }] }));
+  legacy.setHome({ ...legacy.home, assets });
+  let legacyLoads = 0;
+  legacy.setHomeLoader(async () => { legacyLoads++; });
+  for (const asset of assets) {
+    const html = legacy.opportunityCard(asset, "BTCUSDT");
+    assert.ok(html.includes('data-live-field="confidence">99%'), "disabled/SHADOW/outside-CANARY preserves the existing visible confidence");
+    assert.ok(html.includes('data-live-field="price">$99,999'), "the non-cohort keeps its pre-switch price renderer");
+    assert.equal((html.match(/data-live-field="confidence"/g) || []).length, 1);
+    assert.ok(html.includes('data-desktop-hover="risk"'), "outside-cohort keeps its actual evidence risk interaction");
+    assert.ok(legacy.riskDrawerForTrigger({ dataset: { desktopHover: "risk", riskSymbol: asset.rawSymbol } }).includes("fixture-legacy-event"));
+    assert.ok(!html.includes("72%"), "an attached SHADOW result cannot select the new renderer");
+    for (const group of ["PRICE", "SIGNAL", "RISK", "HEALTH"]) legacy.applyAssetCardEvent(event(group, 20, snapshot(asset.rawSymbol), asset.rawSymbol));
+    assert.equal(legacy.snapshot(asset.rawSymbol), undefined, "non-cohort ignores all independent card SSE groups");
+  }
+  await legacy.lightweightHomeRefresh();
+  assert.equal(legacy.requests.length, 0, "no card-only GET when no displayed symbol is in the cohort");
+  assert.equal(legacyLoads, 1, "disabled/SHADOW retains the existing periodic Home read, not blank frozen legacy cards");
+  legacy.setConnected(true); legacy.scheduleHomeFallbackPoll();
+  assert.equal([...legacy.intervals.values()][0].delay, 60000);
+  for (let i = 0; i < 3; i++) { [...legacy.intervals.values()][0].callback(); await Promise.resolve(); }
+  assert.equal(legacyLoads, 4);
+  legacy.setConnected(false); legacy.scheduleHomeFallbackPoll();
+  assert.equal(legacy.intervals.size, 1);
+  assert.equal([...legacy.intervals.values()][0].delay, 15000);
+}
+const cohort = fixture();
+const cohortAssets = cohort.home.assets.map((asset, index) => ({ ...asset, cardSignalDisplayEnabled: index === 0 }));
+cohort.setHome({ ...cohort.home, assets: cohortAssets });
+cohort.mergeAssetCardSnapshot(snapshot("BTCUSDT", 2), false);
+cohort.applyAssetCardEvent(event("PRICE", 4, { spotPrice: 444, latestPriceAt: "2026-09-10T00:00:04Z" }));
+let mixedHomeReads = 0, mixedHtml;
+cohort.setHomeLoader(async () => {
+  mixedHomeReads++;
+  mixedHtml = cohortAssets.map(asset => cohort.opportunityCard({ ...asset, cardSignal: snapshot(asset.rawSymbol, 1) }, "BTCUSDT")).join("");
+});
+cohort.setApi(async () => { throw new Error("mixed cohort must not issue a second concurrent card GET"); });
+await cohort.lightweightHomeRefresh();
+assert.equal(mixedHomeReads, 1);
+assert.equal(cohort.snapshot("BTCUSDT").snapshotVersion, 4);
+assert.equal(cohort.snapshot("BTCUSDT").spotPrice, 444, "a periodic legacy Home result cannot overwrite a newer card SSE field");
+assert.equal(cohort.snapshot("ETHUSDT"), undefined, "an unexpected non-cohort GET row cannot patch legacy cards");
+assert.ok(cohort.opportunityCard(cohortAssets[1], "BTCUSDT").includes('data-live-field="confidence">99%'));
+assert.equal((mixedHtml.match(/data-live-field="confidence"/g) || []).length, 2, "mixed cohorts still have one visible confidence per card");
+assert.deepEqual([...mixedHtml.matchAll(/data-symbol="([^"]+)"/g)].map(match => match[1]), ["BTCUSDT", "ETHUSDT"]);
+for (const invalid of [null, { ...snapshot("BTCUSDT", 3), modelVersion: null },
+  { ...snapshot("BTCUSDT", 4), signal: { direction: null, status: "INSUFFICIENT_DATA" } }]) {
+  const switched = fixture();
+  const asset = { ...switched.home.assets[0], cardSignalDisplayEnabled: true, cardSignal: invalid };
+  const html = switched.opportunityCard(asset, "BTCUSDT");
+  assert.ok(html.includes('data-live-field="confidence">—'));
+  assert.ok(!html.includes("99%") && !html.includes("99,999"), "switched missing/invalid model is fail-closed, never a legacy fallback");
+}
+const changedCohort = fixture();
+let finishPriorCohortRead;
+changedCohort.setApi(() => new Promise(resolve => { finishPriorCohortRead = resolve; }));
+const priorCohortRead = changedCohort.lightweightHomeRefresh();
+changedCohort.setHome({ ...changedCohort.home, assets: changedCohort.home.assets.map(asset => ({ ...asset, cardSignalDisplayEnabled: false })) });
+changedCohort.setHome(changedCohort.home);
+finishPriorCohortRead([snapshot("BTCUSDT", 100)]);
+await priorCohortRead;
+assert.equal(changedCohort.snapshot("BTCUSDT"), undefined, "a request from a previous display cohort cannot revive its old model result after re-entry");
+const reentry = fixture();
+const reentryAsset = { ...reentry.home.assets[0], cardSignal: snapshot("BTCUSDT", 10) };
+reentry.opportunityCard(reentryAsset, "BTCUSDT");
+reentry.opportunityCard({ ...reentryAsset, cardSignalDisplayEnabled: false }, "BTCUSDT");
+assert.ok(reentry.opportunityCard(reentryAsset, "BTCUSDT").includes('data-live-field="confidence">72%'),
+  "a fresh complete cohort projection is not hidden by field watermarks from its previous membership");
+
 const f = fixture();
 const directions = { STRONG_LONG: "强偏多", LONG: "偏多", WEAK_LONG: "弱偏多", STRONG_SHORT: "强偏空",
   SHORT: "偏空", WEAK_SHORT: "弱偏空", RANGE: "震荡", WATCH: "观望" };
@@ -304,6 +385,62 @@ const supersededRead = safety.lightweightHomeRefresh(), currentRead = safety.lig
 safetyPending[1]([snapshot("BTCUSDT", 203)]); await currentRead;
 safetyPending[0]([unavailable(203)]); await supersededRead;
 assert.equal(safety.snapshot("BTCUSDT").signal.status, "VALID", "an obsolete request sequence cannot apply even an equal-version safety downgrade");
+const checkedAt = new Date().toISOString();
+const modelBase = snapshot("BTCUSDT", 300);
+modelBase.signal.signalAsOf = new Date(Date.now() - 5000).toISOString();
+const revokedModel = version => ({ ...modelBase, snapshotVersion: version,
+  signal: { direction: null, status: "UNVALIDATED", calibratedConfidence: null, pLong: null, pShort: null,
+    oneHourState: "数据不足", fourHourTrend: "数据不足", signalAsOf: modelBase.signal.signalAsOf },
+  health: { status: "MODEL_UNAVAILABLE", reason: "fixture-current-model-revoked", asOf: checkedAt } });
+for (const readPath of ["HOME", "CARD_GET"]) {
+  const modelSafety = fixture();
+  modelSafety.mergeAssetCardSnapshot(modelBase, true);
+  modelSafety.mergeAssetCardSnapshot(snapshot("ETHUSDT", 300), true);
+  const beforeOther = JSON.stringify(modelSafety.snapshot("ETHUSDT"));
+  if (readPath === "HOME") modelSafety.opportunityCard({ ...modelSafety.home.assets[0], cardSignal: revokedModel(300) }, "BTCUSDT");
+  else { modelSafety.setApi(async () => [revokedModel(300)]); await modelSafety.lightweightHomeRefresh(); }
+  const result = modelSafety.snapshot("BTCUSDT");
+  assert.equal(result.signal.direction, null, readPath + " same-version current model revocation hides the direction");
+  assert.equal(result.signal.calibratedConfidence, null);
+  assert.equal(result.signal.pLong, null); assert.equal(result.signal.pShort, null);
+  assert.equal(result.signal.status, "UNVALIDATED");
+  assert.equal(result.spotPrice, modelBase.spotPrice, "model failure is not loss of real Spot price");
+  assert.deepEqual(result.risk, modelBase.risk);
+  assert.equal(result.cardAsOf, modelBase.cardAsOf);
+  assert.equal(JSON.stringify(modelSafety.snapshot("ETHUSDT")), beforeOther);
+  const html = modelSafety.opportunityCard({ ...modelSafety.home.assets[0], cardSignal: modelBase }, "BTCUSDT");
+  assert.ok(!html.includes("72%") && !html.includes("99%"), "an equal-version normal Home cannot restore a revoked model or legacy confidence");
+}
+const staleModelHome = fixture();
+staleModelHome.mergeAssetCardSnapshot({ ...modelBase, snapshotVersion: 290 }, false);
+staleModelHome.applyAssetCardEvent(event("PRICE", 301, { spotPrice: 301 }));
+staleModelHome.opportunityCard({ ...staleModelHome.home.assets[0], cardSignal: revokedModel(300) }, "BTCUSDT");
+assert.equal(staleModelHome.snapshot("BTCUSDT").signal.status, "VALID", "old Home revocation cannot clear newer SSE state");
+for (const asOf of [null, "not-a-time", "2099-01-01T00:00:00Z", new Date(Date.now() - 60000).toISOString()]) {
+  const invalidClock = fixture(); invalidClock.mergeAssetCardSnapshot({ ...modelBase, snapshotVersion: 290 }, false);
+  invalidClock.applyAssetCardEvent(event("PRICE", 300, { spotPrice: 300 }));
+  invalidClock.opportunityCard({ ...invalidClock.home.assets[0], cardSignal: { ...revokedModel(300),
+    health: { ...revokedModel(300).health, asOf } } }, "BTCUSDT");
+  assert.equal(invalidClock.snapshot("BTCUSDT").signal.status, "VALID", "unknown/future/pre-signal model check time cannot downgrade a same-version model");
+}
+const modelHealth = fixture(); modelHealth.mergeAssetCardSnapshot(modelBase, false);
+modelHealth.applyAssetCardEvent(event("HEALTH", 299, { health: revokedModel(299).health }));
+assert.equal(modelHealth.snapshot("BTCUSDT").signal.status, "VALID");
+modelHealth.applyAssetCardEvent(event("HEALTH", 300, { health: revokedModel(300).health }));
+assert.equal(modelHealth.snapshot("BTCUSDT").signal.direction, null, "explicit equal-version MODEL_UNAVAILABLE health is a one-way safety action");
+assert.equal(modelHealth.snapshot("BTCUSDT").spotPrice, 100);
+modelHealth.applyAssetCardEvent(event("SIGNAL", 300, modelBase));
+assert.equal(modelHealth.snapshot("BTCUSDT").signal.direction, null, "equal-version SIGNAL cannot undo model safety");
+modelHealth.applyAssetCardEvent(event("HEALTH", 301, { health: revokedModel(301).health }));
+modelHealth.applyAssetCardEvent(event("PRICE", 301, { spotPrice: 301 }));
+modelHealth.applyAssetCardEvent(event("RISK", 301, { risk: modelBase.risk }));
+assert.equal(modelHealth.snapshot("BTCUSDT").spotPrice, 301, "model safety does not suppress independent same-version real price");
+assert.equal(modelHealth.snapshot("BTCUSDT").risk.overallLevel, "HIGH");
+const combinedFailure = fixture(); combinedFailure.mergeAssetCardSnapshot(modelBase, false);
+combinedFailure.opportunityCard({ ...combinedFailure.home.assets[0], cardSignal: { ...revokedModel(300),
+  spotPrice: null, latestPriceAt: null, health: { status: "SOURCE_UNAVAILABLE", reason: "fixture-price-and-model-loss", asOf: null } } }, "BTCUSDT");
+assert.equal(combinedFailure.snapshot("BTCUSDT").signal.direction, null, "explicit UNVALIDATED signal still clears the direction when source failure replaces model health");
+assert.equal(combinedFailure.snapshot("BTCUSDT").spotPrice, null);
 const shared = source.slice(0, source.indexOf("/* Desktop Home runtime */"));
 assert.ok(!shared.includes("cardSignal") && !shared.includes("ASSET_CARD_"), "Pool shared semantics remain untouched");
 const css = fs.readFileSync("src/main/resources/static/css/home.css", "utf8");

@@ -520,8 +520,11 @@ public class DashboardHomeServiceImpl implements DashboardHomeService {
             applyCachedCardPrice(asset, generatedAt);
         });
         // Read only after canonical membership/ranking has completed. Card signals cannot influence it.
-        if (assetCardService != null) home.getAssets().forEach(asset ->
-                asset.setCardSignal(assetCardService.snapshot(asset.getRawSymbol(), asset.getName())));
+        home.getAssets().forEach(asset -> {
+            boolean displayEnabled = assetCardService != null && assetCardService.usesCardSignalDisplay(asset.getRawSymbol());
+            asset.setCardSignalDisplayEnabled(displayEnabled);
+            asset.setCardSignal(displayEnabled ? assetCardService.snapshot(asset.getRawSymbol(), asset.getName()) : null);
+        });
         home.setSnapshotComplete(true);
     }
 
