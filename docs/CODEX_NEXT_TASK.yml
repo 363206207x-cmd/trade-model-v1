@@ -606,7 +606,7 @@ v42_source_pr: 1295
 v42_source_head_full_sha: "2921a4a98254a4bd88f3138ed4eb2e0487b3956b"
 v42_product_source_path: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 v42_product_source_section: "APPENDIX_J"
-v42_product_source_sha256: "d2b3564fa14c8dba382076f019742edcceebb738c663693474cf544d6ec4c992"
+v42_product_source_sha256: "4613e07fba8b0bf82c74ee5a00c031d37792c1bc00de9654bd3604af73eed450"
 v42_scope: "HOME_ASSET_CARD_ONLY"
 v42_gate_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 v42_gate_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
