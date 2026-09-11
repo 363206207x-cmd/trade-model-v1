@@ -395,7 +395,7 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(properties.getTradeRetention()).isEqualTo(java.time.Duration.ofHours(168));
         assertThat(properties.getLabelRetention()).isEqualTo(java.time.Duration.ofHours(2160));
         assertThat(properties.getRetentionBatchSize()).isEqualTo(128);
-        assertThat(properties.getArchiveDirectory()).isEqualTo(Path.of("/var/lib/rine-logic/asset-card/archive"));
+        assertThat(properties.getArchiveDirectory()).isEqualTo(Path.of("/var/lib/rine-logic-asset-card/archive"));
         assertThat(properties.getArchiveMinimumFreeBytes()).isEqualTo(21_474_836_480L);
         var plan=properties.getCollectionWindow();
         assertThat(plan.valid()).isTrue();
@@ -403,7 +403,7 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(plan.getStartsAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"COLLECTION_STARTS_AT")));
         assertThat(plan.getEndsAt()).isEqualTo(plan.getStartsAt().plus(java.time.Duration.ofHours(8)));
         assertThat(plan.getSymbols()).containsExactlyInAnyOrder("BTCUSDT","ETHUSDT","XRPUSDT");
-        assertThat(plan.getStateDirectory()).isEqualTo(Path.of("/var/lib/rine-logic/asset-card/collection"));
+        assertThat(plan.getStateDirectory()).isEqualTo(Path.of("/var/lib/rine-logic-asset-card/collection"));
         assertThat(plan.getSharedIpWeightAllowancePerMinute()).isEqualTo(500);
         assertThat(plan.getSharedIpWeightLimitPerMinute()).isEqualTo(6000);
         assertThat(plan.getSharedIpHeadroomConfirmedAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT")));
@@ -417,6 +417,51 @@ class NativeStagingAssetCardInfrastructureContractTest {
         assertThat(plan.getMinimumFreeBytes()).isEqualTo(21_474_836_480L);
         assertThat(properties.getWriter().getMaximumPoolSize()).isEqualTo(2);
         assertThat(properties.getWriter().getConnectionTimeout()).isEqualTo(java.time.Duration.ofSeconds(5));
+    }
+
+    @Test void dedicatedCollectionRootDoesNotChangeTheExistingServiceStorage() throws Exception {
+        String dropin=Files.readString(SOURCE.resolve("rine-logic-asset-card.conf.template"));
+        assertThat(dropin.lines().filter(line->line.startsWith("ReadWritePaths=")).toList())
+                .containsExactly("ReadWritePaths=/var/lib/rine-logic-asset-card/collection /var/lib/rine-logic-asset-card/archive");
+        Fixture fixture=armedFixture();
+        Path oldStorage=fixture.root().resolve("var/lib/rine-logic");
+        Files.createDirectories(oldStorage);
+        Files.setPosixFilePermissions(oldStorage,PosixFilePermissions.fromString("rwxr-x---"));
+        Path sentinel=oldStorage.resolve("existing-business-state");
+        write(sentinel,"ISOLATED_EXISTING_BUSINESS_FIXTURE\n","rw-------");
+        var before=Files.readAttributes(oldStorage,"unix:uid,gid,mode");
+        Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY");
+        assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+        assertThat(Files.readAttributes(oldStorage,"unix:uid,gid,mode")).isEqualTo(before);
+        assertThat(Files.readString(sentinel)).isEqualTo("ISOLATED_EXISTING_BUSINESS_FIXTURE\n");
+        var properties=bindRenderedEnvironment(Files.readString(cardDropin(fixture)));
+        assertThat(properties.getCollectionWindow().getStateDirectory()).isEqualTo(Path.of("/var/lib/rine-logic-asset-card/collection"));
+        assertThat(properties.getArchiveDirectory()).isEqualTo(Path.of("/var/lib/rine-logic-asset-card/archive"));
+    }
+
+    @Test void collectionLeavesRequireExactGroupAndTrustedRootParentWithoutSymlinks() throws Exception {
+        Fixture wrongGroup=armedFixture();
+        replaceManifestValue(wrongGroup,"SERVICE_GID",String.valueOf(Integer.parseInt(manifestValue(wrongGroup,"SERVICE_GID"))+1));
+        assertThat(run("asset-card-runtime-install.sh",wrongGroup).output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+        assertThat(cardDropin(wrongGroup)).doesNotExist();
+        Fixture missingGroup=fixture();
+        Files.writeString(missingGroup.manifest(),Files.readString(missingGroup.manifest()).replaceAll("(?m)^SERVICE_GID=.*\\n", ""));
+        assertThat(run("asset-card-runtime-install.sh",missingGroup).output()).contains("OWNER_INVALID");
+        for(String mode:List.of("rwx------","rwxrwxr-x")) {
+            Fixture unsafeParent=armedFixture();
+            Files.setPosixFilePermissions(unsafeParent.root().resolve("var/lib/rine-logic-asset-card"),PosixFilePermissions.fromString(mode));
+            Result denied=run("asset-card-runtime-install.sh",unsafeParent);
+            assertThat(denied.code()).isNotZero();
+            assertThat(denied.output()).containsAnyOf("COLLECTION_PARENT_UNSAFE","PERMISSION_INVALID");
+            assertThat(cardDropin(unsafeParent)).doesNotExist();
+        }
+        Fixture symlink=armedFixture();
+        Path parent=symlink.root().resolve("var/lib/rine-logic-asset-card");
+        Path retained=parent.resolveSibling("retained-test-card-root");
+        Files.move(parent,retained);
+        Files.createSymbolicLink(parent,retained);
+        assertThat(run("asset-card-runtime-install.sh",symlink).output()).contains("SYMLINK_FORBIDDEN");
+        assertThat(cardDropin(symlink)).doesNotExist();
     }
 
     @Test void unverifiedQuotaInvalidWindowOrExpandedBudgetCannotInstallAnArmedAttachment() throws Exception {
@@ -452,13 +497,13 @@ class NativeStagingAssetCardInfrastructureContractTest {
         Files.writeString(fixture.manifest(),valid); replaceManifestValue(fixture,"SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE","0500");
         assertThat(run("asset-card-runtime-install.sh",fixture).output()).contains("COLLECTION_QUOTA_UNVERIFIED");
         Files.writeString(fixture.manifest(),valid);
-        Files.setPosixFilePermissions(fixture.root().resolve("var/lib/rine-logic/asset-card/archive"),PosixFilePermissions.fromString("rwxrwxrwx"));
+        Files.setPosixFilePermissions(fixture.root().resolve("var/lib/rine-logic-asset-card/archive"),PosixFilePermissions.fromString("rwxrwxrwx"));
         assertThat(run("asset-card-runtime-install.sh",fixture).output()).contains("COLLECTION_DIRECTORY_UNSAFE");
     }
 
     @Test void repeatedInstallationPreservesAbsoluteClocksAndStoppedLedgerAndExpiredPlansCannotOverwrite() throws Exception {
         Fixture fixture=armedFixture();
-        Path ledger=fixture.root().resolve("var/lib/rine-logic/asset-card/collection/LOCAL_FIXTURE_WINDOW.json");
+        Path ledger=fixture.root().resolve("var/lib/rine-logic-asset-card/collection/LOCAL_FIXTURE_WINDOW.json");
         write(ledger,"{\"status\":\"STOPPED\",\"requests\":288,\"fixtureOnly\":true}\n","rw-------");
         String beforeLedger=Files.readString(ledger);
         for(int i=0;i<2;i++) {
@@ -660,6 +705,7 @@ class NativeStagingAssetCardInfrastructureContractTest {
         String uid=Files.getAttribute(root,"unix:uid").toString();
         template=template.replace("NATIVE_SYSTEMD_JAR_RUNTIME","TEST_FIXTURE_ONLY")
                 .replace("REPLACE_ROOT_UID",uid).replace("REPLACE_SERVICE_UID",String.valueOf(Integer.parseInt(uid)+1))
+                .replace("REPLACE_SERVICE_GID",Files.getAttribute(root,"unix:gid").toString())
                 .replace("REPLACE_JAR_SHA256",sha(root.resolve(paths[3])))
                 .replace("REPLACE_MAIN_UNIT_SHA256",sha(root.resolve(paths[0])))
                 .replace("REPLACE_SCHEDULER_SHA256",sha(root.resolve(paths[1])))
@@ -682,8 +728,9 @@ class NativeStagingAssetCardInfrastructureContractTest {
         replaceManifestValue(fixture,"SHARED_IP_WEIGHT_LIMIT_PER_MINUTE","6000");
         replaceManifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT",confirmed.toString());
         for(String leaf:List.of("collection","archive")) {
-            Path path=fixture.root().resolve("var/lib/rine-logic/asset-card/"+leaf);
+            Path path=fixture.root().resolve("var/lib/rine-logic-asset-card/"+leaf);
             Files.createDirectories(path); Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(path.getParent(),PosixFilePermissions.fromString("rwxr-xr-x"));
         }
         replaceManifestValue(fixture,"STORAGE_SAME_FILESYSTEM_VERIFIED","YES");
         replaceManifestValue(fixture,"DATABASE_FILESYSTEM_DEVICE",Files.getAttribute(fixture.root(),"unix:dev").toString());

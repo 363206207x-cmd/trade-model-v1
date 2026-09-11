@@ -231,9 +231,17 @@ generates a start time/window ID, never erases a ledger, and never restarts.
 PREPARED cannot accidentally enable collection using the ordinary confirmation.
 Missing/unknown quota remains a refusal, not an assumed exchange limit.
 
-State `/var/lib/rine-logic/asset-card/collection` and archives
-`/var/lib/rine-logic/asset-card/archive` require service-owned 0700 leaf directories
-under trusted root-owned parents. `DATABASE_FILESYSTEM_DEVICE` is an independently
+State `/var/lib/rine-logic-asset-card/collection` and archives
+`/var/lib/rine-logic-asset-card/archive` require 0700 leaf directories owned by the
+actual service UID and GID (both explicitly recorded in the manifest). Their
+dedicated parent `/var/lib/rine-logic-asset-card` must be root:root 0755 with
+unchanged trusted root-owned ancestry and no symlinks. The existing
+`/var/lib/rine-logic` contents, ownership and permissions are not modified.
+The card attachment adds only these two leaves to `ReadWritePaths`; it does not
+reset the base unit's existing business/log writable paths. Before a real start,
+verify under the actual service constraints that the two leaves are writable
+but their root-owned parent is not. Fake-root tests do not replace this check.
+`DATABASE_FILESYSTEM_DEVICE` is an independently
 reviewed non-secret `stat` device identity: the installer compares both visible
 directories with it, but **does not itself prove the actual PGDATA device**.
 The execution preflight must read the real PostgreSQL data location via the

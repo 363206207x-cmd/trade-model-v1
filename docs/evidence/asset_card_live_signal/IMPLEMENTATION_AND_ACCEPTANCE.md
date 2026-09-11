@@ -1,5 +1,58 @@
 # Asset-card live signal implementation evidence
 
+## V42 reviewed continuation and dedicated storage wiring — 2026-09-12
+
+PR #1301 was re-reviewed without changing source Head
+`e7670c495256559314db69154b3eafa28ab8e7e8`. The two ancestry/scope findings
+had compared the gate Head with business PR #1300; the posted real-object
+evidence instead binds #1300 to `f2a3903668d8e8129e18bace3d533b6273ebf8a6`.
+All three source/merge/baseline ancestor checks passed. Its 23 business paths
+are within the unchanged 64-path list; the four gate files remain separate.
+The exact-Head re-review completed on 2026-09-11 18:32 UTC with no major issues,
+and all three CI checks passed. No discussion was closed in lieu of review.
+The actual #1301 squash merge is
+`78a0c44738f1f583c6926d7a53e88bef32ed1fb2`.
+
+Safe main synchronization preserves the entire original implementation and
+audited-source ancestry. In the actual business checkout, not a test stub, the
+resolver now reports `REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`,
+`V42_ASSET_CARD_AUTHORIZATION_STATUS=AUTHORIZED`,
+`IMPLEMENTATION_ALLOWED=true` and `RESOLUTION_BLOCK_REASON=NONE`, with #1300
+identified as the authorized successor. Product Source, task validation and
+the post-merge workflow contract passed. This is gate effectivity, not deployed
+card or prediction acceptance.
+
+The Owner-approved storage correction uses only
+`/var/lib/rine-logic-asset-card` (root:root 0755) and its `collection`/`archive`
+leaves (actual service UID/GID, 0700). The manifest explicitly binds both UID
+and GID. Preflight continues to reject untrusted ancestors and symlinks, and
+now verifies the exact leaf group and dedicated-parent mode/group. The card
+drop-in adds only the two new leaves to `ReadWritePaths`; no base-unit path is
+reset and no existing `/var/lib/rine-logic` content or permission is changed.
+Historical paths and runtime observations below remain historical evidence.
+
+The new regression first failed on the actual old `ReadWritePaths` line.
+After the bounded patch, five storage/window focused cases and all 23 native
+wiring tests passed (zero failures/errors/skips), including disposable
+PostgreSQL. Python 49/49, the frontend event/time matrices, Shell/JS syntax
+and diff checks also passed. Added
+coverage preserves existing-directory contents/metadata and rejects missing
+or wrong GID, wrong parent permissions and symlink ancestry. These isolated
+fixtures do not prove the actual service sandbox can write the leaves: real
+UID/GID, parent non-writability, same-PGDATA device and 20-GiB free-space checks
+remain mandatory before the real start. Exact final candidate build/checksum,
+full tests and CI results are recorded on the final #1300 Head; no earlier JAR
+is relabelled as that candidate.
+
+The latest read-only server observation at 2026-09-11 18:18:35 UTC still showed
+`8d77902da7a66f26559a92a9646d99952f89e9b8`, active/running, readiness200,
+PID658723 and no active systemd jobs. New card storage was not yet created;
+old storage remained UID999:GID988 mode0750. Both existing `/var/lib` and actual
+PGDATA report device64770, with 89,941,082,112 available bytes at observation.
+These are not fresh release-time quota/storage evidence. C1 and C2 remain
+unstarted; no missing shared-IP or account quota is filled by a template value.
+MODEL_MODE=SHADOW; PRODUCTION_MODEL_READY=NO; ASSET_CARD_LIVE_READY=NO.
+
 ## V42 startup recovery and retained correctness fixes — 2026-09-11
 
 This section records execution under the Owner's **one additional card-disabled

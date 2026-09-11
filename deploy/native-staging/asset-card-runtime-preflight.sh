@@ -9,6 +9,7 @@ native_sha() {
   else shasum -a 256 -- "$1" | awk '{print $1}'; fi
 }
 native_uid() { stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1"; }
+native_gid() { stat -c '%g' "$1" 2>/dev/null || stat -f '%g' "$1"; }
 native_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 native_size() { stat -c '%s' "$1" 2>/dev/null || stat -f '%z' "$1"; }
 native_no_links() {
@@ -74,7 +75,7 @@ native_init() {
     key=${line%%=*}; value=${line#*=}
     case "$key" in
       MANIFEST_KIND|TARGET_ARCH|SERVICE_NAME|APP_JAR|APP_JAR_SHA256|MAIN_UNIT|MAIN_UNIT_SHA256|SCHEDULER_DROPIN|SCHEDULER_DROPIN_SHA256|READY_SCRIPT|READY_SCRIPT_SHA256|RELEASE_METADATA|RELEASE_METADATA_FORMAT|RELEASE_METADATA_SHA256|MODEL_ROOT|CARD_DROPIN|CREDENTIAL_SOURCE|CREDENTIAL_ID|ROOT_UID|SERVICE_UID|WRITER_JDBC_URL|EXPECTED_DATABASE|WRITER_ROLE|MODEL_MODE|PRODUCTION_MODEL_READY|CARD_STARTUP_MODE|COLLECTION_WINDOW_ID|COLLECTION_STARTS_AT|COLLECTION_ENDS_AT|COLLECTION_SYMBOLS|COLLECTION_STATE_DIRECTORY|ARCHIVE_DIRECTORY|SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE|SHARED_IP_WEIGHT_LIMIT_PER_MINUTE|SHARED_IP_HEADROOM_CONFIRMED_AT|MAXIMUM_REST_REQUESTS|MAXIMUM_REST_WEIGHT|MAXIMUM_CONNECTION_ATTEMPTS|MAXIMUM_CONTROL_MESSAGES|MAXIMUM_NEW_ROWS|MAXIMUM_DATABASE_GROWTH_BYTES|MAXIMUM_WAL_GROWTH_BYTES|MINIMUM_FREE_BYTES|STORAGE_SAME_FILESYSTEM_VERIFIED|DATABASE_FILESYSTEM_DEVICE) ;;
-      OWNER_PREVIEW_USER_ID) ;;
+      OWNER_PREVIEW_USER_ID|SERVICE_GID) ;;
       *) native_fail MANIFEST_INVALID;;
     esac
     [[ "$seen" != *"|$key|"* && -n "$value" && "$value" != REPLACE_* && "$value" != *'$'* && "$value" != *'`'* ]] || native_fail MANIFEST_INVALID
@@ -92,7 +93,8 @@ native_init() {
     && "$CREDENTIAL_SOURCE" = /etc/rine-logic/credentials/asset-card-db-password
     && "$CREDENTIAL_ID" = asset-card-db-password && "$WRITER_ROLE" = rine_asset_card_writer
     && "$MODEL_MODE" = SHADOW && "$PRODUCTION_MODEL_READY" = NO ]] || native_fail MANIFEST_IDENTITY_INVALID
-  [[ "$ROOT_UID" =~ ^[0-9]+$ && "$SERVICE_UID" =~ ^[0-9]+$ && "$SERVICE_UID" != "$ROOT_UID" ]] || native_fail OWNER_INVALID
+  [[ "$ROOT_UID" =~ ^[0-9]+$ && "$SERVICE_UID" =~ ^[0-9]+$ && "$SERVICE_UID" != "$ROOT_UID" \
+    && "$seen" == *'|SERVICE_GID|'* && "${SERVICE_GID:-}" =~ ^[0-9]+$ ]] || native_fail OWNER_INVALID
   OWNER_PREVIEW_USER_IDS=
   if [[ "$OWNER_PREVIEW_USER_ID" != NONE ]]; then
     [[ "$OWNER_PREVIEW_USER_ID" =~ ^[1-9][0-9]{0,18}$ ]] || native_fail OWNER_PREVIEW_ID_INVALID
@@ -133,7 +135,7 @@ native_positive_budget() {
 native_collection_plan_checks() {
   local start end confirmed now symbol seen=',' registered=','
   [[ "$CARD_STARTUP_MODE" = PREPARED || "$CARD_STARTUP_MODE" = ARMED ]] || native_fail COLLECTION_MODE_INVALID
-  [[ "$COLLECTION_STATE_DIRECTORY" = /var/lib/rine-logic/asset-card/collection && "$ARCHIVE_DIRECTORY" = /var/lib/rine-logic/asset-card/archive ]] || native_fail COLLECTION_PATH_INVALID
+  [[ "$COLLECTION_STATE_DIRECTORY" = /var/lib/rine-logic-asset-card/collection && "$ARCHIVE_DIRECTORY" = /var/lib/rine-logic-asset-card/archive ]] || native_fail COLLECTION_PATH_INVALID
   native_positive_budget "$MAXIMUM_REST_REQUESTS" 288; native_positive_budget "$MAXIMUM_REST_WEIGHT" 72000
   native_positive_budget "$MAXIMUM_CONNECTION_ATTEMPTS" 32; native_positive_budget "$MAXIMUM_CONTROL_MESSAGES" 128
   native_positive_budget "$MAXIMUM_NEW_ROWS" 1100000; native_positive_budget "$MAXIMUM_DATABASE_GROWTH_BYTES" 3221225472
@@ -161,12 +163,17 @@ native_collection_plan_checks() {
   CARD_ENABLED=true
 }
 native_service_directory() {
-  local path="$1" owner="$SERVICE_UID" parent mode
-  [[ -z "$NATIVE_ROOT" ]] || owner=$ROOT_UID # Fake-root tests cannot change host account ownership.
+  local path="$1" owner="$SERVICE_UID" parent parent_group=0
+  if [[ -n "$NATIVE_ROOT" ]]; then
+    owner=$ROOT_UID # Fake-root tests cannot change host account ownership.
+    parent_group=$(id -g)
+  fi
   native_no_links "$path"
-  [[ -d "$path" && "$(native_uid "$path")" = "$owner" && "$(native_mode "$path")" = 700 ]] || native_fail COLLECTION_DIRECTORY_UNSAFE
+  [[ -d "$path" && "$(native_uid "$path")" = "$owner" \
+    && "$(native_gid "$path")" = "$SERVICE_GID" && "$(native_mode "$path")" = 700 ]] || native_fail COLLECTION_DIRECTORY_UNSAFE
   parent=$(dirname "$path")
   native_meta "$parent" "$ROOT_UID" 022
+  [[ "$(native_gid "$parent")" = "$parent_group" && "$(native_mode "$parent")" = 755 ]] || native_fail COLLECTION_PARENT_UNSAFE
 }
 native_collection_storage_checks() {
   [[ "$CARD_STARTUP_MODE" = ARMED ]] || return 0
