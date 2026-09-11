@@ -1,5 +1,17 @@
 # Contract Change Log
 
+## 2026-09-11 — Owner-approved V42 Linux OpenMP dependency amendment
+
+Preserve the original 48 V42 implementation paths and add only `Dockerfile`:
+49 unique paths, fingerprint `992926a6dc0724a7ee24e4e982c0b20a5a196d9a`.
+Appendix J.5 permits only runtime-stage `libgomp1` installation after the exact
+gate amendment merges. No other system package, host install, build-stage,
+Java/base-image series, USER or ENTRYPOINT change is authorized. Actual final
+image native loading and Java/Python model parity are required, not cached
+base-image evidence. SHADOW and non-production-model status remain truthful.
+The seven gate paths, V41/original path set, historical contracts and generic
+permission semantics are preserved; no business merge or deployment is added.
+
 ## 2026-09-11 — Owner-authorized V42 directional risk and runtime registration
 
 Appendix J registers the exact V42 asset-card package, source PR #1295 and

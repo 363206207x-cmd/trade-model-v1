@@ -477,6 +477,23 @@ EOF
 fi
 
 case "$resolved_scope_profile" in
+  V42_IMPLEMENTATION)
+    [[ "$resolved_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" \
+      && "$resolved_mode" == "IMPLEMENTATION" \
+      && "$resolved_branch" == "codex/v4-1-asset-card-live-signal-closure" \
+      && "$resolved_branch" == "$(yaml_value "$TASK_FILE" v42_implementation_branch)" \
+      && "$request_class" == "AUTHORIZED_IMPLEMENTATION_PACKAGE" && "$next_package_allowed" == "YES" \
+      && "$resolved_edit_permission" == "true" && "$resolved_implementation_permission" == "true" \
+      && "$resolved_pr_creation_permission" == "true" ]] \
+      || { echo "STOP: exact V42 implementation was not authorized by the authoritative resolver." >&2; exit 1; }
+    generated_allowed_scope="$(yaml_list "$TASK_FILE" v42_implementation_allowed_paths)"
+    [[ "$(printf '%s\n' "$generated_allowed_scope" | awk 'NF {n++} END {print n+0}')" == "49" \
+      && "$(printf '%s\n' "$generated_allowed_scope" | sort -u | awk 'NF {n++} END {print n+0}')" == "49" \
+      && "$(path_list_fingerprint "$generated_allowed_scope")" == "992926a6dc0724a7ee24e4e982c0b20a5a196d9a" ]] \
+      || { echo "STOP: exact V42 implementation paths do not match the authorized registration." >&2; exit 1; }
+    generated_blocked_scope="All paths outside the exact V42 implementation allowlist.
+$(yaml_list "$TASK_FILE" v42_blocked_scope)"
+    ;;
   CURRENT_PACKAGE)
     [[ "$request_class" == "CURRENT_PACKAGE_CONTINUATION" && "$current_package_action_allowed" == "YES" ]] \
       || { echo "STOP: current package was not authorized by the authoritative resolver." >&2; exit 1; }
