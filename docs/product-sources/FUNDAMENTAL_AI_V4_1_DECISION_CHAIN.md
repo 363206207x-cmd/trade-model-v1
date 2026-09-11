@@ -1135,13 +1135,33 @@ identity, rollback, and installation refusal on base-chain SHA mismatch.
 Require x86_64 standard-JAR long/short XGBoost plus Beta prediction, Shell
 matrix, focused/full Maven, Python/frontend matrices and exact-head CI.
 Container-only evidence must never be reported as native Staging acceptance.
-After the exact amended gate merges into `origin/main` and implementation
-permission is verified, continue source definitions and local/disposable tests
-on the same PR #1295 branch only, then stop before business merge. No real
+Historical registration-stage action boundary: after the exact amended gate
+merged into `origin/main` and implementation permission was verified, source
+definitions and local/disposable tests were authorized on PR #1295's branch,
+stopping before business merge. That registration itself authorized no real
 server changes, database-role/ACL operations, credential/model installation,
-daemon-reload, restart or deployment. `BUSINESS_PR_MERGE=NO`,
-`STAGING_DEPLOYMENT=NO`, `REAL_DATABASE_PERMISSION_CHANGE=NO`,
-`SYSTEMD_CHANGE_EXECUTION=NO` and `PRODUCTION_MODEL_READY=NO` remain explicit.
+daemon-reload, restart or deployment. Its `BUSINESS_PR_MERGE=NO`,
+`STAGING_DEPLOYMENT=NO`, `REAL_DATABASE_PERMISSION_CHANGE=NO` and
+`SYSTEMD_CHANGE_EXECUTION=NO` describe that registration-stage authority, not
+the later Owner-approved actions. `PRODUCTION_MODEL_READY=NO` remains required.
+
+Current exact continuation: PR #1295 in `363206207x-cmd/trade-model-v1` was
+merged as `8d77902da7a66f26559a92a9646d99952f89e9b8`. Its original audited
+source remains PR #1295 at `2921a4a98254a4bd88f3138ed4eb2e0487b3956b`;
+neither the merge nor this continuation replaces that source identity.
+PR #1300, with continuation baseline
+`f2a3903668d8e8129e18bace3d533b6273ebf8a6`, is the Owner-authorized
+continuation of the same V42 task on
+`codex/v4-1-asset-card-live-signal-closure` in that same repository, not a new
+package. It must retain the verified original-source, merged-source and
+continuation-baseline ancestry. The gate must verify the repository, branch,
+current remote Head, ancestry and every changed path; other PRs, missing
+evidence, mismatched identity or out-of-scope changes remain blocked.
+The 64 implementation paths, seven gate paths and their fingerprints are
+unchanged. This continuation registration grants no additional deployment
+permission: later merge and restricted Staging actions still require their
+separate explicit Owner authorization, exact-version checks, original budgets,
+stop conditions and rollback constraints. Production remains prohibited.
 
 `MERGE_AUTHORIZATION=NO`, `DEPLOY_AUTHORIZATION=NO`,
 `MODEL_MODE=SHADOW`, and `BUSINESS_IMPLEMENTATION_BEFORE_GATE_PASS=NO` remain
