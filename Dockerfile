@@ -15,6 +15,10 @@ FROM eclipse-temurin:17-jre-jammy AS runtime
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
 COPY --from=build /workspace/target/*.jar /app/app.jar

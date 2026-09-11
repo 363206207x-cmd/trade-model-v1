@@ -181,8 +181,17 @@ class AssetCardSignalServiceTest {
                     AssetCardBetaCalibration.Parameters.class, AssetCardBetaCalibration.Parameters.class,
                     String.class, String.class, String.class, AssetCardModelBundle.Thresholds.class, Map.class, Set.class, String.class);
             constructor.setAccessible(true);
-            return constructor.newInstance(longModel, shortModel, calibration, calibration, version,
+            var bundle = constructor.newInstance(longModel, shortModel, calibration, calibration, version,
                     "fixture-calibration", "fixture-thresholds", THRESHOLDS, Map.of(), Set.of("BTCUSDT"), null);
+            // Synthetic metadata covers only this fixture's all-observed vector; it is not trained-model evidence.
+            int featureCount = AssetCardFeatureService.FEATURE_NAMES.size();
+            var lifecycle = AssetCardModelBundle.class.getDeclaredField("lifecycle");
+            lifecycle.setAccessible(true);
+            lifecycle.set(bundle, new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK",
+                    Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"), Set.of("0".repeat(featureCount)),
+                    Collections.nCopies(featureCount, 0.0), Collections.nCopies(featureCount, 2.0), .5));
+            assertThat(bundle.validated()).isTrue();
+            return bundle;
         } catch (ReflectiveOperationException failure) {
             throw new AssertionError("Test-only bundle fixture no longer matches the immutable bundle constructor", failure);
         }

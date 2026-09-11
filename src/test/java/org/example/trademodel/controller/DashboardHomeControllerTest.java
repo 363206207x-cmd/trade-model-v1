@@ -116,9 +116,13 @@ class DashboardHomeControllerTest {
 
             verify(authenticatedUserIdResolver).requireCurrentUserId();
             verify(fixture.pool).listForUser(7L);
-            for (int index = 1; index <= 6; index++) verify(fixture.mapper).selectSnapshotJson("ASSET" + index + "USDT");
-            verifyNoMoreInteractions(fixture.pool, fixture.mapper);
-            verifyNoInteractions(dashboardHomeService, fixture.market, fixture.events);
+            for (int index = 1; index <= 6; index++) {
+                verify(fixture.mapper).selectSnapshotJson("ASSET" + index + "USDT");
+                verify(fixture.market).quote(org.mockito.ArgumentMatchers.eq("ASSET" + index + "USDT"),
+                        org.mockito.ArgumentMatchers.any(java.time.Instant.class));
+            }
+            verifyNoMoreInteractions(fixture.pool, fixture.mapper, fixture.market);
+            verifyNoInteractions(dashboardHomeService, fixture.events);
         }
     }
 
@@ -183,7 +187,7 @@ class DashboardHomeControllerTest {
             cards.perform(get("/api/dashboard/runtime-snapshot").param("view", "ASSET_CARDS")
                             .param("symbols", "ETHUSDT", "BTCUSDT"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
-            verifyNoInteractions(fixture.mapper);
+            verifyNoInteractions(fixture.mapper, fixture.market);
 
             fixture.properties.setEnabled(true);
             fixture.properties.setModelMode(AssetCardProperties.ModelMode.CANARY);
@@ -196,8 +200,11 @@ class DashboardHomeControllerTest {
                     .andExpect(jsonPath("$.data[0].signal.status").value("INSUFFICIENT_DATA"))
                     .andExpect(jsonPath("$.data[0].signal.calibratedConfidence").isEmpty());
             verify(fixture.mapper).selectSnapshotJson("BTCUSDT");
-            verifyNoMoreInteractions(fixture.mapper);
-            verifyNoInteractions(dashboardHomeService, fixture.market, fixture.events);
+            verify(fixture.market).quote(org.mockito.ArgumentMatchers.eq("BTCUSDT"),
+                    org.mockito.ArgumentMatchers.any(java.time.Instant.class));
+            verify(fixture.pool, times(4)).listForUser(7L);
+            verifyNoMoreInteractions(fixture.mapper, fixture.market, fixture.pool);
+            verifyNoInteractions(dashboardHomeService, fixture.events);
         }
     }
 

@@ -407,6 +407,14 @@ class DashboardHomeServiceImplTest {
         AssetCardService cards = new AssetCardService(properties, market, cardsMapper, pool, events, cardJson);
         try {
             installCardMetadataOnlyFixture(cards);
+            // This isolated projection fixture has explicit lifecycle metadata, never real training or native inference.
+            var bundle = (AssetCardModelBundle) ReflectionTestUtils.getField(cards, "model");
+            int featureCount = AssetCardFeatureService.FEATURE_NAMES.size();
+            ReflectionTestUtils.setField(bundle, "lifecycle", new AssetCardModelBundle.Lifecycle(
+                    "TEST_FIXTURE_DATA", "TEST_FIXTURE_RISK", Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"),
+                    java.util.Set.of("0".repeat(featureCount)), java.util.Collections.nCopies(featureCount, 0.0),
+                    java.util.Collections.nCopies(featureCount, 2.0), .5));
+            assertThat(bundle.validated()).isTrue();
             service.setAssetPoolService(pool);
             service.setAssetCardService(cards);
             List<AssetPoolAssetDTO> members = java.util.stream.IntStream.rangeClosed(1, 36).mapToObj(index ->
@@ -419,10 +427,16 @@ class DashboardHomeServiceImplTest {
             var link = canonicalCardAsset("LINKUSDT", "LINK/USDT", 72, "BULLISH", "LOW", 94);
             var btc = canonicalCardAsset("BTCUSDT", "BTC/USDT", 64, "WEAK_BULLISH", "MEDIUM", 88);
             List<List<Object>> canonicalBefore = List.of(canonicalCardFacts(link), canonicalCardFacts(btc));
-            AssetCardSnapshot linkCard = isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .99);
-            AssetCardSnapshot btcCard = isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.WEAK_LONG, .25, .20);
-            when(cardsMapper.selectSnapshotJson("LINKUSDT")).thenReturn(cardJson.writeValueAsString(linkCard));
-            when(cardsMapper.selectSnapshotJson("BTCUSDT")).thenReturn(cardJson.writeValueAsString(btcCard));
+            Instant observedAt = Instant.now();
+            var cardSnapshots = List.of(
+                    isolatedCardFixture("LINKUSDT", AssetCardSnapshot.Direction.STRONG_SHORT, .01, .99),
+                    isolatedCardFixture("BTCUSDT", AssetCardSnapshot.Direction.WEAK_LONG, .25, .20)).stream()
+                    .map(snapshot -> new AssetCardSnapshot(snapshot.symbol(), snapshot.assetName(), snapshot.spotPrice(), observedAt,
+                            snapshot.signal(), snapshot.risk(), snapshot.health(), snapshot.cardAsOf(), snapshot.snapshotVersion(),
+                            snapshot.featureVersion(), snapshot.modelVersion(), snapshot.calibrationVersion(), "TEST_FIXTURE_THRESHOLDS"))
+                    .toList();
+            when(cardsMapper.selectSnapshotJson("LINKUSDT")).thenReturn(cardJson.writeValueAsString(cardSnapshots.get(0)));
+            when(cardsMapper.selectSnapshotJson("BTCUSDT")).thenReturn(cardJson.writeValueAsString(cardSnapshots.get(1)));
             DashboardHomeVO home = new DashboardHomeVO();
             home.setAssets(List.of(link, btc));
             home.setSelectedSymbol("BTCUSDT");
@@ -451,7 +465,10 @@ class DashboardHomeServiceImplTest {
             verifyNoMoreInteractions(cardsMapper);
             verify(pool).listForUser(USER_ID);
             verifyNoMoreInteractions(pool);
-            verifyNoInteractions(market, events, userPositionService, monitorService, positionSyncService,
+            verify(market).quote(eq("LINKUSDT"), any(Instant.class));
+            verify(market).quote(eq("BTCUSDT"), any(Instant.class));
+            verifyNoMoreInteractions(market);
+            verifyNoInteractions(events, userPositionService, monitorService, positionSyncService,
                     positionMonitorLogService, opportunityLogService);
         } finally {
             cards.close();
@@ -545,12 +562,13 @@ class DashboardHomeServiceImplTest {
                             assertThat(asset.getCardSignal().signal().status()).isEqualTo("INSUFFICIENT_DATA");
                             assertThat(asset.getCardSignal().signal().calibratedConfidence()).isNull();
                             verify(mapper).selectSnapshotJson(asset.getRawSymbol());
+                            verify(market).quote(eq(asset.getRawSymbol()), any(Instant.class));
                         } else assertThat(asset.getCardSignal()).isNull();
                     }
                     assertThat(home.getAssets().stream().map(this::canonicalCardFacts).toList()).isEqualTo(before);
                     assertThat(home.getAssetPool().stream().map(this::canonicalCardFacts).toList()).isEqualTo(before);
-                    verifyNoMoreInteractions(mapper);
-                    verifyNoInteractions(market, events);
+                    verifyNoMoreInteractions(mapper, market);
+                    verifyNoInteractions(events);
                 } finally { cards.close(); }
             }
         }

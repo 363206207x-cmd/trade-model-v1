@@ -314,6 +314,9 @@ class AssetCardServiceTest {
         Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
         try (var fixture = new RuntimeFixture()) {
             assertThat(fixture.properties.getModelMode()).isEqualTo(AssetCardProperties.ModelMode.SHADOW);
+            var configuredBundle = (AssetCardModelBundle) ReflectionTestUtils.getField(fixture.service, "model");
+            assertThat(configuredBundle.reason()).isEqualTo("MODEL_NOT_CONFIGURED");
+            assertThat(configuredBundle.validated()).isFalse();
             fixture.freshMarket();
             when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24)))
                     .thenAnswer(invocation -> closedBars(invocation.getArgument(1), close));
@@ -329,8 +332,14 @@ class AssetCardServiceTest {
             assertThat(audit.path("rawFrame").path("bars").path("5m").size()).isEqualTo(24);
             assertThat(audit.path("state").path("auditPrediction").isObject()).isTrue();
             assertThat(audit.path("state").path("auditPrediction").path("available").asBoolean()).isFalse();
-            assertThat(audit.path("state").path("auditPrediction").path("reasons").toString()).contains("MODEL_NOT_CONFIGURED");
+            // The bundle retains its specific configuration reason; predict() classifies all non-valid bundles separately.
+            assertThat(audit.path("state").path("auditPrediction").path("reasons").toString())
+                    .isEqualTo("[\"MODEL_EXPIRED_OR_UNAVAILABLE\"]");
+            for (String probability : List.of("rawLong", "rawShort", "pLong", "pShort"))
+                assertThat(audit.path("state").path("auditPrediction").path(probability).isNull()).isTrue();
             assertThat(fixture.lastSnapshot().signal().status()).isEqualTo("SHADOW");
+            assertThat(fixture.lastSnapshot().signal().calibratedConfidence()).isNull();
+            assertThat(fixture.lastSnapshot().signal().direction()).isNull();
             verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyLong(), anyString(), nullable(Instant.class));
             assertThat(fixture.service.usesCardSignalDisplay("BTCUSDT")).isFalse();
             verifyNoInteractions(fixture.events);
@@ -499,6 +508,38 @@ class AssetCardServiceTest {
     }
 
     @Test
+    void readOnlyPriceIdentityPreservesNullableStoredIdAndUsesOnlyTheActualQuoteId() {
+        for (Long storedId : new Long[]{null, 41L}) {
+            try (var fixture = new RuntimeFixture()) {
+                Instant at = Instant.now();
+                var source = publicSignalFixture(at, AssetCardFeatureService.FEATURE_VERSION);
+                var stored = new AssetCardSnapshot(source.symbol(), source.assetName(), source.spotPrice(), source.latestPriceAt(),
+                        source.signal(), source.risk(), source.health(), source.cardAsOf(), source.snapshotVersion(),
+                        source.featureVersion(), source.modelVersion(), source.calibrationVersion(), source.thresholdVersion(), storedId);
+                runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
+
+                var withoutQuote = fixture.service.snapshot("BTCUSDT", "Bitcoin");
+                assertThat(withoutQuote.priceTradeId()).isEqualTo(storedId);
+                assertThat(withoutQuote.spotPrice()).isEqualTo(stored.spotPrice());
+                assertThat(withoutQuote.latestPriceAt()).isEqualTo(stored.latestPriceAt());
+                assertThat(withoutQuote.snapshotVersion()).isEqualTo(stored.snapshotVersion());
+
+                var quote = new AssetCardMarketDataService.SpotQuote("BTCUSDT", BigDecimal.valueOf(101), BigDecimal.ONE, 83L, at, at);
+                when(fixture.market.quote(eq("BTCUSDT"), any())).thenReturn(Optional.of(quote));
+                var withQuote = fixture.service.snapshot("BTCUSDT", "Bitcoin");
+                assertThat(withQuote.priceTradeId()).isEqualTo(83L);
+                assertThat(withQuote.spotPrice()).isEqualTo(quote.price());
+                assertThat(withQuote.latestPriceAt()).isEqualTo(quote.observedAt());
+                assertThat(withQuote.snapshotVersion()).isEqualTo(stored.snapshotVersion());
+                assertThat(fixture.lastSnapshot()).isSameAs(stored);
+                verify(fixture.market, times(2)).quote(eq("BTCUSDT"), any());
+                verifyNoMoreInteractions(fixture.market);
+                verifyNoInteractions(fixture.mapper, fixture.events, fixture.pool);
+            }
+        }
+    }
+
+    @Test
     void expiredSpotReadProjectsDataHighWithoutAllocatingOrWritingAnything() {
         try (var fixture = new RuntimeFixture()) {
             Instant at = Instant.now().minus(fixture.properties.getPriceTtl()).minusSeconds(2);
@@ -507,6 +548,7 @@ class AssetCardServiceTest {
             runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
             var visible = fixture.service.snapshot("BTCUSDT", "Bitcoin");
             assertThat(visible.spotPrice()).isNull();
+            assertThat(visible.priceTradeId()).isNull();
             assertThat(visible.signal().direction()).isEqualTo(stored.signal().direction());
             assertThat(visible.signal().status()).isEqualTo("INVALIDATED");
             assertThat(visible.signal().calibratedConfidence()).isNull();

@@ -91,17 +91,23 @@ class HomeUiReviewRuntimeContractTest {
                   riskLabel: index === 2 ? '高' : '中', oneHourOpportunityLabel: '1小时机会',
                   fourHourTrendLabel: '4小时趋势偏多', hasFinal: true, cardSignalDisplayEnabled: true,
                   cardSignal: { symbol, assetName: ['Bitcoin','Ethereum','Solana'][index], snapshotVersion: 1,
-                    featureVersion:'test-only',modelVersion:'test-only',calibrationVersion:'test-only',
-                    spotPrice:100,latestPriceAt:'2026-09-10T00:00:00Z',cardAsOf:'2026-09-10T00:00:00Z',
+                    featureVersion:'test-only',modelVersion:'test-only',calibrationVersion:'test-only',thresholdVersion:'test-only',
+                    spotPrice:100,latestPriceAt:'2026-09-10T00:00:00Z',priceTradeId:1,cardAsOf:'2026-09-10T00:00:00Z',
                     signal:{direction:'WEAK_SHORT',status:'VALID',calibratedConfidence:54,pLong:.18,pShort:.54,
-                      oneHourState:'OPPORTUNITY',fourHourTrend:'LONG'},
-                    risk:{overallLevel:null,items:[]},health:{status:'HEALTHY'} }
+                      oneHourState:'OPPORTUNITY',fourHourTrend:'LONG',signalAsOf:'2026-09-10T00:00:00Z'},
+                    risk:{overallLevel:null,items:[],riskVersion:'test-only-risk',riskBasisSide:'SHORT',
+                      riskBasisDirection:'WEAK_SHORT',riskBasisSignalAsOf:'2026-09-10T00:00:00Z',
+                      riskMarketAsOf:'2026-09-10T00:00:00Z'},health:{status:'HEALTHY'} }
                 }));
                 function render(selected) { return assets.map(asset => opportunityCard(asset, selected)).join(''); }
                 const missingCardSignal = opportunityCard({...assets[0],cardSignal:null},'BTCUSDT');
                 assert.equal(missingCardSignal.includes('data-live-field="direction" class="asset-card-unknown">—'), true);
                 assert.equal(missingCardSignal.includes('data-live-field="confidence">—'), true);
-                assert.equal(missingCardSignal.includes('data-live-field="risk" class="asset-card-risk-unknown">—'), true);
+                assert.match(missingCardSignal, /data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
+                assert.equal(missingCardSignal.includes('data-desktop-hover="risk"'), true);
+                const missingRiskReason = assetCardRiskDrawer({symbol:'BTCUSDT'});
+                assert.ok(missingRiskReason.includes('风险方向、信号时间或版本尚未匹配当前卡片'));
+                assert.ok(!missingRiskReason.includes('risk-evidence-item'));
                 assert.equal(missingCardSignal.includes('data-live-field="status">数据不足'), true);
                 const btc = render('BTCUSDT');
                 const eth = render('ETHUSDT');
@@ -127,7 +133,7 @@ class HomeUiReviewRuntimeContractTest {
                   currentValue:'2', source:'fixture-event-source', observedAt:'2026-09-07T05:00:00Z',
                   primaryEvidence:'Test-only independently observed event count', evidenceId:'fixture-evidence-1'};
                 const withRisk = opportunityCard({...assets[1],riskItems:[evidencedRisk],cardSignal:{...assets[1].cardSignal,snapshotVersion:2,
-                  risk:{overallLevel:'HIGH',items:[{type:'EVENT',assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:2,
+                  risk:{...assets[1].cardSignal.risk,overallLevel:'HIGH',items:[{type:'EVENT',assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:2,
                     source:'fixture-event-source',asOf:'2026-09-07T05:00:00Z',reason:'Test-only independently observed event count'}]}}}, 'ETHUSDT');
                 assert.equal(withRisk.includes('data-desktop-hover="risk"'), true);
                 assert.equal(withRisk.includes('tabindex="0"'), true);
@@ -138,8 +144,11 @@ class HomeUiReviewRuntimeContractTest {
                 // Complete evidence with no confirmed risk must not become a hover action.
                 // An explicit non-risk severity is not inferred from a missing score or a low aggregate score.
                 const completeNoRisk = {...assets[1],riskItems:[{...evidencedRisk,severity:'NONE',currentValue:'0'}],
-                  cardSignal:{...assets[1].cardSignal,snapshotVersion:3,risk:{overallLevel:null,items:[]}}};
+                  cardSignal:{...assets[1].cardSignal,snapshotVersion:3,risk:{...assets[1].cardSignal.risk,overallLevel:'LOW',
+                    items:['CHASE','SHOCK','REVERSAL','CROWDING','LIQUIDATION','LIQUIDITY','EVENT','DATA']
+                      .map(type=>({type,assessmentStatus:'ASSESSED',level:'NONE'}))}}};
                 assert.equal(opportunityCard(completeNoRisk,'ETHUSDT').includes('data-desktop-hover="risk"'), false);
+                assert.equal(assetCardRiskDrawer(assetCardSnapshots.get('ETHUSDT')), '');
                 assert.equal(desktop.riskDrawer(completeNoRisk), '');
                 assert.equal(desktop.riskDrawer({...assets[1],riskItems:[]}), '');
                 assert.equal(eth.includes('<b data-live-field="direction" class="asset-card-weak-short">弱偏空</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">54%%</strong></div>'), true);
@@ -171,8 +180,15 @@ class HomeUiReviewRuntimeContractTest {
                 assert.match(clock, /^[0-9]{2}:[0-9]{2}:[0-9]{2}$/);
                 assert.equal(clock, new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})
                   .format(new Date(assets[0].cardSignal.cardAsOf)));
+                for (const field of ['featureVersion','modelVersion','calibrationVersion','thresholdVersion']) {
+                  assert.equal(assetCardConfidence({...assets[0].cardSignal,[field]:null}), '—', field);
+                  assert.equal(assetCardDirection({...assets[0].cardSignal,[field]:null}), '—', field);
+                }
                 applyAssetCardEvent({eventType:'ASSET_CARD_PRICE',symbol:'BTCUSDT',snapshotVersion:41,
                   payload:{symbol:'BTCUSDT',snapshotVersion:41,spotPrice:321.5,latestPriceAt:'2026-09-10T00:00:05Z',cardAsOf:'2099-01-01T00:00:00Z'}});
+                assert.equal(assetCardSnapshots.get('BTCUSDT').spotPrice, 100, 'missing real trade identity cannot overwrite price');
+                applyAssetCardEvent({eventType:'ASSET_CARD_PRICE',symbol:'BTCUSDT',snapshotVersion:0,
+                  payload:{symbol:'BTCUSDT',snapshotVersion:0,priceTradeId:2,spotPrice:321.5,latestPriceAt:'2026-09-10T00:00:05Z'}});
                 const priceHtml = opportunityCard({...assets[0],cardSignal:null},'BTCUSDT');
                 assert.equal(priceHtml.includes('data-live-field="price">$321.5'), true);
                 assert.equal(priceHtml.match(/data-live-field="card-time"[^>]*>([^<]*)/)[1], clock);
@@ -273,9 +289,12 @@ class HomeUiReviewRuntimeContractTest {
                 assert.equal(observationHtml.includes('<strong>ETH</strong><span aria-hidden="true">/</span><small>Ethereum</small>'), true);
                 assert.equal(observationHtml.includes('<small>方向</small><b data-live-field="direction" class="asset-card-unknown">—</b>'), true);
                 assert.equal(observationHtml.includes('<small>置信</small><strong data-live-field="confidence">—</strong>'), true);
-                assert.equal(observationHtml.includes('data-desktop-hover="risk"'), false);
+                assert.equal(observationHtml.includes('data-desktop-hover="risk"'), true);
+                const unknownRiskReason = assetCardRiskDrawer({symbol:'ETHUSDT'});
+                assert.ok(unknownRiskReason.includes('风险方向、信号时间或版本尚未匹配当前卡片'));
+                assert.ok(!unknownRiskReason.includes('risk-evidence-item'));
                 assert.equal(observationHtml.includes('尚无独立风险证据'), false);
-                assert.equal(observationHtml.includes('data-live-field="risk" class="asset-card-risk-unknown">—'), true);
+                assert.match(observationHtml, /data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
                 assert.equal(observationHtml.includes('data-desktop-hover="risk-status"'), false);
                 assert.equal(desktop.riskDrawer(observation), '');
                 assert.match(observationHtml, /1小时数据不足/);

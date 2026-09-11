@@ -37,7 +37,10 @@ class AssetCardIsolationIntegrationTest {
             }
             verify(mapper, times(10)).selectSnapshotJson("BTCUSDT");
             verifyNoMoreInteractions(mapper);
-            verifyNoInteractions(market, events);
+            // quote() only reads the in-memory quote map and applies freshness; it never subscribes or fetches.
+            verify(market, times(10)).quote(eq("BTCUSDT"), any(java.time.Instant.class));
+            verifyNoMoreInteractions(market);
+            verifyNoInteractions(events);
             verify(pool, never()).listScanSymbols();
             assertThatThrownBy(() -> service.snapshotsForUser(userId, List.of("ETHUSDT")))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -45,6 +48,8 @@ class AssetCardIsolationIntegrationTest {
                     .isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> service.snapshotsForUser(userId, List.of("BTCUSDT", "BTCUSDT")))
                     .isInstanceOf(IllegalArgumentException.class);
+            verify(pool, times(12)).listForUser(userId);
+            verifyNoMoreInteractions(pool, mapper, market, events);
         } finally { service.close(); }
     }
 

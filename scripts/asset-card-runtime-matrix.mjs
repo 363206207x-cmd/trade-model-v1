@@ -162,6 +162,62 @@ assert.equal(coldHealth.snapshot("BTCUSDT").risk.overallLevel, "HIGH", "first so
 assert.equal(coldHealth.snapshot("BTCUSDT").signal.direction, null);
 assert.equal(coldHealth.snapshot("BTCUSDT").signal.signalAsOf, coldSource.signal.signalAsOf);
 assert.equal(coldHealth.requests.length, 0);
+const sourceRiskMismatch = fixture();
+const oldLowRiskSnapshot = boundSnapshot("LONG", 10);
+oldLowRiskSnapshot.risk = { ...oldLowRiskSnapshot.risk, overallLevel: "LOW",
+  items: ["CHASE", "SHOCK", "REVERSAL", "CROWDING", "LIQUIDATION", "LIQUIDITY", "EVENT", "DATA"]
+    .map(type => ({ ...oldLowRiskSnapshot.risk.items[0], type, level: "LOW" })) };
+sourceRiskMismatch.mergeAssetCardSnapshot(oldLowRiskSnapshot, true);
+assert.equal(sourceRiskMismatch.nodes.get("BTCUSDT").fields.get("risk").textContent, "低");
+const newIdentitySourceFailure = { ...oldLowRiskSnapshot, spotPrice: null, latestPriceAt: null, priceTradeId: null,
+  signal: { ...oldLowRiskSnapshot.signal, status: "INVALIDATED", calibratedConfidence: null, pLong: null, pShort: null },
+  health: { status: "SOURCE_UNAVAILABLE", reason: "fixture-source-loss", asOf: priceInstant(20) },
+  risk: { ...oldLowRiskSnapshot.risk, riskVersion: "test-only-risk-v2", overallLevel: "HIGH",
+    items: [{ ...oldLowRiskSnapshot.risk.items[0], type: "DATA", level: "HIGH", evidenceValue: "SOURCE_LOST",
+      source: "BINANCE_SPOT_AGG_TRADE", reason: "fixture-source-loss", asOf: priceInstant(20) }] } };
+sourceRiskMismatch.applyAssetCardEvent(boundEvent("HEALTH", 10, newIdentitySourceFailure));
+assert.equal(sourceRiskMismatch.snapshot("BTCUSDT").health.status, "SOURCE_UNAVAILABLE");
+assert.equal(sourceRiskMismatch.snapshot("BTCUSDT").spotPrice, null);
+assert.equal(sourceRiskMismatch.snapshot("BTCUSDT").risk.overallLevel, null,
+  "source loss with unverified incoming risk identity must become UNKNOWN, not retain a previously assessed LOW");
+assert.equal(sourceRiskMismatch.nodes.get("BTCUSDT").fields.get("risk").textContent, "—");
+assert.equal(sourceRiskMismatch.requests.length, 0);
+for (const path of ["SSE", "CARD_GET", "HOME"]) {
+  const zeroHealth = fixture();
+  const zeroSource = { ...coldSource, snapshotVersion: 0, spotPrice: null, latestPriceAt: null, priceTradeId: null,
+    signal: { ...coldSource.signal, calibratedConfidence: null, pLong: null, pShort: null } };
+  let zeroHtml;
+  if (path === "SSE") zeroHealth.applyAssetCardEvent(boundEvent("HEALTH", 0, zeroSource));
+  else if (path === "CARD_GET") { zeroHealth.setApi(async () => [zeroSource]); await zeroHealth.lightweightHomeRefresh(); }
+  else zeroHtml = zeroHealth.opportunityCard({ ...zeroHealth.home.assets[0], cardSignal: zeroSource }, "BTCUSDT");
+  const zeroResult = zeroHealth.snapshot("BTCUSDT");
+  assert.equal(zeroResult?.snapshotVersion, 0, path + " first real source failure is visible even when the card DB has never allocated a version");
+  assert.equal(zeroResult.signal.direction, null);
+  assert.equal(zeroResult.signal.calibratedConfidence, null);
+  assert.equal(zeroResult.risk.overallLevel, "HIGH", path + " keeps only backend-bound independent DATA evidence");
+  assert.equal(zeroResult.risk.riskBasisSide, "NON_DIRECTIONAL");
+  assert.ok((zeroHtml || zeroHealth.nodes.get("BTCUSDT").fields.get("risk-items").innerHTML).includes("数据·高"));
+  const cleared = JSON.stringify(zeroResult);
+  zeroHealth.applyAssetCardEvent(boundEvent("SIGNAL", 0, boundSnapshot()));
+  assert.equal(JSON.stringify(zeroHealth.snapshot("BTCUSDT")), cleared, "version zero can never publish a directional signal");
+}
+for (const override of [
+  { signal: { ...coldSource.signal, direction: "LONG" } },
+  { signal: { ...coldSource.signal, calibratedConfidence: 72 } },
+  { signal: { ...coldSource.signal, pLong: .72 } },
+  { signal: { ...coldSource.signal, pShort: .2 } },
+  { signal: { ...coldSource.signal, status: "VALID" } },
+  { health: { ...coldSource.health, asOf: null } },
+  { health: { ...coldSource.health, asOf: "2099-01-01T00:00:00Z" } }
+]) {
+  const invalidZero = fixture();
+  invalidZero.applyAssetCardEvent(boundEvent("HEALTH", 0, { ...coldSource, ...override }));
+  assert.equal(invalidZero.snapshot("BTCUSDT"), undefined, "untrusted zero-version state cannot initialize the visible cohort");
+}
+const zeroLegacy = fixture();
+zeroLegacy.setHome({ ...zeroLegacy.home, assets: zeroLegacy.home.assets.map(asset => ({ ...asset, cardSignalDisplayEnabled: false })) });
+zeroLegacy.applyAssetCardEvent(boundEvent("HEALTH", 0, coldSource));
+assert.equal(zeroLegacy.snapshot("BTCUSDT"), undefined, "cold failure must not activate a legacy/SHADOW card");
 const priceDomain = fixture(); priceDomain.mergeAssetCardSnapshot(boundSnapshot("LONG", 10), true);
 const beforePriceDomain = priceDomain.snapshot("BTCUSDT");
 priceDomain.applyAssetCardEvent(event("PRICE", 0, { priceTradeId: 50, latestPriceAt: priceInstant(50), spotPrice: 123 }));
@@ -173,7 +229,8 @@ for (const stalePrice of [
   { priceTradeId: 49, latestPriceAt: priceInstant(49) },
   { priceTradeId: 50, latestPriceAt: priceInstant(51) },
   { priceTradeId: 51, latestPriceAt: priceInstant(49) },
-  { priceTradeId: null, latestPriceAt: priceInstant(52) }
+  { priceTradeId: null, latestPriceAt: priceInstant(52) },
+  { priceTradeId: 1000000, latestPriceAt: "2099-01-01T00:00:00Z" }
 ]) priceDomain.applyAssetCardEvent(event("PRICE", 999, { ...stalePrice, spotPrice: 1 }));
 assert.equal(priceDomain.snapshot("BTCUSDT").spotPrice, 123);
 const oldFailure = { ...boundSnapshot("LONG", 11), health: { status: "SOURCE_UNAVAILABLE", asOf: priceInstant(49) } };
@@ -230,7 +287,7 @@ cohort.setHomeLoader(async () => {
 cohort.setApi(async () => { throw new Error("mixed cohort must not issue a second concurrent card GET"); });
 await cohort.lightweightHomeRefresh();
 assert.equal(mixedHomeReads, 1);
-assert.equal(cohort.snapshot("BTCUSDT").snapshotVersion, 4);
+assert.equal(cohort.snapshot("BTCUSDT").snapshotVersion, 2, "independent price cannot advance persisted signal/risk version");
 assert.equal(cohort.snapshot("BTCUSDT").spotPrice, 444, "a periodic legacy Home result cannot overwrite a newer card SSE field");
 assert.equal(cohort.snapshot("ETHUSDT"), undefined, "an unexpected non-cohort GET row cannot patch legacy cards");
 assert.ok(cohort.opportunityCard(cohortAssets[1], "BTCUSDT").includes('data-live-field="confidence">99%'));
@@ -306,8 +363,8 @@ const base = snapshot("BTCUSDT", 100);
 f.mergeAssetCardSnapshot(base, false);
 const homeBefore = JSON.stringify(f.home), ethBefore = JSON.stringify(f.nodes.get("ETHUSDT"));
 const clockBefore = f.snapshot("BTCUSDT").cardAsOf;
-f.applyAssetCardEvent(event("PRICE", 104, { spotPrice: 104, latestPriceAt: "2026-09-10T00:00:04Z", cardAsOf: "2099-01-01T00:00:00Z", signal: { direction: "SHORT" } }));
-f.applyAssetCardEvent(event("PRICE", 105, { spotPrice: 105, latestPriceAt: "2026-09-10T00:00:05Z" }));
+f.applyAssetCardEvent(event("PRICE", 104, { spotPrice: 104, latestPriceAt: priceInstant(104), cardAsOf: "2099-01-01T00:00:00Z", signal: { direction: "SHORT" } }));
+f.applyAssetCardEvent(event("PRICE", 105, { spotPrice: 105, latestPriceAt: priceInstant(105) }));
 assert.equal(f.timeouts.size, 1, "one throttled price render per symbol");
 assert.ok([...f.timeouts.values()].every(timer => timer.delay > 0 && timer.delay <= 250));
 assert.equal(f.nodes.get("BTCUSDT").fields.get("price").textContent, "");
@@ -447,16 +504,16 @@ const safety = fixture();
 safety.mergeAssetCardSnapshot(snapshot("BTCUSDT", 200), true);
 safety.mergeAssetCardSnapshot(snapshot("ETHUSDT", 200), true);
 safety.flushPrices();
-safety.applyAssetCardEvent(event("PRICE", 202, { spotPrice: 202, latestPriceAt: "2026-09-10T00:00:02Z" }));
+safety.applyAssetCardEvent(event("PRICE", 202, { spotPrice: 202, latestPriceAt: priceInstant(202) }));
 const safeHomeBefore = JSON.stringify(safety.home), safeEthBefore = JSON.stringify(safety.nodes.get("ETHUSDT"));
 const unavailable = version => ({ ...snapshot("BTCUSDT", version), spotPrice: null, latestPriceAt: null,
   signal: { ...base.signal, direction: "SHORT", status: "INVALIDATED", calibratedConfidence: null },
-  risk: { overallLevel: null, items: [] }, health: { status: "SOURCE_UNAVAILABLE", reason: "test-only stale read" } });
-safety.setApi(async () => [unavailable(201)]);
+  risk: { overallLevel: null, items: [] }, health: { status: "SOURCE_UNAVAILABLE", reason: "test-only stale read", asOf: priceInstant(202) } });
+safety.setApi(async () => [unavailable(199)]);
 await safety.lightweightHomeRefresh();
 assert.equal(safety.snapshot("BTCUSDT").signal.status, "VALID", "a stale complete read cannot downgrade a lagging field group");
 assert.equal(safety.snapshot("BTCUSDT").spotPrice, 202);
-safety.setApi(async () => [unavailable(202)]);
+safety.setApi(async () => [unavailable(200)]);
 await safety.lightweightHomeRefresh();
 assert.equal(safety.snapshot("BTCUSDT").spotPrice, null, "a latest same-version read can clear unsafe price without allocating a version");
 assert.equal(safety.snapshot("BTCUSDT").signal.direction, "LONG", "safety downgrade retains existing direction, never adopts an opposite one");
@@ -465,7 +522,7 @@ assert.equal(safety.snapshot("BTCUSDT").signal.calibratedConfidence, null);
 assert.equal(safety.snapshot("BTCUSDT").signal.pLong, null);
 assert.equal(safety.snapshot("BTCUSDT").signal.pShort, null);
 assert.equal(safety.snapshot("BTCUSDT").risk.overallLevel, "HIGH", "read safety cannot erase a known high risk");
-assert.equal(safety.snapshot("BTCUSDT").snapshotVersion, 202);
+assert.equal(safety.snapshot("BTCUSDT").snapshotVersion, 200);
 assert.equal(safety.snapshot("BTCUSDT").cardAsOf, base.cardAsOf, "read safety does not invent a newly published effective clock");
 assert.equal(safety.snapshot("BTCUSDT").health.status, "SOURCE_UNAVAILABLE");
 assert.equal(safety.nodes.get("BTCUSDT").fields.get("price").textContent, "—");
@@ -474,9 +531,9 @@ assert.equal(safety.nodes.get("BTCUSDT").fields.get("status").textContent, "已�
 assert.equal(JSON.stringify(safety.nodes.get("ETHUSDT")), safeEthBefore);
 assert.equal(JSON.stringify(safety.home), safeHomeBefore);
 const downgraded = JSON.stringify(safety.snapshot("BTCUSDT"));
-safety.setApi(async () => [snapshot("BTCUSDT", 202)]);
+safety.setApi(async () => [snapshot("BTCUSDT", 200)]);
 await safety.lightweightHomeRefresh();
-for (const version of [201, 202]) for (const [group, fields] of [["PRICE", { spotPrice: 999 }],
+for (const version of [199, 200]) for (const [group, fields] of [["PRICE", { spotPrice: 999 }],
   ["SIGNAL", { signal: base.signal }], ["RISK", { risk: { overallLevel: null, items: [] } }], ["HEALTH", { health: base.health }]]) {
   safety.applyAssetCardEvent(event(group, version, fields));
 }
@@ -528,7 +585,8 @@ const staleModelHome = fixture();
 staleModelHome.mergeAssetCardSnapshot({ ...modelBase, snapshotVersion: 290 }, false);
 staleModelHome.applyAssetCardEvent(event("PRICE", 301, { spotPrice: 301 }));
 staleModelHome.opportunityCard({ ...staleModelHome.home.assets[0], cardSignal: revokedModel(300) }, "BTCUSDT");
-assert.equal(staleModelHome.snapshot("BTCUSDT").signal.status, "VALID", "old Home revocation cannot clear newer SSE state");
+assert.equal(staleModelHome.snapshot("BTCUSDT").signal.status, "UNVALIDATED", "model revocation is compared to persisted signal state, not the independent price trade id");
+assert.equal(staleModelHome.snapshot("BTCUSDT").spotPrice, 301, "model revocation must preserve the later real trade");
 for (const asOf of [null, "not-a-time", "2099-01-01T00:00:00Z", new Date(Date.now() - 60000).toISOString()]) {
   const invalidClock = fixture(); invalidClock.mergeAssetCardSnapshot({ ...modelBase, snapshotVersion: 290 }, false);
   invalidClock.applyAssetCardEvent(event("PRICE", 300, { spotPrice: 300 }));
@@ -551,7 +609,7 @@ assert.equal(modelHealth.snapshot("BTCUSDT").spotPrice, 301, "model safety does 
 assert.equal(modelHealth.snapshot("BTCUSDT").risk.overallLevel, null, "old LONG risk cannot repopulate a model-unavailable NON_DIRECTIONAL card");
 const combinedFailure = fixture(); combinedFailure.mergeAssetCardSnapshot(modelBase, false);
 combinedFailure.opportunityCard({ ...combinedFailure.home.assets[0], cardSignal: { ...revokedModel(300),
-  spotPrice: null, latestPriceAt: null, health: { status: "SOURCE_UNAVAILABLE", reason: "fixture-price-and-model-loss", asOf: null } } }, "BTCUSDT");
+  spotPrice: null, latestPriceAt: null, health: { status: "SOURCE_UNAVAILABLE", reason: "fixture-price-and-model-loss", asOf: priceInstant(301) } } }, "BTCUSDT");
 assert.equal(combinedFailure.snapshot("BTCUSDT").signal.direction, null, "explicit UNVALIDATED signal still clears the direction when source failure replaces model health");
 assert.equal(combinedFailure.snapshot("BTCUSDT").spotPrice, null);
 const shared = source.slice(0, source.indexOf("/* Desktop Home runtime */"));

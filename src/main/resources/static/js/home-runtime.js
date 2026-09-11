@@ -921,9 +921,25 @@
                 return !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === risk[key];
             });
     }
+    function mergeAssetCardPrice(symbol, payload) {
+        var tradeId = payload.priceTradeId, observed = assetCardDate(payload.latestPriceAt);
+        if ((typeof tradeId !== "string" && !Number.isSafeInteger(tradeId)) || !/^[1-9][0-9]*$/.test(String(tradeId))
+                || !observed || observed > new Date() || !Number.isFinite(Number(payload.spotPrice)) || Number(payload.spotPrice) <= 0) return false;
+        var previous = assetCardFieldVersions.get(symbol + "|PRICE") || {};
+        if (previous.tradeId && BigInt(String(tradeId)) <= BigInt(previous.tradeId)
+                || previous.observedAt && observed.getTime() < previous.observedAt
+                || previous.failureAt && observed.getTime() <= previous.failureAt) return false;
+        var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
+        assetCardSnapshots.set(symbol, Object.assign({}, current, {
+            spotPrice: payload.spotPrice, latestPriceAt: payload.latestPriceAt, priceTradeId: tradeId }));
+        assetCardFieldVersions.set(symbol + "|PRICE", { tradeId: String(tradeId), observedAt: observed.getTime(), failureAt: previous.failureAt });
+        return true;
+    }
     function mergeAssetCardGroup(symbol, version, group, payload) {
-        if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
-                || !Number.isSafeInteger(version) || version <= 0) return false;
+        if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)) return false;
+        // Real Spot trade ordering is independent from persisted signal/risk CAS and remains live during a DB outage.
+        if (group === "PRICE") return mergeAssetCardPrice(symbol, payload);
+        if (!Number.isSafeInteger(version) || version <= 0) return false;
         var identity = symbol + "|" + group;
         if (version <= (assetCardFieldVersions.get(identity) || 0)) return false;
         var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
@@ -935,25 +951,20 @@
         }
         var next = Object.assign({}, current, { snapshotVersion: Math.max(version, current.snapshotVersion || 0) });
         var key = group.toLowerCase();
-        if (group === "PRICE") {
-            next.spotPrice = payload.spotPrice == null ? null : payload.spotPrice;
-            next.latestPriceAt = payload.latestPriceAt || null;
-        } else {
-            next[key] = payload[key] && typeof payload[key] === "object" ? payload[key] : null;
-            if (group === "SIGNAL") {
-                ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].forEach(function (field) {
-                    next[field] = typeof payload[field] === "string" && payload[field].trim() ? payload[field] : null;
-                });
-                next.riskVersion = payload.riskVersion || payload.risk && payload.risk.riskVersion || null;
-                next.risk = assetCardRiskEnvelopeMatches(payload, next) ? payload.risk
-                    : assetCardUnknownRisk(next, "当前方向的风险证据尚未完成校验");
-                assetCardFieldVersions.set(symbol + "|RISK", version);
-            }
-            if ((group === "SIGNAL" || group === "RISK") && (assetCardSignificant(group, current[key]) !== assetCardSignificant(group, next[key])
-                    || group === "SIGNAL" && assetCardSignificant("RISK", current.risk) !== assetCardSignificant("RISK", next.risk))) {
-                var clock = assetCardDate(payload.cardAsOf), previousClock = assetCardDate(current.cardAsOf);
-                if (clock && (!previousClock || clock >= previousClock)) next.cardAsOf = payload.cardAsOf;
-            }
+        next[key] = payload[key] && typeof payload[key] === "object" ? payload[key] : null;
+        if (group === "SIGNAL") {
+            ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].forEach(function (field) {
+                next[field] = typeof payload[field] === "string" && payload[field].trim() ? payload[field] : null;
+            });
+            next.riskVersion = payload.riskVersion || payload.risk && payload.risk.riskVersion || null;
+            next.risk = assetCardRiskEnvelopeMatches(payload, next) ? payload.risk
+                : assetCardUnknownRisk(next, "当前方向的风险证据尚未完成校验");
+            assetCardFieldVersions.set(symbol + "|RISK", version);
+        }
+        if ((group === "SIGNAL" || group === "RISK") && (assetCardSignificant(group, current[key]) !== assetCardSignificant(group, next[key])
+                || group === "SIGNAL" && assetCardSignificant("RISK", current.risk) !== assetCardSignificant("RISK", next.risk))) {
+            var clock = assetCardDate(payload.cardAsOf), previousClock = assetCardDate(current.cardAsOf);
+            if (clock && (!previousClock || clock >= previousClock)) next.cardAsOf = payload.cardAsOf;
         }
         assetCardFieldVersions.set(identity, version);
         assetCardSnapshots.set(symbol, next);
@@ -1023,7 +1034,7 @@
         if (!snapshot || typeof snapshot !== "object") return false;
         var symbol = String(snapshot.symbol || "").toUpperCase(), version = Number(snapshot.snapshotVersion);
         if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
-                || !Number.isSafeInteger(version) || version <= 0) return false;
+                || !Number.isSafeInteger(version) || version < 0) return false;
         if (snapshot.health && snapshot.health.status === "MODEL_UNAVAILABLE"
                 && !currentModelCheck(snapshot.health, assetCardSnapshots.get(symbol))) return false;
         var accepted = false;
@@ -1050,24 +1061,48 @@
         var symbol = String(snapshot && snapshot.symbol || "").toUpperCase();
         var version = Number(snapshot && snapshot.snapshotVersion);
         var current = assetCardSnapshots.get(symbol);
+        var coldSource = !current && version === 0 && status === "SOURCE_UNAVAILABLE" && snapshot.signal
+            && snapshot.signal.direction === null && snapshot.signal.calibratedConfidence == null
+            && snapshot.signal.pLong == null && snapshot.signal.pShort == null
+            && ["INSUFFICIENT_DATA", "UNVALIDATED"].indexOf(snapshot.signal.status) >= 0;
+        // A real failed source can be reported before persistence has allocated any card version.
+        // This local empty basis never permits a direction or numeric confidence to be published at version zero.
+        if (coldSource) current = { symbol: symbol, snapshotVersion: 0 };
         if (sequence != null && sequence !== assetCardRequestSequence || renderFields !== false && document.hidden || homeCardSymbols.indexOf(symbol) < 0
                 || !assetCardDisplaySymbols.has(symbol)
-                || !current || !Number.isSafeInteger(version) || version <= 0 || version !== current.snapshotVersion
+                || !current || !Number.isSafeInteger(version) || version < 0 || version !== current.snapshotVersion
                 || status === "MODEL_UNAVAILABLE" && !currentModelCheck(snapshot.health, current)) return false;
         var modelUnavailable = status === "MODEL_UNAVAILABLE" || snapshot.signal && snapshot.signal.status === "UNVALIDATED";
         var sourceUnavailable = status === "SOURCE_UNAVAILABLE";
+        var failureAt = sourceUnavailable && assetCardDate(snapshot.health.asOf);
+        if (sourceUnavailable && (!failureAt || failureAt > new Date())) return false;
+        var priceState = assetCardFieldVersions.get(symbol + "|PRICE") || {};
+        var clearPrice = sourceUnavailable && (!priceState.observedAt || failureAt.getTime() >= priceState.observedAt);
         var signal = current.signal && Object.assign({}, current.signal, { calibratedConfidence: null, pLong: null, pShort: null });
+        if (!signal && snapshot.signal && snapshot.signal.direction == null
+                && ["INSUFFICIENT_DATA", "UNVALIDATED"].indexOf(snapshot.signal.status) >= 0) {
+            signal = Object.assign({}, snapshot.signal, { calibratedConfidence: null, pLong: null, pShort: null });
+        }
         if (modelUnavailable) signal = Object.assign({}, signal, { direction: null, status: "UNVALIDATED",
             calibratedConfidence: null, pLong: null, pShort: null, oneHourState: "数据不足", fourHourTrend: "数据不足" });
         else if (signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
         // A read can fail closed without allocating a version. Directional evidence never crosses a changed basis.
         var safe = Object.assign({}, current, {
-            spotPrice: sourceUnavailable ? null : current.spotPrice, latestPriceAt: sourceUnavailable ? null : current.latestPriceAt,
+            spotPrice: clearPrice ? null : current.spotPrice, latestPriceAt: clearPrice ? null : current.latestPriceAt,
             signal: signal, health: Object.assign({}, snapshot.health) });
-        safe.risk = assetCardRiskMatches(safe, snapshot.risk) ? snapshot.risk
-            : assetCardRiskMatches(safe, current.risk) ? current.risk : assetCardUnknownRisk(safe, "当前模型不可用，方向风险需重新评估");
+        if (!current.signal) {
+            ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].forEach(function (key) { safe[key] = snapshot[key] || null; });
+            safe.riskVersion = snapshot.riskVersion || snapshot.risk && snapshot.risk.riskVersion || null;
+        }
+        var previousRiskStillUsable = assetCardRiskMatches(safe, current.risk)
+            && (!sourceUnavailable || ["HIGH", "MEDIUM"].indexOf(assetCardOverallRisk(safe)) >= 0);
+        safe.risk = assetCardRiskEnvelopeMatches(snapshot, safe) ? snapshot.risk
+            : previousRiskStillUsable ? current.risk : assetCardUnknownRisk(safe,
+                sourceUnavailable ? "现货来源不可用；当前风险证据未通过身份校验" : "当前模型不可用，方向风险需重新评估");
         assetCardSnapshots.set(symbol, safe);
-        (sourceUnavailable ? ["PRICE", "SIGNAL", "RISK", "HEALTH"] : ["SIGNAL", "RISK", "HEALTH"]).forEach(function (group) {
+        if (sourceUnavailable) assetCardFieldVersions.set(symbol + "|PRICE", Object.assign({}, priceState, {
+            failureAt: Math.max(priceState.failureAt || 0, failureAt.getTime()) }));
+        ["SIGNAL", "RISK", "HEALTH"].forEach(function (group) {
             assetCardFieldVersions.set(symbol + "|" + group, version);
         });
         if (renderFields !== false) {
@@ -1089,7 +1124,7 @@
         if (group === "HEALTH" && payload.health && ["MODEL_UNAVAILABLE", "SOURCE_UNAVAILABLE"].indexOf(payload.health.status) >= 0) {
             var current = assetCardSnapshots.get(symbol);
             if (current && version < current.snapshotVersion || payload.health.status === "MODEL_UNAVAILABLE" && !currentModelCheck(payload.health, current)) return;
-            if (!current || version > current.snapshotVersion) {
+            if ((!current || version > current.snapshotVersion) && version !== 0) {
                 if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
             }
             applyReadSafetyDowngrade(Object.assign({}, payload, { symbol: symbol, snapshotVersion: version }), null);
@@ -1142,6 +1177,8 @@
         var isSelected = symbol === selected;
         var ticker = assetTicker(asset);
         var current = assetCardSnapshots.get(symbol);
+        if (asset.cardSignal && String(asset.cardSignal.symbol || "").toUpperCase() === symbol)
+            mergeAssetCardGroup(symbol, Number(asset.cardSignal.snapshotVersion), "PRICE", asset.cardSignal);
         if (asset.cardSignal && String(asset.cardSignal.symbol || "").toUpperCase() === symbol
                 && (!current || Number(asset.cardSignal.snapshotVersion) >= current.snapshotVersion)) {
             // The Home loader already checks its own request sequence; this projection still checks the card version.
@@ -1894,7 +1931,10 @@
                 var symbol = String(snapshot && snapshot.symbol || "").toUpperCase();
                 if (!snapshot || symbols.indexOf(symbol) < 0) return;
                 var current = assetCardSnapshots.get(symbol);
-                if (current && Number(snapshot.snapshotVersion) < current.snapshotVersion) return;
+                if (current && Number(snapshot.snapshotVersion) < current.snapshotVersion) {
+                    if (mergeAssetCardGroup(symbol, Number(snapshot.snapshotVersion), "PRICE", snapshot)) scheduleAssetCardPrice(symbol);
+                    return;
+                }
                 if (!applyReadSafetyDowngrade(snapshot, sequence)) mergeAssetCardSnapshot(snapshot, true);
             });
         } catch (error) {

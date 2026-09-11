@@ -724,7 +724,7 @@ public class AssetCardService {
         var quote = market.quote(normalized, now).orElse(null);
         var currentPrice = quote == null ? value.spotPrice() : quote.price();
         var currentPriceAt = quote == null ? value.latestPriceAt() : quote.observedAt();
-        var priceTradeId = quote == null ? value.priceTradeId() : quote.tradeId();
+        Long priceTradeId = quote == null ? value.priceTradeId() : Long.valueOf(quote.tradeId());
         var signal = value.signal();
         var risk = value.risk();
         var health = value.health();

@@ -221,23 +221,37 @@ class GlobalFrozenUiAlignmentContractTest {
                 const drawCard=(asset,selected)=>{assetCardSnapshots.clear();assetCardFieldVersions.clear();return renderCard(asset,selected);};
                 const types=['CHASE_RISK','RAPID_MOVE_RISK','TREND_REVERSAL_RISK','CROWDING_RISK',
                     'LIQUIDATION_RISK','LIQUIDITY_RISK','EVENT_RISK','DATA_RISK'];
+                const cardTypes=['CHASE','SHOCK','REVERSAL','CROWDING','LIQUIDATION','LIQUIDITY','EVENT','DATA'];
+                const cardSignal={symbol:'TESTUSDT',snapshotVersion:1,featureVersion:'test-only-feature',modelVersion:'test-only-model',
+                    calibrationVersion:'test-only-calibration',thresholdVersion:'test-only-threshold',
+                    signal:{direction:'LONG',status:'VALID',calibratedConfidence:65,signalAsOf:'2026-09-08T01:00:00Z'},
+                    risk:{overallLevel:'LOW',riskVersion:'test-only-risk',riskBasisSide:'LONG',riskBasisDirection:'LONG',
+                      riskBasisSignalAsOf:'2026-09-08T01:00:00Z',riskMarketAsOf:'2026-09-08T01:00:00Z',
+                      items:cardTypes.map(type=>({type,assessmentStatus:'ASSESSED',level:'NONE'}))}};
                 const asset={symbol:'TESTUSDT',name:'Test fixture',marketBias:'BULLISH',confidenceLevel:65,cardSignalDisplayEnabled:true,
+                    cardSignal,
                     riskItems:types.map(riskType=>({riskType,evidenceStatus:'AVAILABLE',severity:'NONE',currentValue:'0'}))};
                 assert.equal(desktop.hasConfirmedRisks(asset),false);
                 assert.equal(desktop.riskSummary(asset),'');assert.equal(desktop.riskDrawer(asset),'');
                 const clear=drawCard(asset,'TESTUSDT');
                 assert.ok(!clear.includes('opportunity-risk'));assert.ok(!clear.includes('data-desktop-hover="risk"'));
+                assert.equal(assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT')),'');
                 for(const items of [[],asset.riskItems.slice(1),asset.riskItems.map(x=>({...x,evidenceStatus:'INSUFFICIENT_EVIDENCE'}))]) {
-                    const unknown={...asset,riskItems:items},html=drawCard(unknown,'TESTUSDT');
+                    const unknown={...asset,riskItems:items,cardSignal:{...cardSignal,risk:{...cardSignal.risk,overallLevel:null,
+                      reason:'Test-only missing independent risk evidence',items:cardTypes.map(type=>({type,assessmentStatus:'UNKNOWN',level:null}))}}};
+                    const html=drawCard(unknown,'TESTUSDT');
                     assert.equal(desktop.hasConfirmedRisks(unknown),false);assert.equal(desktop.riskDrawer(unknown),'');
                     assert.equal(desktop.riskSummary(unknown),'<span class="risk-pending-copy">风险待评估</span>');
-                    assert.ok(html.includes('data-live-field="risk" class="asset-card-risk-unknown">—'));
+                    assert.match(html,/data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
                     assert.ok(!html.includes('data-desktop-hover="risk-status"'));
-                    assert.ok(!html.includes('data-desktop-hover="risk"'));assert.ok(!html.includes('risk-evidence-item'));
+                    assert.ok(html.includes('data-desktop-hover="risk"'));assert.ok(!html.includes('risk-evidence-item'));
+                    const reason=assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT'));
+                    assert.ok(reason.includes('Test-only missing independent risk evidence'));
+                    assert.ok(!reason.includes('risk-evidence-item'));
                 }
                 const risky={...asset,riskItems:asset.riskItems.map((x,i)=>({...x,severity:i===0?'MEDIUM':i===1?'HIGH':'NONE',
                     currentValue:i===1?'72':'0',primaryEvidence:'Independent fixture metric',source:'ISOLATED_TEST',observedAt:'2026-09-08T01:00:00Z'})),
-                    cardSignal:{symbol:'TESTUSDT',snapshotVersion:1,risk:{overallLevel:'HIGH',items:[
+                    cardSignal:{...cardSignal,risk:{...cardSignal.risk,overallLevel:'HIGH',items:[
                       {type:'CHASE',assessmentStatus:'ASSESSED',level:'MEDIUM',evidenceValue:2,source:'ISOLATED_TEST'},
                       {type:'SHOCK',assessmentStatus:'ASSESSED',level:'HIGH',evidenceValue:72,source:'ISOLATED_TEST'}]}}};
                 const html=drawCard(risky,'TESTUSDT');
@@ -246,6 +260,17 @@ class GlobalFrozenUiAlignmentContractTest {
                     'tabindex="0" data-desktop-hover="risk"','aria-haspopup="dialog"','aria-label="TESTUSDT 风险详情"']) assert.ok(html.includes(value),value);
                 assert.equal((desktop.riskDrawer(risky).match(/risk-evidence-item/g)||[]).length,2);
                 for(const value of ['72','ISOLATED_TEST','Independent fixture metric']) assert.ok(desktop.riskDrawer(risky).includes(value));
+                for(const invalid of [
+                    {...risky.cardSignal,signal:null},
+                    {...risky.cardSignal,risk:{...risky.cardSignal.risk,riskVersion:null}},
+                    {...risky.cardSignal,risk:{...risky.cardSignal.risk,riskBasisSide:'SHORT'}},
+                    {...risky.cardSignal,risk:{...risky.cardSignal.risk,riskBasisSignalAsOf:'2026-09-08T00:00:00Z'}},
+                    {...risky.cardSignal,riskVersion:'other-risk-version'}]) {
+                    const rejected=drawCard({...risky,cardSignal:invalid},'TESTUSDT');
+                    assert.match(rejected,/data-live-field="risk" class="asset-card-risk-unknown"[^>]*>—/);
+                    assert.ok(!rejected.includes('急涨急跌·高')&&!rejected.includes('追高·中'));
+                    assert.ok(!assetCardRiskDrawer(assetCardSnapshots.get('TESTUSDT')).includes('risk-evidence-item'));
+                }
                 console.log('PASS');
                 """).redirectErrorStream(true).start();
         boolean completed = process.waitFor(30, TimeUnit.SECONDS);

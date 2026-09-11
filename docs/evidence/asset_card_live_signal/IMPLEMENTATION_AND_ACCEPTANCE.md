@@ -1,5 +1,104 @@
 # Asset-card live signal implementation evidence
 
+## V42 continuation status (2026-09-11)
+
+Current package: `V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE`.
+The V41 sections below are retained historical evidence, not current-head acceptance.
+V42's original 48 paths remain intact; PR #1298 adds only `Dockerfile` (49 unique paths,
+fingerprint `992926a6dc0724a7ee24e4e982c0b20a5a196d9a`). Gate head
+`9102710e7f8f9d804e5dc03b844ed1f2b985613d` passed all three exact-head checks and
+was squash-merged as `f24cdf2c5be755d75639317fdfba99cef29bc836`.
+The business branch incorporated that main without changing the 23 preserved WIP files;
+their binary diff SHA-256 is `723a13334fd09f3e5ae20e51602adee6326275fdbb1b76848377246bd4fdd0f5`.
+Local preservation checkpoint `bb4242aef0ae2f85bc7d5d03bde9fa16e029e2cb` contains that exact work.
+Before the runtime edit, the real outer V42 invocation returned `AUTHORIZED`,
+`REQUEST_CLASS=AUTHORIZED_IMPLEMENTATION_PACKAGE`, `IMPLEMENTATION_ALLOWED=true`
+and `RESOLUTION_BLOCK_REASON=NONE`; no fixture replaced real Git/GitHub state.
+
+The Dockerfile patch is exactly the approved runtime-only `libgomp1` installation;
+removing those four added lines reproduces the previous Dockerfile byte-for-byte.
+The two actual final-image build failures, context identity and exit codes are recorded
+below. `LINUX_NATIVE_RUNTIME=FAIL`, not a cached-image or macOS PASS.
+
+Current infrastructure includes signed per-side risk identities, threshold/version
+binding, independent PRICE trade ordering and failure domains, per-symbol closed-bar
+work, bounded Spot/depth processing, point-in-time feature metadata and card snapshot CAS.
+Frontend PRICE coalescing is now 250 ms and the card background tick is 500 ms;
+these settings are not measured production p95 latency. Cold source failures at persisted
+version zero retain explicit non-directional DATA evidence without publishing a direction
+or percentage. No card PRICE event invokes whole-Home `loadHome`.
+An incoming source-failure risk with an invalid identity cannot retain a previous LOW;
+the regression first failed with LOW and now yields UNKNOWN. Independently valid known
+HIGH/MEDIUM evidence is preserved rather than being hidden by a missing replacement.
+
+### V42 local validation of the continuation
+
+- Final full Maven: **5,440 tests / 517 suites, 0 failures, 0 errors, 13 skips**, exit 0,
+  after the final source-loss risk regression. Log:
+  `/private/tmp/v42-full-maven.KsrFND/full-maven-final.log`.
+- Command uses Java 17, the existing fixed Python/XGBoost environment, local Docker
+  socket, and process-only `-Dapi.version=1.44`. The installed older docker-java defaults
+  to API 1.32, which this daemon rejects. No Docker configuration, dependency, daemon
+  version or skip condition was changed. Tests only use isolated H2/PostgreSQL and
+  local mock HTTP; no controlled external-provider opt-in was enabled.
+- Focused card/V24 suite: **141 tests, 0 failures, 0 errors, 0 skips**. V24 migration
+  executed against disposable PostgreSQL; the full run also executed the existing
+  PostgreSQL migration smoke and V23 tests. No Staging/Production database was used.
+- The first full attempt had **5,438 / 7 failures / 7 errors / 20 skips**. Card fixtures
+  were missing newly required identity/lifecycle/price fields or forbade pure quote
+  cache reads. Exact read counts and no-more-interaction checks preserve the read-only
+  contract. The seven HTTP errors were sandbox loopback-bind denial, not Telegram
+  delivery failures; the unchanged mock-client class passes with local socket access.
+- Python numerical suite: **30 tests, 0 failures/errors/skips**, XGBoost 2.1.4 unchanged.
+  Host Java/Python synthetic UBJ parity executes in the Maven opt-in suite. It proves
+  neither real model quality nor final Linux image loading.
+- Asset-card JS matrix plus UTC/Asia-Shanghai/America-New-York subprocesses, timestamp
+  transport matrix, JS syntax and `git diff --check`: PASS. The card-specific test
+  changes preserve non-card methods, ordering, selection and canonical-field isolation.
+- Product Source Gate, task validation, V42 exact 49-path contract, historical machine
+  gates and **36 outer V42 cases / 0 failures**: PASS. Workflow contract exits 0 with
+  `WORKFLOW_CONTRACT_OK`. Original V41 48-path and generic permission checks remain intact.
+- Added-diff high-confidence secret-pattern scan: zero matches; this is a limited
+  pattern scan, not a claim to have read or exhaustively audited secret stores.
+
+The 13 final local skips retain their original controls:
+
+| Class | Count | Exact reason |
+| --- | ---: | --- |
+| `ControlledCurrentStateCloneFlywayActionTest` | 1 | P3 controlled PostgreSQL action environment gate not enabled |
+| `ControlledCurrentStateContentFingerprintTest` | 7 | P3 content-fingerprint environment gate not enabled |
+| `ControlledGeneratedReleaseLikeFixtureFlywayTest` | 1 | P3 generated-fixture Flyway action environment gate not enabled |
+| `ControlledGreenfieldFlywayV7ActionTest` | 1 | P3-G Flyway action environment gate not enabled |
+| `ControlledP3hComposeOfflineSmokeTest` | 1 | Explicit Docker contract opt-in not enabled |
+| `ControlledPostgreSqlFlywaySmokeTest` | 1 | Controlled external PostgreSQL environment missing; external access not authorized |
+| `CoinGlassControlledSmokeTest` | 1 | `COINGLASS_SMOKE_ENABLE_EXTERNAL_CALLS` absent; no real provider smoke authorized |
+
+New exact-head GitHub CI is pending the continuation push. It must not be replaced by
+these local results or PR #1298's gate-only checks. The existing CI profile is a tagged
+subset, not the complete 5,440-test local suite.
+
+Unfinished implementation and evidence are explicit:
+
+- `AssetCardMapper.saveLabel` and archive/prune methods have no production caller.
+  The one-second real-trade observation store and offline label functions do not yet
+  form a DB-to-future1m/future5m/horizonTrade-to-training-manifest export/maturity loop.
+- The mapper still uses the application `JdbcTemplate`. Its card-table write check is
+  a guard, not proof of a dedicated least-privilege writer datasource/role. No role,
+  persistent external database or deployment was changed in this work.
+- One configured model bundle is deliberately validated for one asset; a per-asset
+  multi-model registry is not complete. Mocked 128-symbol scheduling coverage is not
+  128-asset real-model, real-latency acceptance.
+- Real training/calibration/final-test samples, effective four-hour cluster counts,
+  stratified Brier/ECE/LogLoss and RANGE/WATCH results are `NOT_AVAILABLE`, not zero.
+  Synthetic native fixtures are never production models. Final Linux image prediction
+  and live browser/SSE latency evidence remain unavailable.
+
+The only business PR remains #1295, Draft. No business merge or Staging/Production
+deployment is authorized or performed. `MODEL_MODE=SHADOW`, `PRODUCTION_MODEL_READY=NO`,
+`CANARY_OR_ACTIVE_FORBIDDEN=YES`, `CURRENT_PHASE_DONE=NO`.
+
+## Historical V41 evidence
+
 Package: `V41_ASSET_CARD_LIVE_SIGNAL_CLOSURE`.
 Scope: Appendix I; the existing 48-path implementation allowlist is unchanged.
 Registered starting SHA: `094b70a8ed31891999da0814fae5add09e2c4e08`.
@@ -110,7 +209,23 @@ V24 was the next unused migration after V23 on the merged baseline. The change a
 - CI coverage correction: the repository's existing `ci` profile selects `smoke | core-regression`, not the full suite. The card calculation/market/risk/model, Mapper/V24 and Home projection/rendering tests now carry the existing `core-regression` tag. No workflow, global gate or existing assertion was removed or relaxed. The earlier 1,090-test CI run is not presented as card-test coverage; the updated exact-head run must include these tests.
 - Exact `3f7857ef9236ed6da43f7618bbd55517a2dde139` CI ran **1,394 tests, 1 failure, 0 errors, 1 native opt-in skip**; workflow-contract passed. The failure exposed nanosecond epoch timestamps being rounded through a floating-point JSON tree. The regression now deliberately uses a nine-digit fractional instant on every OS and retains exact timestamp equality. Card storage uses a private mapper copy with decimal tree reads, preserving precision without changing the shared application mapper; the test explicitly verifies that isolation. The strengthened regression was reproduced RED locally, then the comprehensive 352-test focused suite passed. The final full-Maven count above is revalidated after this correction before the follow-up commit.
 
-### Exact current local skip reasons (20)
+### V42 final Linux native-image attempt (2026-09-11)
+
+The Dockerfile-path gate is effective through PR #1298 / `f24cdf2c5be755d75639317fdfba99cef29bc836`. The exact runtime-only `libgomp1` insertion was captured with business checkpoint `bb4242aef0ae2f85bc7d5d03bde9fa16e029e2cb`; the build stage, Java versions, `USER app` and application entrypoint were preserved. No host dependency installation or business application startup occurred.
+
+Frozen source-only build context: `/private/tmp/asset-card-final-image.K61wfu/context.tar`, SHA-256 `d56173d0c1d7e6ace47699c38ee9d06c89ee3f59627f8eb61ecfa7add5edc110`; Dockerfile SHA-256 `b0d5daff86401ba3257bbc070a6d26e421425c67be60bda50a804b89675b87d0`. Later worktree edits are not attributed to this context. The local Docker daemon reports Linux aarch64; the requested image platform was `linux/arm64`.
+
+Both the first attempt and the single authorized identical retry exited **1**, before `apt-get`, Maven compilation or native inference:
+
+```sh
+docker build --pull=false --platform linux/arm64 --progress=plain -t trine-asset-card-v42-native-test:local - < /private/tmp/asset-card-final-image.K61wfu/context.tar
+```
+
+Both failed at Dockerfile line 1 while resolving `docker/dockerfile:1.7`: `failed to fetch anonymous token: Get "https://auth.docker.io/token?scope=repository%3Adocker%2Fdockerfile%3Apull&service=registry.docker.io": EOF`. The frontend, base-image aliases, Docker configuration and credentials were not changed; no third attempt was made. Logs: `/private/tmp/asset-card-final-image.K61wfu/build-1.log` (SHA-256 `be7e67cdd215109dcb5cb94faa2b21b8396f45a3066252cdbdf6c554b38ebb1b`) and `build-2.log` (SHA-256 `c23624e51404c7b1fafeda68daf0baf6821f69cb669865c7300fe51183a97e71`).
+
+Final image ID, application-JAR hash, installed `libgomp1` version and final-image long/short raw/Beta deltas are **NOT_AVAILABLE**. The exact local test-image tag is absent. No new UBJ fixture or production model was generated, so no new model artifact requires deletion. The earlier cached-JRE `libgomp.so.1` failure and macOS Java/Python fixture parity are diagnostic evidence only, not a substitute for the required final image. `FINAL_LINUX_NATIVE_PARITY=BLOCKED`; `MODEL_MODE=SHADOW`; `PRODUCTION_MODEL_READY=NO`; real training/calibration/final-test samples and metrics remain `UNKNOWN`. Current phase is NOT DONE.
+
+### Historical V41 local skip reasons (20)
 
 The former native interoperability skip is closed by the successful opt-in run.
 
