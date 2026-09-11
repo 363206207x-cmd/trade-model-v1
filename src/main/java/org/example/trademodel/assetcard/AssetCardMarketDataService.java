@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -43,11 +45,13 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 
 /** Independent, public Spot transport. Never calls a trading, analysis, AI or account API. */
 @Service
-public class AssetCardMarketDataService {
+public class AssetCardMarketDataService implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(AssetCardMarketDataService.class);
     private static final List<String> INTERVALS = List.of("1m", "5m", "15m", "1h", "4h");
     private static final int MAX_DEPTH_LEVELS = 5000;
@@ -55,40 +59,96 @@ public class AssetCardMarketDataService {
     private static final int MAX_BUFFERED_DEPTH_LEVELS = 20_000;
     private static final int BOOK_HISTORY_LIMIT = 16;
     private static final Duration BOOTSTRAP_GAP = Duration.ofSeconds(60);
+    private static final int CONSUMER_SHARDS = 4;
+    private static final int DEPTH_REQUEST_WEIGHT = 250; // Binance Spot limit=5000, shared IP REQUEST_WEIGHT.
     private final AssetCardProperties properties;
     private final ObjectMapper json;
     private final AssetCardMapper mapper;
+    private final Environment environment;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
     private final AtomicBoolean connecting = new AtomicBoolean();
     private final Map<String, SpotQuote> quotes = new ConcurrentHashMap<>();
+    private final Map<String, SpotQuote> tradeWatermarks = new ConcurrentHashMap<>();
     private final Map<String, SpotBook> books = new ConcurrentHashMap<>();
     private final Map<String, DepthState> depthStates = new ConcurrentHashMap<>();
     private final Map<String, ArrayDeque<SpotBook>> bookHistory = new ConcurrentHashMap<>();
     private final Map<String, Instant> depthRetryAfter = new ConcurrentHashMap<>();
     private Instant nextDepthBootstrapAt = Instant.MIN;
+    private Instant weightWindow = Instant.MIN;
+    private int reservedWeight;
     private long connectionEpoch;
     private final Map<String, TreeMap<Instant, SpotBar>> closedBars = new ConcurrentHashMap<>();
     private final List<Consumer<MarketUpdate>> listeners = new CopyOnWriteArrayList<>();
-    private final ThreadPoolExecutor frames = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(2048), runnable -> {
-                Thread thread = new Thread(runnable, "asset-card-spot-events");
-                thread.setDaemon(true);
-                return thread;
-            });
+    private final List<Consumer<SpotQuote>> tradeListeners = new CopyOnWriteArrayList<>();
+    private final ThreadPoolExecutor[] tradeFrames = executors("trade", 2048);
+    private final ThreadPoolExecutor[] depthFrames = executors("depth", 512);
+    private final ThreadPoolExecutor[] barFrames = executors("bar", 512);
+    private final Map<String, SpotQuote> pendingPrices = new ConcurrentHashMap<>();
+    private final Map<String, Instant> publishedPriceAt = new ConcurrentHashMap<>();
+    private final Object priceLock = new Object();
+    private final AtomicLong tradeDrops = new AtomicLong(), depthDrops = new AtomicLong(), barDrops = new AtomicLong();
+    private final AtomicLong coalescedPrices = new AtomicLong(), depthRecoveries = new AtomicLong(), reconnects = new AtomicLong();
+    private final AtomicLong maxProcessingLagMillis = new AtomicLong(), controlId = new AtomicLong();
+    private volatile Instant reconnectAfter = Instant.MIN;
+    private volatile int connectionFailures;
+    private volatile Set<String> prioritySymbols = Set.of();
+    private volatile boolean rolloverRequested;
+    private volatile boolean controlInFlight;
+    private volatile Instant nextControlAt = Instant.MIN;
+    private volatile long pendingControlId;
+    private volatile Set<String> pendingControlSymbols = Set.of();
+    private volatile Instant controlSentAt;
     private volatile Set<String> desiredSymbols = Set.of();
     private volatile Set<String> connectionSymbols = Set.of();
     private volatile WebSocket socket;
     private volatile Instant connectedAt;
     private volatile boolean stopped;
+    private volatile BooleanSupplier writerReadiness = () -> false;
 
     public AssetCardMarketDataService(AssetCardProperties properties, ObjectMapper json, AssetCardMapper mapper) {
+        this(properties, json, mapper, null);
+    }
+
+    @Autowired
+    public AssetCardMarketDataService(AssetCardProperties properties, ObjectMapper json, AssetCardMapper mapper,
+                                      Environment environment) {
         this.properties = properties;
         this.json = json;
         this.mapper = mapper;
+        this.environment = environment;
+    }
+
+    private static ThreadPoolExecutor[] executors(String kind, int capacity) {
+        ThreadPoolExecutor[] result = new ThreadPoolExecutor[CONSUMER_SHARDS];
+        for (int i = 0; i < result.length; i++) {
+            String name = "asset-card-spot-" + kind + "-" + i;
+            result[i] = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(capacity), runnable -> {
+                Thread thread = new Thread(runnable, name); thread.setDaemon(true); return thread;
+            });
+        }
+        return result;
+    }
+
+    boolean networkAllowed() {
+        if (stopped || !properties.isEnabled() || !properties.isExternalCallsEnabled() || environment == null
+                || !explicitOptIn("trade-model.provider-call.external-calls-enabled")) return false;
+        boolean production = java.util.Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> profile.equals("prod") || profile.equals("production"));
+        return !production || explicitOptIn("trade-model.provider-call.enabled")
+                && explicitOptIn("trade-model.schedulers.enabled")
+                && "EXPLICIT_OPT_IN".equals(environment.getProperty("trade-model.production.scheduler-policy"));
+    }
+
+    private boolean explicitOptIn(String key) {
+        return "true".equalsIgnoreCase(environment.getProperty(key, "").trim());
     }
 
     /** Background lifecycle only: callers supply the existing pool/card union; this never changes that union. */
     public synchronized void reconcileSubscriptions(Collection<String> symbols) {
+        reconcileSubscriptions(symbols, List.of());
+    }
+
+    public synchronized void reconcileSubscriptions(Collection<String> symbols, Collection<String> displayedSymbols) {
         TreeSet<String> next = new TreeSet<>();
         if (symbols != null) symbols.forEach(symbol -> {
             String value = normalize(symbol);
@@ -96,7 +156,14 @@ public class AssetCardMarketDataService {
         });
         if (next.size() > 128) throw new IllegalArgumentException("Card stream capacity exceeded; no symbols were truncated");
         desiredSymbols = Set.copyOf(next);
-        quotes.keySet().removeIf(symbol -> !next.contains(symbol));
+        synchronized (priceLock) {
+            quotes.keySet().removeIf(symbol -> !next.contains(symbol));
+            tradeWatermarks.keySet().removeIf(symbol -> !next.contains(symbol));
+            pendingPrices.keySet().removeIf(symbol -> !next.contains(symbol));
+            publishedPriceAt.keySet().removeIf(symbol -> !next.contains(symbol));
+        }
+        prioritySymbols = displayedSymbols == null ? Set.of() : displayedSymbols.stream().map(AssetCardMarketDataService::normalize)
+                .filter(next::contains).collect(java.util.stream.Collectors.toUnmodifiableSet());
         books.keySet().removeIf(symbol -> !next.contains(symbol));
         depthStates.keySet().removeIf(symbol -> !next.contains(symbol));
         bookHistory.keySet().removeIf(symbol -> !next.contains(symbol));
@@ -106,6 +173,13 @@ public class AssetCardMarketDataService {
 
     public Set<String> subscribedSymbols() { return desiredSymbols; }
     public void addListener(Consumer<MarketUpdate> listener) { listeners.add(java.util.Objects.requireNonNull(listener)); }
+    public void addTradeListener(Consumer<SpotQuote> listener) { tradeListeners.add(java.util.Objects.requireNonNull(listener)); }
+    public void setWriterReadiness(BooleanSupplier readiness) { writerReadiness = java.util.Objects.requireNonNull(readiness); }
+
+    public List<String> depthBootstrapOrder() {
+        return desiredSymbols.stream().sorted(Comparator.comparing((String symbol) -> !prioritySymbols.contains(symbol))
+                .thenComparing(symbol -> symbol)).toList();
+    }
 
     public Optional<SpotQuote> quote(String symbol, Instant asOf) {
         SpotQuote value = quotes.get(normalize(symbol));
@@ -141,13 +215,23 @@ public class AssetCardMarketDataService {
     @Scheduled(fixedDelayString = "${trade-model.asset-card.connection-check-ms:5000}", initialDelay = 1000L)
     public synchronized void ensureConnected() {
         if (stopped) return;
-        if (!properties.isEnabled() || desiredSymbols.isEmpty()) {
+        if (!networkAllowed() || desiredSymbols.isEmpty()) {
             disconnect();
             return;
         }
-        if (socket != null && (!connectionSymbols.equals(desiredSymbols)
-                || connectedAt != null && connectedAt.plus(Duration.ofHours(23)).isBefore(Instant.now()))) disconnect();
-        if (socket != null) { bootstrapPendingBook(Instant.now()); return; }
+        Instant now = Instant.now();
+        if (socket != null) {
+            if (controlInFlight && controlSentAt != null && !now.isBefore(controlSentAt.plusSeconds(10))) {
+                controlInFlight = false; rolloverRequested = true;
+                notifyRecovery("RECOVERY", now);
+            }
+            if (!rolloverRequested && connectedAt != null && now.isBefore(connectedAt.plus(Duration.ofHours(23)))) {
+                reconcileConnection(now);
+                bootstrapPendingBook(now);
+                return;
+            }
+        }
+        if (now.isBefore(reconnectAfter)) return;
         if (!connecting.compareAndSet(false, true)) return;
         Set<String> subscribed = desiredSymbols;
         http.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10))
@@ -155,21 +239,82 @@ public class AssetCardMarketDataService {
                 .whenComplete((opened, error) -> {
                     connecting.set(false);
                     if (error != null) {
+                        connectionFailed(Instant.now());
                         log.warn("[asset-card] Spot connection failed ({})", error.getClass().getSimpleName());
-                        subscribed.forEach(symbol -> notifyListeners(new MarketUpdate(symbol, "HEALTH", Instant.now())));
+                        notifyRecovery("RECOVERY", Instant.now());
                     }
                 });
     }
 
-    private URI streamUri(Set<String> symbols) {
+    URI streamUri(Set<String> symbols) {
+        return URI.create(properties.getSpotStreamBaseUri() + "?streams=" + String.join("/", streams(symbols)));
+    }
+
+    private List<String> streams(Set<String> symbols) {
         List<String> streams = new ArrayList<>();
         symbols.stream().sorted().forEach(symbol -> {
             String prefix = symbol.toLowerCase(Locale.ROOT);
-            streams.add(prefix + "@trade");
+            streams.add(prefix + "@aggTrade");
             streams.add(prefix + "@depth@100ms");
             INTERVALS.forEach(interval -> streams.add(prefix + "@kline_" + interval));
         });
-        return URI.create(properties.getSpotStreamBaseUri() + "?streams=" + String.join("/", streams));
+        return streams;
+    }
+
+    /** One JSON control message/second leaves room for the protocol's ping/pong budget. ACK commits membership. */
+    private synchronized void reconcileConnection(Instant now) {
+        if (!networkAllowed() || socket == null || controlInFlight || now.isBefore(nextControlAt)) return;
+        Set<String> removed = new TreeSet<>(connectionSymbols); removed.removeAll(desiredSymbols);
+        Set<String> added = new TreeSet<>(desiredSymbols); added.removeAll(connectionSymbols);
+        if (removed.isEmpty() && added.isEmpty()) return;
+        boolean unsubscribe = !removed.isEmpty();
+        Set<String> changed = unsubscribe ? removed : added;
+        Set<String> target = new TreeSet<>(connectionSymbols);
+        if (unsubscribe) target.removeAll(changed); else target.addAll(changed);
+        pendingControlId = controlId.incrementAndGet(); pendingControlSymbols = Set.copyOf(target);
+        controlInFlight = true; controlSentAt = now; nextControlAt = now.plusSeconds(1);
+        WebSocket expected = socket;
+        try {
+            String message = json.writeValueAsString(Map.of("method", unsubscribe ? "UNSUBSCRIBE" : "SUBSCRIBE",
+                    "params", streams(changed), "id", pendingControlId));
+            expected.sendText(message, true).whenComplete((sent, failure) -> {
+                if (failure != null) synchronized (AssetCardMarketDataService.this) {
+                    if (socket == expected) { controlInFlight = false; rolloverRequested = true; connectionFailed(Instant.now()); }
+                }
+            });
+        } catch (RuntimeException | java.io.IOException failure) {
+            controlInFlight = false; rolloverRequested = true; connectionFailed(now);
+        }
+    }
+
+    private boolean transportControl(String message, Instant at) {
+        try {
+            JsonNode value = json.readTree(message);
+            if (value.has("id")) {
+                synchronized (this) {
+                    if (controlInFlight && value.path("id").asLong(-1) == pendingControlId) {
+                        controlInFlight = false;
+                        if (value.has("result") && value.path("result").isNull()) connectionSymbols = pendingControlSymbols;
+                        else { rolloverRequested = true; connectionFailed(at); }
+                    }
+                }
+                return true;
+            }
+            if ("serverShutdown".equals(value.path("data").path("e").asText())) {
+                rolloverRequested = true; return true;
+            }
+        } catch (RuntimeException | java.io.IOException ignored) { /* Ingestion reports malformed frames. */ }
+        return false;
+    }
+
+    private synchronized void connectionFailed(Instant now) {
+        connectionFailures = Math.min(connectionFailures + 1, 8);
+        reconnectAfter = now.plusSeconds(Math.min(120L, 1L << connectionFailures));
+        reconnects.incrementAndGet();
+    }
+
+    private void notifyRecovery(String type, Instant at) {
+        desiredSymbols.forEach(symbol -> notifyListeners(new MarketUpdate(symbol, type, at)));
     }
 
     private final class SpotListener implements WebSocket.Listener {
@@ -177,17 +322,7 @@ public class AssetCardMarketDataService {
         private final StringBuilder buffer = new StringBuilder();
         private SpotListener(Set<String> symbols) { this.symbols = symbols; }
         @Override public void onOpen(WebSocket opened) {
-            synchronized (AssetCardMarketDataService.this) {
-                if (stopped || !properties.isEnabled() || !symbols.equals(desiredSymbols)) {
-                    opened.abort(); return;
-                }
-                socket = opened;
-                connectionEpoch++;
-                depthStates.clear(); bookHistory.clear(); books.clear();
-                connectionSymbols = symbols;
-                connectedAt = Instant.now();
-            }
-            opened.request(1);
+            if (installConnection(opened, symbols, Instant.now())) opened.request(1);
         }
         @Override public CompletionStage<?> onText(WebSocket opened, CharSequence data, boolean last) {
             synchronized (buffer) {
@@ -200,11 +335,7 @@ public class AssetCardMarketDataService {
                     String message = buffer.toString();
                     Instant receivedAt = Instant.now();
                     buffer.setLength(0);
-                    try { frames.execute(() -> { if (socket == opened) acceptMessage(message, receivedAt); }); }
-                    catch (RejectedExecutionException overloaded) {
-                        lost(opened, symbols);
-                        opened.abort();
-                    }
+                    if (socket == opened && networkAllowed() && !transportControl(message, receivedAt)) enqueueMessage(message, receivedAt);
                 }
             }
             opened.request(1);
@@ -216,53 +347,168 @@ public class AssetCardMarketDataService {
         @Override public void onError(WebSocket failed, Throwable error) { lost(failed, symbols); }
     }
 
+    synchronized boolean installConnection(WebSocket opened, Set<String> symbols, Instant at) {
+        if (!networkAllowed() || !symbols.equals(desiredSymbols)) { opened.abort(); return false; }
+        WebSocket previous = socket;
+        socket = opened; connectionEpoch++;
+        // Make before break: a real sequence gap rebuilds only that book, not every displayed card.
+        depthStates.values().forEach(state -> state.bootstrapInFlight = false);
+        connectionSymbols = symbols; connectedAt = at;
+        connectionFailures = 0; reconnectAfter = Instant.MIN; rolloverRequested = false; controlInFlight = false;
+        if (previous != null && previous != opened) previous.abort();
+        return true;
+    }
+
     private synchronized void lost(WebSocket previous, Set<String> symbols) {
         if (socket == previous) {
+            Set<String> lostSymbols = connectionSymbols;
             socket = null;
             connectionEpoch++;
             connectionSymbols = Set.of();
-            clearLiveData(symbols);
+            controlInFlight = false;
+            connectionFailed(Instant.now());
+            clearLiveData(lostSymbols);
         }
     }
     private void clearLiveData(Set<String> symbols) {
         symbols.forEach(symbol -> {
-            quotes.remove(symbol); books.remove(symbol); bookHistory.remove(symbol); depthStates.remove(symbol);
-            notifyListeners(new MarketUpdate(symbol, "HEALTH", Instant.now()));
+            synchronized (priceLock) { quotes.remove(symbol); pendingPrices.remove(symbol); }
+            books.remove(symbol); bookHistory.remove(symbol); depthStates.remove(symbol);
+            notifyListeners(new MarketUpdate(symbol, "PRICE_FAILURE", Instant.now()));
+            notifyListeners(new MarketUpdate(symbol, "RISK_FAILURE", Instant.now()));
         });
     }
 
     /** Package-private deterministic ingestion seam; never opens a network connection. */
-    synchronized void acceptMessage(String message, Instant receivedAt) {
+    void acceptMessage(String message, Instant receivedAt) {
+        Frame frame = decode(message, receivedAt);
+        if (frame != null) process(frame);
+    }
+
+    /** Live ingress: latest price is O(1); observation, depth and closed-bar consumers have independent bounded shards. */
+    void enqueueMessage(String message, Instant receivedAt) {
+        Frame frame = decode(message, receivedAt);
+        if (frame == null) return;
+        if (frame.kind().equals("TRADE")) {
+            try { acceptTrade(frame.symbol(), frame.data(), frame.receivedAt(), true); }
+            catch (RuntimeException malformed) {
+                tradeDrops.incrementAndGet(); notifyListeners(new MarketUpdate(frame.symbol(), "OBSERVATION_GAP", receivedAt));
+            }
+            return;
+        }
+        ThreadPoolExecutor[] group = frame.kind().equals("DEPTH") ? depthFrames : barFrames;
+        submit(group, frame, () -> process(frame));
+    }
+
+    private void submit(ThreadPoolExecutor[] group, Frame frame, Runnable action) {
+        try {
+            group[Math.floorMod(frame.symbol().hashCode(), CONSUMER_SHARDS)].execute(() -> {
+                if (!desiredSymbols.contains(frame.symbol())) return;
+                long lag = Math.max(0, Duration.between(frame.receivedAt(), Instant.now()).toMillis());
+                maxProcessingLagMillis.accumulateAndGet(lag, Math::max);
+                action.run();
+            });
+        } catch (RejectedExecutionException full) {
+            if (frame.kind().equals("TRADE")) {
+                tradeDrops.incrementAndGet();
+                notifyListeners(new MarketUpdate(frame.symbol(), "OBSERVATION_GAP", frame.receivedAt()));
+            } else if (frame.kind().equals("DEPTH")) {
+                depthDrops.incrementAndGet();
+                synchronized (this) { invalidateDepth(frame.symbol()); }
+            } else {
+                barDrops.incrementAndGet();
+                notifyListeners(new MarketUpdate(frame.symbol(), "BAR_DROPPED",
+                        Instant.ofEpochMilli(frame.data().path("k").path("T").asLong()), frame.data().path("k").path("i").asText()));
+            }
+        }
+    }
+
+    private Frame decode(String message, Instant receivedAt) {
         try {
             JsonNode root = json.readTree(message);
             String stream = root.path("stream").asText("");
             int separator = stream.indexOf('@');
-            if (separator <= 0 || receivedAt == null) return;
+            if (separator <= 0 || receivedAt == null || stopped) return null;
             String symbol = normalize(stream.substring(0, separator));
-            if (!desiredSymbols.contains(symbol)) return;
+            if (!desiredSymbols.contains(symbol)) return null;
             JsonNode data = root.path("data");
-            if (data.has("s") && !symbol.equals(data.path("s").asText())) return;
-            if (stream.endsWith("@trade") && "trade".equals(data.path("e").asText())) acceptTrade(symbol, data, receivedAt);
+            if (!symbol.equals(data.path("s").asText())) return null;
+            if (stream.endsWith("@aggTrade") && "aggTrade".equals(data.path("e").asText())) return new Frame(symbol, stream, data, receivedAt, "TRADE");
             else if (stream.endsWith("@depth@100ms") && "depthUpdate".equals(data.path("e").asText()))
-                acceptDiffDepth(symbol, data, receivedAt);
-            else if (stream.contains("@kline_") && "kline".equals(data.path("e").asText())) acceptBar(symbol, stream, data, receivedAt);
+                return new Frame(symbol, stream, data, receivedAt, "DEPTH");
+            else if (stream.contains("@kline_") && "kline".equals(data.path("e").asText()) && data.path("k").path("x").asBoolean())
+                return new Frame(symbol, stream, data, receivedAt, "BAR");
         } catch (RuntimeException | java.io.IOException failure) {
             log.warn("[asset-card] Spot frame rejected ({})", failure.getClass().getSimpleName());
         }
+        return null;
     }
 
-    private void acceptTrade(String symbol, JsonNode data, Instant receivedAt) {
+    private void process(Frame frame) {
+        try {
+            if (!desiredSymbols.contains(frame.symbol())) return;
+            switch (frame.kind()) {
+                case "TRADE" -> acceptTrade(frame.symbol(), frame.data(), frame.receivedAt(), false);
+                case "DEPTH" -> acceptDiffDepth(frame.symbol(), frame.data(), frame.receivedAt());
+                case "BAR" -> acceptBar(frame.symbol(), frame.stream(), frame.data(), frame.receivedAt());
+                default -> { }
+            }
+        } catch (RuntimeException failure) {
+            if (frame.kind().equals("DEPTH")) synchronized (this) { invalidateDepth(frame.symbol()); }
+            notifyListeners(new MarketUpdate(frame.symbol(), frame.kind().equals("DEPTH") ? "RISK_FAILURE"
+                    : frame.kind().equals("BAR") ? "PERSISTENCE_FAILURE" : "PRICE_FAILURE", frame.receivedAt()));
+            log.warn("[asset-card] {} frame failed ({})", frame.kind(), failure.getClass().getSimpleName());
+        }
+    }
+
+    private record Frame(String symbol, String stream, JsonNode data, Instant receivedAt, String kind) {}
+
+    private void acceptTrade(String symbol, JsonNode data, Instant receivedAt, boolean asyncObservation) {
         BigDecimal price = decimal(data, "p"), quantity = decimal(data, "q");
-        long id = data.path("t").asLong(-1), time = data.path("T").asLong(-1);
+        long id = data.path("a").asLong(-1), time = data.path("T").asLong(-1);
         if (!positive(price) || !positive(quantity) || id < 0 || time < 0 || time > receivedAt.toEpochMilli()) return;
         Instant observedAt = Instant.ofEpochMilli(time);
-        SpotQuote previous = quotes.get(symbol);
-        if (previous != null && (id <= previous.tradeId() || observedAt.isBefore(previous.observedAt()))) return;
-        quotes.put(symbol, new SpotQuote(symbol, price, quantity, id, observedAt, receivedAt));
-        notifyListeners(new MarketUpdate(symbol, "PRICE", observedAt));
+        SpotQuote value = new SpotQuote(symbol, price, quantity, id, observedAt, receivedAt);
+        boolean publish;
+        synchronized (priceLock) {
+            if (!desiredSymbols.contains(symbol)) return;
+            SpotQuote previous = tradeWatermarks.get(symbol);
+            if (previous != null && (id <= previous.tradeId() || observedAt.isBefore(previous.observedAt()))) return;
+            tradeWatermarks.put(symbol, value); quotes.put(symbol, value);
+            Instant lastPublished = publishedPriceAt.get(symbol);
+            publish = lastPublished == null || !receivedAt.isBefore(lastPublished.plusSeconds(1));
+            if (publish) { publishedPriceAt.put(symbol, receivedAt); pendingPrices.remove(symbol); }
+            else { pendingPrices.put(symbol, value); coalescedPrices.incrementAndGet(); }
+        }
+        if (publish) notifyListeners(new MarketUpdate(symbol, "PRICE", observedAt));
+        Runnable observation = () -> {
+            for (Consumer<SpotQuote> listener : tradeListeners) try { listener.accept(value); }
+            catch (RuntimeException failure) {
+                tradeDrops.incrementAndGet(); notifyListeners(new MarketUpdate(symbol, "OBSERVATION_GAP", observedAt));
+            }
+        };
+        if (asyncObservation) submit(tradeFrames, new Frame(symbol, "", data, receivedAt, "TRADE"), observation);
+        else observation.run();
     }
 
-    private void acceptDiffDepth(String symbol, JsonNode data, Instant receivedAt) {
+    @Scheduled(fixedDelay = 250L, initialDelay = 1000L)
+    public void flushPrices() {
+        if (stopped) return;
+        Instant now = Instant.now();
+        List<SpotQuote> due = new ArrayList<>();
+        synchronized (priceLock) {
+            pendingPrices.forEach((symbol, value) -> {
+                if (!now.isBefore(publishedPriceAt.getOrDefault(symbol, Instant.MIN).plusSeconds(1))) {
+                    pendingPrices.remove(symbol, value); publishedPriceAt.put(symbol, now);
+                    if (desiredSymbols.contains(symbol)) due.add(value);
+                }
+            });
+        }
+        due.forEach(value -> notifyListeners(new MarketUpdate(value.symbol(), "PRICE", value.observedAt())));
+    }
+
+    private synchronized void acceptDiffDepth(String symbol, JsonNode data, Instant receivedAt) {
+        if (!desiredSymbols.contains(symbol)) return;
         long first = data.path("U").asLong(-1), last = data.path("u").asLong(-1), time = data.path("E").asLong(-1);
         List<Level> bids = depthLevels(data.path("b"), true), asks = depthLevels(data.path("a"), true);
         if (first < 0 || last < first || time < 0 || time > receivedAt.toEpochMilli() || bids == null || asks == null) {
@@ -285,6 +531,7 @@ public class AssetCardMarketDataService {
         if (!state.pending.isEmpty() && delta.last() <= state.pending.getLast().last()) return;
         int count = delta.bids().size() + delta.asks().size();
         if (state.pending.size() >= MAX_BUFFERED_DEPTH_EVENTS || state.bufferedLevels + count > MAX_BUFFERED_DEPTH_LEVELS) {
+            depthDrops.incrementAndGet();
             state.pending.clear(); state.bufferedLevels = 0;
         }
         state.pending.addLast(delta); state.bufferedLevels += count;
@@ -352,6 +599,10 @@ public class AssetCardMarketDataService {
                 && receivedAt.isBefore(state.lastPublishedAt.plusSeconds(1))) return;
         SpotBook value = new SpotBook(symbol, List.copyOf(state.bids.values()), List.copyOf(state.asks.values()),
                 state.sequence, state.observedAt, state.availableAt, "EXCHANGE_EVENT", state.bidFloor, state.askCeiling);
+        if (!value.coversBasisPoints(25)) {
+            invalidateDepth(symbol);
+            return;
+        }
         ArrayDeque<SpotBook> history = bookHistory.computeIfAbsent(symbol, ignored -> new ArrayDeque<>());
         history.addLast(value);
         while (history.size() > BOOK_HISTORY_LIMIT) history.removeFirst();
@@ -361,13 +612,15 @@ public class AssetCardMarketDataService {
 
     private void invalidateDepth(String symbol) {
         depthStates.remove(symbol); bookHistory.remove(symbol); books.remove(symbol);
-        notifyListeners(new MarketUpdate(symbol, "HEALTH", Instant.now()));
+        depthRecoveries.incrementAndGet();
+        notifyListeners(new MarketUpdate(symbol, "RISK_FAILURE", Instant.now()));
+        notifyListeners(new MarketUpdate(symbol, "RECOVERY", Instant.now()));
     }
 
     /** Called only by the opt-in background connection lifecycle, never by quote/book/bars or a page request. */
     private void bootstrapPendingBook(Instant now) {
-        if (!properties.isEnabled() || socket == null || stopped) return;
-        for (String symbol : desiredSymbols.stream().sorted().toList()) {
+        if (!networkAllowed() || socket == null) return;
+        for (String symbol : depthBootstrapOrder()) {
             DepthState state = depthStates.get(symbol);
             if (state == null || state.sequence >= 0 || state.bootstrapInFlight || state.pending.isEmpty()
                     || !claimDepthBootstrapBudget(symbol, now)) continue;
@@ -379,7 +632,7 @@ public class AssetCardMarketDataService {
             http.sendAsync(request, ignored -> new LimitedDepthBodySubscriber())
                     .whenComplete((response, failure) -> completeDepthBootstrap(symbol, expectedSocket, expectedEpoch,
                             state, response, failure, Instant.now()));
-            return; // One card bootstrap globally per 60 seconds, including errors and connection changes.
+            // Reservations bound all concurrent requests by actual REST weight, including replacement connections.
         }
     }
 
@@ -389,8 +642,12 @@ public class AssetCardMarketDataService {
         // A rate limit applies to the shared public endpoint even if its connection has since been replaced.
         if (response != null && (response.statusCode() == 429 || response.statusCode() == 418))
             recordDepthBootstrapFailure(symbol, response.statusCode(), response.headers().firstValue("Retry-After").orElse(null), receivedAt);
+        if (response != null) response.headers().firstValue("X-MBX-USED-WEIGHT-1M").ifPresent(value -> {
+            try { observeIpWeight(Integer.parseInt(value), receivedAt); }
+            catch (NumberFormatException ignored) { /* A malformed header cannot enlarge the local budget. */ }
+        });
         // Stale responses must not insert data into a replacement connection or subscription.
-        if (stopped || !properties.isEnabled() || socket != expectedSocket || connectionEpoch != expectedEpoch
+        if (!networkAllowed() || socket != expectedSocket || connectionEpoch != expectedEpoch
                 || !desiredSymbols.contains(symbol) || depthStates.get(symbol) != expectedState) return;
         expectedState.bootstrapInFlight = false;
         if (failure != null || response == null) {
@@ -407,11 +664,24 @@ public class AssetCardMarketDataService {
     /** Pure local reservation seam for deterministic cooldown tests; does not perform any HTTP request. */
     synchronized boolean claimDepthBootstrapBudget(String symbol, Instant now) {
         String normalized = normalize(symbol);
+        if (now != null) resetWeightWindow(now);
         if (normalized.isEmpty() || now == null || now.isBefore(nextDepthBootstrapAt)
-                || now.isBefore(depthRetryAfter.getOrDefault(normalized, Instant.MIN))) return false;
-        nextDepthBootstrapAt = now.plus(BOOTSTRAP_GAP);
-        depthRetryAfter.put(normalized, now.plus(BOOTSTRAP_GAP));
+                || now.isBefore(depthRetryAfter.getOrDefault(normalized, Instant.MIN))
+                || reservedWeight + DEPTH_REQUEST_WEIGHT > properties.getDepthWeightBudgetPerMinute()) return false;
+        reservedWeight += DEPTH_REQUEST_WEIGHT;
+        depthRetryAfter.put(normalized, now.plusSeconds(2));
         return true;
+    }
+
+    private void resetWeightWindow(Instant now) {
+        Instant minute = Instant.ofEpochSecond(Math.floorDiv(now.getEpochSecond(), 60) * 60);
+        if (minute.isAfter(weightWindow)) { weightWindow = minute; reservedWeight = 0; }
+    }
+
+    synchronized void observeIpWeight(int used, Instant at) {
+        if (used < 0 || at == null) return;
+        resetWeightWindow(at);
+        reservedWeight = Math.max(reservedWeight, used);
     }
 
     synchronized void recordDepthBootstrapFailure(String symbol, int status, String retryAfter, Instant now) {
@@ -438,6 +708,34 @@ public class AssetCardMarketDataService {
         DepthState state = depthStates.get(normalize(symbol));
         return state == null ? 0 : state.pending.size();
     }
+
+    public RuntimeMetrics runtimeMetrics() {
+        return new RuntimeMetrics(queueDepth(tradeFrames), queueDepth(depthFrames), queueDepth(barFrames),
+                tradeDrops.get(), depthDrops.get(), barDrops.get(), coalescedPrices.get(), depthRecoveries.get(),
+                reconnects.get(), maxProcessingLagMillis.get(), reconnectAfter);
+    }
+
+    private static int queueDepth(ThreadPoolExecutor[] group) {
+        int total = 0; for (ThreadPoolExecutor executor : group) total += executor.getQueue().size(); return total;
+    }
+
+    boolean awaitQueues(Duration timeout) throws Exception {
+        List<CompletableFuture<Void>> barriers = new ArrayList<>();
+        for (ThreadPoolExecutor[] group : List.of(tradeFrames, depthFrames, barFrames)) for (ThreadPoolExecutor executor : group) {
+            CompletableFuture<Void> barrier = new CompletableFuture<>(); barriers.add(barrier);
+            Runnable task = () -> barrier.complete(null);
+            try { executor.execute(task); }
+            catch (RejectedExecutionException busy) {
+                if (executor.isShutdown() || !executor.getQueue().offer(task, timeout.toMillis(), TimeUnit.MILLISECONDS)) return false;
+            }
+        }
+        CompletableFuture.allOf(barriers.toArray(CompletableFuture[]::new)).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        return true;
+    }
+
+    public record RuntimeMetrics(int tradeQueueDepth, int depthQueueDepth, int barQueueDepth,
+                                 long tradeDrops, long depthDrops, long barDrops, long coalescedPrices,
+                                 long depthRecoveries, long reconnects, long maxProcessingLagMillis, Instant reconnectAfter) {}
 
     private static List<Level> depthLevels(JsonNode node, boolean allowZero) {
         if (!node.isArray() || node.size() > MAX_DEPTH_LEVELS) return null;
@@ -506,13 +804,22 @@ public class AssetCardMarketDataService {
                 || tradeCount != null && tradeCount < 0) return;
         TreeMap<Instant, SpotBar> cache = closedBars.computeIfAbsent(symbol + "|" + interval, ignored -> new TreeMap<>());
         Instant openTime = Instant.ofEpochMilli(openMillis);
-        if (cache.containsKey(openTime)) return;
         SpotBar value = new SpotBar(symbol, interval, openTime, Instant.ofEpochMilli(closeMillis), open, high, low, close,
                 volume, takerVolume, tradeCount, receivedAt);
-        int inserted = mapper.upsertClosedBar(value);
-        cache.put(openTime, value);
-        while (cache.size() > properties.getRetainedBarsPerInterval()) cache.pollFirstEntry();
-        if (inserted > 0) notifyListeners(new MarketUpdate(symbol, "BAR", value.closeTime(), interval));
+        synchronized (cache) {
+            if (cache.containsKey(openTime)) return;
+            try {
+                if (properties.isWriterEnabled() && writerReadiness.getAsBoolean()) mapper.upsertClosedBar(value);
+                else notifyListeners(new MarketUpdate(symbol, "PERSISTENCE_FAILURE", value.closeTime(), interval));
+            }
+            catch (RuntimeException failure) {
+                notifyListeners(new MarketUpdate(symbol, "PERSISTENCE_FAILURE", value.closeTime(), interval));
+            }
+            cache.put(openTime, value);
+            while (cache.size() > properties.getRetainedBarsPerInterval()) cache.pollFirstEntry();
+        }
+        // DB idempotency is independent of this process's inference trigger; a pre-existing row must not suppress it.
+        if (desiredSymbols.contains(symbol)) notifyListeners(new MarketUpdate(symbol, "BAR", value.closeTime(), interval));
     }
 
     private void notifyListeners(MarketUpdate update) {
@@ -540,12 +847,17 @@ public class AssetCardMarketDataService {
         socket = null;
         connectionEpoch++;
         connectionSymbols = Set.of();
+        controlInFlight = false;
         if (previous != null) { previous.abort(); clearLiveData(desiredSymbols); }
     }
-    @PreDestroy public void close() { stopped = true; disconnect(); frames.shutdownNow(); }
+    @PreDestroy public void close() {
+        stopped = true; disconnect();
+        for (ThreadPoolExecutor[] group : List.of(tradeFrames, depthFrames, barFrames))
+            for (ThreadPoolExecutor executor : group) executor.shutdownNow();
+    }
 
     public record SpotQuote(String symbol, BigDecimal price, BigDecimal quantity, long tradeId, Instant observedAt, Instant availableAt) {
-        public String source() { return "BINANCE_SPOT_TRADE"; }
+        public String source() { return "BINANCE_SPOT_AGG_TRADE"; }
     }
     public record SpotBar(String symbol, String interval, Instant openTime, Instant closeTime, BigDecimal open,
                           BigDecimal high, BigDecimal low, BigDecimal close, BigDecimal volume,

@@ -781,13 +781,14 @@
     function assetCardDirection(snapshot) {
         var signal = snapshot && snapshot.signal || {};
         if (["VALID", "INVALIDATED"].indexOf(signal.status) < 0) return "—";
+        if (!snapshot.featureVersion || !snapshot.modelVersion || !snapshot.calibrationVersion || !snapshot.thresholdVersion) return "—";
         return Object.prototype.hasOwnProperty.call(assetCardDirections, signal.direction) ? assetCardDirections[signal.direction] : "—";
     }
     function assetCardConfidence(snapshot) {
         var signal = snapshot && snapshot.signal || {};
         var value = signal.calibratedConfidence;
         return signal.status === "VALID" && /^(STRONG_|WEAK_)?(LONG|SHORT)$/.test(signal.direction || "")
-            && snapshot.modelVersion && snapshot.calibrationVersion && snapshot.featureVersion
+            && snapshot.modelVersion && snapshot.calibrationVersion && snapshot.featureVersion && snapshot.thresholdVersion
             && Number.isInteger(value) && value >= 0 && value <= 100 ? value + "%" : "—";
     }
     function assetCardDirectionClass(snapshot) {
@@ -816,7 +817,40 @@
             CONFLICT: "冲突", "机会": "机会", "观察": "观察", "冲突": "冲突" }[oneHour] || "数据不足"),
             fourHour: "4小时趋势" + ({ LONG: "偏多", SHORT: "偏空", RANGE: "震荡", "偏多": "偏多", "偏空": "偏空", "震荡": "震荡" }[fourHour] || "数据不足") };
     }
+    function assetCardSignalSide(signal) {
+        var direction = signal && signal.direction || "";
+        return /^(STRONG_|WEAK_)?LONG$/.test(direction) ? "LONG"
+            : /^(STRONG_|WEAK_)?SHORT$/.test(direction) ? "SHORT" : "NON_DIRECTIONAL";
+    }
+    function assetCardRiskMatches(snapshot, risk) {
+        var signal = snapshot && snapshot.signal;
+        risk = arguments.length > 1 ? risk : snapshot && snapshot.risk;
+        if (!signal || !risk || typeof risk.riskVersion !== "string" || !risk.riskVersion.trim()) return false;
+        var side = assetCardSignalSide(signal);
+        return risk.riskBasisSide === side && (risk.riskBasisDirection || null) === (signal.direction || null)
+            && (risk.riskBasisSignalAsOf || null) === (signal.signalAsOf || null)
+            && (side === "NON_DIRECTIONAL" || assetCardDate(signal.signalAsOf) !== null)
+            && (!snapshot.riskVersion || snapshot.riskVersion === risk.riskVersion);
+    }
+    function assetCardUnknownRisk(snapshot, reason) {
+        var signal = snapshot.signal || {};
+        return { overallLevel: null, items: [], riskAsOf: null, riskMarketAsOf: null,
+            riskBasisSide: assetCardSignalSide(signal), riskBasisDirection: signal.direction || null,
+            riskBasisSignalAsOf: signal.signalAsOf || null, riskVersion: snapshot.riskVersion || null, reason: reason };
+    }
+    function assetCardRiskName(snapshot, type) {
+        return type === "CHASE" ? (snapshot.risk.riskBasisSide === "SHORT" ? "追空"
+            : snapshot.risk.riskBasisSide === "LONG" ? "追高" : "位置") : assetCardRiskNames[type];
+    }
+    function assetCardRiskReason(snapshot) {
+        if (!assetCardRiskMatches(snapshot)) return "风险方向、信号时间或版本尚未匹配当前卡片";
+        var risk = snapshot.risk || {};
+        if (risk.reason) return String(risk.reason);
+        return [...new Set((risk.items || []).filter(function (item) { return item && item.assessmentStatus !== "ASSESSED"; })
+            .map(function (item) { return item.reason; }).filter(Boolean))].slice(0, 3).join("；");
+    }
     function assetCardActiveRisks(snapshot) {
+        if (!assetCardRiskMatches(snapshot)) return [];
         var items = snapshot && snapshot.risk && snapshot.risk.items;
         var seen = new Set();
         return (Array.isArray(items) ? items : []).filter(function (item) {
@@ -832,6 +866,7 @@
         }).slice(0, 3);
     }
     function assetCardOverallRisk(snapshot) {
+        if (!assetCardRiskMatches(snapshot)) return "UNKNOWN";
         var risk = snapshot && snapshot.risk || {};
         var items = Array.isArray(risk.items) ? risk.items : [];
         // Display an assessed high/medium honestly even if another item is unknown; never turn UNKNOWN into LOW.
@@ -848,15 +883,18 @@
     }
     function assetCardRiskItemsHtml(snapshot) {
         return assetCardActiveRisks(snapshot).map(function (item) {
-            return '<span class="asset-card-risk-' + item.level.toLowerCase() + '">' + escapeHtml(assetCardRiskNames[item.type])
+            return '<span class="asset-card-risk-' + item.level.toLowerCase() + '">' + escapeHtml(assetCardRiskName(snapshot, item.type))
                 + '·' + assetCardRiskLabel(item.level) + '</span>';
         }).join("");
     }
     function assetCardRiskDrawer(snapshot) {
         var items = assetCardActiveRisks(snapshot);
-        if (!items.length) return "";
+        if (!items.length) {
+            var reason = snapshot && snapshot.symbol && assetCardOverallRisk(snapshot) === "UNKNOWN" && assetCardRiskReason(snapshot);
+            return reason ? '<h3>' + escapeHtml(snapshot.symbol) + ' · 风险待评估</h3><p>' + escapeHtml(reason) + '</p>' : "";
+        }
         return '<h3>' + escapeHtml(snapshot.symbol) + ' · 风险详情</h3>' + items.map(function (item) {
-            return '<section class="risk-evidence-item"><header><strong class="risk-type-copy">' + escapeHtml(assetCardRiskNames[item.type])
+            return '<section class="risk-evidence-item"><header><strong class="risk-type-copy">' + escapeHtml(assetCardRiskName(snapshot, item.type))
                 + '</strong><span class="risk-level-' + item.level.toLowerCase() + '">' + assetCardRiskLabel(item.level)
                 + '</span></header><p>指标值：' + escapeHtml(item.evidenceValue == null ? "未记录" : item.evidenceValue)
                 + '</p><p>' + escapeHtml(item.reason || "未提供证据说明") + '</p><small>' + escapeHtml(item.source || "未记录来源")
@@ -868,10 +906,20 @@
             + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + escapeHtml(symbol) + ' 风险详情"' : '';
     }
     function assetCardSignificant(group, value) {
-        if (group === "SIGNAL") return JSON.stringify(value ? [value.direction, value.status, value.calibratedConfidence] : null);
-        return JSON.stringify(value ? [value.overallLevel, (Array.isArray(value.items) ? value.items : []).map(function (item) {
-            return item && [item.type, item.assessmentStatus, item.level, item.evidenceValue, item.source, item.reason];
+        if (group === "SIGNAL") return JSON.stringify(value ? [value.direction, value.status, value.calibratedConfidence, value.signalAsOf] : null);
+        return JSON.stringify(value ? [value.overallLevel, value.riskBasisSide, value.riskBasisDirection, value.riskBasisSignalAsOf, value.riskVersion,
+            (Array.isArray(value.items) ? value.items : []).map(function (item) {
+            return item && [item.type, item.assessmentStatus, item.level, item.evidenceValue, item.unit, item.source, item.reason, item.hardInvalidation];
         })] : null);
+    }
+    function assetCardRiskEnvelopeMatches(payload, current) {
+        var risk = payload.risk;
+        return assetCardRiskMatches(current, risk)
+            && ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].every(function (key) {
+                return Object.prototype.hasOwnProperty.call(payload, key) && payload[key] === current[key];
+            }) && ["riskVersion", "riskBasisSide", "riskBasisDirection", "riskBasisSignalAsOf"].every(function (key) {
+                return !Object.prototype.hasOwnProperty.call(payload, key) || payload[key] === risk[key];
+            });
     }
     function mergeAssetCardGroup(symbol, version, group, payload) {
         if (homeCardSymbols.indexOf(symbol) < 0 || !assetCardDisplaySymbols.has(symbol)
@@ -879,6 +927,12 @@
         var identity = symbol + "|" + group;
         if (version <= (assetCardFieldVersions.get(identity) || 0)) return false;
         var current = assetCardSnapshots.get(symbol) || { symbol: symbol, snapshotVersion: 0 };
+        if (group === "RISK" && !assetCardRiskEnvelopeMatches(payload, current)) return false;
+        if (group === "SIGNAL") {
+            if (version < (assetCardFieldVersions.get(symbol + "|RISK") || 0)) return false;
+            var signalAt = assetCardDate(payload.signal && payload.signal.signalAsOf), previousSignalAt = assetCardDate(current.signal && current.signal.signalAsOf);
+            if (signalAt && previousSignalAt && signalAt < previousSignalAt) return false;
+        }
         var next = Object.assign({}, current, { snapshotVersion: Math.max(version, current.snapshotVersion || 0) });
         var key = group.toLowerCase();
         if (group === "PRICE") {
@@ -887,11 +941,16 @@
         } else {
             next[key] = payload[key] && typeof payload[key] === "object" ? payload[key] : null;
             if (group === "SIGNAL") {
-                ["featureVersion", "modelVersion", "calibrationVersion"].forEach(function (field) {
+                ["featureVersion", "modelVersion", "calibrationVersion", "thresholdVersion"].forEach(function (field) {
                     next[field] = typeof payload[field] === "string" && payload[field].trim() ? payload[field] : null;
                 });
+                next.riskVersion = payload.riskVersion || payload.risk && payload.risk.riskVersion || null;
+                next.risk = assetCardRiskEnvelopeMatches(payload, next) ? payload.risk
+                    : assetCardUnknownRisk(next, "当前方向的风险证据尚未完成校验");
+                assetCardFieldVersions.set(symbol + "|RISK", version);
             }
-            if ((group === "SIGNAL" || group === "RISK") && assetCardSignificant(group, current[key]) !== assetCardSignificant(group, next[key])) {
+            if ((group === "SIGNAL" || group === "RISK") && (assetCardSignificant(group, current[key]) !== assetCardSignificant(group, next[key])
+                    || group === "SIGNAL" && assetCardSignificant("RISK", current.risk) !== assetCardSignificant("RISK", next.risk))) {
                 var clock = assetCardDate(payload.cardAsOf), previousClock = assetCardDate(current.cardAsOf);
                 if (clock && (!previousClock || clock >= previousClock)) next.cardAsOf = payload.cardAsOf;
             }
@@ -927,9 +986,16 @@
             var statusNode = card.querySelector('[data-live-field="status"]');
             if (statusNode) statusNode.hidden = !status;
         }
-        if (group === "RISK") {
+        if (group === "RISK" || group === "SIGNAL") {
             var level = assetCardOverallRisk(snapshot);
             patchAssetCardField(card, "risk", assetCardRiskLabel(level), "asset-card-risk-" + level.toLowerCase());
+            var riskNode = card.querySelector('[data-live-field="risk"]');
+            var summaryAttributes = { tabindex: "0", "data-desktop-hover": "risk", "data-risk-symbol": symbol,
+                "aria-haspopup": "dialog", "aria-expanded": "false", "aria-label": symbol + " 风险待评估原因" };
+            if (riskNode) Object.keys(summaryAttributes).forEach(function (name) {
+                if (level === "UNKNOWN" && assetCardRiskReason(snapshot)) riskNode.setAttribute(name, summaryAttributes[name]);
+                else riskNode.removeAttribute(name);
+            });
             var items = card.querySelector('[data-live-field="risk-items"]');
             if (items) {
                 items.innerHTML = assetCardRiskItemsHtml(snapshot); items.hidden = !items.innerHTML;
@@ -951,7 +1017,7 @@
         assetCardPriceTimers.set(symbol, window.setTimeout(function () {
             assetCardPriceTimers.delete(symbol);
             if (!document.hidden) patchAssetCard(symbol, "PRICE");
-        }, 1500));
+        }, 250));
     }
     function mergeAssetCardSnapshot(snapshot, renderFields) {
         if (!snapshot || typeof snapshot !== "object") return false;
@@ -994,12 +1060,14 @@
         if (modelUnavailable) signal = Object.assign({}, signal, { direction: null, status: "UNVALIDATED",
             calibratedConfidence: null, pLong: null, pShort: null, oneHourState: "数据不足", fourHourTrend: "数据不足" });
         else if (signal && assetCardDirection(current) !== "—") signal.status = "INVALIDATED";
-        // A read can fail closed without allocating a published version. It cannot manufacture a direction,
-        // erase assessed risk, advance the effective card clock, or restore values at this same version.
-        assetCardSnapshots.set(symbol, Object.assign({}, current, {
+        // A read can fail closed without allocating a version. Directional evidence never crosses a changed basis.
+        var safe = Object.assign({}, current, {
             spotPrice: sourceUnavailable ? null : current.spotPrice, latestPriceAt: sourceUnavailable ? null : current.latestPriceAt,
-            signal: signal, health: Object.assign({}, snapshot.health) }));
-        (sourceUnavailable ? ["PRICE", "SIGNAL", "RISK", "HEALTH"] : ["SIGNAL", "HEALTH"]).forEach(function (group) {
+            signal: signal, health: Object.assign({}, snapshot.health) });
+        safe.risk = assetCardRiskMatches(safe, snapshot.risk) ? snapshot.risk
+            : assetCardRiskMatches(safe, current.risk) ? current.risk : assetCardUnknownRisk(safe, "当前模型不可用，方向风险需重新评估");
+        assetCardSnapshots.set(symbol, safe);
+        (sourceUnavailable ? ["PRICE", "SIGNAL", "RISK", "HEALTH"] : ["SIGNAL", "RISK", "HEALTH"]).forEach(function (group) {
             assetCardFieldVersions.set(symbol + "|" + group, version);
         });
         if (renderFields !== false) {
@@ -1018,13 +1086,13 @@
         if (payload.symbol && String(payload.symbol).toUpperCase() !== symbol) return;
         var version = Number(event.snapshotVersion == null ? payload.snapshotVersion : event.snapshotVersion);
         if (payload.snapshotVersion != null && Number(payload.snapshotVersion) !== version) return;
-        if (group === "HEALTH" && payload.health && payload.health.status === "MODEL_UNAVAILABLE") {
+        if (group === "HEALTH" && payload.health && ["MODEL_UNAVAILABLE", "SOURCE_UNAVAILABLE"].indexOf(payload.health.status) >= 0) {
             var current = assetCardSnapshots.get(symbol);
-            if (current && version < current.snapshotVersion || !currentModelCheck(payload.health, current)) return;
+            if (current && version < current.snapshotVersion || payload.health.status === "MODEL_UNAVAILABLE" && !currentModelCheck(payload.health, current)) return;
             if (!current || version > current.snapshotVersion) {
                 if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
             }
-            applyReadSafetyDowngrade({ symbol: symbol, snapshotVersion: version, health: payload.health }, null);
+            applyReadSafetyDowngrade(Object.assign({}, payload, { symbol: symbol, snapshotVersion: version }), null);
             return;
         }
         if (!mergeAssetCardGroup(symbol, version, group, payload)) return;
@@ -1093,7 +1161,8 @@
             + '</strong></div></header><div class="opportunity-final"><small>方向</small><b data-live-field="direction" class="' + assetCardDirectionClass(snapshot) + '">' + escapeHtml(direction)
             + '</b><span class="metric-separator">·</span><small>置信</small><strong data-live-field="confidence">' + escapeHtml(confidence)
             + '</strong></div><div class="opportunity-facts"><div class="asset-card-risk-summary"><span>风险 <strong data-live-field="risk" class="asset-card-risk-'
-            + level.toLowerCase() + '">' + assetCardRiskLabel(level) + '</strong></span><small data-live-field="status"'
+            + level.toLowerCase() + '"' + assetCardRiskAttributes(symbol, level === "UNKNOWN" && !!assetCardRiskReason(snapshot))
+            + '>' + assetCardRiskLabel(level) + '</strong></span><small data-live-field="status"'
             + (status ? '' : ' hidden') + '>' + escapeHtml(status) + '</small></div><div class="asset-card-risk-items" data-live-field="risk-items"'
             + (riskItems ? assetCardRiskAttributes(symbol, true) : ' hidden') + '>' + riskItems + '</div></div>'
             + '<div class="opportunity-context"><span data-live-field="one-hour">' + escapeHtml(frames.oneHour)

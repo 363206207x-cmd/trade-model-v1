@@ -32,7 +32,7 @@ class AssetCardFeatureServiceTest {
         }
         Map<String,AssetCardFeatureService.Observation> evidence = new HashMap<>();
         for (String key : List.of("spreadBps", "depth10Bps", "depth25Bps"))
-            evidence.put(key,new AssetCardFeatureService.Observation(2.0,"BINANCE_SPOT",at,at));
+            evidence.put(key,spot(key,2.0,at));
         var frame = new AssetCardFeatureService().build(new AssetCardFeatureService.RawFrame("BTCUSDT",at,bars,evidence));
         assertThat(frame.ready()).isTrue();
         assertThat(frame.atr()).isEqualTo(3.0);
@@ -56,11 +56,11 @@ class AssetCardFeatureServiceTest {
         }
         Map<String,AssetCardFeatureService.Observation> evidence=new HashMap<>();
         for(String key:List.of("spreadBps","depth10Bps","depth25Bps"))
-            evidence.put(key,new AssetCardFeatureService.Observation(2.0,"BINANCE_SPOT",at,at));
+            evidence.put(key,spot(key,2.0,at));
         var raw=new AssetCardFeatureService.RawFrame("BTCUSDT",at,bars,evidence);
         var javaFrame=new AssetCardFeatureService().build(raw);
         var mapper=new ObjectMapper().findAndRegisterModules();
-        String script="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('card','scripts/asset_card_model.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.build_frame(json.loads(sys.argv[1]))))";
+        String script="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('card','scripts/asset_card_model.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.build_frame(m.decode_json(sys.argv[1]))))";
         Process process=new ProcessBuilder("python3","-B","-c",script,mapper.writeValueAsString(raw)).redirectErrorStream(true).start();
         String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
         assertThat(process.waitFor()).as(output).isZero();
@@ -90,10 +90,10 @@ class AssetCardFeatureServiceTest {
         }
         Map<String,AssetCardFeatureService.Observation> evidence=new HashMap<>();
         for(String key:List.of("spreadBps","depth10Bps","depth25Bps"))
-            evidence.put(key,new AssetCardFeatureService.Observation(2.0,"BINANCE_SPOT",at,at));
+            evidence.put(key,spot(key,2.0,at));
         var service=new AssetCardFeatureService();
         var initial=service.build(new AssetCardFeatureService.RawFrame("BTCUSDT",at,bars,evidence));
-        evidence.put("spotPrice",new AssetCardFeatureService.Observation(1000.0,"BINANCE_SPOT",at.plusSeconds(10),at.plusSeconds(10)));
+        evidence.put("spotPrice",spot("spotPrice",1000.0,at.plusSeconds(10)));
         var intrabar=service.build(new AssetCardFeatureService.RawFrame("BTCUSDT",at.plusSeconds(10),bars,evidence));
         assertThat(intrabar.signalAsOf()).isEqualTo(at.plusSeconds(10));
         assertThat(intrabar.closed5mAt()).isEqualTo(at);
@@ -139,5 +139,43 @@ class AssetCardFeatureServiceTest {
                     price,price+2,price-1,price,10,5.0,100L));
         }
         return values;
+    }
+    private AssetCardFeatureService.Observation spot(String key,double value,Instant observed) {
+        return new AssetCardFeatureService.Observation(value,"BINANCE_SPOT",observed,observed,
+                AssetCardFeatureService.spotInstrument("BTCUSDT"),"TEST_FIXTURE_V2",AssetCardFeatureService.observationUnit(key),observed.plusSeconds(60),"spotPrice".equals(key)?"test-trade":null);
+    }
+    @Test void v42ObservationRequiresCompleteIdentityUnitExpiryAndRetainsSignedFunding() {
+        var o=new AssetCardFeatureService.Observation(-.01,"COINGLASS:COINGLASS_FUNDING:test",at,at,
+                "BINANCE:PERPETUAL:LINEAR:BTC/USDT","TEST_SOURCE_V2","RATE",at.plusSeconds(60));
+        assertThat(AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",o,at)).isTrue();
+        assertThat(AssetCardFeatureService.usableObservation("ETHUSDT","fundingRate",o,at)).isFalse();
+        assertThat(AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",o,at.plusSeconds(61))).isFalse();
+        assertThat(AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",new AssetCardFeatureService.Observation(-.01,o.source(),at,at),at)).isFalse();
+        var frame=new AssetCardFeatureService().build(new AssetCardFeatureService.RawFrame("BTCUSDT",at,Map.of(),Map.of("fundingRate",o)));
+        assertThat(frame.realInputs().get("fundingRate").value()).isEqualTo(-.01);
+        assertThat(frame.realInputs()).doesNotContainKey("absFundingRate");
+        assertThat(frame.featureNames()).doesNotContain("takerBuySellRatio");
+        assertThat(frame.featureVersion()).isEqualTo("SPOT_CARD_FEATURES_V2_SIGNED_PIT");
+    }
+    @Test void javaAndPythonRejectTheSameObservationIdentitySourceUnitAndTimeCorruption() throws Exception {
+        var mapper=new ObjectMapper().findAndRegisterModules();
+        var original=new AssetCardFeatureService.Observation(-.01,"COINGLASS:COINGLASS_FUNDING:fixture",at,at,
+                "BINANCE:PERPETUAL:LINEAR:BTC/USDT","TEST_SOURCE_V2","RATE",at.plusSeconds(60));
+        List<AssetCardFeatureService.Observation> observations=new ArrayList<>(List.of(original));
+        for(var corruption:Map.of("source","COINGLASS:COINGLASS_OPEN_INTEREST:fixture","sourceVersion","UNKNOWN",
+                "instrument","BINANCE:SPOT:NONE:BTC/USDT","unit","PERCENT").entrySet()) {
+            com.fasterxml.jackson.databind.node.ObjectNode node=mapper.valueToTree(original); node.put(corruption.getKey(),corruption.getValue());
+            observations.add(mapper.treeToValue(node,AssetCardFeatureService.Observation.class));
+        }
+        observations.add(new AssetCardFeatureService.Observation(-.01,original.source(),at,at,original.instrument(),original.sourceVersion(),"RATE",at.minusSeconds(1)));
+        observations.add(new AssetCardFeatureService.Observation(-.01,original.source(),at,at.plusSeconds(1),original.instrument(),original.sourceVersion(),"RATE",at.plusSeconds(60)));
+        observations.add(new AssetCardFeatureService.Observation(-.01,original.source(),at,at));
+        List<Boolean> expected=observations.stream().map(o->AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",o,at)).toList();
+        String script="import json,sys; sys.path.insert(0,'scripts'); import asset_card_model as m; x=m.decode_json(sys.argv[1]); print(json.dumps([m.valid_observation('BTCUSDT','fundingRate',o,m.timestamp(x['at'])) for o in x['observations']]))";
+        Process process=new ProcessBuilder("python3","-B","-c",script,mapper.writeValueAsString(Map.of("at",at,"observations",observations))).redirectErrorStream(true).start();
+        String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(process.waitFor()).as(output).isZero();
+        assertThat(mapper.readTree(output)).isEqualTo(mapper.valueToTree(expected));
+        assertThat(expected).containsExactly(true,false,false,false,false,false,false,false);
     }
 }

@@ -2076,13 +2076,17 @@ CREATE INDEX IF NOT EXISTS idx_asset_card_spot_available
 
 CREATE TABLE IF NOT EXISTS tm_asset_card_feature_history (
     symbol VARCHAR(32) NOT NULL,
+    record_kind VARCHAR(16) NOT NULL,
+    record_key VARCHAR(128) NOT NULL,
     signal_as_of TIMESTAMP WITH TIME ZONE NOT NULL,
     available_at TIMESTAMP WITH TIME ZONE NOT NULL,
     payload_json TEXT NOT NULL,
     version_no BIGINT NOT NULL DEFAULT 1,
-    PRIMARY KEY (symbol, signal_as_of),
+    PRIMARY KEY (symbol, record_kind, record_key),
+    CONSTRAINT ck_asset_card_history_kind CHECK (record_kind IN ('FEATURE','INFERENCE','TRADE','LABEL')),
+    CONSTRAINT ck_asset_card_history_key CHECK (LENGTH(TRIM(record_key)) > 0),
     CONSTRAINT ck_asset_card_feature_times CHECK (available_at >= signal_as_of),
     CONSTRAINT ck_asset_card_feature_version CHECK (version_no = 1)
 );
 CREATE INDEX IF NOT EXISTS idx_asset_card_feature_available
-    ON tm_asset_card_feature_history(symbol, signal_as_of, available_at);
+    ON tm_asset_card_feature_history(symbol, record_kind, signal_as_of, available_at);

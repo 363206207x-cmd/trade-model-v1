@@ -1,6 +1,8 @@
 package org.example.trademodel.mapper;
 
 import org.example.trademodel.assetcard.AssetCardMarketDataService.SpotBar;
+import org.example.trademodel.assetcard.AssetCardMarketDataService.SpotQuote;
+import org.example.trademodel.assetcard.AssetCardFeatureService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -11,8 +13,14 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.HexFormat;
 
 /** Card-owned persistence only. Canonical OHLCV access below is strictly read-only. */
 @Repository
@@ -56,13 +64,14 @@ public class AssetCardMapper {
                 """, Long.class, symbol));
     }
 
-    public int saveSnapshot(String symbol, long version, String json, Instant cardAsOf) {
+    public int saveSnapshot(String symbol, long expectedSnapshotVersion, long version, String json, Instant cardAsOf) {
         requireSymbol(symbol);
         Objects.requireNonNull(json, "snapshot JSON");
+        if (expectedSnapshotVersion < 0 || version <= expectedSnapshotVersion) return 0;
         return jdbc.update("""
                 UPDATE tm_asset_card_snapshot SET snapshot_json=?,snapshot_version=?,card_as_of=?,updated_at=CURRENT_TIMESTAMP
-                WHERE symbol=? AND snapshot_version < ? AND version_counter >= ?
-                """, json, version, utc(cardAsOf), symbol, version, version);
+                WHERE symbol=? AND snapshot_version = ? AND version_counter >= ?
+                """, json, version, utc(cardAsOf), symbol, expectedSnapshotVersion, version);
     }
 
     public String selectSnapshotJson(String symbol) {
@@ -121,25 +130,211 @@ public class AssetCardMapper {
     }
 
     public int saveFeatureHistory(String symbol, Instant signalAsOf, Instant availableAt, String json) {
-        requireSymbol(symbol);
-        Objects.requireNonNull(json, "feature audit JSON");
-        String sql = postgres ? "INSERT INTO tm_asset_card_feature_history(symbol,signal_as_of,available_at,payload_json) VALUES (?,?,?,?) ON CONFLICT(symbol,signal_as_of) DO NOTHING"
-                : "MERGE INTO tm_asset_card_feature_history target USING (VALUES (?,?,?,?)) incoming(symbol,signal_as_of,available_at,payload_json) "
-                + "ON target.symbol=incoming.symbol AND target.signal_as_of=incoming.signal_as_of "
-                + "WHEN NOT MATCHED THEN INSERT(symbol,signal_as_of,available_at,payload_json) VALUES(incoming.symbol,incoming.signal_as_of,incoming.available_at,incoming.payload_json)";
-        return jdbc.update(sql, symbol, utc(signalAsOf), utc(availableAt), json);
+        return saveHistory(symbol, HistoryKind.FEATURE, "FEATURE:" + Objects.requireNonNull(signalAsOf), signalAsOf, availableAt, json);
+    }
+
+    /** Exact closed-bar identity, including timeout/failure results; no processing timestamp participates in the key. */
+    public int saveInference(String symbol, Instant closed5mAt, Instant availableAt, String json) {
+        Instant close = canonicalClose(closed5mAt);
+        return saveHistory(symbol, HistoryKind.INFERENCE, "5m:" + close, close, availableAt, json);
+    }
+
+    public Optional<TypedHistory> selectInference(String symbol, Instant closed5mAt, Instant availableAtCutoff) {
+        requireSymbol(symbol); Objects.requireNonNull(availableAtCutoff, "availability cutoff");
+        Instant close = canonicalClose(closed5mAt);
+        List<TypedHistory> rows = jdbc.query("""
+                SELECT symbol,record_kind,record_key,signal_as_of,available_at,payload_json FROM tm_asset_card_feature_history
+                WHERE symbol=? AND record_kind='INFERENCE' AND record_key=? AND available_at<=?
+                """, (rs, row) -> typedHistory(rs), symbol, "5m:" + close, utc(availableAtCutoff));
+        return rows.stream().findFirst();
+    }
+
+    public int saveTradeObservation(SpotQuote quote, String instrumentId, String sourceVersion, String json) {
+        Objects.requireNonNull(quote, "actual aggregate trade");
+        requireInstrument(quote.symbol(), instrumentId); requireIdentity(sourceVersion);
+        if (quote.tradeId() < 0 || quote.price() == null || quote.price().signum() <= 0
+                || quote.quantity() == null || quote.quantity().signum() <= 0)
+            throw new IllegalArgumentException("Invalid actual aggregate trade");
+        String key = identityKey("TRADE", instrumentId, quote.source(), sourceVersion, Long.toString(quote.tradeId()));
+        return saveHistory(quote.symbol(), HistoryKind.TRADE, key, quote.observedAt(), quote.availableAt(), json);
+    }
+
+    public int saveLabel(String symbol, Instant signalAsOf, String instrumentId, String sourceVersion, long signalTradeId,
+                         String featureVersion, String labelDefinition, String side, Instant availableAt, String json) {
+        requireInstrument(symbol, instrumentId); requireIdentity(sourceVersion); requireIdentity(featureVersion); requireIdentity(labelDefinition);
+        if (signalTradeId < 0 || !Set.of("LONG", "SHORT").contains(side) || signalAsOf == null || availableAt == null
+                || availableAt.isBefore(signalAsOf.plus(Duration.ofHours(4))))
+            throw new IllegalArgumentException("Labels require a real signal trade, explicit side and mature four-hour horizon");
+        String key = identityKey("LABEL", signalAsOf.toString(), instrumentId, sourceVersion, Long.toString(signalTradeId),
+                featureVersion, labelDefinition, side);
+        return saveHistory(symbol, HistoryKind.LABEL, key, signalAsOf, availableAt, json);
+    }
+
+    private int saveHistory(String symbol, HistoryKind kind, String recordKey, Instant observedAt, Instant availableAt, String json) {
+        requireSymbol(symbol); Objects.requireNonNull(kind); Objects.requireNonNull(json, "immutable audit JSON");
+        if (observedAt == null || availableAt == null || availableAt.isBefore(observedAt))
+            throw new IllegalArgumentException("History availability must not precede its real observation");
+        String columns = "symbol,record_kind,record_key,signal_as_of,available_at,payload_json";
+        String sql = postgres ? "INSERT INTO tm_asset_card_feature_history(" + columns + ") VALUES (?,?,?,?,?,?) "
+                + "ON CONFLICT(symbol,record_kind,record_key) DO NOTHING"
+                : "MERGE INTO tm_asset_card_feature_history target USING (VALUES (?,?,?,?,?,?)) incoming(" + columns + ") "
+                + "ON target.symbol=incoming.symbol AND target.record_kind=incoming.record_kind AND target.record_key=incoming.record_key "
+                + "WHEN NOT MATCHED THEN INSERT(" + columns + ") VALUES(incoming.symbol,incoming.record_kind,incoming.record_key,"
+                + "incoming.signal_as_of,incoming.available_at,incoming.payload_json)";
+        try { return jdbc.update(sql, symbol, kind.name(), recordKey, utc(observedAt), utc(availableAt), json); }
+        catch (DuplicateKeyException concurrentInsert) { return 0; }
     }
 
     public List<FeatureHistory> selectFeatureHistory(String symbol, Instant fromInclusive, Instant toInclusive,
                                                    Instant availableAtCutoff, int limit) {
-        requireSymbol(symbol);
+        return selectHistory(symbol, HistoryKind.FEATURE, fromInclusive, toInclusive, availableAtCutoff, limit).stream()
+                .map(row -> new FeatureHistory(row.symbol(), row.signalAsOf(), row.availableAt(), row.payloadJson())).toList();
+    }
+
+    public List<TypedHistory> selectHistory(String symbol, HistoryKind kind, Instant fromInclusive, Instant toInclusive,
+                                           Instant availableAtCutoff, int limit) {
+        requireSymbol(symbol); Objects.requireNonNull(kind); Objects.requireNonNull(fromInclusive);
+        Objects.requireNonNull(toInclusive); Objects.requireNonNull(availableAtCutoff);
+        if (fromInclusive.isAfter(toInclusive)) throw new IllegalArgumentException("Invalid history interval");
         return jdbc.query("""
-                SELECT symbol,signal_as_of,available_at,payload_json FROM tm_asset_card_feature_history
-                WHERE symbol=? AND signal_as_of>=? AND signal_as_of<=? AND available_at<=?
-                ORDER BY signal_as_of LIMIT ?
-                """, (rs, row) -> new FeatureHistory(rs.getString(1), instant(rs, "signal_as_of"),
-                instant(rs, "available_at"), rs.getString(4)), symbol, utc(fromInclusive), utc(toInclusive),
+                SELECT symbol,record_kind,record_key,signal_as_of,available_at,payload_json FROM tm_asset_card_feature_history
+                WHERE symbol=? AND record_kind=? AND signal_as_of>=? AND signal_as_of<=? AND available_at<=?
+                ORDER BY signal_as_of,record_key LIMIT ?
+                """, (rs, row) -> typedHistory(rs), symbol, kind.name(), utc(fromInclusive), utc(toInclusive),
                 utc(availableAtCutoff), bounded(limit));
+    }
+
+    /** Read-only evidence, never a grant or role mutation; PostgreSQL enforces permissions again at each actual write. */
+    public WriterReadiness inspectWriterPermissions() {
+        if (!postgres) return new WriterReadiness(false, false, "H2_TEST_ONLY_NOT_PRODUCTION_WRITER");
+        try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
+            if (connection.isReadOnly()) return new WriterReadiness(false, false, "CARD_CONNECTION_READ_ONLY");
+            List<TablePermissions> permissions = jdbc.query("""
+                    SELECT COALESCE(to_regclass(table_name)=to_regclass('public.' || table_name),FALSE) AS exact_table,
+                        current_setting('transaction_read_only')='off' AS transaction_writable,
+                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'SELECT'),FALSE) AS can_select,
+                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'INSERT'),FALSE) AS can_insert,
+                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'UPDATE'),FALSE) AS can_update,
+                        COALESCE(has_table_privilege(current_user,to_regclass('public.' || table_name),'DELETE'),FALSE) AS can_delete
+                    FROM (VALUES ('tm_asset_card_snapshot'),('tm_asset_card_spot_bar'),('tm_asset_card_feature_history')) AS card_tables(table_name)
+                    """, (rs, row) -> new TablePermissions(rs.getBoolean("exact_table") && rs.getBoolean("transaction_writable")
+                    && rs.getBoolean("can_select") && rs.getBoolean("can_insert") && rs.getBoolean("can_update"), rs.getBoolean("can_delete")));
+            boolean writable = permissions.size() == 3 && permissions.stream().allMatch(TablePermissions::writable);
+            return new WriterReadiness(writable, writable && permissions.stream().allMatch(TablePermissions::canDelete),
+                    writable ? "CARD_TABLE_WRITE_PERMISSIONS_VERIFIED" : "CARD_TABLE_MISSING_OR_WRITE_DENIED");
+        } catch (RuntimeException | SQLException failure) {
+            return new WriterReadiness(false, false, "CARD_PERMISSION_CHECK_FAILED");
+        }
+    }
+
+    /** The caller must verify the archive file/manifest before supplying this exact immutable scope. Never called by a read endpoint. */
+    public int pruneArchivedHistory(ArchiveConfirmation confirmation, int limit) {
+        if (confirmation == null) throw new IllegalArgumentException("Verified archive confirmation required");
+        requireCleanupPermission();
+        int deleted = 0;
+        for (String key : confirmation.recordKeys().stream().limit(cleanupLimit(limit)).toList()) {
+            deleted += jdbc.update("""
+                    DELETE FROM tm_asset_card_feature_history WHERE symbol=? AND record_kind=? AND record_key=?
+                    AND signal_as_of>=? AND signal_as_of<? AND available_at<=?
+                    """, confirmation.symbol(), confirmation.recordKind().name(), key, utc(confirmation.fromInclusive()),
+                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()));
+        }
+        return deleted;
+    }
+
+    public int pruneArchivedBars(BarArchiveConfirmation confirmation, int limit) {
+        if (confirmation == null) throw new IllegalArgumentException("Verified archive confirmation required");
+        requireCleanupPermission();
+        int deleted = 0;
+        for (BarIdentity bar : confirmation.bars().stream().limit(cleanupLimit(limit)).toList()) {
+            deleted += jdbc.update("""
+                    DELETE FROM tm_asset_card_spot_bar WHERE symbol=? AND interval_code=? AND open_time=?
+                    AND close_time>=? AND close_time<? AND available_at<=?
+                    """, confirmation.symbol(), bar.interval(), utc(bar.openTime()), utc(confirmation.fromInclusive()),
+                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()));
+        }
+        return deleted;
+    }
+
+    private void requireCleanupPermission() {
+        if (postgres && !inspectWriterPermissions().cleanupAllowed())
+            throw new IllegalStateException("Card archive cleanup permission has not been verified");
+    }
+
+    private static int cleanupLimit(int limit) {
+        if (limit < 1 || limit > 500) throw new IllegalArgumentException("Archive cleanup is bounded to 1..500 exact records");
+        return limit;
+    }
+
+    public enum HistoryKind { FEATURE, INFERENCE, TRADE, LABEL }
+    public record TypedHistory(String symbol, HistoryKind recordKind, String recordKey, Instant signalAsOf,
+                               Instant availableAt, String payloadJson) {}
+    public record WriterReadiness(boolean writable, boolean cleanupAllowed, String reason) {}
+    private record TablePermissions(boolean writable, boolean canDelete) {}
+    public record ArchiveConfirmation(String symbol, HistoryKind recordKind, List<String> recordKeys, Instant fromInclusive,
+                                      Instant toExclusive, Instant availableAtCutoff, String manifestSha256, Instant archivedAt) {
+        public ArchiveConfirmation {
+            validateArchive(symbol, fromInclusive, toExclusive, availableAtCutoff, manifestSha256, archivedAt);
+            if (recordKind == null || recordKeys == null || recordKeys.isEmpty() || recordKeys.size() > 500
+                    || recordKeys.stream().anyMatch(key -> key == null || key.isBlank() || key.length() > 128)
+                    || Set.copyOf(recordKeys).size() != recordKeys.size())
+                throw new IllegalArgumentException("Archive must name exact unique history keys");
+            recordKeys = List.copyOf(recordKeys);
+        }
+    }
+    public record BarIdentity(String interval, Instant openTime) {
+        public BarIdentity {
+            if (interval == null || !Set.of("1m", "5m", "15m", "1h", "4h").contains(interval) || openTime == null)
+                throw new IllegalArgumentException("Exact archived bar identity required");
+        }
+    }
+    public record BarArchiveConfirmation(String symbol, List<BarIdentity> bars, Instant fromInclusive, Instant toExclusive,
+                                         Instant availableAtCutoff, String manifestSha256, Instant archivedAt) {
+        public BarArchiveConfirmation {
+            validateArchive(symbol, fromInclusive, toExclusive, availableAtCutoff, manifestSha256, archivedAt);
+            if (bars == null || bars.isEmpty() || bars.size() > 500 || bars.stream().anyMatch(Objects::isNull)
+                    || Set.copyOf(bars).size() != bars.size()) throw new IllegalArgumentException("Exact unique archived bars required");
+            bars = List.copyOf(bars);
+        }
+    }
+
+    private static void validateArchive(String symbol, Instant from, Instant to, Instant available, String sha, Instant archivedAt) {
+        requireSymbol(symbol);
+        if (from == null || to == null || available == null || archivedAt == null || !from.isBefore(to)
+                || to.isAfter(archivedAt.minus(Duration.ofHours(5))) || available.isAfter(archivedAt)
+                || archivedAt.isAfter(Instant.now()) || sha == null || !sha.matches("[0-9a-f]{64}"))
+            throw new IllegalArgumentException("Archive identity, confirmed range, checksum and retention cutoff are required");
+    }
+
+    private static TypedHistory typedHistory(ResultSet rs) throws SQLException {
+        return new TypedHistory(rs.getString("symbol"), HistoryKind.valueOf(rs.getString("record_kind")), rs.getString("record_key"),
+                instant(rs, "signal_as_of"), instant(rs, "available_at"), rs.getString("payload_json"));
+    }
+
+    private static Instant canonicalClose(Instant value) {
+        if (value == null || value.getNano() % 1_000_000 != 0) throw new IllegalArgumentException("Exact closed 5m timestamp required");
+        long millis = value.toEpochMilli(), position = Math.floorMod(millis, 300_000L);
+        if (millis < 0 || position != 0 && position != 299_999)
+            throw new IllegalArgumentException("Processing time cannot identify a closed 5m bar");
+        return Instant.ofEpochMilli(Math.floorDiv(millis + 1, 300_000L) * 300_000L - 1);
+    }
+
+    private static void requireInstrument(String symbol, String instrument) {
+        requireSymbol(symbol);
+        String expected = AssetCardFeatureService.spotInstrument(symbol);
+        if (expected == null || !expected.equals(instrument)) throw new IllegalArgumentException("Exact Binance Spot instrument required");
+    }
+
+    private static void requireIdentity(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9][A-Za-z0-9_.:/@+|=-]{0,255}") || Set.of("UNKNOWN", "UNVERIFIED").contains(value))
+            throw new IllegalArgumentException("Explicit immutable source/definition version required");
+    }
+
+    private static String identityKey(String... fields) {
+        StringBuilder identity = new StringBuilder();
+        for (String field : fields) identity.append(field.length()).append(':').append(field);
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(identity.toString().getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
 
     public record FeatureHistory(String symbol, Instant signalAsOf, Instant availableAt, String payloadJson) {}

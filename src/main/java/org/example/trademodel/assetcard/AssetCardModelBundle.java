@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /** One immutable, locally verified pair of models and independent calibrators. No runtime training. */
 public final class AssetCardModelBundle implements AutoCloseable {
@@ -33,7 +34,10 @@ public final class AssetCardModelBundle implements AutoCloseable {
     }
     public record RiskDistribution(List<Double> sortedValues,String source,Instant asOf,int samples,
                                    double mediumPercentile,double highPercentile,int minSamples,
-                                   String unit,boolean higherIsWorse) {
+                                   String unit,boolean higherIsWorse,String symbol,String side,String metricKey,String riskVersion) {
+        public RiskDistribution(List<Double> values,String source,Instant asOf,int samples,double medium,double high,int minimum,String unit,boolean higher) {
+            this(values,source,asOf,samples,medium,high,minimum,unit,higher,null,null,null,null);
+        }
         public RiskDistribution {
             sortedValues=List.copyOf(sortedValues);
             require(samples==sortedValues.size() && minSamples>0 && samples>=minSamples,"RISK_SAMPLE_COUNT");
@@ -46,8 +50,11 @@ public final class AssetCardModelBundle implements AutoCloseable {
         /** Midrank empirical CDF, inverted only when the bundle says lower values are worse. */
         public double adversePercentile(double value) {
             require(finite(value),"INVALID_RISK_OBSERVATION");
-            int below=0,equal=0;
-            for(double sample:sortedValues) { if(sample<value) below++; else if(sample==value) equal++; }
+            int lo=0,hi=samples;
+            while(lo<hi) { int mid=(lo+hi)>>>1; if(sortedValues.get(mid)<value) lo=mid+1; else hi=mid; }
+            int below=lo; hi=samples;
+            while(lo<hi) { int mid=(lo+hi)>>>1; if(sortedValues.get(mid)<=value) lo=mid+1; else hi=mid; }
+            int equal=lo-below;
             double percentile=(below+equal*.5)/samples;
             return higherIsWorse?percentile:1-percentile;
         }
@@ -66,7 +73,26 @@ public final class AssetCardModelBundle implements AutoCloseable {
     private final Thresholds thresholds;
     private final Map<String,Map<String,RiskDistribution>> riskDistributions;
     private final Set<String> validatedAssets;
-    private boolean closed;
+    private volatile boolean closed;
+    private volatile boolean drifted;
+    private final ReentrantReadWriteLock resources=new ReentrantReadWriteLock();
+    private Lifecycle lifecycle;
+    public record Lifecycle(String dataVersion,String riskVersion,Instant trainedThrough,Instant validUntil,
+                            Set<String> missingPatterns,List<Double> featureLower,List<Double> featureUpper,
+                            double maxFeatureOutlierFraction) {
+        public Lifecycle {
+            require(dataVersion!=null && !dataVersion.isBlank() && riskVersion!=null && !riskVersion.isBlank()
+                    && trainedThrough!=null && validUntil!=null && trainedThrough.isBefore(validUntil),"INVALID_MODEL_LIFECYCLE");
+            missingPatterns=Set.copyOf(missingPatterns); featureLower=Collections.unmodifiableList(new ArrayList<>(featureLower));
+            featureUpper=Collections.unmodifiableList(new ArrayList<>(featureUpper));
+            require(!missingPatterns.isEmpty() && featureLower.size()==AssetCardFeatureService.FEATURE_NAMES.size()
+                    && featureUpper.size()==featureLower.size() && maxFeatureOutlierFraction>0 && maxFeatureOutlierFraction<1,"MISSING_DRIFT_OR_PATTERN_COVERAGE");
+            for(String pattern:missingPatterns) require(pattern.matches("[01]{"+featureLower.size()+"}"),"INVALID_MISSING_PATTERN");
+            for(int i=0;i<featureLower.size();i++) require(featureLower.get(i)==null && featureUpper.get(i)==null
+                    || featureLower.get(i)!=null && featureUpper.get(i)!=null && finite(featureLower.get(i)) && finite(featureUpper.get(i))
+                    && featureLower.get(i)<=featureUpper.get(i),"INVALID_TRAINING_DRIFT_REFERENCE");
+        }
+    }
 
     private AssetCardModelBundle(Booster longModel,Booster shortModel,AssetCardBetaCalibration.Parameters longCalibration,
                                  AssetCardBetaCalibration.Parameters shortCalibration,String modelVersion,String calibrationVersion,
@@ -79,10 +105,22 @@ public final class AssetCardModelBundle implements AutoCloseable {
     public static AssetCardModelBundle unavailable(String reason) {
         return new AssetCardModelBundle(null,null,null,null,null,null,null,null,Map.of(),Set.of(),reason==null?"MODEL_UNAVAILABLE":reason);
     }
-    public synchronized boolean validated() { return !closed && longModel!=null && shortModel!=null; }
-    public String reason() { return closed?"MODEL_CLOSED":reason; }
+    public boolean validated() { return validatedAt(Instant.now()); }
+    public boolean validatedAt(Instant at) { return !closed && !drifted && longModel!=null && shortModel!=null && lifecycle!=null
+            && at!=null && !at.isBefore(lifecycle.trainedThrough()) && !at.isAfter(lifecycle.validUntil()); }
+    public String reason() { return closed?"MODEL_CLOSED":drifted?"FEATURE_DISTRIBUTION_DRIFT_SHADOW":reason; }
     public Thresholds thresholds() { return thresholds; }
     public Map<String,Map<String,RiskDistribution>> riskDistributions() { return riskDistributions; }
+    public Map<String,RiskDistribution> riskDistributions(String symbol,String side) {
+        if(!validated()) return Map.of();
+        Map<String,RiskDistribution> result=new HashMap<>();
+        riskDistributions.getOrDefault(symbol,Map.of()).values().stream().filter(d->side.equals(d.side()) && Objects.equals(riskVersion(),d.riskVersion()))
+                .forEach(d->result.put(d.metricKey(),d));
+        return Map.copyOf(result);
+    }
+    public String riskVersion() { return lifecycle==null?null:lifecycle.riskVersion(); }
+    public String dataVersion() { return lifecycle==null?null:lifecycle.dataVersion(); }
+    public Lifecycle lifecycle() { return lifecycle; }
     public String modelVersion() { return modelVersion; }
     public String calibrationVersion() { return calibrationVersion; }
     public String thresholdVersion() { return thresholdVersion; }
@@ -125,25 +163,41 @@ public final class AssetCardModelBundle implements AutoCloseable {
             verifyModelIdentity(shortBooster,"SHORT",manifest,report);
             Set<String> validatedAssets=new HashSet<>();
             policy.path("requiredAssets").forEach(n->validatedAssets.add(n.asText()));
-            return new AssetCardModelBundle(longBooster,shortBooster,longCalibration,shortCalibration,
+            var bundle=new AssetCardModelBundle(longBooster,shortBooster,longCalibration,shortCalibration,
                     requiredText(manifest,"modelVersion"),requiredText(manifest,"calibrationVersion"),requiredText(manifest,"thresholdVersion"),thresholds,distributions,validatedAssets,null);
+            bundle.lifecycle=readLifecycle(manifest,report);
+            require(bundle.validated(),"MODEL_EXPIRED_OR_NOT_YET_VALID");
+            return bundle;
         } catch(Exception | LinkageError error) {
-            if(longBooster!=null) longBooster.dispose();
-            if(shortBooster!=null) shortBooster.dispose();
+            safeDispose(longBooster); safeDispose(shortBooster);
             // No file contents, paths or native stack traces escape into a public card.
             return unavailable(error instanceof IllegalArgumentException?error.getMessage():"MODEL_BUNDLE_LOAD_FAILED");
         }
     }
 
-    public synchronized Prediction predict(AssetCardFeatureService.Frame frame) {
-        if(!validated()) return noPrediction(reason());
+    public Prediction predict(AssetCardFeatureService.Frame frame) {
+        resources.readLock().lock();
+        try { return predictWithResources(frame); }
+        finally { resources.readLock().unlock(); }
+    }
+    private Prediction predictWithResources(AssetCardFeatureService.Frame frame) {
+        if(!validated()) return noPrediction("MODEL_EXPIRED_OR_UNAVAILABLE");
         if(frame==null || !frame.ready()) return noPrediction("INSUFFICIENT_POINT_IN_TIME_FEATURES");
         if(frame.symbol()==null || !validatedAssets.contains(frame.symbol())) return noPrediction("ASSET_OUTSIDE_VALIDATED_COVERAGE");
+        if(!validatedAt(frame.signalAsOf())) return noPrediction("MODEL_NOT_VALID_AT_SIGNAL_TIME");
         if(!AssetCardFeatureService.FEATURE_VERSION.equals(frame.featureVersion())
                 || !AssetCardFeatureService.FEATURE_NAMES.equals(frame.featureNames())
                 || frame.vector().size()!=AssetCardFeatureService.FEATURE_NAMES.size()
                 || frame.signalAsOf()==null || frame.availableAt()==null || frame.availableAt().isAfter(frame.signalAsOf()))
             return noPrediction("FEATURE_CONTRACT_MISMATCH");
+        StringBuilder pattern=new StringBuilder(); int observed=0,outliers=0;
+        for(int i=0;i<frame.vector().size();i++) {
+            Double value=frame.vector().get(i); pattern.append(value==null?'1':'0');
+            if(value!=null) { observed++; Double lower=lifecycle.featureLower().get(i),upper=lifecycle.featureUpper().get(i);
+                if(lower==null || upper==null || value<lower || value>upper) outliers++; }
+        }
+        if(!lifecycle.missingPatterns().contains(pattern.toString())) return noPrediction("MISSING_PATTERN_OUTSIDE_VALIDATED_COVERAGE");
+        if(observed==0 || (double)outliers/observed>lifecycle.maxFeatureOutlierFraction()) { drifted=true; return noPrediction("FEATURE_DISTRIBUTION_DRIFT_SHADOW"); }
         DMatrix matrix=null;
         try {
             float[] data=new float[frame.vector().size()];
@@ -157,19 +211,21 @@ public final class AssetCardModelBundle implements AutoCloseable {
             return new Prediction(true,rawLong,rawShort,AssetCardBetaCalibration.calibrate(rawLong,longCalibration),
                     AssetCardBetaCalibration.calibrate(rawShort,shortCalibration),modelVersion,calibrationVersion,thresholdVersion,thresholds,List.of());
         } catch(Exception | LinkageError error) { return noPrediction("MODEL_INFERENCE_UNAVAILABLE"); }
-        finally { if(matrix!=null) matrix.dispose(); }
+        finally { if(matrix!=null) try { matrix.dispose(); } catch(LinkageError unavailable) { drifted=true; } }
     }
     private Prediction noPrediction(String reason) { return new Prediction(false,null,null,null,null,modelVersion,
             calibrationVersion,thresholdVersion,null,List.of(reason==null?"MODEL_UNAVAILABLE":reason)); }
-    @Override public synchronized void close() {
+    @Override public void close() {
+        resources.writeLock().lock();
+        try {
         if(closed) return;
         closed=true;
-        if(longModel!=null) longModel.dispose();
-        if(shortModel!=null) shortModel.dispose();
+        safeDispose(longModel); safeDispose(shortModel);
+        } finally { resources.writeLock().unlock(); }
     }
 
     private static void verifyManifest(JsonNode m) {
-        require(m.path("schemaVersion").asInt()==1 && "REAL_HISTORICAL".equals(requiredText(m,"dataKind")),"UNSUPPORTED_MODEL_MANIFEST");
+        require(m.path("schemaVersion").asInt()==2 && "REAL_HISTORICAL".equals(requiredText(m,"dataKind")),"UNSUPPORTED_MODEL_MANIFEST");
         require(AssetCardFeatureService.FEATURE_VERSION.equals(requiredText(m,"featureVersion"))
                 && AssetCardFeatureService.ATR_DEFINITION.equals(requiredText(m,"atrDefinition")),"FEATURE_VERSION_MISMATCH");
         List<String> names=new ArrayList<>(); m.path("featureNames").forEach(n->names.add(n.asText()));
@@ -192,6 +248,7 @@ public final class AssetCardModelBundle implements AutoCloseable {
             Set<String> unique=new HashSet<>();
             for(JsonNode value:p.path(key)) require(value.isTextual() && !value.asText().isBlank() && unique.add(value.asText()),"INVALID_COVERAGE_POLICY:"+key);
         }
+        verifyV42Policy(p);
     }
 
     private static void verifyReport(JsonNode report,JsonNode policy) {
@@ -201,6 +258,14 @@ public final class AssetCardModelBundle implements AutoCloseable {
                 && "RECORDED_AT_INGESTION".equals(requiredText(provenance,"availabilityBasis")),"UNVERIFIED_HISTORICAL_AVAILABILITY");
         require(requiredText(report,"datasetVersion").equals(requiredText(provenance,"datasetVersion")),"DATASET_VERSION_MISMATCH");
         Instant.parse(requiredText(provenance,"capturedAt"));
+        Set<String> providers=new HashSet<>();
+        require(provenance.path("sources").isArray() && !provenance.path("sources").isEmpty(),"MISSING_MULTI_SOURCE_PROVENANCE");
+        for(JsonNode source:provenance.path("sources")) {
+            for(String key:List.of("provider","source","sourceVersion","instrument","unit")) requiredText(source,key);
+            require(!Set.of("UNKNOWN","UNVERIFIED").contains(source.path("sourceVersion").asText()),"UNVERIFIED_SOURCE_VERSION");
+            providers.add(source.path("provider").asText());
+        }
+        require(providers.containsAll(Set.of("BINANCE_SPOT","COINGLASS")),"SPOT_AND_COINGLASS_LINEAGE_REQUIRED");
         require(report.path("actualInputSamples").canConvertToInt() && report.path("actualUsableSamples").canConvertToInt()
                 && report.path("actualInputSamples").asInt()>=report.path("actualUsableSamples").asInt()
                 && report.path("actualUsableSamples").asInt()>0,"UNKNOWN_REAL_SAMPLE_COUNTS");
@@ -250,6 +315,89 @@ public final class AssetCardModelBundle implements AutoCloseable {
         require(positiveInt(fold.path("rangeEvidence"),"count")>=positiveInt(policy,"minRangeSamples")
                 && "VALIDATION_ONLY".equals(requiredText(fold.path("rangeEvidence"),"selectionSplit")),"UNVALIDATED_RANGE_THRESHOLDS");
         verifyPopulationCounts(fold,policy);
+        verifyV42Fold(fold,policy);
+    }
+
+    static void verifyV42Policy(JsonNode p) {
+        require(p.path("requiredAssets").size()==1,"PER_ASSET_BUNDLE_REQUIRED_FOR_RAW_SCALE_FEATURES");
+        requiredText(p,"riskVersion");
+        require(p.path("riskMetrics").isObject() && p.path("riskMetrics").size()==3,"INCOMPLETE_SIDE_RISK_POLICY");
+        for(String side:List.of("LONG","SHORT","NON_DIRECTIONAL")) {
+            Set<String> actual=new HashSet<>(); p.path("riskMetrics").path(side).fieldNames().forEachRemaining(actual::add);
+            require(actual.equals(requiredRiskMetrics(side)),"INCOMPLETE_SIDE_RISK_POLICY:"+side);
+            for(String metric:actual) require(Objects.equals(AssetCardFeatureService.observationUnit(metric),requiredText(p.path("riskMetrics").path(side).path(metric),"unit")),"RISK_METRIC_UNIT_MISMATCH");
+        }
+        for(String key:List.of("minPositiveSamples","minNegativeSamples","minTimeBlocks","ciReplicates","timeBlockSeconds","minRangeTestSamples","minWatchTestSamples")) positiveInt(p,key);
+        require(p.path("bootstrapSeed").isIntegralNumber() && positiveInt(p,"timeBlockSeconds")>=14400
+                && positiveInt(p,"minTimeBlocks")>=2 && positiveInt(p,"ciReplicates")>=2,"INVALID_TEMPORAL_UNCERTAINTY_POLICY");
+        for(String key:List.of("minEffectiveSamples","maxBrierCiWidth","maxEceCiWidth","maxLogLossCiWidth","maxHitRateCiWidth")) require(number(p,key)>0,"MISSING_UNCERTAINTY_POLICY:"+key);
+        for(String key:List.of("ciConfidence","minNonDirectionalCoverage","maxNonDirectionalCoverageSwing","maxRangeFalseEntryRate","maxWatchFalseEntryRate","maxFeatureOutlierFraction","driftLowerQuantile","driftUpperQuantile"))
+            require(number(p,key)>0 && number(p,key)<1,"INVALID_BOUNDED_POLICY:"+key);
+        require(number(p,"driftLowerQuantile")<number(p,"driftUpperQuantile"),"INVALID_DRIFT_QUANTILES");
+        JsonNode costs=p.path("costProvenance");
+        require("REAL_HISTORICAL".equals(requiredText(costs,"kind")) && "RATE".equals(requiredText(costs,"unit")),"REAL_COST_PROVENANCE_REQUIRED");
+        requiredText(costs,"source"); String version=requiredText(costs,"sourceVersion");
+        require(!Set.of("UNKNOWN","UNVERIFIED").contains(version),"UNVERIFIED_COST_SOURCE_VERSION");
+        require(Objects.equals(AssetCardFeatureService.spotInstrument(p.path("requiredAssets").get(0).asText()),requiredText(costs,"instrument")),"COST_INSTRUMENT_MISMATCH");
+        Instant observed=Instant.parse(requiredText(costs,"observedAt")),available=Instant.parse(requiredText(costs,"availableAt")),expires=Instant.parse(requiredText(costs,"expiresAt"));
+        require(!available.isBefore(observed) && !expires.isBefore(available),"COST_PROVENANCE_TIMES");
+    }
+    static Set<String> requiredRiskMetrics(String side) {
+        if("NON_DIRECTIONAL".equals(side)) return Set.of("volatility1m","volatility5m","spreadBps","depth10Bps","depth25Bps");
+        require(Set.of("LONG","SHORT").contains(side),"INVALID_RISK_SIDE");
+        Set<String> metrics=new HashSet<>(Set.of("structuralCenterDistanceAtr","extensionAtr","return1m","return5m","volatility1m","volatility5m",
+                "slope5m","slope1h","slope4h","fundingRate","logLongShortRatio","crowdingOpenInterestChange1h","liquidationImbalance","spreadBps","depth10Bps","depth25Bps","bookImbalance"));
+        metrics.add("LONG".equals(side)?"longLiquidation":"shortLiquidation"); return Set.copyOf(metrics);
+    }
+    static void verifyPopulation(JsonNode p,JsonNode policy) {
+        int n=positiveInt(p,"count"),positive=positiveInt(p,"positive"),negative=positiveInt(p,"negative");
+        require((long)positive+negative==n && positive>=positiveInt(policy,"minPositiveSamples") && negative>=positiveInt(policy,"minNegativeSamples")
+                && number(p,"effectiveSamples")>=number(policy,"minEffectiveSamples") && number(p,"effectiveSamples")<=n,"INSUFFICIENT_INDEPENDENT_OUTCOME_POPULATION");
+    }
+    static void verifyUncertainty(JsonNode u,JsonNode policy) {
+        require(positiveInt(u,"blockCount")>=positiveInt(policy,"minTimeBlocks") && positiveInt(u,"blockSeconds")==positiveInt(policy,"timeBlockSeconds")
+                && positiveInt(u,"replicates")==positiveInt(policy,"ciReplicates") && number(u,"confidence")==number(policy,"ciConfidence"),"MISSING_TIME_BLOCK_UNCERTAINTY");
+        for(String key:List.of("brier","ece","logLoss","hitRate")) {
+            JsonNode band=u.path("intervals").path(key); double lower=number(band,"lower"),upper=number(band,"upper");
+            require(lower>=0 && upper>=lower && upper-lower<=number(policy,"max"+Character.toUpperCase(key.charAt(0))+key.substring(1)+"CiWidth"),"UNVALIDATED_METRIC_UNCERTAINTY:"+key);
+        }
+    }
+    private static void verifyV42Pair(JsonNode pair,JsonNode policy) {
+        verifyPopulation(pair.path("population"),policy); verifyUncertainty(pair.path("uncertainty"),policy);
+        require(positiveInt(pair.path("population"),"count")==positiveInt(pair.path("calibrated"),"count")
+                && positiveInt(pair.path("population"),"positive")==positiveInt(pair.path("calibrated"),"positive")
+                && positiveInt(pair.path("population"),"negative")==positiveInt(pair.path("calibrated"),"negative"),"OUTCOME_METRIC_POPULATION_MISMATCH");
+    }
+    private static void verifyV42Fold(JsonNode fold,JsonNode policy) {
+        fold.path("sides").forEach(pair->verifyV42Pair(pair,policy));
+        fold.path("strata").forEach(pair->verifyV42Pair(pair,policy));
+        JsonNode patterns=fold.path("patternMetrics"); require(patterns.isObject() && !patterns.isEmpty(),"MISSING_PATTERN_CALIBRATION_COVERAGE");
+        patterns.fields().forEachRemaining(pattern->{
+            require(pattern.getKey().matches("[01]{"+AssetCardFeatureService.FEATURE_NAMES.size()+"}"),"INVALID_MISSING_PATTERN");
+            for(String side:List.of("LONG","SHORT")) { JsonNode pair=pattern.getValue().path(side); verifyMetrics(pair,positiveInt(policy,"minStratumSamples"),policy); verifyV42Pair(pair,policy); }
+        });
+        JsonNode populations=fold.path("populations"); require(populations.isArray() && populations.size()==4,"INDEPENDENT_SPLIT_OUTCOME_EVIDENCE_REQUIRED");
+        Set<String> expected=new HashSet<>(Set.of("ALL"));
+        for(String field:List.of("symbol","regime","volatility")) { String key=field.equals("symbol")?"requiredAssets":field.equals("regime")?"requiredRegimes":"requiredVolatilityStrata";
+            policy.path(key).forEach(value->expected.add(field+":"+value.asText())); }
+        patterns.fieldNames().forEachRemaining(pattern->expected.add("missing:"+pattern));
+        for(int i=0;i<4;i++) {
+            JsonNode population=populations.get(i); Set<String> actual=new HashSet<>(); population.fieldNames().forEachRemaining(actual::add);
+            require(actual.equals(expected),"INCOMPLETE_SPLIT_STRATIFIED_POPULATIONS");
+            for(JsonNode group:population) for(String side:List.of("LONG","SHORT")) verifyPopulation(group.path(side),policy);
+            for(String side:List.of("LONG","SHORT")) require(positiveInt(population.path("ALL").path(side),"count")==positiveInt(fold.path("splits").get(i),"count"),"SPLIT_POPULATION_MISMATCH");
+            Instant available=Instant.parse(requiredText(policy.path("costProvenance"),"availableAt")),expires=Instant.parse(requiredText(policy.path("costProvenance"),"expiresAt"));
+            require(!Instant.parse(fold.path("splits").get(i).path("start").asText()).isBefore(available)
+                    && !Instant.parse(fold.path("splits").get(i).path("end").asText()).isAfter(expires),"COSTS_NOT_POINT_IN_TIME");
+        }
+        for(String state:List.of("RANGE","WATCH")) {
+            JsonNode n=fold.path("nonDirectional").path(state); String title=state.equals("RANGE")?"Range":"Watch";
+            require("FINAL_TEST_ONLY".equals(requiredText(n,"selectionSplit")) && positiveInt(n,"count")>=positiveInt(policy,"min"+title+"TestSamples")
+                    && number(n,"effectiveSamples")>=number(policy,"minEffectiveSamples") && number(n,"effectiveSamples")<=positiveInt(n,"count")
+                    && number(n,"coverage")>=number(policy,"minNonDirectionalCoverage") && number(n,"coverage")<=1
+                    && number(n,"falseEntryRate")>=0 && number(n,"falseEntryRate")<=number(policy,"max"+title+"FalseEntryRate")
+                    && number(n,"coverageSwing")>=0 && number(n,"coverageSwing")<=number(policy,"maxNonDirectionalCoverageSwing"),"UNVALIDATED_FINAL_"+state+"_COVERAGE");
+        }
     }
 
     static void verifyPopulationCounts(JsonNode fold,JsonNode policy) {
@@ -316,21 +464,49 @@ public final class AssetCardModelBundle implements AutoCloseable {
             Set<String> covered=new HashSet<>(); policy.path("requiredAssets").forEach(n->covered.add(n.asText()));
             require(covered.contains(asset.getKey()),"RISK_ASSET_OUTSIDE_VALIDATED_COVERAGE");
             Map<String,RiskDistribution> metrics=new HashMap<>();
-            asset.getValue().fields().forEachRemaining(metric->{
-                JsonNode n=metric.getValue(),spec=policy.path("riskMetrics").path(metric.getKey());
+            require(asset.getValue().size()==3,"INCOMPLETE_SIDE_RISK_COVERAGE");
+            for(String side:List.of("LONG","SHORT","NON_DIRECTIONAL")) {
+            JsonNode sideNode=asset.getValue().path(side),sidePolicy=policy.path("riskMetrics").path(side);
+            require(sideNode.isObject() && sidePolicy.isObject() && !sidePolicy.isEmpty() && sideNode.size()==sidePolicy.size(),"INCOMPLETE_SIDE_RISK_COVERAGE");
+            sideNode.fields().forEachRemaining(metric->{
+                JsonNode n=metric.getValue(),spec=sidePolicy.path(metric.getKey());
                 List<Double> values=new ArrayList<>(); n.path("sortedValues").forEach(v->{ require(v.isNumber() && finite(v.asDouble()),"INVALID_RISK_VALUE");values.add(v.asDouble()); });
                 require(n.path("higherIsWorse").isBoolean() && spec.path("higherIsWorse").isBoolean(),"MISSING_RISK_ORIENTATION");
                 var distribution=new RiskDistribution(values,requiredText(n,"source"),Instant.parse(requiredText(n,"asOf")),
-                        positiveInt(n,"samples"),number(n,"mediumPercentile"),number(n,"highPercentile"),positiveInt(n,"minSamples"),requiredText(n,"unit"),n.path("higherIsWorse").asBoolean());
+                        positiveInt(n,"samples"),number(n,"mediumPercentile"),number(n,"highPercentile"),positiveInt(n,"minSamples"),requiredText(n,"unit"),n.path("higherIsWorse").asBoolean(),
+                        requiredText(n,"symbol"),requiredText(n,"side"),requiredText(n,"metricKey"),requiredText(n,"riskVersion"));
+                require(asset.getKey().equals(distribution.symbol()) && side.equals(distribution.side()) && metric.getKey().equals(distribution.metricKey())
+                        && requiredText(policy,"riskVersion").equals(distribution.riskVersion()),"RISK_SIDE_VERSION_IDENTITY_MISMATCH");
                 require(distribution.mediumPercentile()==number(spec,"mediumPercentile") && distribution.highPercentile()==number(spec,"highPercentile")
                         && distribution.minSamples()==positiveInt(spec,"minSamples") && distribution.unit().equals(requiredText(spec,"unit"))
                         && distribution.higherIsWorse()==spec.path("higherIsWorse").asBoolean()
                         && !distribution.asOf().isAfter(trainEnd) && "REAL_HISTORICAL_TRAIN_ONLY".equals(distribution.source()),"UNVALIDATED_RISK_DISTRIBUTION");
-                metrics.put(metric.getKey(),distribution);
+                metrics.put(side+":"+metric.getKey(),distribution);
             });
+            }
             result.put(asset.getKey(),Map.copyOf(metrics));
         });
+        Set<String> expected=new HashSet<>(); policy.path("requiredAssets").forEach(n->expected.add(n.asText()));
+        require(result.keySet().equals(expected),"INCOMPLETE_ASSET_RISK_COVERAGE");
         return Map.copyOf(result);
+    }
+    private static Lifecycle readLifecycle(JsonNode manifest,JsonNode report) {
+        JsonNode life=manifest.path("lifecycle");
+        require(life.equals(report.path("lifecycle")),"LIFECYCLE_NOT_BOUND_TO_VALIDATION");
+        require(requiredText(life,"dataVersion").equals(requiredText(report,"datasetVersion"))
+                && requiredText(life,"riskVersion").equals(requiredText(manifest.path("releasePolicy"),"riskVersion"))
+                && number(life,"maxFeatureOutlierFraction")==number(manifest.path("releasePolicy"),"maxFeatureOutlierFraction"),"LIFECYCLE_DATA_OR_RISK_IDENTITY_MISMATCH");
+        List<Double> lower=new ArrayList<>(),upper=new ArrayList<>();
+        life.path("featureLower").forEach(v->lower.add(v.isNull()?null:v.asDouble(Double.NaN)));
+        life.path("featureUpper").forEach(v->upper.add(v.isNull()?null:v.asDouble(Double.NaN)));
+        Set<String> patterns=new HashSet<>(); life.path("missingPatterns").forEach(v->patterns.add(v.asText()));
+        Set<String> tested=new HashSet<>(); report.path("final").path("patternMetrics").fieldNames().forEachRemaining(tested::add);
+        require(patterns.equals(tested) && requiredText(life,"trainedThrough").equals(report.path("final").path("splits").get(1).path("labelEnd").asText())
+                && requiredText(life,"validatedThrough").equals(report.path("final").path("splits").get(3).path("labelEnd").asText())
+                && Instant.parse(requiredText(life,"validUntil")).isAfter(Instant.parse(requiredText(life,"validatedThrough")))
+                && !Instant.now().isBefore(Instant.parse(requiredText(life,"validatedThrough"))),"LIFECYCLE_TEMPORAL_OR_PATTERN_MISMATCH");
+        return new Lifecycle(requiredText(life,"dataVersion"),requiredText(life,"riskVersion"),Instant.parse(requiredText(life,"trainedThrough")),
+                Instant.parse(requiredText(life,"validUntil")),patterns,lower,upper,number(life,"maxFeatureOutlierFraction"));
     }
     private static AssetCardBetaCalibration.Parameters calibration(JsonNode n) { return new AssetCardBetaCalibration.Parameters(number(n,"a"),number(n,"b"),number(n,"c"),number(n,"epsilon")); }
     static void verifyModelIdentity(Booster model,String side,JsonNode manifest,JsonNode report) throws Exception {
@@ -344,6 +520,9 @@ public final class AssetCardModelBundle implements AutoCloseable {
                 && requiredText(manifest,"calibrationVersion").equals(attributes.get("asset_card_calibration_version"))
                 && requiredText(manifest,"thresholdVersion").equals(attributes.get("asset_card_threshold_version"))
                 && requiredText(report,"datasetVersion").equals(attributes.get("asset_card_dataset_version"))
+                && requiredText(manifest.path("lifecycle"),"riskVersion").equals(attributes.get("asset_card_risk_version"))
+                && requiredText(manifest.path("lifecycle"),"trainedThrough").equals(attributes.get("asset_card_trained_through"))
+                && requiredText(manifest.path("lifecycle"),"validUntil").equals(attributes.get("asset_card_valid_until"))
                 && Arrays.asList(featureNames).equals(AssetCardFeatureService.FEATURE_NAMES),"MODEL_IDENTITY_OR_SIDE_MISMATCH");
     }
     private static Thresholds thresholds(JsonNode n) { return new Thresholds(tier(n.path("weak")),tier(n.path("normal")),tier(n.path("strong")),number(n,"rangeMaxGap"),number(n,"rangeMaxProbability")); }
@@ -353,6 +532,7 @@ public final class AssetCardModelBundle implements AutoCloseable {
         return positiveInt(policy,List.of("minTrainSamples","minCalibrationSamples","minValidationSamples","minTestSamples").get(split));
     }
     private static double probability(float[][] values) { require(values!=null && values.length==1 && values[0].length==1 && finite(values[0][0]) && values[0][0]>=0 && values[0][0]<=1,"INVALID_BINARY_MODEL_OUTPUT");return values[0][0]; }
+    private static void safeDispose(Booster model) { if(model!=null) try { model.dispose(); } catch(LinkageError unavailable) { /* Fail-closed cleanup must not crash application startup. */ } }
     private static byte[] read(Path directory,String name,int maximum) throws Exception {
         Path file=directory.resolve(name); require(!Files.isSymbolicLink(file) && Files.isRegularFile(file)
                 && Files.size(file)>0 && Files.size(file)<=maximum,"MISSING_OR_INVALID_BUNDLE_ARTIFACT:"+name);

@@ -31,7 +31,7 @@ class AssetCardServiceTest {
         org.mockito.Mockito.when(market.quote("BTCUSDT", at)).thenReturn(java.util.Optional.of(
                 new AssetCardMarketDataService.SpotQuote("BTCUSDT", new java.math.BigDecimal("100"), java.math.BigDecimal.ONE, 1, at, at)));
         org.mockito.Mockito.when(mapper.nextSnapshotVersion("BTCUSDT")).thenReturn(1L);
-        org.mockito.Mockito.when(mapper.saveSnapshot(org.mockito.ArgumentMatchers.eq("BTCUSDT"),org.mockito.ArgumentMatchers.eq(1L),
+        org.mockito.Mockito.when(mapper.saveSnapshot(org.mockito.ArgumentMatchers.eq("BTCUSDT"),org.mockito.ArgumentMatchers.eq(0L),org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.isNull())).thenReturn(1);
         var service = new AssetCardService(properties,market,mapper,pool,events,new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules());
         try {
@@ -41,9 +41,12 @@ class AssetCardServiceTest {
             assertThat(captor.getAllValues()).allMatch(e -> java.util.Set.of("ASSET_CARD_PRICE","ASSET_CARD_HEALTH").contains(e.eventType()));
             var price = captor.getAllValues().stream().filter(e -> e.eventType().equals("ASSET_CARD_PRICE")).findFirst().orElseThrow();
             assertThat(price.payload()).containsEntry("spotPrice",new java.math.BigDecimal("100"))
-                    .containsEntry("latestPriceAt",at).doesNotContainKeys("cardAsOf","signal","risk","modelVersion");
+                    .containsEntry("latestPriceAt",at).containsEntry("modelVersion", null)
+                    .containsEntry("calibrationVersion", null).containsEntry("thresholdVersion", null)
+                    .doesNotContainKeys("cardAsOf","signal","risk");
             org.mockito.Mockito.verify(mapper,org.mockito.Mockito.never()).saveFeatureHistory(org.mockito.ArgumentMatchers.any(),
                     org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+            verify(mapper, never()).saveInference(anyString(), any(), any(), anyString());
         } finally { service.close(); }
     }
 
@@ -148,6 +151,38 @@ class AssetCardServiceTest {
             assertThat(repeated.pendingDirection()).isNull();
             assertThat(repeated.confirmationCount()).isZero();
             verify(fixture.mapper, never()).saveFeatureHistory(any(), any(), any(), any());
+            verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
+        }
+    }
+
+    @Test
+    void riskRefreshFailureCannotEraseAHealthySpotPrice() {
+        Instant at = Instant.now();
+        try (var fixture = new RuntimeFixture()) {
+            fixture.seed(validLong(at.minusSeconds(2)), at.minusSeconds(1));
+            fixture.freshMarket();
+            when(fixture.market.book(eq("BTCUSDT"), any())).thenThrow(new IllegalStateException("ISOLATED_RISK_FAILURE"));
+            ReflectionTestUtils.invokeMethod(fixture.service, "refreshRisksSafely");
+            var result = fixture.service.snapshot("BTCUSDT", "Bitcoin");
+            assertThat(result.spotPrice()).isEqualByComparingTo("100");
+            assertThat(result.risk().overallLevel()).isNull();
+            assertThat(result.health().status()).isNotEqualTo("SOURCE_UNAVAILABLE");
+            verifyNoInteractions(fixture.events);
+        }
+    }
+
+    @Test
+    void repeatedIdenticalRiskFactsDoNotAllocateOrPersistAnotherSnapshot() {
+        Instant at = Instant.parse("2026-09-10T12:00:00Z");
+        try (var fixture = new RuntimeFixture()) {
+            fixture.seed(validLong(at.minusSeconds(1)), at.minusSeconds(1));
+            fixture.freshMarket();
+            fixture.service.refreshRisk("BTCUSDT", at);
+            clearInvocations(fixture.mapper, fixture.events);
+            fixture.service.refreshRisk("BTCUSDT", at.plusSeconds(1));
+            verify(fixture.mapper, never()).nextSnapshotVersion(anyString());
+            verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any());
+            verifyNoInteractions(fixture.events);
         }
     }
 
@@ -159,7 +194,7 @@ class AssetCardServiceTest {
             var state = new AssetCardSignalService.State("BTCUSDT", null, null, 0, close,
                     identity(AssetCardProperties.ModelMode.SHADOW, null), null,
                     AssetCardSnapshot.Signal.unavailable("SHADOW", frame.signalAsOf()), null, "MODEL_UNAVAILABLE");
-            when(fixture.mapper.selectFeatureHistory(eq("BTCUSDT"), any(), any(), any(), anyInt()))
+            when(fixture.mapper.selectHistory(eq("BTCUSDT"), eq(org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE), any(), any(), any(), anyInt()))
                     .thenReturn(List.of(fixture.audit(frame, state)));
             ReflectionTestUtils.invokeMethod(fixture.service, "recoverRuntimeState", "BTCUSDT", at);
             assertThat(AssetCardServiceTest.<AssetCardSignalService.State>runtimeMap(fixture.service, "signalStates").get("BTCUSDT")).isEqualTo(state);
@@ -168,6 +203,7 @@ class AssetCardServiceTest {
             assertThat(fixture.lastSnapshot().signal().status()).isEqualTo("SHADOW");
             assertThat(fixture.lastSnapshot().signal().calibratedConfidence()).isNull();
             verify(fixture.mapper, never()).saveFeatureHistory(any(), any(), any(), any());
+            verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
             verify(fixture.market, never()).bars(any(), any(), any(), anyInt());
             verifyNoInteractions(fixture.pool);
         }
@@ -186,13 +222,14 @@ class AssetCardServiceTest {
                 var state = new AssetCardSignalService.State("BTCUSDT", null, null, 0, close,
                         identity(AssetCardProperties.ModelMode.SHADOW, "model".equals(mismatch) ? "OTHER_MODEL" : null), null,
                         AssetCardSnapshot.Signal.unavailable("SHADOW", frame.signalAsOf()), null, "MODEL_UNAVAILABLE");
-                when(fixture.mapper.selectFeatureHistory(eq("BTCUSDT"), any(), any(), any(), anyInt()))
+                when(fixture.mapper.selectHistory(eq("BTCUSDT"), eq(org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE), any(), any(), any(), anyInt()))
                         .thenReturn(List.of(fixture.audit(frame, state)));
                 ReflectionTestUtils.invokeMethod(fixture.service, "recoverRuntimeState", "BTCUSDT", at);
                 assertThat(runtimeMap(fixture.service, "signalStates")).doesNotContainKey("BTCUSDT");
                 assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT");
                 assertThat(runtimeMap(fixture.service, "signalFrames")).doesNotContainKey("BTCUSDT");
                 verify(fixture.mapper, never()).saveFeatureHistory(any(), any(), any(), any());
+                verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
                 verify(fixture.market, never()).bars(any(), any(), any(), anyInt());
             }
         }
@@ -209,19 +246,21 @@ class AssetCardServiceTest {
             });
             fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(1));
             verify(fixture.mapper, never()).saveFeatureHistory(any(), any(), any(), any());
+            verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
             assertThat(runtimeMap(fixture.service, "featureFrames")).doesNotContainKey("BTCUSDT");
             when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24)))
                     .thenAnswer(invocation -> closedBars(invocation.getArgument(1), close));
             fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(3));
             var payload = org.mockito.ArgumentCaptor.forClass(String.class);
-            verify(fixture.mapper, times(1)).saveFeatureHistory(eq("BTCUSDT"), any(), any(), payload.capture());
+            verify(fixture.mapper, times(1)).saveInference(eq("BTCUSDT"), eq(close), any(), payload.capture());
             var audit = fixture.json.readTree(payload.getValue());
             var hours = audit.path("rawFrame").path("bars").path("1h");
             assertThat(hours.size()).isEqualTo(24);
             assertThat(fixture.json.treeToValue(hours.get(23).get("closeTime"), Instant.class)).isEqualTo(close);
             assertThat(fixture.json.treeToValue(audit.path("frame").get("closed5mAt"), Instant.class)).isEqualTo(close);
             fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(4));
-            verify(fixture.mapper, times(1)).saveFeatureHistory(eq("BTCUSDT"), any(), any(), any());
+            verify(fixture.mapper, times(1)).saveInference(eq("BTCUSDT"), eq(close), any(), any());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
         }
     }
 
@@ -281,7 +320,10 @@ class AssetCardServiceTest {
             fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(3));
 
             var captured = org.mockito.ArgumentCaptor.forClass(String.class);
-            verify(fixture.mapper).saveFeatureHistory(eq("BTCUSDT"), eq(close.plusSeconds(3)), eq(close.plusSeconds(3)), captured.capture());
+            var completedAt = org.mockito.ArgumentCaptor.forClass(Instant.class);
+            verify(fixture.mapper).saveInference(eq("BTCUSDT"), eq(close), completedAt.capture(), captured.capture());
+            assertThat(completedAt.getValue()).isBetween(close.plusSeconds(3), close.plusSeconds(15));
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
             var audit = fixture.json.readTree(captured.getValue());
             assertThat(audit.path("modelMode").asText()).isEqualTo("SHADOW");
             assertThat(audit.path("rawFrame").path("bars").path("5m").size()).isEqualTo(24);
@@ -289,7 +331,7 @@ class AssetCardServiceTest {
             assertThat(audit.path("state").path("auditPrediction").path("available").asBoolean()).isFalse();
             assertThat(audit.path("state").path("auditPrediction").path("reasons").toString()).contains("MODEL_NOT_CONFIGURED");
             assertThat(fixture.lastSnapshot().signal().status()).isEqualTo("SHADOW");
-            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyString(), nullable(Instant.class));
+            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyLong(), anyString(), nullable(Instant.class));
             assertThat(fixture.service.usesCardSignalDisplay("BTCUSDT")).isFalse();
             verifyNoInteractions(fixture.events);
         }
@@ -309,11 +351,16 @@ class AssetCardServiceTest {
             runtimeMap(fixture.service, "signalStates").put("BTCUSDT", state);
             runtimeMap(fixture.service, "featureFrames").put("BTCUSDT", runtimeFrame(at.minusSeconds(1)));
             fixture.seed(hidden, at);
+            var before = fixture.lastSnapshot();
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", new AssetCardSnapshot(before.symbol(), before.assetName(),
+                    before.spotPrice(), before.latestPriceAt(), before.signal(), before.risk(),
+                    new AssetCardSnapshot.Health("INSUFFICIENT_DATA", "TEST_FIXTURE_BEFORE_PRICE_RECOVERY", at), before.cardAsOf(),
+                    before.snapshotVersion(), before.featureVersion(), before.modelVersion(), before.calibrationVersion(), before.thresholdVersion()));
             fixture.freshMarket();
             fixture.service.flushPrices(at.plusSeconds(1));
 
             var captured = org.mockito.ArgumentCaptor.forClass(String.class);
-            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), captured.capture(), nullable(Instant.class));
+            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyLong(), captured.capture(), nullable(Instant.class));
             var persisted = fixture.json.readTree(captured.getValue());
             assertThat(persisted.path("_runtime").path("state").path("auditPrediction").path("rawLong").asDouble()).isEqualTo(.81);
             assertThat(persisted.path("_runtime").path("state").path("auditPrediction").path("pLong").asDouble()).isEqualTo(.79);
@@ -338,8 +385,8 @@ class AssetCardServiceTest {
                     "ETHUSDT", BigDecimal.valueOf(100), BigDecimal.ONE, 1, at, at)));
             fixture.service.flushPrices(at);
 
-            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyString(), nullable(Instant.class));
-            verify(fixture.mapper).saveSnapshot(eq("ETHUSDT"), anyLong(), anyString(), nullable(Instant.class));
+            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), anyLong(), anyLong(), anyString(), nullable(Instant.class));
+            verify(fixture.mapper).saveSnapshot(eq("ETHUSDT"), anyLong(), anyLong(), anyString(), nullable(Instant.class));
             var published = org.mockito.ArgumentCaptor.forClass(org.example.trademodel.v41.DashboardLiveEvent.class);
             verify(fixture.events, atLeastOnce()).publish(published.capture());
             assertThat(published.getAllValues()).allSatisfy(event -> assertThat(event.symbol()).isEqualTo("BTCUSDT"));
@@ -350,13 +397,15 @@ class AssetCardServiceTest {
     void storedAndCachedValidSignalsRequireCurrentBundleAndExactIdentityOnEveryPublicRead() throws Exception {
         for (var mode : List.of(AssetCardProperties.ModelMode.ACTIVE, AssetCardProperties.ModelMode.CANARY)) {
             for (boolean cached : List.of(false, true)) {
-                for (String mismatch : List.of("missing", "closed", "feature", "model", "calibration", "asset", "none")) {
+                for (String mismatch : List.of("missing", "closed", "feature", "model", "calibration", "asset", "threshold", "risk", "none")) {
                     try (var fixture = new RuntimeFixture()) {
                         fixture.properties.setModelMode(mode);
                         fixture.properties.setCanarySymbols(Set.of("BTCUSDT"));
                         // Exercise Linux nanosecond precision deterministically on every host.
                         Instant at = Instant.ofEpochSecond(Instant.now().getEpochSecond() - 1, 309_209_149);
-                        var stored = publicSignalFixture(at, "feature".equals(mismatch) ? "OLD_FEATURE" : AssetCardFeatureService.FEATURE_VERSION);
+                        var stored = publicSignalFixture(at, "feature".equals(mismatch) ? "OLD_FEATURE" : AssetCardFeatureService.FEATURE_VERSION,
+                                "threshold".equals(mismatch) ? "OLD_THRESHOLD" : "TEST_FIXTURE_THRESHOLDS",
+                                "risk".equals(mismatch) ? "OLD_RISK" : "TEST_RISK");
                         if (!"missing".equals(mismatch)) {
                             var bundle = metadataOnlyBundle("model".equals(mismatch) ? "NEW_MODEL" : "TEST_FIXTURE_MODEL",
                                     "calibration".equals(mismatch) ? "NEW_CALIBRATION" : "TEST_FIXTURE_CALIBRATION",
@@ -374,10 +423,15 @@ class AssetCardServiceTest {
                         assertThat(fixture.service.usesCardSignalDisplay("BTCUSDT")).isTrue();
                         assertThat(visible.spotPrice()).isEqualTo(stored.spotPrice());
                         assertThat(visible.latestPriceAt()).isEqualTo(stored.latestPriceAt());
-                        assertThat(visible.risk()).isEqualTo(stored.risk());
+                        if ("none".equals(mismatch)) assertThat(visible.risk()).isEqualTo(stored.risk());
+                        else {
+                            assertThat(visible.risk().overallLevel()).isNull();
+                            assertThat(visible.risk().items()).hasSize(8).allMatch(item -> "UNKNOWN".equals(item.assessmentStatus()));
+                            assertThat(visible.risk().matchesBasis(visible.signal())).isTrue();
+                        }
                         assertThat(visible.cardAsOf()).isEqualTo(stored.cardAsOf());
                         assertThat(visible.snapshotVersion()).isEqualTo(stored.snapshotVersion());
-                        if ("none".equals(mismatch)) assertThat(visible.signal()).isEqualTo(stored.signal());
+                        if (Set.of("none", "risk").contains(mismatch)) assertThat(visible.signal()).isEqualTo(stored.signal());
                         else {
                             assertThat(visible.signal().direction()).as(mode + ":" + cached + ":" + mismatch).isNull();
                             assertThat(visible.signal().calibratedConfidence()).isNull();
@@ -390,9 +444,12 @@ class AssetCardServiceTest {
                         assertThat(stored.signal().calibratedConfidence()).isEqualTo(81);
                         assertThat(fixture.json.isEnabled(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
                                 .as("Card precision policy must not mutate the shared application mapper").isFalse();
-                        verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyString(), nullable(Instant.class));
+                        verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), nullable(Instant.class));
                         verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
-                        verifyNoInteractions(fixture.market, fixture.events);
+                        verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
+                        verify(fixture.market, times(1)).quote(eq("BTCUSDT"), any());
+                        verifyNoMoreInteractions(fixture.market);
+                        verifyNoInteractions(fixture.events);
                     }
                 }
             }
@@ -411,6 +468,7 @@ class AssetCardServiceTest {
 
             // Rollout visibility is not a mutation of the original private audit/snapshot chain.
             assertThat(fixture.lastSnapshot().signal().calibratedConfidence()).isEqualTo(81);
+            verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), nullable(Instant.class));
             var captured = org.mockito.ArgumentCaptor.forClass(org.example.trademodel.v41.DashboardLiveEvent.class);
             verify(fixture.events, atLeastOnce()).publish(captured.capture());
             assertThat(captured.getAllValues()).anySatisfy(event -> {
@@ -440,12 +498,244 @@ class AssetCardServiceTest {
         }
     }
 
+    @Test
+    void expiredSpotReadProjectsDataHighWithoutAllocatingOrWritingAnything() {
+        try (var fixture = new RuntimeFixture()) {
+            Instant at = Instant.now().minus(fixture.properties.getPriceTtl()).minusSeconds(2);
+            var stored = publicSignalFixture(at, AssetCardFeatureService.FEATURE_VERSION);
+            ReflectionTestUtils.setField(fixture.service, "model", metadataOnlyBundle("TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", Set.of("BTCUSDT")));
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
+            var visible = fixture.service.snapshot("BTCUSDT", "Bitcoin");
+            assertThat(visible.spotPrice()).isNull();
+            assertThat(visible.signal().direction()).isEqualTo(stored.signal().direction());
+            assertThat(visible.signal().status()).isEqualTo("INVALIDATED");
+            assertThat(visible.signal().calibratedConfidence()).isNull();
+            assertThat(visible.risk().overallLevel()).isEqualTo("HIGH");
+            assertThat(visible.risk().items()).filteredOn(item -> "DATA".equals(item.type())).singleElement().satisfies(item -> {
+                assertThat(item.assessmentStatus()).isEqualTo("ASSESSED");
+                assertThat(item.level()).isEqualTo("HIGH");
+                assertThat(item.source()).isEqualTo("BINANCE_SPOT_AGG_TRADE");
+                assertThat(item.invalidatesSignal()).isTrue();
+            });
+            assertThat(visible.risk().matchesBasis(visible.signal())).isTrue();
+            assertThat(visible.snapshotVersion()).isEqualTo(stored.snapshotVersion());
+            assertThat(fixture.lastSnapshot()).isSameAs(stored);
+            verify(fixture.mapper, never()).nextSnapshotVersion(anyString());
+            verify(fixture.mapper, never()).saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), any());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verify(fixture.mapper, never()).saveInference(anyString(), any(), any(), anyString());
+            verify(fixture.market, times(1)).quote(eq("BTCUSDT"), any());
+            verifyNoMoreInteractions(fixture.market);
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void signalWorkerFailureKeepsHealthySpotAndTheSameBoundRiskWhenModelIsStillValid() {
+        try (var fixture = new RuntimeFixture()) {
+            Instant at = Instant.now();
+            Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+            var stored = publicSignalFixture(at, AssetCardFeatureService.FEATURE_VERSION);
+            ReflectionTestUtils.setField(fixture.service, "model", metadataOnlyBundle("TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", Set.of("BTCUSDT")));
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", stored);
+            when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), anyInt())).thenThrow(new IllegalStateException("TEST_SIGNAL_INPUT_FAILURE"));
+            fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(1));
+            var visible = fixture.service.snapshot("BTCUSDT", "Bitcoin");
+            assertThat(visible.spotPrice()).isEqualTo(stored.spotPrice());
+            assertThat(visible.latestPriceAt()).isEqualTo(stored.latestPriceAt());
+            assertThat(visible.signal().status()).isEqualTo("FAILED");
+            assertThat(visible.signal().direction()).isEqualTo(stored.signal().direction());
+            assertThat(visible.signal().signalAsOf()).isEqualTo(stored.signal().signalAsOf());
+            assertThat(visible.signal().calibratedConfidence()).isNull();
+            assertThat(visible.risk()).isEqualTo(stored.risk());
+            assertThat(visible.risk().matchesBasis(visible.signal())).isTrue();
+            verify(fixture.mapper).saveInference(eq("BTCUSDT"), eq(close), any(), contains("FAILED"));
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void directionSwitchPublishesSignalAndUnknownNewSideRiskInOneAtomicVersion() {
+        try (var fixture = new RuntimeFixture()) {
+            fixture.properties.setModelMode(AssetCardProperties.ModelMode.ACTIVE);
+            Instant at = Instant.now();
+            var current = publicSignalFixture(at.minusSeconds(1), AssetCardFeatureService.FEATURE_VERSION);
+            ReflectionTestUtils.setField(fixture.service, "model", metadataOnlyBundle("TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", Set.of("BTCUSDT")));
+            runtimeMap(fixture.service, "snapshots").put("BTCUSDT", current);
+            var nextSignal = new AssetCardSnapshot.Signal(AssetCardSnapshot.Direction.SHORT, "VALID", null, .15, .84, "OPPORTUNITY", "SHORT", at);
+            ReflectionTestUtils.invokeMethod(fixture.service, "publishSignalAndRisk", current, nextSignal, current.risk(),
+                    current.featureVersion(), current.modelVersion(), current.calibrationVersion(), at);
+            var next = fixture.lastSnapshot();
+            assertThat(next.signal()).isEqualTo(nextSignal);
+            assertThat(next.risk().overallLevel()).isNull();
+            assertThat(next.risk().items()).hasSize(8).allMatch(item -> "UNKNOWN".equals(item.assessmentStatus()));
+            assertThat(next.risk().riskBasisSide()).isEqualTo(AssetCardSnapshot.SignalSide.SHORT);
+            assertThat(next.risk().matchesBasis(nextSignal)).isTrue();
+            var events = org.mockito.ArgumentCaptor.forClass(org.example.trademodel.v41.DashboardLiveEvent.class);
+            verify(fixture.events, atLeastOnce()).publish(events.capture());
+            assertThat(events.getAllValues()).allMatch(event -> event.snapshotVersion() == next.snapshotVersion());
+            assertThat(events.getAllValues()).filteredOn(event -> "ASSET_CARD_SIGNAL".equals(event.eventType())).singleElement().satisfies(event -> {
+                assertThat(event.payload()).containsEntry("signal", nextSignal).containsEntry("risk", next.risk());
+                assertThat(event.payload()).containsEntry("thresholdVersion", "TEST_FIXTURE_THRESHOLDS");
+                assertThat(event.payload()).containsEntry("riskVersion", "TEST_RISK");
+            });
+            verify(fixture.mapper).saveSnapshot(eq("BTCUSDT"), eq(current.snapshotVersion()), eq(next.snapshotVersion()), anyString(), any());
+        }
+    }
+
+    @Test
+    void persistedInferenceConflictRestoresTheWinningExactBarAndNeverPublishesTheLoser() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+        try (var fixture = new RuntimeFixture()) {
+            fixture.freshMarket();
+            when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24))).thenAnswer(call -> closedBars(call.getArgument(1), close));
+            var frame = runtimeFrame(close);
+            var winner = new AssetCardSignalService.State("BTCUSDT", null, null, 0, close,
+                    identity(AssetCardProperties.ModelMode.SHADOW, null), null,
+                    AssetCardSnapshot.Signal.unavailable("SHADOW", frame.signalAsOf()), null, "TEST_WINNING_PROCESS");
+            when(fixture.mapper.selectInference(eq("BTCUSDT"), eq(close), any())).thenReturn(Optional.empty(), Optional.of(fixture.audit(frame, winner)));
+            when(fixture.mapper.saveInference(eq("BTCUSDT"), eq(close), any(), anyString())).thenReturn(0);
+            fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(3));
+            assertThat(AssetCardServiceTest.<AssetCardSignalService.State>runtimeMap(fixture.service, "signalStates").get("BTCUSDT")).isEqualTo(winner);
+            assertThat(fixture.lastSnapshot().signal()).isEqualTo(winner.signal());
+            verify(fixture.mapper, times(2)).selectInference(eq("BTCUSDT"), eq(close), any());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verifyNoInteractions(fixture.events);
+        }
+    }
+
+    @Test
+    void blockedSameSymbolInferenceDoesNotBlockItsIndependentPriceProjection() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+        try (var fixture = new RuntimeFixture()) {
+            fixture.freshMarket();
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            var release = new java.util.concurrent.CountDownLatch(1);
+            when(fixture.market.bars(eq("BTCUSDT"), anyString(), any(), eq(24))).thenAnswer(call -> {
+                entered.countDown();
+                if (!release.await(3, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Price path was blocked by inference");
+                return closedBars(call.getArgument(1), close);
+            });
+            var callers = java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                var computing = callers.submit(() -> fixture.service.inferClosedBar("BTCUSDT", close, close.plusSeconds(1)));
+                assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                callers.submit(() -> fixture.service.flushPrices(close.plusSeconds(2))).get(1, java.util.concurrent.TimeUnit.SECONDS);
+                assertThat(fixture.lastSnapshot().spotPrice()).isEqualByComparingTo("100");
+                assertThat(fixture.lastSnapshot().latestPriceAt()).isEqualTo(close.plusSeconds(2));
+                release.countDown(); computing.get(3, java.util.concurrent.TimeUnit.SECONDS);
+            } finally { release.countDown(); callers.shutdownNow(); }
+        }
+    }
+
+    @Test
+    void synthetic128SymbolBoundaryProducesOnePrivateOutcomeEachWithBoundedRuntimeLatency() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+        try (var fixture = new RuntimeFixture()) {
+            Set<String> symbols = java.util.stream.IntStream.range(0, 128).mapToObj(i -> "S" + i + "XUSDT")
+                    .collect(java.util.stream.Collectors.toSet());
+            when(fixture.market.subscribedSymbols()).thenReturn(symbols);
+            var audits = new java.util.concurrent.ConcurrentHashMap<String, String>();
+            var completionNanos = new java.util.concurrent.ConcurrentHashMap<String, Long>();
+            var counters = new java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong>();
+            var concurrent = new java.util.concurrent.atomic.AtomicInteger();
+            var maximumConcurrent = new java.util.concurrent.atomic.AtomicInteger();
+            var twoSymbolsInside = new java.util.concurrent.CountDownLatch(2);
+            when(fixture.mapper.nextSnapshotVersion(anyString())).thenAnswer(call ->
+                    counters.computeIfAbsent(call.getArgument(0), ignored -> new java.util.concurrent.atomic.AtomicLong()).incrementAndGet());
+            when(fixture.mapper.saveInference(anyString(), eq(close), any(), anyString())).thenAnswer(call ->
+                    audits.putIfAbsent(call.getArgument(0), call.getArgument(3)) == null ? 1 : 0);
+            when(fixture.mapper.saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), nullable(Instant.class))).thenAnswer(call -> {
+                completionNanos.putIfAbsent(call.getArgument(0), System.nanoTime()); return 1;
+            });
+            when(fixture.market.bars(anyString(), anyString(), any(), eq(24))).thenAnswer(call -> {
+                int active = concurrent.incrementAndGet(); maximumConcurrent.accumulateAndGet(active, Math::max);
+                try {
+                    twoSymbolsInside.countDown();
+                    if (!twoSymbolsInside.await(2, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Global inference serialization detected");
+                    return closedBars(call.getArgument(0), call.getArgument(1), close);
+                } finally { concurrent.decrementAndGet(); }
+            });
+            var callers = java.util.concurrent.Executors.newFixedThreadPool(16);
+            long start = System.nanoTime();
+            try {
+                var tasks = symbols.stream().map(symbol -> (java.util.concurrent.Callable<Void>) () -> {
+                    fixture.service.inferClosedBar(symbol, close, close.plusSeconds(1)); return null;
+                }).toList();
+                for (var future : callers.invokeAll(tasks, 15, java.util.concurrent.TimeUnit.SECONDS)) {
+                    assertThat(future.isCancelled()).isFalse(); future.get();
+                }
+            } finally { callers.shutdownNow(); }
+            assertThat(maximumConcurrent.get()).isGreaterThan(1);
+            assertThat(audits.keySet()).isEqualTo(symbols);
+            assertThat(completionNanos.keySet()).isEqualTo(symbols);
+            var latency = completionNanos.values().stream().map(value -> (value - start) / 1_000_000.0).sorted().toList();
+            assertThat(latency.get((int) Math.ceil(latency.size() * .95) - 1)).as("Synthetic private runtime p95; NOT native-model or production readiness").isLessThanOrEqualTo(15_000);
+            for (String encoded : audits.values()) {
+                var audit = fixture.json.readTree(encoded);
+                assertThat(audit.path("outcome").asText()).isEqualTo("COMPLETED");
+                assertThat(audit.path("modelMode").asText()).isEqualTo("SHADOW");
+                assertThat(audit.path("state").path("auditPrediction").path("available").asBoolean()).isFalse();
+            }
+            for (String symbol : symbols) fixture.service.inferClosedBar(symbol, close, close.plusSeconds(3));
+            verify(fixture.mapper, times(128)).saveInference(anyString(), eq(close), any(), anyString());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void actualWorkerQueueRecordsAll128ExpiredBoundariesInsteadOfSilentlyDroppingThem() throws Exception {
+        Instant close = Instant.ofEpochMilli(Math.floorDiv(Instant.now().toEpochMilli(), 300_000) * 300_000 - 300_001);
+        try (var fixture = new RuntimeFixture()) {
+            fixture.enableLocalWorkers();
+            Set<String> symbols = java.util.stream.IntStream.range(0, 128).mapToObj(i -> "S" + i + "XUSDT")
+                    .collect(java.util.stream.Collectors.toSet());
+            when(fixture.market.subscribedSymbols()).thenReturn(symbols);
+            var outcomes = new java.util.concurrent.ConcurrentHashMap<String, String>();
+            var completed = new java.util.concurrent.CountDownLatch(128);
+            when(fixture.mapper.saveInference(anyString(), eq(close), any(), anyString())).thenAnswer(call -> {
+                if (outcomes.putIfAbsent(call.getArgument(0), call.getArgument(3)) == null) { completed.countDown(); return 1; }
+                return 0;
+            });
+            for (String symbol : symbols) fixture.service.onMarketUpdate(new AssetCardMarketDataService.MarketUpdate(symbol, "BAR", close, "5m"));
+            assertThat(completed.await(15, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(outcomes).hasSize(128);
+            for (String encoded : outcomes.values()) assertThat(fixture.json.readTree(encoded).path("outcome").asText()).isEqualTo("TIMED_OUT");
+            verify(fixture.market, never()).bars(anyString(), anyString(), any(), anyInt());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
+    @Test
+    void queuedBarDropPersistsExplicitIdentityWithoutRunningInference() throws Exception {
+        Instant close = Instant.parse("2026-09-10T11:59:59.999Z");
+        try (var fixture = new RuntimeFixture()) {
+            fixture.enableLocalWorkers();
+            fixture.service.onMarketUpdate(new AssetCardMarketDataService.MarketUpdate("BTCUSDT", "BAR_DROPPED", close, "5m"));
+            var encoded = org.mockito.ArgumentCaptor.forClass(String.class);
+            verify(fixture.mapper, timeout(2000)).saveInference(eq("BTCUSDT"), eq(close), any(), encoded.capture());
+            assertThat(fixture.json.readTree(encoded.getValue()).path("outcome").asText()).contains("DROPPED");
+            verify(fixture.market, never()).bars(anyString(), anyString(), any(), anyInt());
+            verify(fixture.mapper, never()).saveFeatureHistory(anyString(), any(), any(), anyString());
+            verifyNoInteractions(fixture.events, fixture.pool);
+        }
+    }
+
     private static AssetCardSnapshot publicSignalFixture(Instant at, String featureVersion) {
+        return publicSignalFixture(at, featureVersion, "TEST_FIXTURE_THRESHOLDS", "TEST_RISK");
+    }
+
+    private static AssetCardSnapshot publicSignalFixture(Instant at, String featureVersion, String thresholdVersion, String riskVersion) {
+        var signal = validLong(at.minusSeconds(30));
         return new AssetCardSnapshot("BTCUSDT", "TEST_FIXTURE", BigDecimal.valueOf(100), at,
-                validLong(at.minusSeconds(30)), new AssetCardSnapshot.Risk("HIGH", List.of(new AssetCardSnapshot.RiskItem(
-                        "CROWDING", "ASSESSED", "HIGH", "TEST_FIXTURE", "TEST_FIXTURE", at, "TEST_FIXTURE")), at),
+                signal, new AssetCardSnapshot.Risk("HIGH", List.of(new AssetCardSnapshot.RiskItem(
+                        "CROWDING", "ASSESSED", "HIGH", "TEST_FIXTURE", "TEST_FIXTURE", at, "TEST_FIXTURE")), at,
+                        AssetCardSnapshot.SignalSide.LONG, signal.direction(), signal.signalAsOf(), at, riskVersion),
                 new AssetCardSnapshot.Health("HEALTHY", null, at), at.minusSeconds(30), 10,
-                featureVersion, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION");
+                featureVersion, "TEST_FIXTURE_MODEL", "TEST_FIXTURE_CALIBRATION", thresholdVersion);
     }
 
     /** Metadata seam only. No native loading/inference or production model gate is bypassed at runtime. */
@@ -457,8 +747,13 @@ class AssetCardServiceTest {
                     AssetCardModelBundle.Thresholds.class, Map.class, Set.class, String.class);
             constructor.setAccessible(true);
             var calibration = new AssetCardBetaCalibration.Parameters(1, 1, 0, 1e-12);
-            return constructor.newInstance(mock(ml.dmlc.xgboost4j.java.Booster.class), mock(ml.dmlc.xgboost4j.java.Booster.class),
+            var bundle = constructor.newInstance(mock(ml.dmlc.xgboost4j.java.Booster.class), mock(ml.dmlc.xgboost4j.java.Booster.class),
                     calibration, calibration, modelVersion, calibrationVersion, "TEST_FIXTURE_THRESHOLDS", null, Map.of(), assets, null);
+            int count = AssetCardFeatureService.FEATURE_NAMES.size();
+            ReflectionTestUtils.setField(bundle, "lifecycle", new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA", "TEST_RISK",
+                    Instant.EPOCH, Instant.parse("2100-01-01T00:00:00Z"), Set.of("0".repeat(count), "1".repeat(count)),
+                    Collections.nCopies(count, -1_000_000.0), Collections.nCopies(count, 1_000_000.0), .5));
+            return bundle;
         } catch (ReflectiveOperationException failure) { throw new AssertionError("Test-only immutable bundle signature changed", failure); }
     }
 
@@ -486,20 +781,24 @@ class AssetCardServiceTest {
     }
 
     private static List<AssetCardMarketDataService.SpotBar> closedBars(String interval, Instant lastClose) {
+        return closedBars("BTCUSDT", interval, lastClose);
+    }
+
+    private static List<AssetCardMarketDataService.SpotBar> closedBars(String symbol, String interval, Instant lastClose) {
         long seconds = switch (interval) { case "5m" -> 300; case "15m" -> 900; case "1h" -> 3600; case "4h" -> 14400;
             default -> throw new IllegalArgumentException("Unexpected fixture interval"); };
         List<AssetCardMarketDataService.SpotBar> bars = new java.util.ArrayList<>();
         for (int i = 0; i < 24; i++) {
             Instant end = lastClose.minusSeconds((23L - i) * seconds);
             BigDecimal price = BigDecimal.valueOf(100 + i * .1);
-            bars.add(new AssetCardMarketDataService.SpotBar("BTCUSDT", interval, end.plusMillis(1).minusSeconds(seconds), end,
+            bars.add(new AssetCardMarketDataService.SpotBar(symbol, interval, end.plusMillis(1).minusSeconds(seconds), end,
                     price, price.add(BigDecimal.ONE), price.subtract(BigDecimal.ONE), price, BigDecimal.TEN,
                     BigDecimal.valueOf(6), 10L, end.plusMillis(1)));
         }
         return bars;
     }
 
-    /** No Spring context, datasource, native model, provider client or scheduled lifecycle is started. */
+    /** No Spring/start lifecycle, datasource, native model or provider client; tests may explicitly enqueue local workers. */
     private static final class RuntimeFixture implements AutoCloseable {
         private final AssetCardProperties properties = new AssetCardProperties();
         private final AssetCardMarketDataService market = mock(AssetCardMarketDataService.class);
@@ -514,8 +813,9 @@ class AssetCardServiceTest {
             when(market.subscribedSymbols()).thenReturn(Set.of("BTCUSDT"));
             var counter = new java.util.concurrent.atomic.AtomicLong(10);
             when(mapper.nextSnapshotVersion("BTCUSDT")).thenAnswer(ignored -> counter.incrementAndGet());
-            when(mapper.saveSnapshot(anyString(), anyLong(), anyString(), nullable(Instant.class))).thenReturn(1);
-            when(mapper.saveFeatureHistory(anyString(), any(), any(), anyString())).thenReturn(1);
+            when(mapper.saveSnapshot(anyString(), anyLong(), anyLong(), anyString(), nullable(Instant.class))).thenReturn(1);
+            when(mapper.saveInference(anyString(), any(), any(), anyString())).thenReturn(1);
+            when(mapper.selectInference(anyString(), any(), any())).thenReturn(Optional.empty());
         }
         private void freshMarket() {
             when(market.quote(eq("BTCUSDT"), any())).thenAnswer(invocation -> {
@@ -530,19 +830,25 @@ class AssetCardServiceTest {
                         1, at, at, "EXCHANGE_EVENT", BigDecimal.valueOf(99), BigDecimal.valueOf(101)));
             });
         }
+        private void enableLocalWorkers() {
+            ReflectionTestUtils.setField(service, "started", true);
+            ReflectionTestUtils.setField(service, "writerReady", true); // Isolated mock-permission fixture, never runtime readiness evidence.
+        }
         private void seed(AssetCardSnapshot.Signal signal, Instant priceAt) {
             var snapshot = new AssetCardSnapshot("BTCUSDT", "Bitcoin", BigDecimal.valueOf(100), priceAt, signal,
-                    AssetCardSnapshot.Risk.unknown("Fixture has no calibrated risk distributions"),
+                    AssetCardSnapshot.Risk.unknownFor(signal, AssetCardRiskService.RULE_VERSION, "Fixture has no calibrated risk distributions"),
                     new AssetCardSnapshot.Health("HEALTHY", null, priceAt), signal.signalAsOf(), 10,
                     AssetCardFeatureService.FEATURE_VERSION, null, null);
             runtimeMap(service, "snapshots").put("BTCUSDT", snapshot);
         }
         private AssetCardSnapshot lastSnapshot() { return AssetCardServiceTest.<AssetCardSnapshot>runtimeMap(service, "snapshots").get("BTCUSDT"); }
-        private org.example.trademodel.mapper.AssetCardMapper.FeatureHistory audit(AssetCardFeatureService.Frame frame,
+        private org.example.trademodel.mapper.AssetCardMapper.TypedHistory audit(AssetCardFeatureService.Frame frame,
                                                                                  AssetCardSignalService.State state) throws Exception {
             String encoded = json.writeValueAsString(Map.of("frame", frame, "signalFrame", frame, "state", state,
                     "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS"));
-            return new org.example.trademodel.mapper.AssetCardMapper.FeatureHistory("BTCUSDT", frame.signalAsOf(), frame.availableAt(), encoded);
+            return new org.example.trademodel.mapper.AssetCardMapper.TypedHistory("BTCUSDT",
+                    org.example.trademodel.mapper.AssetCardMapper.HistoryKind.INFERENCE, "5m:" + frame.closed5mAt(),
+                    frame.closed5mAt(), frame.availableAt(), encoded);
         }
         @Override public void close() { service.close(); }
     }

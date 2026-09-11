@@ -93,15 +93,19 @@ class AssetCardModelBundleTest {
         assertThatThrownBy(()->AssetCardModelBundle.verifyPopulationCounts(fold,policy)).hasMessage("TIERS_EXCEED_INDEPENDENT_SPLIT_POPULATION");
     }
     @Test void modelSideAndEmbeddedMetadataMustMatchTheAtomicBundle() throws Exception {
-        Map<String,String> attributes=Map.of("asset_card_side","LONG","asset_card_data_kind","REAL_HISTORICAL",
+        Map<String,String> attributes=new HashMap<>(Map.of("asset_card_side","LONG","asset_card_data_kind","REAL_HISTORICAL",
                 "asset_card_model_version","TEST_FIXTURE_MODEL","asset_card_feature_version",AssetCardFeatureService.FEATURE_VERSION,
                 "asset_card_calibration_version","TEST_FIXTURE_CAL","asset_card_threshold_version","TEST_FIXTURE_THRESHOLD",
-                "asset_card_dataset_version","TEST_FIXTURE_DATA");
+                "asset_card_dataset_version","TEST_FIXTURE_DATA"));
+        attributes.put("asset_card_risk_version","TEST_RISK");
+        attributes.put("asset_card_trained_through","2025-01-01T00:00:00Z");
+        attributes.put("asset_card_valid_until","2030-01-01T00:00:00Z");
         String[] names=AssetCardFeatureService.FEATURE_NAMES.toArray(String[]::new);
         var mapper=new ObjectMapper();
         var manifest=mapper.valueToTree(Map.of("modelVersion","TEST_FIXTURE_MODEL","featureVersion",AssetCardFeatureService.FEATURE_VERSION,
                 "calibrationVersion","TEST_FIXTURE_CAL","thresholdVersion","TEST_FIXTURE_THRESHOLD"));
         var report=mapper.valueToTree(Map.of("datasetVersion","TEST_FIXTURE_DATA"));
+        ((ObjectNode)manifest).putObject("lifecycle").put("riskVersion","TEST_RISK").put("trainedThrough","2025-01-01T00:00:00Z").put("validUntil","2030-01-01T00:00:00Z");
         AssetCardModelBundle.verifyModelMetadata(attributes,names,"LONG",manifest,report);
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(attributes,names,"SHORT",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
         assertThatThrownBy(()->AssetCardModelBundle.verifyModelMetadata(attributes,new String[]{"wrongOrder"},"LONG",manifest,report)).hasMessage("MODEL_IDENTITY_OR_SIDE_MISMATCH");
@@ -121,6 +125,7 @@ class AssetCardModelBundleTest {
                 new AssetCardModelBundle.Tier(.65,.1),new AssetCardModelBundle.Tier(.75,.2),.01,.5);
         try(var bundle=constructor.newInstance(longModel,shortModel,parameters,parameters,"TEST_FIXTURE_MODEL","TEST_FIXTURE_CAL",
                 "TEST_FIXTURE_THRESHOLD",thresholds,Map.of(),Set.of("BTCUSDT"),null)) {
+            setTestLifecycle(bundle);
             var at=java.time.Instant.EPOCH;
             var frame=new AssetCardFeatureService.Frame("ETHUSDT",at,at,at,AssetCardFeatureService.FEATURE_VERSION,
                     AssetCardFeatureService.FEATURE_NAMES,Collections.nCopies(AssetCardFeatureService.FEATURE_NAMES.size(),null),
@@ -129,8 +134,50 @@ class AssetCardModelBundleTest {
             assertThat(result.available()).isFalse();
             assertThat(result.pLong()).isNull();
             assertThat(result.reasons()).containsExactly("ASSET_OUTSIDE_VALIDATED_COVERAGE");
+            var unknownPattern=new ArrayList<Double>(frame.vector()); unknownPattern.set(0,1.0);
+            var missing=new AssetCardFeatureService.Frame("BTCUSDT",at,at,at,frame.featureVersion(),frame.featureNames(),unknownPattern,
+                    true,List.of(),"OBSERVATION","RANGE",1.0,99.0,101.0,Map.of());
+            assertThat(bundle.predict(missing).reasons()).containsExactly("MISSING_PATTERN_OUTSIDE_VALIDATED_COVERAGE");
+            var outlier=new AssetCardFeatureService.Frame("BTCUSDT",at,at,at,frame.featureVersion(),frame.featureNames(),
+                    Collections.nCopies(frame.featureNames().size(),1.0e12),true,List.of(),"OBSERVATION","RANGE",1.0,99.0,101.0,Map.of());
+            assertThat(bundle.predict(outlier).reasons()).containsExactly("FEATURE_DISTRIBUTION_DRIFT_SHADOW");
+            assertThat(bundle.validated()).isFalse();
             verifyNoInteractions(longModel,shortModel);
         }
+    }
+    private static void setTestLifecycle(AssetCardModelBundle bundle) throws Exception {
+        int count=AssetCardFeatureService.FEATURE_NAMES.size();
+        var field=AssetCardModelBundle.class.getDeclaredField("lifecycle"); field.setAccessible(true);
+        field.set(bundle,new AssetCardModelBundle.Lifecycle("TEST_FIXTURE_DATA","TEST_RISK",java.time.Instant.EPOCH,java.time.Instant.parse("2100-01-01T00:00:00Z"),
+                Set.of("0".repeat(count),"1".repeat(count)),Collections.nCopies(count,-1_000_000.0),Collections.nCopies(count,1_000_000.0),.5));
+    }
+    @Test void v42PopulationAndTimeBlockIntervalsCannotBeReplacedByRawCounts() throws Exception {
+        var mapper=new ObjectMapper();
+        var policy=mapper.readTree("""
+                {"minPositiveSamples":2,"minNegativeSamples":2,"minEffectiveSamples":2,"minTimeBlocks":2,
+                 "timeBlockSeconds":14400,"ciReplicates":40,"ciConfidence":0.9,
+                 "maxBrierCiWidth":0.2,"maxEceCiWidth":0.2,"maxLogLossCiWidth":0.2,"maxHitRateCiWidth":0.2}
+                """);
+        ObjectNode population=mapper.createObjectNode().put("count",100).put("positive",50).put("negative",50).put("effectiveSamples",1);
+        assertThatThrownBy(()->AssetCardModelBundle.verifyPopulation(population,policy)).hasMessage("INSUFFICIENT_INDEPENDENT_OUTCOME_POPULATION");
+        population.put("effectiveSamples",3); AssetCardModelBundle.verifyPopulation(population,policy);
+        population.put("negative",0);
+        assertThatThrownBy(()->AssetCardModelBundle.verifyPopulation(population,policy)).isInstanceOf(IllegalArgumentException.class);
+        ObjectNode uncertainty=mapper.createObjectNode().put("blockCount",3).put("blockSeconds",14400).put("replicates",40).put("confidence",.9);
+        var intervals=uncertainty.putObject("intervals");
+        for(String key:List.of("brier","ece","logLoss","hitRate")) intervals.putObject(key).put("lower",.1).put("upper",.2);
+        AssetCardModelBundle.verifyUncertainty(uncertainty,policy);
+        intervals.remove("ece");
+        assertThatThrownBy(()->AssetCardModelBundle.verifyUncertainty(uncertainty,policy)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void sideVersionDistributionUsesSignedMidrankAndBinaryBounds() {
+        var distribution=new AssetCardModelBundle.RiskDistribution(List.of(-3.0,-1.0,-1.0,2.0),"TEST_FIXTURE",java.time.Instant.EPOCH,
+                4,.75,.9,4,"RATE",true,"BTCUSDT","LONG","fundingRate","TEST_RISK");
+        assertThat(distribution.adversePercentile(-1)).isEqualTo(.5);
+        assertThat(distribution.adversePercentile(-4)).isZero();
+        assertThat(distribution.adversePercentile(3)).isEqualTo(1);
+        assertThat(distribution.side()).isEqualTo("LONG");
+        assertThat(distribution.riskVersion()).isEqualTo("TEST_RISK");
     }
     @Test void pythonUbjsonDualModelsLoadAndPredictIdenticallyOnJava17TestFixtureOnly() throws Exception {
         String python=System.getProperty("assetCard.testPython");

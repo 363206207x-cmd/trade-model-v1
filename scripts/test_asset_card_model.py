@@ -13,6 +13,28 @@ SPEC.loader.exec_module(model)
 
 
 class ModelTests(unittest.TestCase):
+    def test_json_numeric_policy_arrays_remain_numbers_while_times_keep_nanoseconds(self):
+        value=model.decode_json('{"signalAsOf":1767268800.000000001,"volatilityStrata":[0.01,0.02],"nested":[[0.5],{"value":0.25,"availableAt":1767268800.000000002}]}')
+        self.assertTrue(all(model.finite(v) for v in value["volatilityStrata"]))
+        self.assertTrue(model.finite(value["nested"][0][0]))
+        self.assertEqual(model.instant(value["signalAsOf"]),"2026-01-01T12:00:00.000000001Z")
+        self.assertEqual(model.instant(value["nested"][1]["availableAt"]),"2026-01-01T12:00:00.000000002Z")
+        self.assertEqual(json.loads(json.dumps(value,default=model.json_default))["volatilityStrata"],[.01,.02])
+
+    def test_v42_observation_identity_expiry_and_signed_value_contract(self):
+        observation={"value":-.01,"source":"COINGLASS:COINGLASS_FUNDING:fixture","instrument":"BINANCE:PERPETUAL:LINEAR:BTC/USDT",
+                     "sourceVersion":"TEST_SOURCE_V2","unit":"RATE","observedAt":90,"availableAt":95,"expiresAt":110}
+        self.assertTrue(model.valid_observation("BTCUSDT","fundingRate",observation,100))
+        for key,value in (("instrument","BINANCE:SPOT:NONE:BTC/USDT"),("unit","PERCENT"),("expiresAt",99),("sourceVersion","UNKNOWN"),("availableAt",89)):
+            self.assertFalse(model.valid_observation("BTCUSDT","fundingRate",{**observation,key:value},100))
+        self.assertNotIn("takerBuySellRatio",model.FEATURE_NAMES)
+        self.assertEqual(model.FEATURE_VERSION,"SPOT_CARD_FEATURES_V2_SIGNED_PIT")
+
+    def test_overlapping_labels_do_not_count_as_independent_samples(self):
+        rows=[{"signalAsOf":i*300,"labelEnd":i*300+14400} for i in range(48)]
+        self.assertLess(model.overlap_effective_samples(rows),3)
+        self.assertEqual(model.overlap_effective_samples([{"signalAsOf":0,"labelEnd":14400},{"signalAsOf":14400,"labelEnd":28800}]),2)
+
     @staticmethod
     def path_bars(start=0,count=48,step=300):
         return [{"openTime":start+i*step,"closeTime":start+(i+1)*step,"open":100,"close":100,"high":100.5,"low":99.5} for i in range(count)]
@@ -24,9 +46,14 @@ class ModelTests(unittest.TestCase):
             raw["bars"][interval]=[{"openTime":at-(24-i)*step,"closeTime":at-(23-i)*step,"availableAt":at-(23-i)*step,
                 "open":100+i,"high":102+i,"low":99+i,"close":101+i,"volume":10+i,"takerBuyBaseVolume":5+i/2,"tradeCount":100+i} for i in range(24)]
         for key in ("spreadBps","depth10Bps","depth25Bps"):
-            raw["evidence"][key]={"value":2,"source":"BINANCE_SPOT","observedAt":at,"availableAt":at}
-        raw["evidence"]["spotPrice"]={"value":100,"source":"BINANCE_SPOT","observedAt":at,"availableAt":at}
+            raw["evidence"][key]=ModelTests.observation(key,2,at)
+        raw["evidence"]["spotPrice"]=ModelTests.observation("spotPrice",100,at)
         return raw
+
+    @staticmethod
+    def observation(key,value,at):
+        return {"value":value,"source":"BINANCE_SPOT","observedAt":at,"availableAt":at,"expiresAt":at+60,
+                "instrument":"BINANCE:SPOT:NONE:BTC/USDT","sourceVersion":"TEST_FIXTURE_V2","unit":model.UNITS[key],"observationId":"test-trade" if key=="spotPrice" else None}
 
     def test_beta_matches_java_equation_and_identity(self):
         self.assertAlmostEqual(model.beta(.2, {"a":1,"b":1,"c":0,"epsilon":1e-7}),.2)
@@ -68,22 +95,42 @@ class ModelTests(unittest.TestCase):
         bars[-1]["close"]=100000
         self.assertEqual(model.first_touch(100,1,0,bars,[],"SHORT"),(None,"INCOMPLETE_HORIZON"))
 
+    def test_future_label_bars_require_exact_opens_and_closed_duration_tolerance(self):
+        bars=self.path_bars()
+        bars[1]["openTime"]=model.timestamp("1970-01-01T00:05:00.000000001Z")
+        self.assertEqual(model.first_touch(100,1,0,bars,[],"LONG"),(None,"INCOMPLETE_HORIZON"))
+        bars=self.path_bars(); bars[1]["closeTime"]=model.timestamp("1970-01-01T00:09:59.998999999Z")
+        self.assertEqual(model.first_touch(100,1,0,bars,[],"LONG"),(None,"INCOMPLETE_HORIZON"))
+
+    def test_future_label_bar_lineage_is_registered_and_unit_bound(self):
+        bar={**self.path_bars(count=1)[0],"availableAt":300,"instrument":model.instrument("BTCUSDT"),
+             "source":"BINANCE_SPOT_CLOSED_5M","sourceVersion":"TEST_FIXTURE_V2","unit":"OHLCV"}
+        provenance={"sources":[{k:bar[k] for k in ("source","sourceVersion","instrument","unit")}]}
+        self.assertTrue(model.future_bar_valid(bar,"BTCUSDT",301,provenance))
+        for key,value in (("unit","RATE"),("source","BINANCE_SPOT_FAKE"),("sourceVersion","UNREGISTERED"),("availableAt",302)):
+            self.assertFalse(model.future_bar_valid({**bar,key:value},"BTCUSDT",301,provenance))
+        self.assertFalse(model.future_bar_valid(bar,"BTCUSDT",301,{"sources":[]}))
+
     def test_timeout_requires_actual_point_in_time_horizon_trade(self):
         at=1767268800; cutoff=at+5.123
         raw=self.feature_fixture(at); raw["signalAsOf"]=cutoff
         raw["evidence"]["spotPrice"].update(observedAt=cutoff,availableAt=cutoff)
         record={"rawFrame":raw,"future5m":self.path_bars(at,49),"future1m":[],
                 "provenance":{"kind":"SYNTHETIC_FIXTURE","capturedAt":model.instant(at+15000)}}
+        for bar in record["future5m"]:
+            bar.update(instrument=model.instrument("BTCUSDT"),source="BINANCE_SPOT",sourceVersion="TEST_FIXTURE_V2",unit="OHLCV",availableAt=bar["closeTime"])
+        record["provenance"]["sources"]=[{k:o[k] for k in ("source","sourceVersion","instrument","unit")} for o in raw["evidence"].values()]
+        record["provenance"]["sources"].append({k:record["future5m"][0][k] for k in ("source","sourceVersion","instrument","unit")})
         policy={"maxSignalTradeAgeSeconds":2,"roundTripFeeRate":.001,"roundTripSlippageRate":.001,"volatilityStrata":[.01,.02]}
         # Isolate preparation logic only; the real CLI validator rejects this fixture unconditionally.
         with self.assertRaises(ValueError): model.validate_provenance(record["provenance"])
         with patch.object(model,"validate_provenance",return_value=None):
             rows,excluded=model.prepare_records([record],policy)
             self.assertEqual(rows,[]); self.assertEqual(excluded,{"MISSING_POINT_IN_TIME_HORIZON_TRADE":1})
-            record["horizonTrade"]={"value":100.2,"source":"BINANCE_SPOT","observedAt":cutoff+14400-.5,"availableAt":cutoff+14400}
+            record["horizonTrade"]={**self.observation("spotPrice",100.2,cutoff+14400-.5),"availableAt":cutoff+14400}
             rows,excluded=model.prepare_records([record],policy)
             self.assertEqual(excluded,{})
-            self.assertEqual(rows[0]["signalAsOf"],cutoff)
+            self.assertEqual(rows[0]["signalAsOf"],model.timestamp(cutoff))
             self.assertAlmostEqual(rows[0]["netReturns"]["LONG"],0)
             self.assertEqual(rows[0]["labels"],{"LONG":0,"SHORT":0})
             record["horizonTrade"]["availableAt"]=cutoff+14400+.1
@@ -173,10 +220,10 @@ class ModelTests(unittest.TestCase):
     def test_duplicate_asof_risk_cache_is_not_independent_history(self):
         observation={"value":2,"source":"COINGLASS","observedAt":"2026-01-01T00:00:00Z","availableAt":"2026-01-01T00:01:00Z"}
         rows=[{"symbol":"BTCUSDT","realInputs":{"fundingRate":observation}}]*100
-        policy={"requiredAssets":["BTCUSDT"],"riskMetrics":{"fundingRate":{"unit":"RATE","higherIsWorse":True,"mediumPercentile":.8,"highPercentile":.95,"minSamples":2}}}
-        self.assertEqual(model.risk_distributions(rows,policy),{})
+        policy={"requiredAssets":["BTCUSDT"],"riskVersion":"TEST_RISK","riskMetrics":{"LONG":{"fundingRate":{"unit":"RATE","higherIsWorse":True,"mediumPercentile":.8,"highPercentile":.95,"minSamples":2}}}}
+        self.assertEqual(model.risk_distributions(rows,policy),{"BTCUSDT":{"LONG":{}}})
         rows.append({"symbol":"BTCUSDT","realInputs":{"fundingRate":{**observation,"availableAt":"2026-01-01T00:02:00Z"}}})
-        self.assertEqual(model.risk_distributions(rows,policy),{})
+        self.assertEqual(model.risk_distributions(rows,policy),{"BTCUSDT":{"LONG":{}}})
 
     def test_risk_distribution_metric_keys_survive_deduplication_and_json_roundtrip(self):
         observations=[]
@@ -186,14 +233,15 @@ class ModelTests(unittest.TestCase):
                          "availableAt":f"2026-01-01T00:0{minute}:01Z"}
                     for key,value in (("spreadBps",2),("depth10Bps",100))}
             observations.append({"symbol":"BTCUSDT","realInputs":inputs})
-        policy={"requiredAssets":["BTCUSDT"],"riskMetrics":{
+        policy={"requiredAssets":["BTCUSDT"],"riskVersion":"TEST_RISK","riskMetrics":{"LONG":{
             key:{"unit":unit,"higherIsWorse":adverse,"mediumPercentile":.8,
                  "highPercentile":.95,"minSamples":2}
-            for key,unit,adverse in (("spreadBps","BPS",True),("depth10Bps","QUOTE_CURRENCY",False))}}
+            for key,unit,adverse in (("spreadBps","BASIS_POINTS",True),("depth10Bps","QUOTE_CURRENCY",False))}}}
         result=model.risk_distributions(observations+[observations[0]],policy)
-        self.assertEqual(set(result["BTCUSDT"]),{"spreadBps","depth10Bps"})
-        self.assertEqual(result["BTCUSDT"]["spreadBps"]["sortedValues"],[2,3])
-        self.assertEqual(result["BTCUSDT"]["depth10Bps"]["sortedValues"],[100,101])
+        self.assertEqual(set(result["BTCUSDT"]["LONG"]),{"spreadBps","depth10Bps"})
+        self.assertEqual(result["BTCUSDT"]["LONG"]["spreadBps"]["sortedValues"],[2,3])
+        self.assertEqual(result["BTCUSDT"]["LONG"]["depth10Bps"]["sortedValues"],[100,101])
+        self.assertEqual(result["BTCUSDT"]["LONG"]["depth10Bps"]["side"],"LONG")
         self.assertEqual(json.loads(json.dumps(result,allow_nan=False)),result)
 
     def test_population_counts_and_missing_strata_never_release(self):
@@ -215,6 +263,94 @@ class ModelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"TIERS_EXCEED_INDEPENDENT_SPLIT_POPULATION"): model.verify_population_counts(invalid,policy)
         report["strata"].clear()
         self.assertFalse(model.release_pass(report,policy))
+
+    def test_time_block_uncertainty_and_outcome_minima_fail_closed(self):
+        rows=[{"signalAsOf":i*14400,"labelEnd":(i+1)*14400,"labels":{"LONG":i%2}} for i in range(12)]
+        policy={"timeBlockSeconds":14400,"minTimeBlocks":3,"ciReplicates":40,"ciConfidence":.9,"bootstrapSeed":7,"binCount":2,
+                "maxBrierCiWidth":1,"maxEceCiWidth":1,"maxLogLossCiWidth":3,"maxHitRateCiWidth":1,
+                "minPositiveSamples":3,"minNegativeSamples":3,"minEffectiveSamples":3}
+        labels=[r["labels"]["LONG"] for r in rows]; predictions=[.8 if y else .2 for y in labels]
+        intervals=model.time_block_intervals(rows,labels,predictions,.5,policy)
+        self.assertTrue(model.uncertainty_pass(intervals,policy))
+        self.assertEqual(intervals,model.time_block_intervals(rows,labels,predictions,.5,policy))
+        self.assertTrue(model.population_pass(model.population(rows,"LONG"),policy))
+        self.assertFalse(model.population_pass({"count":12,"positive":12,"negative":0,"effectiveSamples":12},policy))
+        self.assertFalse(model.uncertainty_pass({**intervals,"blockCount":1},policy))
+        del intervals["intervals"]["brier"]
+        self.assertFalse(model.uncertainty_pass(intervals,policy))
+
+    def test_oi_risk_history_requires_same_side_price_build_and_own_version(self):
+        rows=[]
+        for i,(oi,price) in enumerate(((3,.1),(4,-.1),(-2,.1),(9,0))):
+            rows.append({"symbol":"BTCUSDT","realInputs":{"openInterestChange1h":{"value":oi,"source":"COINGLASS:fixture","observedAt":i,"availableAt":i},"priceReturn1h":{"value":price}}})
+        spec={"unit":"PERCENT","higherIsWorse":True,"mediumPercentile":.8,"highPercentile":.95,"minSamples":1}
+        policy={"requiredAssets":["BTCUSDT"],"riskVersion":"TEST_RISK_V42","riskMetrics":{s:{"crowdingOpenInterestChange1h":spec} for s in ("LONG","SHORT")}}
+        distributions=model.risk_distributions(rows,policy)["BTCUSDT"]
+        self.assertEqual(distributions["LONG"]["crowdingOpenInterestChange1h"]["sortedValues"],[3])
+        self.assertEqual(distributions["SHORT"]["crowdingOpenInterestChange1h"]["sortedValues"],[4])
+
+    @staticmethod
+    def v42_policy_fixture():
+        policy={key:2 for key in ("minTrainSamples","minCalibrationSamples","minValidationSamples","minTestSamples","minStratumSamples","minTierSamples","minRangeSamples",
+                "minProbabilityBandSamples","minOccupiedBands","minWalkForwardFolds","minPositiveSamples","minNegativeSamples","minTimeBlocks","minRangeTestSamples","minWatchTestSamples")}
+        policy.update(version="TEST_POLICY_ONLY",riskVersion="TEST_RISK_ONLY",binCount=4,minEffectiveSamples=2,bootstrapSeed=7,timeBlockSeconds=86400,ciReplicates=40,ciConfidence=.9,
+                maxEce=.3,maxLogLoss=2,minProbabilitySpread=.1,roundTripFeeRate=.001,roundTripSlippageRate=.001,maxSignalTradeAgeSeconds=2,
+                requiredAssets=["BTCUSDT"],requiredRegimes=["LONG"],requiredVolatilityStrata=["LOW"],volatilityStrata=[.01,.02],
+                maxBrierCiWidth=.5,maxEceCiWidth=.5,maxLogLossCiWidth=2,maxHitRateCiWidth=.5,minNonDirectionalCoverage=.1,maxNonDirectionalCoverageSwing=.8,
+                maxRangeFalseEntryRate=.3,maxWatchFalseEntryRate=.3,maxFeatureOutlierFraction=.1,driftLowerQuantile=.01,driftUpperQuantile=.99,
+                costProvenance={"kind":"REAL_HISTORICAL","source":"TEST_FIXTURE_NOT_REAL_FEES","sourceVersion":"TEST_VERSION","instrument":model.instrument("BTCUSDT"),"unit":"RATE","observedAt":1,"availableAt":1,"expiresAt":9999999999})
+        policy["riskMetrics"]={s:{k:{"unit":model.UNITS[k],"higherIsWorse":True,"mediumPercentile":.8,"highPercentile":.95,"minSamples":2} for k in keys} for s,keys in model.RISK_REQUIRED.items()}
+        return policy
+
+    def test_release_policy_never_defaults_missing_v42_evidence_or_metric_coverage(self):
+        # In-memory schema fixture only: no training invocation or production artifact is emitted.
+        policy=self.v42_policy_fixture(); model.validate_policy(policy)
+        for key in ("minNegativeSamples","ciConfidence","costProvenance","minEffectiveSamples","riskMetrics"):
+            invalid=copy.deepcopy(policy); del invalid[key]
+            with self.assertRaises((ValueError,KeyError)): model.validate_policy(invalid)
+        invalid=copy.deepcopy(policy); del invalid["riskMetrics"]["SHORT"]["shortLiquidation"]
+        with self.assertRaises(ValueError): model.validate_policy(invalid)
+        invalid=copy.deepcopy(policy); invalid["costProvenance"]["kind"]="SYNTHETIC_FIXTURE"
+        with self.assertRaises(ValueError): model.validate_policy(invalid)
+
+    def test_all_four_splits_require_each_side_outcome_and_missing_pattern_coverage(self):
+        policy=self.v42_policy_fixture()
+        parts=[[{"signalAsOf":(j*20+i)*14400,"labelEnd":(j*20+i+1)*14400,"symbol":"BTCUSDT","regime":"LONG","volatility":"LOW","vector":[1.0],
+                 "labels":{"LONG":i%2,"SHORT":1-i%2}} for i in range(12)] for j in range(4)]
+        self.assertEqual(len(model.validate_v42_populations(parts,policy)),4)
+        invalid=copy.deepcopy(parts)
+        for row in invalid[1]: row["labels"]["SHORT"]=0
+        with self.assertRaisesRegex(ValueError,"population"): model.validate_v42_populations(invalid,policy)
+        invalid=copy.deepcopy(parts); invalid[3][0]["vector"]=[None]
+        with self.assertRaisesRegex(ValueError,"Missing-pattern"): model.validate_v42_populations(invalid,policy)
+
+    def test_range_and_watch_need_their_own_final_test_stable_coverage(self):
+        policy=self.v42_policy_fixture()
+        rows=[{"signalAsOf":i*14400,"labelEnd":(i+1)*14400,"regime":"RANGE" if i%2==0 else "LONG","labels":{"LONG":0,"SHORT":0}} for i in range(12)]
+        thresholds={"weak":{"minProbability":.6,"minGap":.1},"normal":{"minProbability":.7,"minGap":.2},"strong":{"minProbability":.8,"minGap":.3},"rangeMaxGap":.05,"rangeMaxProbability":.5}
+        evidence=model.nondirectional_evidence(rows,[.4]*12,[.4]*12,thresholds,policy)
+        self.assertTrue(model.nondirectional_pass(evidence,policy))
+        self.assertEqual(evidence["RANGE"]["selectionSplit"],"FINAL_TEST_ONLY")
+        self.assertEqual(evidence["WATCH"]["count"],6)
+        evidence["WATCH"]["coverageSwing"]=1
+        self.assertFalse(model.nondirectional_pass(evidence,policy))
+
+    def test_provenance_requires_both_actual_provider_identity_sets(self):
+        source={"provider":"BINANCE_SPOT","source":"BINANCE_SPOT_AGG_TRADE","sourceVersion":"TEST","instrument":model.instrument("BTCUSDT"),"unit":"QUOTE_CURRENCY"}
+        provenance={"kind":"REAL_HISTORICAL","datasetVersion":"TEST_SCHEMA_ONLY","source":"BINANCE_SPOT","availabilityBasis":"RECORDED_AT_INGESTION","capturedAt":100,"sources":[source]}
+        with self.assertRaisesRegex(ValueError,"CoinGlass"): model.validate_provenance(provenance)
+        provenance["sources"].append({**source,"provider":"COINGLASS","source":"COINGLASS:COINGLASS_FUNDING:fixture","instrument":model.instrument("BTCUSDT",True),"unit":"RATE"})
+        model.validate_provenance(provenance)
+        provenance["kind"]="SYNTHETIC_FIXTURE"
+        with self.assertRaises(ValueError): model.validate_provenance(provenance)
+
+    def test_ingestion_nanoseconds_survive_json_and_never_become_past_knowledge(self):
+        text='{"value":-0.01,"source":"COINGLASS:COINGLASS_FUNDING:fixture","sourceVersion":"TEST","unit":"RATE","instrument":"BINANCE:PERPETUAL:LINEAR:BTC/USDT","observedAt":1767268800.000000001,"availableAt":1767268800.000000002,"expiresAt":1767268801}'
+        o=model.decode_json(text)
+        self.assertFalse(model.valid_observation("BTCUSDT","fundingRate",o,model.timestamp("2026-01-01T12:00:00.000000001Z")))
+        self.assertTrue(model.valid_observation("BTCUSDT","fundingRate",o,model.timestamp("2026-01-01T12:00:00.000000002Z")))
+        self.assertEqual(model.instant(o["availableAt"]),"2026-01-01T12:00:00.000000002Z")
+        self.assertEqual(model.timestamp(model.instant(o["availableAt"])),o["availableAt"])
 
     def test_real_xgboost_and_independent_beta_numeric_smoke_test_fixture_only(self):
         if importlib.util.find_spec("xgboost") is None: self.skipTest("Install fixed offline test dependencies for JNI/Python numerical smoke")

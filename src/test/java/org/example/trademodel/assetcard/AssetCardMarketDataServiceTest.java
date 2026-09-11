@@ -19,14 +19,25 @@ class AssetCardMarketDataServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-10T12:00:00Z");
     private final AssetCardProperties properties = new AssetCardProperties();
     private final AssetCardMapper mapper = mock(AssetCardMapper.class);
-    private final AssetCardMarketDataService service = new AssetCardMarketDataService(properties, new ObjectMapper(), mapper);
+    private final org.springframework.mock.env.MockEnvironment environment = new org.springframework.mock.env.MockEnvironment()
+            .withProperty("trade-model.provider-call.external-calls-enabled", "true");
+    private final AssetCardMarketDataService service = new AssetCardMarketDataService(properties, new ObjectMapper(), mapper, environment);
 
     @org.junit.jupiter.api.AfterEach
     void releaseResources() { service.close(); }
 
+    @org.junit.jupiter.api.BeforeEach
+    void explicitFixtureWriterReadiness() {
+        properties.setWriterEnabled(true);
+        service.setWriterReadiness(() -> true); // Test-only permission evidence; no real database or grants.
+    }
+
     @Test
     void defaultsDisableNetworkAndUseShadowWithoutFuturesFallback() {
+        properties.setWriterEnabled(false);
         assertThat(properties.isEnabled()).isFalse();
+        assertThat(properties.isExternalCallsEnabled()).isFalse();
+        assertThat(properties.isWriterEnabled()).isFalse();
         assertThat(properties.getModelMode().name()).isEqualTo("SHADOW");
         service.reconcileSubscriptions(List.of("BTCUSDT", "ETHUSDT", "BTCUSDT"));
         service.ensureConnected();
@@ -157,9 +168,11 @@ class AssetCardMarketDataServiceTest {
 
     @Test
     void bootstrapBudgetIsGlobalAndRetriesHonorExchangeCooldownWithoutNetwork() {
+        properties.setDepthWeightBudgetPerMinute(500);
         assertThat(service.claimDepthBootstrapBudget("BTCUSDT", NOW)).isTrue();
-        assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW.plusSeconds(59))).isFalse();
-        assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW.plusSeconds(60))).isTrue();
+        assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW)).isTrue();
+        assertThat(service.claimDepthBootstrapBudget("SOLUSDT", NOW.plusSeconds(59))).isFalse();
+        assertThat(service.claimDepthBootstrapBudget("SOLUSDT", NOW.plusSeconds(60))).isTrue();
         service.recordDepthBootstrapFailure("ETHUSDT", 429, "120", NOW.plusSeconds(61));
         assertThat(service.claimDepthBootstrapBudget("BTCUSDT", NOW.plusSeconds(180))).isFalse();
         assertThat(service.claimDepthBootstrapBudget("BTCUSDT", NOW.plusSeconds(181))).isTrue();
@@ -178,6 +191,7 @@ class AssetCardMarketDataServiceTest {
         java.net.http.WebSocket oldSocket = mock(java.net.http.WebSocket.class);
         java.net.http.WebSocket newSocket = mock(java.net.http.WebSocket.class);
         properties.setEnabled(true); // No lifecycle/network method is called; both sockets are inert mocks.
+        properties.setExternalCallsEnabled(true);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "socket", newSocket);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L);
         org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "completeDepthBootstrap", "BTCUSDT", oldSocket,
@@ -201,6 +215,7 @@ class AssetCardMarketDataServiceTest {
         service.acceptMessage(depth(20, 22, NOW, "[]", "[]"), NOW);
         java.net.http.WebSocket currentSocket = mock(java.net.http.WebSocket.class);
         properties.setEnabled(true);
+        properties.setExternalCallsEnabled(true);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "socket", currentSocket);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "connectionEpoch", 2L);
         org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "completeDepthBootstrap", "BTCUSDT", currentSocket,
@@ -313,7 +328,227 @@ class AssetCardMarketDataServiceTest {
     }
 
     private String trade(String stream, String symbol, long id, String price, Instant time) {
-        return "{\"stream\":\"" + stream + "\",\"data\":{\"e\":\"trade\",\"s\":\"" + symbol
-                + "\",\"t\":" + id + ",\"p\":\"" + price + "\",\"q\":\"1\",\"T\":" + time.toEpochMilli() + "}}";
+        return "{\"stream\":\"" + stream.replace("@trade", "@aggTrade") + "\",\"data\":{\"e\":\"aggTrade\",\"s\":\"" + symbol
+                + "\",\"a\":" + id + ",\"p\":\"" + price + "\",\"q\":\"1\",\"T\":" + time.toEpochMilli() + "}}";
+    }
+
+    @Test
+    void aggregateTradeIdentityIsNotRawTradeAndEveryObservationSurvivesPriceCoalescing() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        List<AssetCardMarketDataService.SpotQuote> observations = new ArrayList<>();
+        service.addTradeListener(observations::add);
+        for (int i = 1; i <= 100; i++) service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", i, "100", NOW), NOW);
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 100, "999", NOW), NOW);
+        service.acceptMessage("{\"stream\":\"btcusdt@trade\",\"data\":{\"e\":\"trade\",\"s\":\"BTCUSDT\",\"t\":101,\"p\":\"999\",\"q\":\"1\",\"T\":" + NOW.toEpochMilli() + "}}", NOW);
+        assertThat(observations).hasSize(100);
+        assertThat(observations.get(99).source()).isEqualTo("BINANCE_SPOT_AGG_TRADE");
+        assertThat(observations.get(99).tradeId()).isEqualTo(100);
+        assertThat(service.quote("BTCUSDT", NOW).orElseThrow().price()).isEqualByComparingTo("100");
+        assertThat(service.runtimeMetrics().coalescedPrices()).isEqualTo(99);
+    }
+
+    @Test
+    void existingDatabaseBarStillNotifiesThisInstanceOnce() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        when(mapper.upsertClosedBar(any())).thenReturn(0);
+        List<AssetCardMarketDataService.MarketUpdate> events = new ArrayList<>();
+        service.addListener(events::add);
+        service.acceptMessage(kline(true), NOW);
+        service.acceptMessage(kline(true), NOW);
+        assertThat(events).extracting(AssetCardMarketDataService.MarketUpdate::type).containsExactly("BAR");
+        verify(mapper, times(1)).upsertClosedBar(any());
+    }
+
+    @Test
+    void blockedBarPersistenceCannotBlockAggregateTradeOrDepthQueues() throws Exception {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var observed = new java.util.concurrent.CountDownLatch(1);
+        when(mapper.upsertClosedBar(any())).thenAnswer(call -> { entered.countDown(); release.await(3, java.util.concurrent.TimeUnit.SECONDS); return 1; });
+        service.addTradeListener(value -> observed.countDown());
+        try {
+            service.enqueueMessage(kline(true), NOW);
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            service.enqueueMessage(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", NOW), NOW);
+            service.enqueueMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
+            assertThat(observed.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(service.quote("BTCUSDT", NOW)).isPresent();
+        } finally { release.countDown(); }
+        assertThat(service.awaitQueues(Duration.ofSeconds(2))).isTrue();
+        assertThat(service.bufferedDepthEventCount("BTCUSDT")).isEqualTo(1);
+        assertThat(service.runtimeMetrics().barQueueDepth()).isZero();
+    }
+
+    @Test
+    void depthCoverageLossRebuildsOnlyRiskAndNeverDeletesRealPrice() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", NOW), NOW);
+        service.acceptMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
+        String narrow = "{\"lastUpdateId\":11,\"bids\":[[\"99.99\",\"2\"]],\"asks\":[[\"100.01\",\"2\"]]}";
+        service.acceptDepthSnapshot("BTCUSDT", narrow, NOW);
+        assertThat(service.book("BTCUSDT", NOW)).isEmpty();
+        assertThat(service.quote("BTCUSDT", NOW)).isPresent();
+        assertThat(service.runtimeMetrics().depthRecoveries()).isEqualTo(1);
+        service.acceptMessage(depth(13, 14, NOW.plusSeconds(1), "[]", "[]"), NOW.plusSeconds(1));
+        service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(13), NOW.plusSeconds(1));
+        assertThat(service.book("BTCUSDT", NOW.plusSeconds(1)).orElseThrow().coversBasisPoints(25)).isTrue();
+    }
+
+    @Test
+    void incrementalMembershipAndRolloverDoNotClearUnchangedQuotesOrBooks() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", NOW), NOW);
+        service.acceptMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
+        service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(11), NOW);
+        service.reconcileSubscriptions(List.of("BTCUSDT", "ETHUSDT"), List.of("ETHUSDT", "NOTAMEMBER"));
+        assertThat(service.depthBootstrapOrder()).containsExactly("ETHUSDT", "BTCUSDT");
+        assertThat(service.quote("BTCUSDT", NOW)).isPresent();
+        assertThat(service.book("BTCUSDT", NOW)).isPresent();
+        assertThat(service.streamUri(service.subscribedSymbols()).toString()).contains("@aggTrade").doesNotContain("@trade/");
+    }
+
+    @Test
+    void networkRequiresBothExplicitCardSwitchAndExistingProductionPolicy() {
+        var env = new org.springframework.mock.env.MockEnvironment();
+        try (var guarded = new AssetCardMarketDataService(properties, new ObjectMapper(), mapper, env)) {
+            properties.setEnabled(true);
+            assertThat(guarded.networkAllowed()).isFalse();
+            properties.setExternalCallsEnabled(true);
+            assertThat(guarded.networkAllowed()).isFalse();
+            env.setProperty("trade-model.provider-call.external-calls-enabled", "yes");
+            assertThat(guarded.networkAllowed()).isFalse();
+            env.setProperty("trade-model.provider-call.external-calls-enabled", "true");
+            assertThat(guarded.networkAllowed()).isTrue();
+            env.setActiveProfiles("prod");
+            assertThat(guarded.networkAllowed()).isFalse();
+            env.setProperty("trade-model.production.scheduler-policy", "EXPLICIT_OPT_IN");
+            env.setProperty("trade-model.schedulers.enabled", "true");
+            env.setProperty("trade-model.provider-call.enabled", "true");
+            assertThat(guarded.networkAllowed()).isTrue();
+            env.setProperty("trade-model.provider-call.external-calls-enabled", "false");
+            assertThat(guarded.networkAllowed()).isFalse();
+        }
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void retentionMustBeExplicitAndLongEnoughForMatureLabels() {
+        assertThat(properties.getBarRetention()).isEqualTo(Duration.ZERO);
+        assertThat(properties.getFeatureRetention()).isEqualTo(Duration.ZERO);
+        assertThat(properties.getTradeRetention()).isEqualTo(Duration.ZERO);
+        assertThat(properties.getLabelRetention()).isEqualTo(Duration.ZERO);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> properties.setTradeRetention(Duration.ofHours(4)))
+                .isInstanceOf(IllegalArgumentException.class);
+        properties.setTradeRetention(Duration.ofHours(5));
+        assertThat(properties.getTradeRetention()).isEqualTo(Duration.ofHours(5));
+    }
+
+    @Test
+    void unreadyOrFailedWriterCannotSuppressLocalClosedBarInference() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        service.setWriterReadiness(() -> false);
+        List<AssetCardMarketDataService.MarketUpdate> events = new ArrayList<>();
+        service.addListener(events::add);
+        service.acceptMessage(kline(true), NOW);
+        assertThat(events).extracting(AssetCardMarketDataService.MarketUpdate::type)
+                .containsExactly("PERSISTENCE_FAILURE", "BAR");
+        verify(mapper, never()).upsertClosedBar(any());
+    }
+
+    @Test
+    void observationBackpressureReportsGapButRetainsTheActualLatestPrice() throws Exception {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        List<AssetCardMarketDataService.MarketUpdate> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        service.addListener(events::add);
+        service.addTradeListener(value -> { entered.countDown(); try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); } });
+        try {
+            service.enqueueMessage(trade("btcusdt@aggTrade", "BTCUSDT", 1, "100", NOW), NOW);
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            for (int i = 2; i <= 2052; i++) service.enqueueMessage(trade("btcusdt@aggTrade", "BTCUSDT", i, "101", NOW), NOW);
+            assertThat(service.runtimeMetrics().tradeDrops()).isGreaterThan(0);
+            assertThat(service.runtimeMetrics().tradeQueueDepth()).isLessThanOrEqualTo(2048);
+            assertThat(events).anyMatch(event -> event.type().equals("OBSERVATION_GAP"));
+            assertThat(service.quote("BTCUSDT", NOW).orElseThrow().tradeId()).isEqualTo(2052);
+            assertThat(service.quote("BTCUSDT", NOW).orElseThrow().price()).isEqualByComparingTo("101");
+        } finally { release.countDown(); }
+        assertThat(service.awaitQueues(Duration.ofSeconds(3))).isTrue();
+    }
+
+    @Test
+    void replacementConnectionPreservesDataAndStaleCloseCannotInvalidateIt() {
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+        var first = mock(java.net.http.WebSocket.class);
+        var replacement = mock(java.net.http.WebSocket.class);
+        service.installConnection(first, java.util.Set.of("BTCUSDT"), NOW);
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", NOW), NOW);
+        service.acceptMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
+        service.acceptDepthSnapshot("BTCUSDT", depthSnapshot(11), NOW);
+        service.installConnection(replacement, java.util.Set.of("BTCUSDT"), NOW.plusSeconds(1));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "lost", first, java.util.Set.of("BTCUSDT"));
+        assertThat(service.quote("BTCUSDT", NOW.plusSeconds(1))).isPresent();
+        assertThat(service.book("BTCUSDT", NOW.plusSeconds(1))).isPresent();
+        verify(first).abort();
+        verifyNoInteractions(replacement, mapper);
+    }
+
+    @Test
+    void depthIpWeightFromAnotherCallerConstrainsOurReservationAndResetsAtTheMinute() {
+        service.observeIpWeight(1999, NOW);
+        assertThat(service.claimDepthBootstrapBudget("BTCUSDT", NOW.plusSeconds(1))).isFalse();
+        service.observeIpWeight(0, NOW.plusSeconds(2));
+        assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW.plusSeconds(3))).isFalse();
+        assertThat(service.claimDepthBootstrapBudget("BTCUSDT", NOW.plusSeconds(60))).isTrue();
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void incrementalSubscribeRequiresAckAndUnsubscribeDoesNotRebuildUnchangedBook() {
+        properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        var connection = mock(java.net.http.WebSocket.class);
+        when(connection.sendText(any(), eq(true))).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(connection));
+        service.installConnection(connection, java.util.Set.of("BTCUSDT"), NOW);
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", NOW), NOW);
+        service.reconcileSubscriptions(List.of("BTCUSDT", "ETHUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "reconcileConnection", NOW);
+        var message = org.mockito.ArgumentCaptor.forClass(CharSequence.class);
+        verify(connection).sendText(message.capture(), eq(true));
+        assertThat(message.getValue().toString()).contains("SUBSCRIBE", "ethusdt@aggTrade").doesNotContain("btcusdt@");
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(service, "connectionSymbols"))
+                .isEqualTo(java.util.Set.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "transportControl", "{\"id\":1,\"result\":null}", NOW);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(service, "connectionSymbols"))
+                .isEqualTo(java.util.Set.of("BTCUSDT", "ETHUSDT"));
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "reconcileConnection", NOW.plusSeconds(1));
+        verify(connection, times(2)).sendText(message.capture(), eq(true));
+        assertThat(message.getValue().toString()).contains("UNSUBSCRIBE", "ethusdt@aggTrade").doesNotContain("btcusdt@");
+        assertThat(service.quote("BTCUSDT", NOW)).isPresent();
+        verify(connection, never()).abort();
+    }
+
+    @Test
+    void lostConnectionHasBoundedBackoffAndCannotReplayDuplicateTradeObservations() {
+        properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        var connection = mock(java.net.http.WebSocket.class);
+        service.installConnection(connection, java.util.Set.of("BTCUSDT"), NOW);
+        List<AssetCardMarketDataService.SpotQuote> observed = new ArrayList<>();
+        service.addTradeListener(observed::add);
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", NOW), NOW);
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "lost", connection, java.util.Set.of("BTCUSDT"));
+        assertThat(service.quote("BTCUSDT", NOW)).isEmpty();
+        assertThat(service.runtimeMetrics().reconnects()).isEqualTo(1);
+        for (int i = 0; i < 20; i++) org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "connectionFailed", NOW);
+        assertThat(service.runtimeMetrics().reconnectAfter()).isEqualTo(NOW.plusSeconds(120));
+        service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", NOW), NOW);
+        assertThat(observed).hasSize(1);
+        assertThat(service.quote("BTCUSDT", NOW)).isEmpty();
+        verifyNoInteractions(mapper);
     }
 }

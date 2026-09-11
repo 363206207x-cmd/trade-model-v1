@@ -46,10 +46,26 @@ class AssetCardMapperIntegrationTest {
         long first = mapper.nextSnapshotVersion(symbol);
         long next = new AssetCardMapper(jdbc).nextSnapshotVersion(symbol);
         assertThat(next).isGreaterThan(first);
-        assertThat(mapper.saveSnapshot(symbol, next, "{\"truth\":2}", now)).isEqualTo(1);
-        assertThat(mapper.saveSnapshot(symbol, first, "{\"truth\":1}", now.minusSeconds(1))).isZero();
+        assertThat(mapper.saveSnapshot(symbol, 0, next, "{\"truth\":2}", now)).isEqualTo(1);
+        assertThat(mapper.saveSnapshot(symbol, 0, first, "{\"truth\":1}", now.minusSeconds(1))).isZero();
         assertThat(mapper.selectSnapshotJson(symbol)).isEqualTo("{\"truth\":2}");
-        assertThat(mapper.saveSnapshot(symbol, next + 20, "{}", now)).isZero();
+        assertThat(mapper.saveSnapshot(symbol, next, next + 20, "{}", now)).isZero();
+    }
+
+    @Test
+    void independentWritersMustNotOverwriteTheSameReadVersion() {
+        var secondWriter = new AssetCardMapper(jdbc);
+        long firstAllocated = mapper.nextSnapshotVersion(symbol);
+        long secondAllocated = secondWriter.nextSnapshotVersion(symbol);
+        // Both writers read snapshot version 0. A larger allocated number is
+        // not permission to replace another writer's committed atomic fields.
+        assertThat(mapper.saveSnapshot(symbol, 0, firstAllocated, "{\"signal\":\"LONG\"}", now)).isEqualTo(1);
+        assertThat(secondWriter.saveSnapshot(symbol, 0, secondAllocated, "{\"signal\":\"STALE\"}", now)).isZero();
+        assertThat(mapper.selectSnapshotJson(symbol)).isEqualTo("{\"signal\":\"LONG\"}");
+        long rebasedVersion = secondWriter.nextSnapshotVersion(symbol);
+        assertThat(secondWriter.saveSnapshot(symbol, firstAllocated, rebasedVersion,
+                "{\"signal\":\"SHORT\"}", now)).isEqualTo(1);
+        assertThat(mapper.selectSnapshotJson(symbol)).isEqualTo("{\"signal\":\"SHORT\"}");
     }
 
     @Test
@@ -86,6 +102,112 @@ class AssetCardMapperIntegrationTest {
         assertThat(mapper.selectFeatureHistory(symbol, now, now, now, 100)).isEmpty();
         assertThat(mapper.selectFeatureHistory(symbol, now, now, now.plusSeconds(2), 100))
                 .extracting(AssetCardMapper.FeatureHistory::payloadJson).containsExactly("{\"spread\":1}");
+    }
+
+    @Test
+    void inferenceIdentityNormalizesClosedBoundaryButNeverUsesProcessingTime() {
+        assertThat(mapper.saveInference(symbol, now, now.plusSeconds(2), "{\"status\":\"TIMEOUT\"}")).isEqualTo(1);
+        assertThat(mapper.saveInference(symbol, now.minusMillis(1), now.plusSeconds(4), "{\"status\":\"RECOMPUTED\"}")).isZero();
+        assertThat(mapper.selectInference(symbol, now, now)).isEmpty();
+        assertThat(mapper.selectInference(symbol, now.minusMillis(1), now.plusSeconds(2)).orElseThrow().payloadJson())
+                .isEqualTo("{\"status\":\"TIMEOUT\"}");
+        assertThat(mapper.saveInference(symbol, now.minusSeconds(300), now.plusSeconds(2), "{\"status\":\"OTHER_BAR\"}")).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.saveInference(symbol, now.plusSeconds(2), now.plusSeconds(2), "{}"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(mapper.selectFeatureHistory(symbol, now.minusSeconds(600), now, now.plusSeconds(5), 10)).isEmpty();
+    }
+
+    @Test
+    void concurrentInferenceWritersKeepOneImmutableResult() throws Exception {
+        var pool = Executors.newFixedThreadPool(4);
+        try {
+            var tasks = IntStream.range(0, 16).mapToObj(i -> (Callable<Integer>) () ->
+                    mapper.saveInference(symbol, now, now.plusSeconds(i), "{\"writer\":" + i + "}")).toList();
+            int inserted = 0;
+            for (var result : pool.invokeAll(tasks)) inserted += result.get();
+            assertThat(inserted).isEqualTo(1);
+            assertThat(mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.INFERENCE, now.minusSeconds(1), now,
+                    now.plusSeconds(20), 100)).hasSize(1);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test
+    void tradeIdentitySeparatesAggregateIdAndSourceVersionAndNeverOverwritesItsObservation() {
+        var quote = new org.example.trademodel.assetcard.AssetCardMarketDataService.SpotQuote("BTCUSDT",
+                BigDecimal.TEN, BigDecimal.ONE, 42, now, now.plusSeconds(1));
+        String instrument = "BINANCE:SPOT:NONE:BTC/USDT";
+        assertThat(mapper.saveTradeObservation(quote, instrument, "SPOT_V1", "{\"price\":10}")).isEqualTo(1);
+        assertThat(mapper.saveTradeObservation(quote, instrument, "SPOT_V1", "{\"price\":999}")).isZero();
+        assertThat(mapper.saveTradeObservation(quote, instrument, "SPOT_V2", "{\"price\":10}")).isEqualTo(1);
+        assertThat(mapper.selectHistory("BTCUSDT", AssetCardMapper.HistoryKind.TRADE, now, now, now, 100)).isEmpty();
+        assertThat(mapper.selectHistory("BTCUSDT", AssetCardMapper.HistoryKind.TRADE, now, now, now.plusSeconds(1), 100))
+                .extracting(AssetCardMapper.TypedHistory::payloadJson).containsOnly("{\"price\":10}").hasSize(2);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.saveTradeObservation(quote,
+                "BINANCE:SPOT:NONE:ETH/USDT", "SPOT_V1", "{}" )).isInstanceOf(IllegalArgumentException.class);
+        assertThat(mapper.selectFeatureHistory("BTCUSDT", now, now, now.plusSeconds(1), 100)).isEmpty();
+    }
+
+    @Test
+    void labelsBindSideVersionAndActualSignalTradeAndRequireMaturity() {
+        String instrument = "BINANCE:SPOT:NONE:BTC/USDT";
+        Instant mature = now.plusSeconds(14400);
+        assertThat(mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1", 42, "F2", "TP1_SL075_4H", "LONG", mature, "{\"label\":1}")).isEqualTo(1);
+        assertThat(mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1", 42, "F2", "TP1_SL075_4H", "LONG", mature.plusSeconds(1), "{\"label\":0}")).isZero();
+        assertThat(mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1", 42, "F2", "TP1_SL075_4H", "SHORT", mature, "{}")).isEqualTo(1);
+        assertThat(mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1", 43, "F2", "TP1_SL075_4H", "LONG", mature, "{}")).isEqualTo(1);
+        assertThat(mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1", 42, "F3", "TP1_SL075_4H", "LONG", mature, "{}")).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.saveLabel("BTCUSDT", now, instrument, "SPOT_V1",
+                44, "F2", "TP1_SL075_4H", "LONG", mature.minusSeconds(1), "{}")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(mapper.selectHistory("BTCUSDT", AssetCardMapper.HistoryKind.LABEL, now, now, mature.minusSeconds(1), 10)).isEmpty();
+        assertThat(mapper.selectHistory("BTCUSDT", AssetCardMapper.HistoryKind.LABEL, now, now, mature.plusSeconds(2), 10)).hasSize(4);
+    }
+
+    @Test
+    void writerPermissionInspectionIsReadOnlyAndH2IsNotProductionReadiness() {
+        assertThat(mapper.inspectWriterPermissions().writable()).isFalse();
+        assertThat(mapper.inspectWriterPermissions().reason()).isEqualTo("H2_TEST_ONLY_NOT_PRODUCTION_WRITER");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tm_asset_card_snapshot", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tm_asset_card_feature_history", Integer.class)).isZero();
+    }
+
+    @Test
+    void archivedHistoryCleanupRequiresExactConfirmedScopeAndNeverResetsSnapshotCounter() {
+        Instant old = now.minusSeconds(43200);
+        mapper.saveFeatureHistory(symbol, old, old.plusSeconds(1), "{\"archived\":1}");
+        mapper.saveFeatureHistory(symbol, old.plusSeconds(1), now.plusSeconds(1), "{\"lateArrival\":1}");
+        mapper.saveFeatureHistory("OTHERUSDT", old, old, "{\"other\":1}");
+        long version = mapper.nextSnapshotVersion(symbol);
+        mapper.saveSnapshot(symbol, 0, version, "{\"live\":1}", now);
+        var keys = mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.FEATURE, old, now, now.plusSeconds(2), 10)
+                .stream().map(AssetCardMapper.TypedHistory::recordKey).toList();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.pruneArchivedHistory(null, 10))
+                .isInstanceOf(IllegalArgumentException.class);
+        var confirmed = new AssetCardMapper.ArchiveConfirmation(symbol, AssetCardMapper.HistoryKind.FEATURE, keys,
+                old, now.minusSeconds(21600), now, "a".repeat(64), now);
+        assertThat(mapper.pruneArchivedHistory(confirmed, 1)).isEqualTo(1);
+        assertThat(mapper.pruneArchivedHistory(confirmed, 10)).isZero();
+        assertThat(mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.FEATURE, old, now, now.plusSeconds(2), 10))
+                .extracting(AssetCardMapper.TypedHistory::payloadJson).containsExactly("{\"lateArrival\":1}");
+        assertThat(mapper.selectFeatureHistory("OTHERUSDT", old, now, now, 10)).hasSize(1);
+        assertThat(mapper.selectSnapshotJson(symbol)).isEqualTo("{\"live\":1}");
+        assertThat(mapper.nextSnapshotVersion(symbol)).isGreaterThan(version);
+    }
+
+    @Test
+    void archivedBarsCleanupIsBoundedToConfirmedIntervalsAndAvailability() {
+        Instant old = now.minusSeconds(43200);
+        var bar = new SpotBar(symbol, "5m", old, old.plusSeconds(300).minusMillis(1), BigDecimal.ONE, BigDecimal.ONE,
+                BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, null, old.plusSeconds(300));
+        mapper.upsertClosedBar(bar);
+        var confirmed = new AssetCardMapper.BarArchiveConfirmation(symbol,
+                java.util.List.of(new AssetCardMapper.BarIdentity("1m", old)), old, now.minusSeconds(21600), now, "b".repeat(64), now);
+        assertThat(mapper.pruneArchivedBars(confirmed, 10)).isZero();
+        var exact = new AssetCardMapper.BarArchiveConfirmation(symbol,
+                java.util.List.of(new AssetCardMapper.BarIdentity("5m", old)), old, now.minusSeconds(21600), now, "b".repeat(64), now);
+        assertThat(mapper.pruneArchivedBars(exact, 10)).isEqualTo(1);
+        assertThat(mapper.selectClosedBars(symbol, "5m", now, 10)).isEmpty();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new AssetCardMapper.BarArchiveConfirmation(symbol,
+                exact.bars(), old, now.minusSeconds(21600), now, "", now)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

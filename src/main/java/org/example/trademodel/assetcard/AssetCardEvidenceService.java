@@ -51,14 +51,17 @@ public class AssetCardEvidenceService {
     }
 
     public record Fact(double value, String source, Instant observedAt, Instant availableAt, Instant expiresAt,
-                       String sourceVersion) {
+                       String sourceVersion, String instrument, String unit) {
+        public Fact(double value,String source,Instant observedAt,Instant availableAt,Instant expiresAt,String sourceVersion) {
+            this(value,source,observedAt,availableAt,expiresAt,sourceVersion,null,null);
+        }
         public boolean freshAt(Instant at) {
             return at != null && Double.isFinite(value) && source != null && !source.isBlank()
                     && observedAt != null && availableAt != null && expiresAt != null && !availableAt.isBefore(observedAt)
                     && !observedAt.isAfter(at) && !availableAt.isAfter(at) && !expiresAt.isBefore(at);
         }
         public AssetCardFeatureService.Observation observation() {
-            return new AssetCardFeatureService.Observation(value, source, observedAt, availableAt);
+            return new AssetCardFeatureService.Observation(value, source, observedAt, availableAt,instrument,sourceVersion,unit,expiresAt,null);
         }
     }
     public record EvidenceFrame(Map<String, Fact> facts, Map<String, String> missingReasons,
@@ -167,7 +170,7 @@ public class AssetCardEvidenceService {
         }
         var m = result.metadata();
         facts.put(key, new Fact(value.doubleValue(), "COINGLASS:" + m.datasetType() + ":" + fieldSource, m.providerDataTime(),
-                m.fetchTime(), m.expiresAt(), m.sourceVersion()));
+                m.fetchTime(), m.expiresAt(), m.sourceVersion(), m.canonicalInstrumentId().canonical(),AssetCardFeatureService.observationUnit(key)));
     }
 
     static boolean usable(ProviderSnapshotMetadata m, String symbol, Instant asOf) {

@@ -22,7 +22,8 @@ class V24AssetCardLiveSignalMigrationContractTest {
         assertThat(upper).contains("TM_ASSET_CARD_SNAPSHOT", "TM_ASSET_CARD_SPOT_BAR",
                 "TM_ASSET_CARD_FEATURE_HISTORY", "VERSION_COUNTER", "SNAPSHOT_VERSION",
                 "TIMESTAMP WITH TIME ZONE", "AVAILABLE_AT", "PRIMARY KEY (SYMBOL, INTERVAL_CODE, OPEN_TIME)",
-                "PRIMARY KEY (SYMBOL, SIGNAL_AS_OF)");
+                "RECORD_KIND", "RECORD_KEY", "PRIMARY KEY (SYMBOL, RECORD_KIND, RECORD_KEY)",
+                "'FEATURE'", "'INFERENCE'", "'TRADE'", "'LABEL'");
         assertThat(upper).doesNotContain("DELETE", "DROP ", "TRUNCATE", "ALTER ", "UPDATE ", "INSERT ",
                 "TM_USER_POSITION", "GRANT ", "REVOKE ", "SUPERUSER", "NEXTVAL", "CREATE SEQUENCE", "CREATE FUNCTION", "CREATE TRIGGER");
         assertThat(upper.split("CREATE TABLE IF NOT EXISTS", -1)).hasSize(4);
@@ -76,8 +77,8 @@ class V24AssetCardLiveSignalMigrationContractTest {
                 var asOf = java.time.Instant.parse("2026-09-10T12:00:00Z");
                 long first = mapper.nextSnapshotVersion(symbol), second = mapper.nextSnapshotVersion(symbol);
                 assertThat(second).isGreaterThan(first);
-                assertThat(mapper.saveSnapshot(symbol, second, "{\"version\":2}", asOf)).isEqualTo(1);
-                assertThat(mapper.saveSnapshot(symbol, first, "{\"version\":1}", asOf)).isZero();
+                assertThat(mapper.saveSnapshot(symbol, 0, second, "{\"version\":2}", asOf)).isEqualTo(1);
+                assertThat(mapper.saveSnapshot(symbol, 0, first, "{\"version\":1}", asOf)).isZero();
                 assertThat(mapper.selectSnapshotJson(symbol)).isEqualTo("{\"version\":2}");
                 var bar = new org.example.trademodel.assetcard.AssetCardMarketDataService.SpotBar(symbol, "5m",
                         asOf.minusSeconds(300), asOf.minusMillis(1), java.math.BigDecimal.ONE, java.math.BigDecimal.ONE,
@@ -90,6 +91,11 @@ class V24AssetCardLiveSignalMigrationContractTest {
                 assertThat(mapper.selectFeatureHistory(symbol, asOf, asOf, asOf, 10))
                         .extracting(org.example.trademodel.mapper.AssetCardMapper.FeatureHistory::payloadJson)
                         .containsExactly("{\"evidence\":1}");
+                assertThat(mapper.inspectWriterPermissions().writable()).isTrue();
+                assertThat(mapper.saveInference(symbol, asOf, asOf, "{\"status\":\"TIMEOUT\"}")).isEqualTo(1);
+                assertThat(mapper.saveInference(symbol, asOf.minusMillis(1), asOf.plusSeconds(1), "{\"status\":\"LATER\"}")).isZero();
+                assertThat(mapper.selectInference(symbol, asOf, asOf).orElseThrow().payloadJson())
+                        .isEqualTo("{\"status\":\"TIMEOUT\"}");
             }
         }
     }

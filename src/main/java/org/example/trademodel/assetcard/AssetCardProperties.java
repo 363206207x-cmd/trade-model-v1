@@ -12,6 +12,13 @@ import java.util.Set;
 public class AssetCardProperties {
     public enum ModelMode { LEGACY, SHADOW, CANARY, ACTIVE }
     private boolean enabled;
+    private boolean externalCallsEnabled;
+    private boolean writerEnabled;
+    private Duration barRetention = Duration.ZERO;
+    private Duration featureRetention = Duration.ZERO;
+    private Duration tradeRetention = Duration.ZERO;
+    private Duration labelRetention = Duration.ZERO;
+    private int depthWeightBudgetPerMinute = 2000;
     private ModelMode modelMode = ModelMode.SHADOW;
     private URI spotStreamBaseUri = URI.create("wss://stream.binance.com:9443/stream");
     private URI spotDepthSnapshotUri = URI.create("https://api.binance.com/api/v3/depth");
@@ -23,6 +30,29 @@ public class AssetCardProperties {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean value) { enabled = value; }
+    public boolean isExternalCallsEnabled() { return externalCallsEnabled; }
+    public void setExternalCallsEnabled(boolean value) { externalCallsEnabled = value; }
+    public boolean isWriterEnabled() { return writerEnabled; }
+    public void setWriterEnabled(boolean value) { writerEnabled = value; }
+    public Duration getBarRetention() { return barRetention; }
+    public void setBarRetention(Duration value) { barRetention = retention(value); }
+    public Duration getFeatureRetention() { return featureRetention; }
+    public void setFeatureRetention(Duration value) { featureRetention = retention(value); }
+    public Duration getTradeRetention() { return tradeRetention; }
+    public void setTradeRetention(Duration value) { tradeRetention = retention(value); }
+    public Duration getLabelRetention() { return labelRetention; }
+    public void setLabelRetention(Duration value) { labelRetention = retention(value); }
+    private static Duration retention(Duration value) {
+        if (value == null || value.isNegative() || !value.isZero() && value.compareTo(Duration.ofHours(5)) < 0)
+            throw new IllegalArgumentException("Card retention must be unconfigured (zero) or at least five hours");
+        return value;
+    }
+    public int getDepthWeightBudgetPerMinute() { return depthWeightBudgetPerMinute; }
+    public void setDepthWeightBudgetPerMinute(int value) {
+        if (value < 250 || value > 2000)
+            throw new IllegalArgumentException("Card depth budget must reserve 250..2000 IP weight per minute");
+        depthWeightBudgetPerMinute = value;
+    }
     public ModelMode getModelMode() { return modelMode; }
     public void setModelMode(ModelMode value) { modelMode = value == null ? ModelMode.SHADOW : value; }
     public URI getSpotStreamBaseUri() { return spotStreamBaseUri; }

@@ -79,6 +79,12 @@ class AssetCardEvidenceServiceTest {
         assertThat(read.facts().get("openInterest").source()).contains("fixture-oi-value");
         assertThat(read.facts().get("openInterestChange1h").source()).contains("fixture-oi-change");
         assertThat(read.observations(AT)).hasSize(6);
+        var observation=read.observations(AT).get("fundingRate");
+        assertThat(observation.instrument()).isEqualTo("BINANCE:PERPETUAL:LINEAR:BTC/USDT");
+        assertThat(observation.sourceVersion()).isEqualTo(read.facts().get("fundingRate").sourceVersion());
+        assertThat(observation.expiresAt()).isEqualTo(read.facts().get("fundingRate").expiresAt());
+        assertThat(observation.unit()).isEqualTo("RATE");
+        assertThat(AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",observation,AT)).isTrue();
         assertThat(read.observations(AT.plusSeconds(61))).isEmpty();
         verify(f.oi, never()).get(anyString(), any(), any(), anyString());
         verify(f.funding, never()).get(anyString(), any(), any(), anyString());

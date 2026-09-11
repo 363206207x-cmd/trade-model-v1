@@ -15,33 +15,95 @@ import itertools
 import json
 import math
 import pathlib
+import random
+import bisect
+import re
+from decimal import Decimal
 from datetime import datetime, timezone
 
-FEATURE_VERSION = "SPOT_CARD_FEATURES_V1"
+FEATURE_VERSION = "SPOT_CARD_FEATURES_V2_SIGNED_PIT"
+SPOT_SOURCE_VERSION = "BINANCE_SPOT_PUBLIC_V1"
 ATR_DEFINITION = "5m_TR_SMA14_FIXED_AT_SIGNAL"
 XGBOOST_VERSION = "2.1.4"
 INTERVALS = {"5m":300,"15m":900,"1h":3600,"4h":14400}
 BAR_FEATURES = ["momentum6","atrRelative","volatility12","volumeRatio","slope12",
                 "centerDistanceAtr","rangePosition","takerBuyFraction","tradeCount"]
 EVIDENCE_FEATURES = ["spreadBps","depth10Bps","depth25Bps","bookImbalance","openInterest",
-                     "fundingRate","longShortRatio","longLiquidation","shortLiquidation","takerBuySellRatio"]
+                     "fundingRate","longShortRatio","longLiquidation","shortLiquidation"]
 FEATURE_NAMES = [f"{interval}.{feature}" for interval in INTERVALS for feature in BAR_FEATURES] + EVIDENCE_FEATURES
 HORIZON = 14400
 EPSILON = 1e-7  # numeric endpoint protection, not a strength or release threshold
+UNITS={**dict.fromkeys(("spotPrice","openInterest","longLiquidation","shortLiquidation","depth10Bps","depth25Bps"),"QUOTE_CURRENCY"),
+       "fundingRate":"RATE","openInterestChange1h":"PERCENT","crowdingOpenInterestChange1h":"PERCENT",
+       **dict.fromkeys(("longShortRatio","bookImbalance","liquidationImbalance","timeframeConflict"),"RATIO"),
+       "logLongShortRatio":"LOG_RATIO","spreadBps":"BASIS_POINTS",
+       **dict.fromkeys(("volatility1m","volatility5m"),"LOG_RETURN_STD"),
+       **dict.fromkeys(("return1m","return5m","priceReturn1h"),"LOG_RETURN"),
+       **dict.fromkeys(("structuralCenterDistanceAtr","extensionAtr","slope5m","slope1h","slope4h"),"ATR_MULTIPLE")}
+DERIVATIVES={"openInterest","fundingRate","longShortRatio","longLiquidation","shortLiquidation","openInterestChange1h","logLongShortRatio","liquidationImbalance","crowdingOpenInterestChange1h"}
+_DIRECTIONAL_RISK={"structuralCenterDistanceAtr","extensionAtr","return1m","return5m","volatility1m","volatility5m",
+                   "slope5m","slope1h","slope4h","fundingRate","logLongShortRatio","crowdingOpenInterestChange1h",
+                   "liquidationImbalance","spreadBps","depth10Bps","depth25Bps","bookImbalance"}
+RISK_REQUIRED={"LONG":_DIRECTIONAL_RISK|{"longLiquidation"},"SHORT":_DIRECTIONAL_RISK|{"shortLiquidation"},
+               "NON_DIRECTIONAL":{"volatility1m","volatility5m","spreadBps","depth10Bps","depth25Bps"}}
+
+
+def instrument(symbol,derivative=False):
+    import re
+    if not isinstance(symbol,str) or not re.fullmatch(r"[A-Z0-9]{2,15}USDT",symbol): return None
+    return "BINANCE:"+("PERPETUAL:LINEAR:" if derivative else "SPOT:NONE:")+symbol[:-4]+"/USDT"
+
+
+def valid_observation(symbol,key,o,at):
+    try:
+        if not isinstance(o,dict) or not finite(o.get("value")) or not isinstance(o.get("source"),str): return False
+        if not isinstance(o.get("sourceVersion"),str) or not o["sourceVersion"].strip() or o["sourceVersion"] in ("UNKNOWN","UNVERIFIED"): return False
+        if key not in UNITS or o.get("unit")!=UNITS[key] or instrument(symbol,key in DERIVATIVES) is None or o.get("instrument")!=instrument(symbol,key in DERIVATIVES): return False
+        if key in DERIVATIVES:
+            dataset="COINGLASS_FUNDING" if key=="fundingRate" else "COINGLASS_LONG_SHORT_RATIO" if key in ("longShortRatio","logLongShortRatio") else "COINGLASS_LIQUIDATION" if key in ("longLiquidation","shortLiquidation","liquidationImbalance") else "COINGLASS_OPEN_INTEREST"
+            if not o["source"].startswith("COINGLASS:"+dataset+":"): return False
+        elif o["source"] not in ("BINANCE_SPOT","BINANCE_SPOT_AGG_TRADE","BINANCE_SPOT_TRADE","BINANCE_SPOT_DIFF_DEPTH","BINANCE_SPOT_STRUCTURE_AND_TRADE","BINANCE_SPOT_CLOSED_1M","BINANCE_SPOT_CLOSED_5M","BINANCE_SPOT_CLOSED_15M","BINANCE_SPOT_CLOSED_1H","BINANCE_SPOT_CLOSED_4H","BINANCE_SPOT_CLOSED_5M_1H_4H"): return False
+        observed,available,expiry=(timestamp(o[k]) for k in ("observedAt","availableAt","expiresAt"))
+        if not observed<=available<=at<=expiry: return False
+        if key=="spotPrice": return o["value"]>0 and isinstance(o.get("observationId"),str) and bool(o["observationId"].strip())
+        if key in ("spreadBps","depth10Bps","depth25Bps","openInterest","longLiquidation","shortLiquidation","volatility1m","volatility5m"): return o["value"]>=0
+        if key in ("bookImbalance","liquidationImbalance"): return -1<=o["value"]<=1
+        if key=="timeframeConflict": return 0<=o["value"]<=1
+        return key!="longShortRatio" or o["value"]>0
+    except (KeyError,TypeError,ValueError): return False
 
 
 def timestamp(value):
-    if isinstance(value, (int,float)) and math.isfinite(value):
-        return float(value)
+    if isinstance(value, (int,float,Decimal)) and not isinstance(value,bool) and math.isfinite(value):
+        result=Decimal(str(value))
+        if result*1_000_000_000!=(result*1_000_000_000).to_integral_value(): raise ValueError("Nanosecond timestamp precision exceeded")
+        return result
     if isinstance(value,str):
         result=datetime.fromisoformat(value.replace("Z","+00:00"))
         if result.tzinfo is None: raise ValueError("UTC/offset timestamp required")
-        return result.timestamp()
+        fraction=re.search(r"\.(\d+)(?:Z|[+-]\d\d:\d\d)$",value)
+        if fraction and len(fraction.group(1))>9: raise ValueError("Nanosecond timestamp precision exceeded")
+        return Decimal(int(result.replace(microsecond=0).timestamp()))+(Decimal("0."+fraction.group(1)) if fraction else Decimal(0))
     raise ValueError("Missing real timestamp")
 
 
 def instant(value):
-    return datetime.fromtimestamp(value,timezone.utc).isoformat().replace("+00:00","Z")
+    value=timestamp(value); seconds=math.floor(value); nanos=int((value-seconds)*1_000_000_000)
+    return datetime.fromtimestamp(seconds,timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")+("."+f"{nanos:09d}".rstrip("0") if nanos else "")+"Z"
+
+
+def decode_json(text):
+    times={"at","asOf","openTime","closeTime","observedAt","availableAt","expiresAt","signalAsOf","capturedAt","trainEnd","calibrationEnd","validationEnd","testEnd","trainedThrough","validatedThrough","validUntil"}
+    def normalize(value,key=None):
+        if isinstance(value,dict): return {k:normalize(v,k) for k,v in value.items()}
+        if isinstance(value,list): return [normalize(v) for v in value]
+        return value if not isinstance(value,Decimal) or key in times else float(value)
+    return normalize(json.loads(text,parse_float=Decimal))
+
+
+def json_default(value):
+    if isinstance(value,Decimal): return instant(value)
+    raise TypeError("Unsupported artifact value: "+type(value).__name__)
 
 
 def finite(value):
@@ -64,12 +126,12 @@ def valid_bars(values, interval, as_of):
     for bar in values:
         try:
             opened,closed,available=(timestamp(bar[k]) for k in ("openTime","closeTime","availableAt"))
-            if closed>as_of or available>as_of or available<closed or not opened<closed or abs(closed-opened-INTERVALS[interval])>.00101: return []
+            if closed>as_of or available>as_of or available<closed or not opened<closed or abs(closed-opened-INTERVALS[interval])>Decimal(".001"): return []
             if any(not finite(bar.get(k)) for k in ("open","high","low","close","volume")): return []
             if bar["low"]<=0 or bar["high"]<max(bar["open"],bar["close"]) or bar["low"]>min(bar["open"],bar["close"]) or bar["volume"]<0: return []
             if bar.get("takerBuyBaseVolume") is not None and (not finite(bar["takerBuyBaseVolume"]) or not 0<=bar["takerBuyBaseVolume"]<=bar["volume"]): return []
-            if bar.get("tradeCount") is not None and (not finite(bar["tradeCount"]) or bar["tradeCount"]<0): return []
-            if previous is not None and abs(opened-previous-INTERVALS[interval])>1e-6: return []
+            if bar.get("tradeCount") is not None and (type(bar["tradeCount"]) is not int or bar["tradeCount"]<0): return []
+            if previous is not None and opened!=previous+INTERVALS[interval]: return []
             previous=opened
         except (KeyError,TypeError,ValueError): return []
     if as_of-timestamp(values[-1]["closeTime"])>INTERVALS[interval]+15: return []
@@ -108,8 +170,8 @@ def build_frame(raw):
     for key,observation in raw.get("evidence",{}).items():
         try:
             observed_at=timestamp(observation["observedAt"]); available_at=timestamp(observation["availableAt"])
-            if not finite(observation.get("value")) or not observation.get("source") or not observed_at<=available_at<=as_of: raise ValueError()
-            observations[key]=observation; available.append(available_at)
+            if not valid_observation(symbol,key,observation,as_of): raise ValueError()
+            observations[key]={**observation,**{k:instant(timestamp(observation[k])) for k in ("observedAt","availableAt","expiresAt")}}; available.append(available_at)
         except (KeyError,TypeError,ValueError): reasons.append("FUTURE_OR_INVALID_EVIDENCE:"+key)
     vector.extend(observations[k]["value"] if k in observations else None for k in EVIDENCE_FEATURES)
     for key in ("spreadBps","depth10Bps","depth25Bps"):
@@ -123,30 +185,40 @@ def build_frame(raw):
         alignment=values["1h"][1][0]*values["4h"][1][4]
         one="CONFLICT" if alignment<0 else "OPPORTUNITY" if alignment>0 else "OBSERVATION"
     if five and atr is not None and atr>0:
-        derived={"source":"BINANCE_SPOT_CLOSED_5M","observedAt":five[0][-1]["closeTime"],"availableAt":instant(max(timestamp(b["availableAt"]) for b in five[0]))}
+        derived={"source":"BINANCE_SPOT_CLOSED_5M","observedAt":instant(timestamp(five[0][-1]["closeTime"])),"availableAt":instant(max(timestamp(b["availableAt"]) for b in five[0])),
+                 "instrument":instrument(symbol),"sourceVersion":SPOT_SOURCE_VERSION,"expiresAt":instant(timestamp(five[0][-1]["closeTime"])+315),"observationId":None}
         center=(five[3]+five[4])/2; price=five[0][-1]["close"]
-        observations["structuralCenterDistanceAtr"]={**derived,"value":abs(price-center)/atr}
-        observations["extensionAtr"]={**derived,"value":max(0,price-five[4],five[3]-price)/atr}
-        observations["volatility5m"]={**derived,"value":five[1][2]}
-    for source_key,target_key in (("fundingRate","absFundingRate"),("bookImbalance","absBookImbalance"),("openInterestChange1h","absOpenInterestChange1h")):
-        if source_key in observations: observations[target_key]={**observations[source_key],"value":abs(observations[source_key]["value"])}
+        observations["structuralCenterDistanceAtr"]={**derived,"value":(price-center)/atr,"unit":"ATR_MULTIPLE"}
+        observations["extensionAtr"]={**derived,"value":(price-five[4] if price>five[4] else price-five[3] if price<five[3] else 0)/atr,"unit":"ATR_MULTIPLE"}
+        observations["volatility5m"]={**derived,"value":five[1][2],"unit":"LOG_RETURN_STD"}
+        observations["return5m"]={**derived,"value":math.log(price/five[0][-2]["close"]),"unit":"LOG_RETURN"}
     if "longShortRatio" in observations and observations["longShortRatio"]["value"]>0:
-        observations["absLogLongShortRatio"]={**observations["longShortRatio"],"value":abs(math.log(observations["longShortRatio"]["value"]))}
+        observations["logLongShortRatio"]={**observations["longShortRatio"],"value":math.log(observations["longShortRatio"]["value"]),"unit":"LOG_RATIO"}
     if "longLiquidation" in observations and "shortLiquidation" in observations:
         long,short=observations["longLiquidation"],observations["shortLiquidation"]
-        if long["value"]>=0 and short["value"]>=0:
+        if long["value"]>=0 and short["value"]>=0 and long["instrument"]==short["instrument"] and long["sourceVersion"]==short["sourceVersion"]:
             total=long["value"]+short["value"]
-            observations["absLiquidationImbalance"]={"value":abs(long["value"]-short["value"])/total if total>0 else 0,
+            observations["liquidationImbalance"]={"value":(long["value"]-short["value"])/total if total>0 else 0,
                 "source":long["source"]+"+"+short["source"],"observedAt":instant(max(timestamp(long["observedAt"]),timestamp(short["observedAt"]))),
-                "availableAt":instant(max(timestamp(long["availableAt"]),timestamp(short["availableAt"])))}
+                "availableAt":instant(max(timestamp(long["availableAt"]),timestamp(short["availableAt"]))),"instrument":long["instrument"],
+                "sourceVersion":long["sourceVersion"],"unit":"RATIO","expiresAt":instant(min(timestamp(long["expiresAt"]),timestamp(short["expiresAt"]))),"observationId":None}
+    for interval in ("5m","1h","4h"):
+        if interval in values and values[interval][1][4] is not None:
+            bars=values[interval][0]; closed=instant(timestamp(bars[-1]["closeTime"]))
+            derived={"source":"BINANCE_SPOT_CLOSED_"+interval.upper(),"instrument":instrument(symbol),"sourceVersion":SPOT_SOURCE_VERSION,
+                     "observedAt":closed,"availableAt":instant(max(timestamp(b["availableAt"]) for b in bars)),"expiresAt":instant(timestamp(closed)+INTERVALS[interval]+15),"observationId":None}
+            observations["slope"+interval]={**derived,"unit":"ATR_MULTIPLE","value":values[interval][1][4]}
+            if interval=="1h": observations["priceReturn1h"]={**derived,"unit":"LOG_RETURN","value":math.log(bars[-1]["close"]/bars[-2]["close"])}
     conflict_intervals=("5m","1h","4h")
     if all(interval in values and values[interval][1][4] is not None for interval in conflict_intervals):
         slopes=[values[interval][1][4] for interval in conflict_intervals]
         opposite=sum(1 for i in range(3) for j in range(i+1,3) if (slopes[i]<0<slopes[j]) or (slopes[j]<0<slopes[i]))
         observations["timeframeConflict"]={"value":opposite/3,"source":"BINANCE_SPOT_CLOSED_5M_1H_4H",
             "observedAt":instant(max(timestamp(values[interval][0][-1]["closeTime"]) for interval in conflict_intervals)),
-            "availableAt":instant(max(timestamp(bar["availableAt"]) for interval in conflict_intervals for bar in values[interval][0]))}
-    return {"symbol":symbol,"closed5mAt":five[0][-1]["closeTime"] if five else None,
+            "availableAt":instant(max(timestamp(bar["availableAt"]) for interval in conflict_intervals for bar in values[interval][0])),
+            "instrument":instrument(symbol),"sourceVersion":SPOT_SOURCE_VERSION,"unit":"RATIO","observationId":None,
+            "expiresAt":instant(max(timestamp(values[interval][0][-1]["closeTime"]) for interval in conflict_intervals)+315)}
+    return {"symbol":symbol,"closed5mAt":instant(timestamp(five[0][-1]["closeTime"])) if five else None,
             "signalAsOf":instant(as_of),"availableAt":instant(max(available)) if available else None,
             "featureVersion":FEATURE_VERSION,"featureNames":FEATURE_NAMES,"vector":vector,
             "ready":len(values)==4 and atr is not None and atr>0 and not any(x.startswith("MISSING_OR_INVALID_CORE_EVIDENCE") for x in reasons),
@@ -160,7 +232,7 @@ def contiguous(bars, start, count, step):
     for i,bar in enumerate(bars):
         if any(not finite(bar.get(k)) for k in ("open","high","low","close")): return False
         if bar["low"]<=0 or bar["high"]<max(bar["open"],bar["close"]) or bar["low"]>min(bar["open"],bar["close"]): return False
-        if abs(timestamp(bar["openTime"])-(start+i*step))>1e-6 or abs(timestamp(bar["closeTime"])-(start+(i+1)*step))>.00101: return False
+        if timestamp(bar["openTime"])!=start+i*step or abs(timestamp(bar["closeTime"])-(start+(i+1)*step))>Decimal(".001"): return False
     return True
 
 
@@ -208,13 +280,32 @@ def validate_provenance(provenance):
     if provenance["source"]!="BINANCE_SPOT" or provenance["availabilityBasis"]!="RECORDED_AT_INGESTION":
         raise ValueError("Spot lineage and original recorded availability are mandatory; no current snapshot backfill")
     timestamp(provenance["capturedAt"])
+    sources=provenance.get("sources")
+    if not isinstance(sources,list) or not sources: raise ValueError("Explicit Spot and CoinGlass source identities required")
+    for source in sources:
+        if any(not isinstance(source.get(k),str) or not source[k].strip() for k in ("provider","source","sourceVersion","instrument","unit")) or source["sourceVersion"] in ("UNKNOWN","UNVERIFIED"):
+            raise ValueError("Incomplete historical source identity")
+    if not {"BINANCE_SPOT","COINGLASS"}.issubset({s["provider"] for s in sources}): raise ValueError("Spot and CoinGlass provenance must be separate")
+
+
+def registered_observation(o,provenance):
+    return any(all(o.get(k)==source.get(k) for k in ("source","sourceVersion","instrument","unit")) for source in provenance["sources"])
+
+
+def future_bar_valid(bar,symbol,captured_at,provenance):
+    try:
+        return (instrument(symbol) is not None and bar.get("instrument")==instrument(symbol) and bar.get("source") in ("BINANCE_SPOT","BINANCE_SPOT_CLOSED_1M","BINANCE_SPOT_CLOSED_5M")
+                and isinstance(bar.get("sourceVersion"),str) and bool(bar["sourceVersion"].strip()) and bar["sourceVersion"] not in ("UNKNOWN","UNVERIFIED")
+                and bar.get("unit")=="OHLCV" and registered_observation(bar,provenance)
+                and timestamp(bar["closeTime"])<=timestamp(bar["availableAt"])<=captured_at)
+    except (KeyError,TypeError,ValueError): return False
 
 
 def sha256(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def read_dataset(manifest_path):
-    path=pathlib.Path(manifest_path).resolve(); manifest=json.loads(path.read_text())
+    path=pathlib.Path(manifest_path).resolve(); manifest=decode_json(path.read_text())
     validate_provenance(manifest["provenance"])
     records=[]
     if not manifest.get("files"): raise ValueError("No explicit historical files; actual sample count UNKNOWN")
@@ -224,8 +315,9 @@ def read_dataset(manifest_path):
         if sha256(data_path)!=descriptor["sha256"]: raise ValueError("Historical file checksum mismatch")
         for line in data_path.read_text().splitlines():
             if line.strip():
-                record=json.loads(line); validate_provenance(record["provenance"])
+                record=decode_json(line); validate_provenance(record["provenance"])
                 if record["provenance"]["datasetVersion"]!=manifest["provenance"]["datasetVersion"]: raise ValueError("Mixed dataset versions")
+                if any(source not in manifest["provenance"]["sources"] for source in record["provenance"]["sources"]): raise ValueError("Record expands the manifest source identity allowlist")
                 if "vector" in record or "features" in record or "currentSnapshot" in record: raise ValueError("Features must be rebuilt from genuine raw point-in-time inputs")
                 records.append(record)
     return manifest,records
@@ -245,14 +337,17 @@ def prepare_records(records, policy):
         first=math.floor(timestamp(frame["signalAsOf"])/300)*300
         future=[b for b in record.get("future5m",[]) if first<=timestamp(b["openTime"])<end]
         captured_at=timestamp(record["provenance"]["capturedAt"])
-        if not future or any(timestamp(b["closeTime"])>captured_at for b in future):
+        if not future or any(not future_bar_valid(b,frame["symbol"],captured_at,record["provenance"]) for b in future):
             excluded["UNCLOSED_OR_UNCAPTURED_FUTURE"]=excluded.get("UNCLOSED_OR_UNCAPTURED_FUTURE",0)+1; continue
-        if any(timestamp(b["closeTime"])>captured_at for b in record.get("future1m",[])):
+        if any(not future_bar_valid(b,frame["symbol"],captured_at,record["provenance"]) for b in record.get("future1m",[])):
             excluded["UNCLOSED_OR_UNCAPTURED_FUTURE"]=excluded.get("UNCLOSED_OR_UNCAPTURED_FUTURE",0)+1; continue
         # An actual Spot trade at the signal cutoff is required. A stale close cannot be an invented entry.
         price=frame["realInputs"].get("spotPrice")
-        if price is None or price["source"]!="BINANCE_SPOT" or timestamp(frame["signalAsOf"])-timestamp(price["observedAt"])>policy["maxSignalTradeAgeSeconds"]:
+        if price is None or not price["source"].startswith("BINANCE_SPOT") or not registered_observation(price,record["provenance"]) or timestamp(frame["signalAsOf"])-timestamp(price["observedAt"])>policy["maxSignalTradeAgeSeconds"]:
             excluded["MISSING_SIGNAL_TRADE"]=excluded.get("MISSING_SIGNAL_TRADE",0)+1; continue
+        original=record["rawFrame"].get("evidence",{})
+        if any(not registered_observation(o,record["provenance"]) for key,o in original.items() if key in frame["realInputs"]):
+            excluded["UNREGISTERED_OBSERVATION_IDENTITY"]=excluded.get("UNREGISTERED_OBSERVATION_IDENTITY",0)+1; continue
         labels={}; returns={}; reject=None
         for side in ("LONG","SHORT"):
             label,reason=first_touch(price["value"],frame["atr"],frame["signalAsOf"],record.get("future5m",[]),record.get("future1m",[]),side)
@@ -261,9 +356,9 @@ def prepare_records(records, policy):
             if reason=="TIMEOUT":
                 horizon=record.get("horizonTrade")
                 try:
-                    if horizon is None or horizon.get("source")!="BINANCE_SPOT" or not finite(horizon.get("value")) or horizon["value"]<=0: raise ValueError()
+                    if not valid_observation(frame["symbol"],"spotPrice",horizon,end) or not registered_observation(horizon,record["provenance"]): raise ValueError()
                     observed,available=timestamp(horizon["observedAt"]),timestamp(horizon["availableAt"])
-                    if not end-policy["maxSignalTradeAgeSeconds"]<=observed<=available<=end: raise ValueError()
+                    if not end-Decimal(str(policy["maxSignalTradeAgeSeconds"]))<=observed<=available<=end: raise ValueError()
                 except (KeyError,TypeError,ValueError): reject="MISSING_POINT_IN_TIME_HORIZON_TRADE"; break
                 gross=(horizon["value"]-price["value"])/price["value"]*(1 if side=="LONG" else -1)
             else: gross=frame["atr"]/price["value"] if reason=="TARGET" else -.75*frame["atr"]/price["value"]
@@ -276,7 +371,7 @@ def prepare_records(records, policy):
         prepared.append({"symbol":frame["symbol"],"signalAsOf":timestamp(frame["signalAsOf"]),
                          "labelEnd":timestamp(frame["signalAsOf"])+HORIZON,"vector":frame["vector"],
                          "labels":labels,"netReturns":returns,"regime":frame["fourHourTrend"],"volatility":bucket,
-                         "realInputs":frame["realInputs"],"frame":frame})
+                         "realInputs":frame["realInputs"],"frame":frame,"missingPattern":missing_pattern(frame["vector"])})
     return sorted(prepared,key=lambda r:(r["signalAsOf"],r["symbol"])),excluded
 
 
@@ -293,6 +388,66 @@ def temporal_split(rows, boundaries):
     return parts
 
 
+def overlap_effective_samples(rows):
+    """Sum of average label uniqueness for fixed 4h intervals, across simultaneous assets.
+    For equal horizons this equals union duration / horizon; repeated rows cannot
+    manufacture independent samples. Adjacent nonoverlapping intervals each count once.
+    """
+    intervals=sorted((timestamp(r["signalAsOf"]),timestamp(r["labelEnd"])) for r in rows)
+    total=0; end=None
+    for start,stop in intervals:
+        if not math.isclose(stop-start,HORIZON,abs_tol=.001): raise ValueError("Invalid four-hour label identity")
+        total+=max(0,stop-max(start,end if end is not None else start))
+        end=stop if end is None else max(end,stop)
+    return float(total/HORIZON)
+
+
+def missing_pattern(vector):
+    return "".join("1" if v is None else "0" for v in vector)
+
+
+def population(rows,side):
+    positive=sum(r["labels"][side] for r in rows)
+    return {"count":len(rows),"positive":positive,"negative":len(rows)-positive,"effectiveSamples":overlap_effective_samples(rows)}
+
+
+def population_pass(value,policy):
+    return (value["positive"]>=policy["minPositiveSamples"] and value["negative"]>=policy["minNegativeSamples"]
+            and value["positive"]+value["negative"]==value["count"] and policy["minEffectiveSamples"]<=value["effectiveSamples"]<=value["count"])
+
+
+def time_block_intervals(rows,labels,probabilities,base_rate,policy):
+    """Deterministic non-overlapping temporal block bootstrap. Never iid-row bootstrap."""
+    blocks={}
+    for i,row in enumerate(rows):
+        block=math.floor(row["signalAsOf"]/policy["timeBlockSeconds"])
+        # Purge labels crossing a bootstrap block boundary; adjacent resampled blocks then share no 4h outcomes.
+        if row["labelEnd"]<=(block+1)*policy["timeBlockSeconds"]: blocks.setdefault(block,[]).append(i)
+    ordered=[blocks[k] for k in sorted(blocks)]
+    if len(ordered)<policy["minTimeBlocks"]: return {"blockCount":len(ordered),"intervals":{}}
+    rng=random.Random(policy["bootstrapSeed"]); samples={k:[] for k in ("brier","ece","logLoss","hitRate")}
+    for _ in range(policy["ciReplicates"]):
+        indices=[i for _ in ordered for i in ordered[rng.randrange(len(ordered))]]
+        m=metrics([labels[i] for i in indices],[probabilities[i] for i in indices],base_rate,policy["binCount"])
+        for key in samples: samples[key].append(m[key])
+    alpha=(1-policy["ciConfidence"])/2
+    def quantile(values,q):
+        values=sorted(values); position=(len(values)-1)*q; lo=math.floor(position); hi=math.ceil(position)
+        return values[lo]+(values[hi]-values[lo])*(position-lo)
+    return {"blockCount":len(ordered),"blockSeconds":policy["timeBlockSeconds"],"replicates":policy["ciReplicates"],
+            "confidence":policy["ciConfidence"],"intervals":{k:{"lower":quantile(v,alpha),"upper":quantile(v,1-alpha)} for k,v in samples.items()}}
+
+
+def uncertainty_pass(value,policy):
+    try:
+        if value["blockCount"]<policy["minTimeBlocks"] or value["blockSeconds"]!=policy["timeBlockSeconds"] or value["replicates"]!=policy["ciReplicates"] or value["confidence"]!=policy["ciConfidence"]: return False
+        for key in ("brier","ece","logLoss","hitRate"):
+            interval=value["intervals"][key]
+            if not 0<=interval["lower"]<=interval["upper"] or interval["upper"]-interval["lower"]>policy["max"+key[0].upper()+key[1:]+"CiWidth"]: return False
+        return True
+    except (KeyError,TypeError,ValueError): return False
+
+
 def metrics(labels, probabilities, base_rate, bin_count):
     if not labels or len(labels)!=len(probabilities) or not 0<=base_rate<=1 or bin_count<2: raise ValueError("Real nonempty validation predictions required")
     if any(y not in (0,1) for y in labels) or any(not finite(p) or not 0<=p<=1 for p in probabilities): raise ValueError("Invalid binary labels/probabilities")
@@ -307,6 +462,7 @@ def metrics(labels, probabilities, base_rate, bin_count):
             "baseBrier":sum((base_rate-y)**2 for y in labels)/n,
             "ece":sum(b["count"]*abs(b["meanProbability"]-b["observedRate"]) for b in bins if b["count"])/n,
             "logLoss":-sum(y*math.log(max(EPSILON,p))+(1-y)*math.log(max(EPSILON,1-p)) for y,p in zip(labels,probabilities))/n,
+            "hitRate":sum(labels)/n,"positive":sum(labels),"negative":n-sum(labels),
             "probabilityMin":min(probabilities),"probabilityMax":max(probabilities),"bins":bins}
 
 
@@ -365,16 +521,44 @@ def evaluate(rows,raw,calibrated,base_rates,thresholds,policy):
     report={"sides":{},"strata":{},"tiers":tier_evidence(rows,calibrated["LONG"],calibrated["SHORT"],thresholds)}
     for side in ("LONG","SHORT"):
         labels=[r["labels"][side] for r in rows]
-        report["sides"][side]={"raw":metrics(labels,raw[side],base_rates[side],policy["binCount"]),
-                              "calibrated":metrics(labels,calibrated[side],base_rates[side],policy["binCount"])}
+        report["sides"][side]=metric_evidence(rows,side,raw[side],calibrated[side],base_rates[side],policy)
         for field,expected in (("symbol",policy["requiredAssets"]),("regime",policy["requiredRegimes"]),("volatility",policy["requiredVolatilityStrata"])):
             for value in expected:
                 indices=[i for i,r in enumerate(rows) if r[field]==value]
                 key=side+":"+field+":"+value
-                report["strata"][key]={"count":0} if not indices else {
-                    "raw":metrics([labels[i] for i in indices],[raw[side][i] for i in indices],base_rates[side],policy["binCount"]),
-                    "calibrated":metrics([labels[i] for i in indices],[calibrated[side][i] for i in indices],base_rates[side],policy["binCount"])}
+                report["strata"][key]={"count":0} if not indices else metric_evidence([rows[i] for i in indices],side,[raw[side][i] for i in indices],[calibrated[side][i] for i in indices],base_rates[side],policy)
+    report["nonDirectional"]=nondirectional_evidence(rows,calibrated["LONG"],calibrated["SHORT"],thresholds,policy)
     return report
+
+
+def metric_evidence(rows,side,raw,calibrated,base,policy):
+    labels=[r["labels"][side] for r in rows]
+    return {"raw":metrics(labels,raw,base,policy["binCount"]),"calibrated":metrics(labels,calibrated,base,policy["binCount"]),
+            "population":population(rows,side),"uncertainty":time_block_intervals(rows,labels,calibrated,base,policy)}
+
+
+def nondirectional_evidence(rows,longs,shorts,thresholds,policy):
+    result={}; blocks={math.floor(r["signalAsOf"]/policy["timeBlockSeconds"]) for r in rows}
+    for state in ("RANGE","WATCH"):
+        indices=[]
+        for i,row in enumerate(rows):
+            if tier_name(longs[i],shorts[i],thresholds) or tier_name(shorts[i],longs[i],thresholds): continue
+            is_range=abs(longs[i]-shorts[i])<=thresholds["rangeMaxGap"] and max(longs[i],shorts[i])<=thresholds["rangeMaxProbability"] and row["regime"]=="RANGE"
+            if is_range==(state=="RANGE"): indices.append(i)
+        coverage=[sum(math.floor(rows[i]["signalAsOf"]/policy["timeBlockSeconds"])==block for i in indices)/sum(math.floor(r["signalAsOf"]/policy["timeBlockSeconds"])==block for r in rows) for block in blocks]
+        # A first-touch success on either side is a missed directional entry for this non-directional output.
+        result[state]={"count":len(indices),"coverage":len(indices)/len(rows),"effectiveSamples":overlap_effective_samples([rows[i] for i in indices]),
+                       "falseEntryRate":sum(rows[i]["labels"]["LONG"]==1 or rows[i]["labels"]["SHORT"]==1 for i in indices)/len(indices) if indices else None,
+                       "coverageSwing":max(coverage)-min(coverage) if coverage else None,"selectionSplit":"FINAL_TEST_ONLY"}
+    return result
+
+
+def nondirectional_pass(report,policy):
+    try:
+        return all(report[s]["selectionSplit"]=="FINAL_TEST_ONLY" and report[s]["count"]>=policy["min"+s.title()+"TestSamples"]
+                   and report[s]["effectiveSamples"]>=policy["minEffectiveSamples"] and report[s]["coverage"]>=policy["minNonDirectionalCoverage"]
+                   and report[s]["falseEntryRate"]<=policy["max"+s.title()+"FalseEntryRate"] and report[s]["coverageSwing"]<=policy["maxNonDirectionalCoverageSwing"] for s in ("RANGE","WATCH"))
+    except (KeyError,TypeError,ValueError): return False
 
 
 def check_metric_pair(pair,minimum,policy):
@@ -390,7 +574,8 @@ def release_pass(report,policy):
         expected_strata={side+":"+field+":"+value for side in ("LONG","SHORT") for field,key in
                          (("symbol","requiredAssets"),("regime","requiredRegimes"),("volatility","requiredVolatilityStrata")) for value in policy[key]}
         expected_tiers={side+"_"+tier for side in ("LONG","SHORT") for tier in ("weak","normal","strong")}
-        return set(report["sides"])=={"LONG","SHORT"} and set(report["strata"])==expected_strata and set(report["tiers"])==expected_tiers and all(check_metric_pair(v,policy["minTestSamples"],policy) for v in report["sides"].values()) and all(check_metric_pair(v,policy["minStratumSamples"],policy) for v in report["strata"].values()) and all(v["count"]>=policy["minTierSamples"] and finite(v["netEdge"]) and v["netEdge"]>0 for v in report["tiers"].values())
+        pairs=list(report["sides"].values())+list(report["strata"].values())
+        return set(report["sides"])=={"LONG","SHORT"} and set(report["strata"])==expected_strata and set(report["tiers"])==expected_tiers and all(check_metric_pair(v,policy["minTestSamples"],policy) for v in report["sides"].values()) and all(check_metric_pair(v,policy["minStratumSamples"],policy) for v in report["strata"].values()) and all(v["count"]>=policy["minTierSamples"] and finite(v["netEdge"]) and v["netEdge"]>0 for v in report["tiers"].values()) and all(population_pass(v["population"],policy) and uncertainty_pass(v["uncertainty"],policy) for v in pairs) and nondirectional_pass(report["nonDirectional"],policy)
     except (KeyError,TypeError,ValueError): return False
 
 
@@ -419,35 +604,59 @@ def validate_policy(policy):
         if not isinstance(policy.get(k),list) or not policy[k] or len(set(policy[k]))!=len(policy[k]): raise ValueError("Explicit coverage policy required: "+k)
     if not policy.get("version") or len(policy.get("volatilityStrata",[]))!=2 or not 0<policy["volatilityStrata"][0]<policy["volatilityStrata"][1]: raise ValueError("Versioned frozen volatility strata required")
     if policy["minWalkForwardFolds"]<2: raise ValueError("Multiple temporal walk-forward folds required")
-    if not isinstance(policy.get("riskMetrics"),dict): raise ValueError("Explicit risk distribution definitions required (empty means UNKNOWN)")
-    for spec in policy["riskMetrics"].values():
-        if not spec.get("unit") or not isinstance(spec.get("higherIsWorse"),bool) or not 0<spec["mediumPercentile"]<spec["highPercentile"]<1 or type(spec.get("minSamples")) is not int or spec["minSamples"]<1: raise ValueError("Invalid asset-history risk distribution policy")
+    if not isinstance(policy.get("riskMetrics"),dict) or set(policy["riskMetrics"])!=set(RISK_REQUIRED): raise ValueError("Explicit complete side risk metric policy required; missing coverage is UNKNOWN")
+    for side,specs in policy["riskMetrics"].items():
+        if side not in ("LONG","SHORT","NON_DIRECTIONAL") or not isinstance(specs,dict): raise ValueError("Side-specific risk policy required")
+        if set(specs)!=RISK_REQUIRED[side]: raise ValueError("Missing asset-side-metric risk coverage")
+        for metric,spec in specs.items():
+            if spec.get("unit")!=UNITS.get(metric) or not isinstance(spec.get("higherIsWorse"),bool) or not 0<spec["mediumPercentile"]<spec["highPercentile"]<1 or type(spec.get("minSamples")) is not int or spec["minSamples"]<1: raise ValueError("Invalid asset-side-history risk distribution policy")
+    for key in ("minPositiveSamples","minNegativeSamples","minTimeBlocks","ciReplicates","timeBlockSeconds","minRangeTestSamples","minWatchTestSamples"):
+        if type(policy.get(key)) is not int or policy[key]<=0: raise ValueError("Explicit V42 sample policy required: "+key)
+    if type(policy.get("bootstrapSeed")) is not int or policy["timeBlockSeconds"]<HORIZON or policy["minTimeBlocks"]<2 or policy["ciReplicates"]<2: raise ValueError("Independent time-block uncertainty policy required")
+    for key in ("minEffectiveSamples","maxBrierCiWidth","maxEceCiWidth","maxLogLossCiWidth","maxHitRateCiWidth"):
+        if not finite(policy.get(key)) or policy[key]<=0: raise ValueError("Explicit uncertainty/effective sample policy required: "+key)
+    for key in ("ciConfidence","minNonDirectionalCoverage","maxNonDirectionalCoverageSwing","maxRangeFalseEntryRate","maxWatchFalseEntryRate","maxFeatureOutlierFraction","driftLowerQuantile","driftUpperQuantile"):
+        if not finite(policy.get(key)) or not 0<policy[key]<1: raise ValueError("Explicit bounded coverage/drift policy required: "+key)
+    if policy["driftLowerQuantile"]>=policy["driftUpperQuantile"]: raise ValueError("Ordered drift reference quantiles required")
+    costs=policy.get("costProvenance",{})
+    for key in ("source","sourceVersion","instrument","observedAt","availableAt","expiresAt","unit"):
+        if not costs.get(key): raise ValueError("Real fee/slippage provenance required: "+key)
+    if costs["unit"]!="RATE" or costs.get("kind")!="REAL_HISTORICAL" or costs["sourceVersion"] in ("UNKNOWN","UNVERIFIED") or not timestamp(costs["observedAt"])<=timestamp(costs["availableAt"])<=timestamp(costs["expiresAt"]): raise ValueError("Invalid fee/slippage identity")
 
 
 def risk_distributions(train,policy):
     result={}
     for asset in policy["requiredAssets"]:
         entries={}
-        for key,spec in policy["riskMetrics"].items():
-            observations=[r["realInputs"][key] for r in train if r["symbol"]==asset and key in r["realInputs"]]
+        for side,specs in policy["riskMetrics"].items():
+          entries={}
+          for key,spec in specs.items():
+            observations=[]
+            for r in train:
+                if r["symbol"]!=asset: continue
+                if key=="crowdingOpenInterestChange1h":
+                    oi=r["realInputs"].get("openInterestChange1h"); price=r["realInputs"].get("priceReturn1h")
+                    if oi and price and oi["value"]>0 and ((side=="LONG" and price["value"]>0) or (side=="SHORT" and price["value"]<0)): observations.append(oi)
+                elif key in r["realInputs"]: observations.append(r["realInputs"][key])
             # Repeated cached snapshots are one observation, not inflated independent samples.
             unique={}
             for observation in observations:
-                observation_key=(observation["source"],timestamp(observation["observedAt"]))
+                observation_key=(observation["source"],observation.get("instrument"),observation.get("sourceVersion"),timestamp(observation["observedAt"]))
                 existing=unique.get(observation_key)
                 if existing is not None and existing["value"]!=observation["value"]:
                     raise ValueError("Conflicting same-source historical risk observation")
                 if existing is None or timestamp(observation["availableAt"])<timestamp(existing["availableAt"]): unique[observation_key]=observation
             values=sorted(o["value"] for o in unique.values())
             if len(values)<spec["minSamples"]: continue
-            entries[key]={**spec,"sortedValues":values,"samples":len(values),"source":"REAL_HISTORICAL_TRAIN_ONLY",
+            entries[key]={**spec,"symbol":asset,"side":side,"metricKey":key,"riskVersion":policy["riskVersion"],"sortedValues":values,"samples":len(values),"source":"REAL_HISTORICAL_TRAIN_ONLY",
                           "asOf":instant(max(timestamp(o["availableAt"]) for o in unique.values()))}
-        if entries: result[asset]=entries
+          result.setdefault(asset,{})[side]=entries
     return result
 
 
 def train_fold(parts,manifest):
     validate_split_samples(parts,manifest["releasePolicy"])
+    populations=validate_v42_populations(parts,manifest["releasePolicy"])
     import numpy as np
     import xgboost as xgb
     if xgb.__version__!=XGBOOST_VERSION: raise ValueError("Python/JVM XGBoost version mismatch")
@@ -474,6 +683,12 @@ def train_fold(parts,manifest):
         raw_test[side]=models[side].predict(matrix(test)).tolist()
         calibrated_test[side]=[beta(p,calibrators[side]) for p in raw_test[side]]
     report=evaluate(test,raw_test,calibrated_test,bases,thresholds,policy)
+    report["populations"]=populations
+    report["patternMetrics"]={}
+    for pattern in sorted({missing_pattern(r["vector"]) for r in test}):
+        indices=[i for i,r in enumerate(test) if missing_pattern(r["vector"])==pattern]
+        report["patternMetrics"][pattern]={side:metric_evidence([test[i] for i in indices],side,[raw_test[side][i] for i in indices],
+                                              [calibrated_test[side][i] for i in indices],bases[side],policy) for side in ("LONG","SHORT")}
     report["thresholdSelectionTiers"]=selection_tiers; report["rangeEvidence"]=range_evidence
     report["thresholds"]=thresholds; report["calibrators"]=calibrators
     report["splits"]=[{"name":name,"count":len(rows),"start":instant(min(r["signalAsOf"] for r in rows)),
@@ -481,6 +696,8 @@ def train_fold(parts,manifest):
                       for name,rows in zip(("TRAIN","CALIBRATION","VALIDATION","TEST"),parts)]
     report["embargoSeconds"]=HORIZON
     report["passed"]=release_pass(report,policy)
+    report["passed"]=report["passed"] and all(check_metric_pair(v,policy["minStratumSamples"],policy) and population_pass(v["population"],policy)
+                             and uncertainty_pass(v["uncertainty"],policy) for pair in report["patternMetrics"].values() for v in pair.values())
     return models,calibrators,thresholds,report,risk_distributions(train,policy)
 
 
@@ -491,13 +708,32 @@ def validate_split_samples(parts,policy):
         if len(rows)<policy[key]: raise ValueError("Insufficient genuine independent split samples: "+key)
 
 
+def validate_v42_populations(parts,policy):
+    evidence=[]
+    patterns={missing_pattern(r["vector"]) for r in parts[0]}
+    for rows in parts:
+        if {missing_pattern(r["vector"]) for r in rows}!=patterns: raise ValueError("Missing-pattern coverage differs across independent splits")
+        strata={"ALL":rows}
+        for field,key in (("symbol","requiredAssets"),("regime","requiredRegimes"),("volatility","requiredVolatilityStrata")):
+            for value in policy[key]: strata[field+":"+value]=[r for r in rows if r[field]==value]
+        for pattern in patterns: strata["missing:"+pattern]=[r for r in rows if missing_pattern(r["vector"])==pattern]
+        report={key:{side:population(group,side) for side in ("LONG","SHORT")} for key,group in strata.items()}
+        if any(not population_pass(p,policy) for group in report.values() for p in group.values()): raise ValueError("Insufficient side/outcome/effective population in independent split stratum")
+        evidence.append(report)
+    return evidence
+
+
 def write_json(path,value):
-    path.write_text(json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False)+"\n")
+    path.write_text(json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False,default=json_default)+"\n")
 
 
 def train_bundle(manifest,rows,excluded,output):
     validate_training_manifest(manifest)
     policy=manifest["releasePolicy"]; validate_policy(policy)
+    if len(policy["requiredAssets"])!=1: raise ValueError("V42 raw-scale features require a per-asset bundle; cross-asset normalization is not inferred")
+    if policy["costProvenance"]["instrument"]!=instrument(policy["requiredAssets"][0]): raise ValueError("Fee/slippage instrument mismatch")
+    if any(not timestamp(policy["costProvenance"]["availableAt"])<=r["signalAsOf"]<=timestamp(policy["costProvenance"]["expiresAt"]) for r in rows): raise ValueError("Costs unavailable at actual historical signal cutoff")
+    if not any(o.get("source","").startswith("COINGLASS:") for r in rows for o in r["realInputs"].values()): raise ValueError("No actual historical CoinGlass observations; declared provenance alone is not evidence")
     if any(row["symbol"] not in policy["requiredAssets"] or row["regime"] not in policy["requiredRegimes"] or row["volatility"] not in policy["requiredVolatilityStrata"] for row in rows):
         raise ValueError("Every actual asset/regime/volatility stratum must be covered by the frozen release policy")
     folds=manifest["walkForward"]
@@ -509,12 +745,28 @@ def train_bundle(manifest,rows,excluded,output):
         previous_test_end=max(r["labelEnd"] for r in parts[-1])
         models,calibrators,thresholds,report,distributions=train_fold(parts,manifest)
         reports.append(report)
+    required_sides={"LONG","SHORT","NON_DIRECTIONAL"}
+    risk_complete=(set(policy["riskMetrics"])==required_sides and all(policy["riskMetrics"][s] for s in required_sides)
+                   and all(set(distributions.get(asset,{}))==required_sides and all(set(distributions[asset][s])==set(policy["riskMetrics"][s]) for s in required_sides) for asset in policy["requiredAssets"]))
+    def train_quantile(values,q):
+        if not values: return None
+        values=sorted(values); x=(len(values)-1)*q; lo=math.floor(x); hi=math.ceil(x)
+        return values[lo]+(values[hi]-values[lo])*(x-lo)
+    train=parts[0]
+    lifecycle={"dataVersion":manifest["provenance"]["datasetVersion"],"riskVersion":policy["riskVersion"],
+               "trainedThrough":report["splits"][1]["labelEnd"],"validatedThrough":report["splits"][3]["labelEnd"],"validUntil":manifest["validUntil"],
+               "missingPatterns":sorted(report["patternMetrics"]),"maxFeatureOutlierFraction":policy["maxFeatureOutlierFraction"],
+               "featureLower":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftLowerQuantile"]) for i in range(len(FEATURE_NAMES))],
+               "featureUpper":[train_quantile([r["vector"][i] for r in train if r["vector"][i] is not None],policy["driftUpperQuantile"]) for i in range(len(FEATURE_NAMES))]}
+    if timestamp(lifecycle["validUntil"])<=timestamp(lifecycle["validatedThrough"]): raise ValueError("Bundle expires before independent validation is complete")
     out=pathlib.Path(output)
     if out.exists(): raise ValueError("Atomic bundle output must be a new directory; refusing overwrite")
     out.mkdir(parents=True)
     final_report={"dataKind":"REAL_HISTORICAL","datasetVersion":manifest["provenance"]["datasetVersion"],
                   "actualInputSamples":len(rows)+sum(excluded.values()),"actualUsableSamples":len(rows),"excluded":excluded,
-                  "folds":reports,"final":reports[-1],"productionModelReady":all(r["passed"] for r in reports),
+                  "folds":reports,"final":reports[-1],"lifecycle":lifecycle,"riskMetricCoverageComplete":risk_complete,
+                  "unassessedRiskCategories":{"NON_DIRECTIONAL":["CHASE","REVERSAL","CROWDING","LIQUIDATION"]},
+                  "productionModelReady":all(r["passed"] for r in reports) and risk_complete,
                   "provenance":manifest["provenance"],"files":manifest["files"]}
     write_json(out/"validation.json",final_report)
     if not final_report["productionModelReady"]:
@@ -524,12 +776,13 @@ def train_bundle(manifest,rows,excluded,output):
         models[side].set_attr(asset_card_side=side,asset_card_model_version=manifest["modelVersion"],
                              asset_card_feature_version=FEATURE_VERSION,asset_card_calibration_version=manifest["calibrationVersion"],
                              asset_card_threshold_version=manifest["thresholdVersion"],asset_card_data_kind="REAL_HISTORICAL",
-                             asset_card_dataset_version=manifest["provenance"]["datasetVersion"])
+                             asset_card_dataset_version=manifest["provenance"]["datasetVersion"],asset_card_risk_version=policy["riskVersion"],
+                             asset_card_trained_through=lifecycle["trainedThrough"],asset_card_valid_until=lifecycle["validUntil"])
         models[side].save_model(out/(side.lower()+".ubj"))
     write_json(out/"calibration.json",calibrators)
     write_json(out/"thresholds.json",thresholds)
     write_json(out/"risk-distributions.json",distributions)
-    bundle={"schemaVersion":1,"dataKind":"REAL_HISTORICAL","featureVersion":FEATURE_VERSION,"atrDefinition":ATR_DEFINITION,
+    bundle={"schemaVersion":2,"dataKind":"REAL_HISTORICAL","featureVersion":FEATURE_VERSION,"atrDefinition":ATR_DEFINITION,"lifecycle":lifecycle,
             "featureNames":FEATURE_NAMES,"modelVersion":manifest["modelVersion"],"calibrationVersion":manifest["calibrationVersion"],
             "thresholdVersion":manifest["thresholdVersion"],"xgboostVersion":XGBOOST_VERSION,"horizonSeconds":HORIZON,
             "labelDefinition":"ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED",
@@ -543,6 +796,8 @@ def validate_training_manifest(manifest):
     for key in ("modelVersion","calibrationVersion","thresholdVersion"):
         if not isinstance(manifest.get(key),str) or not manifest[key].strip(): raise ValueError("Explicit nonblank atomic model version required: "+key)
     validate_policy(manifest["releasePolicy"])
+    if not isinstance(manifest["releasePolicy"].get("riskVersion"),str) or not manifest["releasePolicy"]["riskVersion"].strip(): raise ValueError("Explicit directional risk version required")
+    timestamp(manifest["validUntil"])
     if not isinstance(manifest.get("thresholdCandidates"),dict) or not manifest["thresholdCandidates"].get("tiers") or not manifest["thresholdCandidates"].get("range"):
         raise ValueError("Explicit validation-only threshold candidates required")
 
@@ -566,7 +821,7 @@ def main():
         path=pathlib.Path(args.output)
         if path.exists(): raise ValueError("Refusing to overwrite prepared history")
         write_json(path,{"featureVersion":FEATURE_VERSION,"rows":rows,"excluded":excluded,"productionModelReady":False})
-    else: print(json.dumps(train_bundle(manifest,rows,excluded,args.output),sort_keys=True,allow_nan=False))
+    else: print(json.dumps(train_bundle(manifest,rows,excluded,args.output),sort_keys=True,allow_nan=False,default=json_default))
 
 
 if __name__ == "__main__": main()
