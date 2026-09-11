@@ -927,7 +927,8 @@ Starting merged-main baseline: `2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2`.
 Scope: `HOME_ASSET_CARD_ONLY`.
 
 Appendix J is an additive V42 registration for the existing 48 exact
-asset-card paths. It does not replace Appendix I, any V41 package, a
+asset-card paths plus the sole runtime-dependency path `Dockerfile` (49 total).
+It does not replace Appendix I, any V41 package, a
 predecessor state, or generic gate policy. Business implementation remains
 blocked until this registration is merged to `origin/main`; this registration
 itself has no merge or deployment execution permission.
@@ -1014,6 +1015,18 @@ manifest-bound; OpenMP/native loading is verified in the final Linux image.
 External Binance access has its own explicit safety switch and cannot be
 enabled by the card flag alone.
 
+The Owner-approved Linux dependency amendment adds only `Dockerfile` to the
+V42 implementation list. After this amendment is effective on `origin/main`,
+its runtime stage may install only `libgomp1` with `--no-install-recommends`
+and clear the apt package lists. Build stage, Java/base-image series, USER and
+ENTRYPOINT remain unchanged; no host installation, additional system package,
+apt upgrade or deployment is authorized. Acceptance must use the final image
+built from this Dockerfile, load libgomp/XGBoost and both UBJ test models, and
+compare Java/Python predictions with image ID, architecture, model/feature
+versions and exit codes. Cache-only evidence is not final-image acceptance.
+Without successful final-image prediction, `LINUX_NATIVE_RUNTIME=FAIL` and
+`PRODUCTION_MODEL_READY=NO`; `MODEL_MODE=SHADOW` remains unchanged.
+
 ### J.6 Acceptance and action boundary
 
 Acceptance must prove side-opposite risk semantics, non-directional RANGE/WATCH
@@ -1027,8 +1040,9 @@ registration.
 
 The registration gate permits only the seven exact contract/YAML/script paths
 listed in the task handoff, with no wildcard or directory grant. The future
-implementation keeps the existing 48 exact asset-card paths and their
-fingerprint. `MERGE_AUTHORIZATION=NO`, `DEPLOY_AUTHORIZATION=NO`,
+implementation preserves all original 48 paths and adds only `Dockerfile`,
+with 49 unique paths and fingerprint `992926a6dc0724a7ee24e4e982c0b20a5a196d9a`.
+`MERGE_AUTHORIZATION=NO`, `DEPLOY_AUTHORIZATION=NO`,
 `MODEL_MODE=SHADOW`, and `BUSINESS_IMPLEMENTATION_BEFORE_GATE_PASS=NO` remain
 machine-enforced. Eligibility flags do not execute a merge; only a later
 Owner-approved action may do so after this exact registration is merged and
