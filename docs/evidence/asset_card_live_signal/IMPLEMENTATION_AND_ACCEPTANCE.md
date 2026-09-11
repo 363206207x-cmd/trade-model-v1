@@ -1,5 +1,141 @@
 # Asset-card live signal implementation evidence
 
+## V42 unified finite-SHADOW execution package — 2026-09-11 follow-up
+
+本节取代下方历史预检中的“仅人工停采集”“归档没有生产调用者”和“旧JAR回滚待验证”三个未完成结论；历史数据盘点、服务器身份和历史测试结果原样保留。**本轮仅实现、隔离测试、提交与推送；本节所有真实执行命令仍待 Owner 对这一份执行包统一批准。** 不合并、不安装、不授予真实权限、不联网探测或采集、不训练。
+
+### A. 审批对象、已有证明与执行前身份停点
+
+- 开始时本地／origin／Draft PR #1295同为 `4a3e418512a7aa50b2eaae204c0f10686a8f7031`。登记main `8af9ef5b08723b6058d7320730830ea2686d29a4`；64条实际路径、FP `4262f151a513d7bec00bcc9f0614531d8cae537f`不变。最终提交及exact-head CI记录在本节验收记录及同一PR交付评论中；不得用4a或旧b87c测试冒充最终Head。
+- 发布批准必须绑定最终PR完整Head；之后获取实际Squash merged-main SHA，比较全部业务树，再从该**干净精确merged-main**构建。尚未合并，因此现在没有可伪填的“部署SHA”。源代码允许推送不等于服务器执行权限。
+- 回滚实物已找到并在本轮真正启动：`094b70a8ed31891999da0814fae5add09e2c4e08`，JAR SHA256 `b9e49308b0ce84e3d2033a07a571d009d8d1483b5770010fd7c74555dba0105b`。其本地原字节在 `/Users/xuchao/Documents/trade-model-v1/target/trade-model-v1-0.0.1-SNAPSHOT.jar`；服务器匹配旧release路径见下方历史身份表。未改写该实物。
+- 最终候选与回滚制品都必须存在、hash匹配；再次只读核对固定SSH身份、无活动／不明发布进程、x86_64 Java17、主unit/drop-in/readiness脚本及当前运行JAR/三字段元数据。任一变化停止发布并列diff，不复用旧上传、不使用`--collect`判断状态。
+- 最终包保留默认 `SHADOW`、无生产bundle链接、训练导出开关false；默认应用连接、旧调度开关、方向／风险阈值／置信度公式、64路径和通用门禁不变。
+
+### B. 本轮补齐的真实执行链
+
+1. **归档再删除。** `AssetCardService`后台每60秒调用`RetentionLifecycle`，每资产每轮最多128行；专用writer事务锁与写入共用`symbol`锁，验证同一批原始身份／数量／完整内容。不可变内容寻址JSON写入、fsync、原子命名、SHA256复核、完整恢复读取全部成功后，才按精确主键及旧内容删除。snapshot没有DELETE。旧业务表及ACL不参与此链。
+2. **待成熟保护。** 任一LONG/SHORT未成熟INFERENCE的依赖保护优先于保留时长；原始输入完整冻结在rawFrame，未来1m/5m及实际成交依赖不能按年龄清理。本次固定采集窗口内`protectedFrom=EPOCH`，不删除任何卡片历史，避免净行数减少抵消新增量预算。窗口结束后仅经已验证档案清理。缺horizon/闭线/时点证据仍PENDING，重启后不会填false标签。
+3. **可导出与恢复。** LabelPipeline从DB及已验证档案联合恢复INFERENCE、成交、闭线、成熟双侧标签；保留原始observedAt/availableAt，不用文件归档时间替换它们。DB中已无记录也能追溯与导出，不重插重复label。缺原始CG身份的样本保留原始审计，但在训练导出中明确剔除，不能以“档案恢复成功”冒充训练合格。
+4. **失败关闭。** 目录、SHA、内容、读取、空间、事务或锁失败保留原DB数据，停止本次清理并报告状态；归档/存储异常停止卡片联网。单文件32MiB、每资产最多8192档／128MiB读取上限，超限是明确阻断，不静默略档。初次共享主机使用一个受保护共享档案目录；未证明独立主机各自本地磁盘的多实例归档安全。
+5. **有限租约。** `CollectionLease`使用service-owned0700真实目录，0600账本和锁，严格身份hash、原子replace及文件/目录fsync。绝对开始/结束、符号、配额和累计计数写入同一身份；正常关闭后重启继续旧值，不能重获8h。已初始化账本丢失、损坏、权限不符、时钟倒退、存量异常减少均拒绝联网；第一个持久停止原因不会被后续动作抹掉。T0之前STOP也持久化；I/O异常在进程内锁存且优先记录停止标记，不读取旧OPEN恢复。未记录正常关闭的旧进程身份（包括SIGKILL或无法持久化停止）在新进程中返回UNVERIFIED_PREVIOUS_COLLECTION_PROCESS，保持终止，不能用自动重启绕过。
+6. **停止隔离。** 到期判断在每个入站帧／请求上生效，250ms卡片watchdog关闭卡片WS、取消卡片REST、清理卡片排队任务；15秒测量DB/WAL/空间。未完成的少量已执行事务与只读证据驱动离线成熟可结束；不延长联网、不改其他业务调度。这里不声称所有数据库写入瞬间为0。
+7. **来源隔离。** aggregate-All OI、coin加权但单位未证明的funding、多所USD liquidation不得冒充Binance单合约USDT。它们返回UNKNOWN及具体原因；仅精确Binance/pair/1m账户比值及其已证明无量纲转换可用。rawFrame与审计使用同一个Provider快照；旧历史不重写。`trainingEligible=false`与逐字段原因随INFERENCE保留，导出拒绝未证明记录。现有独立有效高中风险不被其他UNKNOWN覆盖。
+
+### C. 两个不同批准项：21 GET探测与固定8h采集
+
+**C1：21 GET只读探测，未执行。** 沿用下方完整端点表：BTCUSDT、ETHUSDT、XRPUSDT，Binance klines(1m×5)、aggTrades(最近60s最多100)、depth5000各3次；CoinGlass exchange-list、oi-weight-history(1m×1)、aggregated-liquidation(Binance/OKX/Bybit,1m×60)、global-long-short-account-ratio(Binance/pair,1m×1)各3次。host只允许`api.binance.com`和`open-api-v4.coinglass.com`。
+
+- T只在批准执行前冻结一次UTC整分钟。Kline范围T−300000..T−1ms；aggTrade T−60000..T−1ms。其他参数、端点和预算与下方表完全相同。
+- 总上限21GET／10分钟／并发1／请求起始间隔至少20秒；重试0、分页0、批量历史0、WS0。Binance权重总上限768；CG最多12请求、≤3rpm且≤已证账号rpm的80%，只用已有额度，不购买或升级。账户额度未确认则CG请求不执行，不能调用接口来猜额度。
+- 401/403/418/429、provider非成功码、超时、配额未知/不足、跨host重定向或来源/单位冲突立即停剩余请求；一次失败也不得用重试补齐“21”。探测响应不写生产卡片表、不启动服务、认证头不存日志。
+
+**C2：最多8h有限SHADOW，未执行、不是训练条件。** 精确符号固定为本次已核注册资产36项，运行时再与现有注册集合求交，不修改资产池成员、排序或用户选择：
+
+```text
+AAVEUSDT,ADAUSDT,ALGOUSDT,APTUSDT,ARBUSDT,ASTERUSDT,AVAXUSDT,BCHUSDT,BNBUSDT,BTCUSDT,DOGEUSDT,DOTUSDT,ETCUSDT,ETHUSDT,FETUSDT,FILUSDT,HBARUSDT,HYPERUSDT,ICPUSDT,INJUSDT,LINKUSDT,LTCUSDT,NEARUSDT,OPUSDT,POLUSDT,RUNEUSDT,SEIUSDT,SOLUSDT,SUIUSDT,TAOUSDT,TRXUSDT,UNIUSDT,VETUSDT,XLMUSDT,XRPUSDT,ZECUSDT
+```
+
+- 先完成PREPARED启动/全部前置，再把未来一个UTC整分钟记为`COLLECTION_STARTS_AT=T0`、`COLLECTION_ENDS_AT=T0+28800s`；两值在第二次启动**前**冻结在保护manifest，window ID=`v42-shadow-<批准Head前12位>-<T0 UTC数字>`。延迟启动只缩短可用时间；重启原样复用，不重新计算T0。不是从每次进程启动起算8小时。
+- 共享IP额度证明必须在T0之前5分钟内完成。`SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE=1000`为卡片自身最大预算，不是假定账户全额度；`SHARED_IP_WEIGHT_LIMIT_PER_MINUTE`填写实际已核官方限制且≥2000。当前limit/余量未知，manifest维持0/NOT_CONFIGURED并拒绝ARMED；不能伪填常见6000。每个真实响应必须有有效权重头，达到实际全IP限制80%或头缺失即停止卡片。本任务不改变共享调用频率，其他业务同IP用量计入安全停止。
+
+| 项目 | 工程验收固定预算／触发值 |
+|---|---|
+| WS范围 | 每symbol真实Spot aggTrade、depth@100ms、闭合1m/5m/15m/1h/4h；最多252stream；只读行情，无用户数据/交易stream |
+| WS重连／控制 | 全窗连接尝试最多32，动态订退控制最多128；失败退避最高120秒；重启保留累计值；无无限23h延长 |
+| REST初始化／恢复 | 仅现有depth5000；全窗最多288次／权重72000（250/次）；一分钟最多1000；约36初始＋252恢复的上限，不保证全部用满 |
+| CoinGlass持续额外调用 | 0；仅peek已有缓存。未知29资产或不可信字段保持UNKNOWN；不另开scan或补历史 |
+| 真实成交记录估算 | 每资产每秒最多最后一笔真实aggTrade，36×28800=1,036,800条；不是每笔成交全量，也不是独立训练样本 |
+| DB新增监测阈值 | 三卡片表合计新增1,100,000行；初次不清理抵扣；15秒检查，异常存量下降停止 |
+| 数据库体积／WAL | database增长3,221,225,472bytes；WAL差值8,589,934,592bytes。两者包括同库／同cluster其他业务，是保守全局停止阈值，不冒充卡片独占计量 |
+| 尾批／离线余量 | 阈值之外预留50,000行、512MiB数据库空间、1GiB WAL预算供15秒检测尾批/离线标签；不是允许再联网。预算审批上限1,150,000行、3.5GiB DB、9GiB WAL；触发值仍上述更低值 |
+| 空闲空间 | state/archive/PGDATA必须证明同设备；启动时及每15秒至少21,474,836,480bytes；原生配置档案写入也采用21,474,836,480bytes下限。不同盘或无法证明则禁止ARMED，不能拿/opt空闲量替代PG盘 |
+| 保留配置 | Bar168h、Trade168h、Feature720h、Label2160h；每60秒最多128行/资产、先保护未成熟依赖再归档校验后删除；不是训练样本门槛 |
+| 训练与模型 | 自动训练0、导出开关false、模型安装0；SHADOW，CANARY/ACTIVE禁止，真实新置信度不发布 |
+
+上述行数、DB和WAL是监测停止阈值，不是逐INSERT硬配额。到期或到任一预算停止连接，不为缺失horizon继续采集。已齐证据允许离线成熟，未齐保持PENDING直到另行批准的数据准备；既不填写失败标签，也不擅自延长窗口。没有有限新窗口明确批准时不得删除账本、换ID或调大预算重新启动。
+
+### D. 待批准的精确发布顺序、两次受控启动及回滚
+
+所有命令只在批准后的Staging、固定SSH身份、`rine_logic_staging`执行。密码仅走既有受保护认证渠道，禁止argv/普通env/日志/secret hash。下列准备不在本轮执行。
+
+1. **候选/回滚冻结。** 等最终exact-head CI通过后另批合并#1295；取得真实merged-main。先完整回归，再按本目录README的`asset-card-native-evidence`命令在干净精确提交构建标准JAR，提取实际git.properties（SHA一致、dirty=false）、本地sha256；新唯一release目录及上传文件名包含完整SHA＋UTC。上传完成远端sha256须逐字一致；不覆盖/复用中断文件。备份当前b9e493…JAR、三字段发布元数据和卡片drop-in存在/缺失事实；主unit、旧env与core调度不变。
+2. **迁移前停点。** 只读新连接确认DB名/PG16版本、V23SUCCESS、V24未执行、三新表不存在、rine_migrator非super且publicCREATE=false。记录旧表结构/ACL/defaultACL/数据基线的受控指纹；不输出Owner数据。若已经V24SUCCESS则只核对checksum/表身份并NO-OP，不重复GRANT/迁移。任何不匹配停止。
+3. **独立权限回收保护。** GRANT前准备唯一新命名的独立`systemd-run --on-active=45s`一次性回收看门狗，固定命令为既有本地管理员认证下单句`REVOKE CREATE ON SCHEMA public FROM rine_migrator;`、目标仅rine_logic_staging，默认autocommit。不使用`--collect`。确认该回收任务已排程，才允许独立提交`GRANT CREATE ON SCHEMA public TO rine_migrator;`。控制流程成功/失败/TERM都立即用新连接独立提交REVOKE，再另一新连接读CREATE=false、SUPERUSER=false；看门狗保留运行以覆盖控制进程丢失，重复REVOKE幂等。日志不包含凭据。
+4. **受控启动一：迁移且卡片关闭。** 仅准确merged-main候选JAR替换current并同步三字段真实元数据，enabled/external/writer全部false，无模型；沿用原Spring Flyway设置只运行V24三表及既定索引。最多45秒临时权限窗口；锁超时/失败/权限回收不能确认即停止候选。成功后必须先确认独立回收，再允许角色/凭据步骤。真实系统断电不是finally测试证明：恢复后先禁继续发布、独立REVOKE及fresh验证，确认前不得重新启动候选；不把本地线程测试冒充真实systemd容灾。
+5. **仅三新表ACL收敛＋专用角色。** V24SUCCESS后管理员执行已审脚本`asset-card-role-bootstrap.sql`，显式`-v card_reconcile_new_table_acl=true`。只撤销rine_app在三张新卡片表的SELECT/INSERT/UPDATE/DELETE，然后建立/验证rine_asset_card_writer。**不改旧default ACL，不撤销旧表权限。** 发现PUBLIC、成员关系、ownership、column grant或definer带来额外访问立即停止，不全库REVOKE。矩阵：snapshot S/I/U、禁止D；spot_bar与feature_history S/I/D、禁止U；其他业务表、序列、DDL、CREATE、TEMP、角色继承、额外权限全部拒绝。旧连接仍按原业务ACL读取。
+6. **精确目录、凭据及PREPARED配置。** root-owned0700 `/etc/rine-logic/credentials`，密码候选root0400只走保护输入；source为`/etc/rine-logic/credentials/asset-card-db-password`。仅专用角色设置SCRAM认证，不把口令写入脚本。`asset-card-runtime-credentials.sh --prepare --candidate <同目录保护文件> --confirm PREPARE_OR_ROTATE_ASSET_CARD_CREDENTIAL_ONLY`调用候选标准JAR的独立新连接校验DB身份/全部权限，通过后才原子安装；失败保留旧inode、输出RESTART_REQUIRED，不自动重启。模型根`/opt/rine-logic/models/asset-card`root只读，**不安装生产模型current链接**。state和archive叶目录为rine-logic UID999、0700，可信root祖先，路径见manifest；既有40-asset-card.conf仅卡片附加源可更新。
+7. **第二启动前停点。** PREPARED本身三开关false，不是已采集。先完成角色fresh验证、实际service读取凭据、原始JAR原生探针、源/共享IP/预算证明、PGDATA与state/archive同设备且空闲≥20GiB、全部真实manifest身份。安装脚本DRY_RUN先PASS。保护manifest填上C2精确绝对窗口及已核配额；ARMED只接受完整安全值。`asset-card-runtime-install.sh --apply --confirm INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY`只写40-asset-card.conf，保留旧卡片配置和非秘密回滚清单，不自动reload/restart。
+8. **受控启动二：同一JAR的有限SHADOW。** Owner一次批准此包后才执行一次daemon-reload/restart，enabled/external/writer=true、SHADOW、export=false、四个保留周期生效；任何旧全局/AI/Telegram/交易/持仓调度值不改。检查current exactSHA、active/readiness200、凭据身份、专用pool+默认pool、账本时间/预算和0/5m/10m/每小时/到期状态。不能因readiness200就宣布数据链通过。到期自动停止卡片网络；新启动继续同一账本。除失败回滚外，不额外启动候选或扩大窗口。
+9. **失败回滚。** 在独立CREATE回收证据通过后，停止候选，恢复原JAR和原元数据b9e493…/094b70a8…，恢复之前卡片drop-in（原来不存在则仅停用本次新卡片附加配置，保留可恢复副本）。原main unit/core/env/Owner数据不改。daemon-reload/start旧服务并验证旧SHA/readiness200。**新表、迁移历史、采集数据、档案、停止账本保留**；不DROP、repair、关闭validate或删数据。角色/ACL不为回滚扩大到旧账号，旧Jar已实证不需要卡片表权限。
+
+### E. 停止点及恢复动作
+
+| 停止条件 | 自动／执行控制动作 | 允许恢复方式 |
+|---|---|---|
+| Head/JAR/hash/SSH/main unit或元数据不一致 | 不替换、不GRANT、不启动 | 重新只读列实际差异，审批不自动转移到新身份 |
+| 迁移失败／控制任务中断 | 控制流程及独立watchdog回收CREATE；验证后恢复旧JAR | 保留V24已成功对象；Flyway失败事务不修history，不重复权限试探 |
+| CREATE回收无法确认 | 停候选及所有后续步骤 | 只核验回收；未确认前不继续ACL/凭据/联网或网页验收 |
+| PUBLIC/旧defaultACL异常扩大 | 专用验证拒绝，停在新对象步骤 | 只列精确权限来源；不动旧ACL，不用旧账号fallback写入 |
+| 凭据/专用连接失败 | 新候选连接关闭；不替换旧凭据、不回退应用pool | 修正保护候选后再新连接verify；需要restart明确标注 |
+| quota未知、401/403/418/429、80%sharedIP、budget耗尽 | 持久终止原因、abort卡片WS、cancel卡片REST、清队列 | 原窗口保持终止；不换ID/续时/增额；另批才可新窗口 |
+| 到期 | 同上；已接收有限尾批可完成，离线成熟仅用既有证据 | 未成熟保持PENDING；不自动联网补标签 |
+| 空间/DB/WAL异常、档案/校验失败 | 停新采集及本轮清理，原证据保留 | 修复存储/校验原因并只读证明；不得先删未验档数据腾空间 |
+| CoinGlass来源/单位/窗口不明 | 仅该证据UNKNOWN，训练资格false | 不猜测补齐、不改算法；未来精确探测/来源证明另有结果才可接纳 |
+
+### F. 本地验证与真实剩余事项
+
+- 隔离PG16.14（缓存官方镜像）复制Staging16.15的defaultACL条件；补丁级版本不同如实记录。V24只新增3表／既定索引，成功、锁超时失败及中断路径独立COMMIT回收、新连接CREATE=false。真实专用writer、Hikari池1、advisory锁、WAL/DB测量、归档读回及精确删除通过。
+- 本轮实际旧JAR在隔离Linux x86_64真正启动readiness200；V1–V23迁移字节23/23一致，原Flyway验证规则将V24保留为未来版本并NO-OP。V24 history、新三表及测试行、旧ACL/defaultACL/全行指纹、原JAR字节均未变；没有关闭校验或模拟旧main。
+- 本轮最终完整Maven：**5533 tests／520 suites／0 failures／0 errors／13 skips，exit0**。日志`/private/tmp/v42-release-full-maven-final.log`，SHA256 `4dee0f5276dd1e57598b78dd69470b272c896efcb2edf29944650b9c89238e1a`。停止边界focused：Market41＋Service43＝84，0失败/错误/跳过；Native19＋V24五项＝24，0失败/错误/跳过。V24实际控制进程SIGKILL=137后，独立回收者新连接REVOKE+COMMIT，另一连接CREATE=false；这是隔离看门狗证明，不是已在Staging安装。最终Head CI在同一PR交付评论核对，不复用旧Head。
+- Python45／0失败／0跳过、前端事件矩阵与北京时间矩阵PASS；JS/shell语法、diff及高可信秘密模式扫描PASS（新增diff匹配0）。Product Source、任务校验、workflow-contract含V42真实外层自测PASS。实际工作区在提交前如实显示BLOCKED_WORKTREE_DIRTY；不改门禁，提交后须重新核对真实干净外层IMPLEMENTATION_ALLOWED=true。
+- 测试日志：停止focused SHA256 `4f348b832af27a73a63151d0787d001a51712ca10cccaffc444a7a8ad45ec888`；Native/V24 `2a7ca51b0f748a7fd2fbb1530baf0d1f060e8ee1f1bdb36346c35612b2c003d2`；Python `3fdf9eb8e8dfeba61877454bee54ca1f29f7c7126ec5da8c9dffce90cfb3b519`；前端 `879db747162704ebb94474505b2fd308be5d014e30652e4e0c4140eed8848fc2`；时间 `e9a510a787e647a096b2083c7986197039935ba94517158eb384bfb1eea62326`。
+- 本轮13项skip未新增或放宽：ControlledCurrentStateContentFingerprintTest七项（rollbackRestoresFingerprint、fingerprintOutputDoesNotContainRawModifiedValues、sameDataProducesMatchingFingerprint、sameRowCountTimeMutationIsDetected、sameRowCountPlanBoundaryMutationIsDetected、sessionTimezoneDoesNotChangeFingerprint、sameRowCountStatusMutationIsDetected），因P3 content-fingerprint显式环境未启用；ControlledCurrentStateCloneFlywayActionTest一项，P3受控DB未启用；ControlledGeneratedReleaseLikeFixtureFlywayTest一项，generated fixture环境未启用；ControlledGreenfieldFlywayV7ActionTest一项，P3-G未启用；ControlledPostgreSqlFlywaySmokeTest一项，真实外部PG环境未授权；ControlledP3hComposeOfflineSmokeTest一项，独立P3-H opt-in未启用；CoinGlassControlledSmokeTest一项，COINGLASS_SMOKE_ENABLE_EXTERNAL_CALLS不存在。新卡片PG、旧JAR回滚、原生fixture互操作均实际本地执行，不以skip冒充通过。
+- 真实服务器同设备/实际共享IP限额及CG账号额度目前**未重新执行验证**，是发布第二启动／C1的明确前置值；源实现已有拒绝机制，不是假称已通过。真实SHADOW、原生服务器probe、重启断流、4h真实标签和页面新模型验收仍NOT_EXECUTED。
+- 原始样本、成熟标签、有效非重叠4h簇、Brier/ECE/LogLoss、RANGE/WATCH及时间外结果仍NOT_AVAILABLE；8h只是管道工程验收，不具备训练或上线百分比资格。CG不合格不妨碍SHADOW冻结原始证据/合格标签成熟，但禁止它进入训练。
+
+本轮实际20条改动如下，均在64内；完整业务分支相对origin/main仍为60条变更，范围外0、重复路径0、白名单/门禁变更0。算法及旧canonical源文件本轮无diff：
+
+```text
+deploy/native-staging/README.md
+deploy/native-staging/asset-card-role-bootstrap.sql
+deploy/native-staging/asset-card-runtime-install.sh
+deploy/native-staging/asset-card-runtime-manifest.template
+deploy/native-staging/asset-card-runtime-preflight.sh
+deploy/native-staging/rine-logic-asset-card.conf.template
+docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md
+src/main/java/org/example/trademodel/assetcard/AssetCardEvidenceService.java
+src/main/java/org/example/trademodel/assetcard/AssetCardFeatureService.java
+src/main/java/org/example/trademodel/assetcard/AssetCardMarketDataService.java
+src/main/java/org/example/trademodel/assetcard/AssetCardProperties.java
+src/main/java/org/example/trademodel/assetcard/AssetCardService.java
+src/main/java/org/example/trademodel/mapper/AssetCardMapper.java
+src/test/java/org/example/trademodel/assetcard/AssetCardEvidenceServiceTest.java
+src/test/java/org/example/trademodel/assetcard/AssetCardFeatureServiceTest.java
+src/test/java/org/example/trademodel/assetcard/AssetCardMarketDataServiceTest.java
+src/test/java/org/example/trademodel/assetcard/AssetCardServiceTest.java
+src/test/java/org/example/trademodel/mapper/AssetCardMapperIntegrationTest.java
+src/test/java/org/example/trademodel/postgresql/NativeStagingAssetCardInfrastructureContractTest.java
+src/test/java/org/example/trademodel/postgresql/V24AssetCardLiveSignalMigrationContractTest.java
+```
+
+审批请一次覆盖D1–D9及分别列项的C1/C2（可以明确不批准其中某项，未批准项保持不执行）；所有前置停点继续有效。不是授权无限重试、外部数据批量下载、其他业务变更、模型训练、CANARY/ACTIVE或Production。
+
+```text
+BUSINESS_PR_1295_STATE=DRAFT_UNMERGED
+MODEL_MODE=SHADOW
+PRODUCTION_MODEL_READY=NO
+REAL_STAGING_NATIVE_ACCEPTANCE=NOT_EXECUTED
+REAL_DATABASE_PERMISSION_CHANGE=NO
+BUSINESS_PR_MERGE_EXECUTED=NO
+DEPLOY_EXECUTED=NO
+EXTERNAL_PROBE_EXECUTED=NO
+NEW_LIVE_COLLECTION_STARTED=NO
+REAL_MODEL_TRAINING_EXECUTED=NO
+ASSET_CARD_LIVE_READY=NO
+CURRENT_PHASE_DONE=NO
+```
+
 ## V42 Staging read-only preflight and SHADOW release preparation — 2026-09-11
 
 本节是本轮只读结果与待批准方案；下面此前的本地集成、原生预测和历史测试记录保持原样，不视为真实 Staging 验收。本轮不安装依赖、不改变服务器、ACL、数据或开关，不合并、不部署、不启动采集或训练。

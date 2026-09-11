@@ -3,11 +3,23 @@
 LoadCredential=asset-card-db-password:/etc/rine-logic/credentials/asset-card-db-password
 ReadOnlyPaths=/opt/rine-logic/models/asset-card
 Environment="TRADE_MODEL_ASSET_CARD_MODEL_MODE=SHADOW"
-Environment="TRADE_MODEL_ASSET_CARD_WRITER_ENABLED=false"
+Environment="TRADE_MODEL_ASSET_CARD_ENABLED=@CARD_ENABLED@"
+Environment="TRADE_MODEL_ASSET_CARD_EXTERNAL_CALLS_ENABLED=@CARD_ENABLED@"
+Environment="TRADE_MODEL_ASSET_CARD_WRITER_ENABLED=@CARD_ENABLED@"
+Environment="TRADE_MODEL_ASSET_CARD_RETENTION_ENABLED=@CARD_ENABLED@"
+Environment="TRADE_MODEL_ASSET_CARD_BAR_RETENTION=168h"
+Environment="TRADE_MODEL_ASSET_CARD_FEATURE_RETENTION=720h"
+Environment="TRADE_MODEL_ASSET_CARD_TRADE_RETENTION=168h"
+Environment="TRADE_MODEL_ASSET_CARD_LABEL_RETENTION=2160h"
+Environment="TRADE_MODEL_ASSET_CARD_RETENTION_BATCH_SIZE=128"
+Environment="TRADE_MODEL_ASSET_CARD_ARCHIVE_DIRECTORY=@ARCHIVE_DIRECTORY@"
+Environment="TRADE_MODEL_ASSET_CARD_ARCHIVE_MINIMUM_FREE_BYTES=21474836480"
+Environment="TRADE_MODEL_ASSET_CARD_TRAINING_EXPORT_ENABLED=false"
+ReadWritePaths=-/var/lib/rine-logic/asset-card/collection -/var/lib/rine-logic/asset-card/archive
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_JDBC_URL=@WRITER_JDBC_URL@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_EXPECTED_DATABASE=@EXPECTED_DATABASE@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_CREDENTIAL_FILE=%d/asset-card-db-password"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_CREDENTIAL_OWNER=@SERVICE_UID@"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_MAXIMUM_POOL_SIZE=2"
 Environment="TRADE_MODEL_ASSET_CARD_WRITER_CONNECTION_TIMEOUT=5s"
-# No implicit model pointer, external-market switch, default-data-source replacement or service action.
+# Window fields are appended only for validated ARMED mode. No implicit clock, model or service action.

@@ -106,13 +106,14 @@ public class AssetCardService implements AutoCloseable {
         riskWorkers.scheduleWithFixedDelay(this::refreshWriterReadiness, 60, 60, TimeUnit.SECONDS);
         labelWorker.scheduleWithFixedDelay(() -> matureLabels(Instant.now()), 0,
                 Math.max(1, properties.getLabelMaturityInterval().toSeconds()), TimeUnit.SECONDS);
+        labelWorker.scheduleWithFixedDelay(() -> retainHistory(Instant.now()), 30, 60, TimeUnit.SECONDS);
     }
 
     /** Only this background owner writes labels; Home/SSE reads never call it. Missing evidence is retried, not fabricated. */
     void matureLabels(Instant at) {
         if (!started || !properties.isEnabled() || !writerReady) return;
         try {
-            var pipeline = new LabelPipeline(mapper, json);
+            var pipeline = new LabelPipeline(mapper, json, properties.getArchiveDirectory());
             for (String symbol : mapper.selectInferenceSymbols()) {
                 try {
                     var cursor = labelCursors.get(symbol);
@@ -140,7 +141,30 @@ public class AssetCardService implements AutoCloseable {
     public LabelPipeline.ExportReceipt exportTrainingDataset(String symbol, Instant from, Instant to, Instant cutoff) {
         if (!properties.isTrainingExportEnabled() || properties.getTrainingExportDirectory() == null)
             throw new IllegalStateException("ASSET_CARD_EXPORT_NOT_CONFIGURED");
-        return new LabelPipeline(mapper, json).export(normalize(symbol), from, to, cutoff, properties.getTrainingExportDirectory());
+        return new LabelPipeline(mapper, json, properties.getArchiveDirectory())
+                .export(normalize(symbol), from, to, cutoff, properties.getTrainingExportDirectory());
+    }
+
+    /** Bounded archive-before-delete work, independent of Home and of network-window expiry. */
+    void retainHistory(Instant at) {
+        if (!started || !properties.isEnabled() || !writerReady || !properties.isRetentionEnabled()) return;
+        try {
+            var retention = new RetentionLifecycle(mapper, json, properties.getArchiveDirectory(), properties.getArchiveMinimumFreeBytes());
+            var window = properties.getCollectionWindow();
+            Instant protectedFrom = window.valid() && at.isBefore(window.getEndsAt()) && !at.isBefore(window.getStartsAt())
+                    ? Instant.EPOCH : at; // Do not offset the finite-window growth budget with concurrent deletion.
+            for (String symbol : mapper.selectRetentionSymbols()) {
+                var result = retention.run(symbol, at, properties.getBarRetention(), properties.getFeatureRetention(),
+                        properties.getTradeRetention(), properties.getLabelRetention(), properties.getRetentionBatchSize(), protectedFrom);
+                if (!Set.of("ARCHIVED_VERIFIED_AND_PRUNED", "NOTHING_EXPIRED", "PENDING_LABEL_DEPENDENCIES_PRESERVED").contains(result.status())) {
+                    failed(Field.PERSISTENCE, symbol, result.status());
+                    market.stopCollection("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE", at);
+                }
+            }
+        } catch (RuntimeException failure) {
+            market.stopCollection("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE", at);
+            log.warn("[asset-card] Retention unavailable; data preserved ({})", failure.getClass().getSimpleName());
+        }
     }
 
     /** Re-read configuration in background; model loading never runs on a card GET or SSE publication. */
@@ -171,11 +195,13 @@ public class AssetCardService implements AutoCloseable {
     /** One-second sampled actual aggregate trade, never an interpolated or substituted price. */
     private void onTradeObserved(AssetCardMarketDataService.SpotQuote quote) {
         if (!started || !properties.isEnabled() || !writerReady) return;
+        if (properties.isExternalCallsEnabled() && !market.collectionAccepting(Instant.now())) return;
         pendingTrades.compute(quote.symbol(), (symbol, previous) -> previous == null || quote.tradeId() > previous.tradeId() ? quote : previous);
     }
 
     private void flushTradeObservations() {
         if (!writerReady) return;
+        if (properties.isExternalCallsEnabled() && !market.collectionAccepting(Instant.now())) { pendingTrades.clear(); return; }
         pendingTrades.forEach((symbol, quote) -> {
             if (!pendingTrades.remove(symbol, quote)) return;
             try {
@@ -205,6 +231,7 @@ public class AssetCardService implements AutoCloseable {
     /** Only a closed market bar can enqueue inference. No page request reaches this method. */
     void onMarketUpdate(AssetCardMarketDataService.MarketUpdate update) {
         if (!started || !properties.isEnabled()) return;
+        if (properties.isExternalCallsEnabled() && !market.collectionAccepting(Instant.now())) return;
         switch (update.type()) {
             case "PRICE_FAILURE" -> failed(Field.PRICE, update.symbol(), "真实现货成交连接中断");
             case "RISK_FAILURE" -> failed(Field.RISK, update.symbol(), "盘口证据重建中");
@@ -288,7 +315,8 @@ public class AssetCardService implements AutoCloseable {
                 }
                 return;
             }
-            Map<String, AssetCardFeatureService.Observation> inputs = rawInputs(symbol, at);
+            var providerSnapshot = providerFacts.get(symbol);
+            Map<String, AssetCardFeatureService.Observation> inputs = rawInputs(symbol, at, providerSnapshot);
             var raw = new AssetCardFeatureService.RawFrame(symbol, at, bars, inputs);
             var frame = featureBuilder.build(raw);
             // Missing/old 5m bars do not produce an inference for an unrelated close.
@@ -305,7 +333,9 @@ public class AssetCardService implements AutoCloseable {
                 Map<String, Object> audit = payload("rawFrame", raw, "frame", frame, "signalFrame", anchor, "state", state,
                         "closed5mAt", closedAt, "completedAt", completedAt, "outcome", "COMPLETED",
                         "thresholdVersion", model.thresholdVersion(), "riskVersion", riskVersion(model),
-                        "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS");
+                        "modelMode", properties.getModelMode(), "dataKind", "LIVE_OBSERVED_CARD_INPUTS",
+                        "trainingEligible", frame.trainingEligible(), "trainingQualificationReasons", frame.trainingQualificationReasons(),
+                        "providerEvidenceMissingReasons", providerSnapshot == null ? List.of("COINGLASS_NOT_YET_OBSERVED") : providerSnapshot.missingReasons());
                 if (mapper.saveInference(symbol, closedAt, completedAt, json.writeValueAsString(audit)) != 1) {
                     mapper.selectInference(symbol, closedAt, completedAt).ifPresent(existing -> {
                         try { restoreAudit(symbol, existing.payloadJson(), completedAt, model); }
@@ -418,8 +448,12 @@ public class AssetCardService implements AutoCloseable {
     }
 
     private Map<String, AssetCardFeatureService.Observation> rawInputs(String symbol, Instant at) {
+        return rawInputs(symbol, at, providerFacts.get(symbol));
+    }
+
+    private Map<String, AssetCardFeatureService.Observation> rawInputs(String symbol, Instant at,
+                                                                    AssetCardEvidenceService.EvidenceFrame facts) {
         Map<String, AssetCardFeatureService.Observation> inputs = new LinkedHashMap<>();
-        var facts = providerFacts.get(symbol);
         if (facts != null) inputs.putAll(facts.observations(at));
         market.quote(symbol, at).ifPresent(q -> inputs.put("spotPrice", new AssetCardFeatureService.Observation(
                 q.price().doubleValue(), q.source(), q.observedAt(), q.availableAt(),
@@ -581,7 +615,9 @@ public class AssetCardService implements AutoCloseable {
         }
         Map<String, AssetCardRiskService.Metric> result = new LinkedHashMap<>();
         facts.forEach((key, fact) -> {
-            if (AssetCardFeatureService.usableObservation(symbol, key, fact, at))
+            if (AssetCardFeatureService.usableObservation(symbol, key, fact, at)
+                    && (!fact.source().startsWith("COINGLASS:")
+                        || AssetCardFeatureService.verifiedCoinGlassObservation(symbol,key,fact,at)))
                 result.put(key,new AssetCardRiskService.Metric(fact.value(),fact.unit(),fact.source(),fact.observedAt(),fact.availableAt(),fact.expiresAt()));
         });
         return result;
@@ -906,14 +942,220 @@ public class AssetCardService implements AutoCloseable {
     }
 
     /** Fixed-label pipeline. Original inference inputs are immutable; only outcome evidence is read after the horizon. */
+    /** Scheduled by the card owner only. No endpoint or generic business cleanup calls this lifecycle. */
+    static final class RetentionLifecycle {
+        private final AssetCardMapper mapper;
+        private final ObjectMapper json;
+        private final Path archiveRoot;
+        private final long minimumFreeBytes;
+        RetentionLifecycle(AssetCardMapper mapper,ObjectMapper json,Path archiveRoot,long minimumFreeBytes) {
+            this.mapper=Objects.requireNonNull(mapper);
+            this.json=json.copy().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                    .enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+            this.archiveRoot=archiveRoot;
+            this.minimumFreeBytes=minimumFreeBytes;
+        }
+        record Result(String status,int archived,int deleted,int protectedInferences) {}
+        Result run(String symbol,Instant now,Duration bars,Duration features,Duration trades,Duration labels,int batchSize) {
+            return run(symbol,now,bars,features,trades,labels,batchSize,now);
+        }
+        Result run(String symbol,Instant now,Duration bars,Duration features,Duration trades,Duration labels,int batchSize,Instant protectedFrom) {
+            if(now==null || now.isAfter(Instant.now()) || batchSize<1 || batchSize>500
+                    || protectedFrom==null || protectedFrom.isAfter(now)
+                    || List.of(bars,features,trades,labels).stream().anyMatch(d -> d==null || d.compareTo(Duration.ofHours(5))<0))
+                return new Result("RETENTION_CONFIGURATION_INVALID",0,0,0);
+            try {
+                return mapper.withRetentionLock(symbol, () -> retainLocked(symbol,now,bars,features,trades,labels,batchSize,protectedFrom));
+            } catch(RuntimeException failure) {
+                // Never report success after a failed archive/checksum/space/permission/transaction check; transaction rolls back deletes.
+                return new Result(failure instanceof RetentionFailure ? failure.getMessage() : "RETENTION_FAILED_DATA_PRESERVED",0,0,0);
+            }
+        }
+        private Result retainLocked(String symbol,Instant now,Duration barRetention,Duration featureRetention,Duration tradeRetention,
+                                    Duration labelRetention,int batchSize,Instant explicitlyProtectedFrom) {
+            Path root=checkedRoot(archiveRoot);
+            checkSpace(root,minimumFreeBytes,0);
+            ArchiveCatalog catalog=ArchiveCatalog.load(root,symbol,json);
+            var pipeline=new LabelPipeline(mapper,json,root,catalog);
+            Instant protectedFrom=explicitlyProtectedFrom; int protectedCount=0, scanned=0;
+            AssetCardMapper.TypedHistory cursor=null;
+            while(true) {
+                var page=mapper.selectHistoryPage(symbol,AssetCardMapper.HistoryKind.INFERENCE,Instant.EPOCH,now.plusMillis(1),now,
+                        cursor==null?null:cursor.signalAsOf(),cursor==null?null:cursor.recordKey(),500);
+                if(page.isEmpty()) break;
+                for(var row:page) {
+                    cursor=row;
+                    if(++scanned>10000) throw new RetentionFailure("RETENTION_INFERENCE_SCAN_LIMIT_DATA_PRESERVED");
+                    var item=pipeline.materialize(row,now);
+                    // A failed inference never declared a usable frame/horizon. Its raw audit is still archived, never fabricated into a label.
+                    if(item.status().equals("NO_SUCCESSFUL_REAL_INFERENCE")) continue;
+                    if(item.record()==null || !pipeline.persisted(row,item,now)) {
+                        protectedCount++;
+                        Instant boundary=Instant.ofEpochSecond(Math.floorDiv(row.signalAsOf().getEpochSecond(),300)*300);
+                        if(boundary.isBefore(protectedFrom)) protectedFrom=boundary;
+                    }
+                }
+            }
+            List<AssetCardMapper.TypedHistory> history=new ArrayList<>();
+            for(var kind:List.of(AssetCardMapper.HistoryKind.FEATURE,AssetCardMapper.HistoryKind.TRADE,
+                    AssetCardMapper.HistoryKind.LABEL,AssetCardMapper.HistoryKind.INFERENCE)) {
+                if(history.size()==batchSize) break;
+                Duration retention=kind==AssetCardMapper.HistoryKind.TRADE?tradeRetention:kind==AssetCardMapper.HistoryKind.LABEL?labelRetention:featureRetention;
+                Instant cutoff=earlier(now.minus(retention),protectedFrom);
+                if(!cutoff.isAfter(Instant.EPOCH)) continue;
+                history.addAll(mapper.selectHistoryPage(symbol,kind,Instant.EPOCH,cutoff,now,null,null,batchSize-history.size()));
+            }
+            Instant barCutoff=earlier(now.minus(barRetention),protectedFrom);
+            var barRows=history.size()==batchSize?List.<AssetCardMarketDataService.SpotBar>of():
+                    mapper.selectArchiveBars(symbol,barCutoff,now,batchSize-history.size());
+            if(history.isEmpty() && barRows.isEmpty()) return new Result(protectedCount==0?"NOTHING_EXPIRED":"PENDING_LABEL_DEPENDENCIES_PRESERVED",0,0,protectedCount);
+            var contents=new AssetCardMapper.VerifiedArchive(1,"ASSET_CARD_HISTORY_ARCHIVE_V1",symbol,history.size(),barRows.size(),history,barRows);
+            ArchiveFile archive=publish(root,symbol,contents);
+            // Re-open bytes from disk through exactly the verifier used immediately before every delete.
+            var restored=AssetCardMapper.readVerifiedArchive(archive.path(),archive.sha256(),symbol);
+            if(!restored.history().equals(history) || !restored.bars().equals(barRows))
+                throw new RetentionFailure("RETENTION_ARCHIVE_RESTORE_MISMATCH_DATA_PRESERVED");
+            int deleted=0;
+            for(var kind:AssetCardMapper.HistoryKind.values()) {
+                var selected=history.stream().filter(r -> r.recordKind()==kind).toList();
+                if(selected.isEmpty()) continue;
+                Duration duration=kind==AssetCardMapper.HistoryKind.TRADE?tradeRetention:kind==AssetCardMapper.HistoryKind.LABEL?labelRetention:featureRetention;
+                var confirmation=new AssetCardMapper.ArchiveConfirmation(symbol,kind,selected.stream().map(AssetCardMapper.TypedHistory::recordKey).toList(),
+                        Instant.EPOCH,earlier(now.minus(duration),protectedFrom),now,archive.sha256(),now,archive.path());
+                deleted+=mapper.pruneArchivedHistory(confirmation,batchSize);
+            }
+            if(!barRows.isEmpty()) deleted+=mapper.pruneArchivedBars(new AssetCardMapper.BarArchiveConfirmation(symbol,
+                    barRows.stream().map(b -> new AssetCardMapper.BarIdentity(b.interval(),b.openTime())).toList(),Instant.EPOCH,
+                    barCutoff,now,archive.sha256(),now,archive.path()),batchSize);
+            return new Result("ARCHIVED_VERIFIED_AND_PRUNED",history.size()+barRows.size(),deleted,protectedCount);
+        }
+        private record ArchiveFile(Path path,String sha256) {}
+        private ArchiveFile publish(Path root,String symbol,AssetCardMapper.VerifiedArchive contents) {
+            try {
+                byte[] bytes=json.writeValueAsBytes(contents);
+                if(bytes.length>32*1024*1024) throw new RetentionFailure("RETENTION_BATCH_TOO_LARGE_DATA_PRESERVED");
+                checkSpace(root,minimumFreeBytes,Math.multiplyExact((long)bytes.length,2));
+                Path directory=root.resolve(symbol);
+                if(!java.nio.file.Files.exists(directory)) {
+                    try { java.nio.file.Files.createDirectory(directory,java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                            java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))); }
+                    catch(java.nio.file.FileAlreadyExistsException concurrent) { /* Verify the winner's directory below. */ }
+                }
+                checkedRoot(directory);
+                String digest=LabelPipeline.sha(bytes); Path target=directory.resolve(digest+".json");
+                if(!java.nio.file.Files.exists(target,java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    Path temporary=java.nio.file.Files.createTempFile(directory,"archive-",".partial");
+                    try(var channel=java.nio.channels.FileChannel.open(temporary,java.nio.file.StandardOpenOption.WRITE)) {
+                        var buffer=java.nio.ByteBuffer.wrap(bytes); while(buffer.hasRemaining()) channel.write(buffer); channel.force(true);
+                    }
+                    // Same filesystem, immutable content-addressed name. A pre-existing winner is verified; never overwritten.
+                    try { java.nio.file.Files.move(temporary,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE); }
+                    catch(java.nio.file.FileAlreadyExistsException concurrent) { java.nio.file.Files.delete(temporary); }
+                    try(var parent=java.nio.channels.FileChannel.open(directory,java.nio.file.StandardOpenOption.READ)) { parent.force(true); }
+                }
+                AssetCardMapper.readVerifiedArchive(target,digest,symbol);
+                checkSpace(root,minimumFreeBytes,0);
+                return new ArchiveFile(target,digest);
+            } catch(java.io.IOException failure) { throw new RetentionFailure("RETENTION_ARCHIVE_IO_FAILED_DATA_PRESERVED"); }
+        }
+        private static Instant earlier(Instant a,Instant b) { return a.isBefore(b)?a:b; }
+        private static Path checkedRoot(Path root) {
+            try {
+                if(root==null || java.nio.file.Files.isSymbolicLink(root) || !java.nio.file.Files.isDirectory(root,java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                    throw new RetentionFailure("RETENTION_ARCHIVE_DIRECTORY_UNAVAILABLE_DATA_PRESERVED");
+                var permissions=java.nio.file.Files.getPosixFilePermissions(root,java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                if(permissions.contains(java.nio.file.attribute.PosixFilePermission.GROUP_WRITE)
+                        || permissions.contains(java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE))
+                    throw new RetentionFailure("RETENTION_ARCHIVE_DIRECTORY_UNSAFE_DATA_PRESERVED");
+                return root.toRealPath();
+            } catch(java.io.IOException failure) { throw new RetentionFailure("RETENTION_ARCHIVE_DIRECTORY_UNAVAILABLE_DATA_PRESERVED"); }
+        }
+        private static void checkSpace(Path root,long minimum,long reserve) {
+            try {
+                if(minimum<1 || java.nio.file.Files.getFileStore(root).getUsableSpace()<Math.addExact(minimum,reserve))
+                    throw new RetentionFailure("RETENTION_LOW_SPACE_DATA_PRESERVED");
+            } catch(java.io.IOException | ArithmeticException failure) { throw new RetentionFailure("RETENTION_SPACE_CHECK_FAILED_DATA_PRESERVED"); }
+        }
+        private static final class RetentionFailure extends IllegalStateException { RetentionFailure(String reason) { super(reason); } }
+        /** Verified archive read-through, preserving original observations and clocks; no database restore/write. */
+        static final class ArchiveCatalog {
+            final Map<String,AssetCardMapper.TypedHistory> history=new LinkedHashMap<>();
+            final Map<String,AssetCardMarketDataService.SpotBar> bars=new LinkedHashMap<>();
+            static ArchiveCatalog load(Path root,String symbol,ObjectMapper json) {
+                var catalog=new ArchiveCatalog();
+                if(root==null) return catalog;
+                Path directory=checkedRoot(root).resolve(symbol);
+                if(!java.nio.file.Files.exists(directory,java.nio.file.LinkOption.NOFOLLOW_LINKS)) return catalog;
+                checkedRoot(directory);
+                try(var files=java.nio.file.Files.list(directory)) {
+                    long bytes=0; int count=0;
+                    for(Path file:files.sorted().toList()) {
+                        if(file.getFileName().toString().endsWith(".partial")) continue; // Never a committed archive or cleanup proof.
+                        String name=file.getFileName().toString();
+                        if(!name.matches("[0-9a-f]{64}\\.json")) throw new RetentionFailure("RETENTION_UNRECOGNIZED_ARCHIVE_DATA_PRESERVED");
+                        if(++count>8192 || (bytes+=java.nio.file.Files.size(file))>128L*1024*1024)
+                            throw new RetentionFailure("RETENTION_ARCHIVE_SCAN_BUDGET_DATA_PRESERVED");
+                        var archive=AssetCardMapper.readVerifiedArchive(file,name.substring(0,64),symbol);
+                        for(var row:archive.history()) merge(catalog.history,row.recordKind()+":"+row.recordKey(),row);
+                        for(var bar:archive.bars()) merge(catalog.bars,bar.interval()+":"+bar.openTime(),bar);
+                    }
+                    return catalog;
+                } catch(java.io.IOException failure) { throw new RetentionFailure("RETENTION_ARCHIVE_READ_FAILED_DATA_PRESERVED"); }
+            }
+            private static <T> void merge(Map<String,T> rows,String key,T value) {
+                T old=rows.putIfAbsent(key,value);
+                if(old!=null && !old.equals(value)) throw new RetentionFailure("RETENTION_IMMUTABLE_ARCHIVE_IDENTITY_CONFLICT");
+            }
+        }
+    }
+
     static final class LabelPipeline {
         static final String LABEL_DEFINITION = "ATR_FIRST_TOUCH_LONG_1_0.75_SHORT_SYMMETRIC_TIMEOUT_FAIL_1M_AMBIGUITY_EXCLUDED";
         private final AssetCardMapper mapper;
         private final ObjectMapper json;
+        private final Path archiveRoot;
+        private final Map<String,RetentionLifecycle.ArchiveCatalog> archives=new HashMap<>();
         LabelPipeline(AssetCardMapper mapper, ObjectMapper json) {
+            this(mapper,json,null,null);
+        }
+        LabelPipeline(AssetCardMapper mapper,ObjectMapper json,Path archiveRoot) {
+            this(mapper,json,archiveRoot,null);
+        }
+        private LabelPipeline(AssetCardMapper mapper,ObjectMapper json,Path archiveRoot,RetentionLifecycle.ArchiveCatalog catalog) {
             this.mapper = mapper;
+            this.archiveRoot=archiveRoot;
+            if(catalog!=null && !catalog.history.isEmpty()) archives.put(catalog.history.values().iterator().next().symbol(),catalog);
             this.json = json.copy().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                     .enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        }
+        private RetentionLifecycle.ArchiveCatalog archive(String symbol) {
+            return archives.computeIfAbsent(symbol,s -> RetentionLifecycle.ArchiveCatalog.load(archiveRoot,s,json));
+        }
+        private List<AssetCardMarketDataService.SpotBar> labelBars(String symbol,String interval,Instant first,Instant last,Instant cutoff) {
+            Map<String,AssetCardMarketDataService.SpotBar> rows=new TreeMap<>();
+            for(var b:archive(symbol).bars.values()) if(b.interval().equals(interval) && !b.openTime().isBefore(first)
+                    && b.openTime().isBefore(last) && !b.availableAt().isAfter(cutoff)) rows.put(b.openTime().toString(),b);
+            for(var b:mapper.selectLabelBars(symbol,interval,first,last,cutoff)) RetentionLifecycle.ArchiveCatalog.merge(rows,b.openTime().toString(),b);
+            return new ArrayList<>(rows.values());
+        }
+        private Optional<AssetCardMapper.TypedHistory> horizonTrade(String symbol,Instant first,Instant end) {
+            var rows=new ArrayList<AssetCardMapper.TypedHistory>();
+            for(var row:archive(symbol).history.values()) if(row.recordKind()==AssetCardMapper.HistoryKind.TRADE
+                    && !row.signalAsOf().isBefore(first) && !row.signalAsOf().isAfter(end) && !row.availableAt().isAfter(end)) rows.add(row);
+            mapper.selectHorizonTrade(symbol,first,end).ifPresent(rows::add);
+            return rows.stream().max(Comparator.comparing(AssetCardMapper.TypedHistory::signalAsOf).thenComparing(AssetCardMapper.TypedHistory::recordKey));
+        }
+        private List<AssetCardMapper.TypedHistory> inferencePage(String symbol,Instant from,Instant to,Instant cutoff,
+                                                                AssetCardMapper.TypedHistory cursor) {
+            var order=Comparator.comparing(AssetCardMapper.TypedHistory::signalAsOf).thenComparing(AssetCardMapper.TypedHistory::recordKey);
+            Map<String,AssetCardMapper.TypedHistory> records=new HashMap<>();
+            for(var row:archive(symbol).history.values()) if(row.recordKind()==AssetCardMapper.HistoryKind.INFERENCE
+                    && !row.signalAsOf().isBefore(from) && row.signalAsOf().isBefore(to) && !row.availableAt().isAfter(cutoff)
+                    && (cursor==null || order.compare(row,cursor)>0)) records.put(row.recordKey(),row);
+            for(var row:mapper.selectHistoryPage(symbol,AssetCardMapper.HistoryKind.INFERENCE,from,to,cutoff,
+                    cursor==null?null:cursor.signalAsOf(),cursor==null?null:cursor.recordKey(),128))
+                RetentionLifecycle.ArchiveCatalog.merge(records,row.recordKey(),row);
+            return records.values().stream().sorted(order).limit(128).toList();
         }
         record Outcome(Integer y, String outcome) {}
         record Materialized(String status, Map<String,Object> record, Instant maturedAt, String evidenceSha256) {}
@@ -991,11 +1233,11 @@ public class AssetCardService implements AutoCloseable {
                 Instant first=Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(),300)*300);
                 Instant last=Instant.ofEpochSecond(Math.floorDiv(end.getEpochSecond(),300)*300);
                 if (last.isBefore(end)) last=last.plusSeconds(300);
-                var five=mapper.selectLabelBars(frame.symbol(),"5m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
-                var one=mapper.selectLabelBars(frame.symbol(),"1m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
+                var five=labelBars(frame.symbol(),"5m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
+                var one=labelBars(frame.symbol(),"1m",first,last,cutoff).stream().map(AssetCardService::featureBar).toList();
                 int fiveCount=(int)Duration.between(first,last).toSeconds()/300;
                 if (!contiguous(five,first,fiveCount,300) || !contiguous(one,first,fiveCount*5,60)) return pending("PENDING_COMPLETE_1M_5M_HORIZON");
-                var horizonRow=mapper.selectHorizonTrade(frame.symbol(),start,end).orElse(null);
+                var horizonRow=horizonTrade(frame.symbol(),start,end).orElse(null);
                 if (horizonRow==null) return pending("MISSING_POINT_IN_TIME_HORIZON_TRADE");
                 var horizon=json.treeToValue(json.readTree(horizonRow.payloadJson()).path("observation"),AssetCardFeatureService.Observation.class);
                 if (!AssetCardFeatureService.usableObservation(frame.symbol(),"spotPrice",horizon,end)
@@ -1034,6 +1276,7 @@ public class AssetCardService implements AutoCloseable {
         @SuppressWarnings("unchecked")
         void save(AssetCardMapper.TypedHistory inference,Materialized item) {
             try {
+                if(persisted(inference,item,item.maturedAt())) return; // A verified archived pair is already durable; do not recreate pruned labels.
                 var labels=(Map<String,Map<String,Object>>)item.record().get("labelResults");
                 for (var label:labels.values()) {
                     String encoded=json.writeValueAsString(payload("label",label,"evidenceSha256",item.evidenceSha256(),
@@ -1047,7 +1290,12 @@ public class AssetCardService implements AutoCloseable {
         private boolean persisted(AssetCardMapper.TypedHistory inference,Materialized item,Instant cutoff) {
             var raw=(AssetCardFeatureService.RawFrame)item.record().get("rawFrame");
             Set<String> sides=new HashSet<>();
-            for (var row:mapper.selectHistory(inference.symbol(),AssetCardMapper.HistoryKind.LABEL,raw.signalAsOf(),raw.signalAsOf(),cutoff,100)) {
+            var persistedRows=new LinkedHashMap<String,AssetCardMapper.TypedHistory>();
+            for(var row:archive(inference.symbol()).history.values()) if(row.recordKind()==AssetCardMapper.HistoryKind.LABEL
+                    && sameDatabaseInstant(row.signalAsOf(),raw.signalAsOf()) && !row.availableAt().isAfter(cutoff)) persistedRows.put(row.recordKey(),row);
+            for(var row:mapper.selectHistory(inference.symbol(),AssetCardMapper.HistoryKind.LABEL,raw.signalAsOf(),raw.signalAsOf(),cutoff,100))
+                RetentionLifecycle.ArchiveCatalog.merge(persistedRows,row.recordKey(),row);
+            for (var row:persistedRows.values()) {
                 try {
                     var saved=json.readTree(row.payloadJson());
                     String side=saved.path("label").path("side").asText();
@@ -1082,8 +1330,7 @@ public class AssetCardService implements AutoCloseable {
                         java.nio.file.StandardOpenOption.CREATE_NEW),digest)) {
                     while (true) {
                         // Inference identity uses the preceding closed bar; raw signal time is checked separately below.
-                        var rows=mapper.selectHistoryPage(symbol,AssetCardMapper.HistoryKind.INFERENCE,from.minusSeconds(300),to,cutoff,
-                                cursor==null?null:cursor.signalAsOf(),cursor==null?null:cursor.recordKey(),128);
+                        var rows=inferencePage(symbol,from.minusSeconds(300),to,cutoff,cursor);
                         if (rows.isEmpty()) break;
                         for (var row:rows) {
                             cursor=row;
@@ -1092,6 +1339,12 @@ public class AssetCardService implements AutoCloseable {
                             var raw=(AssetCardFeatureService.RawFrame)item.record().get("rawFrame");
                             if (raw.signalAsOf().isBefore(from) || !raw.signalAsOf().isBefore(to)) continue;
                             if (!persisted(row,item,cutoff)) { excluded.merge("MATURE_LABEL_NOT_PERSISTED_OR_IDENTITY_MISMATCH",1L,Long::sum); continue; }
+                            var trainingFrame=new AssetCardFeatureService().build(raw);
+                            if(!trainingFrame.trainingEligible()) {
+                                excluded.merge("COINGLASS_EVIDENCE_UNQUALIFIED",1L,Long::sum);
+                                for(String reason:trainingFrame.trainingQualificationReasons()) excluded.merge(reason,1L,Long::sum);
+                                continue;
+                            }
                             var recordSources=sourceIdentities(item.record());
                             if (!recordSources.values().stream().anyMatch(s -> s.get("provider").equals("COINGLASS"))) {
                                 excluded.merge("MISSING_SEPARATE_COINGLASS_PROVENANCE",1L,Long::sum); continue;

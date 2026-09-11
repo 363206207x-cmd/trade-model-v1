@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.HexFormat;
+import java.nio.file.Path;
 
 /** Card-owned persistence only. Canonical OHLCV access below is strictly read-only. */
 @Repository
@@ -153,7 +154,31 @@ public class AssetCardMapper {
     /** Exact closed-bar identity, including timeout/failure results; no processing timestamp participates in the key. */
     public int saveInference(String symbol, Instant closed5mAt, Instant availableAt, String json) {
         Instant close = canonicalClose(closed5mAt);
-        return saveHistory(symbol, HistoryKind.INFERENCE, "5m:" + close, close, availableAt, json);
+        return withRetentionLock(symbol, () -> saveHistory(symbol, HistoryKind.INFERENCE, "5m:" + close, close, availableAt, json));
+    }
+
+    /** Serializes retention against late inference creation across instances; unrelated symbols keep running. */
+    public <T> T withRetentionLock(String symbol,java.util.function.Supplier<T> action) {
+        requireSymbol(symbol); Objects.requireNonNull(action);
+        var manager=new org.springframework.jdbc.datasource.DataSourceTransactionManager(Objects.requireNonNull(jdbc.getDataSource()));
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(manager);
+        transaction.setTimeout(30);
+        return transaction.execute(status -> {
+            if(postgres) jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", rs -> null,"asset-card-retention:"+symbol);
+            return action.get();
+        });
+    }
+
+    public record StorageUsage(long snapshotRows,long barRows,long historyRows,long databaseBytes,long walBytes,boolean postgres) {
+        public long totalRows() { return Math.addExact(Math.addExact(snapshotRows,barRows),historyRows); }
+    }
+    /** Aggregate card counts and current-database storage only: never reads other business contents. */
+    public StorageUsage storageUsage() {
+        return jdbc.queryForObject("SELECT (SELECT count(*) FROM tm_asset_card_snapshot) AS snapshots,"
+                +"(SELECT count(*) FROM tm_asset_card_spot_bar) AS bars,(SELECT count(*) FROM tm_asset_card_feature_history) AS history,"
+                +(postgres ? "pg_database_size(current_database()) AS bytes,pg_wal_lsn_diff(pg_current_wal_lsn(),'0/0') AS wal"
+                : "CAST(0 AS BIGINT) AS bytes,CAST(0 AS BIGINT) AS wal"),
+                (rs,row) -> new StorageUsage(rs.getLong("snapshots"),rs.getLong("bars"),rs.getLong("history"),rs.getLong("bytes"),rs.getLong("wal"),postgres));
     }
 
     public Optional<TypedHistory> selectInference(String symbol, Instant closed5mAt, Instant availableAtCutoff) {
@@ -222,6 +247,22 @@ public class AssetCardMapper {
     public List<String> selectInferenceSymbols() {
         return jdbc.query("SELECT DISTINCT symbol FROM tm_asset_card_feature_history WHERE record_kind='INFERENCE' ORDER BY symbol",
                 (rs, row) -> rs.getString(1));
+    }
+
+    /** Card-owned inventory only; unsubscribed historical symbols still require retention processing. */
+    public List<String> selectRetentionSymbols() {
+        return jdbc.query("SELECT symbol FROM tm_asset_card_feature_history UNION SELECT symbol FROM tm_asset_card_spot_bar ORDER BY symbol",
+                (rs, row) -> rs.getString(1));
+    }
+
+    public List<SpotBar> selectArchiveBars(String symbol, Instant before, Instant cutoff, int limit) {
+        requireSymbol(symbol); Objects.requireNonNull(before); Objects.requireNonNull(cutoff);
+        return jdbc.query("SELECT * FROM tm_asset_card_spot_bar WHERE symbol=? AND close_time<? AND available_at<=? ORDER BY close_time,interval_code,open_time LIMIT ?",
+                (rs, row) -> new SpotBar(rs.getString("symbol"),rs.getString("interval_code"),instant(rs,"open_time"),
+                        instant(rs,"close_time"),rs.getBigDecimal("open_price"),rs.getBigDecimal("high_price"),
+                        rs.getBigDecimal("low_price"),rs.getBigDecimal("close_price"),rs.getBigDecimal("volume"),
+                        rs.getBigDecimal("taker_buy_base_volume"),rs.getObject("trade_count",Long.class),instant(rs,"available_at")),
+                symbol,utc(before),utc(cutoff),cleanupLimit(limit));
     }
 
     public List<SpotBar> selectLabelBars(String symbol, String interval, Instant from, Instant to, Instant cutoff) {
@@ -300,34 +341,50 @@ public class AssetCardMapper {
     /** The caller must verify the archive file/manifest before supplying this exact immutable scope. Never called by a read endpoint. */
     public int pruneArchivedHistory(ArchiveConfirmation confirmation, int limit) {
         if (confirmation == null) throw new IllegalArgumentException("Verified archive confirmation required");
+        var archive = readVerifiedArchive(confirmation.archiveFile(), confirmation.manifestSha256(), confirmation.symbol());
+        var archived = archive.history().stream().collect(java.util.stream.Collectors.toMap(
+                row -> row.recordKind()+":"+row.recordKey(), java.util.function.Function.identity()));
         requireCleanupPermission();
         int deleted = 0;
         for (String key : confirmation.recordKeys().stream().limit(cleanupLimit(limit)).toList()) {
+            var row = archived.get(confirmation.recordKind()+":"+key);
+            if (row == null) throw new IllegalArgumentException("Confirmed history is absent from verified archive");
             deleted += jdbc.update("""
                     DELETE FROM tm_asset_card_feature_history WHERE symbol=? AND record_kind=? AND record_key=?
-                    AND signal_as_of>=? AND signal_as_of<? AND available_at<=?
+                    AND signal_as_of>=? AND signal_as_of<? AND available_at<=? AND signal_as_of=? AND available_at=? AND payload_json=? AND version_no=1
                     """, confirmation.symbol(), confirmation.recordKind().name(), key, utc(confirmation.fromInclusive()),
-                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()));
+                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()),utc(row.signalAsOf()),utc(row.availableAt()),row.payloadJson());
         }
         return deleted;
     }
 
     public int pruneArchivedBars(BarArchiveConfirmation confirmation, int limit) {
         if (confirmation == null) throw new IllegalArgumentException("Verified archive confirmation required");
+        var archive = readVerifiedArchive(confirmation.archiveFile(), confirmation.manifestSha256(), confirmation.symbol());
+        var archived = archive.bars().stream().collect(java.util.stream.Collectors.toMap(
+                row -> new BarIdentity(row.interval(),row.openTime()),java.util.function.Function.identity()));
         requireCleanupPermission();
         int deleted = 0;
         for (BarIdentity bar : confirmation.bars().stream().limit(cleanupLimit(limit)).toList()) {
+            var row=archived.get(bar);
+            if(row==null) throw new IllegalArgumentException("Confirmed bar is absent from verified archive");
             deleted += jdbc.update("""
                     DELETE FROM tm_asset_card_spot_bar WHERE symbol=? AND interval_code=? AND open_time=?
-                    AND close_time>=? AND close_time<? AND available_at<=?
+                    AND close_time>=? AND close_time<? AND available_at<=? AND close_time=? AND available_at=?
+                    AND open_price=? AND high_price=? AND low_price=? AND close_price=? AND volume=?
+                    AND taker_buy_base_volume IS NOT DISTINCT FROM ? AND trade_count IS NOT DISTINCT FROM ?
                     """, confirmation.symbol(), bar.interval(), utc(bar.openTime()), utc(confirmation.fromInclusive()),
-                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()));
+                    utc(confirmation.toExclusive()), utc(confirmation.availableAtCutoff()),utc(row.closeTime()),utc(row.availableAt()),
+                    row.open(),row.high(),row.low(),row.close(),row.volume(),row.takerBuyBaseVolume(),row.tradeCount());
         }
         return deleted;
     }
 
     private void requireCleanupPermission() {
-        if (postgres && !inspectWriterPermissions().cleanupAllowed())
+        // Reuse the transaction-bound dedicated connection. Borrowing a second pool connection while a
+        // retention lock is held could starve a bounded pool behind another waiting inference transaction.
+        if (postgres && !Boolean.TRUE.equals(jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Boolean>) connection ->
+                AssetCardDataSourceConfiguration.verify(connection,connection.getCatalog()).allowed())))
             throw new IllegalStateException("Card archive cleanup permission has not been verified");
     }
 
@@ -341,7 +398,10 @@ public class AssetCardMapper {
                                Instant availableAt, String payloadJson) {}
     public record WriterReadiness(boolean writable, boolean cleanupAllowed, String reason) {}
     public record ArchiveConfirmation(String symbol, HistoryKind recordKind, List<String> recordKeys, Instant fromInclusive,
-                                      Instant toExclusive, Instant availableAtCutoff, String manifestSha256, Instant archivedAt) {
+                                      Instant toExclusive, Instant availableAtCutoff, String manifestSha256, Instant archivedAt, Path archiveFile) {
+        public ArchiveConfirmation(String symbol,HistoryKind kind,List<String> keys,Instant from,Instant to,Instant cutoff,String sha,Instant archivedAt) {
+            this(symbol,kind,keys,from,to,cutoff,sha,archivedAt,null);
+        }
         public ArchiveConfirmation {
             validateArchive(symbol, fromInclusive, toExclusive, availableAtCutoff, manifestSha256, archivedAt);
             if (recordKind == null || recordKeys == null || recordKeys.isEmpty() || recordKeys.size() > 500
@@ -358,12 +418,57 @@ public class AssetCardMapper {
         }
     }
     public record BarArchiveConfirmation(String symbol, List<BarIdentity> bars, Instant fromInclusive, Instant toExclusive,
-                                         Instant availableAtCutoff, String manifestSha256, Instant archivedAt) {
+                                         Instant availableAtCutoff, String manifestSha256, Instant archivedAt, Path archiveFile) {
+        public BarArchiveConfirmation(String symbol,List<BarIdentity> bars,Instant from,Instant to,Instant cutoff,String sha,Instant archivedAt) {
+            this(symbol,bars,from,to,cutoff,sha,archivedAt,null);
+        }
         public BarArchiveConfirmation {
             validateArchive(symbol, fromInclusive, toExclusive, availableAtCutoff, manifestSha256, archivedAt);
             if (bars == null || bars.isEmpty() || bars.size() > 500 || bars.stream().anyMatch(Objects::isNull)
                     || Set.copyOf(bars).size() != bars.size()) throw new IllegalArgumentException("Exact unique archived bars required");
             bars = List.copyOf(bars);
+        }
+    }
+
+    /** Complete immutable row contents, not a caller-supplied claim that archival happened. */
+    public record VerifiedArchive(int schemaVersion,String archiveKind,String symbol,int historyCount,int barCount,
+                                  List<TypedHistory> history,List<SpotBar> bars) {}
+
+    public static VerifiedArchive readVerifiedArchive(Path file,String expectedSha,String symbol) {
+        requireSymbol(symbol);
+        try {
+            if(file==null || expectedSha==null || !expectedSha.matches("[0-9a-f]{64}")
+                    || java.nio.file.Files.isSymbolicLink(file) || !java.nio.file.Files.isRegularFile(file,java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || !file.getFileName().toString().equals(expectedSha+".json") || java.nio.file.Files.size(file)>32L*1024*1024)
+                throw new IllegalArgumentException("Actual bounded immutable archive file required");
+            byte[] bytes=java.nio.file.Files.readAllBytes(file);
+            if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(expectedSha))
+                throw new IllegalArgumentException("Archive checksum mismatch");
+            var objectMapper=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+            var archive=objectMapper.readValue(bytes,VerifiedArchive.class);
+            if(archive.schemaVersion()!=1 || !"ASSET_CARD_HISTORY_ARCHIVE_V1".equals(archive.archiveKind()) || !symbol.equals(archive.symbol())
+                    || archive.history()==null || archive.bars()==null || archive.historyCount()!=archive.history().size()
+                    || archive.barCount()!=archive.bars().size() || archive.historyCount()+archive.barCount()<1
+                    || archive.historyCount()+archive.barCount()>500)
+                throw new IllegalArgumentException("Archive identity/count mismatch");
+            Set<String> identities=new java.util.HashSet<>();
+            for(var row:archive.history()) {
+                if(row==null || !symbol.equals(row.symbol()) || row.recordKind()==null || row.recordKey()==null || row.recordKey().isBlank()
+                        || row.recordKey().length()>128 || row.signalAsOf()==null || row.availableAt()==null || row.availableAt().isBefore(row.signalAsOf())
+                        || row.payloadJson()==null || !identities.add(row.recordKind()+":"+row.recordKey()))
+                    throw new IllegalArgumentException("Invalid immutable history row in archive");
+                objectMapper.readTree(row.payloadJson());
+            }
+            for(var row:archive.bars()) {
+                if(row==null || !symbol.equals(row.symbol()) || !Set.of("1m","5m","15m","1h","4h").contains(row.interval())
+                        || row.openTime()==null || row.closeTime()==null || !row.closeTime().isAfter(row.openTime())
+                        || row.availableAt()==null || row.availableAt().isBefore(row.closeTime()) || row.open()==null || row.high()==null
+                        || row.low()==null || row.close()==null || row.volume()==null || !identities.add("BAR:"+row.interval()+":"+row.openTime()))
+                    throw new IllegalArgumentException("Invalid immutable bar row in archive");
+            }
+            return archive;
+        } catch(java.io.IOException | java.security.NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("CARD_ARCHIVE_READ_OR_VERIFICATION_FAILED",failure);
         }
     }
 

@@ -32,7 +32,7 @@ class NativeStagingAssetCardInfrastructureContractTest {
                 "asset-card-runtime-preflight.sh", "asset-card-runtime-manifest.template", "asset-card-runtime-install.sh"))
             assertThat(SOURCE.resolve(name)).isRegularFile();
         String dropin=Files.readString(SOURCE.resolve("rine-logic-asset-card.conf.template"));
-        assertThat(dropin).contains("LoadCredential=", "ReadOnlyPaths=", "MODEL_MODE=SHADOW", "WRITER_ENABLED=false");
+        assertThat(dropin).contains("LoadCredential=", "ReadOnlyPaths=", "MODEL_MODE=SHADOW", "WRITER_ENABLED=@CARD_ENABLED@");
         assertThat(dropin).doesNotContain("ExecStart=", "EnvironmentFile=", "active.env", "ai.env");
         for (String name : List.of("asset-card-runtime-install.sh", "asset-card-model-install.sh", "asset-card-runtime-credentials.sh")) {
             String source=Files.readString(SOURCE.resolve(name));
@@ -321,6 +321,133 @@ class NativeStagingAssetCardInfrastructureContractTest {
         }
     }
 
+    @Test void preparedAttachmentBindsAllCardSwitchesOffAndHasNoImplicitWindowOrRestart() throws Exception {
+        Fixture fixture=fixture();
+        Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY");
+        assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+        String rendered=Files.readString(cardDropin(fixture));
+        assertThat(rendered).contains("ASSET_CARD_ENABLED=false", "EXTERNAL_CALLS_ENABLED=false", "WRITER_ENABLED=false", "RETENTION_ENABLED=false")
+                .doesNotContain("COLLECTION_WINDOW_", "NOT_CONFIGURED", "@CARD_ENABLED@", "ExecStart=", "active.env", "ai.env");
+        var properties=bindRenderedEnvironment(rendered);
+        assertThat(properties.isEnabled()).isFalse();
+        assertThat(properties.isExternalCallsEnabled()).isFalse();
+        assertThat(properties.isWriterEnabled()).isFalse();
+        assertThat(properties.isRetentionEnabled()).isFalse();
+        assertThat(properties.getCollectionWindow().valid()).isFalse();
+        assertThat(properties.getCollectionWindow().getStartsAt()).isNull();
+        assertThat(properties.getModelMode()).isEqualTo(org.example.trademodel.assetcard.AssetCardProperties.ModelMode.SHADOW);
+        assertThat(applied.output()).contains("CARD_STARTUP_MODE=PREPARED", "RESTART_REQUIRED=YES", "SYSTEMD_CHANGE_EXECUTION=NO");
+    }
+
+    @Test void armedAttachmentRequiresDistinctConfirmationAndBindsTheExactFiniteJavaPlan() throws Exception {
+        Fixture fixture=armedFixture();
+        String base=Files.readString(fixture.root().resolve("etc/systemd/system/rine-logic.service"));
+        assertThat(run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_DROPIN_ONLY").output())
+                .contains("EXPLICIT_CONFIRMATION_REQUIRED");
+        assertThat(cardDropin(fixture)).doesNotExist();
+        Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY");
+        assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+        assertThat(applied.output()).contains("CARD_STARTUP_MODE=ARMED", "DATABASE_FILESYSTEM_EVIDENCE=REVIEWED_DECLARATION_ONLY",
+                "VISIBLE_COLLECTION_DIRECTORIES_DEVICE_MATCH=YES", "RESTART_REQUIRED=YES", "SYSTEMD_CHANGE_EXECUTION=NO");
+        assertThat(Files.readString(fixture.root().resolve("etc/systemd/system/rine-logic.service"))).isEqualTo(base);
+        var properties=bindRenderedEnvironment(Files.readString(cardDropin(fixture)));
+        assertThat(properties.isEnabled()).isTrue();
+        assertThat(properties.isExternalCallsEnabled()).isTrue();
+        assertThat(properties.isWriterEnabled()).isTrue();
+        assertThat(properties.isRetentionEnabled()).isTrue();
+        assertThat(properties.isTrainingExportEnabled()).isFalse();
+        assertThat(properties.getModelMode()).isEqualTo(org.example.trademodel.assetcard.AssetCardProperties.ModelMode.SHADOW);
+        assertThat(properties.getBarRetention()).isEqualTo(java.time.Duration.ofHours(168));
+        assertThat(properties.getFeatureRetention()).isEqualTo(java.time.Duration.ofHours(720));
+        assertThat(properties.getTradeRetention()).isEqualTo(java.time.Duration.ofHours(168));
+        assertThat(properties.getLabelRetention()).isEqualTo(java.time.Duration.ofHours(2160));
+        assertThat(properties.getRetentionBatchSize()).isEqualTo(128);
+        assertThat(properties.getArchiveDirectory()).isEqualTo(Path.of("/var/lib/rine-logic/asset-card/archive"));
+        assertThat(properties.getArchiveMinimumFreeBytes()).isEqualTo(21_474_836_480L);
+        var plan=properties.getCollectionWindow();
+        assertThat(plan.valid()).isTrue();
+        assertThat(plan.getId()).isEqualTo("LOCAL_FIXTURE_WINDOW");
+        assertThat(plan.getStartsAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"COLLECTION_STARTS_AT")));
+        assertThat(plan.getEndsAt()).isEqualTo(plan.getStartsAt().plus(java.time.Duration.ofHours(8)));
+        assertThat(plan.getSymbols()).containsExactlyInAnyOrder("BTCUSDT","ETHUSDT","XRPUSDT");
+        assertThat(plan.getStateDirectory()).isEqualTo(Path.of("/var/lib/rine-logic/asset-card/collection"));
+        assertThat(plan.getSharedIpWeightAllowancePerMinute()).isEqualTo(500);
+        assertThat(plan.getSharedIpWeightLimitPerMinute()).isEqualTo(6000);
+        assertThat(plan.getSharedIpHeadroomConfirmedAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT")));
+        assertThat(plan.getMaximumRestRequests()).isEqualTo(288);
+        assertThat(plan.getMaximumRestWeight()).isEqualTo(72_000);
+        assertThat(plan.getMaximumConnectionAttempts()).isEqualTo(32);
+        assertThat(plan.getMaximumControlMessages()).isEqualTo(128);
+        assertThat(plan.getMaximumNewRows()).isEqualTo(1_100_000);
+        assertThat(plan.getMaximumDatabaseGrowthBytes()).isEqualTo(3_221_225_472L);
+        assertThat(plan.getMaximumWalGrowthBytes()).isEqualTo(8_589_934_592L);
+        assertThat(plan.getMinimumFreeBytes()).isEqualTo(21_474_836_480L);
+        assertThat(properties.getWriter().getMaximumPoolSize()).isEqualTo(2);
+        assertThat(properties.getWriter().getConnectionTimeout()).isEqualTo(java.time.Duration.ofSeconds(5));
+    }
+
+    @Test void unverifiedQuotaInvalidWindowOrExpandedBudgetCannotInstallAnArmedAttachment() throws Exception {
+        Fixture fixture=armedFixture(); String valid=Files.readString(fixture.manifest());
+        var invalid=java.util.Map.ofEntries(
+                java.util.Map.entry("CARD_STARTUP_MODE","ACTIVE"),
+                java.util.Map.entry("COLLECTION_WINDOW_ID","NOT_CONFIGURED"),
+                java.util.Map.entry("COLLECTION_STARTS_AT","2026-02-30T12:00:00Z"),
+                java.util.Map.entry("COLLECTION_ENDS_AT",java.time.Instant.parse(manifestValue(fixture,"COLLECTION_STARTS_AT")).plusSeconds(28801).toString()),
+                java.util.Map.entry("SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE","0"),
+                java.util.Map.entry("SHARED_IP_WEIGHT_LIMIT_PER_MINUTE","999"),
+                java.util.Map.entry("SHARED_IP_HEADROOM_CONFIRMED_AT","NOT_CONFIGURED"),
+                java.util.Map.entry("COLLECTION_SYMBOLS","BTCUSDT,BTCUSDT"),
+                java.util.Map.entry("MAXIMUM_REST_REQUESTS","289"),
+                java.util.Map.entry("MAXIMUM_REST_WEIGHT","72001"),
+                java.util.Map.entry("MAXIMUM_CONNECTION_ATTEMPTS","33"),
+                java.util.Map.entry("MAXIMUM_CONTROL_MESSAGES","129"),
+                java.util.Map.entry("MAXIMUM_NEW_ROWS","1100001"),
+                java.util.Map.entry("MAXIMUM_DATABASE_GROWTH_BYTES","3221225473"),
+                java.util.Map.entry("MAXIMUM_WAL_GROWTH_BYTES","8589934593"),
+                java.util.Map.entry("MINIMUM_FREE_BYTES","21474836479"),
+                java.util.Map.entry("COLLECTION_STATE_DIRECTORY","/tmp/escape"),
+                java.util.Map.entry("STORAGE_SAME_FILESYSTEM_VERIFIED","NO"),
+                java.util.Map.entry("DATABASE_FILESYSTEM_DEVICE","999999999"));
+        for(var entry:invalid.entrySet()) {
+            Files.writeString(fixture.manifest(),valid); replaceManifestValue(fixture,entry.getKey(),entry.getValue());
+            Result denied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY");
+            assertThat(denied.code()).as("Invalid %s must fail closed",entry.getKey()).isNotZero();
+            assertThat(cardDropin(fixture)).doesNotExist();
+        }
+        Files.writeString(fixture.manifest(),valid); replaceManifestValue(fixture,"COLLECTION_SYMBOLS","UNREGISTEREDUSDT");
+        assertThat(run("asset-card-runtime-install.sh",fixture).output()).contains("COLLECTION_SYMBOLS_INVALID");
+        Files.writeString(fixture.manifest(),valid); replaceManifestValue(fixture,"SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE","0500");
+        assertThat(run("asset-card-runtime-install.sh",fixture).output()).contains("COLLECTION_QUOTA_UNVERIFIED");
+        Files.writeString(fixture.manifest(),valid);
+        Files.setPosixFilePermissions(fixture.root().resolve("var/lib/rine-logic/asset-card/archive"),PosixFilePermissions.fromString("rwxrwxrwx"));
+        assertThat(run("asset-card-runtime-install.sh",fixture).output()).contains("COLLECTION_DIRECTORY_UNSAFE");
+    }
+
+    @Test void repeatedInstallationPreservesAbsoluteClocksAndStoppedLedgerAndExpiredPlansCannotOverwrite() throws Exception {
+        Fixture fixture=armedFixture();
+        Path ledger=fixture.root().resolve("var/lib/rine-logic/asset-card/collection/LOCAL_FIXTURE_WINDOW.json");
+        write(ledger,"{\"status\":\"STOPPED\",\"requests\":288,\"fixtureOnly\":true}\n","rw-------");
+        String beforeLedger=Files.readString(ledger);
+        for(int i=0;i<2;i++) {
+            Result applied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY");
+            assertThat(applied.code()).withFailMessage(applied.output()).isZero();
+            assertThat(Files.readString(ledger)).isEqualTo(beforeLedger);
+            var plan=bindRenderedEnvironment(Files.readString(cardDropin(fixture))).getCollectionWindow();
+            assertThat(plan.getStartsAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"COLLECTION_STARTS_AT")));
+            assertThat(plan.getEndsAt()).isEqualTo(java.time.Instant.parse(manifestValue(fixture,"COLLECTION_ENDS_AT")));
+        }
+        String oldDropin=Files.readString(cardDropin(fixture));
+        java.time.Instant ended=java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).minusSeconds(60);
+        replaceManifestValue(fixture,"COLLECTION_ENDS_AT",ended.toString());
+        replaceManifestValue(fixture,"COLLECTION_STARTS_AT",ended.minusSeconds(28800).toString());
+        replaceManifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT",ended.minusSeconds(28860).toString());
+        Result denied=run("asset-card-runtime-install.sh",fixture,"--apply","--confirm","INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY");
+        assertThat(denied.code()).isNotZero();
+        assertThat(denied.output()).contains("COLLECTION_WINDOW_EXPIRED");
+        assertThat(Files.readString(cardDropin(fixture))).isEqualTo(oldDropin);
+        assertThat(Files.readString(ledger)).isEqualTo(beforeLedger);
+    }
+
     @Test void bootstrapAndVerifyProveExactEffectivePrivilegesWithoutChangingOldAcls() throws Exception {
         boolean docker;
         try { docker= DockerClientFactory.instance().isDockerAvailable(); } catch (RuntimeException unavailable) { docker=false; }
@@ -509,6 +636,50 @@ class NativeStagingAssetCardInfrastructureContractTest {
                 .replace("REPLACE_DATABASE_NAME","test").replace("REPLACE_NON_SECRET_JDBC_URL","jdbc:postgresql://127.0.0.1:1/test");
         Path manifest=root.resolve("runtime.manifest"); write(manifest,template,"rw-------");
         return new Fixture(root,manifest);
+    }
+    private Fixture armedFixture() throws Exception {
+        Fixture fixture=fixture();
+        java.time.Instant confirmed=java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        replaceManifestValue(fixture,"CARD_STARTUP_MODE","ARMED");
+        replaceManifestValue(fixture,"COLLECTION_WINDOW_ID","LOCAL_FIXTURE_WINDOW");
+        replaceManifestValue(fixture,"COLLECTION_STARTS_AT",confirmed.plusSeconds(60).toString());
+        replaceManifestValue(fixture,"COLLECTION_ENDS_AT",confirmed.plusSeconds(60+28800).toString());
+        replaceManifestValue(fixture,"COLLECTION_SYMBOLS","BTCUSDT,ETHUSDT,XRPUSDT");
+        replaceManifestValue(fixture,"SHARED_IP_WEIGHT_ALLOWANCE_PER_MINUTE","500");
+        replaceManifestValue(fixture,"SHARED_IP_WEIGHT_LIMIT_PER_MINUTE","6000");
+        replaceManifestValue(fixture,"SHARED_IP_HEADROOM_CONFIRMED_AT",confirmed.toString());
+        for(String leaf:List.of("collection","archive")) {
+            Path path=fixture.root().resolve("var/lib/rine-logic/asset-card/"+leaf);
+            Files.createDirectories(path); Files.setPosixFilePermissions(path,PosixFilePermissions.fromString("rwx------"));
+        }
+        replaceManifestValue(fixture,"STORAGE_SAME_FILESYSTEM_VERIFIED","YES");
+        replaceManifestValue(fixture,"DATABASE_FILESYSTEM_DEVICE",Files.getAttribute(fixture.root(),"unix:dev").toString());
+        return fixture;
+    }
+    private static Path cardDropin(Fixture fixture) { return fixture.root().resolve("etc/systemd/system/rine-logic.service.d/40-asset-card.conf"); }
+    private static String manifestValue(Fixture fixture,String key) throws Exception {
+        return Files.readAllLines(fixture.manifest()).stream().filter(line->line.startsWith(key+"=")).findFirst().orElseThrow().substring(key.length()+1);
+    }
+    private static void replaceManifestValue(Fixture fixture,String key,String value) throws Exception {
+        String contents=Files.readString(fixture.manifest());
+        assertThat(contents.lines().filter(line->line.startsWith(key+"=")).count()).isEqualTo(1);
+        Files.writeString(fixture.manifest(),contents.replaceAll("(?m)^"+java.util.regex.Pattern.quote(key)+"=.*$",
+                java.util.regex.Matcher.quoteReplacement(key+"="+value)));
+    }
+    private static org.example.trademodel.assetcard.AssetCardProperties bindRenderedEnvironment(String dropin) {
+        java.util.Map<String,Object> variables=new java.util.LinkedHashMap<>();
+        dropin.lines().filter(line->line.startsWith("Environment=\"")).forEach(line->{
+            String pair=line.substring("Environment=\"".length(),line.length()-1); int separator=pair.indexOf('=');
+            assertThat(variables.put(pair.substring(0,separator),pair.substring(separator+1))).isNull();
+        });
+        var environment=new org.springframework.core.env.StandardEnvironment();
+        environment.getPropertySources().remove(org.springframework.core.env.StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+        environment.getPropertySources().remove(org.springframework.core.env.StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME);
+        environment.getPropertySources().addFirst(new org.springframework.core.env.SystemEnvironmentPropertySource("systemEnvironment",variables));
+        var properties=new org.example.trademodel.assetcard.AssetCardProperties();
+        org.springframework.boot.context.properties.bind.Binder.get(environment)
+                .bind("trade-model.asset-card",org.springframework.boot.context.properties.bind.Bindable.ofInstance(properties));
+        return properties;
     }
     private void replaceDeploymentMetadata(Fixture fixture,String content) throws Exception {
         Path metadata=fixture.root().resolve("opt/rine-logic/current/deployment-metadata.txt");

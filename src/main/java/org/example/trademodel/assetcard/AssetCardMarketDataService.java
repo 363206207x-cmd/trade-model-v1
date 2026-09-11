@@ -48,6 +48,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+import java.util.function.LongSupplier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.LinkOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 /** Independent, public Spot transport. Never calls a trading, analysis, AI or account API. */
 @Service
@@ -104,6 +115,8 @@ public class AssetCardMarketDataService implements AutoCloseable {
     private volatile Instant connectedAt;
     private volatile boolean stopped;
     private volatile BooleanSupplier writerReadiness = () -> false;
+    private final CollectionLease collectionLease;
+    private final Set<CompletableFuture<?>> depthRequests = ConcurrentHashMap.newKeySet();
 
     public AssetCardMarketDataService(AssetCardProperties properties, ObjectMapper json, AssetCardMapper mapper) {
         this(properties, json, mapper, null);
@@ -116,6 +129,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
         this.json = json;
         this.mapper = mapper;
         this.environment = environment;
+        this.collectionLease = new CollectionLease(properties.getCollectionWindow(), json, mapper::storageUsage);
     }
 
     private static ThreadPoolExecutor[] executors(String kind, int capacity) {
@@ -155,6 +169,8 @@ public class AssetCardMarketDataService implements AutoCloseable {
             if (!value.isEmpty()) next.add(value);
         });
         if (next.size() > 128) throw new IllegalArgumentException("Card stream capacity exceeded; no symbols were truncated");
+        if (!properties.getCollectionWindow().getSymbols().isEmpty())
+            next.retainAll(properties.getCollectionWindow().getSymbols());
         desiredSymbols = Set.copyOf(next);
         synchronized (priceLock) {
             quotes.keySet().removeIf(symbol -> !next.contains(symbol));
@@ -175,6 +191,29 @@ public class AssetCardMarketDataService implements AutoCloseable {
     public void addListener(Consumer<MarketUpdate> listener) { listeners.add(java.util.Objects.requireNonNull(listener)); }
     public void addTradeListener(Consumer<SpotQuote> listener) { tradeListeners.add(java.util.Objects.requireNonNull(listener)); }
     public void setWriterReadiness(BooleanSupplier readiness) { writerReadiness = java.util.Objects.requireNonNull(readiness); }
+    public String collectionStatus() { return collectionLease.status(); }
+    public boolean collectionAccepting(Instant now) {
+        return !stopped && properties.getModelMode() == AssetCardProperties.ModelMode.SHADOW && collectionLease.accepting(now);
+    }
+    void stopCollection(String reason, Instant now) {
+        collectionLease.stop(reason, now);
+        stopCardTransport();
+    }
+    private void stopCardTransport() {
+        disconnect();
+        pendingPrices.clear();
+        for (ThreadPoolExecutor[] group : List.of(tradeFrames, depthFrames, barFrames))
+            for (ThreadPoolExecutor executor : group) executor.getQueue().clear();
+    }
+
+    /** This watchdog owns only card transport; other schedulers and label evidence are not stopped. */
+    @Scheduled(fixedDelay = 250L, initialDelay = 1000L)
+    public void enforceCollectionWindow() {
+        if (!properties.isEnabled() || !properties.isExternalCallsEnabled() || stopped) return;
+        Instant now = Instant.now();
+        if (!writerReadiness.getAsBoolean() || properties.getModelMode() != AssetCardProperties.ModelMode.SHADOW) { stopCardTransport(); return; }
+        if (!collectionLease.check(now)) stopCardTransport();
+    }
 
     public List<String> depthBootstrapOrder() {
         return desiredSymbols.stream().sorted(Comparator.comparing((String symbol) -> !prioritySymbols.contains(symbol))
@@ -220,6 +259,8 @@ public class AssetCardMarketDataService implements AutoCloseable {
             return;
         }
         Instant now = Instant.now();
+        if (!writerReadiness.getAsBoolean() || properties.getModelMode() != AssetCardProperties.ModelMode.SHADOW
+                || !collectionLease.check(now)) { disconnect(); return; }
         if (socket != null) {
             if (controlInFlight && controlSentAt != null && !now.isBefore(controlSentAt.plusSeconds(10))) {
                 controlInFlight = false; rolloverRequested = true;
@@ -233,6 +274,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
         }
         if (now.isBefore(reconnectAfter)) return;
         if (!connecting.compareAndSet(false, true)) return;
+        if (!collectionLease.reserve("CONNECTION", now)) { connecting.set(false); disconnect(); return; }
         Set<String> subscribed = desiredSymbols;
         http.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10))
                 .buildAsync(streamUri(subscribed), new SpotListener(subscribed))
@@ -267,6 +309,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
         Set<String> removed = new TreeSet<>(connectionSymbols); removed.removeAll(desiredSymbols);
         Set<String> added = new TreeSet<>(desiredSymbols); added.removeAll(connectionSymbols);
         if (removed.isEmpty() && added.isEmpty()) return;
+        if (!collectionLease.reserve("CONTROL", now)) { disconnect(); return; }
         boolean unsubscribe = !removed.isEmpty();
         Set<String> changed = unsubscribe ? removed : added;
         Set<String> target = new TreeSet<>(connectionSymbols);
@@ -335,7 +378,9 @@ public class AssetCardMarketDataService implements AutoCloseable {
                     String message = buffer.toString();
                     Instant receivedAt = Instant.now();
                     buffer.setLength(0);
-                    if (socket == opened && networkAllowed() && !transportControl(message, receivedAt)) enqueueMessage(message, receivedAt);
+                    if (socket == opened && networkAllowed() && collectionAccepting(receivedAt)
+                            && !transportControl(message, receivedAt)) enqueueMessage(message, receivedAt);
+                    else if (!collectionAccepting(receivedAt)) { opened.abort(); return CompletableFuture.completedFuture(null); }
                 }
             }
             opened.request(1);
@@ -348,7 +393,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
     }
 
     synchronized boolean installConnection(WebSocket opened, Set<String> symbols, Instant at) {
-        if (!networkAllowed() || !symbols.equals(desiredSymbols)) { opened.abort(); return false; }
+        if (!networkAllowed() || !collectionAccepting(at) || !symbols.equals(desiredSymbols)) { opened.abort(); return false; }
         WebSocket previous = socket;
         socket = opened; connectionEpoch++;
         // Make before break: a real sequence gap rebuilds only that book, not every displayed card.
@@ -404,6 +449,7 @@ public class AssetCardMarketDataService implements AutoCloseable {
         try {
             group[Math.floorMod(frame.symbol().hashCode(), CONSUMER_SHARDS)].execute(() -> {
                 if (!desiredSymbols.contains(frame.symbol())) return;
+                if (properties.isExternalCallsEnabled() && !collectionAccepting(Instant.now())) return;
                 long lag = Math.max(0, Duration.between(frame.receivedAt(), Instant.now()).toMillis());
                 maxProcessingLagMillis.accumulateAndGet(lag, Math::max);
                 action.run();
@@ -624,14 +670,18 @@ public class AssetCardMarketDataService implements AutoCloseable {
             DepthState state = depthStates.get(symbol);
             if (state == null || state.sequence >= 0 || state.bootstrapInFlight || state.pending.isEmpty()
                     || !claimDepthBootstrapBudget(symbol, now)) continue;
+            if (!collectionLease.reserve("REST", now)) return;
             state.bootstrapInFlight = true;
             WebSocket expectedSocket = socket;
             long expectedEpoch = connectionEpoch;
             URI uri = URI.create(properties.getSpotDepthSnapshotUri() + "?symbol=" + symbol + "&limit=" + MAX_DEPTH_LEVELS);
             HttpRequest request = HttpRequest.newBuilder(uri).GET().timeout(Duration.ofSeconds(15)).build();
-            http.sendAsync(request, ignored -> new LimitedDepthBodySubscriber())
-                    .whenComplete((response, failure) -> completeDepthBootstrap(symbol, expectedSocket, expectedEpoch,
-                            state, response, failure, Instant.now()));
+            CompletableFuture<HttpResponse<String>> pending = http.sendAsync(request, ignored -> new LimitedDepthBodySubscriber());
+            depthRequests.add(pending);
+            pending.whenComplete((response, failure) -> {
+                depthRequests.remove(pending);
+                completeDepthBootstrap(symbol, expectedSocket, expectedEpoch, state, response, failure, Instant.now());
+            });
             // Reservations bound all concurrent requests by actual REST weight, including replacement connections.
         }
     }
@@ -642,12 +692,24 @@ public class AssetCardMarketDataService implements AutoCloseable {
         // A rate limit applies to the shared public endpoint even if its connection has since been replaced.
         if (response != null && (response.statusCode() == 429 || response.statusCode() == 418))
             recordDepthBootstrapFailure(symbol, response.statusCode(), response.headers().firstValue("Retry-After").orElse(null), receivedAt);
+        if (response != null && (response.statusCode() == 429 || response.statusCode() == 418
+                || response.statusCode() == 401 || response.statusCode() == 403)) {
+            stopCollection("PROVIDER_QUOTA_OR_AUTH_FAILURE", receivedAt); return;
+        }
+        if (response != null) {
+            try {
+                int used = Integer.parseInt(response.headers().firstValue("X-MBX-USED-WEIGHT-1M").orElseThrow());
+                if (used < 0 || used >= properties.getCollectionWindow().getSharedIpWeightLimitPerMinute() * 0.8) {
+                    stopCollection("SHARED_IP_HEADROOM_EXHAUSTED", receivedAt); return;
+                }
+            } catch (RuntimeException missing) { stopCollection("SHARED_IP_QUOTA_UNVERIFIABLE", receivedAt); return; }
+        }
         if (response != null) response.headers().firstValue("X-MBX-USED-WEIGHT-1M").ifPresent(value -> {
             try { observeIpWeight(Integer.parseInt(value), receivedAt); }
             catch (NumberFormatException ignored) { /* A malformed header cannot enlarge the local budget. */ }
         });
         // Stale responses must not insert data into a replacement connection or subscription.
-        if (!networkAllowed() || socket != expectedSocket || connectionEpoch != expectedEpoch
+        if (!networkAllowed() || !collectionAccepting(receivedAt) || socket != expectedSocket || connectionEpoch != expectedEpoch
                 || !desiredSymbols.contains(symbol) || depthStates.get(symbol) != expectedState) return;
         expectedState.bootstrapInFlight = false;
         if (failure != null || response == null) {
@@ -764,6 +826,209 @@ public class AssetCardMarketDataService implements AutoCloseable {
     private record DepthDelta(long first, long last, List<Level> bids, List<Level> asks,
                               Instant observedAt, Instant availableAt) {}
 
+    /** Durable card-only allowance. Absolute clocks, counters and stop state survive a process restart. */
+    static final class CollectionLease {
+        private static final String PROCESS_ID = java.util.UUID.randomUUID().toString();
+        private final AssetCardProperties.CollectionWindow plan;
+        private final ObjectMapper json;
+        private final Supplier<AssetCardMapper.StorageUsage> usage;
+        private final LongSupplier freeBytes;
+        private final String processId;
+        private volatile String pendingStop;
+        private volatile String status = "NOT_STARTED";
+        private volatile Instant checkedAt;
+        private volatile boolean permitted;
+        CollectionLease(AssetCardProperties.CollectionWindow plan, ObjectMapper json,
+                        Supplier<AssetCardMapper.StorageUsage> usage) {
+            this(plan, json, usage, () -> {
+                try { return Files.getFileStore(plan.getStateDirectory()).getUsableSpace(); }
+                catch (java.io.IOException failure) { throw new IllegalStateException("STORAGE_UNAVAILABLE"); }
+            });
+        }
+        CollectionLease(AssetCardProperties.CollectionWindow plan, ObjectMapper json,
+                        Supplier<AssetCardMapper.StorageUsage> usage, LongSupplier freeBytes) {
+            this(plan, json, usage, freeBytes, PROCESS_ID);
+        }
+        CollectionLease(AssetCardProperties.CollectionWindow plan, ObjectMapper json,
+                        Supplier<AssetCardMapper.StorageUsage> usage, LongSupplier freeBytes, String processId) {
+            this.plan = plan;
+            this.json = json.copy().enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+            this.usage = usage; this.freeBytes = freeBytes;
+            this.processId = processId;
+        }
+        String status() { return status; }
+        boolean accepting(Instant now) {
+            return pendingStop == null && permitted && plan.valid() && now != null && !now.isBefore(plan.getStartsAt())
+                    && now.isBefore(plan.getEndsAt()) && checkedAt != null
+                    && !now.isBefore(checkedAt.minusSeconds(1)) && now.isBefore(checkedAt.plusSeconds(16));
+        }
+        synchronized boolean check(Instant now) {
+            if (pendingStop != null) return transact("STOP", now, pendingStop);
+            if (accepting(now) && now.isBefore(checkedAt.plusSeconds(15))) return true;
+            return transact("CHECK", now, null);
+        }
+        synchronized boolean reserve(String kind, Instant now) {
+            if (pendingStop != null) return transact("STOP", now, pendingStop);
+            if (!Set.of("REST", "CONNECTION", "CONTROL").contains(kind)) return false;
+            return transact(kind, now, null);
+        }
+        synchronized void stop(String reason, Instant now) {
+            permitted = false;
+            if (pendingStop == null) pendingStop = reason != null && reason.matches("[A-Z_]{3,80}") ? reason : "COLLECTION_STOPPED";
+            transact("STOP", now, pendingStop);
+        }
+        synchronized void release(Instant now) {
+            if (pendingStop != null) { transact("STOP", now, pendingStop); return; }
+            if (plan.valid() && Files.exists(plan.getStateDirectory().resolve(plan.getId()+".json"),LinkOption.NOFOLLOW_LINKS))
+                transact("RELEASE", now, null);
+            permitted=false;
+        }
+        private boolean transact(String action, Instant now, String reason) {
+            if (now == null || !plan.valid()) { permitted = false; status = "WINDOW_NOT_CONFIGURED"; return false; }
+            if (now.isBefore(plan.getStartsAt()) && !"STOP".equals(action)) { permitted = false; status = "WAITING_FIXED_START"; return false; }
+            try {
+                Path root = plan.getStateDirectory().toAbsolutePath().normalize();
+                requireDirectory(root);
+                String identity = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+                        json.writeValueAsBytes(new TreeMap<>(Map.ofEntries(
+                                Map.entry("id", plan.getId()), Map.entry("start", plan.getStartsAt().toString()),
+                                Map.entry("end", plan.getEndsAt().toString()), Map.entry("symbols", new TreeSet<>(plan.getSymbols())),
+                                Map.entry("restRequests", plan.getMaximumRestRequests()), Map.entry("restWeight", plan.getMaximumRestWeight()),
+                                Map.entry("connections", plan.getMaximumConnectionAttempts()), Map.entry("controls", plan.getMaximumControlMessages()),
+                                Map.entry("rows", plan.getMaximumNewRows()), Map.entry("dbBytes", plan.getMaximumDatabaseGrowthBytes()),
+                                Map.entry("walBytes", plan.getMaximumWalGrowthBytes()), Map.entry("freeBytes", plan.getMinimumFreeBytes()),
+                                Map.entry("minuteWeight", plan.getSharedIpWeightAllowancePerMinute()),
+                                Map.entry("ipLimit", plan.getSharedIpWeightLimitPerMinute()),
+                                Map.entry("confirmedAt", plan.getSharedIpHeadroomConfirmedAt().toString()))))));
+                Path file = root.resolve(plan.getId() + ".json"), lock = root.resolve(plan.getId() + ".lock");
+                if (!Files.exists(lock, LinkOption.NOFOLLOW_LINKS)) {
+                    try { Files.createFile(lock, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))); }
+                    catch (java.nio.file.FileAlreadyExistsException concurrent) { /* Validate before opening. */ }
+                }
+                requireFile(lock);
+                try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+                     var held = channel.lock()) {
+                  try {
+                    Map<String, Object> state;
+                    if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+                        requireFile(file);
+                        if (Files.size(file) > 4096) throw new IllegalStateException("LEDGER_INVALID");
+                        state = json.readValue(Files.readAllBytes(file), new com.fasterxml.jackson.core.type.TypeReference<TreeMap<String,Object>>() {});
+                        if (!identity.equals(state.get("identity")) || !Set.of("OPEN", "STOPPED").contains(state.get("state")))
+                            throw new IllegalStateException("LEDGER_IDENTITY_MISMATCH");
+                        for (String key : List.of("rest", "weight", "connections", "controls", "baseRows", "baseDb", "baseWal", "lastRows", "minute", "minuteWeight", "lastAt"))
+                            number(state, key);
+                    } else {
+                        if (channel.size() != 0) throw new IllegalStateException("LEDGER_MISSING_AFTER_INITIALIZATION");
+                        AssetCardMapper.StorageUsage initial = new AssetCardMapper.StorageUsage(0,0,0,0,0,true);
+                        if (!"STOP".equals(action)) try {
+                            initial = java.util.Objects.requireNonNull(usage.get());
+                            if (!initial.postgres()) reason = "POSTGRES_STORAGE_EVIDENCE_REQUIRED";
+                        } catch (RuntimeException unavailable) { reason = "STORAGE_MEASUREMENT_FAILED"; }
+                        state = new TreeMap<>();
+                        state.put("identity", identity); state.put("state", "OPEN"); state.put("reason", "RUNNING");
+                        state.put("process",processId); state.put("cleanShutdown",false);
+                        state.put("baseRows", initial.totalRows()); state.put("baseDb", initial.databaseBytes());
+                        state.put("lastRows", initial.totalRows());
+                        state.put("baseWal", initial.walBytes());
+                        for (String key : List.of("rest", "weight", "connections", "controls", "minute", "minuteWeight", "lastAt")) state.put(key, 0L);
+                        // Losing an initialized ledger must never establish a fresh baseline on restart.
+                        channel.write(ByteBuffer.wrap(new byte[]{1})); channel.force(true);
+                        forceDirectory(root);
+                    }
+                    if ("STOPPED".equals(state.get("state"))) { permitted = false; status = (String)state.get("reason"); return false; }
+                    String stop = reason;
+                    ByteBuffer marker = ByteBuffer.allocate(1); channel.read(marker,0);
+                    if (marker.array()[0] == 2) stop = "COLLECTION_STOPPED_DURABILITY_GUARD";
+                    if (!processId.equals(state.get("process")) && !Boolean.TRUE.equals(state.get("cleanShutdown")))
+                        stop = "UNVERIFIED_PREVIOUS_COLLECTION_PROCESS";
+                    state.put("process",processId); state.put("cleanShutdown",false);
+                    if (!now.isBefore(plan.getEndsAt())) stop = "WINDOW_EXPIRED";
+                    if (now.toEpochMilli() + 1000 < number(state, "lastAt")) stop = "CLOCK_MOVED_BACKWARDS";
+                    if (stop == null) try {
+                        var current = java.util.Objects.requireNonNull(usage.get());
+                        if (!current.postgres()) stop = "POSTGRES_STORAGE_EVIDENCE_REQUIRED";
+                        else if (freeBytes.getAsLong() < plan.getMinimumFreeBytes()) stop = "STORAGE_FREE_SPACE_LIMIT";
+                        else if (current.totalRows() < number(state,"lastRows")) stop = "UNEXPECTED_CARD_ROWS_REMOVED";
+                        else if (current.totalRows() - number(state, "baseRows") >= plan.getMaximumNewRows()) stop = "DATABASE_ROW_LIMIT";
+                        else if (current.databaseBytes() - number(state, "baseDb") >= plan.getMaximumDatabaseGrowthBytes()) stop = "DATABASE_GROWTH_LIMIT";
+                        else if (current.walBytes() - number(state, "baseWal") >= plan.getMaximumWalGrowthBytes()) stop = "WAL_GROWTH_LIMIT";
+                        else if (current.walBytes() < number(state, "baseWal")) stop = "WAL_IDENTITY_CHANGED";
+                        state.put("lastRows", Math.max(number(state,"lastRows"),current.totalRows()));
+                    } catch (RuntimeException unavailable) { stop = "STORAGE_MEASUREMENT_FAILED"; }
+                    if (stop == null && "REST".equals(action)) {
+                        long minute = Math.floorDiv(now.getEpochSecond(), 60);
+                        if (minute != number(state, "minute")) { state.put("minute", minute); state.put("minuteWeight", 0L); }
+                        if (number(state,"rest") >= plan.getMaximumRestRequests()
+                                || number(state,"weight") + DEPTH_REQUEST_WEIGHT > plan.getMaximumRestWeight()) stop = "REST_TOTAL_BUDGET_EXHAUSTED";
+                        else if (number(state,"minuteWeight") + DEPTH_REQUEST_WEIGHT > plan.getSharedIpWeightAllowancePerMinute()) {
+                            permitted = true; checkedAt = now; status = "REST_MINUTE_BUDGET_WAIT"; return false;
+                        } else { increment(state,"rest",1); increment(state,"weight",DEPTH_REQUEST_WEIGHT); increment(state,"minuteWeight",DEPTH_REQUEST_WEIGHT); }
+                    } else if (stop == null && "CONNECTION".equals(action)) {
+                        if (number(state,"connections") >= plan.getMaximumConnectionAttempts()) stop = "WS_CONNECTION_BUDGET_EXHAUSTED";
+                        else increment(state,"connections",1);
+                    } else if (stop == null && "CONTROL".equals(action)) {
+                        if (number(state,"controls") >= plan.getMaximumControlMessages()) stop = "WS_CONTROL_BUDGET_EXHAUSTED";
+                        else increment(state,"controls",1);
+                    }
+                    if (stop != null) { markStopped(channel); pendingStop=stop; state.put("state", "STOPPED"); state.put("reason", stop); }
+                    if (stop == null && "RELEASE".equals(action)) state.put("cleanShutdown",true);
+                    state.put("lastAt", Math.max(number(state,"lastAt"),now.toEpochMilli()));
+                    writeState(root, file, state);
+                    permitted = stop == null && !"RELEASE".equals(action); checkedAt = now; status = stop == null ? "RUNNING" : stop;
+                    return permitted;
+                  } catch (Exception failure) {
+                    // Overwrite the already allocated marker before any later recovery can read stale OPEN.
+                    try { markStopped(channel); } catch (Exception unavailable) { /* In-memory stop plus unclean-process refusal remains. */ }
+                    throw failure;
+                  }
+                }
+            } catch (Exception failure) {
+                permitted = false; status = "COLLECTION_LEDGER_OR_STORAGE_UNAVAILABLE";
+                if (pendingStop == null) pendingStop=status;
+                // No fallback allowance, fresh time window, raw exception or unverified data deletion.
+                return false;
+            }
+        }
+        private static void markStopped(FileChannel channel) throws java.io.IOException {
+            channel.write(ByteBuffer.wrap(new byte[]{2}),0); channel.force(true);
+        }
+        private static long number(Map<String,Object> state, String key) {
+            Object value = state.get(key);
+            if (!(value instanceof Number n) || n.longValue() < 0 || n.doubleValue() != n.longValue())
+                throw new IllegalArgumentException("LEDGER_INVALID");
+            return n.longValue();
+        }
+        private static void increment(Map<String,Object> state, String key, long amount) { state.put(key,Math.addExact(number(state,key),amount)); }
+        private void writeState(Path root, Path target, Map<String,Object> state) throws java.io.IOException {
+            Path temporary = Files.createTempFile(root, ".window-", ".tmp", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            try {
+                try (FileChannel output = FileChannel.open(temporary, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+                    ByteBuffer bytes = ByteBuffer.wrap(json.writeValueAsBytes(state));
+                    while (bytes.hasRemaining()) output.write(bytes);
+                    output.force(true);
+                }
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                forceDirectory(root);
+            } finally { Files.deleteIfExists(temporary); }
+        }
+        private static void forceDirectory(Path root) throws java.io.IOException {
+            try (FileChannel directory = FileChannel.open(root, StandardOpenOption.READ)) { directory.force(true); }
+        }
+        private static void requireDirectory(Path path) throws java.io.IOException {
+            if (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS) || !path.equals(path.toRealPath())
+                    || !Files.getPosixFilePermissions(path).equals(PosixFilePermissions.fromString("rwx------"))
+                    || !Files.getOwner(path).getName().equals(ProcessHandle.current().info().user().orElse("")))
+                throw new IllegalArgumentException("Protected service-owned collection directory required");
+        }
+        private static void requireFile(Path path) throws java.io.IOException {
+            if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
+                    || !Files.getPosixFilePermissions(path).equals(PosixFilePermissions.fromString("rw-------"))
+                    || !Files.getOwner(path).equals(Files.getOwner(path.getParent())))
+                throw new IllegalArgumentException("Protected collection state file required");
+        }
+    }
+
     /** Bounds the public REST response before decoding, including error responses. */
     private static final class LimitedDepthBodySubscriber implements HttpResponse.BodySubscriber<String> {
         private static final int MAX_BYTES = 2_097_152;
@@ -848,10 +1113,13 @@ public class AssetCardMarketDataService implements AutoCloseable {
         connectionEpoch++;
         connectionSymbols = Set.of();
         controlInFlight = false;
+        for (CompletableFuture<?> pending : depthRequests) pending.cancel(true);
+        depthRequests.clear();
         if (previous != null) { previous.abort(); clearLiveData(desiredSymbols); }
     }
     @PreDestroy public void close() {
         stopped = true; disconnect();
+        collectionLease.release(Instant.now());
         for (ThreadPoolExecutor[] group : List.of(tradeFrames, depthFrames, barFrames))
             for (ThreadPoolExecutor executor : group) executor.shutdownNow();
     }

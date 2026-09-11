@@ -1,6 +1,33 @@
 \set ON_ERROR_STOP on
 -- Definition only. Execution requires separately authorized administration of an exact target database.
--- Existing roles are verify-only. No old role/ACL/data is repaired or altered.
+-- Existing role attributes remain verify-only. V1-V23 ACLs/data are never repaired or altered.
+-- Optional, separately approved post-V24 convergence. Never changes default ACLs
+-- or V1-V23 objects. The default invocation does not perform this action.
+\if :{?card_reconcile_new_table_acl}
+  \if :card_reconcile_new_table_acl
+BEGIN;
+DO $card_new_table_acl$
+DECLARE t text;
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM public.flyway_schema_history
+      WHERE version='24' AND success AND script='V24__asset_card_live_signal.sql')
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='rine_app')
+  THEN RAISE EXCEPTION 'VERIFIED_V24_AND_LEGACY_APP_REQUIRED'; END IF;
+  FOREACH t IN ARRAY ARRAY['tm_asset_card_snapshot','tm_asset_card_spot_bar','tm_asset_card_feature_history'] LOOP
+    IF NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        JOIN pg_roles r ON r.oid=c.relowner
+        WHERE n.nspname='public' AND c.relname=t AND c.relkind='r' AND r.rolname='rine_migrator')
+    THEN RAISE EXCEPTION 'NEW_CARD_TABLE_OWNER_MISMATCH'; END IF;
+    EXECUTE format('REVOKE SELECT,INSERT,UPDATE,DELETE ON TABLE public.%I FROM rine_app',t);
+    IF has_table_privilege('rine_app',format('public.%I',t),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+      OR has_any_column_privilege('rine_app',format('public.%I',t),'SELECT,INSERT,UPDATE,REFERENCES')
+    THEN RAISE EXCEPTION 'INHERITED_CARD_ACCESS_REQUIRES_SEPARATE_OWNER_REVIEW'; END IF;
+  END LOOP;
+END
+$card_new_table_acl$;
+COMMIT;
+  \endif
+\endif
 SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='rine_asset_card_writer') AS card_role_exists \gset
 \if :card_role_exists
   \ir asset-card-role-verify.sql

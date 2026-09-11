@@ -206,7 +206,7 @@ class AssetCardServiceTest {
     }
 
     @Test
-    void immutableCardDatabaseExportIsRepeatableReadOnlyAndPythonVerifiable(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
+    void immutableCardDatabaseExportIsRepeatableAndPythonRejectsUnqualifiedTrainingPopulation(@org.junit.jupiter.api.io.TempDir java.nio.file.Path temp) throws Exception {
         try (var fixture = new LabelDatabaseFixture()) {
             var pipeline = new AssetCardService.LabelPipeline(fixture.mapper,fixture.json);
             var before = pipeline.export("BTCUSDT",fixture.start,fixture.start.plusSeconds(1),fixture.cutoff,temp);
@@ -217,16 +217,19 @@ class AssetCardServiceTest {
             var labels = fixture.labels();
             var a = pipeline.export("BTCUSDT",fixture.start,fixture.start.plusSeconds(1),fixture.cutoff,temp);
             var b = pipeline.export("BTCUSDT",fixture.start,fixture.start.plusSeconds(1),fixture.cutoff,temp);
-            assertThat(a.recordCount()).as(a.exclusions().toString()).isEqualTo(1);
+            assertThat(a.recordCount()).as(a.exclusions().toString()).isZero();
+            assertThat(a.exclusions()).containsEntry("COINGLASS_EVIDENCE_UNQUALIFIED",1L);
             assertThat(a.recordsSha256()).isEqualTo(b.recordsSha256());
             assertThat(a.manifestSha256()).isEqualTo(b.manifestSha256());
+            assertThat(a.manifestSha256()).isNotEqualTo(before.manifestSha256()); // Distinct truthful exclusion evidence, not a fabricated eligible row.
             assertThat(a.productionModelReady()).isFalse(); assertThat(a.modelMode()).isEqualTo("SHADOW");
             assertThat(fixture.labels()).isEqualTo(labels);
             var manifest=fixture.json.readTree(java.nio.file.Files.readString(a.manifest()));
-            assertThat(manifest.path("provenance").path("datasetVersion").asText())
-                    .isNotEqualTo(fixture.json.readTree(java.nio.file.Files.readString(before.manifest())).path("provenance").path("datasetVersion").asText());
-            assertThat(manifest.path("sourceVersions").findValuesAsText("provider")).contains("BINANCE_SPOT","COINGLASS");
-            var record=fixture.json.readTree(java.nio.file.Files.readString(a.manifest().getParent().resolve("records.jsonl")));
+            assertThat(manifest.path("exclusions").path("COINGLASS_EVIDENCE_UNQUALIFIED").asInt()).isEqualTo(1);
+            assertThat(java.nio.file.Files.readString(a.manifest().getParent().resolve("records.jsonl"))).isEmpty();
+            // Unqualified source evidence remains fully available for audit/maturity, but cannot enter training export.
+            var record=fixture.json.copy().disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                    .valueToTree(pipeline.materialize(fixture.inference,fixture.cutoff).record());
             assertThat(record.path("rawFrame").path("signalAsOf").asText()).isEqualTo(fixture.start.toString());
             assertThat(record.path("labelResults").path("LONG").path("y").intValue()).isZero();
             assertThat(record.path("horizonTrade").path("observationId").asText()).isEqualTo("9001");
@@ -239,8 +242,149 @@ class AssetCardServiceTest {
                 process.environment().put("PYTHONDONTWRITEBYTECODE","1");
                 var running=process.start();
                 assertThat(running.waitFor(30,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-                assertThat(running.exitValue()).as(java.nio.file.Files.readString(log)).isZero();
+                assertThat(running.exitValue()).as(java.nio.file.Files.readString(log)).isNotZero();
+                assertThat(java.nio.file.Files.readString(log)).contains("Explicit Spot and CoinGlass source identities required");
             }
+        }
+    }
+
+    @Test
+    void retentionPreservesPendingDependenciesAndUsesVerifiedArchiveForMaturedAuditAndExport(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path archive) throws Exception {
+        try(var fixture=new LabelDatabaseFixture()) {
+            Instant now=fixture.cutoff.plusSeconds(21600);
+            var retention=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1);
+            var fiveHours=java.time.Duration.ofHours(5);
+            long before=fixture.mapper.storageUsage().totalRows();
+            var pending=retention.run("BTCUSDT",now,fiveHours,fiveHours,fiveHours,fiveHours,500);
+            assertThat(pending.status()).isEqualTo("PENDING_LABEL_DEPENDENCIES_PRESERVED");
+            assertThat(pending.deleted()).isZero(); assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(before);
+            fixture.saveMatured();
+            var original=new AssetCardService.LabelPipeline(fixture.mapper,fixture.json).materialize(fixture.inference,fixture.cutoff);
+            var archived=retention.run("BTCUSDT",now,fiveHours,fiveHours,fiveHours,fiveHours,500);
+            assertThat(archived.status()).isEqualTo("ARCHIVED_VERIFIED_AND_PRUNED");
+            assertThat(archived.deleted()).isPositive().isLessThanOrEqualTo(500);
+            assertThat(fixture.mapper.selectInference("BTCUSDT",fixture.inference.signalAsOf(),now)).isEmpty();
+            assertThat(fixture.labels()).isEmpty();
+            var restarted=new AssetCardService.LabelPipeline(fixture.mapper,fixture.json,archive);
+            var restored=restarted.materialize(fixture.inference,fixture.cutoff);
+            assertThat(restored.status()).isEqualTo("MATURED");
+            assertThat(restored.evidenceSha256()).isEqualTo(original.evidenceSha256());
+            assertThat(fixture.json.<com.fasterxml.jackson.databind.JsonNode>valueToTree(restored.record()))
+                    .isEqualTo(fixture.json.<com.fasterxml.jackson.databind.JsonNode>valueToTree(original.record()));
+            var export=restarted.export("BTCUSDT",fixture.start,fixture.start.plusSeconds(1),fixture.cutoff,archive);
+            assertThat(export.exclusions()).containsEntry("COINGLASS_EVIDENCE_UNQUALIFIED",1L)
+                    .doesNotContainKey("MATURE_LABEL_NOT_PERSISTED_OR_IDENTITY_MISMATCH");
+            assertThat(export.recordCount()).isZero(); // The original unproven CoinGlass evidence stays unqualified after archival.
+            var again=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,fiveHours,fiveHours,fiveHours,fiveHours,500);
+            assertThat(again.deleted()).isZero();
+            assertThat(again.status()).isEqualTo("NOTHING_EXPIRED");
+        }
+    }
+
+    @Test
+    void archiveFailureLowSpaceAndActiveWindowNeverDeletePendingOrSnapshotRows(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path archive) throws Exception {
+        try(var fixture=new LabelDatabaseFixture()) {
+            fixture.saveMatured();
+            long version=fixture.mapper.nextSnapshotVersion("BTCUSDT");
+            fixture.mapper.saveSnapshot("BTCUSDT",0,version,"{\"safe\":true}",fixture.start);
+            Instant now=fixture.cutoff.plusSeconds(21600); var duration=java.time.Duration.ofHours(5);
+            long before=fixture.mapper.storageUsage().totalRows();
+            var lowSpace=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,Long.MAX_VALUE)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,100);
+            assertThat(lowSpace.status()).isEqualTo("RETENTION_LOW_SPACE_DATA_PRESERVED");
+            assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(before);
+            var missing=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive.resolve("missing"),1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,100);
+            assertThat(missing.status()).isEqualTo("RETENTION_ARCHIVE_DIRECTORY_UNAVAILABLE_DATA_PRESERVED");
+            assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(before);
+            var activeWindow=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,100,fixture.inference.signalAsOf().minusSeconds(300));
+            assertThat(activeWindow.deleted()).isZero();
+            var good=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,100);
+            assertThat(good.deleted()).isPositive().isLessThanOrEqualTo(100);
+            assertThat(fixture.mapper.selectSnapshotJson("BTCUSDT")).isEqualTo("{\"safe\":true}");
+            java.nio.file.Path stored;
+            try(var files=java.nio.file.Files.list(archive.resolve("BTCUSDT"))) { stored=files.findFirst().orElseThrow(); }
+            java.nio.file.Files.writeString(stored,"{\"corrupt\":true}");
+            long after=fixture.mapper.storageUsage().totalRows();
+            var corrupt=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,100);
+            assertThat(corrupt.status()).isEqualTo("RETENTION_FAILED_DATA_PRESERVED");
+            assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(after);
+        }
+    }
+
+    @Test
+    void failedBatchRollsBackDeletesAndRestartReusesVerifiedContentAddressedArchive(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path archive) throws Exception {
+        try(var fixture=new LabelDatabaseFixture()) {
+            fixture.saveMatured();
+            long before=fixture.mapper.storageUsage().totalRows();
+            var failingMapper=new org.example.trademodel.mapper.AssetCardMapper(fixture.jdbc) {
+                @Override public int pruneArchivedBars(BarArchiveConfirmation confirmation,int limit) {
+                    throw new IllegalStateException("ISOLATED_FAILURE_AFTER_HISTORY_DELETE");
+                }
+            };
+            Instant now=fixture.cutoff.plusSeconds(21600); var duration=java.time.Duration.ofHours(5);
+            var failed=new AssetCardService.RetentionLifecycle(failingMapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,500);
+            assertThat(failed.status()).isEqualTo("RETENTION_FAILED_DATA_PRESERVED");
+            assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(before);
+            java.nio.file.Path file;
+            try(var files=java.nio.file.Files.list(archive.resolve("BTCUSDT"))) { file=files.findFirst().orElseThrow(); }
+            byte[] original=java.nio.file.Files.readAllBytes(file);
+            var resumed=new AssetCardService.RetentionLifecycle(fixture.mapper,fixture.json,archive,1)
+                    .run("BTCUSDT",now,duration,duration,duration,duration,500);
+            assertThat(resumed.status()).isEqualTo("ARCHIVED_VERIFIED_AND_PRUNED");
+            assertThat(resumed.deleted()).isEqualTo(before);
+            assertThat(java.nio.file.Files.readAllBytes(file)).isEqualTo(original);
+            try(var files=java.nio.file.Files.list(archive.resolve("BTCUSDT"))) { assertThat(files.count()).isEqualTo(1); }
+            var readAfterRestart=new AssetCardService.LabelPipeline(fixture.mapper,fixture.json,archive)
+                    .materialize(fixture.inference,fixture.cutoff);
+            assertThat(readAfterRestart.status()).isEqualTo("MATURED");
+        }
+    }
+
+    @Test
+    void expiredWindowKeepsUnfinishedLabelsPendingAcrossServiceRestartWithoutLiveCalls(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path archive) throws Exception {
+        try(var fixture=new LabelDatabaseFixture(false)) {
+            var properties=new AssetCardProperties(); properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+            properties.setWriterEnabled(true); properties.setRetentionEnabled(true); properties.setArchiveDirectory(archive);
+            properties.setArchiveMinimumFreeBytes(1);
+            properties.setBarRetention(java.time.Duration.ofHours(5)); properties.setFeatureRetention(java.time.Duration.ofHours(5));
+            properties.setTradeRetention(java.time.Duration.ofHours(5)); properties.setLabelRetention(java.time.Duration.ofHours(5));
+            var window=properties.getCollectionWindow(); window.setId("expired-card-window-fixture");
+            window.setStartsAt(fixture.start); window.setEndsAt(fixture.start.plusSeconds(8*3600L));
+            window.setStateDirectory(archive); window.setSymbols(java.util.Set.of("BTCUSDT"));
+            window.setSharedIpWeightAllowancePerMinute(500); window.setSharedIpWeightLimitPerMinute(6000);
+            window.setSharedIpHeadroomConfirmedAt(fixture.start.minusSeconds(60));
+            assertThat(window.valid()).isTrue();
+            var market=mock(AssetCardMarketDataService.class);
+            var events=mock(org.example.trademodel.v41.DashboardLiveEventService.class);
+            var pool=mock(org.example.trademodel.service.watchlistsource.AssetPoolService.class);
+            long originalRows=fixture.mapper.storageUsage().totalRows();
+            for(int restart=0;restart<2;restart++) {
+                try(var service=new AssetCardService(properties,market,fixture.mapper,pool,events,fixture.json)) {
+                    org.springframework.test.util.ReflectionTestUtils.setField(service,"started",true);
+                    org.springframework.test.util.ReflectionTestUtils.setField(service,"writerReady",true);
+                    Instant afterEightHourWindow=fixture.start.plusSeconds(8*3600L+restart*3600L);
+                    service.matureLabels(afterEightHourWindow);
+                    assertThat(fixture.labels()).isEmpty();
+                    @SuppressWarnings("unchecked") var statuses=(java.util.Map<String,String>)
+                            org.springframework.test.util.ReflectionTestUtils.getField(service,"labelStatuses");
+                    assertThat(statuses).containsEntry("BTCUSDT","MISSING_POINT_IN_TIME_HORIZON_TRADE");
+                    service.retainHistory(afterEightHourWindow);
+                    assertThat(fixture.mapper.storageUsage().totalRows()).isEqualTo(originalRows);
+                    assertThat(fixture.mapper.selectInference("BTCUSDT",fixture.inference.signalAsOf(),afterEightHourWindow))
+                            .contains(fixture.inference);
+                }
+            }
+            verifyNoInteractions(market,events,pool);
         }
     }
 

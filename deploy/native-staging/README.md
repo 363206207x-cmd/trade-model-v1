@@ -99,7 +99,13 @@ required. PUBLIC grants are effective grants: PostgreSQL has no per-role DENY.
 Conflicting old PUBLIC permissions therefore produce a refusal, not an old-ACL
 REVOKE. In particular a database with default PUBLIC TEMP needs separate
 base-database authorization/hardening; this package cannot change it. Old roles,
-ACLs and data are unchanged. The three card objects must be actual ordinary
+ACLs and data are unchanged. The optional, separately approved
+`-v card_reconcile_new_table_acl=true` path revokes only inherited
+SELECT/INSERT/UPDATE/DELETE from `rine_app` on the three verified V24 tables,
+after checking V24 SUCCESS and `rine_migrator` ownership. The default invocation
+does not do that. It never changes the pre-existing default ACL, other tables,
+role membership or PUBLIC permissions; inherited residual access refuses the
+operation. The three card objects must be actual ordinary
 `public` tables from V24, not same-named views, foreign tables or other relations.
 Callable user-domain `SECURITY DEFINER` routines are also refused because they
 can delegate an owner's business access even when direct table ACLs are absent.
@@ -184,9 +190,68 @@ requires `--apply --confirm INSTALL_ASSET_CARD_DROPIN_ONLY`. It writes only
 `40-asset-card.conf`, retains an existing card drop-in, and writes a non-secret
 rollback inventory. The main unit, readiness script, core scheduler and
 environment files remain unchanged. Its LoadCredential exposes the password
-at the systemd credential path, the model root is read-only, writer remains
-disabled and model mode stays SHADOW. No reload, restart, enable, remote command
+at the systemd credential path and the model root is read-only. Default
+`CARD_STARTUP_MODE=PREPARED` renders card enabled/external/writer/retention false;
+model mode stays SHADOW. No reload, restart, enable, remote command
 or deployment is performed. Applying a drop-in is not proof it has been loaded.
+
+## Fixed-window SHADOW and verified retention
+
+The unified approval package is in
+`docs/evidence/asset_card_live_signal/IMPLEMENTATION_AND_ACCEPTANCE.md`, first
+section. Its 21-GET probe and <=8-hour collection allowance are separate items;
+neither is executed by preparing these sources.
+
+`CARD_STARTUP_MODE=ARMED` additionally requires the distinct confirmation
+`INSTALL_ASSET_CARD_ARMED_WINDOW_ONLY`. All absolute window, symbol, known
+shared-IP allowance, row/database/WAL budgets and storage-proof fields must
+validate first. The installer writes only the existing card drop-in, never
+generates a start time/window ID, never erases a ledger, and never restarts.
+PREPARED cannot accidentally enable collection using the ordinary confirmation.
+Missing/unknown quota remains a refusal, not an assumed exchange limit.
+
+State `/var/lib/rine-logic/asset-card/collection` and archives
+`/var/lib/rine-logic/asset-card/archive` require service-owned 0700 leaf directories
+under trusted root-owned parents. `DATABASE_FILESYSTEM_DEVICE` is an independently
+reviewed non-secret `stat` device identity: the installer compares both visible
+directories with it, but **does not itself prove the actual PGDATA device**.
+The execution preflight must read the real PostgreSQL data location via the
+protected administrative channel and verify its device matches; otherwise ARMED
+must not be approved. This avoids reporting state-directory free bytes as another
+database filesystem's capacity. No new database privileges are added for this.
+
+The Java lease persists its exact plan identity, immutable start/end, cumulative
+REST/control/connection counters and first stop reason under an exclusive file
+lock; files are 0600, atomically replaced and fsynced with their parent directory.
+Missing/corrupt initialized state, ownership/mode failure, backwards time,
+database/WAL measurement failure, quota failure or budget exhaustion disables
+card transport. STOP before the start time is durable. I/O failure latches a
+terminal state instead of reopening a stale OPEN ledger when the filesystem
+recovers. Normal shutdown records a clean process handoff; an unclean process
+identity refuses automatic restart of that allowance. A permitted clean restart
+does not reset time/counters. Deadline checking runs
+at ingress and via a 250ms card-only watchdog; DB/WAL/free-space are checked every
+15 seconds. The monitored thresholds are not per-INSERT hard limits: the reviewed
+package reserves explicit headroom for bounded already-running work and offline
+labels. Other business schedulers remain unchanged.
+
+Only the registered Spot symbols are subscribed; only depth5000 REST recovery
+is added to the fixed WS allowance. CoinGlass remains read-only cache access,
+with unproven source/unit/window quarantined UNKNOWN and training-unqualified.
+Window expiry never extends networking to finish a four-hour label; incomplete
+evidence remains PENDING, including after restart. No production model is required
+for private SHADOW audit persistence, but unqualified data is not training-ready.
+
+The installed retention periods are Bar/Trade=168h, Feature=720h and Label=2160h,
+batch128 per asset per 60-second cycle. These are engineering storage settings,
+not model sample-size thresholds. During the finite collection window all
+historical deletes are protected to prevent deletion offsetting new-row budgets.
+Afterward pending-label dependencies still take precedence over age. The service
+archives complete original identities/values/timestamps, verifies SHA/count and
+read-back before exact deletion, and exports from both database and verified
+archives. Archiving/verification/space failure preserves data. Snapshot never
+receives DELETE; only the two authorized history tables can be cleaned. The
+native manifest sets both collection and archive space floors to 20 GiB.
 
 ## Local tests, not deployment
 

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardMapperIntegrationTest {
+    @org.junit.jupiter.api.io.TempDir Path archiveDirectory;
     private JdbcTemplate jdbc;
     private AssetCardMapper mapper;
     private final String symbol = "T" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
@@ -323,7 +324,7 @@ class AssetCardMapperIntegrationTest {
     }
 
     @Test
-    void archivedHistoryCleanupRequiresExactConfirmedScopeAndNeverResetsSnapshotCounter() {
+    void archivedHistoryCleanupRequiresExactConfirmedScopeAndNeverResetsSnapshotCounter() throws Exception {
         Instant old = now.minusSeconds(43200);
         mapper.saveFeatureHistory(symbol, old, old.plusSeconds(1), "{\"archived\":1}");
         mapper.saveFeatureHistory(symbol, old.plusSeconds(1), now.plusSeconds(1), "{\"lateArrival\":1}");
@@ -334,8 +335,10 @@ class AssetCardMapperIntegrationTest {
                 .stream().map(AssetCardMapper.TypedHistory::recordKey).toList();
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.pruneArchivedHistory(null, 10))
                 .isInstanceOf(IllegalArgumentException.class);
+        var rows=mapper.selectHistory(symbol,AssetCardMapper.HistoryKind.FEATURE,old,now,now.plusSeconds(2),10);
+        Path file=archive(rows,java.util.List.of()); String sha=file.getFileName().toString().substring(0,64);
         var confirmed = new AssetCardMapper.ArchiveConfirmation(symbol, AssetCardMapper.HistoryKind.FEATURE, keys,
-                old, now.minusSeconds(21600), now, "a".repeat(64), now);
+                old, now.minusSeconds(21600), now, sha, now,file);
         assertThat(mapper.pruneArchivedHistory(confirmed, 1)).isEqualTo(1);
         assertThat(mapper.pruneArchivedHistory(confirmed, 10)).isZero();
         assertThat(mapper.selectHistory(symbol, AssetCardMapper.HistoryKind.FEATURE, old, now, now.plusSeconds(2), 10))
@@ -346,20 +349,61 @@ class AssetCardMapperIntegrationTest {
     }
 
     @Test
-    void archivedBarsCleanupIsBoundedToConfirmedIntervalsAndAvailability() {
+    void archivedBarsCleanupIsBoundedToConfirmedIntervalsAndAvailability() throws Exception {
         Instant old = now.minusSeconds(43200);
         var bar = new SpotBar(symbol, "5m", old, old.plusSeconds(300).minusMillis(1), BigDecimal.ONE, BigDecimal.ONE,
                 BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, null, old.plusSeconds(300));
         mapper.upsertClosedBar(bar);
+        Path file=archive(java.util.List.of(),mapper.selectArchiveBars(symbol,now,now,10));
+        String sha=file.getFileName().toString().substring(0,64);
         var confirmed = new AssetCardMapper.BarArchiveConfirmation(symbol,
-                java.util.List.of(new AssetCardMapper.BarIdentity("1m", old)), old, now.minusSeconds(21600), now, "b".repeat(64), now);
-        assertThat(mapper.pruneArchivedBars(confirmed, 10)).isZero();
+                java.util.List.of(new AssetCardMapper.BarIdentity("1m", old)), old, now.minusSeconds(21600), now, sha, now,file);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.pruneArchivedBars(confirmed,10)).isInstanceOf(IllegalArgumentException.class);
         var exact = new AssetCardMapper.BarArchiveConfirmation(symbol,
-                java.util.List.of(new AssetCardMapper.BarIdentity("5m", old)), old, now.minusSeconds(21600), now, "b".repeat(64), now);
+                java.util.List.of(new AssetCardMapper.BarIdentity("5m", old)), old, now.minusSeconds(21600), now, sha, now,file);
         assertThat(mapper.pruneArchivedBars(exact, 10)).isEqualTo(1);
         assertThat(mapper.selectClosedBars(symbol, "5m", now, 10)).isEmpty();
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new AssetCardMapper.BarArchiveConfirmation(symbol,
                 exact.bars(), old, now.minusSeconds(21600), now, "", now)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private Path archive(java.util.List<AssetCardMapper.TypedHistory> rows,java.util.List<SpotBar> bars) throws Exception {
+        var json=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        byte[] bytes=json.writeValueAsBytes(new AssetCardMapper.VerifiedArchive(1,"ASSET_CARD_HISTORY_ARCHIVE_V1",symbol,rows.size(),bars.size(),rows,bars));
+        String sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        Path file=archiveDirectory.resolve(sha+".json"); Files.write(file,bytes); return file;
+    }
+
+    @Test
+    void missingCorruptOrChangedArchiveCannotAuthorizeAnyDeletion() throws Exception {
+        Instant old=now.minusSeconds(43200);
+        mapper.saveFeatureHistory(symbol,old,old,"{\"immutable\":1}");
+        var rows=mapper.selectHistory(symbol,AssetCardMapper.HistoryKind.FEATURE,old,old,now,10);
+        var missing=new AssetCardMapper.ArchiveConfirmation(symbol,AssetCardMapper.HistoryKind.FEATURE,
+                rows.stream().map(AssetCardMapper.TypedHistory::recordKey).toList(),old,now.minusSeconds(21600),now,"a".repeat(64),now);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.pruneArchivedHistory(missing,10)).isInstanceOf(IllegalArgumentException.class);
+        Path file=archive(rows,java.util.List.of()); String sha=file.getFileName().toString().substring(0,64);
+        var confirmed=new AssetCardMapper.ArchiveConfirmation(symbol,AssetCardMapper.HistoryKind.FEATURE,missing.recordKeys(),old,
+                now.minusSeconds(21600),now,sha,now,file);
+        Files.writeString(file,"{\"tampered\":true}");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.pruneArchivedHistory(confirmed,10)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(mapper.selectHistoryRecord(symbol,AssetCardMapper.HistoryKind.FEATURE,rows.get(0).recordKey())).contains(rows.get(0));
+        assertThat(mapper.storageUsage().historyRows()).isEqualTo(1);
+        assertThat(mapper.storageUsage().postgres()).isFalse();
+    }
+
+    @Test
+    void exactArchiveDoesNotDeleteChangedDatabaseContentsOrLaterArrival() throws Exception {
+        Instant old=now.minusSeconds(43200);
+        mapper.saveFeatureHistory(symbol,old,old,"{\"immutable\":1}");
+        var rows=mapper.selectHistory(symbol,AssetCardMapper.HistoryKind.FEATURE,old,old,now,10);
+        Path file=archive(rows,java.util.List.of()); String sha=file.getFileName().toString().substring(0,64);
+        // Disposable fixture deliberately violates production immutable-writer semantics to prove exact-content matching.
+        jdbc.update("UPDATE tm_asset_card_feature_history SET payload_json=? WHERE symbol=?","{\"changed\":1}",symbol);
+        assertThat(mapper.pruneArchivedHistory(new AssetCardMapper.ArchiveConfirmation(symbol,AssetCardMapper.HistoryKind.FEATURE,
+                rows.stream().map(AssetCardMapper.TypedHistory::recordKey).toList(),old,now.minusSeconds(21600),now,sha,now,file),10)).isZero();
+        assertThat(mapper.storageUsage().totalRows()).isEqualTo(1);
     }
 
     @Test

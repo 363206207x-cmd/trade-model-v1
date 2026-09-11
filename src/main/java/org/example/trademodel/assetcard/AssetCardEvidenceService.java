@@ -155,7 +155,7 @@ public class AssetCardEvidenceService {
     long monotonicNanos() { return System.nanoTime(); }
 
     private static int rank(String level) { return "HIGH".equals(level) ? 3 : "MEDIUM".equals(level) ? 2 : 1; }
-    private static void put(Map<String, Fact> facts, Map<String, String> missing, String key,
+    private void put(Map<String, Fact> facts, Map<String, String> missing, String key,
                             ProviderDatasetType expectedDataset, String expectedTimeframe, String payloadKey, ProviderCallResult<?> result,
                             BigDecimal value, String payloadSymbol, Instant payloadDataTime, Map<String, String> fieldSources,
                             CoinGlassSymbolMapper.CoinGlassSymbol mapped, Instant asOf) {
@@ -168,9 +168,37 @@ public class AssetCardEvidenceService {
             missing.put(key, "缺少新鲜且身份一致的CoinGlass " + key + " 证据");
             return;
         }
+        String provenanceIssue = provenanceIssue(key, fieldSource, result.payload());
+        if (provenanceIssue != null) {
+            missing.put(key, provenanceIssue);
+            return;
+        }
         var m = result.metadata();
-        facts.put(key, new Fact(value.doubleValue(), "COINGLASS:" + m.datasetType() + ":" + fieldSource, m.providerDataTime(),
+        facts.put(key, new Fact(value.doubleValue(), AssetCardFeatureService.VERIFIED_BINANCE_ACCOUNT_RATIO_SOURCE, m.providerDataTime(),
                 m.fetchTime(), m.expiresAt(), m.sourceVersion(), m.canonicalInstrumentId().canonical(),AssetCardFeatureService.observationUnit(key)));
+    }
+
+    /** The registry identifies the requested instrument, not what an aggregate endpoint actually returned.
+     * Only the existing pair-specific account-ratio chain carries a provable matching market/window/unit.
+     * These failures quarantine card inputs; they do not alter a shared cache or request a replacement. */
+    private String provenanceIssue(String key, String fieldSource, Object payload) {
+        return switch (key) {
+            case "openInterest", "openInterestChange1h" ->
+                    "来源待核验：跨交易所 All 的 USD 持仓量不能等同 Binance USDT 合约；来源观察时间与实际可用时间缺少独立证明";
+            case "fundingRate" ->
+                    "来源待核验：币种级加权资金费率并非单一 Binance USDT 合约，百分数或小数单位尚未证明";
+            case "longLiquidation", "shortLiquidation" ->
+                    "来源待核验：多交易所 USD 清算额的5分钟汇总不能等同单一 Binance USDT 合约；交易所与统计窗口证明不完整";
+            case "longShortRatio" -> payload instanceof CoinGlassLongShortSnapshot ratio
+                    && ratio.longShortRatio() != null && ratio.longShortRatio().signum() > 0
+                    && "BINANCE_GLOBAL_ACCOUNT_RATIO".equals(ratio.longShortRatioSource())
+                    && AssetCardFeatureService.BINANCE_ACCOUNT_RATIO_FIELD.equals(fieldSource)
+                    && "Binance".equals(properties.getLongShortExchange())
+                    && CoinGlassProperties.OFFICIAL_BASE_URL.equals(properties.getBaseUrl())
+                    && CoinGlassProperties.LONG_SHORT_PATH.equals(properties.getEndpoints().getLongShortRatio())
+                    ? null : "来源待核验：需要 Binance 单交易对1分钟账户多空比及原始比例字段，不能使用其他市场或未知来源";
+            default -> "来源待核验：未登记的资产卡片证据";
+        };
     }
 
     static boolean usable(ProviderSnapshotMetadata m, String symbol, Instant asOf) {

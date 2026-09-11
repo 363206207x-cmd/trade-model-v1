@@ -16,6 +16,7 @@ import static org.mockito.Mockito.*;
 
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardMarketDataServiceTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path windowDirectory;
     private static final Instant NOW = Instant.parse("2026-09-10T12:00:00Z");
     private final AssetCardProperties properties = new AssetCardProperties();
     private final AssetCardMapper mapper = mock(AssetCardMapper.class);
@@ -185,6 +186,7 @@ class AssetCardMarketDataServiceTest {
 
     @Test
     void oldHttpRateLimitStillCoolsGlobalBudgetButOldSuccessCannotPopulateNewSocketEpoch() {
+        configureWindowFixture();
         service.reconcileSubscriptions(List.of("BTCUSDT"));
         service.acceptMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
         Object oldState = ((java.util.Map<?, ?>) org.springframework.test.util.ReflectionTestUtils.getField(service, "depthStates")).get("BTCUSDT");
@@ -202,11 +204,15 @@ class AssetCardMarketDataServiceTest {
         assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW.plusSeconds(119))).isFalse();
         assertThat(service.claimDepthBootstrapBudget("ETHUSDT", NOW.plusSeconds(120))).isTrue();
         assertThat(service.book("BTCUSDT", NOW)).isEmpty();
-        verifyNoInteractions(oldSocket, newSocket, mapper);
+        assertThat(service.collectionStatus()).isEqualTo("PROVIDER_QUOTA_OR_AUTH_FAILURE");
+        verify(newSocket).abort();
+        verifyNoInteractions(oldSocket);
+        verify(mapper, atLeastOnce()).storageUsage(); verifyNoMoreInteractions(mapper);
     }
 
     @Test
     void oldSnapshotCannotPopulateReplacementDepthStateEvenOnTheSameConnection() {
+        configureWindowFixture();
         service.reconcileSubscriptions(List.of("BTCUSDT"));
         service.acceptMessage(depth(10, 12, NOW, "[]", "[]"), NOW);
         Object oldState = ((java.util.Map<?, ?>) org.springframework.test.util.ReflectionTestUtils.getField(service, "depthStates")).get("BTCUSDT");
@@ -225,7 +231,8 @@ class AssetCardMarketDataServiceTest {
         org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "completeDepthBootstrap", "BTCUSDT", currentSocket,
                 2L, currentState, depthResponse(200, depthSnapshot(21), null), null, NOW);
         assertThat(service.book("BTCUSDT", NOW).orElseThrow().sequence()).isEqualTo(22);
-        verifyNoInteractions(currentSocket, mapper);
+        verifyNoInteractions(currentSocket);
+        verify(mapper, atLeastOnce()).storageUsage(); verifyNoMoreInteractions(mapper);
     }
 
     @SuppressWarnings("unchecked")
@@ -233,8 +240,9 @@ class AssetCardMarketDataServiceTest {
         java.net.http.HttpResponse<String> response = mock(java.net.http.HttpResponse.class);
         when(response.statusCode()).thenReturn(status);
         when(response.body()).thenReturn(body);
-        when(response.headers()).thenReturn(java.net.http.HttpHeaders.of(retryAfter == null ? java.util.Map.of()
-                : java.util.Map.of("Retry-After", List.of(retryAfter)), (name, value) -> true));
+        when(response.headers()).thenReturn(java.net.http.HttpHeaders.of(retryAfter == null
+                ? java.util.Map.of("X-MBX-USED-WEIGHT-1M", List.of("250"))
+                : java.util.Map.of("Retry-After", List.of(retryAfter), "X-MBX-USED-WEIGHT-1M", List.of("250")), (name, value) -> true));
         return response;
     }
 
@@ -480,6 +488,7 @@ class AssetCardMarketDataServiceTest {
 
     @Test
     void replacementConnectionPreservesDataAndStaleCloseCannotInvalidateIt() {
+        configureWindowFixture();
         service.reconcileSubscriptions(List.of("BTCUSDT"));
         properties.setEnabled(true); properties.setExternalCallsEnabled(true);
         var first = mock(java.net.http.WebSocket.class);
@@ -493,7 +502,8 @@ class AssetCardMarketDataServiceTest {
         assertThat(service.quote("BTCUSDT", NOW.plusSeconds(1))).isPresent();
         assertThat(service.book("BTCUSDT", NOW.plusSeconds(1))).isPresent();
         verify(first).abort();
-        verifyNoInteractions(replacement, mapper);
+        verifyNoInteractions(replacement);
+        verify(mapper, atLeastOnce()).storageUsage(); verifyNoMoreInteractions(mapper);
     }
 
     @Test
@@ -508,6 +518,7 @@ class AssetCardMarketDataServiceTest {
 
     @Test
     void incrementalSubscribeRequiresAckAndUnsubscribeDoesNotRebuildUnchangedBook() {
+        configureWindowFixture();
         properties.setEnabled(true); properties.setExternalCallsEnabled(true);
         service.reconcileSubscriptions(List.of("BTCUSDT"));
         var connection = mock(java.net.http.WebSocket.class);
@@ -534,6 +545,7 @@ class AssetCardMarketDataServiceTest {
 
     @Test
     void lostConnectionHasBoundedBackoffAndCannotReplayDuplicateTradeObservations() {
+        configureWindowFixture();
         properties.setEnabled(true); properties.setExternalCallsEnabled(true);
         service.reconcileSubscriptions(List.of("BTCUSDT"));
         var connection = mock(java.net.http.WebSocket.class);
@@ -549,6 +561,188 @@ class AssetCardMarketDataServiceTest {
         service.acceptMessage(trade("btcusdt@aggTrade", "BTCUSDT", 10, "100", NOW), NOW);
         assertThat(observed).hasSize(1);
         assertThat(service.quote("BTCUSDT", NOW)).isEmpty();
-        verifyNoInteractions(mapper);
+        verify(mapper, atLeastOnce()).storageUsage(); verifyNoMoreInteractions(mapper);
+    }
+
+    private void configureWindowFixture() {
+        try { windowDirectory=windowDirectory.toRealPath(); java.nio.file.Files.setPosixFilePermissions(windowDirectory, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); }
+        catch (java.io.IOException failure) { throw new IllegalStateException(failure); }
+        var window = properties.getCollectionWindow();
+        window.setId("isolated-window"); window.setStartsAt(NOW); window.setEndsAt(NOW.plus(Duration.ofHours(8)));
+        window.setStateDirectory(windowDirectory); window.setSymbols(java.util.Set.of("BTCUSDT", "ETHUSDT"));
+        window.setSharedIpWeightAllowancePerMinute(1000); window.setSharedIpWeightLimitPerMinute(6000);
+        window.setSharedIpHeadroomConfirmedAt(NOW); window.setMinimumFreeBytes(1);
+        when(mapper.storageUsage()).thenReturn(new AssetCardMapper.StorageUsage(0,0,0,100,100,true));
+        var lease = (AssetCardMarketDataService.CollectionLease)org.springframework.test.util.ReflectionTestUtils.getField(service,"collectionLease");
+        assertThat(lease.check(NOW)).as(lease.status()).isTrue();
+    }
+
+    @Test void absoluteEightHourWindowExpiresAcrossRestartAndCannotBeRebased() throws Exception {
+        configureWindowFixture();
+        var window=properties.getCollectionWindow();
+        var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(first.check(NOW.plusSeconds(1))).isTrue();
+        assertThat(first.accepting(NOW.plus(Duration.ofHours(8)))).isFalse();
+        assertThat(first.check(NOW.plus(Duration.ofHours(8)))).isFalse();
+        assertThat(first.status()).isEqualTo("WINDOW_EXPIRED");
+        var restarted=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(restarted.check(NOW.plus(Duration.ofHours(8)).plusSeconds(1))).isFalse();
+        assertThat(restarted.status()).isEqualTo("WINDOW_EXPIRED");
+        window.setStartsAt(NOW.plusSeconds(60)); window.setEndsAt(NOW.plusSeconds(60).plus(Duration.ofHours(8)));
+        assertThat(restarted.check(NOW.plusSeconds(61))).isFalse();
+        assertThat(restarted.status()).isEqualTo("COLLECTION_LEDGER_OR_STORAGE_UNAVAILABLE");
+    }
+
+    @Test void durableRestReservationsAndStopSurviveTwoInstancesAndRestart() throws Exception {
+        var window=budgetFixture("rest-window"); window.setMaximumRestRequests(2);
+        var a=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        var b=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(a.reserve("REST",NOW)).isTrue(); assertThat(b.reserve("REST",NOW.plusSeconds(1))).isTrue();
+        assertThat(a.reserve("REST",NOW.plusSeconds(2))).isFalse();
+        assertThat(a.status()).isEqualTo("REST_TOTAL_BUDGET_EXHAUSTED");
+        assertThat(b.check(NOW.plusSeconds(20))).isFalse();
+        assertThat(b.status()).isEqualTo("REST_TOTAL_BUDGET_EXHAUSTED");
+    }
+
+    @Test void missingOrDeletedLedgerNeverGrantsFreshBudget() throws Exception {
+        var window=budgetFixture("lost-ledger");
+        var a=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(a.check(NOW)).isTrue();
+        java.nio.file.Files.delete(windowDirectory.resolve("lost-ledger.json")); // only this disposable fixture file
+        var restarted=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(restarted.check(NOW.plusSeconds(1))).isFalse();
+        assertThat(restarted.status()).isEqualTo("COLLECTION_LEDGER_OR_STORAGE_UNAVAILABLE");
+    }
+
+    @Test void everyStorageBoundaryStopsAndKeepsTerminalReasonAcrossRestart() throws Exception {
+        var window=budgetFixture("storage-window"); window.setMaximumNewRows(10);
+        window.setMaximumDatabaseGrowthBytes(10); window.setMaximumWalGrowthBytes(10); window.setMinimumFreeBytes(100);
+        var metrics=new java.util.concurrent.atomic.AtomicReference<>(new AssetCardMapper.StorageUsage(0,0,0,100,100,true));
+        var space=new java.util.concurrent.atomic.AtomicLong(1000);
+        var lease=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),metrics::get,space::get);
+        assertThat(lease.check(NOW)).isTrue();
+        metrics.set(new AssetCardMapper.StorageUsage(0,0,10,100,100,true));
+        assertThat(lease.check(NOW.plusSeconds(15))).isFalse();
+        assertThat(lease.status()).isEqualTo("DATABASE_ROW_LIMIT");
+        assertThat(new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),metrics::get,space::get)
+                .check(NOW.plusSeconds(16))).isFalse();
+        for (String kind:List.of("DB", "WAL", "FREE", "ERROR")) {
+            window.setId("storage-"+kind); metrics.set(new AssetCardMapper.StorageUsage(0,0,0,100,100,true)); space.set(1000);
+            var current=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),() -> {
+                if (metrics.get()==null) throw new IllegalStateException("isolated-unavailable"); return metrics.get();
+            },space::get);
+            assertThat(current.check(NOW)).isTrue();
+            if (kind.equals("DB")) metrics.set(new AssetCardMapper.StorageUsage(0,0,0,110,100,true));
+            if (kind.equals("WAL")) metrics.set(new AssetCardMapper.StorageUsage(0,0,0,100,110,true));
+            if (kind.equals("FREE")) space.set(99);
+            if (kind.equals("ERROR")) metrics.set(null);
+            assertThat(current.check(NOW.plusSeconds(15))).isFalse();
+            assertThat(current.status()).isEqualTo(switch(kind) {
+                case "DB" -> "DATABASE_GROWTH_LIMIT"; case "WAL" -> "WAL_GROWTH_LIMIT";
+                case "FREE" -> "STORAGE_FREE_SPACE_LIMIT"; default -> "STORAGE_MEASUREMENT_FAILED";
+            });
+        }
+    }
+
+    @Test void collectionWindowRejectsUnknownQuotaLongDurationAndExtraSymbols() throws Exception {
+        var window=budgetFixture("invalid-window");
+        window.setEndsAt(NOW.plusSeconds(8*3600+1)); assertThat(window.valid()).isFalse();
+        window.setEndsAt(NOW.plusSeconds(8*3600)); window.setSharedIpWeightLimitPerMinute(0); assertThat(window.valid()).isFalse();
+        window.setSharedIpWeightLimitPerMinute(6000); window.setSharedIpHeadroomConfirmedAt(NOW.minusSeconds(301)); assertThat(window.valid()).isFalse();
+        window.setSharedIpHeadroomConfirmedAt(NOW);
+        service.reconcileSubscriptions(List.of("BTCUSDT","ETHUSDT","SOLUSDT"));
+        assertThat(service.subscribedSymbols()).containsExactlyInAnyOrder("BTCUSDT","ETHUSDT");
+        assertThat(properties.isEnabled()).isFalse(); // quota checks never enable a scheduler
+    }
+
+    @Test void connectionAndControlBudgetsPersistAndDoNotAffectOtherSchedulerSwitches() throws Exception {
+        var window=budgetFixture("connection-budget"); window.setMaximumConnectionAttempts(1); window.setMaximumControlMessages(1);
+        for (String kind:List.of("CONNECTION","CONTROL")) {
+            window.setId("limited-"+kind);
+            var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+            assertThat(first.reserve(kind,NOW)).isTrue();
+            var restarted=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+            assertThat(restarted.reserve(kind,NOW.plusSeconds(1))).isFalse();
+            assertThat(restarted.status()).isEqualTo(kind.equals("CONNECTION") ? "WS_CONNECTION_BUDGET_EXHAUSTED" : "WS_CONTROL_BUDGET_EXHAUSTED");
+        }
+        properties.setEnabled(true); properties.setExternalCallsEnabled(true);
+        service.reconcileSubscriptions(List.of("BTCUSDT"));
+        var socket=mock(java.net.http.WebSocket.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"socket",socket);
+        service.stopCollection("OPERATOR_STOPPED_CARD_WINDOW",NOW.plusSeconds(2));
+        verify(socket).abort();
+        assertThat(properties.isEnabled()).isTrue();
+        assertThat(properties.isExternalCallsEnabled()).isTrue();
+        assertThat(service.subscribedSymbols()).containsExactly("BTCUSDT");
+        assertThat(service.collectionAccepting(NOW.plusSeconds(2))).isFalse();
+        // A later stop must not overwrite the first durable cause or reset its allowance.
+        assertThat(service.collectionStatus()).isEqualTo("WS_CONTROL_BUDGET_EXHAUSTED");
+    }
+
+    @Test void unsafeLedgerPermissionsAndClockRollbackFailClosed() throws Exception {
+        var window=budgetFixture("protected-ledger");
+        java.nio.file.Files.setPosixFilePermissions(windowDirectory,java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(first.check(NOW)).isFalse();
+        assertThat(first.status()).isEqualTo("COLLECTION_LEDGER_OR_STORAGE_UNAVAILABLE");
+        java.nio.file.Files.setPosixFilePermissions(windowDirectory,java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        assertThat(first.check(NOW.plusSeconds(40))).isFalse(); // fixing the directory cannot reset a terminal stop
+        window.setId("clock-fixture");
+        var clock=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(clock.check(NOW.plusSeconds(40))).isTrue();
+        var restarted=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage);
+        assertThat(restarted.check(NOW.plusSeconds(20))).isFalse();
+        assertThat(restarted.status()).isEqualTo("CLOCK_MOVED_BACKWARDS");
+    }
+
+    @Test void stopBeforeStartPersistsWithoutAWriterAndSurvivesRestart() throws Exception {
+        var window=budgetFixture("prestart-stop");
+        var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),() -> {
+            throw new IllegalStateException("No writer before start");
+        },() -> 1L,"first-process");
+        first.stop("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE",NOW.minusSeconds(10));
+        assertThat(first.status()).isEqualTo("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE");
+        var restarted=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"next-process");
+        assertThat(restarted.check(NOW)).isFalse();
+        assertThat(restarted.status()).isEqualTo("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE");
+    }
+
+    @Test void failedStopPersistenceCannotResumeOpenLedgerAfterIoRecovers() throws Exception {
+        var window=budgetFixture("failed-stop");
+        var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"first-process");
+        assertThat(first.check(NOW)).isTrue();
+        var ledger=windowDirectory.resolve(window.getId()+".json");
+        java.nio.file.Files.setPosixFilePermissions(ledger,java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        first.stop("ARCHIVE_VERIFICATION_OR_STORAGE_FAILURE",NOW.plusSeconds(1));
+        assertThat(first.accepting(NOW.plusSeconds(1))).isFalse();
+        java.nio.file.Files.setPosixFilePermissions(ledger,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        assertThat(first.check(NOW.plusSeconds(2))).isFalse();
+        var next=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"next-process");
+        assertThat(next.check(NOW.plusSeconds(3))).isFalse();
+    }
+
+    @Test void cleanRestartRetainsBudgetButUncleanProcessCannotReopenOldAllowance() throws Exception {
+        var window=budgetFixture("restart-identity"); window.setMaximumRestRequests(2);
+        var first=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"first-process");
+        assertThat(first.reserve("REST",NOW)).isTrue(); first.release(NOW.plusSeconds(1));
+        var clean=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"clean-process");
+        assertThat(clean.reserve("REST",NOW.plusSeconds(2))).isTrue();
+        var unclean=new AssetCardMarketDataService.CollectionLease(window,new ObjectMapper(),mapper::storageUsage,() -> 1L,"unclean-process");
+        assertThat(unclean.check(NOW.plusSeconds(3))).isFalse();
+        assertThat(unclean.status()).isEqualTo("UNVERIFIED_PREVIOUS_COLLECTION_PROCESS");
+        assertThat(unclean.reserve("REST",NOW.plusSeconds(4))).isFalse();
+        assertThat(new ObjectMapper().readTree(java.nio.file.Files.readAllBytes(windowDirectory.resolve(window.getId()+".json"))).path("rest").asLong()).isEqualTo(2);
+    }
+
+    private AssetCardProperties.CollectionWindow budgetFixture(String id) throws Exception {
+        windowDirectory=windowDirectory.toRealPath();
+        java.nio.file.Files.setPosixFilePermissions(windowDirectory,java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        var window=properties.getCollectionWindow(); window.setId(id); window.setStartsAt(NOW);
+        window.setEndsAt(NOW.plus(Duration.ofHours(8))); window.setStateDirectory(windowDirectory);
+        window.setSymbols(java.util.Set.of("BTCUSDT","ETHUSDT"));
+        window.setSharedIpWeightAllowancePerMinute(1000); window.setSharedIpWeightLimitPerMinute(6000); window.setSharedIpHeadroomConfirmedAt(NOW);
+        window.setMinimumFreeBytes(1);
+        when(mapper.storageUsage()).thenReturn(new AssetCardMapper.StorageUsage(0,0,0,100,100,true));
+        return window;
     }
 }

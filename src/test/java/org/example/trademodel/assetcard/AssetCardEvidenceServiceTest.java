@@ -28,6 +28,66 @@ import static org.mockito.Mockito.*;
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardEvidenceServiceTest {
     private static final Instant AT = Instant.parse("2026-09-10T12:00:00Z");
+    private static final String RATIO_FIELD = "CG_V4_GLOBAL_ACCOUNT_LONG_SHORT_RATIO:data.latest.global_account_long_short_ratio";
+
+    @Test
+    void actualAdapterShapesDoNotRelabelAggregateUsdOrUnknownFundingAsBinanceUsdt() throws Exception {
+        var f = fixture();
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var validator = new CoinGlassV4ResponseValidator();
+        var mapped = new CoinGlassSymbolMapper().map("BTCUSDT");
+        var fetched = AT.minusSeconds(1);
+        var oi = validator.openInterest(json.readTree("[{\"symbol\":\"BTC\",\"exchange\":\"All\",\"open_interest_usd\":123456,\"open_interest_change_percent_1h\":2}]"), mapped, fetched);
+        var funding = validator.funding(json.readTree("[{\"time\":" + AT.minusSeconds(60).toEpochMilli() + ",\"close\":-0.01}]"), mapped, fetched);
+        var rows = json.createArrayNode();
+        for (int minute = 1; minute <= 5; minute++) rows.addObject().put("time", AT.minusSeconds(minute * 60L).toEpochMilli())
+                .put("aggregated_long_liquidation_usd", 10).put("aggregated_short_liquidation_usd", 4);
+        var liquidation = validator.liquidation(rows, mapped, fetched);
+        var ratio = validator.longShort(json.readTree("[{\"time\":" + AT.minusSeconds(60).toEpochMilli() + ",\"global_account_long_short_ratio\":1.25}]"), mapped, fetched, "Binance");
+        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(oi.payload(), ProviderDatasetType.COINGLASS_OPEN_INTEREST, oi.providerDataTime(), fetched));
+        when(f.funding.peek(anyString(), any(), any(), anyString())).thenReturn(result(funding.payload(), ProviderDatasetType.COINGLASS_FUNDING, funding.providerDataTime(), fetched));
+        when(f.liquidation.peek(anyString(), any(), any(), anyString())).thenReturn(result(liquidation.payload(), ProviderDatasetType.COINGLASS_LIQUIDATION, liquidation.providerDataTime(), fetched));
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(ratio.payload(), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, ratio.providerDataTime(), fetched));
+        var read = f.service.read("BTCUSDT", AT);
+        assertThat(read.facts()).containsOnlyKeys("longShortRatio");
+        assertThat(read.facts().get("longShortRatio").unit()).isEqualTo("RATIO");
+        assertThat(read.facts().get("longShortRatio").value()).isEqualTo(1.25);
+        assertThat(read.missingReasons().get("openInterest")).contains("跨交易所", "USD", "实际可用时间");
+        assertThat(read.missingReasons().get("fundingRate")).contains("加权", "单位");
+        assertThat(read.missingReasons().get("longLiquidation")).contains("5分钟", "USD", "交易所");
+        assertThat(read.observations(AT)).containsOnlyKeys("longShortRatio");
+        verify(f.oi, never()).get(anyString(), any(), any(), anyString());
+        verify(f.funding, never()).get(anyString(), any(), any(), anyString());
+        verify(f.ratio, never()).get(anyString(), any(), any(), anyString());
+        verify(f.liquidation, never()).get(anyString(), any(), any(), anyString());
+    }
+
+    @Test
+    void ratioNeedsRealFieldAndExchangeNotOnlyRegistryIdentity() {
+        for (String ratioSource : List.of("OKX_GLOBAL_ACCOUNT_RATIO", "BINANCE", "UNKNOWN")) {
+            var f = fixture();
+            when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
+                    new CoinGlassLongShortSnapshot("BTCUSDT", BigDecimal.ONE, ratioSource, AT.minusSeconds(2), Map.of("longShortRatio", RATIO_FIELD)),
+                    ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, AT.minusSeconds(2), AT));
+            assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
+        }
+        for (var invalidRatio : List.of(BigDecimal.ZERO, BigDecimal.ONE.negate())) {
+            var invalid = fixture();
+            when(invalid.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
+                    new CoinGlassLongShortSnapshot("BTCUSDT", invalidRatio, "BINANCE_GLOBAL_ACCOUNT_RATIO", AT.minusSeconds(2), Map.of("longShortRatio", RATIO_FIELD)),
+                    ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, AT.minusSeconds(2), AT));
+            assertThat(invalid.service.read("BTCUSDT", AT).facts()).isEmpty();
+        }
+        var f = fixture();
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(ratio(AT.minusSeconds(2)),
+                ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, AT.minusSeconds(2), AT));
+        assertThat(f.service.read("BTCUSDT", AT).facts()).containsOnlyKeys("longShortRatio");
+        var properties = new CoinGlassProperties(); properties.setLongShortExchange("OKX");
+        var wrongConfig = new AssetCardEvidenceService(f.oi, f.funding, f.ratio, f.liquidation, properties, f.macro, f.news);
+        assertThat(wrongConfig.read("BTCUSDT", AT).facts()).isEmpty();
+        properties.setLongShortExchange("Binance"); properties.setBaseUrl("https://untrusted.invalid");
+        assertThat(wrongConfig.read("BTCUSDT", AT).facts()).isEmpty();
+    }
     @Test
     void missingDatasetIsUnknownAndReadNeverCallsProviderGet() {
         var oi = mock(CoinGlassOpenInterestSnapshotService.class);
@@ -58,7 +118,7 @@ class AssetCardEvidenceServiceTest {
     }
 
     @Test
-    void allDatasetsRequireRealFieldProvenanceAndOnlyReadPeekCaches() {
+    void arbitraryFieldLabelsNeverProveMarketUnitOrWindowAndOnlyReadPeekCaches() {
         var f = fixture();
         var observed = AT.minusSeconds(2);
         var oi = oi(observed, Map.of("openInterestUsd", "fixture-oi-value", "openInterestChange1h", "fixture-oi-change"));
@@ -74,18 +134,20 @@ class AssetCardEvidenceServiceTest {
                         observed, Map.of("longLiquidationUsd5m", "fixture-long-liquidation", "shortLiquidationUsd5m", "fixture-short-liquidation")),
                 ProviderDatasetType.COINGLASS_LIQUIDATION, observed, AT.minusSeconds(1)));
         var read = f.service.read("BTCUSDT", AT);
-        assertThat(read.facts()).containsOnlyKeys("openInterest", "openInterestChange1h", "fundingRate", "longShortRatio", "longLiquidation", "shortLiquidation");
-        assertThat(read.missingReasons()).isEmpty();
-        assertThat(read.facts().get("openInterest").source()).contains("fixture-oi-value");
-        assertThat(read.facts().get("openInterestChange1h").source()).contains("fixture-oi-change");
-        assertThat(read.observations(AT)).hasSize(6);
-        var observation=read.observations(AT).get("fundingRate");
+        assertThat(read.facts()).isEmpty();
+        assertThat(read.missingReasons()).containsOnlyKeys("openInterest", "openInterestChange1h", "fundingRate", "longShortRatio", "longLiquidation", "shortLiquidation");
+        assertThat(read.observations(AT)).isEmpty();
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(ratio(observed),
+                ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT.minusSeconds(1)));
+        var verified = f.service.read("BTCUSDT", AT);
+        assertThat(verified.facts()).containsOnlyKeys("longShortRatio");
+        var observation=verified.observations(AT).get("longShortRatio");
         assertThat(observation.instrument()).isEqualTo("BINANCE:PERPETUAL:LINEAR:BTC/USDT");
-        assertThat(observation.sourceVersion()).isEqualTo(read.facts().get("fundingRate").sourceVersion());
-        assertThat(observation.expiresAt()).isEqualTo(read.facts().get("fundingRate").expiresAt());
-        assertThat(observation.unit()).isEqualTo("RATE");
-        assertThat(AssetCardFeatureService.usableObservation("BTCUSDT","fundingRate",observation,AT)).isTrue();
-        assertThat(read.observations(AT.plusSeconds(61))).isEmpty();
+        assertThat(observation.sourceVersion()).isEqualTo(verified.facts().get("longShortRatio").sourceVersion());
+        assertThat(observation.expiresAt()).isEqualTo(verified.facts().get("longShortRatio").expiresAt());
+        assertThat(observation.unit()).isEqualTo("RATIO");
+        assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("BTCUSDT","longShortRatio",observation,AT)).isTrue();
+        assertThat(verified.observations(AT.plusSeconds(61))).isEmpty();
         verify(f.oi, never()).get(anyString(), any(), any(), anyString());
         verify(f.funding, never()).get(anyString(), any(), any(), anyString());
         verify(f.ratio, never()).get(anyString(), any(), any(), anyString());
@@ -96,19 +158,18 @@ class AssetCardEvidenceServiceTest {
     void datasetPayloadTimestampAndActualPayloadFieldKeysMustMatch() {
         var f = fixture();
         var observed = AT.minusSeconds(2);
-        var payload = oi(observed, Map.of("openInterestUsd", "fixture-oi-value", "openInterestChange1h", "fixture-oi-change"));
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(payload, ProviderDatasetType.COINGLASS_FUNDING, observed, AT));
+        var payload = ratio(observed);
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(payload, ProviderDatasetType.COINGLASS_FUNDING, observed, AT));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(payload, ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed.minusSeconds(1), AT));
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(payload, ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed.minusSeconds(1), AT));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(oi(observed, Map.of("openInterest", "wrong-projection-key")),
-                ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT));
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(new CoinGlassLongShortSnapshot("BTCUSDT", BigDecimal.ONE,
+                "BINANCE_GLOBAL_ACCOUNT_RATIO", observed, Map.of("wrong-projection-key", RATIO_FIELD)), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(oi(observed, Map.of("openInterestUsd", "fixture-oi-value")),
-                ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT));
-        assertThat(f.service.read("BTCUSDT", AT).facts()).containsOnlyKeys("openInterest");
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(oi(observed, Map.of("openInterestUsd", " ")),
-                ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT));
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(payload, ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
+        assertThat(f.service.read("BTCUSDT", AT).facts()).containsOnlyKeys("longShortRatio");
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(new CoinGlassLongShortSnapshot("BTCUSDT", BigDecimal.ONE,
+                "BINANCE_GLOBAL_ACCOUNT_RATIO", observed, Map.of("longShortRatio", " ")), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
     }
 
@@ -116,11 +177,11 @@ class AssetCardEvidenceServiceTest {
     void availabilityCannotPrecedeTheProviderObservation() {
         var f = fixture();
         var observed = AT.minusSeconds(2);
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(
-                oi(observed, Map.of("openInterestUsd", "fixture-oi-value")), ProviderDatasetType.COINGLASS_OPEN_INTEREST,
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
+                ratio(observed), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO,
                 observed, observed.minusSeconds(1)));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
-        assertThat(f.service.read("BTCUSDT", AT).missingReasons()).containsKey("openInterest");
+        assertThat(f.service.read("BTCUSDT", AT).missingReasons()).containsKey("longShortRatio");
     }
 
     @Test
@@ -178,16 +239,16 @@ class AssetCardEvidenceServiceTest {
     void fullCanonicalIdentityAndProviderMappingVersionMustMatchTheInjectedMapper() {
         var f = fixture();
         var observed = AT.minusSeconds(2);
-        var valid = result(oi(observed, Map.of("openInterestUsd", "fixture-oi")), ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT);
+        var valid = result(ratio(observed), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT);
         for (var identity : List.of(
                 new CanonicalInstrumentId("BTC", "USDC", MarketType.PERPETUAL, "BINANCE", ContractType.LINEAR),
                 new CanonicalInstrumentId("BTC", "USDT", MarketType.PERPETUAL, "OTHER_VENUE", ContractType.LINEAR),
                 new CanonicalInstrumentId("BTC", "USDT", MarketType.SPOT, "BINANCE", ContractType.NONE))) {
-            when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
+            when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
                     metadata(identity, "COINGLASS_MAPPING_V1", observed, AT), null));
             assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
         }
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
                 metadata(valid.metadata().canonicalInstrumentId(), "old-mapping-version", observed, AT), null));
         assertThat(f.service.read("BTCUSDT", AT).facts()).isEmpty();
         var mapper = mock(CoinGlassSymbolMapper.class);
@@ -195,9 +256,9 @@ class AssetCardEvidenceServiceTest {
                 valid.metadata().canonicalInstrumentId(), "fixture-injected-mapping"));
         var injected = new AssetCardEvidenceService(f.oi, f.funding, f.ratio, f.liquidation,
                 new CoinGlassProperties(), f.macro, f.news, mapper);
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(new ProviderCallResult<>(valid.payload(),
                 metadata(valid.metadata().canonicalInstrumentId(), "fixture-injected-mapping", observed, AT), null));
-        assertThat(injected.read("BTCUSDT", AT).facts()).containsOnlyKeys("openInterest");
+        assertThat(injected.read("BTCUSDT", AT).facts()).containsOnlyKeys("longShortRatio");
         verify(mapper).map("BTCUSDT");
     }
 
@@ -212,7 +273,7 @@ class AssetCardEvidenceServiceTest {
                     new CoinGlassFundingSnapshot("BTCUSDT", BigDecimal.ONE, observed, Map.of("weightedFundingRate", "fixture-funding")),
                     ProviderDatasetType.COINGLASS_FUNDING, observed, AT));
             when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
-                    new CoinGlassLongShortSnapshot("BTCUSDT", BigDecimal.ONE, "fixture-ratio", observed, Map.of("longShortRatio", "fixture-ratio")),
+                    ratio(observed),
                     ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
             when(f.liquidation.peek(anyString(), any(), any(), anyString())).thenReturn(result(
                     new CoinGlassLiquidationSnapshot("BTCUSDT", null, BigDecimal.TEN, null, null, null, BigDecimal.ONE, null, null,
@@ -226,7 +287,8 @@ class AssetCardEvidenceServiceTest {
                 default -> when(f.liquidation.peek(anyString(), any(), any(), anyString())).thenThrow(failure);
             }
             var read = f.service.read("BTCUSDT", AT);
-            assertThat(read.facts()).hasSize(List.of("oi", "liquidation").contains(failed) ? 4 : 5);
+            if ("ratio".equals(failed)) assertThat(read.facts()).isEmpty();
+            else assertThat(read.facts()).containsOnlyKeys("longShortRatio");
             assertThat(read.missingReasons()).isNotEmpty();
             verify(f.oi, never()).get(anyString(), any(), any(), anyString());
             verify(f.funding, never()).get(anyString(), any(), any(), anyString());
@@ -239,9 +301,8 @@ class AssetCardEvidenceServiceTest {
     void oneEventQueryFailurePreservesTheOtherRealHighRiskAndCoinGlassFactsWithoutExtraQueries() {
         for (String failed : List.of("macro", "news")) {
             var f = fixture(); var observed = AT.minusSeconds(2);
-            when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(
-                    oi(observed, Map.of("openInterestUsd", "fixture-oi")),
-                    ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT));
+            when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
+                    ratio(observed), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
             var macro = event(); macro.setEventId("fixture-macro-high");
             var news = completeEvent(new NewsEventDO()); news.setEventId("fixture-news-high");
             when(f.macro.selectWindowCandidates(any(), eq(500))).thenReturn(List.of(macro));
@@ -252,7 +313,7 @@ class AssetCardEvidenceServiceTest {
                 when(f.news.selectWindowCandidates(any(), eq(500))).thenThrow(new IllegalStateException("fixture-news-unavailable"));
             }
             var read = f.service.read("BTCUSDT", AT);
-            assertThat(read.facts()).containsOnlyKeys("openInterest");
+            assertThat(read.facts()).containsOnlyKeys("longShortRatio");
             assertThat(read.eventRisk().level()).isEqualTo("HIGH");
             assertThat(read.eventRisk().evidenceValue()).isEqualTo("macro".equals(failed) ? "fixture-news-high" : "fixture-macro-high");
             assertThat(f.service.readEventRisk("BTCUSDT", AT.plusMillis(500))).isEqualTo(read.eventRisk());
@@ -266,16 +327,15 @@ class AssetCardEvidenceServiceTest {
     @Test
     void failedEventQueriesCannotReplayAnOlderHighAssessmentOrEraseUnrelatedFacts() {
         var f = fixture(); var observed = AT.minusSeconds(2);
-        when(f.oi.peek(anyString(), any(), any(), anyString())).thenReturn(result(
-                oi(observed, Map.of("openInterestUsd", "fixture-oi")),
-                ProviderDatasetType.COINGLASS_OPEN_INTEREST, observed, AT));
+        when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
+                ratio(observed), ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, observed, AT));
         when(f.macro.selectWindowCandidates(any(), eq(500))).thenReturn(List.of(event()))
                 .thenThrow(new IllegalStateException("fixture-macro-unavailable"));
         when(f.news.selectWindowCandidates(any(), eq(500))).thenThrow(new IllegalStateException("fixture-news-unavailable"));
         assertThat(f.service.read("BTCUSDT", AT).eventRisk().level()).isEqualTo("HIGH");
         f.nanos.set(1_000_000_000L);
         var read = f.service.read("BTCUSDT", AT.plusSeconds(1));
-        assertThat(read.facts()).containsOnlyKeys("openInterest");
+        assertThat(read.facts()).containsOnlyKeys("longShortRatio");
         assertThat(read.eventRisk()).isNull();
         assertThat(f.service.readEventRisk("BTCUSDT", AT.plusMillis(1500))).isNull();
         verify(f.macro, times(2)).selectWindowCandidates(any(), eq(500));
@@ -296,8 +356,8 @@ class AssetCardEvidenceServiceTest {
             }
             var f = fixture();
             stubDataset(f, dataset, expected);
-            assertThat(f.service.read("BTCUSDT", AT).facts()).as("%s accepts exact owner timeframe", dataset)
-                    .hasSize(dataset == ProviderDatasetType.COINGLASS_OPEN_INTEREST || dataset == ProviderDatasetType.COINGLASS_LIQUIDATION ? 2 : 1);
+            assertThat(f.service.read("BTCUSDT", AT).facts()).as("%s needs exact window plus proven market and unit", dataset)
+                    .hasSize(dataset == ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO ? 1 : 0);
         }
     }
 
@@ -325,7 +385,7 @@ class AssetCardEvidenceServiceTest {
                     new CoinGlassFundingSnapshot("BTCUSDT", BigDecimal.ONE, observed, Map.of("weightedFundingRate", "fixture-funding")),
                     dataset, timeframe, observed, AT));
             case COINGLASS_LONG_SHORT_RATIO -> when(f.ratio.peek(anyString(), any(), any(), anyString())).thenReturn(result(
-                    new CoinGlassLongShortSnapshot("BTCUSDT", BigDecimal.ONE, "fixture-ratio", observed, Map.of("longShortRatio", "fixture-ratio")),
+                    ratio(observed),
                     dataset, timeframe, observed, AT));
             case COINGLASS_LIQUIDATION -> when(f.liquidation.peek(anyString(), any(), any(), anyString())).thenReturn(result(
                     new CoinGlassLiquidationSnapshot("BTCUSDT", null, BigDecimal.TEN, null, null, null, BigDecimal.ONE, null, null,
@@ -357,6 +417,11 @@ class AssetCardEvidenceServiceTest {
                 null, List.of(), at, sources);
     }
 
+    private static CoinGlassLongShortSnapshot ratio(Instant at) {
+        return new CoinGlassLongShortSnapshot("BTCUSDT", new BigDecimal("1.2"), "BINANCE_GLOBAL_ACCOUNT_RATIO", at,
+                Map.of("longShortRatio", RATIO_FIELD));
+    }
+
     private static <T> ProviderCallResult<T> result(T payload, ProviderDatasetType dataset, Instant observed, Instant fetched) {
         return result(payload, dataset, dataset == ProviderDatasetType.COINGLASS_OPEN_INTEREST ? "CURRENT" : "1M", observed, fetched);
     }
@@ -370,8 +435,8 @@ class AssetCardEvidenceServiceTest {
     }
 
     private static ProviderSnapshotMetadata metadata(CanonicalInstrumentId identity, String sourceVersion, Instant observed, Instant fetched) {
-        return new ProviderSnapshotMetadata("COINGLASS", ProviderDatasetType.COINGLASS_OPEN_INTEREST, identity,
-                "BTCUSDT", "CURRENT", observed, fetched, AT.plusSeconds(60), 0L,
+        return new ProviderSnapshotMetadata("COINGLASS", ProviderDatasetType.COINGLASS_LONG_SHORT_RATIO, identity,
+                "BTCUSDT", "1M", observed, fetched, AT.plusSeconds(60), 0L,
                 UnifiedSourceStatus.READY, SnapshotFreshnessStatus.FRESH, "fixture-trace", "fixture-request",
                 sourceVersion, true, false, null, List.of());
     }

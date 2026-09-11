@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,92 @@ public class AssetCardProperties {
     private Path trainingExportDirectory;
     private boolean trainingExportEnabled;
     private Set<String> canarySymbols = Set.of();
+    private final CollectionWindow collectionWindow = new CollectionWindow();
+    private boolean retentionEnabled;
+    private Path archiveDirectory;
+    private long archiveMinimumFreeBytes = 10L * 1024 * 1024 * 1024;
+    private int retentionBatchSize = 128;
+
+    public CollectionWindow getCollectionWindow() { return collectionWindow; }
+    public boolean isRetentionEnabled() { return retentionEnabled; }
+    public void setRetentionEnabled(boolean value) { retentionEnabled = value; }
+    public Path getArchiveDirectory() { return archiveDirectory; }
+    public void setArchiveDirectory(Path value) { archiveDirectory = value; }
+    public long getArchiveMinimumFreeBytes() { return archiveMinimumFreeBytes; }
+    public void setArchiveMinimumFreeBytes(long value) {
+        if (value < 1) throw new IllegalArgumentException("Positive archive free-space reserve required");
+        archiveMinimumFreeBytes = value;
+    }
+    public int getRetentionBatchSize() { return retentionBatchSize; }
+    public void setRetentionBatchSize(int value) {
+        if (value < 1 || value > 500) throw new IllegalArgumentException("Retention batch must contain 1..500 records");
+        retentionBatchSize = value;
+    }
+
+    /** An explicit, absolute engineering window; JVM startup never supplies or renews either clock. */
+    public static final class CollectionWindow {
+        private String id;
+        private Instant startsAt, endsAt;
+        private Path stateDirectory;
+        private Set<String> symbols = Set.of();
+        private int sharedIpWeightAllowancePerMinute;
+        private int sharedIpWeightLimitPerMinute;
+        private Instant sharedIpHeadroomConfirmedAt;
+        private long maximumRestRequests = 288, maximumRestWeight = 72_000;
+        private long maximumConnectionAttempts = 32, maximumControlMessages = 128;
+        private long maximumNewRows = 1_100_000, maximumDatabaseGrowthBytes = 3L * 1024 * 1024 * 1024;
+        private long maximumWalGrowthBytes = 8L * 1024 * 1024 * 1024, minimumFreeBytes = 20L * 1024 * 1024 * 1024;
+        public String getId() { return id; }
+        public void setId(String value) { id = value; }
+        public Instant getStartsAt() { return startsAt; }
+        public void setStartsAt(Instant value) { startsAt = value; }
+        public Instant getEndsAt() { return endsAt; }
+        public void setEndsAt(Instant value) { endsAt = value; }
+        public Path getStateDirectory() { return stateDirectory; }
+        public void setStateDirectory(Path value) { stateDirectory = value; }
+        public Set<String> getSymbols() { return symbols; }
+        public void setSymbols(Set<String> value) {
+            if (value == null || value.isEmpty() || value.size() > 36
+                    || value.stream().anyMatch(s -> s == null || !s.matches("[A-Z0-9]{2,28}USDT")))
+                throw new IllegalArgumentException("Collection requires 1..36 exact registered Spot symbols");
+            symbols = Set.copyOf(value);
+        }
+        public int getSharedIpWeightAllowancePerMinute() { return sharedIpWeightAllowancePerMinute; }
+        public void setSharedIpWeightAllowancePerMinute(int value) { sharedIpWeightAllowancePerMinute = value; }
+        public int getSharedIpWeightLimitPerMinute() { return sharedIpWeightLimitPerMinute; }
+        public void setSharedIpWeightLimitPerMinute(int value) { sharedIpWeightLimitPerMinute = value; }
+        public Instant getSharedIpHeadroomConfirmedAt() { return sharedIpHeadroomConfirmedAt; }
+        public void setSharedIpHeadroomConfirmedAt(Instant value) { sharedIpHeadroomConfirmedAt = value; }
+        public long getMaximumRestRequests() { return maximumRestRequests; }
+        public void setMaximumRestRequests(long value) { maximumRestRequests = positive(value); }
+        public long getMaximumRestWeight() { return maximumRestWeight; }
+        public void setMaximumRestWeight(long value) { maximumRestWeight = positive(value); }
+        public long getMaximumConnectionAttempts() { return maximumConnectionAttempts; }
+        public void setMaximumConnectionAttempts(long value) { maximumConnectionAttempts = positive(value); }
+        public long getMaximumControlMessages() { return maximumControlMessages; }
+        public void setMaximumControlMessages(long value) { maximumControlMessages = positive(value); }
+        public long getMaximumNewRows() { return maximumNewRows; }
+        public void setMaximumNewRows(long value) { maximumNewRows = positive(value); }
+        public long getMaximumDatabaseGrowthBytes() { return maximumDatabaseGrowthBytes; }
+        public void setMaximumDatabaseGrowthBytes(long value) { maximumDatabaseGrowthBytes = positive(value); }
+        public long getMaximumWalGrowthBytes() { return maximumWalGrowthBytes; }
+        public void setMaximumWalGrowthBytes(long value) { maximumWalGrowthBytes = positive(value); }
+        public long getMinimumFreeBytes() { return minimumFreeBytes; }
+        public void setMinimumFreeBytes(long value) { minimumFreeBytes = positive(value); }
+        private static long positive(long value) {
+            if (value <= 0) throw new IllegalArgumentException("Positive collection budget required");
+            return value;
+        }
+        public boolean valid() {
+            return id != null && id.matches("[A-Za-z0-9_-]{8,80}") && startsAt != null && endsAt != null
+                    && startsAt.isBefore(endsAt) && Duration.between(startsAt, endsAt).compareTo(Duration.ofHours(8)) <= 0
+                    && stateDirectory != null && stateDirectory.isAbsolute() && !symbols.isEmpty()
+                    && sharedIpWeightAllowancePerMinute >= 250 && sharedIpWeightAllowancePerMinute <= 1000
+                    && sharedIpWeightLimitPerMinute >= sharedIpWeightAllowancePerMinute * 2
+                    && sharedIpHeadroomConfirmedAt != null && !sharedIpHeadroomConfirmedAt.isAfter(startsAt)
+                    && !sharedIpHeadroomConfirmedAt.isBefore(startsAt.minusSeconds(300));
+        }
+    }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean value) { enabled = value; }

@@ -9,6 +9,52 @@ import static org.assertj.core.api.Assertions.*;
 @org.junit.jupiter.api.Tag("core-regression")
 class AssetCardFeatureServiceTest {
     private final Instant at = Instant.parse("2026-01-01T12:00:00Z");
+    @Test void shadowFeatureReadinessIsNotTrainingQualificationForQuarantinedCoinGlass() {
+        Map<String,List<AssetCardFeatureService.Bar>> bars = new LinkedHashMap<>();
+        for (var interval : Map.of("5m",300,"15m",900,"1h",3600,"4h",14400).entrySet())
+            bars.put(interval.getKey(), slopeBars(interval.getValue(), 1));
+        Map<String,AssetCardFeatureService.Observation> evidence = new LinkedHashMap<>();
+        for (String key : List.of("spreadBps", "depth10Bps", "depth25Bps")) evidence.put(key, spot(key, 2, at));
+        var ratio = new AssetCardFeatureService.Observation(1.2, AssetCardFeatureService.VERIFIED_BINANCE_ACCOUNT_RATIO_SOURCE,
+                at, at, "BINANCE:PERPETUAL:LINEAR:BTC/USDT", "COINGLASS_V4_V1", "RATIO", at.plusSeconds(60));
+        evidence.put("longShortRatio", ratio);
+        var frame = new AssetCardFeatureService().build(new AssetCardFeatureService.RawFrame("BTCUSDT", at, bars, evidence));
+        assertThat(frame.ready()).isTrue(); // SHADOW observation and label maturity must remain possible.
+        assertThat(frame.realInputs()).containsKey("longShortRatio");
+        assertThat(frame.trainingEligible()).isFalse();
+        assertThat(frame.trainingQualificationReasons()).containsExactly("MISSING_COINGLASS_EVIDENCE:openInterest",
+                "MISSING_COINGLASS_EVIDENCE:fundingRate", "MISSING_COINGLASS_EVIDENCE:longLiquidation",
+                "MISSING_COINGLASS_EVIDENCE:shortLiquidation");
+        for (String key : List.of("openInterest", "fundingRate", "longLiquidation", "shortLiquidation")) {
+            String dataset = key.equals("fundingRate") ? "COINGLASS_FUNDING" : key.equals("openInterest") ? "COINGLASS_OPEN_INTEREST" : "COINGLASS_LIQUIDATION";
+            evidence.put(key, new AssetCardFeatureService.Observation(1.0, "COINGLASS:" + dataset + ":internally-labelled-but-unproven",
+                    at, at, ratio.instrument(), ratio.sourceVersion(), AssetCardFeatureService.observationUnit(key), at.plusSeconds(60)));
+        }
+        var legacy = new AssetCardFeatureService().build(new AssetCardFeatureService.RawFrame("BTCUSDT", at, bars, evidence));
+        assertThat(legacy.ready()).isTrue();
+        assertThat(legacy.trainingEligible()).isFalse();
+        assertThat(legacy.trainingQualificationReasons()).containsExactly("UNPROVEN_COINGLASS_MARKET_UNIT_OR_WINDOW:openInterest",
+                "UNPROVEN_COINGLASS_MARKET_UNIT_OR_WINDOW:fundingRate", "UNPROVEN_COINGLASS_MARKET_UNIT_OR_WINDOW:longLiquidation",
+                "UNPROVEN_COINGLASS_MARKET_UNIT_OR_WINDOW:shortLiquidation");
+        assertThat(legacy.featureVersion()).isEqualTo(frame.featureVersion());
+        assertThat(legacy.atr()).isEqualTo(frame.atr()); // This gate has not changed a feature formula.
+    }
+
+    @Test void verifiedRatioProofRejectsUnitWindowMarketAndLegacyProvenance() throws Exception {
+        var mapper = new ObjectMapper().findAndRegisterModules();
+        var original = new AssetCardFeatureService.Observation(1.2, AssetCardFeatureService.VERIFIED_BINANCE_ACCOUNT_RATIO_SOURCE,
+                at, at, "BINANCE:PERPETUAL:LINEAR:BTC/USDT", "COINGLASS_V4_V1", "RATIO", at.plusSeconds(60));
+        assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("BTCUSDT", "longShortRatio", original, at)).isTrue();
+        for (var entry : Map.of("unit", "PERCENT", "instrument", "BINANCE:SPOT:NONE:BTC/USDT",
+                "source", original.source().replace(":1M:RATIO", ":5M:RATIO"), "sourceVersion", "UNKNOWN").entrySet()) {
+            com.fasterxml.jackson.databind.node.ObjectNode node = mapper.valueToTree(original); node.put(entry.getKey(), entry.getValue());
+            assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("BTCUSDT", "longShortRatio",
+                    mapper.treeToValue(node, AssetCardFeatureService.Observation.class), at)).as(entry.getKey()).isFalse();
+        }
+        assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("ETHUSDT", "longShortRatio", original, at)).isFalse();
+        assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("BTCUSDT", "longShortRatio", original, at.plusSeconds(61))).isFalse();
+        assertThat(AssetCardFeatureService.verifiedCoinGlassObservation("BTCUSDT", "longLiquidation", original, at)).isFalse();
+    }
     @Test void missingHistoryIsUnknownNotZeroAndFutureAvailabilityIsRejected() {
         var input = new AssetCardFeatureService.RawFrame("BTCUSDT", at, Map.of(), Map.of(
                 "fundingRate", new AssetCardFeatureService.Observation(.01, "COINGLASS", at.minusSeconds(60), at.plusSeconds(1))));

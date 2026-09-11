@@ -9,6 +9,10 @@ public final class AssetCardFeatureService {
     public static final String FEATURE_VERSION = "SPOT_CARD_FEATURES_V2_SIGNED_PIT";
     public static final String SPOT_SOURCE_VERSION = "BINANCE_SPOT_PUBLIC_V1";
     public static final String ATR_DEFINITION = "5m_TR_SMA14_FIXED_AT_SIGNAL";
+    public static final String BINANCE_ACCOUNT_RATIO_FIELD = "CG_V4_GLOBAL_ACCOUNT_LONG_SHORT_RATIO:data.latest.global_account_long_short_ratio";
+    public static final String VERIFIED_BINANCE_ACCOUNT_RATIO_SOURCE = "COINGLASS:COINGLASS_LONG_SHORT_RATIO:"
+            + BINANCE_ACCOUNT_RATIO_FIELD + ":BINANCE_GLOBAL_ACCOUNT_RATIO:1M:RATIO";
+    private static final List<String> COINGLASS_MODEL_INPUTS = List.of("openInterest", "fundingRate", "longShortRatio", "longLiquidation", "shortLiquidation");
     public static final List<String> INTERVALS = List.of("5m", "15m", "1h", "4h");
     private static final Map<String, Long> SECONDS = Map.of("5m",300L,"15m",900L,"1h",3600L,"4h",14400L);
     private static final List<String> BAR_FEATURES = List.of("momentum6", "atrRelative", "volatility12",
@@ -51,6 +55,28 @@ public final class AssetCardFeatureService {
             reasons = List.copyOf(reasons);
             realInputs = Collections.unmodifiableMap(new LinkedHashMap<>(realInputs));
         }
+        /** Collection/readiness is not model-training qualification. Missing derivatives do not stop SHADOW
+         * observation or label maturity, but this run is not a complete, proven training example. */
+        public List<String> trainingQualificationReasons() {
+            List<String> result = new ArrayList<>();
+            if (!ready) result.add("INCOMPLETE_POINT_IN_TIME_FEATURES");
+            for (String key : COINGLASS_MODEL_INPUTS) {
+                Observation observation = realInputs.get(key);
+                if (observation == null) result.add("MISSING_COINGLASS_EVIDENCE:" + key);
+                else if (!verifiedCoinGlassObservation(symbol, key, observation, signalAsOf))
+                    result.add("UNPROVEN_COINGLASS_MARKET_UNIT_OR_WINDOW:" + key);
+            }
+            return List.copyOf(result);
+        }
+        public boolean trainingEligible() { return trainingQualificationReasons().isEmpty(); }
+    }
+
+    /** Separate source-semantic proof from the shared Java/Python numeric/time validator. Historical
+     * internally consistent registry labels alone cannot qualify an observation for risk or training. */
+    public static boolean verifiedCoinGlassObservation(String symbol, String key, Observation observation, Instant at) {
+        return Set.of("longShortRatio", "logLongShortRatio").contains(key)
+                && usableObservation(symbol, key, observation, at)
+                && VERIFIED_BINANCE_ACCOUNT_RATIO_SOURCE.equals(observation.source());
     }
 
     public Frame build(RawFrame input) {
