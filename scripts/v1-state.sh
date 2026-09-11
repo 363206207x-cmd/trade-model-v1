@@ -2473,6 +2473,36 @@ v42_checked_changed_paths() {
   done < <(printf '%s' "$output")
 }
 
+# Owner-authorized continuation only: #1295 remains the audited source, while
+# #1300 must preserve both its merged-main commit and the reviewed repair head.
+# Query the exact repository/PRs; branch spelling alone is not authorization.
+v42_pr1300_continuation_matches() {
+  local number="$1" head_branch="$2" head_sha="$3" source_row continuation_row
+  local repository="363206207x-cmd/trade-model-v1"
+  local merged_source="8d77902da7a66f26559a92a9646d99952f89e9b8"
+  local continuation_base="f2a3903668d8e8129e18bace3d533b6273ebf8a6"
+  [[ "$requested_package" == V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE \
+    && "$number" == 1300 && "$head_branch" == "$v42_implementation_branch" ]] || return 1
+  v42_contract_matches && is_full_git_sha "$head_sha" || return 1
+  source_row="$(gh api "repos/$repository/pulls/1295" --method GET \
+    --jq '[.number,.merged,.merge_commit_sha,.base.repo.full_name,.head.repo.full_name,.head.ref]|@tsv' 2>/dev/null)" || return 1
+  [[ "$source_row" == "$(printf '1295\ttrue\t%s\t%s\t%s\t%s' \
+    "$merged_source" "$repository" "$repository" "$v42_implementation_branch")" ]] || return 1
+  continuation_row="$(gh api "repos/$repository/pulls/1300" --method GET \
+    --jq '[.number,.state,.base.ref,.base.repo.full_name,.head.repo.full_name,.head.ref,.head.sha]|@tsv' 2>/dev/null)" || return 1
+  [[ "$continuation_row" == "$(printf '1300\topen\tmain\t%s\t%s\t%s\t%s' \
+    "$repository" "$repository" "$v42_implementation_branch" "$head_sha")" ]] || return 1
+  git cat-file -e "$merged_source^{commit}" >/dev/null 2>&1 \
+    && git cat-file -e "$continuation_base^{commit}" >/dev/null 2>&1 \
+    && git cat-file -e "$head_sha^{commit}" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$merged_source" origin/main >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$merged_source" "$head_sha" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$v42_source_head_full_sha" "$head_sha" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$continuation_base" "$head_sha" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$head_sha" HEAD >/dev/null 2>&1 || return 1
+  v42_checked_changed_paths diff --name-only --no-renames "origin/main...$head_sha" >/dev/null
+}
+
 evaluate_machine_runtime_identity() {
   local actual_package expected_package expected_branch expected_starting_sha expected_mode
   local expected_repository_edits expected_implementation expected_pr expected_push expected_merge expected_deployment
@@ -3214,7 +3244,37 @@ run_v42_outer_resolution_self_test() {
     unset V1_REQUESTED_PACKAGE V1_OPEN_PR_NONE_CONFIRMED
     git() {
       local source_sha="2921a4a98254a4bd88f3138ed4eb2e0487b3956b"
+      local continuation_sha="3333333333333333333333333333333333333333"
+      local merged_sha="8d77902da7a66f26559a92a9646d99952f89e9b8"
+      local baseline_sha="f2a3903668d8e8129e18bace3d533b6273ebf8a6"
       local path="src/main/java/org/example/trademodel/assetcard/AssetCardService.java"
+      if [[ "$V42_OUTER_CASE" == CONT_* ]]; then
+        case "$*" in
+          'rev-parse HEAD') printf '%s\n' "$continuation_sha"; return 0 ;;
+          "cat-file -e $continuation_sha^{commit}"|"cat-file -e $baseline_sha^{commit}"|"cat-file -e $merged_sha^{commit}")
+            [[ "$V42_OUTER_CASE" != CONT_MISSING_COMMIT ]]; return $? ;;
+          "merge-base --is-ancestor $merged_sha origin/main")
+            [[ "$V42_OUTER_CASE" != CONT_SOURCE_NOT_MAIN ]]; return $? ;;
+          "merge-base --is-ancestor $merged_sha $continuation_sha")
+            [[ "$V42_OUTER_CASE" != CONT_MERGE_NOT_ANCESTOR ]]; return $? ;;
+          "merge-base --is-ancestor $source_sha $continuation_sha")
+            [[ "$V42_OUTER_CASE" != CONT_AUDIT_NOT_ANCESTOR ]]; return $? ;;
+          "merge-base --is-ancestor $baseline_sha $continuation_sha")
+            [[ "$V42_OUTER_CASE" != CONT_BASE_NOT_ANCESTOR ]]; return $? ;;
+          "merge-base --is-ancestor $continuation_sha HEAD")
+            [[ "$V42_OUTER_CASE" != CONT_LOCAL_DIVERGED ]]; return $? ;;
+          "diff --name-only --no-renames origin/main...$continuation_sha")
+            case "$V42_OUTER_CASE" in
+              CONT_PATH_OUTSIDE) path='src/main/java/NotAuthorized.java' ;;
+              CONT_GATE_OWNER) path='scripts/v1-state.sh' ;;
+              CONT_PATH_WHITESPACE) path='  ' ;;
+              CONT_PATH_WILDCARD) path='src/main/java/*' ;;
+              CONT_PATH_BLANK) printf '%s\n\n%s\n' "$path" "$path"; return 0 ;;
+              CONT_PATH_ERROR) return 128 ;;
+            esac
+            printf '%s\n' "$path"; return 0 ;;
+        esac
+      fi
       case "$*" in
         'branch --show-current')
           if [[ "$V42_OUTER_CASE" == WRONG_BRANCH ]]; then printf 'codex/not-authorized\n';
@@ -3289,11 +3349,17 @@ run_v42_outer_resolution_self_test() {
       esac
     }
     gh() {
+      local repository="363206207x-cmd/trade-model-v1" head_repository="363206207x-cmd/trade-model-v1"
+      local head_branch="codex/v4-1-asset-card-live-signal-closure" head_sha="3333333333333333333333333333333333333333"
+      local merged_sha="8d77902da7a66f26559a92a9646d99952f89e9b8" merged=true state=open base=main
       case "$1 $2" in
         'auth status') return 0 ;;
         'pr list')
           [[ "$V42_OUTER_CASE" != PR_UNKNOWN ]] || return 1
-          if [[ "$V42_OUTER_CASE" == SAME_BRANCH_OTHER_PR ]]; then
+          if [[ "$V42_OUTER_CASE" == CONT_* ]]; then
+            [[ "$V42_OUTER_CASE" != CONT_WRONG_BRANCH ]] || head_branch='codex/not-authorized'
+            printf '1300\t%s\t%s\tIsolated authorized continuation fixture\ttrue\n' "$head_branch" "$head_sha"
+          elif [[ "$V42_OUTER_CASE" == SAME_BRANCH_OTHER_PR ]]; then
             printf '9999\tcodex/v4-1-asset-card-live-signal-closure\t2921a4a98254a4bd88f3138ed4eb2e0487b3956b\tIsolated wrong PR fixture\ttrue\n'
           elif [[ "$V42_OUTER_CASE" == SOURCE_PR_UNRELATED ]]; then
             printf '1295\tcodex/v4-1-asset-card-live-signal-closure\t1111111111111111111111111111111111111111\tIsolated unrelated source fixture\ttrue\n'
@@ -3303,6 +3369,22 @@ run_v42_outer_resolution_self_test() {
           if [[ "$V42_OUTER_CASE" == OTHER_PR ]]; then
             printf '9999\tcodex/other-package\t2921a4a98254a4bd88f3138ed4eb2e0487b3956b\tIsolated conflicting fixture\ttrue\n'
           fi
+          return 0 ;;
+        'api repos/363206207x-cmd/trade-model-v1/pulls/1295')
+          [[ "$V42_OUTER_CASE" == CONT_* && "$V42_OUTER_CASE" != CONT_SOURCE_UNKNOWN ]] || return 1
+          [[ "$V42_OUTER_CASE" != CONT_SOURCE_UNMERGED ]] || merged=false
+          [[ "$V42_OUTER_CASE" != CONT_WRONG_MERGE ]] || merged_sha="$head_sha"
+          [[ "$V42_OUTER_CASE" != CONT_SOURCE_WRONG_REPO ]] || repository='other/repository'
+          printf '1295\t%s\t%s\t%s\t%s\t%s\n' "$merged" "$merged_sha" "$repository" "$head_repository" "$head_branch"
+          return 0 ;;
+        'api repos/363206207x-cmd/trade-model-v1/pulls/1300')
+          [[ "$V42_OUTER_CASE" == CONT_* && "$V42_OUTER_CASE" != CONT_PR_UNKNOWN ]] || return 1
+          [[ "$V42_OUTER_CASE" != CONT_WRONG_REPO ]] || repository='other/repository'
+          [[ "$V42_OUTER_CASE" != CONT_FORK ]] || head_repository='other/repository'
+          [[ "$V42_OUTER_CASE" != CONT_PR_CLOSED ]] || state=closed
+          [[ "$V42_OUTER_CASE" != CONT_WRONG_BASE ]] || base=not-main
+          [[ "$V42_OUTER_CASE" != CONT_HEAD_RACE ]] || head_sha='4444444444444444444444444444444444444444'
+          printf '1300\t%s\t%s\t%s\t%s\t%s\t%s\n' "$state" "$base" "$repository" "$head_repository" "$head_branch" "$head_sha"
           return 0 ;;
       esac
       return 127
@@ -3363,6 +3445,30 @@ run_v42_outer_resolution_self_test() {
     [[ "$name" != V41_PRESERVED ]] || legacy_output="$output"
   done <<'V42_OUTER_CASES'
 MERGED_EXACT|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+CONT_EXACT|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+CONT_WRONG_BRANCH|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_WRONG_BASE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_WRONG_REPO|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_FORK|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_HEAD_RACE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PR_CLOSED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PR_UNKNOWN|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_SOURCE_UNKNOWN|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_SOURCE_UNMERGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_SOURCE_WRONG_REPO|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_WRONG_MERGE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_MISSING_COMMIT|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_SOURCE_NOT_MAIN|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_MERGE_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_AUDIT_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_BASE_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_LOCAL_DIVERGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PATH_OUTSIDE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_GATE_OWNER|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PATH_WHITESPACE|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PATH_WILDCARD|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PATH_BLANK|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+CONT_PATH_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 DOCKERFILE_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 DOCKERFILE_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 DOCKERFILE_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
@@ -4725,12 +4831,13 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       pr_line="#$pr_number $pr_head head=$pr_oid $pr_title draft=$pr_draft"
       open_pr_lines+=("$pr_line")
       if [[ "$requested_package" == "V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE" ]]; then
-        # Continue only the registered source PR. A similarly named branch or
-        # another PR must not be interpreted as the audited implementation.
-        if [[ "$pr_number" == "$v42_source_pr" && "$pr_head" == "$v42_implementation_branch" ]] \
+        # Preserve the source-PR rule; the sole additional continuation requires
+        # explicit remote identity, merged-source/baseline ancestry and scope.
+        if { [[ "$pr_number" == "$v42_source_pr" && "$pr_head" == "$v42_implementation_branch" ]] \
           && is_full_git_sha "$pr_oid" \
           && git cat-file -e "$pr_oid^{commit}" >/dev/null 2>&1 \
-          && git merge-base --is-ancestor "$v42_source_head_full_sha" "$pr_oid" >/dev/null 2>&1; then
+          && git merge-base --is-ancestor "$v42_source_head_full_sha" "$pr_oid" >/dev/null 2>&1; } \
+          || v42_pr1300_continuation_matches "$pr_number" "$pr_head" "$pr_oid"; then
           authorized_successor_pr_lines+=("$pr_line status=AUTHORIZED_SUCCESSOR_PR")
           ((authorized_successor_pr_count+=1))
         else
