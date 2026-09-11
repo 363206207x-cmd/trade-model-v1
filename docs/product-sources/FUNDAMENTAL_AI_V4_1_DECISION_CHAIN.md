@@ -926,8 +926,9 @@ Implementation branch: `codex/v4-1-asset-card-live-signal-closure`.
 Starting merged-main baseline: `2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2`.
 Scope: `HOME_ASSET_CARD_ONLY`.
 
-Appendix J is an additive V42 registration for the existing 48 exact
-asset-card paths plus the sole runtime-dependency path `Dockerfile` (49 total).
+Appendix J is an additive V42 registration preserving the existing 49 exact
+asset-card paths, including `Dockerfile`, and adding the Owner's 15 exact
+native systemd/JAR source and local-test paths (64 total).
 It does not replace Appendix I, any V41 package, a
 predecessor state, or generic gate policy. Business implementation remains
 blocked until this registration is merged to `origin/main`; this registration
@@ -1011,21 +1012,87 @@ publishing. Spot bars, feature history, observations and labels use an
 explicit retention/archive policy; no existing business table or position is
 altered. Any writer is limited to asset-card-owned storage and does not widen
 generic database roles. Runtime model loading is read-only, checksummed and
-manifest-bound; OpenMP/native loading is verified in the final Linux image.
+manifest-bound; final Staging acceptance targets `NATIVE_SYSTEMD_JAR_RUNTIME`.
 External Binance access has its own explicit safety switch and cannot be
 enabled by the card flag alone.
 
-The Owner-approved Linux dependency amendment adds only `Dockerfile` to the
-V42 implementation list. After this amendment is effective on `origin/main`,
-its runtime stage may install only `libgomp1` with `--no-install-recommends`
-and clear the apt package lists. Build stage, Java/base-image series, USER and
-ENTRYPOINT remain unchanged; no host installation, additional system package,
-apt upgrade or deployment is authorized. Acceptance must use the final image
-built from this Dockerfile, load libgomp/XGBoost and both UBJ test models, and
-compare Java/Python predictions with image ID, architecture, model/feature
-versions and exit codes. Cache-only evidence is not final-image acceptance.
-Without successful final-image prediction, `LINUX_NATIVE_RUNTIME=FAIL` and
-`PRODUCTION_MODEL_READY=NO`; `MODEL_MODE=SHADOW` remains unchanged.
+The existing root Dockerfile runtime-stage `libgomp1` allowance is preserved:
+`--no-install-recommends`, clear apt lists, no build-stage, Java/base-image
+series, USER or ENTRYPOINT changes. Docker evidence is container-only
+corroboration, not native Staging acceptance; Docker Hub EOF is not the final
+blocker for the actual systemd/JAR chain. No host installation, additional
+system package, apt upgrade or deployment is authorized in this stage.
+
+The Owner selects an explicitly locked external base chain plus managed
+asset-card-only attachments, not replacement of the public release system or
+the withdrawn isolated `deploy/staging/*` files. The non-secret runtime
+manifest must bind `TARGET_ARCH=x86_64`, `SERVICE_NAME=rine-logic.service`,
+`APP_JAR=/opt/rine-logic/current/app.jar`, the SHA-256 of the main unit,
+`20-core-loop-schedulers.conf` and `/usr/local/sbin/rine-logic-wait-ready`,
+the current release-metadata format/path, model root and card drop-in target.
+Do not read or record active.env, ai.env or other credential contents, hash
+secret files, or commit passwords, tokens, host keys or environment values.
+Any base-unit, scheduler-drop-in or readiness-script identity mismatch blocks
+installation. Manifest placeholders are not verified runtime evidence.
+
+Keep the default application DataSource/JdbcTemplate unchanged for existing
+business reads. Use an independent explicitly named card DataSource and
+JdbcTemplate for card-owned writes; existing OHLCV reads still use the default
+read-only path. Missing connection, invalid credentials or insufficient
+permissions fails closed with zero fallback writes through the default pool.
+Bound pool size, timeouts and lifetimes, and release old connections on close
+or rotation. Passwords may only be read from protected systemd credential
+files; no password in argv, logs, exceptions, APIs or ordinary environment
+variables.
+
+The dedicated writer's exact effective privilege matrix is:
+
+| Card table | Allowed | Forbidden |
+|---|---|---|
+| `tm_asset_card_snapshot` | SELECT, INSERT, UPDATE | DELETE |
+| `tm_asset_card_spot_bar` | SELECT, INSERT, DELETE | UPDATE |
+| `tm_asset_card_feature_history` | SELECT, INSERT, DELETE | UPDATE |
+
+No access to other business tables or sequences; no DDL, CREATE, TEMP,
+TRUNCATE, REFERENCES, TRIGGER, role inheritance/SET ROLE, database ownership
+or schema ownership. Effective permissions, including PUBLIC and memberships,
+must be checked without changing historical roles, old ACLs or existing data.
+V24 remains limited to its three card tables: no fourth table or V25 is added.
+Role/bootstrap/verify SQL is defined and tested only in disposable local
+databases in this stage; it must not execute on the real server.
+
+The card drop-in must not replace the main unit, modify active.env/ai.env or
+the core scheduler drop-in. It exposes only the dedicated credential file and
+read-only model directory; the service user cannot alter models, manifests or
+credentials. SHADOW remains default; CANARY/ACTIVE never enable implicitly.
+No script implicitly daemon-reloads, restarts or deploys.
+
+Credential tooling checks only by default. Preparation/rotation requires an
+independent exact confirmation string; reject symlinks, broad permissions,
+wrong ownership and empty files. Do not leak or retain passwords in temporary
+files. Verify new credentials using a separate fresh connection; failure
+preserves usable old credentials and fails closed. Output `RESTART_REQUIRED`
+when connection-pool restart is needed, never claim unperformed hot rotation.
+
+Install models in immutable bundle-SHA directories, validating the manifest,
+complete file list and every model SHA. Reject symlinks, path traversal,
+duplicate assets and inconsistent identities. Switch atomically without
+overwriting the old bundle and retain the rollback version. No qualified real
+model means no current-production-model link. Installation is DRY_RUN by
+default, verifies target ownership/permissions/real paths and base-chain SHAs,
+and prepares a rollback inventory without restarting. Actual installation of
+drop-in, credentials or models requires later independent deployment approval.
+
+Read-only preflight checks x86_64, Java 17, libgomp.so.1, JAR SHA, base-unit
+identity, directory permissions, model SHA and credential metadata. It cannot
+open, print or hash secret contents. The non-Web standard-JAR native probe
+loads real XGBoost/libgomp and separate long/short UBJ/Beta inputs, predicts
+fixed float32 features, and reports version, model SHA, maximum error and
+PASS/FAIL without secrets. It cannot connect to a real database, Binance,
+CoinGlass, AI or Telegram. Delete temporary models after tests. Architecture,
+native-library, version or SHA mismatch fails closed; readiness 200 alone is
+not native prediction PASS. `MODEL_MODE=SHADOW` and
+`PRODUCTION_MODEL_READY=NO` remain unchanged.
 
 ### J.6 Acceptance and action boundary
 
@@ -1039,9 +1106,43 @@ modules remain outside scope. No real AI or Telegram call is part of this
 registration.
 
 The registration gate permits only the seven exact contract/YAML/script paths
-listed in the task handoff, with no wildcard or directory grant. The future
-implementation preserves all original 48 paths and adds only `Dockerfile`,
-with 49 unique paths and fingerprint `992926a6dc0724a7ee24e4e982c0b20a5a196d9a`.
+listed in the task handoff, with no wildcard or directory grant. Preserve all
+original 49 paths and add exactly these 15 source/local-test paths: 64 unique
+implementation paths, fingerprint `4262f151a513d7bec00bcc9f0614531d8cae537f`.
+
+```text
+src/main/java/org/example/trademodel/assetcard/AssetCardDataSourceConfiguration.java
+src/main/java/org/example/trademodel/assetcard/AssetCardNativeRuntimeProbe.java
+src/test/java/org/example/trademodel/assetcard/AssetCardDataSourceConfigurationTest.java
+src/test/java/org/example/trademodel/assetcard/AssetCardNativeRuntimeProbeTest.java
+deploy/native-staging/README.md
+deploy/native-staging/rine-logic-asset-card.conf.template
+deploy/native-staging/asset-card-role-bootstrap.sql
+deploy/native-staging/asset-card-role-verify.sql
+deploy/native-staging/asset-card-runtime-credentials.sh
+deploy/native-staging/asset-card-model-install.sh
+deploy/native-staging/asset-card-runtime-preflight.sh
+deploy/native-staging/asset-card-runtime-manifest.template
+deploy/native-staging/asset-card-runtime-install.sh
+scripts/asset-card-native-staging-matrix.sh
+src/test/java/org/example/trademodel/postgresql/NativeStagingAssetCardInfrastructureContractTest.java
+```
+
+Tests must prove unchanged default read-only access, zero writer fallback,
+every allowed/denied table privilege and unchanged old ACLs; secret symlink,
+permission, failed-rotation and redaction cases; read-only models, bad SHA or
+identity, rollback, and installation refusal on base-chain SHA mismatch.
+Require x86_64 standard-JAR long/short XGBoost plus Beta prediction, Shell
+matrix, focused/full Maven, Python/frontend matrices and exact-head CI.
+Container-only evidence must never be reported as native Staging acceptance.
+After the exact amended gate merges into `origin/main` and implementation
+permission is verified, continue source definitions and local/disposable tests
+on the same PR #1295 branch only, then stop before business merge. No real
+server changes, database-role/ACL operations, credential/model installation,
+daemon-reload, restart or deployment. `BUSINESS_PR_MERGE=NO`,
+`STAGING_DEPLOYMENT=NO`, `REAL_DATABASE_PERMISSION_CHANGE=NO`,
+`SYSTEMD_CHANGE_EXECUTION=NO` and `PRODUCTION_MODEL_READY=NO` remain explicit.
+
 `MERGE_AUTHORIZATION=NO`, `DEPLOY_AUTHORIZATION=NO`,
 `MODEL_MODE=SHADOW`, and `BUSINESS_IMPLEMENTATION_BEFORE_GATE_PASS=NO` remain
 machine-enforced. Eligibility flags do not execute a merge; only a later
