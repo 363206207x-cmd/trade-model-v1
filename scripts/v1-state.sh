@@ -237,9 +237,9 @@ v42_contract_matches() {
   is_full_git_sha "$v42_starting_full_sha" || return 1
   is_full_git_sha "$v42_source_head_full_sha" || return 1
   [[ "$v42_gate_allowlist_count" == "7" ]] || return 1
-  [[ "$v42_implementation_allowlist_count" == "49" ]] || return 1
+  [[ "$v42_implementation_allowlist_count" == "64" ]] || return 1
   [[ "$v42_gate_allowlist_fingerprint" == "6e1d73813dd16643f7ebeacf2cb4c3c156048396" ]] || return 1
-  [[ "$v42_implementation_allowlist_fingerprint" == "992926a6dc0724a7ee24e4e982c0b20a5a196d9a" ]] || return 1
+  [[ "$v42_implementation_allowlist_fingerprint" == "4262f151a513d7bec00bcc9f0614531d8cae537f" ]] || return 1
   [[ "$(path_list_fingerprint "$v42_gate_allowed_paths")" == "$v42_gate_allowlist_fingerprint" ]] || return 1
   [[ "$(path_list_fingerprint "$v42_implementation_allowed_paths")" == "$v42_implementation_allowlist_fingerprint" ]] || return 1
   [[ "$(printf '%s\n' "$v42_gate_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "$v42_gate_allowlist_count" ]] || return 1
@@ -3248,6 +3248,7 @@ run_v42_outer_resolution_self_test() {
         'diff --name-only origin/main...HEAD'|'diff --name-only --no-renames origin/main...HEAD')
           case "$V42_OUTER_CASE" in
             DOCKERFILE_COMMITTED) path='Dockerfile' ;;
+            NATIVE_PATH_COMMITTED) path='src/main/java/org/example/trademodel/assetcard/AssetCardDataSourceConfiguration.java' ;;
             NEW_FILE_COMMITTED) path='Dockerfile.extra' ;;
             OUTSIDE) path='src/main/java/NotAuthorized.java' ;;
             GATE_OWNER) path='scripts/v1-state.sh' ;;
@@ -3261,18 +3262,21 @@ run_v42_outer_resolution_self_test() {
           [[ "$V42_OUTER_CASE" != UNSTAGED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != UNSTAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
           [[ "$V42_OUTER_CASE" != DOCKERFILE_UNSTAGED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NATIVE_PATH_UNSTAGED ]] || printf 'deploy/native-staging/asset-card-role-bootstrap.sql\n'
           [[ "$V42_OUTER_CASE" != NEW_FILE_UNSTAGED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
         'diff --cached --name-only'|'diff --cached --name-only --no-renames')
           [[ "$V42_OUTER_CASE" != STAGED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != STAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
           [[ "$V42_OUTER_CASE" != DOCKERFILE_STAGED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NATIVE_PATH_STAGED ]] || printf 'deploy/native-staging/rine-logic-asset-card.conf.template\n'
           [[ "$V42_OUTER_CASE" != NEW_FILE_STAGED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
         'ls-files --others --exclude-standard')
           [[ "$V42_OUTER_CASE" != UNTRACKED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != UNTRACKED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
           [[ "$V42_OUTER_CASE" != DOCKERFILE_UNTRACKED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NATIVE_PATH_UNTRACKED ]] || printf 'src/test/java/org/example/trademodel/postgresql/NativeStagingAssetCardInfrastructureContractTest.java\n'
           [[ "$V42_OUTER_CASE" != NEW_FILE_UNTRACKED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
       esac
@@ -3363,6 +3367,10 @@ DOCKERFILE_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 DOCKERFILE_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 DOCKERFILE_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 DOCKERFILE_UNTRACKED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+NATIVE_PATH_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+NATIVE_PATH_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+NATIVE_PATH_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+NATIVE_PATH_UNTRACKED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
 NEW_FILE_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 NEW_FILE_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 NEW_FILE_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
@@ -3414,15 +3422,16 @@ V42_OUTER_CASES
       capture && /^- / {print substr($0,3)}')"
     if v42_outer_has_line "$output" "GENERATED_PACKAGE: $v42_package" \
       && path_is_in_list Dockerfile "$handoff_paths" \
-      && [[ "$(printf '%s\n' "$handoff_paths" | sort -u | awk 'NF {n++} END {print n+0}')" == 49 ]] \
-      && [[ "$(path_list_fingerprint "$handoff_paths")" == 992926a6dc0724a7ee24e4e982c0b20a5a196d9a ]]; then
-      printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: PASS\n'
+      && path_is_in_list 'deploy/native-staging/asset-card-role-verify.sql' "$handoff_paths" \
+      && [[ "$(printf '%s\n' "$handoff_paths" | sort -u | awk 'NF {n++} END {print n+0}')" == 64 ]] \
+      && [[ "$(path_list_fingerprint "$handoff_paths")" == 4262f151a513d7bec00bcc9f0614531d8cae537f ]]; then
+      printf 'V42_OUTER_EXACT_64_PATH_HANDOFF: PASS\n'
     else
-      printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: FAIL\n'
+      printf 'V42_OUTER_EXACT_64_PATH_HANDOFF: FAIL\n'
       failures=$((failures + 1))
     fi
   else
-    printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: FAIL (generator did not complete)\n'
+    printf 'V42_OUTER_EXACT_64_PATH_HANDOFF: FAIL (generator did not complete)\n'
     failures=$((failures + 1))
   fi
   printf 'V42_OUTER_RESOLUTION_TESTS: %s cases, %s failures\n' "$cases" "$failures"
@@ -3639,6 +3648,9 @@ if [[ "$check_v42_contract" == "YES" ]]; then
   v42_contract_negative_case SHORT_SHA v42_starting_full_sha 2c71f1cd
   v42_contract_negative_case WRONG_IMPLEMENTATION_COUNT v42_implementation_allowlist_count 48
   v42_contract_negative_case WRONG_IMPLEMENTATION_FINGERPRINT v42_implementation_allowlist_fingerprint 00e6820de3e507b0d716c39a8027c36c35c0f305
+  v42_contract_negative_case OLD_49_COUNT v42_implementation_allowlist_count 49
+  v42_contract_negative_case OLD_49_FINGERPRINT v42_implementation_allowlist_fingerprint 992926a6dc0724a7ee24e4e982c0b20a5a196d9a
+  v42_contract_negative_case WRONG_PRODUCT_SOURCE_HASH v42_product_source_sha256 0000000000000000000000000000000000000000000000000000000000000000
   for path_mutation in DUPLICATE_DOCKERFILE MISSING_DOCKERFILE UNAUTHORIZED_FIFTIETH_PATH; do
     if (
       case "$path_mutation" in
@@ -3658,6 +3670,44 @@ if [[ "$check_v42_contract" == "YES" ]]; then
     && ! path_is_in_list Dockerfile "$authorized_next_package_allowed_paths" \
     || { echo "V41_ORIGINAL_48_PATHS_PRESERVED: FAIL"; exit 1; }
   echo "V41_ORIGINAL_48_PATHS_PRESERVED: PASS"
+  # Explicit Owner-approved delta: every added path must be present exactly
+  # once, and removing only that delta must recover the original V42 49 paths.
+  v42_original_paths="$v42_implementation_allowed_paths"
+  v42_native_path_count=0
+  while IFS= read -r v42_native_path; do
+    path_is_in_list "$v42_native_path" "$v42_implementation_allowed_paths" \
+      || { echo "V42_NATIVE_EXACT_15_PATHS: FAIL"; exit 1; }
+    v42_contract_negative_case NATIVE_PATH_DUPLICATE v42_implementation_allowed_paths "${v42_implementation_allowed_paths}"$'\n'"$v42_native_path"
+    v42_without_native_path="$(printf '%s\n' "$v42_implementation_allowed_paths" | awk -v omitted="$v42_native_path" '$0 != omitted')"
+    v42_contract_negative_case NATIVE_PATH_MISSING v42_implementation_allowed_paths "$v42_without_native_path"
+    v42_original_paths="$(printf '%s\n' "$v42_original_paths" | awk -v omitted="$v42_native_path" '$0 != omitted')"
+    v42_native_path_count=$((v42_native_path_count + 1))
+  done <<'V42_EXACT_NATIVE_PATHS'
+src/main/java/org/example/trademodel/assetcard/AssetCardDataSourceConfiguration.java
+src/main/java/org/example/trademodel/assetcard/AssetCardNativeRuntimeProbe.java
+src/test/java/org/example/trademodel/assetcard/AssetCardDataSourceConfigurationTest.java
+src/test/java/org/example/trademodel/assetcard/AssetCardNativeRuntimeProbeTest.java
+deploy/native-staging/README.md
+deploy/native-staging/rine-logic-asset-card.conf.template
+deploy/native-staging/asset-card-role-bootstrap.sql
+deploy/native-staging/asset-card-role-verify.sql
+deploy/native-staging/asset-card-runtime-credentials.sh
+deploy/native-staging/asset-card-model-install.sh
+deploy/native-staging/asset-card-runtime-preflight.sh
+deploy/native-staging/asset-card-runtime-manifest.template
+deploy/native-staging/asset-card-runtime-install.sh
+scripts/asset-card-native-staging-matrix.sh
+src/test/java/org/example/trademodel/postgresql/NativeStagingAssetCardInfrastructureContractTest.java
+V42_EXACT_NATIVE_PATHS
+  [[ "$v42_native_path_count" == 15 \
+    && "$(printf '%s\n' "$v42_original_paths" | awk 'NF {n++} END {print n+0}')" == 49 \
+    && "$(path_list_fingerprint "$v42_original_paths")" == 992926a6dc0724a7ee24e4e982c0b20a5a196d9a ]] \
+    || { echo "V42_ORIGINAL_49_PATHS_PRESERVED: FAIL"; exit 1; }
+  echo "V42_NATIVE_EXACT_15_PATHS: PASS"
+  echo "V42_ORIGINAL_49_PATHS_PRESERVED: PASS"
+  v42_contract_negative_case UNAUTHORIZED_NATIVE_PATH v42_implementation_allowed_paths "${v42_implementation_allowed_paths}"$'\ndeploy/native-staging/unapproved.sh'
+  v42_contract_negative_case NATIVE_DIRECTORY v42_implementation_allowed_paths "${v42_implementation_allowed_paths}"$'\ndeploy/native-staging'
+  v42_contract_negative_case NATIVE_WILDCARD v42_implementation_allowed_paths "${v42_implementation_allowed_paths}"$'\ndeploy/native-staging/*'
   if ( v42_gate_allowed_paths="${v42_gate_allowed_paths}\ndocs/UNAUTHORIZED.md"; ! v42_contract_matches ); then
     echo "V42_NEGATIVE_ALLOWLIST_ADDED: PASS"
   else

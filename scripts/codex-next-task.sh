@@ -487,9 +487,9 @@ case "$resolved_scope_profile" in
       && "$resolved_pr_creation_permission" == "true" ]] \
       || { echo "STOP: exact V42 implementation was not authorized by the authoritative resolver." >&2; exit 1; }
     generated_allowed_scope="$(yaml_list "$TASK_FILE" v42_implementation_allowed_paths)"
-    [[ "$(printf '%s\n' "$generated_allowed_scope" | awk 'NF {n++} END {print n+0}')" == "49" \
-      && "$(printf '%s\n' "$generated_allowed_scope" | sort -u | awk 'NF {n++} END {print n+0}')" == "49" \
-      && "$(path_list_fingerprint "$generated_allowed_scope")" == "992926a6dc0724a7ee24e4e982c0b20a5a196d9a" ]] \
+    [[ "$(printf '%s\n' "$generated_allowed_scope" | awk 'NF {n++} END {print n+0}')" == "64" \
+      && "$(printf '%s\n' "$generated_allowed_scope" | sort -u | awk 'NF {n++} END {print n+0}')" == "64" \
+      && "$(path_list_fingerprint "$generated_allowed_scope")" == "4262f151a513d7bec00bcc9f0614531d8cae537f" ]] \
       || { echo "STOP: exact V42 implementation paths do not match the authorized registration." >&2; exit 1; }
     generated_blocked_scope="All paths outside the exact V42 implementation allowlist.
 $(yaml_list "$TASK_FILE" v42_blocked_scope)"

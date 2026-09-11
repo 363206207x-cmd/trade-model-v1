@@ -58,7 +58,7 @@ The HTML comments below are the machine-readable registry consumed by `scripts/p
 <!-- PRODUCT_SOURCE|PS-HOME-INTERACTION|docs/design/P3_U2_IPHONE_HOME_SEMANTIC_CONTRACT.md|1a51a9fc30d696a852d9193007f9d8aa00c6d5656ef2152eccec59c597e23834|HOME_AND_MOBILE_NAVIGATION -->
 <!-- PRODUCT_SOURCE|PS-HOME-CORE-DATA-AUTHORIZATION|docs/P1B_HOME_CORE_DATA_AUTHORIZATION.md|3b149afd60063fd8a640258018f4aa7225a01f94f12cfb7eb9524975a4358628|HOME_CORE_DATA -->
 <!-- PRODUCT_SOURCE|PS-P2-POSITION-MONITORING-AUTHORIZATION|docs/P2_POSITION_MONITORING_BACKEND_AUTHORIZATION.md|32f5e9351b8552a1dc82761b0e0b5e2bc54e69cb4a3647a73a343b294dd90919|POSITION_MONITORING_BACKEND -->
-<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|3f7c9b35b2c6818019b90918754a11a67f2f4c6b0b94b83296c54fe3deed9059|V4_1_UNIFIED_PRODUCT_SOURCE -->
+<!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-DECISION-CHAIN|docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md|0a4ae97bd121fa0caf5ec803fbed520ab4e61f4756441466a75156665a01682b|V4_1_UNIFIED_PRODUCT_SOURCE -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-FINAL-INTERACTION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_FINAL_INTERACTION_PAGE_AND_RUNTIME_AUTHORIZATION.md|a3a108609ad080e42211e5fcfa9ede5ac7c66fbc3fab410f0abfde83ca8a6c1a|V4_1_FINAL_INTERACTION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TARGET-RUNTIME-REMEDIATION-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TARGET_RUNTIME_BLOCKER_REMEDIATION_AUTHORIZATION.md|fcd2b953182d6bdedf2a332e0028dc824e95bbf781f405467c11b44bd764b24f|V4_1_TARGET_RUNTIME_REMEDIATION_AUTHORIZATION -->
 <!-- PRODUCT_SOURCE|PS-FUNDAMENTAL-AI-V4-1-TELEGRAM-AUTHORIZATION|docs/FUNDAMENTAL_AI_V4_1_TELEGRAM_HIGH_VALUE_ALERT_AUTHORIZATION.md|261742b4bb2da3fe9234250003bb47e691e32123ee79856e2502a6c5b10e94c4|V4_1_TELEGRAM_CHANNEL_AUTHORIZATION -->
@@ -962,11 +962,13 @@ Starting merged-main baseline:
 `2c71f1cd36ea7da6b7c5cf7d4d737aa4a70099b2`.
 Scope: `HOME_ASSET_CARD_ONLY`.
 
-The V42 registration reuses seven exact gate-owner paths and preserves all 48
-original asset-card implementation paths, adding only `Dockerfile` (49 total)
-for the runtime-stage `libgomp1` dependency. The fingerprints are
+The V42 registration reuses seven exact gate-owner paths and preserves all 49
+existing implementation paths, including the root Dockerfile's runtime-stage
+`libgomp1` allowance. It adds exactly the 15 native systemd/JAR source and
+local-test paths listed in Appendix J.6 and `v42_implementation_allowed_paths`
+(64 total). The gate and implementation fingerprints are
 `6e1d73813dd16643f7ebeacf2cb4c3c156048396` and
-`992926a6dc0724a7ee24e4e982c0b20a5a196d9a`, respectively. Appendix J fixes
+`4262f151a513d7bec00bcc9f0614531d8cae537f`, respectively. Appendix J fixes
 directional risk identity and signed-evidence semantics, side-bound snapshot
 versions, runtime failure-domain separation, training/provenance requirements
 and SHADOW-only readiness. It is additive: V41, predecessor states, generic
@@ -976,11 +978,18 @@ Registration status is `AUTHORIZED_PENDING_MERGED_MAIN` and implementation is
 `NOT_STARTED`. No business implementation, merge execution, Staging or
 Production deployment is authorized by this entry. Real AI, Telegram, trading,
 Owner-position mutation, native-app and mobile-web changes remain blocked.
-Only after this exact registration is merged to `origin/main` and all gates
-pass may a later Owner instruction authorize the 49 registered paths. The
-Dockerfile amendment is limited to Appendix J.5; V41's 48-path list and all
-historical fingerprints remain unchanged. Actual final Linux-image native
-loading/parity is required; cached-image evidence cannot replace it.
+Only after this exact amendment is merged to `origin/main` and all gates pass
+may the Owner-authorized source definitions and local/disposable tests resume
+on the same PR #1295 branch. Appendix J.5/J.6 locks the existing external
+systemd/JAR base identity, separate card connection and exact three-table
+privileges, protected credential files, immutable read-only models and an
+x86_64 standard-JAR native probe. No real database-role/ACL change, server
+installation, credential/model installation, daemon-reload, restart or
+deployment is authorized. Business PR #1295 remains Draft and unmerged.
+The final target is `NATIVE_SYSTEMD_JAR_RUNTIME`; Docker validation is only
+container corroboration and cannot substitute for native Staging acceptance.
+V41's 48-path list, historical fingerprints, generic permission logic and
+all existing merge/deployment permission booleans remain unchanged.
 
 ## 11. Active Desktop Home runtime and priority supplement
 
