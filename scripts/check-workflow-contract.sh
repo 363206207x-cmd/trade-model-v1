@@ -1091,18 +1091,25 @@ printf '%s\n' "$run_next_output" | grep -Fq "PR_CREATION_PERMISSION: true" \
 exact_gate_text="$(bash scripts/v1-state.sh --self-test-exact-machine-gate)" \
   || fail "exact machine-gate self-test failed"
 for v42_case in DOCKERFILE_COMMITTED DOCKERFILE_UNSTAGED DOCKERFILE_STAGED DOCKERFILE_UNTRACKED \
-  NEW_FILE_COMMITTED NEW_FILE_UNSTAGED NEW_FILE_STAGED NEW_FILE_UNTRACKED EXACT_49_PATH_HANDOFF; do
+  NEW_FILE_COMMITTED NEW_FILE_UNSTAGED NEW_FILE_STAGED NEW_FILE_UNTRACKED \
+  NATIVE_PATH_COMMITTED NATIVE_PATH_UNSTAGED NATIVE_PATH_STAGED NATIVE_PATH_UNTRACKED EXACT_64_PATH_HANDOFF; do
   printf '%s\n' "$exact_gate_text" | grep -Fx "V42_OUTER_${v42_case}: PASS" >/dev/null \
     || fail "V42 exact runtime path self-test failed: $v42_case"
 done
 v42_contract_text="$(bash scripts/v1-state.sh --check-v42-contract)" \
-  || fail "V42 exact 49-path registration self-test failed"
-for v42_case in WRONG_IMPLEMENTATION_COUNT WRONG_IMPLEMENTATION_FINGERPRINT DUPLICATE_DOCKERFILE MISSING_DOCKERFILE UNAUTHORIZED_FIFTIETH_PATH; do
+  || fail "V42 exact 64-path registration self-test failed"
+for v42_case in WRONG_IMPLEMENTATION_COUNT WRONG_IMPLEMENTATION_FINGERPRINT DUPLICATE_DOCKERFILE MISSING_DOCKERFILE UNAUTHORIZED_FIFTIETH_PATH \
+  OLD_49_COUNT OLD_49_FINGERPRINT WRONG_PRODUCT_SOURCE_HASH NATIVE_PATH_DUPLICATE NATIVE_PATH_MISSING \
+  UNAUTHORIZED_NATIVE_PATH NATIVE_DIRECTORY NATIVE_WILDCARD; do
   printf '%s\n' "$v42_contract_text" | grep -Fx "V42_NEGATIVE_${v42_case}: PASS" >/dev/null \
     || fail "V42 registration negative self-test failed: $v42_case"
 done
 printf '%s\n' "$v42_contract_text" | grep -Fx 'V41_ORIGINAL_48_PATHS_PRESERVED: PASS' >/dev/null \
   || fail "V42 Dockerfile amendment changed the original V41 allowlist"
+printf '%s\n' "$v42_contract_text" | grep -Fx 'V42_ORIGINAL_49_PATHS_PRESERVED: PASS' >/dev/null \
+  || fail "V42 native amendment changed an existing implementation path"
+printf '%s\n' "$v42_contract_text" | grep -Fx 'V42_NATIVE_EXACT_15_PATHS: PASS' >/dev/null \
+  || fail "V42 native amendment does not match the fifteen exact Owner-approved paths"
 for exact_gate_case in \
   EXACT_GATE_01_CORRECT_TRIPLE \
   EXACT_GATE_02_WRONG_SHA \

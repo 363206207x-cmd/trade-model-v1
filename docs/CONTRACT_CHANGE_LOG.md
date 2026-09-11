@@ -1,5 +1,30 @@
 # Contract Change Log
 
+## 2026-09-11 — Owner-authorized V42 native systemd/JAR source amendment
+
+The Owner's explicit trusted-text authorization preserves all existing 49
+V42 paths and adds only the 15 exact native source/test paths listed in
+Appendix J.6 and `v42_implementation_allowed_paths`: 64 unique paths,
+fingerprint `4262f151a513d7bec00bcc9f0614531d8cae537f`. The seven gate-owner
+paths and their fingerprint are unchanged; this is the same V42 package,
+implementation branch, starting baseline and PR #1295 continuation.
+
+J.5/J.6 now reflect the actual external systemd/JAR base chain: lock non-secret
+unit/scheduler/readiness-script identities, manage only card attachments,
+isolate the card writer, enforce the exact SIU/SID/SID table matrix, inject
+protected credential files, preserve immutable read-only models and verify
+x86_64 standard-JAR XGBoost/Beta loading. Docker remains container-only
+corroboration; Docker Hub EOF cannot stand in for a native-runtime blocker.
+No source copies or replaces the public service/release system.
+
+This amendment permits only gate definitions and validation. After its exact
+merged-main gate is effective, implementation is limited to source files and
+local/disposable tests. Real role/ACL changes, secret/model installation,
+daemon-reload, restart, server deployment and business merge stay forbidden.
+No V41/history/generic permission change, new merge authorization, permission
+boolean change, algorithm change, Owner-data change or production-model claim.
+MODEL_MODE=SHADOW; PRODUCTION_MODEL_READY=NO; CURRENT_PHASE_DONE=NO.
+
 ## 2026-09-11 — Owner-approved V42 Linux OpenMP dependency amendment
 
 Preserve the original 48 V42 implementation paths and add only `Dockerfile`:
