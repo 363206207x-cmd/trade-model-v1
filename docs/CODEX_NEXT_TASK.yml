@@ -606,15 +606,15 @@ v42_source_pr: 1295
 v42_source_head_full_sha: "2921a4a98254a4bd88f3138ed4eb2e0487b3956b"
 v42_product_source_path: "docs/product-sources/FUNDAMENTAL_AI_V4_1_DECISION_CHAIN.md"
 v42_product_source_section: "APPENDIX_J"
-v42_product_source_sha256: "e77965dd8da9d066c3e063b211c0b7452865131fb210de9ba41b23ed15c9a63b"
+v42_product_source_sha256: "9d2fcae6060102db97364e7dd525f31cb99733025c6be8e26f34ecfb8a1793da"
 v42_scope: "HOME_ASSET_CARD_ONLY"
 v42_gate_mode: "DOCS_GATE_BASELINE_RECONCILIATION"
 v42_gate_authorization_status: "AUTHORIZED_PENDING_MERGED_MAIN"
 v42_implementation_status: "NOT_STARTED"
 v42_gate_allowlist_count: 7
 v42_gate_allowlist_fingerprint: "6e1d73813dd16643f7ebeacf2cb4c3c156048396"
-v42_implementation_allowlist_count: 48
-v42_implementation_allowlist_fingerprint: "00e6820de3e507b0d716c39a8027c36c35c0f305"
+v42_implementation_allowlist_count: 49
+v42_implementation_allowlist_fingerprint: "992926a6dc0724a7ee24e4e982c0b20a5a196d9a"
 v42_gate_repository_edits_allowed: true
 v42_gate_implementation_allowed: false
 v42_gate_implementation_pr_allowed: true
@@ -662,6 +662,7 @@ v42_gate_allowed_paths:
   - "scripts/codex-next-task.sh"
   - "scripts/check-workflow-contract.sh"
 v42_implementation_allowed_paths:
+  - "Dockerfile"
   - "pom.xml"
   - "src/main/java/org/example/trademodel/controller/DashboardHomeController.java"
   - "src/main/java/org/example/trademodel/service/impl/DashboardHomeServiceImpl.java"
@@ -713,7 +714,7 @@ v42_implementation_allowed_paths:
 v42_allowed_scope:
   - "Signed LONG/SHORT/NON_DIRECTIONAL risk semantics for the existing Home asset-card snapshot"
   - "Per-side risk identity, runtime event isolation, model provenance and SHADOW readiness evidence"
-  - "Existing 48 exact asset-card paths only after this registration is effective on origin/main"
+  - "Original 48 exact asset-card paths plus Dockerfile runtime libgomp1 only (49 total), after this registration is effective on origin/main"
 v42_blocked_scope:
   - "Direction, confidence, risk, plan or threshold formula changes"
   - "Execution plans, positions, Three-AI, Telegram, trading, native/mobile clients or unrelated Home modules"

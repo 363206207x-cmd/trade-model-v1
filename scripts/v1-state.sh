@@ -237,9 +237,9 @@ v42_contract_matches() {
   is_full_git_sha "$v42_starting_full_sha" || return 1
   is_full_git_sha "$v42_source_head_full_sha" || return 1
   [[ "$v42_gate_allowlist_count" == "7" ]] || return 1
-  [[ "$v42_implementation_allowlist_count" == "48" ]] || return 1
+  [[ "$v42_implementation_allowlist_count" == "49" ]] || return 1
   [[ "$v42_gate_allowlist_fingerprint" == "6e1d73813dd16643f7ebeacf2cb4c3c156048396" ]] || return 1
-  [[ "$v42_implementation_allowlist_fingerprint" == "00e6820de3e507b0d716c39a8027c36c35c0f305" ]] || return 1
+  [[ "$v42_implementation_allowlist_fingerprint" == "992926a6dc0724a7ee24e4e982c0b20a5a196d9a" ]] || return 1
   [[ "$(path_list_fingerprint "$v42_gate_allowed_paths")" == "$v42_gate_allowlist_fingerprint" ]] || return 1
   [[ "$(path_list_fingerprint "$v42_implementation_allowed_paths")" == "$v42_implementation_allowlist_fingerprint" ]] || return 1
   [[ "$(printf '%s\n' "$v42_gate_allowed_paths" | awk 'NF {n++} END {print n+0}')" == "$v42_gate_allowlist_count" ]] || return 1
@@ -636,9 +636,8 @@ resolve_task_handoff() {
     elif [[ "${authorized_successor_pr_count:-UNKNOWN}" != "0" \
       && "${authorized_successor_pr_count:-UNKNOWN}" != "1" ]]; then
       resolution_block_reason="BLOCKED_V42_SOURCE_PR_STATE"
-    elif [[ "$v42_implementation_allowed_paths" != "$authorized_next_package_allowed_paths" ]]; then
-      # Existing downstream consumers resolve this scope profile from that exact
-      # list. Do not emit a profile that could expand or substitute V42 paths.
+    elif ! v42_contract_matches; then
+      # V42 owns its exact list; the historical V41 list remains unchanged.
       resolution_block_reason="BLOCKED_V42_SCOPE_PROFILE_PATH_MISMATCH"
     else
       resolution_status="ALLOWED"
@@ -647,7 +646,7 @@ resolve_task_handoff() {
       resolved_mode="IMPLEMENTATION"
       resolved_branch="$v42_implementation_branch"
       resolved_active_block="$v42_implementation_package"
-      resolved_scope_profile="AUTHORIZED_NEXT_PACKAGE"
+      resolved_scope_profile="V42_IMPLEMENTATION"
       resolved_handoff_stage="AUTHORIZED_IMPLEMENTATION_REVIEW"
       resolved_edit_permission="$v42_implementation_repository_edits_allowed"
       resolved_implementation_permission="$v42_implementation_allowed"
@@ -3208,7 +3207,7 @@ ASSET_CARD_REJECTED_DECLARATIONS
 # Git/GH functions exist only inside these explicit test subprocesses: no fixture
 # can enable a production request, write a repository, or contact GitHub.
 run_v42_outer_resolution_self_test() {
-  local output positive_output legacy_output name package expected expected_reason failures=0 cases=0
+  local output positive_output legacy_output name package expected expected_reason expected_profile handoff_paths failures=0 cases=0
   local v42_package="V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE"
   v42_outer_fixture() (
     export V42_OUTER_CASE="$1"
@@ -3248,6 +3247,8 @@ run_v42_outer_resolution_self_test() {
           [[ "$V42_OUTER_CASE" != GATE_OWNER ]]; return $? ;;
         'diff --name-only origin/main...HEAD'|'diff --name-only --no-renames origin/main...HEAD')
           case "$V42_OUTER_CASE" in
+            DOCKERFILE_COMMITTED) path='Dockerfile' ;;
+            NEW_FILE_COMMITTED) path='Dockerfile.extra' ;;
             OUTSIDE) path='src/main/java/NotAuthorized.java' ;;
             GATE_OWNER) path='scripts/v1-state.sh' ;;
             WHITESPACE) path='  ' ;;
@@ -3259,14 +3260,20 @@ run_v42_outer_resolution_self_test() {
         'diff --name-only'|'diff --name-only --no-renames')
           [[ "$V42_OUTER_CASE" != UNSTAGED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != UNSTAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          [[ "$V42_OUTER_CASE" != DOCKERFILE_UNSTAGED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NEW_FILE_UNSTAGED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
         'diff --cached --name-only'|'diff --cached --name-only --no-renames')
           [[ "$V42_OUTER_CASE" != STAGED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != STAGED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          [[ "$V42_OUTER_CASE" != DOCKERFILE_STAGED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NEW_FILE_STAGED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
         'ls-files --others --exclude-standard')
           [[ "$V42_OUTER_CASE" != UNTRACKED_ERROR ]] || return 128
           [[ "$V42_OUTER_CASE" != UNTRACKED_OUTSIDE ]] || printf 'src/main/java/NotAuthorized.java\n'
+          [[ "$V42_OUTER_CASE" != DOCKERFILE_UNTRACKED ]] || printf 'Dockerfile\n'
+          [[ "$V42_OUTER_CASE" != NEW_FILE_UNTRACKED ]] || printf 'Dockerfile.extra\n'
           return 0 ;;
       esac
       # Even an accidental future command in the public entry point cannot use
@@ -3297,7 +3304,11 @@ run_v42_outer_resolution_self_test() {
       return 127
     }
     export -f git gh
-    bash "$ROOT_DIR/scripts/v1-state.sh" --request-package "$2"
+    if [[ "${3:-}" == HANDOFF ]]; then
+      bash "$ROOT_DIR/scripts/codex-next-task.sh" --request-package "$2"
+    else
+      bash "$ROOT_DIR/scripts/v1-state.sh" --request-package "$2"
+    fi
   )
   v42_outer_has_line() {
     # Consume the complete input under pipefail (no grep -q/SIGPIPE).
@@ -3314,16 +3325,18 @@ run_v42_outer_resolution_self_test() {
     case "$name" in
       SOURCE_MISSING) expected_reason="BLOCKED_V42_SOURCE_HEAD_MISSING_OR_UNVERIFIABLE" ;;
       SOURCE_NOT_ANCESTOR|SOURCE_ERROR) expected_reason="BLOCKED_V42_SOURCE_HEAD_NOT_ANCESTOR_OR_UNVERIFIABLE" ;;
-      OUTSIDE|UNSTAGED_OUTSIDE|STAGED_OUTSIDE|UNTRACKED_OUTSIDE|WHITESPACE|WILDCARD|EMPTY_ENTRY|DIFF_ERROR|UNSTAGED_ERROR|STAGED_ERROR|UNTRACKED_ERROR)
+      OUTSIDE|UNSTAGED_OUTSIDE|STAGED_OUTSIDE|UNTRACKED_OUTSIDE|WHITESPACE|WILDCARD|EMPTY_ENTRY|DIFF_ERROR|UNSTAGED_ERROR|STAGED_ERROR|UNTRACKED_ERROR|NEW_FILE_*)
         expected_reason="BLOCKED_V42_CHANGED_PATH_OUTSIDE_ALLOWLIST_OR_UNVERIFIABLE" ;;
       GATE_OWNER) expected_reason="BLOCKED_V42_GATE_OWNER_CHANGED_OR_UNVERIFIABLE" ;;
     esac
     if [[ "$expected" == ALLOWED ]]; then
+      expected_profile="AUTHORIZED_NEXT_PACKAGE"
+      [[ "$package" != "$v42_package" ]] || expected_profile="V42_IMPLEMENTATION"
       if v42_outer_has_line "$output" "RESOLVED_PACKAGE: $package" \
         && v42_outer_has_line "$output" 'REQUEST_CLASS: AUTHORIZED_IMPLEMENTATION_PACKAGE' \
         && v42_outer_has_line "$output" 'IMPLEMENTATION_ALLOWED: true' \
         && v42_outer_has_line "$output" 'RESOLUTION_BLOCK_REASON: NONE' \
-        && v42_outer_has_line "$output" 'RESOLVED_SCOPE_PROFILE: AUTHORIZED_NEXT_PACKAGE' \
+        && v42_outer_has_line "$output" "RESOLVED_SCOPE_PROFILE: $expected_profile" \
         && v42_outer_has_line "$output" 'ACTIVE_CONFLICTING_PRS: 0' \
         && v42_outer_has_line "$output" 'AUTHORIZED_SUCCESSOR_PRS: 1'; then
         printf 'V42_OUTER_%s: PASS\n' "$name"
@@ -3346,6 +3359,14 @@ run_v42_outer_resolution_self_test() {
     [[ "$name" != V41_PRESERVED ]] || legacy_output="$output"
   done <<'V42_OUTER_CASES'
 MERGED_EXACT|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+DOCKERFILE_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+DOCKERFILE_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+DOCKERFILE_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+DOCKERFILE_UNTRACKED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|ALLOWED
+NEW_FILE_COMMITTED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+NEW_FILE_UNSTAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+NEW_FILE_STAGED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
+NEW_FILE_UNTRACKED|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 SOURCE_MISSING|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 SOURCE_NOT_ANCESTOR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
 SOURCE_ERROR|V42_ASSET_CARD_DIRECTIONAL_RISK_AND_RUNTIME_CLOSURE|BLOCKED
@@ -3383,6 +3404,25 @@ V42_OUTER_CASES
     printf 'V42_OUTER_IDENTITY_AND_HISTORY_PRESERVED: PASS\n'
   else
     printf 'V42_OUTER_IDENTITY_AND_HISTORY_PRESERVED: FAIL\n'
+    failures=$((failures + 1))
+  fi
+  cases=$((cases + 1))
+  if output="$(v42_outer_fixture DOCKERFILE_COMMITTED "$v42_package" HANDOFF 2>&1)"; then
+    handoff_paths="$(printf '%s\n' "$output" | awk '
+      /^GENERATED_ALLOWED_SCOPE:$/ {capture=1; next}
+      /^GENERATED_BLOCKED_SCOPE:$/ {capture=0}
+      capture && /^- / {print substr($0,3)}')"
+    if v42_outer_has_line "$output" "GENERATED_PACKAGE: $v42_package" \
+      && path_is_in_list Dockerfile "$handoff_paths" \
+      && [[ "$(printf '%s\n' "$handoff_paths" | sort -u | awk 'NF {n++} END {print n+0}')" == 49 ]] \
+      && [[ "$(path_list_fingerprint "$handoff_paths")" == 992926a6dc0724a7ee24e4e982c0b20a5a196d9a ]]; then
+      printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: PASS\n'
+    else
+      printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'V42_OUTER_EXACT_49_PATH_HANDOFF: FAIL (generator did not complete)\n'
     failures=$((failures + 1))
   fi
   printf 'V42_OUTER_RESOLUTION_TESTS: %s cases, %s failures\n' "$cases" "$failures"
@@ -3597,6 +3637,27 @@ if [[ "$check_v42_contract" == "YES" ]]; then
   v42_contract_negative_case WRONG_BRANCH v42_gate_branch codex/wrong-branch
   v42_contract_negative_case WRONG_SHA v42_starting_full_sha b60eff8d83c0e1d04371bd425267f1e8d0e4f95c
   v42_contract_negative_case SHORT_SHA v42_starting_full_sha 2c71f1cd
+  v42_contract_negative_case WRONG_IMPLEMENTATION_COUNT v42_implementation_allowlist_count 48
+  v42_contract_negative_case WRONG_IMPLEMENTATION_FINGERPRINT v42_implementation_allowlist_fingerprint 00e6820de3e507b0d716c39a8027c36c35c0f305
+  for path_mutation in DUPLICATE_DOCKERFILE MISSING_DOCKERFILE UNAUTHORIZED_FIFTIETH_PATH; do
+    if (
+      case "$path_mutation" in
+        DUPLICATE_DOCKERFILE) v42_implementation_allowed_paths="${v42_implementation_allowed_paths}"$'\nDockerfile' ;;
+        MISSING_DOCKERFILE) v42_implementation_allowed_paths="$(printf '%s\n' "$v42_implementation_allowed_paths" | sed '/^Dockerfile$/d')" ;;
+        UNAUTHORIZED_FIFTIETH_PATH) v42_implementation_allowed_paths="${v42_implementation_allowed_paths}"$'\nDockerfile.extra' ;;
+      esac
+      ! v42_contract_matches
+    ); then
+      printf 'V42_NEGATIVE_%s: PASS\n' "$path_mutation"
+    else
+      printf 'V42_NEGATIVE_%s: FAIL\n' "$path_mutation"; exit 1
+    fi
+  done
+  [[ "$(printf '%s\n' "$authorized_next_package_allowed_paths" | awk 'NF {n++} END {print n+0}')" == 48 \
+    && "$(path_list_fingerprint "$authorized_next_package_allowed_paths")" == 00e6820de3e507b0d716c39a8027c36c35c0f305 ]] \
+    && ! path_is_in_list Dockerfile "$authorized_next_package_allowed_paths" \
+    || { echo "V41_ORIGINAL_48_PATHS_PRESERVED: FAIL"; exit 1; }
+  echo "V41_ORIGINAL_48_PATHS_PRESERVED: PASS"
   if ( v42_gate_allowed_paths="${v42_gate_allowed_paths}\ndocs/UNAUTHORIZED.md"; ! v42_contract_matches ); then
     echo "V42_NEGATIVE_ALLOWLIST_ADDED: PASS"
   else
